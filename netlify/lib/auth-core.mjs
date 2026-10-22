@@ -7,6 +7,13 @@ const ACCESS_CODE_SHA256 = {
   admin: "e90006efb1935ad651efa74b10b58270650d34be833a320228eef0437dad2403",
   state: "3577b5f173d6ace1cbff153510cb8b3eef4003706b6ba05152056b0e5268f376",
 };
+// Truecaller Client IDs (public; also inside the apps).
+const TC_CLIENT_ID = {
+  admin: "ch5mnecr-j4xvppaykjcunml3rhj_orhqkvravmrq4e",
+  state: "va-4qf3ljrl36tfbtkc3ogxl6rnoazvbjuw6nqcgs4s",
+};
+const TC_TOKEN_URL = "https://oauth-account-noneu.truecaller.com/v1/token";
+const TC_USERINFO_URL = "https://oauth-account-noneu.truecaller.com/v1/userinfo";
 const MAX_LOGIN_FAILS = 8;
 const LOCK_MS = 15 * 60 * 1000;
 
@@ -52,8 +59,31 @@ function checkPassword(pw, rec) {
 
 const maskPhone = (p) => p.slice(0, 3) + " ******" + p.slice(-4);
 
+// Truecaller one-tap login: swap the app's authorization code for the user's verified number.
+export async function truecallerPhone(app, code, codeVerifier, fetchImpl = fetch) {
+  const form = new URLSearchParams({
+    grant_type: "authorization_code", client_id: TC_CLIENT_ID[app],
+    code: String(code || ""), code_verifier: String(codeVerifier || ""),
+  });
+  const t = await fetchImpl(TC_TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
+  const tj = await t.json().catch(() => ({}));
+  if (!t.ok || !tj.access_token) {
+    return { ok: false, error: "Truecaller could not confirm the login (" + t.status + (tj.error ? ": " + tj.error : "") + "). Please try again." };
+  }
+  const u = await fetchImpl(TC_USERINFO_URL, { headers: { authorization: "Bearer " + tj.access_token } });
+  const uj = await u.json().catch(() => ({}));
+  const phone = normalizePhone(uj.phone_number || uj.phoneNumber || "");
+  if (!u.ok || !phone) return { ok: false, error: "Truecaller did not share an Indian mobile number (" + u.status + ")." };
+  const name = [uj.given_name, uj.family_name].filter(Boolean).join(" ");
+  return { ok: true, phone, name };
+}
+
 // store: { get(key) -> object|null, set(key, object), delete(key) }
-export async function handle(req, { store, now = () => Date.now() }) {
+export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch }) {
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
   if (req.headers.get("x-bi-app") !== "1") return json(403, { ok: false, error: "Not allowed" });
 
@@ -128,6 +158,12 @@ export async function handle(req, { store, now = () => Date.now() }) {
     Object.assign(rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t });
     await store.set(uKeyOf(idx.key), rec);
     return json(200, { ok: true, username: rec.username });
+  }
+
+  if (b.action === "tc-exchange") {
+    const r = await truecallerPhone(app, b.code, b.codeVerifier, tcFetch);
+    if (!r.ok) return json(400, { ok: false, error: r.error });
+    return json(200, { ok: true, phone: r.phone.slice(3), name: r.name });
   }
 
   return json(400, { ok: false, error: "Unknown action" });
