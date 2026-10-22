@@ -110,6 +110,8 @@ public class MainActivity extends FragmentActivity {
     private boolean unlocked = false;      // dashboard (not a login/profile screen) is showing
     private boolean inProfile = false;     // a profile screen is showing over the dashboard
     private LinearLayout dashboardRoot;
+    private ProgressBar loadBar;
+    private boolean pageLoading = true;
     private FrameLayout topAvatar;
 
     private String tr(String key) { return L.t(this, key); }
@@ -893,6 +895,14 @@ public class MainActivity extends FragmentActivity {
         updateTopAvatar();
 
         dashboardRoot.addView(bar, new LinearLayout.LayoutParams(-1, dp(48)));
+        if (loadBar == null) {
+            loadBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            loadBar.setMax(100);
+            loadBar.setProgressTintList(android.content.res.ColorStateList.valueOf(BRAND));
+        }
+        if (loadBar.getParent() != null) ((ViewGroup) loadBar.getParent()).removeView(loadBar);
+        dashboardRoot.addView(loadBar, new LinearLayout.LayoutParams(-1, dp(3)));
+        loadBar.setVisibility(pageLoading ? View.VISIBLE : View.GONE);
         dashboardRoot.addView(webView, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(dashboardRoot);
     }
@@ -910,17 +920,19 @@ public class MainActivity extends FragmentActivity {
         return b;
     }
 
+    // Loads assistant.js only when 🔍 / 💬 is tapped, then opens it (polls up to ~6 s while it loads).
     private void openAssistant(String fn) {
         if (webView == null) return;
         webView.evaluateJavascript(ASSIST_LOADER_JS, null);
+        tryOpenAssistant(fn, 0);
+    }
+
+    private void tryOpenAssistant(String fn, int attempt) {
+        if (webView == null) return;
         webView.evaluateJavascript("(function(){if(window.BIAssist){BIAssist." + fn + "();return 'ok';}return 'wait';})()", r -> {
-            if (r != null && r.contains("wait")) {
-                // assistant still loading: try again shortly
-                ui.postDelayed(() -> webView.evaluateJavascript(
-                        "(function(){if(window.BIAssist){BIAssist." + fn + "();return 'ok';}return 'wait';})()", r2 -> {
-                            if (r2 != null && r2.contains("wait")) Toast.makeText(this, tr("assistant_loading"), Toast.LENGTH_SHORT).show();
-                        }), 1500);
-            }
+            if (r == null || !r.contains("wait")) return;
+            if (attempt < 20) ui.postDelayed(() -> tryOpenAssistant(fn, attempt + 1), 300);
+            else Toast.makeText(this, tr("assistant_loading"), Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -1526,7 +1538,18 @@ public class MainActivity extends FragmentActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
-                if (url != null && url.startsWith(START_URL)) view.evaluateJavascript(ASSIST_LOADER_JS, null);
+            }
+
+            @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                // The page used too much memory and Android stopped it: rebuild the view and reload.
+                if (webView == view) {
+                    detachWebView();
+                    webView.destroy();
+                    webView = null;
+                    if (unlocked) openDashboard();
+                }
+                return true;
             }
 
             @Override
@@ -1542,6 +1565,15 @@ public class MainActivity extends FragmentActivity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onProgressChanged(WebView view, int progress) {
+                pageLoading = progress < 100;
+                if (loadBar != null) {
+                    loadBar.setProgress(progress);
+                    loadBar.setVisibility(pageLoading ? View.VISIBLE : View.GONE);
+                }
+            }
+
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (STATE_APP) { // no imports in the state app
@@ -1660,12 +1692,17 @@ public class MainActivity extends FragmentActivity {
             "var css='#data-tools,#unlock-b,#exmenu,#imodal,#umodal,#lmodal,#cmodal,#tmodal,[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"],input[type=file]{display:none!important}';" +
             "function addCss(){if(document.getElementById('bist-css'))return;var s=document.createElement('style');s.id='bist-css';s.textContent=css;(document.head||document.documentElement).appendChild(s)}" +
             "var bad=/(import data|export|edit leaders|save updated file|shareable copy|blank template|common all-states|common file|active retailers|unlock my state|retailer ids|save png|excel)/i;" +
-            "function scrub(){addCss();var els=document.querySelectorAll('button,a');for(var i=0;i<els.length;i++){var e=els[i];if(e.__bis)continue;" +
-            "if(bad.test((e.textContent||'')+' '+(e.title||''))){e.style.setProperty('display','none','important');e.__bis=1}}}" +
+            "function check(e){if(e.__bis)return;if(bad.test((e.textContent||'')+' '+(e.title||''))){e.style.setProperty('display','none','important');e.__bis=1}}" +
+            "function scan(root){if(!root||root.nodeType!==1)return;if(root.matches('button,a'))check(root);var els=root.querySelectorAll('button,a');for(var i=0;i<els.length;i++)check(els[i])}" +
+            "var pend=[],full=1;function scrub(){addCss();if(full){full=0;pend=[];scan(document.documentElement);return}var p=pend;pend=[];" +
+            "for(var i=0;i<p.length;i++){var n=p[i];if(n.isConnected)scan(n)}}" +
             "function guard(){var h='';try{h=decodeURIComponent(location.hash.slice(1))}catch(x){}if(/^(retailers|retv|ret)\\b/i.test(h)){location.hash=''}}" +
-            "var q=0;function tick(){if(q)return;q=1;setTimeout(function(){q=0;scrub();guard()},60)}" +
-            "addCss();tick();document.addEventListener('DOMContentLoaded',tick);" +
-            "new MutationObserver(tick).observe(document.documentElement,{childList:true,subtree:true});" +
+            "var q=0;function tick(){if(q)return;q=1;setTimeout(function(){q=0;scrub();guard()},80)}" +
+            "addCss();tick();document.addEventListener('DOMContentLoaded',function(){full=1;tick()});" +
+            "new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i],t=m.target;" +
+            "if(t.nodeType===1){var b=t.closest&&t.closest('button,a');if(b)pend.push(b)}" +
+            "for(var j=0;j<m.addedNodes.length;j++){if(m.addedNodes[j].nodeType===1)pend.push(m.addedNodes[j])}}" +
+            "if(pend.length>400){pend=[];full=1}tick()}).observe(document.documentElement,{childList:true,subtree:true});" +
             "window.addEventListener('hashchange',guard);" +
             "document.addEventListener('click',function(e){var t=e.target&&e.target.closest?e.target.closest('[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"]'):null;" +
             "if(t){e.preventDefault();e.stopImmediatePropagation()}},true);" +
