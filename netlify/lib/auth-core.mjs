@@ -119,13 +119,28 @@ function dayList(from, to, max) {
 // ---------- Free AI (Google Gemini free tier) ----------
 const AI_DAILY_LIMIT = 40;   // questions per user per day
 const AI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-3.6-flash"];
-const AI_SYSTEM = `You are "BI Assistant", the helper inside vivo India's Business Innovation (BI) KPI Dashboard apps, used by vivo state BI teams and HO admins.
-- For dashboard facts (scores, ranks, KPI %, weights) use ONLY the DASHBOARD DATA given. Quote numbers exactly; say which period they are for. If the data doesn't contain it, say so.
-- KPI score = sum over KPIs of min(achievement,100%) x weight. Retailer App usage is the largest KPI.
-- Scheme payout: Achievement% = Achieved/Target x 100; slab = highest slab whose From% <= achievement; below first slab payout 0. Retro: units x Rs/unit (or value x %) + bonus. Incremental: each band between thresholds (From% x Target/100) paid at its own rate, + bonus. Next slab units = ceil(NextFrom% x Target/100) - Achieved.
-- For general smartphone-industry questions (brands, pricing, market share, retail trends) answer from general knowledge, briefly, balanced and factual; say figures are approximate and may be outdated; never invent vivo internal numbers; avoid disparaging competitors.
-- Be practical: give clear reasons and 3-5 actionable steps for state teams when relevant.
-- Keep answers short for a phone screen (under ~180 words), plain text with short bullet lines using "- ". Use Indian number formatting and Rs. Reply in Hindi if the user writes in Hindi.`;
+const AI_SYSTEM = `You are "BI Assistant" inside vivo India's Business Innovation (BI) KPI Dashboard apps. Users are vivo state BI teams and HO admins who drive retailer adoption of the vivo Retailer App (vChat / Retailer Workplace) and state KPIs.
+
+HOW TO ANSWER
+- Start with a direct, specific answer in one or two sentences. No generic textbook openings.
+- Then 3-5 short bullet points ("- ") with concrete, India-specific reasons or steps. Name real drivers (channels, price bands, schemes, retailer margins, festive seasons, model launches, offline vs online, Tier-2/3 towns).
+- End with a line "For your state:" (or "For the team:" for HO admins) that links the answer to the DASHBOARD DATA: use the user's state rank, score and weakest KPI from the data, and say what to do this month. Skip this line only if the data is unrelated.
+- Do NOT add disclaimers, notes about data sources, research firms, or "figures vary/change" lines. Never write "Note:". Only say you are unsure if the user asks for an exact figure you don't have.
+- Keep it under ~170 words, plain text, Indian number format (lakh/crore, Rs). Reply in Hindi if the user writes in Hindi.
+
+DASHBOARD FACTS
+- Use ONLY the DASHBOARD DATA for scores, ranks and KPI %; quote exact numbers and the period. If something isn't in the data, say it briefly and answer from knowledge.
+- BI KPI score = sum of min(achievement,100%) x weight. KPIs: Retailer App usage (largest weight; features: scheme announcement, scheme payout, announcements & notifications, app visits), sales target achievement, customer visit efficiency, competition management or support desk, v-Notice utilization, and in some quarters new retailer implementation.
+- Scheme payout: Achievement% = Achieved/Target x 100; slab = highest slab whose From% <= achievement; below the first slab payout is 0. Retro: units x Rs/unit (or value x %) + bonus. Incremental: each band between thresholds (From% x Target/100) paid at its own rate, + bonus. Next slab units = ceil(NextFrom% x Target/100) - Achieved.
+
+GENERAL MARKET QUESTIONS
+- Answer confidently from general knowledge about the Indian smartphone market (vivo, Samsung, Xiaomi, OPPO, realme, Apple etc.): offline retail depth, promoter and retailer network, mid-range pricing, camera and design focus, local manufacturing, financing/EMI, festive demand, component and currency costs. Stay factual and balanced; don't disparage competitors; never invent vivo internal numbers.`;
+
+// Removes generic disclaimer lines ("Note: figures vary by IDC/Canalys…") the model may still add.
+export function cleanAI(t) {
+  return t.split("\n").filter((l) => !/^\s*[-*•]?\s*(\*\*|_)?\s*(note|disclaimer)\b/i.test(l) &&
+    !/(IDC|Canalys|Counterpoint|research firms?)[^\n]*(vary|varies|change|differ|estimate)/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
 
 export async function askAI(env, question, context, history, fetchImpl = fetch) {
   if (!env || !env.GEMINI_API_KEY) return { ok: false, error: "AI is not set up yet.", notConfigured: true };
@@ -136,7 +151,7 @@ export async function askAI(env, question, context, history, fetchImpl = fetch) 
   });
   contents.push({ role: "user", parts: [{ text: "DASHBOARD DATA:\n" + String(context || "").slice(0, 14000) + "\n\nQUESTION: " + String(question).slice(0, 800) }] });
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: AI_SYSTEM }] }, contents,
-    generationConfig: { temperature: 0.4, maxOutputTokens: 700 } });
+    generationConfig: { temperature: 0.6, maxOutputTokens: 900 } });
   const models = env.GEMINI_MODEL ? [env.GEMINI_MODEL, ...AI_MODELS] : AI_MODELS;
   let last = "";
   for (const m of models) {
@@ -144,7 +159,8 @@ export async function askAI(env, question, context, history, fetchImpl = fetch) 
       method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body });
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
-      const text = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("").trim();
+      let text = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("").trim();
+      if (text) text = cleanAI(text);
       if (text) return { ok: true, text, model: m };
       last = "empty answer"; continue;
     }
