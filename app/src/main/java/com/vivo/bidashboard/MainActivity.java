@@ -1290,7 +1290,7 @@ public class MainActivity extends FragmentActivity {
         setContentView(scroll);
     }
 
-    // ---------- Support desk (state users raise queries, admin users answer; everyone sees all) ----------
+    // ---------- Support desk (state users: own + own-state queries; admins: all queries) ----------
     private static final String[] SUPPORT_TOPICS = {"Overview", "Rankings", "Trends", "Retailer app usage", "Active retailers",
             "Support desk KPI", "Action plan", "KPI framework / calculation", "Sales target", "Customer visit", "Competition",
             "v-Notice", "Schemes & payout", "Data mismatch", "App issue", "Other"};
@@ -1369,25 +1369,130 @@ public class MainActivity extends FragmentActivity {
         return sb.toString();
     }
 
+    // ---------- Support desk look: hero banner with vivo BI logo, cards, status accents ----------
+    private static final int NAVY = Color.parseColor("#1B1F5E");
+    private static final String[] TOPIC_ICONS = {"🏠", "🏆", "📈", "📱", "👥", "🎧", "🎯", "🧮", "💹", "🚶", "⚔️", "🔔", "💰", "⚠️", "🛠️", "💬"};
+
+    private String topicIcon(String topic) {
+        for (int i = 0; i < SUPPORT_TOPICS.length; i++) if (SUPPORT_TOPICS[i].equals(topic)) return TOPIC_ICONS[i];
+        return "💬";
+    }
+
+    private static String statusColor(String st) {
+        return "answered".equals(st) ? "#1E9E61" : "closed".equals(st) ? "#9E9E9E" : "#E69A00";
+    }
+
+    // Gradient banner: back arrow, white logo card, headset badge, title and subtitle.
+    private LinearLayout supportHero(String title, String subtitle, Runnable back) {
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(14), dp(10), dp(16), dp(20));
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{NAVY, Color.parseColor("#3A3FB8"), BRAND2});
+        hero.setBackground(g);
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        TextView arrow = infoLine("←", 24, "#FFFFFF", false);
+        arrow.setPadding(dp(4), 0, dp(12), 0);
+        arrow.setOnClickListener(v -> back.run());
+        top.addView(arrow);
+        FrameLayout logoCard = new FrameLayout(this);
+        GradientDrawable lc = new GradientDrawable();
+        lc.setColor(Color.WHITE);
+        lc.setCornerRadius(dp(10));
+        logoCard.setBackground(lc);
+        logoCard.setPadding(dp(8), dp(5), dp(8), dp(5));
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.brand_logo);
+        logo.setAdjustViewBounds(true);
+        logoCard.addView(logo, new FrameLayout.LayoutParams(-2, dp(28)));
+        top.addView(logoCard);
+        top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+        TextView badge = infoLine("🎧", 22, "#FFFFFF", false);
+        badge.setGravity(Gravity.CENTER);
+        GradientDrawable bb = new GradientDrawable();
+        bb.setShape(GradientDrawable.OVAL);
+        bb.setColor(Color.parseColor("#33FFFFFF"));
+        badge.setBackground(bb);
+        top.addView(badge, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        hero.addView(top);
+
+        TextView t = infoLine(title, 21, "#FFFFFF", true);
+        t.setPadding(0, dp(14), 0, dp(2));
+        hero.addView(t);
+        if (subtitle != null && !subtitle.isEmpty()) hero.addView(infoLine(subtitle, 13, "#DCDDFB", false));
+        return hero;
+    }
+
+    private LinearLayout sectionCard(LinearLayout parent, String title) {
+        LinearLayout c = listCard();
+        if (title != null) {
+            TextView h = infoLine(title, 13, "#3D47C8", true);
+            h.setPadding(0, 0, 0, dp(6));
+            c.addView(h);
+        }
+        parent.addView(c, listCardParams());
+        return c;
+    }
+
+    private TextView miniStat(String value, String label, String color) {
+        TextView t = new TextView(this);
+        t.setText(value + "\n" + label);
+        t.setGravity(Gravity.CENTER);
+        t.setTextColor(Color.parseColor(color));
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setPadding(dp(6), dp(10), dp(6), dp(10));
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.WHITE);
+        g.setCornerRadius(dp(12));
+        g.setStroke(dp(1), Color.parseColor("#E6E8F0"));
+        t.setBackground(g);
+        return t;
+    }
+
+    private View statusAccentCard(LinearLayout inner, String status) {
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.HORIZONTAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dp(12));
+        bg.setStroke(dp(1), Color.parseColor("#E6E8F0"));
+        outer.setBackground(bg);
+        outer.setClipToOutline(true);
+        View strip = new View(this);
+        strip.setBackgroundColor(Color.parseColor(statusColor(status)));
+        outer.addView(strip, new LinearLayout.LayoutParams(dp(4), -1));
+        inner.setPadding(dp(12), dp(12), dp(14), dp(12));
+        outer.addView(inner, new LinearLayout.LayoutParams(0, -2, 1f));
+        return outer;
+    }
+
     private void showSupportList(String filter) {
         inProfile = true;
         unlocked = false;
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setBackgroundColor(Color.parseColor("#F3F4F9"));
         page.setPadding(0, 0, 0, dp(24));
-        page.addView(profileHeaderBar("🎧 " + tr("support_desk"), this::openDashboard));
-        TextView intro = infoLine(tr(STATE_APP ? "support_intro_state" : "support_intro_admin"), 13, "#555566", false);
-        intro.setPadding(dp(18), 0, dp(18), dp(6));
-        page.addView(intro);
-        Button raise = authButton("＋ " + tr("raise_query"));
-        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, dp(48));
-        rlp.setMargins(dp(14), dp(2), dp(14), dp(8));
+        page.addView(supportHero(tr("support_desk"), tr(STATE_APP ? "support_intro_state" : "support_intro_admin"), this::openDashboard));
+
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setPadding(dp(11), dp(12), dp(11), dp(2));
+        page.addView(stats);
+
+        Button raise = authButton("＋  " + tr("raise_query"));
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, dp(50));
+        rlp.setMargins(dp(14), dp(10), dp(14), dp(6));
         raise.setOnClickListener(v -> showNewTicket());
         page.addView(raise, rlp);
-        String[] keys = {"all", "mine", "open", "answered"};
+
+        String[] keys = {"all", "mine", "open", "answered", "closed"};
         int sel = Math.max(0, java.util.Arrays.asList(keys).indexOf(filter));
-        page.addView(segmented(new String[]{tr("f_all"), tr("f_mine"), tr("st_open"), tr("st_answered")}, sel, i -> showSupportList(keys[i])));
+        page.addView(segmented(new String[]{tr("f_all"), tr("f_mine"), tr("st_open"), tr("st_answered"), tr("st_closed")}, sel, i -> showSupportList(keys[i])));
         TextView count = infoLine(tr("loading"), 13, "#7A7F99", false);
         count.setPadding(dp(18), dp(2), dp(18), dp(4));
         page.addView(count);
@@ -1399,45 +1504,84 @@ public class MainActivity extends FragmentActivity {
         callAuth(sessionBody("action", "support-list"), (ok, res, err) -> {
             if (!ok) { count.setText(err); if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
             org.json.JSONArray ts = res.optJSONArray("tickets");
-            int shown = 0, unread = 0;
+            int shown = 0, unread = 0, nOpen = 0, nAns = 0, nClosed = 0;
             for (int i = 0; ts != null && i < ts.length(); i++) {
                 JSONObject tk = ts.optJSONObject(i);
-                if (tk.optBoolean("unread")) unread++;
                 String st = tk.optString("status");
+                if ("open".equals(st)) nOpen++; else if ("answered".equals(st)) nAns++; else nClosed++;
+                if (tk.optBoolean("unread")) unread++;
                 if ("mine".equals(filter) && !tk.optBoolean("mine")) continue;
-                if ("open".equals(filter) && !"open".equals(st)) continue;
-                if ("answered".equals(filter) && !"answered".equals(st)) continue;
+                if (("open".equals(filter) || "answered".equals(filter) || "closed".equals(filter)) && !filter.equals(st)) continue;
                 shown++;
-                LinearLayout c = listCard();
+                LinearLayout c = new LinearLayout(this);
+                c.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout top = new LinearLayout(this);
                 top.setOrientation(LinearLayout.HORIZONTAL);
                 top.setGravity(Gravity.CENTER_VERTICAL);
-                top.addView(infoLine((tk.optBoolean("unread") ? "🔵 " : "") + "#" + tk.optInt("no") + " · " + tk.optString("topic"), 12, "#3D47C8", true),
-                        new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView tic = infoLine(topicIcon(tk.optString("topic")), 16, "#000000", false);
+                tic.setGravity(Gravity.CENTER);
+                GradientDrawable tg = new GradientDrawable();
+                tg.setColor(Color.parseColor("#EEF0FF"));
+                tg.setCornerRadius(dp(9));
+                tic.setBackground(tg);
+                top.addView(tic, new LinearLayout.LayoutParams(dp(32), dp(32)));
+                TextView no = infoLine((tk.optBoolean("unread") ? "● " : "") + "#" + tk.optInt("no") + " · " + tk.optString("topic"), 12,
+                        tk.optBoolean("unread") ? "#E53935" : "#3D47C8", true);
+                no.setPadding(dp(8), 0, 0, 0);
+                top.addView(no, new LinearLayout.LayoutParams(0, -2, 1f));
                 top.addView(statusChip(st));
                 c.addView(top);
-                c.addView(infoLine(tk.optString("subject"), 16, "#1A1A2E", true));
+                TextView subj = infoLine(tk.optString("subject"), 16, "#141833", true);
+                subj.setPadding(0, dp(8), 0, dp(2));
+                c.addView(subj);
                 JSONObject by = tk.optJSONObject("by");
-                String byTxt = by == null ? "" : by.optString("fullName") + (by.optString("state").isEmpty() ? "" : " · " + by.optString("state"));
-                c.addView(infoLine(byTxt, 13, "#555566", false));
+                c.addView(infoLine(by == null ? "" : by.optString("fullName") + (tk.optString("state").isEmpty() ? "" : "  ·  " + tk.optString("state")), 13, "#4A4F6A", false));
                 JSONObject last = tk.optJSONObject("last");
                 if (last != null && !last.optString("text").isEmpty()) {
                     JSONObject lb = last.optJSONObject("by");
                     String who = lb == null ? "" : ("admin".equals(lb.optString("app")) ? "🛡 " : "") + lb.optString("fullName") + ": ";
-                    TextView prev = infoLine(who + last.optString("text"), 13, "#333344", false);
+                    TextView prev = infoLine(who + last.optString("text"), 13, "#4A4F6A", false);
                     prev.setMaxLines(2);
                     prev.setEllipsize(TextUtils.TruncateAt.END);
+                    prev.setPadding(0, dp(4), 0, 0);
                     c.addView(prev);
                 }
                 String meta = "💬 " + tk.optInt("count") + "   ·   " + fmtTime(tk.optLong("updatedAt"), "d MMM, h:mm a");
-                if (tk.optInt("rating") > 0) meta += "   ·   " + stars(tk.optInt("rating"));
-                c.addView(infoLine(meta, 12, "#7A7F99", false));
+                TextView m = infoLine(meta, 12, "#7A7F99", false);
+                m.setPadding(0, dp(6), 0, 0);
+                if (tk.optInt("rating") > 0) m.append("   ·   " + stars(tk.optInt("rating")));
+                c.addView(m);
                 final String id = tk.optString("id");
-                c.setOnClickListener(v -> showTicket(id));
-                list.addView(c, listCardParams());
+                View card = statusAccentCard(c, st);
+                card.setOnClickListener(v -> showTicket(id));
+                list.addView(card, listCardParams());
+            }
+            stats.removeAllViews();
+            String[][] s3 = {{String.valueOf(nOpen), tr("st_open"), "#E69A00"}, {String.valueOf(nAns), tr("st_answered"), "#1E9E61"}, {String.valueOf(nClosed), tr("st_closed"), "#616161"}};
+            for (String[] x : s3) {
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+                lp.setMargins(dp(3), 0, dp(3), 0);
+                stats.addView(miniStat(x[0], x[1], x[2]), lp);
             }
             authPrefs().edit().putInt("support_unread", unread).apply();
-            count.setText(shown == 0 ? tr("no_queries") : trf("queries_count", shown));
+            if (shown == 0) {
+                count.setText("");
+                LinearLayout empty = new LinearLayout(this);
+                empty.setOrientation(LinearLayout.VERTICAL);
+                empty.setGravity(Gravity.CENTER_HORIZONTAL);
+                empty.setPadding(dp(20), dp(30), dp(20), dp(20));
+                TextView big = infoLine("🎧", 40, "#000000", false);
+                big.setGravity(Gravity.CENTER);
+                GradientDrawable eg = new GradientDrawable();
+                eg.setShape(GradientDrawable.OVAL);
+                eg.setColor(Color.parseColor("#EEF0FF"));
+                big.setBackground(eg);
+                empty.addView(big, new LinearLayout.LayoutParams(dp(84), dp(84)));
+                TextView et = infoLine(tr("no_queries"), 15, "#4A4F6A", false);
+                et.setPadding(0, dp(12), 0, 0);
+                empty.addView(et);
+                list.addView(empty);
+            } else count.setText(trf("queries_count", shown));
         });
     }
 
@@ -1453,16 +1597,22 @@ public class MainActivity extends FragmentActivity {
                 LinearLayout r = new LinearLayout(this);
                 r.setOrientation(LinearLayout.HORIZONTAL);
                 r.setGravity(Gravity.CENTER_VERTICAL);
-                r.setPadding(dp(6), dp(4), dp(6), dp(4));
+                r.setPadding(dp(10), dp(8), dp(8), dp(8));
+                GradientDrawable g = new GradientDrawable();
+                g.setColor(Color.parseColor("#F5F6FA"));
+                g.setCornerRadius(dp(8));
+                r.setBackground(g);
                 r.addView(infoLine("📎 " + a.optString("name") + "  (" + Math.max(1, a.optLong("size") / 1024) + " KB)", 13, "#333344", false),
                         new LinearLayout.LayoutParams(0, -2, 1f));
                 TextView x = infoLine("✕", 16, "#C62828", true);
-                x.setPadding(dp(10), 0, dp(6), 0);
+                x.setPadding(dp(10), 0, dp(4), 0);
                 x.setOnClickListener(v -> { pendingAtts.remove(idx); onAttachChanged.run(); });
                 r.addView(x);
-                attList.addView(r);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+                lp.topMargin = dp(6);
+                attList.addView(r, lp);
             }
-            attachBtn.setText("📎 " + tr("attach") + (pendingAtts.isEmpty() ? "" : " (" + pendingAtts.size() + "/5)"));
+            attachBtn.setText("📎  " + tr("attach") + (pendingAtts.isEmpty() ? "" : " (" + pendingAtts.size() + "/5)"));
         };
         onAttachChanged.run();
         attachBtn.setOnClickListener(v -> pickAttachment());
@@ -1475,60 +1625,107 @@ public class MainActivity extends FragmentActivity {
         b.setTextColor(BRAND);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.WHITE);
+        bg.setColor(Color.parseColor("#F7F8FF"));
         bg.setCornerRadius(dp(10));
-        bg.setStroke(dp(1), Color.parseColor("#C9CDF7"));
+        bg.setStroke(dp(1), Color.parseColor("#9AA1F5"), dp(6), dp(4));
         b.setBackground(bg);
         return b;
     }
 
+    private String selectedTopic = "";
+
     private void showNewTicket() {
         inProfile = true;
         pendingAtts.clear();
+        selectedTopic = "";
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setBackgroundColor(Color.WHITE);
-        page.addView(profileHeaderBar(tr("raise_query"), () -> showSupportList("all")));
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(22), dp(6), dp(22), dp(28));
-        page.addView(box);
-        box.addView(fieldLabel(tr("q_topic")));
-        Spinner topic = stateSpinner(SUPPORT_TOPICS, "");
-        addField(box, topic);
-        box.addView(fieldLabel(tr("q_kpi")));
+        page.setBackgroundColor(Color.parseColor("#F3F4F9"));
+        page.setPadding(0, 0, 0, dp(28));
+        page.addView(supportHero(tr("raise_query"), tr("raise_sub"), () -> showSupportList("all")));
+
+        // 1. Topic chips (2 columns)
+        LinearLayout c1 = sectionCard(page, "1  ·  " + tr("q_topic"));
+        List<TextView> chips = new ArrayList<>();
+        LinearLayout row = null;
+        for (int i = 0; i < SUPPORT_TOPICS.length; i++) {
+            if (i % 2 == 0) {
+                row = new LinearLayout(this);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                c1.addView(row);
+            }
+            final String topic = SUPPORT_TOPICS[i];
+            TextView ch = infoLine(TOPIC_ICONS[i] + "  " + topic, 13, "#333344", false);
+            ch.setSingleLine(true);
+            ch.setEllipsize(TextUtils.TruncateAt.END);
+            ch.setPadding(dp(10), dp(10), dp(8), dp(10));
+            chips.add(ch);
+            ch.setOnClickListener(v -> {
+                selectedTopic = topic;
+                for (TextView o : chips) styleTopicChip(o, false);
+                styleTopicChip(ch, true);
+            });
+            styleTopicChip(ch, false);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+            lp.setMargins(dp(3), dp(3), dp(3), dp(3));
+            row.addView(ch, lp);
+        }
+
+        // 2. Details
+        LinearLayout c2 = sectionCard(page, "2  ·  " + tr("q_details"));
+        c2.addView(fieldLabel(tr("q_kpi")));
         Spinner kpi = stateSpinner(withBlank("—", SUPPORT_KPIS, null), "");
-        addField(box, kpi);
-        box.addView(fieldLabel(tr("q_state")));
-        Spinner st = stateSpinner(withBlank("PAN India", dashboardStates(), null), profile().optString("state", ""));
-        addField(box, st);
-        box.addView(fieldLabel(tr("q_subject")));
+        addField(c2, kpi);
+        Spinner st = null;
+        c2.addView(fieldLabel(tr("q_state")));
+        if (STATE_APP) {
+            TextView own = infoLine("📍 " + profile().optString("state", "—") + "   🔒", 15, "#141833", true);
+            own.setPadding(dp(6), dp(4), 0, dp(10));
+            c2.addView(own);
+        } else {
+            st = stateSpinner(withBlank("PAN India", dashboardStates(), null), "");
+            addField(c2, st);
+        }
+        final Spinner stSel = st;
+        c2.addView(fieldLabel(tr("q_subject")));
         EditText subject = authField(tr("q_subject_hint"), TEXT_NAME, 120);
-        addField(box, subject);
-        box.addView(fieldLabel(tr("q_details")));
+        addField(c2, subject);
+        c2.addView(fieldLabel(tr("q_details")));
         EditText details = authField(tr("q_details_hint"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 4000);
         details.setSingleLine(false);
         details.setMinLines(4);
         details.setGravity(Gravity.TOP | Gravity.START);
-        addField(box, details);
-        Button attach = plainButton("📎 " + tr("attach"));
-        box.addView(attach, new LinearLayout.LayoutParams(-1, dp(46)));
-        addAttachRow(box, attach);
-        box.addView(infoLine(tr("attach_note"), 12, "#7A7F99", false));
-        tcStatus = authMsg(box);
+        addField(c2, details);
+
+        // 3. Attachments
+        LinearLayout c3 = sectionCard(page, "3  ·  " + tr("attachments_opt"));
+        Button attach = plainButton("📎  " + tr("attach"));
+        c3.addView(attach, new LinearLayout.LayoutParams(-1, dp(48)));
+        addAttachRow(c3, attach);
+        TextView note = infoLine(tr("attach_note"), 12, "#7A7F99", false);
+        note.setPadding(0, dp(6), 0, 0);
+        c3.addView(note);
+
+        LinearLayout foot = new LinearLayout(this);
+        foot.setOrientation(LinearLayout.VERTICAL);
+        foot.setPadding(dp(14), dp(4), dp(14), 0);
+        tcStatus = authMsg(foot);
         Button send = authButton(tr("submit_query"));
-        box.addView(send, buttonParams());
+        foot.addView(send, buttonParams());
+        page.addView(foot);
         send.setOnClickListener(v -> {
             String sj = subject.getText().toString().trim(), dt = details.getText().toString().trim();
+            if (selectedTopic.isEmpty()) { setStatus(tr("err_topic"), true); return; }
             if (sj.length() < 3) { setStatus(tr("err_subject"), true); return; }
             if (dt.isEmpty()) { setStatus(tr("err_details"), true); return; }
             hideKeyboard(details);
             busy(send, tr("saving"));
             org.json.JSONArray ids = new org.json.JSONArray();
             for (JSONObject a : pendingAtts) ids.put(a.optString("id"));
-            callAuth(sessionBody("action", "support-create", "topic", (String) topic.getSelectedItem(),
+            String stVal = stSel == null ? profile().optString("state", "") : (String) stSel.getSelectedItem();
+            callAuth(sessionBody("action", "support-create", "topic", selectedTopic,
                     "kpi", kpi.getSelectedItemPosition() == 0 ? "" : (String) kpi.getSelectedItem(),
-                    "state", (String) st.getSelectedItem(), "subject", sj, "text", dt, "atts", ids), (ok, res, err) -> {
+                    "state", stVal, "subject", sj, "text", dt, "atts", ids), (ok, res, err) -> {
                 busy(send, null);
                 if (ok) {
                     pendingAtts.clear();
@@ -1537,7 +1734,60 @@ public class MainActivity extends FragmentActivity {
                 } else handleSessionError(res, err);
             });
         });
-        showScreen(page, subject);
+        showScreen(page, null);
+    }
+
+    private void styleTopicChip(TextView ch, boolean on) {
+        GradientDrawable g = new GradientDrawable();
+        g.setCornerRadius(dp(10));
+        if (on) {
+            g.setColor(Color.parseColor("#EEF0FF"));
+            g.setStroke(dp(2), BRAND);
+            ch.setTextColor(Color.parseColor("#2B33A6"));
+            ch.setTypeface(Typeface.DEFAULT_BOLD);
+        } else {
+            g.setColor(Color.parseColor("#F7F8FC"));
+            g.setStroke(dp(1), Color.parseColor("#E1E3EE"));
+            ch.setTextColor(Color.parseColor("#333344"));
+            ch.setTypeface(Typeface.DEFAULT);
+        }
+        ch.setBackground(g);
+    }
+
+    // Big, evenly spaced stars for the requester to rate an admin reply.
+    private LinearLayout ratingCard(String ticketId, String msgId, int given) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.parseColor("#FFFBF0"));
+        g.setCornerRadius(dp(14));
+        g.setStroke(dp(1), Color.parseColor("#F5D58A"));
+        card.setBackground(g);
+        TextView q = infoLine(given > 0 ? trf("you_rated", given) : tr("rate_question"), 14, "#5C4300", true);
+        q.setGravity(Gravity.CENTER);
+        card.addView(q);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dp(6), 0, dp(2));
+        for (int s = 1; s <= 5; s++) {
+            final int sv = s;
+            TextView star = infoLine(s <= given ? "★" : "☆", 32, "#F5A623", false);
+            star.setGravity(Gravity.CENTER);
+            star.setContentDescription(s + " star");
+            star.setOnClickListener(v -> callAuth(sessionBody("action", "support-rate", "id", ticketId, "msgId", msgId, "stars", sv), (ok, res, err) -> {
+                if (ok) {
+                    Toast.makeText(this, res.optBoolean("autoClosed") ? tr("rated_closed") : tr("rated_open"), Toast.LENGTH_LONG).show();
+                    showTicket(ticketId);
+                } else Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+            }));
+            row.addView(star, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        }
+        card.addView(row);
+        TextView hint = infoLine(tr("rate_hint"), 11, "#8A6D1F", false);
+        hint.setGravity(Gravity.CENTER);
+        card.addView(hint);
+        return card;
     }
 
     private void showTicket(String id) {
@@ -1545,11 +1795,14 @@ public class MainActivity extends FragmentActivity {
         pendingAtts.clear();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setBackgroundColor(Color.parseColor("#F3F4F9"));
         page.setPadding(0, 0, 0, dp(24));
-        page.addView(profileHeaderBar(tr("query"), () -> showSupportList("all")));
+        LinearLayout heroHolder = new LinearLayout(this);
+        heroHolder.setOrientation(LinearLayout.VERTICAL);
+        heroHolder.addView(supportHero(tr("query"), "", () -> showSupportList("all")));
+        page.addView(heroHolder);
         TextView loading = infoLine(tr("loading"), 13, "#7A7F99", false);
-        loading.setPadding(dp(18), dp(6), dp(18), dp(6));
+        loading.setPadding(dp(18), dp(10), dp(18), dp(6));
         page.addView(loading);
         showScreen(page, null);
 
@@ -1560,21 +1813,23 @@ public class MainActivity extends FragmentActivity {
             JSONObject tk = res.optJSONObject("ticket");
             boolean canRate = res.optBoolean("canRate");
             JSONObject owner = tk.optJSONObject("by");
-            boolean mine = canRate;
+            heroHolder.removeAllViews();
+            heroHolder.addView(supportHero("#" + tk.optInt("no") + "  " + tk.optString("subject"),
+                    topicIcon(tk.optString("topic")) + " " + tk.optString("topic") + (tk.optString("kpi").isEmpty() ? "" : " · " + tk.optString("kpi")),
+                    () -> showSupportList("all")));
 
             LinearLayout head = listCard();
             LinearLayout top = new LinearLayout(this);
             top.setOrientation(LinearLayout.HORIZONTAL);
             top.setGravity(Gravity.CENTER_VERTICAL);
-            top.addView(infoLine("#" + tk.optInt("no") + " · " + tk.optString("topic"), 12, "#3D47C8", true), new LinearLayout.LayoutParams(0, -2, 1f));
+            top.addView(infoLine("📍 " + (tk.optString("state").isEmpty() ? "PAN India" : tk.optString("state")), 13, "#3D47C8", true), new LinearLayout.LayoutParams(0, -2, 1f));
             top.addView(statusChip(tk.optString("status")));
             head.addView(top);
-            head.addView(infoLine(tk.optString("subject"), 18, "#1A1A2E", true));
-            String meta = (tk.optString("kpi").isEmpty() ? "" : tk.optString("kpi") + " · ") + tk.optString("state")
-                    + "\n" + tr("raised_by") + " " + owner.optString("fullName") + " (@" + owner.optString("username") + ") · "
-                    + fmtTime(tk.optLong("createdAt"), "d MMM yyyy, h:mm a");
-            head.addView(infoLine(meta, 12, "#555566", false));
-            page.addView(head, listCardParams());
+            head.addView(infoLine(tr("raised_by") + " " + owner.optString("fullName") + " (@" + owner.optString("username") + ")\n"
+                    + fmtTime(tk.optLong("createdAt"), "d MMM yyyy, h:mm a"), 12, "#4A4F6A", false));
+            LinearLayout.LayoutParams hlp = listCardParams();
+            hlp.topMargin = dp(10);
+            page.addView(head, hlp);
 
             org.json.JSONArray ms = tk.optJSONArray("messages");
             for (int i = 0; ms != null && i < ms.length(); i++) {
@@ -1586,13 +1841,14 @@ public class MainActivity extends FragmentActivity {
                 bub.setPadding(dp(14), dp(10), dp(14), dp(10));
                 GradientDrawable bg = new GradientDrawable();
                 bg.setColor(Color.parseColor(admin ? "#EEF0FF" : "#FFFFFF"));
-                bg.setCornerRadius(dp(14));
+                bg.setCornerRadii(admin ? new float[]{dp(4), dp(4), dp(14), dp(14), dp(14), dp(14), dp(14), dp(14)}
+                        : new float[]{dp(14), dp(14), dp(4), dp(4), dp(14), dp(14), dp(14), dp(14)});
                 bg.setStroke(dp(1), Color.parseColor(admin ? "#C9CDF7" : "#E6E8F0"));
                 bub.setBackground(bg);
-                bub.addView(infoLine((admin ? "🛡 " + tr("bi_admin") + " · " : "") + by.optString("fullName")
-                        + (by.optString("state").isEmpty() || admin ? "" : " · " + by.optString("state")), 13, admin ? "#3D47C8" : "#1A1A2E", true));
+                bub.addView(infoLine((admin ? "🛡 " + tr("bi_admin") + " · " : "👤 ") + by.optString("fullName")
+                        + (by.optString("state").isEmpty() || admin ? "" : " · " + by.optString("state")), 13, admin ? "#2B33A6" : "#141833", true));
                 if (!m.optString("text").isEmpty()) {
-                    TextView tx = infoLine(m.optString("text"), 15, "#1A1A2E", false);
+                    TextView tx = infoLine(m.optString("text"), 15, "#141833", false);
                     tx.setTextIsSelectable(true);
                     tx.setPadding(0, dp(4), 0, dp(2));
                     bub.addView(tx);
@@ -1600,54 +1856,51 @@ public class MainActivity extends FragmentActivity {
                 org.json.JSONArray atts = m.optJSONArray("atts");
                 for (int k = 0; atts != null && k < atts.length(); k++) {
                     JSONObject a = atts.optJSONObject(k);
-                    TextView at = infoLine("📎 " + a.optString("name") + "  (" + Math.max(1, a.optLong("size") / 1024) + " KB) ⬇", 14, "#3D47C8", false);
-                    at.setPadding(0, dp(6), 0, dp(2));
+                    TextView at = infoLine("📎 " + a.optString("name") + "  (" + Math.max(1, a.optLong("size") / 1024) + " KB)  ⬇", 14, "#2B33A6", false);
+                    at.setPadding(dp(10), dp(8), dp(10), dp(8));
+                    GradientDrawable ag = new GradientDrawable();
+                    ag.setColor(Color.WHITE);
+                    ag.setCornerRadius(dp(8));
+                    ag.setStroke(dp(1), Color.parseColor("#DADCF5"));
+                    at.setBackground(ag);
                     final String aid = a.optString("id");
-                    at.setOnClickListener(v -> downloadAttachment(aid));
-                    bub.addView(at);
+                    at.setOnClickListener(v -> downloadAttachment(aid, id));
+                    LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-1, -2);
+                    alp.topMargin = dp(6);
+                    bub.addView(at, alp);
                 }
-                bub.addView(infoLine(fmtTime(m.optLong("ts"), "d MMM, h:mm a"), 11, "#7A7F99", false));
-                // Requester rates each admin reply (1-5 stars) right under it.
-                if (admin) {
-                    JSONObject rt = m.optJSONObject("rating");
-                    int given = rt == null ? 0 : rt.optInt("stars");
-                    if (canRate) {
-                        LinearLayout row = new LinearLayout(this);
-                        row.setOrientation(LinearLayout.HORIZONTAL);
-                        row.setGravity(Gravity.CENTER_VERTICAL);
-                        row.setPadding(0, dp(6), 0, 0);
-                        row.addView(infoLine(given > 0 ? tr("your_rating") : tr("rate_reply"), 12, "#555566", false));
-                        final String mid = m.optString("id");
-                        for (int sIdx = 1; sIdx <= 5; sIdx++) {
-                            final int sv = sIdx;
-                            TextView star = infoLine(sIdx <= given ? "★" : "☆", 26, "#F5A623", false);
-                            star.setPadding(dp(4), 0, dp(4), 0);
-                            star.setOnClickListener(v -> callAuth(sessionBody("action", "support-rate", "id", id, "msgId", mid, "stars", sv), (ok2, r2, e2) -> {
-                                if (ok2) { Toast.makeText(this, tr("thanks_rating"), Toast.LENGTH_SHORT).show(); showTicket(id); }
-                                else Toast.makeText(this, e2, Toast.LENGTH_LONG).show();
-                            }));
-                            row.addView(star);
-                        }
-                        bub.addView(row);
-                    } else if (given > 0) {
-                        bub.addView(infoLine(tr("rated") + " " + stars(given), 13, "#F5A623", true));
-                    }
+                TextView when = infoLine(fmtTime(m.optLong("ts"), "d MMM, h:mm a"), 11, "#7A7F99", false);
+                when.setPadding(0, dp(4), 0, 0);
+                bub.addView(when);
+                JSONObject rt = admin ? m.optJSONObject("rating") : null;
+                int given = rt == null ? 0 : rt.optInt("stars");
+                if (admin && !canRate && given > 0) {
+                    // Admins (and others) see the requester's rating on the reply.
+                    bub.addView(infoLine("⭐ " + tr("rated") + " " + stars(given) + "  (" + given + "/5)", 13, "#B07A00", true));
                 }
                 LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
-                blp.setMargins(admin ? dp(34) : dp(14), dp(5), admin ? dp(14) : dp(34), dp(5));
+                blp.setMargins(admin ? dp(30) : dp(14), dp(6), admin ? dp(14) : dp(30), dp(4));
                 page.addView(bub, blp);
+                if (admin && canRate) {
+                    LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, -2);
+                    rlp.setMargins(dp(30), dp(2), dp(14), dp(8));
+                    page.addView(ratingCard(id, m.optString("id"), given), rlp);
+                }
             }
 
             // Reply box
             LinearLayout box = listCard();
-            EditText reply = authField(tr(STATE_APP && !mine ? "add_comment" : "write_reply"),
+            box.addView(infoLine(tr(STATE_APP ? "add_comment" : "write_reply"), 13, "#3D47C8", true));
+            EditText reply = authField(tr(STATE_APP ? "add_comment" : "write_reply"),
                     InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 4000);
             reply.setSingleLine(false);
             reply.setMinLines(2);
             reply.setGravity(Gravity.TOP | Gravity.START);
-            box.addView(reply, new LinearLayout.LayoutParams(-1, -2));
-            Button attach = plainButton("📎 " + tr("attach"));
-            LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-1, dp(44));
+            LinearLayout.LayoutParams rlp2 = new LinearLayout.LayoutParams(-1, -2);
+            rlp2.topMargin = dp(6);
+            box.addView(reply, rlp2);
+            Button attach = plainButton("📎  " + tr("attach"));
+            LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-1, dp(46));
             alp.topMargin = dp(8);
             box.addView(attach, alp);
             addAttachRow(box, attach);
@@ -1667,15 +1920,16 @@ public class MainActivity extends FragmentActivity {
                     else handleSessionError(r2, e2);
                 });
             });
-            if (!STATE_APP || mine) {
+            if (!STATE_APP || canRate) {
                 boolean closed = "closed".equals(tk.optString("status"));
-                TextView cl = linkText(closed ? tr("reopen") : tr("mark_closed"), v ->
+                box.addView(linkText(closed ? tr("reopen") : tr("mark_closed"), v ->
                         callAuth(sessionBody("action", "support-status", "id", id, "status", closed ? "open" : "closed"), (ok2, r2, e2) -> {
                             if (ok2) showTicket(id); else Toast.makeText(this, e2, Toast.LENGTH_LONG).show();
-                        }));
-                box.addView(cl);
+                        })));
             }
-            page.addView(box, listCardParams());
+            LinearLayout.LayoutParams blp2 = listCardParams();
+            blp2.topMargin = dp(12);
+            page.addView(box, blp2);
         });
     }
 
@@ -1737,9 +1991,9 @@ public class MainActivity extends FragmentActivity {
         }).start();
     }
 
-    private void downloadAttachment(String aid) {
+    private void downloadAttachment(String aid, String ticketId) {
         Toast.makeText(this, tr("downloading"), Toast.LENGTH_SHORT).show();
-        callAuth(sessionBody("action", "support-att", "id", aid), (ok, res, err) -> {
+        callAuth(sessionBody("action", "support-att", "id", aid, "ticketId", ticketId), (ok, res, err) -> {
             if (!ok) { Toast.makeText(this, err, Toast.LENGTH_LONG).show(); return; }
             String data = res.optString("data"), name = res.optString("name", "attachment"), mime = res.optString("mime", "");
             new Thread(() -> new DownloadBridge().save(data, name, mime)).start();
@@ -1813,8 +2067,9 @@ public class MainActivity extends FragmentActivity {
             TextView b = new TextView(this);
             b.setText(labels[i]);
             b.setGravity(Gravity.CENTER);
-            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-            b.setPadding(dp(8), dp(9), dp(8), dp(9));
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, labels.length > 4 ? 12 : 14);
+            b.setSingleLine(true);
+            b.setPadding(dp(labels.length > 4 ? 4 : 8), dp(9), dp(labels.length > 4 ? 4 : 8), dp(9));
             GradientDrawable bg = new GradientDrawable();
             bg.setCornerRadius(dp(99));
             if (i == selected) { bg.setColor(BRAND); b.setTextColor(Color.WHITE); }

@@ -159,8 +159,8 @@ final class L {
         put("ev_logout", "Logged out", "लॉग आउट किया");
         put("ev_password_reset", "Reset password", "पासवर्ड रीसेट किया");
         put("support_desk", "Support desk", "सपोर्ट डेस्क");
-        put("support_intro_state", "Raise a query about the dashboard. Any BI admin can answer; everyone can see queries and replies.",
-                "डैशबोर्ड से जुड़ा सवाल पूछें। कोई भी BI एडमिन जवाब दे सकता है; सभी सवाल और जवाब देख सकते हैं।");
+        put("support_intro_state", "Ask about the dashboard. BI admins reply here; you see your state's queries.",
+                "डैशबोर्ड के बारे में पूछें। BI एडमिन यहीं जवाब देंगे; आपको अपने राज्य के सवाल दिखेंगे।");
         put("support_intro_admin", "Queries from state teams. Reply to answer; the requester can rate your reply.",
                 "स्टेट टीमों के सवाल। जवाब दें; सवाल पूछने वाला आपके जवाब को रेटिंग दे सकता है।");
         put("raise_query", "Raise a query", "सवाल पूछें");
@@ -217,6 +217,14 @@ final class L {
         put("admin_insights", "Admin insights", "एडमिन इनसाइट्स");
         put("access_insights", "Access logs & insights", "एक्सेस लॉग और इनसाइट्स");
         put("support_report", "Support desk report", "सपोर्ट डेस्क रिपोर्ट");
+        put("raise_sub", "Pick a topic, describe the issue and attach a screenshot if you can.", "विषय चुनें, समस्या बताएँ और हो सके तो स्क्रीनशॉट जोड़ें।");
+        put("attachments_opt", "Attachments (optional)", "अटैचमेंट (वैकल्पिक)");
+        put("err_topic", "Please choose a topic.", "कृपया विषय चुनें।");
+        put("rate_question", "How helpful was this reply?", "यह जवाब कितना मददगार था?");
+        put("you_rated", "You rated this reply %d/5 · tap to change", "आपने इस जवाब को %d/5 दिया · बदलने के लिए टैप करें");
+        put("rate_hint", "4–5★ closes the query · 1–3★ keeps it open for another reply", "4–5★ पर सवाल बंद · 1–3★ पर दोबारा जवाब के लिए खुला रहेगा");
+        put("rated_closed", "Thanks! Rating saved and query closed.", "धन्यवाद! रेटिंग सेव हुई और सवाल बंद हो गया।");
+        put("rated_open", "Thanks! Query stays open so an admin can help further.", "धन्यवाद! सवाल खुला है ताकि एडमिन आगे मदद कर सकें।");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 
