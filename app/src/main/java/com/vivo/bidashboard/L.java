@@ -149,7 +149,7 @@ final class L {
         put("loading", "Loading…", "लोड हो रहा है…");
         put("joined", "Joined", "जुड़े");
         put("last_seen", "Last seen", "आख़िरी बार");
-        put("users_count", "Showing %d of %d users · tap a user to call", "%2$d में से %1$d यूज़र · कॉल के लिए टैप करें");
+        put("users_count", "Showing %d of %d users · tap a user to call or change state", "%2$d में से %1$d यूज़र · कॉल या राज्य बदलने के लिए टैप करें");
         put("all_apps", "All", "सभी");
         put("no_logs", "No activity on this day.", "इस दिन कोई गतिविधि नहीं।");
         put("logs_count", "%d events by %d users (newest first)", "%2$d यूज़र्स की %1$d गतिविधियाँ (नई पहले)");
@@ -158,6 +158,62 @@ final class L {
         put("ev_signup", "Signed up", "साइन अप किया");
         put("ev_logout", "Logged out", "लॉग आउट किया");
         put("ev_password_reset", "Reset password", "पासवर्ड रीसेट किया");
+        put("support_desk", "Support desk", "सपोर्ट डेस्क");
+        put("support_intro_state", "Raise a query about the dashboard. Any BI admin can answer; everyone can see queries and replies.",
+                "डैशबोर्ड से जुड़ा सवाल पूछें। कोई भी BI एडमिन जवाब दे सकता है; सभी सवाल और जवाब देख सकते हैं।");
+        put("support_intro_admin", "Queries from state teams. Reply to answer; the requester can rate your reply.",
+                "स्टेट टीमों के सवाल। जवाब दें; सवाल पूछने वाला आपके जवाब को रेटिंग दे सकता है।");
+        put("raise_query", "Raise a query", "सवाल पूछें");
+        put("f_all", "All", "सभी");
+        put("f_mine", "My queries", "मेरे सवाल");
+        put("st_open", "Open", "खुला");
+        put("st_answered", "Answered", "जवाब मिला");
+        put("st_closed", "Closed", "बंद");
+        put("no_queries", "No queries here yet.", "यहाँ अभी कोई सवाल नहीं है।");
+        put("queries_count", "%d queries · newest activity first", "%d सवाल · नई गतिविधि पहले");
+        put("attach", "Attach file", "फ़ाइल जोड़ें");
+        put("attach_note", "PDF, Excel, Word, PowerPoint, CSV, text or image/screenshot · up to 4 MB each, 5 files",
+                "PDF, Excel, Word, PowerPoint, CSV, टेक्स्ट या इमेज/स्क्रीनशॉट · हर फ़ाइल 4 MB तक, 5 फ़ाइलें");
+        put("q_topic", "Topic (dashboard section)", "विषय (डैशबोर्ड सेक्शन)");
+        put("q_kpi", "KPI (optional)", "KPI (वैकल्पिक)");
+        put("q_state", "State / region", "राज्य / क्षेत्र");
+        put("q_subject", "Subject", "विषय पंक्ति");
+        put("q_subject_hint", "e.g. Our rank looks wrong for October", "जैसे: अक्टूबर की रैंक गलत लग रही है");
+        put("q_details", "Details", "विवरण");
+        put("q_details_hint", "Describe the issue: which page, period and numbers", "समस्या बताएँ: कौन सा पेज, अवधि और आँकड़े");
+        put("submit_query", "Submit query", "सवाल भेजें");
+        put("err_subject", "Please enter a short subject.", "छोटी विषय पंक्ति डालें।");
+        put("err_details", "Please describe your query.", "अपना सवाल बताएँ।");
+        put("query_sent", "Query sent to BI admins", "सवाल BI एडमिन को भेज दिया गया");
+        put("query", "Query", "सवाल");
+        put("raised_by", "Raised by", "पूछने वाले");
+        put("bi_admin", "BI Admin", "BI एडमिन");
+        put("your_rating", "Your rating:", "आपकी रेटिंग:");
+        put("rate_reply", "Rate this reply:", "इस जवाब को रेट करें:");
+        put("thanks_rating", "Thanks for your rating!", "रेटिंग के लिए धन्यवाद!");
+        put("rated", "Rated", "रेटिंग");
+        put("add_comment", "Add a comment", "टिप्पणी लिखें");
+        put("write_reply", "Write a reply", "जवाब लिखें");
+        put("send", "Send", "भेजें");
+        put("send_reply", "Send reply", "जवाब भेजें");
+        put("err_reply", "Write a message or attach a file.", "संदेश लिखें या फ़ाइल जोड़ें।");
+        put("reopen", "Reopen query", "सवाल फिर से खोलें");
+        put("mark_closed", "Mark as closed", "बंद करें");
+        put("max_files", "You can attach up to 5 files.", "अधिकतम 5 फ़ाइलें जोड़ सकते हैं।");
+        put("uploading", "Uploading", "अपलोड हो रहा है");
+        put("file_too_big", "File is larger than 4 MB.", "फ़ाइल 4 MB से बड़ी है।");
+        put("downloading", "Downloading…", "डाउनलोड हो रहा है…");
+        put("sec_tools", "Help & tools", "सहायता और टूल्स");
+        put("payout_calc", "Payout calculator", "पेआउट कैलकुलेटर");
+        put("pick_state_sub", "Select the state you belong to. You'll see Active retailer IDs for this state only.",
+                "अपना राज्य चुनें। आप केवल इसी राज्य के एक्टिव रिटेलर ID देख पाएँगे।");
+        put("select_state", "Select your state", "अपना राज्य चुनें");
+        put("err_state", "Please select your state.", "कृपया अपना राज्य चुनें।");
+        put("your_state", "Your state", "आपका राज्य");
+        put("state_locked_note", "Your state decides which Active retailer IDs you can see. Ask a BI admin to change it.",
+                "आपका राज्य तय करता है कि कौन से एक्टिव रिटेलर ID दिखेंगे। बदलने के लिए BI एडमिन से कहें।");
+        put("call", "Call", "कॉल करें");
+        put("change_state", "Change state", "राज्य बदलें");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

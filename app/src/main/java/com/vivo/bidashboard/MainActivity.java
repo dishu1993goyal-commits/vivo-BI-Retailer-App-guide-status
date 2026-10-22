@@ -110,6 +110,7 @@ public class MainActivity extends FragmentActivity {
     private boolean unlocked = false;      // dashboard (not a login/profile screen) is showing
     private boolean inProfile = false;     // a profile screen is showing over the dashboard
     private LinearLayout dashboardRoot;
+    private String lockedState = null;   // state baked into the state-app page script
     private ProgressBar loadBar;
     private boolean pageLoading = true;
     private FrameLayout topAvatar;
@@ -121,9 +122,11 @@ public class MainActivity extends FragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initTruecaller();
+        fetchStates();
         // Stay logged in until the user taps Log out.
         if (sessionToken() != null) {
-            openDashboard();
+            if (STATE_APP && profile().optString("state", "").isEmpty()) showPickState();
+            else openDashboard();
             refreshProfile();
         } else {
             showLoginScreen(null);
@@ -215,6 +218,16 @@ public class MainActivity extends FragmentActivity {
             if (ok) {
                 JSONObject p = res.optJSONObject("profile");
                 saveProfile(p);
+                refreshSupportBadge();
+                if (STATE_APP && p != null) {
+                    String st = p.optString("state", "");
+                    if (st.isEmpty()) { showPickState(); return; }
+                    if (lockedState != null && !st.equals(lockedState) && webView != null) {
+                        // An admin changed this user's state: rebuild the page with the new state lock.
+                        detachWebView(); webView.destroy(); webView = null;
+                        if (unlocked) openDashboard();
+                    }
+                }
                 syncPhoto(p == null ? 0 : p.optLong("photoVersion", 0));
                 updateTopAvatar();
             } else if (res.optBoolean("loggedOut", false)) {
@@ -733,7 +746,9 @@ public class MainActivity extends FragmentActivity {
                 busy(login, null);
                 if (ok) {
                     saveSession(res);
+                    if (STATE_APP && profile().optString("state", "").isEmpty()) { showPickState(); return; }
                     openDashboard();
+                    refreshSupportBadge();
                     syncPhoto(profile().optLong("photoVersion", 0));
                 } else {
                     pass.setText("");
@@ -749,6 +764,7 @@ public class MainActivity extends FragmentActivity {
 
     // ---------- Sign up: profile + password, mobile verified once with Truecaller ----------
     private String[] signupDraft = new String[6];
+    private String signupState = "";
 
     private void showSignup() {
         unlocked = false;
@@ -764,6 +780,12 @@ public class MainActivity extends FragmentActivity {
         addField(box, full);
         addField(box, user);
         addField(box, phoneRow(phone));
+        Spinner stateSp = null;
+        if (STATE_APP) {
+            stateSp = stateSpinner(withBlank(tr("select_state"), dashboardStates(), null), signupState);
+            addField(box, stateSp);
+        }
+        final Spinner stateSel = stateSp;
         addField(box, pass);
         addField(box, pass2);
         box.addView(showPasswordBox(pass, pass2));
@@ -778,6 +800,8 @@ public class MainActivity extends FragmentActivity {
 
         go.setOnClickListener(v -> {
             for (int i = 0; i < all.length; i++) signupDraft[i] = all[i].getText().toString();
+            String st = stateSel == null ? "" : (stateSel.getSelectedItemPosition() == 0 ? "" : (String) stateSel.getSelectedItem());
+            signupState = st;
             String fn = full.getText().toString().trim();
             String un = user.getText().toString().trim();
             String ph = phone.getText().toString().replaceAll("\\D", "");
@@ -788,12 +812,13 @@ public class MainActivity extends FragmentActivity {
             if (!ph.matches("[6-9]\\d{9}")) { setStatus(tr("err_mobile"), true); return; }
             if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
             if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            if (STATE_APP && st.isEmpty()) { setStatus(tr("err_state"), true); return; }
             if (ac.isEmpty()) { setStatus(tr("err_code"), true); return; }
             hideKeyboard(code);
             busy(go, tr("checking"));
-            JSONObject details = obj("fullName", fn, "username", un, "phone", ph, "password", pw, "accessCode", ac);
+            JSONObject details = obj("fullName", fn, "username", un, "phone", ph, "password", pw, "accessCode", ac, "state", st);
             callAuth(obj("action", "signup-check", "fullName", fn, "username", un, "phone", ph,
-                    "password", pw, "accessCode", ac), (ok, res, err) -> {
+                    "password", pw, "accessCode", ac, "state", st), (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
                 startPhoneVerification(fn, ph, () -> finishSignup(details), this::showSignup);
@@ -909,10 +934,13 @@ public class MainActivity extends FragmentActivity {
         name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         name.setTypeface(Typeface.DEFAULT_BOLD);
         name.setTextColor(Color.parseColor("#111111"));
-        name.setPadding(dp(10), 0, 0, 0);
+        name.setPadding(dp(10), 0, dp(4), 0);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
         bar.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
         bar.addView(barButton("🔍", tr("search"), "openSearch"));
         bar.addView(barButton("💬", tr("assistant"), "openChat"));
+        bar.addView(supportButton());
         topAvatar = new FrameLayout(this);
         topAvatar.setContentDescription(tr("profile"));
         topAvatar.setOnClickListener(v -> showProfile());
@@ -1179,6 +1207,10 @@ public class MainActivity extends FragmentActivity {
             row(adm, "🕒", tr("access_logs"), "", v -> showLogs(null, "all"));
         }
 
+        LinearLayout help = card(page, tr("sec_tools"));
+        row(help, "🎧", tr("support_desk"), "", v -> showSupportList("all"));
+        row(help, "🧾", tr("payout_calc"), "", v -> { openDashboard(); openAssistant("openCalculator"); });
+
         LinearLayout acc = card(page, tr("sec_account"));
         row(acc, "👤", tr("edit_profile"), p.optString("email", ""), v -> showEditProfile());
         row(acc, "🔒", tr("change_password"), "", v -> showChangePassword());
@@ -1254,6 +1286,462 @@ public class MainActivity extends FragmentActivity {
         scroll.addView(page);
         detachWebView();
         setContentView(scroll);
+    }
+
+    // ---------- Support desk (state users raise queries, admin users answer; everyone sees all) ----------
+    private static final String[] SUPPORT_TOPICS = {"Overview", "Rankings", "Trends", "Retailer app usage", "Active retailers",
+            "Support desk KPI", "Action plan", "KPI framework / calculation", "Sales target", "Customer visit", "Competition",
+            "v-Notice", "Schemes & payout", "Data mismatch", "App issue", "Other"};
+    private static final String[] SUPPORT_KPIS = {"Overall BI KPI score", "Retailer app usage", "Sales target achievement",
+            "Customer visit efficiency", "Competition management", "Support desk", "v-Notice utilization", "Scheme announcement",
+            "Scheme payout", "Announcements & notifications", "App visits"};
+    private static final int ATTACH_REQUEST = 1003;
+    private static final int MAX_ATTACH_BYTES = 4 * 1024 * 1024;
+    private TextView supportBadge;
+    private final List<JSONObject> pendingAtts = new ArrayList<>();
+    private Runnable onAttachChanged;
+
+    private View supportButton() {
+        FrameLayout f = new FrameLayout(this);
+        f.setLayoutParams(new LinearLayout.LayoutParams(dp(42), dp(40)));
+        f.setBackgroundResource(android.R.drawable.list_selector_background);
+        f.setContentDescription(tr("support_desk"));
+        TextView ic = new TextView(this);
+        ic.setText("🎧");
+        ic.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        ic.setGravity(Gravity.CENTER);
+        f.addView(ic, new FrameLayout.LayoutParams(-1, -1));
+        supportBadge = new TextView(this);
+        supportBadge.setTextColor(Color.WHITE);
+        supportBadge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        supportBadge.setTypeface(Typeface.DEFAULT_BOLD);
+        supportBadge.setGravity(Gravity.CENTER);
+        GradientDrawable bb = new GradientDrawable();
+        bb.setColor(Color.parseColor("#E53935"));
+        bb.setCornerRadius(dp(99));
+        supportBadge.setBackground(bb);
+        supportBadge.setPadding(dp(4), 0, dp(4), 0);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, dp(16), Gravity.TOP | Gravity.END);
+        lp.setMargins(0, dp(2), dp(2), 0);
+        supportBadge.setMinWidth(dp(16));
+        f.addView(supportBadge, lp);
+        int n = authPrefs().getInt("support_unread", 0);
+        supportBadge.setText(n > 9 ? "9+" : String.valueOf(n));
+        supportBadge.setVisibility(n > 0 ? View.VISIBLE : View.GONE);
+        f.setOnClickListener(v -> showSupportList("all"));
+        return f;
+    }
+
+    private void refreshSupportBadge() {
+        if (sessionToken() == null) return;
+        callAuth(sessionBody("action", "support-unread"), (ok, res, err) -> {
+            if (!ok) return;
+            int n = res.optInt("unread", 0);
+            authPrefs().edit().putInt("support_unread", n).apply();
+            if (supportBadge != null) {
+                supportBadge.setText(n > 9 ? "9+" : String.valueOf(n));
+                supportBadge.setVisibility(n > 0 ? View.VISIBLE : View.GONE);
+            }
+        });
+    }
+
+    private TextView chip(String text, String bg, String fg) {
+        TextView c = infoLine(text, 11, fg, true);
+        c.setPadding(dp(8), dp(3), dp(8), dp(3));
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(Color.parseColor(bg));
+        g.setCornerRadius(dp(99));
+        c.setBackground(g);
+        return c;
+    }
+
+    private TextView statusChip(String status) {
+        if ("answered".equals(status)) return chip(tr("st_answered"), "#E6F4EA", "#2E7D32");
+        if ("closed".equals(status)) return chip(tr("st_closed"), "#EEEEEE", "#616161");
+        return chip(tr("st_open"), "#FFF4E5", "#B26A00");
+    }
+
+    private static String stars(int n) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i <= 5; i++) sb.append(i <= n ? "★" : "☆");
+        return sb.toString();
+    }
+
+    private void showSupportList(String filter) {
+        inProfile = true;
+        unlocked = false;
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setPadding(0, 0, 0, dp(24));
+        page.addView(profileHeaderBar("🎧 " + tr("support_desk"), this::openDashboard));
+        TextView intro = infoLine(tr(STATE_APP ? "support_intro_state" : "support_intro_admin"), 13, "#555566", false);
+        intro.setPadding(dp(18), 0, dp(18), dp(6));
+        page.addView(intro);
+        Button raise = authButton("＋ " + tr("raise_query"));
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(-1, dp(48));
+        rlp.setMargins(dp(14), dp(2), dp(14), dp(8));
+        raise.setOnClickListener(v -> showNewTicket());
+        page.addView(raise, rlp);
+        String[] keys = {"all", "mine", "open", "answered"};
+        int sel = Math.max(0, java.util.Arrays.asList(keys).indexOf(filter));
+        page.addView(segmented(new String[]{tr("f_all"), tr("f_mine"), tr("st_open"), tr("st_answered")}, sel, i -> showSupportList(keys[i])));
+        TextView count = infoLine(tr("loading"), 13, "#7A7F99", false);
+        count.setPadding(dp(18), dp(2), dp(18), dp(4));
+        page.addView(count);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        page.addView(list);
+        showScreen(page, null);
+
+        callAuth(sessionBody("action", "support-list"), (ok, res, err) -> {
+            if (!ok) { count.setText(err); if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
+            org.json.JSONArray ts = res.optJSONArray("tickets");
+            int shown = 0, unread = 0;
+            for (int i = 0; ts != null && i < ts.length(); i++) {
+                JSONObject tk = ts.optJSONObject(i);
+                if (tk.optBoolean("unread")) unread++;
+                String st = tk.optString("status");
+                if ("mine".equals(filter) && !tk.optBoolean("mine")) continue;
+                if ("open".equals(filter) && !"open".equals(st)) continue;
+                if ("answered".equals(filter) && !"answered".equals(st)) continue;
+                shown++;
+                LinearLayout c = listCard();
+                LinearLayout top = new LinearLayout(this);
+                top.setOrientation(LinearLayout.HORIZONTAL);
+                top.setGravity(Gravity.CENTER_VERTICAL);
+                top.addView(infoLine((tk.optBoolean("unread") ? "🔵 " : "") + "#" + tk.optInt("no") + " · " + tk.optString("topic"), 12, "#3D47C8", true),
+                        new LinearLayout.LayoutParams(0, -2, 1f));
+                top.addView(statusChip(st));
+                c.addView(top);
+                c.addView(infoLine(tk.optString("subject"), 16, "#1A1A2E", true));
+                JSONObject by = tk.optJSONObject("by");
+                String byTxt = by == null ? "" : by.optString("fullName") + (by.optString("state").isEmpty() ? "" : " · " + by.optString("state"));
+                c.addView(infoLine(byTxt, 13, "#555566", false));
+                JSONObject last = tk.optJSONObject("last");
+                if (last != null && !last.optString("text").isEmpty()) {
+                    JSONObject lb = last.optJSONObject("by");
+                    String who = lb == null ? "" : ("admin".equals(lb.optString("app")) ? "🛡 " : "") + lb.optString("fullName") + ": ";
+                    TextView prev = infoLine(who + last.optString("text"), 13, "#333344", false);
+                    prev.setMaxLines(2);
+                    prev.setEllipsize(TextUtils.TruncateAt.END);
+                    c.addView(prev);
+                }
+                String meta = "💬 " + tk.optInt("count") + "   ·   " + fmtTime(tk.optLong("updatedAt"), "d MMM, h:mm a");
+                if (tk.optInt("rating") > 0) meta += "   ·   " + stars(tk.optInt("rating"));
+                c.addView(infoLine(meta, 12, "#7A7F99", false));
+                final String id = tk.optString("id");
+                c.setOnClickListener(v -> showTicket(id));
+                list.addView(c, listCardParams());
+            }
+            authPrefs().edit().putInt("support_unread", unread).apply();
+            count.setText(shown == 0 ? tr("no_queries") : trf("queries_count", shown));
+        });
+    }
+
+    private void addAttachRow(LinearLayout box, Button attachBtn) {
+        LinearLayout attList = new LinearLayout(this);
+        attList.setOrientation(LinearLayout.VERTICAL);
+        box.addView(attList);
+        onAttachChanged = () -> {
+            attList.removeAllViews();
+            for (int i = 0; i < pendingAtts.size(); i++) {
+                JSONObject a = pendingAtts.get(i);
+                final int idx = i;
+                LinearLayout r = new LinearLayout(this);
+                r.setOrientation(LinearLayout.HORIZONTAL);
+                r.setGravity(Gravity.CENTER_VERTICAL);
+                r.setPadding(dp(6), dp(4), dp(6), dp(4));
+                r.addView(infoLine("📎 " + a.optString("name") + "  (" + Math.max(1, a.optLong("size") / 1024) + " KB)", 13, "#333344", false),
+                        new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView x = infoLine("✕", 16, "#C62828", true);
+                x.setPadding(dp(10), 0, dp(6), 0);
+                x.setOnClickListener(v -> { pendingAtts.remove(idx); onAttachChanged.run(); });
+                r.addView(x);
+                attList.addView(r);
+            }
+            attachBtn.setText("📎 " + tr("attach") + (pendingAtts.isEmpty() ? "" : " (" + pendingAtts.size() + "/5)"));
+        };
+        onAttachChanged.run();
+        attachBtn.setOnClickListener(v -> pickAttachment());
+    }
+
+    private Button plainButton(String text) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setAllCaps(false);
+        b.setTextColor(BRAND);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dp(10));
+        bg.setStroke(dp(1), Color.parseColor("#C9CDF7"));
+        b.setBackground(bg);
+        return b;
+    }
+
+    private void showNewTicket() {
+        inProfile = true;
+        pendingAtts.clear();
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        page.addView(profileHeaderBar(tr("raise_query"), () -> showSupportList("all")));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(6), dp(22), dp(28));
+        page.addView(box);
+        box.addView(fieldLabel(tr("q_topic")));
+        Spinner topic = stateSpinner(SUPPORT_TOPICS, "");
+        addField(box, topic);
+        box.addView(fieldLabel(tr("q_kpi")));
+        Spinner kpi = stateSpinner(withBlank("—", SUPPORT_KPIS, null), "");
+        addField(box, kpi);
+        box.addView(fieldLabel(tr("q_state")));
+        Spinner st = stateSpinner(withBlank("PAN India", dashboardStates(), null), profile().optString("state", ""));
+        addField(box, st);
+        box.addView(fieldLabel(tr("q_subject")));
+        EditText subject = authField(tr("q_subject_hint"), TEXT_NAME, 120);
+        addField(box, subject);
+        box.addView(fieldLabel(tr("q_details")));
+        EditText details = authField(tr("q_details_hint"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 4000);
+        details.setSingleLine(false);
+        details.setMinLines(4);
+        details.setGravity(Gravity.TOP | Gravity.START);
+        addField(box, details);
+        Button attach = plainButton("📎 " + tr("attach"));
+        box.addView(attach, new LinearLayout.LayoutParams(-1, dp(46)));
+        addAttachRow(box, attach);
+        box.addView(infoLine(tr("attach_note"), 12, "#7A7F99", false));
+        tcStatus = authMsg(box);
+        Button send = authButton(tr("submit_query"));
+        box.addView(send, buttonParams());
+        send.setOnClickListener(v -> {
+            String sj = subject.getText().toString().trim(), dt = details.getText().toString().trim();
+            if (sj.length() < 3) { setStatus(tr("err_subject"), true); return; }
+            if (dt.isEmpty()) { setStatus(tr("err_details"), true); return; }
+            hideKeyboard(details);
+            busy(send, tr("saving"));
+            org.json.JSONArray ids = new org.json.JSONArray();
+            for (JSONObject a : pendingAtts) ids.put(a.optString("id"));
+            callAuth(sessionBody("action", "support-create", "topic", (String) topic.getSelectedItem(),
+                    "kpi", kpi.getSelectedItemPosition() == 0 ? "" : (String) kpi.getSelectedItem(),
+                    "state", (String) st.getSelectedItem(), "subject", sj, "text", dt, "atts", ids), (ok, res, err) -> {
+                busy(send, null);
+                if (ok) {
+                    pendingAtts.clear();
+                    Toast.makeText(this, tr("query_sent"), Toast.LENGTH_SHORT).show();
+                    showTicket(res.optJSONObject("ticket").optString("id"));
+                } else handleSessionError(res, err);
+            });
+        });
+        showScreen(page, subject);
+    }
+
+    private void showTicket(String id) {
+        inProfile = true;
+        pendingAtts.clear();
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setPadding(0, 0, 0, dp(24));
+        page.addView(profileHeaderBar(tr("query"), () -> showSupportList("all")));
+        TextView loading = infoLine(tr("loading"), 13, "#7A7F99", false);
+        loading.setPadding(dp(18), dp(6), dp(18), dp(6));
+        page.addView(loading);
+        showScreen(page, null);
+
+        callAuth(sessionBody("action", "support-get", "id", id), (ok, res, err) -> {
+            if (!ok) { loading.setText(err); if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
+            page.removeView(loading);
+            refreshSupportBadge();
+            JSONObject tk = res.optJSONObject("ticket");
+            boolean canRate = res.optBoolean("canRate");
+            JSONObject owner = tk.optJSONObject("by");
+            boolean mine = canRate;
+
+            LinearLayout head = listCard();
+            LinearLayout top = new LinearLayout(this);
+            top.setOrientation(LinearLayout.HORIZONTAL);
+            top.setGravity(Gravity.CENTER_VERTICAL);
+            top.addView(infoLine("#" + tk.optInt("no") + " · " + tk.optString("topic"), 12, "#3D47C8", true), new LinearLayout.LayoutParams(0, -2, 1f));
+            top.addView(statusChip(tk.optString("status")));
+            head.addView(top);
+            head.addView(infoLine(tk.optString("subject"), 18, "#1A1A2E", true));
+            String meta = (tk.optString("kpi").isEmpty() ? "" : tk.optString("kpi") + " · ") + tk.optString("state")
+                    + "\n" + tr("raised_by") + " " + owner.optString("fullName") + " (@" + owner.optString("username") + ") · "
+                    + fmtTime(tk.optLong("createdAt"), "d MMM yyyy, h:mm a");
+            head.addView(infoLine(meta, 12, "#555566", false));
+            page.addView(head, listCardParams());
+
+            org.json.JSONArray ms = tk.optJSONArray("messages");
+            for (int i = 0; ms != null && i < ms.length(); i++) {
+                JSONObject m = ms.optJSONObject(i);
+                JSONObject by = m.optJSONObject("by");
+                boolean admin = by != null && "admin".equals(by.optString("app"));
+                LinearLayout bub = new LinearLayout(this);
+                bub.setOrientation(LinearLayout.VERTICAL);
+                bub.setPadding(dp(14), dp(10), dp(14), dp(10));
+                GradientDrawable bg = new GradientDrawable();
+                bg.setColor(Color.parseColor(admin ? "#EEF0FF" : "#FFFFFF"));
+                bg.setCornerRadius(dp(14));
+                bg.setStroke(dp(1), Color.parseColor(admin ? "#C9CDF7" : "#E6E8F0"));
+                bub.setBackground(bg);
+                bub.addView(infoLine((admin ? "🛡 " + tr("bi_admin") + " · " : "") + by.optString("fullName")
+                        + (by.optString("state").isEmpty() || admin ? "" : " · " + by.optString("state")), 13, admin ? "#3D47C8" : "#1A1A2E", true));
+                if (!m.optString("text").isEmpty()) {
+                    TextView tx = infoLine(m.optString("text"), 15, "#1A1A2E", false);
+                    tx.setTextIsSelectable(true);
+                    tx.setPadding(0, dp(4), 0, dp(2));
+                    bub.addView(tx);
+                }
+                org.json.JSONArray atts = m.optJSONArray("atts");
+                for (int k = 0; atts != null && k < atts.length(); k++) {
+                    JSONObject a = atts.optJSONObject(k);
+                    TextView at = infoLine("📎 " + a.optString("name") + "  (" + Math.max(1, a.optLong("size") / 1024) + " KB) ⬇", 14, "#3D47C8", false);
+                    at.setPadding(0, dp(6), 0, dp(2));
+                    final String aid = a.optString("id");
+                    at.setOnClickListener(v -> downloadAttachment(aid));
+                    bub.addView(at);
+                }
+                bub.addView(infoLine(fmtTime(m.optLong("ts"), "d MMM, h:mm a"), 11, "#7A7F99", false));
+                // Requester rates each admin reply (1-5 stars) right under it.
+                if (admin) {
+                    JSONObject rt = m.optJSONObject("rating");
+                    int given = rt == null ? 0 : rt.optInt("stars");
+                    if (canRate) {
+                        LinearLayout row = new LinearLayout(this);
+                        row.setOrientation(LinearLayout.HORIZONTAL);
+                        row.setGravity(Gravity.CENTER_VERTICAL);
+                        row.setPadding(0, dp(6), 0, 0);
+                        row.addView(infoLine(given > 0 ? tr("your_rating") : tr("rate_reply"), 12, "#555566", false));
+                        final String mid = m.optString("id");
+                        for (int sIdx = 1; sIdx <= 5; sIdx++) {
+                            final int sv = sIdx;
+                            TextView star = infoLine(sIdx <= given ? "★" : "☆", 26, "#F5A623", false);
+                            star.setPadding(dp(4), 0, dp(4), 0);
+                            star.setOnClickListener(v -> callAuth(sessionBody("action", "support-rate", "id", id, "msgId", mid, "stars", sv), (ok2, r2, e2) -> {
+                                if (ok2) { Toast.makeText(this, tr("thanks_rating"), Toast.LENGTH_SHORT).show(); showTicket(id); }
+                                else Toast.makeText(this, e2, Toast.LENGTH_LONG).show();
+                            }));
+                            row.addView(star);
+                        }
+                        bub.addView(row);
+                    } else if (given > 0) {
+                        bub.addView(infoLine(tr("rated") + " " + stars(given), 13, "#F5A623", true));
+                    }
+                }
+                LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+                blp.setMargins(admin ? dp(34) : dp(14), dp(5), admin ? dp(14) : dp(34), dp(5));
+                page.addView(bub, blp);
+            }
+
+            // Reply box
+            LinearLayout box = listCard();
+            EditText reply = authField(tr(STATE_APP && !mine ? "add_comment" : "write_reply"),
+                    InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 4000);
+            reply.setSingleLine(false);
+            reply.setMinLines(2);
+            reply.setGravity(Gravity.TOP | Gravity.START);
+            box.addView(reply, new LinearLayout.LayoutParams(-1, -2));
+            Button attach = plainButton("📎 " + tr("attach"));
+            LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-1, dp(44));
+            alp.topMargin = dp(8);
+            box.addView(attach, alp);
+            addAttachRow(box, attach);
+            tcStatus = authMsg(box);
+            Button send = authButton(tr(STATE_APP ? "send" : "send_reply"));
+            box.addView(send, buttonParams());
+            send.setOnClickListener(v -> {
+                String t = reply.getText().toString().trim();
+                if (t.isEmpty() && pendingAtts.isEmpty()) { setStatus(tr("err_reply"), true); return; }
+                hideKeyboard(reply);
+                busy(send, tr("saving"));
+                org.json.JSONArray ids = new org.json.JSONArray();
+                for (JSONObject a : pendingAtts) ids.put(a.optString("id"));
+                callAuth(sessionBody("action", "support-reply", "id", id, "text", t, "atts", ids), (ok2, r2, e2) -> {
+                    busy(send, null);
+                    if (ok2) { pendingAtts.clear(); showTicket(id); }
+                    else handleSessionError(r2, e2);
+                });
+            });
+            if (!STATE_APP || mine) {
+                boolean closed = "closed".equals(tk.optString("status"));
+                TextView cl = linkText(closed ? tr("reopen") : tr("mark_closed"), v ->
+                        callAuth(sessionBody("action", "support-status", "id", id, "status", closed ? "open" : "closed"), (ok2, r2, e2) -> {
+                            if (ok2) showTicket(id); else Toast.makeText(this, e2, Toast.LENGTH_LONG).show();
+                        }));
+                box.addView(cl);
+            }
+            page.addView(box, listCardParams());
+        });
+    }
+
+    private void pickAttachment() {
+        if (pendingAtts.size() >= 5) { Toast.makeText(this, tr("max_files"), Toast.LENGTH_SHORT).show(); return; }
+        Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        pick.setType("*/*");
+        pick.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/pdf", "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "text/csv", "text/plain", "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-powerpoint",
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation", "image/*"});
+        try {
+            startActivityForResult(Intent.createChooser(pick, tr("attach")), ATTACH_REQUEST);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, tr("photo_failed"), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void uploadAttachment(Uri uri) {
+        String name = "file";
+        try (android.database.Cursor c = getContentResolver().query(uri, null, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                if (i >= 0) name = c.getString(i);
+            }
+        } catch (Exception ignored) { }
+        if (!name.contains(".")) {
+            String mime = getContentResolver().getType(uri);
+            String ext = mime == null ? null : android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(mime);
+            if (ext != null) name = name + "." + ext;
+        }
+        final String fname = name;
+        Toast.makeText(this, tr("uploading") + " " + fname, Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String b64 = null, problem = null;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buf = new byte[16384];
+                int n;
+                while (in != null && (n = in.read(buf)) > 0) {
+                    bos.write(buf, 0, n);
+                    if (bos.size() > MAX_ATTACH_BYTES) { problem = tr("file_too_big"); break; }
+                }
+                if (problem == null) b64 = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP);
+            } catch (Exception e) {
+                problem = tr("photo_failed");
+            }
+            final String data = b64, prob = problem;
+            ui.post(() -> {
+                if (prob != null) { Toast.makeText(this, prob, Toast.LENGTH_LONG).show(); return; }
+                callAuth(sessionBody("action", "support-upload", "name", fname, "data", data), (ok, res, err) -> {
+                    if (ok) {
+                        pendingAtts.add(res.optJSONObject("att"));
+                        if (onAttachChanged != null) onAttachChanged.run();
+                    } else Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                });
+            });
+        }).start();
+    }
+
+    private void downloadAttachment(String aid) {
+        Toast.makeText(this, tr("downloading"), Toast.LENGTH_SHORT).show();
+        callAuth(sessionBody("action", "support-att", "id", aid), (ok, res, err) -> {
+            if (!ok) { Toast.makeText(this, err, Toast.LENGTH_LONG).show(); return; }
+            String data = res.optString("data"), name = res.optString("name", "attachment"), mime = res.optString("mime", "");
+            new Thread(() -> new DownloadBridge().save(data, name, mime)).start();
+        });
     }
 
     // ---------- Admin app: registered users and access log ----------
@@ -1361,9 +1849,26 @@ public class MainActivity extends FragmentActivity {
                     c.addView(infoLine(tr("joined") + " " + fmtTime(u.optLong("createdAt"), "d MMM yyyy") + "   ·   "
                             + tr("last_seen") + " " + fmtTime(u.optLong("lastSeen"), "d MMM, h:mm a"), 12, "#7A7F99", false));
                     final String phone = u.optString("phone");
-                    c.setOnClickListener(v -> {
-                        try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone))); } catch (Exception ignored) { }
-                    });
+                    final String uname = u.optString("username");
+                    final String ustate = u.optString("state");
+                    c.setOnClickListener(v -> new AlertDialog.Builder(this)
+                            .setTitle(u.optString("fullName") + " (@" + uname + ")")
+                            .setItems(new String[]{"📞 " + tr("call") + " " + phone, "📍 " + tr("change_state") + (ustate.isEmpty() ? "" : " (" + ustate + ")")}, (d, w) -> {
+                                if (w == 0) {
+                                    try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone))); } catch (Exception ignored) { }
+                                } else {
+                                    String[] items = dashboardStates();
+                                    int curI = java.util.Arrays.asList(items).indexOf(ustate);
+                                    new AlertDialog.Builder(this).setTitle(tr("change_state"))
+                                            .setSingleChoiceItems(items, curI, (d2, which2) -> {
+                                                d2.dismiss();
+                                                callAuth(sessionBody("action", "admin-set-state", "which", which, "target", uname, "state", items[which2]), (ok2, r2, e2) -> {
+                                                    Toast.makeText(this, ok2 ? tr("saved") : e2, Toast.LENGTH_SHORT).show();
+                                                    if (ok2) showUsers(which, search.getText().toString());
+                                                });
+                                            }).setNegativeButton(tr("cancel"), null).show();
+                                }
+                            }).show());
                     list.addView(c, listCardParams());
                 }
                 count.setText(trf("users_count", shown, users == null ? 0 : users.length()));
@@ -1486,11 +1991,92 @@ public class MainActivity extends FragmentActivity {
                 .show();
     }
 
-    private static final String[] STATES = {"", "Andaman & Nicobar", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar",
-            "Chandigarh", "Chhattisgarh", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu & Kashmir",
-            "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-            "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
-            "Uttar Pradesh", "Uttarakhand", "West Bengal", "PAN India / HO"};
+    // States/regions exactly as in the dashboard (states.json, published with each dashboard update).
+    private static final String[] FALLBACK_STATES = {"Bihar", "Chhattisgarh", "Delhi", "Gujarat", "Haryana", "Himachal Pradesh",
+            "Jammu & Kashmir", "Jharkhand", "Karnataka", "Kerala", "MHA", "MHM", "MHN", "MHP", "Madhya Pradesh", "North East",
+            "Odisha", "Punjab", "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh", "Uttarakhand", "West Bengal"};
+
+    private String[] dashboardStates() {
+        try {
+            org.json.JSONArray a = new JSONObject(settings().getString("states_json", "{}")).optJSONArray("states");
+            if (a != null && a.length() > 0) {
+                String[] out = new String[a.length()];
+                for (int i = 0; i < a.length(); i++) out[i] = a.optString(i);
+                return out;
+            }
+        } catch (Exception ignored) { }
+        return FALLBACK_STATES;
+    }
+
+    private void fetchStates() {
+        new Thread(() -> {
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(START_URL + "states.json").openConnection();
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(15000);
+                if (c.getResponseCode() == 200) {
+                    StringBuilder sb = new StringBuilder();
+                    try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = r.readLine()) != null) sb.append(line);
+                    }
+                    JSONObject j = new JSONObject(sb.toString());
+                    if (j.optJSONArray("states") != null) settings().edit().putString("states_json", j.toString()).apply();
+                }
+            } catch (Exception ignored) {
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }).start();
+    }
+
+    private Spinner stateSpinner(String[] items, String current) {
+        Spinner sp = new Spinner(this);
+        sp.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, items));
+        for (int i = 0; i < items.length; i++) if (items[i].equals(current)) sp.setSelection(i);
+        GradientDrawable sbg = new GradientDrawable();
+        sbg.setColor(Color.parseColor("#F5F6FA"));
+        sbg.setCornerRadius(dp(10));
+        sbg.setStroke(dp(1), Color.parseColor("#D8DAE5"));
+        sp.setBackground(sbg);
+        sp.setPadding(dp(8), dp(12), dp(8), dp(12));
+        return sp;
+    }
+
+    private String[] withBlank(String first, String[] items, String last) {
+        List<String> l = new ArrayList<>();
+        l.add(first);
+        for (String x : items) l.add(x);
+        if (last != null) l.add(last);
+        return l.toArray(new String[0]);
+    }
+
+    // Existing state-app users choose their state once (it decides which retailer IDs they can see).
+    private void showPickState() {
+        unlocked = false;
+        inProfile = false;
+        LinearLayout box = authHeader(tr("pick_state_sub"));
+        String[] items = withBlank(tr("select_state"), dashboardStates(), null);
+        Spinner sp = stateSpinner(items, "");
+        addField(box, sp);
+        tcStatus = authMsg(box);
+        Button save = authButton(tr("save"));
+        box.addView(save, buttonParams());
+        save.setOnClickListener(v -> {
+            if (sp.getSelectedItemPosition() == 0) { setStatus(tr("err_state"), true); return; }
+            busy(save, tr("saving"));
+            callAuth(sessionBody("action", "set-state-once", "state", (String) sp.getSelectedItem()), (ok, res, err) -> {
+                busy(save, null);
+                if (ok) {
+                    saveProfile(res.optJSONObject("profile"));
+                    if (webView != null) { detachWebView(); webView.destroy(); webView = null; }
+                    openDashboard();
+                } else handleSessionError(res, err);
+            });
+        });
+        showScreen(box, null);
+    }
 
     private void showEditProfile() {
         inProfile = true;
@@ -1512,19 +2098,21 @@ public class MainActivity extends FragmentActivity {
         EditText email = authField("name@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 80);
         email.setText(p.optString("email", ""));
         addField(box, email);
-        box.addView(fieldLabel(tr("state_optional")));
-        Spinner state = new Spinner(this);
-        ArrayAdapter<String> ad = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, STATES);
-        state.setAdapter(ad);
         String cur = p.optString("state", "");
-        for (int i = 0; i < STATES.length; i++) if (STATES[i].equals(cur)) state.setSelection(i);
-        GradientDrawable sbg = new GradientDrawable();
-        sbg.setColor(Color.parseColor("#F5F6FA"));
-        sbg.setCornerRadius(dp(10));
-        sbg.setStroke(dp(1), Color.parseColor("#D8DAE5"));
-        state.setBackground(sbg);
-        state.setPadding(dp(8), dp(12), dp(8), dp(12));
-        addField(box, state);
+        Spinner state = null;
+        if (STATE_APP) {
+            // Locked: only an admin can change a state user's state.
+            box.addView(fieldLabel(tr("your_state")));
+            TextView st = infoLine(cur.isEmpty() ? "—" : cur + "   🔒", 16, "#1A1A2E", true);
+            st.setPadding(dp(6), dp(4), 0, dp(4));
+            box.addView(st);
+            box.addView(infoLine(tr("state_locked_note"), 12, "#7A7F99", false));
+        } else {
+            box.addView(fieldLabel(tr("state_optional")));
+            state = stateSpinner(withBlank("", dashboardStates(), "PAN India / HO"), cur);
+            addField(box, state);
+        }
+        final Spinner stateSel = state;
         box.addView(fieldLabel(tr("designation_optional")));
         EditText desig = authField(tr("designation_optional"), TEXT_NAME, 50);
         desig.setText(p.optString("designation", ""));
@@ -1543,7 +2131,7 @@ public class MainActivity extends FragmentActivity {
             hideKeyboard(desig);
             busy(save, tr("saving"));
             JSONObject prof = obj("fullName", full.getText().toString().trim(), "email", email.getText().toString().trim(),
-                    "state", (String) state.getSelectedItem(), "designation", desig.getText().toString().trim());
+                    "state", stateSel == null ? cur : (String) stateSel.getSelectedItem(), "designation", desig.getText().toString().trim());
             callAuth(sessionBody("action", "update-profile", "profile", prof), (ok, res, err) -> {
                 busy(save, null);
                 if (ok) {
@@ -1771,19 +2359,21 @@ public class MainActivity extends FragmentActivity {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
+                if (STATE_APP) view.evaluateJavascript(stateLockScript(), null);
+                view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
             }
 
             @Override
             public void onPageCommitVisible(WebView view, String url) {
                 super.onPageCommitVisible(view, url);
-                if (STATE_APP) view.evaluateJavascript(STATE_LOCK_JS, null);
+                if (STATE_APP) view.evaluateJavascript(stateLockScript(), null);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
+                if (STATE_APP) view.evaluateJavascript(stateLockScript(), null);
+                view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
             }
 
             @Override
@@ -1848,11 +2438,18 @@ public class MainActivity extends FragmentActivity {
         });
 
         // Bridge that receives files created inside the page (blob:/data: downloads) and saves them
-        if (!STATE_APP) webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+        // (state app: only the own-state Active retailers Excel export gets through, checked in the page)
+        webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
-            if (STATE_APP) { // no exports/downloads in the state app
-                Toast.makeText(this, "Download is not available in this app", Toast.LENGTH_SHORT).show();
+            if (STATE_APP) {
+                if (url.startsWith("blob:") || url.startsWith("data:")) {
+                    String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                    webView.evaluateJavascript("window.__biCanExport && window.__biCanExport() && window.__bidlSend && window.__bidlSend("
+                            + JSONObject.quote(url) + "," + JSONObject.quote(name) + ")", null);
+                } else {
+                    Toast.makeText(this, "Download is not available in this app", Toast.LENGTH_SHORT).show();
+                }
                 return;
             }
             if (url.startsWith("blob:") || url.startsWith("data:")) {
@@ -1882,7 +2479,8 @@ public class MainActivity extends FragmentActivity {
         if (STATE_APP) {
             try {
                 if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
-                    androidx.webkit.WebViewCompat.addDocumentStartJavaScript(webView, STATE_LOCK_JS,
+                    lockedState = profile().optString("state", "");
+                    androidx.webkit.WebViewCompat.addDocumentStartJavaScript(webView, stateLockScript(),
                             java.util.Collections.singleton("https://" + APP_HOST));
                 }
             } catch (Throwable ignored) { }
@@ -1901,6 +2499,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == ATTACH_REQUEST) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) uploadAttachment(data.getData());
+            return;
+        }
         if (requestCode == PHOTO_REQUEST) {
             if (resultCode == RESULT_OK && data != null && data.getData() != null) uploadPhoto(data.getData());
             return;
@@ -1934,6 +2536,7 @@ public class MainActivity extends FragmentActivity {
             "AndroidDL.save(s.substring(i+1),name||'download',b.type||'')};fr.onerror=function(){AndroidDL.fail('read')};" +
             "fr.readAsDataURL(b)})['catch'](function(e){AndroidDL.fail(String(e))})};" +
             "function grab(a){var h=a.href||'';if(a.hasAttribute('download')&&(h.indexOf('blob:')===0||h.indexOf('data:')===0)){" +
+            "if(window.__biStateApp&&!(window.__biCanExport&&window.__biCanExport()))return true;" +
             "window.__bidlSend(h,a.getAttribute('download')||a.download||'');return true}return false}" +
             "document.addEventListener('click',function(e){var t=e.target;var a=t&&t.closest?t.closest('a'):null;" +
             "if(a&&grab(a)){e.preventDefault();e.stopImmediatePropagation()}},true);" +
@@ -1943,26 +2546,52 @@ public class MainActivity extends FragmentActivity {
 
     // State app only: hides admin tools (import, edit leaders, export & share), the Active
     // retailers tab and every link to retailer IDs, and sends any retailers page back to overview.
+    // State app only. window.BI_STATE (the user's state) is set before this runs.
+    // - hides admin tools (import, edit leaders, export & share, PNG saves) everywhere
+    // - Active retailers (IDs) and their Excel export: own state only; other states are switched to own
+    // - without a state: all retailer IDs and Excel stay hidden
     private static final String STATE_LOCK_JS =
-            "(function(){if(window.__bist)return;window.__bist=1;" +
-            "var css='#data-tools,#unlock-b,#exmenu,#imodal,#umodal,#lmodal,#cmodal,#tmodal,[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"],input[type=file]{display:none!important}';" +
+            "(function(){if(window.__bist)return;window.__bist=1;window.__biStateApp=1;var own=window.BI_STATE||'';" +
+            "var retSel='[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"],';" +
+            "var css='#data-tools,#unlock-b,#exmenu,#imodal,#umodal,#lmodal,#cmodal,#tmodal,'+(own?'':retSel)+'input[type=file]{display:none!important}';" +
             "function addCss(){if(document.getElementById('bist-css'))return;var r=document.head||document.documentElement;if(!r)return;var s=document.createElement('style');s.id='bist-css';s.textContent=css;r.appendChild(s)}" +
-            "var bad=/(import data|export|edit leaders|save updated file|shareable copy|blank template|common all-states|common file|active retailers|unlock my state|retailer ids|save png|excel)/i;" +
-            "function check(e){if(e.__bis)return;if(bad.test((e.textContent||'')+' '+(e.title||''))){e.style.setProperty('display','none','important');e.__bis=1}}" +
+            "var bad=new RegExp('(import data|export & share|edit leaders|save updated file|shareable copy|blank template|common all-states|common file|unlock my state|save png'+(own?'':'|active retailers|retailer ids')+')','i');" +
+            "var exl=/(excel|export)/i;" +
+            "function hashTxt(){try{return decodeURIComponent(location.hash.slice(1))}catch(x){return ''}}" +
+            "function retvOn(){var b=document.querySelector('#tabs [data-t=\"retv\"]');return !!(b&&b.getAttribute('aria-selected')==='true')}" +
+            "function scopeVal(){var s=document.getElementById('scope-sel');return s&&s.selectedOptions[0]?s.selectedOptions[0].textContent.trim():''}" +
+            "function inRet(){return /^retailers=/i.test(hashTxt())||retvOn()}" +
+            "window.__biCanExport=function(){if(!own||!inRet())return false;var h=hashTxt();if(/^retailers=/i.test(h))return h.indexOf('retailers='+own+'~')===0;return scopeVal()===own};" +
+            "function setScope(){var s=document.getElementById('scope-sel');if(!s)return;var o=[].find.call(s.options,function(x){return x.textContent.trim()===own});if(o&&s.value!==o.value){s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}))}}" +
+            "function enforce(){if(!own)return;var h=hashTxt(),m=/^retailers=([^~]*)~?(.*)$/i.exec(h);" +
+            "if(m&&m[1]!==own){location.replace('#retailers='+encodeURIComponent(own)+'~'+(m[2]||'all'));return}" +
+            "if(retvOn()&&scopeVal()!==own)setScope()}" +
+            "function check(e){if(e.__bis===1)return;var t=(e.textContent||'')+' '+(e.title||'');" +
+            "if(bad.test(t)){e.style.setProperty('display','none','important');e.__bis=1;return}" +
+            "if(exl.test(t)){if(window.__biCanExport()){if(e.__bis===2){e.style.removeProperty('display');e.__bis=0}}else{e.style.setProperty('display','none','important');e.__bis=2}}}" +
             "function scan(root){if(!root||root.nodeType!==1)return;if(root.matches('button,a'))check(root);var els=root.querySelectorAll('button,a');for(var i=0;i<els.length;i++)check(els[i])}" +
-            "var pend=[],full=1;function scrub(){addCss();if(full){full=0;pend=[];scan(document.documentElement);return}var p=pend;pend=[];" +
+            "var pend=[],full=1;function scrub(){addCss();enforce();if(full){full=0;pend=[];scan(document.documentElement);return}var p=pend;pend=[];" +
             "for(var i=0;i<p.length;i++){var n=p[i];if(n.isConnected)scan(n)}}" +
-            "function guard(){var h='';try{h=decodeURIComponent(location.hash.slice(1))}catch(x){}if(/^(retailers|retv|ret)\\b/i.test(h)){location.hash=''}}" +
-            "var q=0;function tick(){if(q)return;q=1;setTimeout(function(){q=0;scrub();guard()},80)}" +
+            "function guard(){var h=hashTxt();if(!own&&/^(retailers|retv|ret)\\b/i.test(h)){location.hash=''}full=1;tick()}" +
+            "var q=0;function tick(){if(q)return;q=1;setTimeout(function(){q=0;scrub()},80)}" +
             "addCss();tick();document.addEventListener('DOMContentLoaded',function(){full=1;tick()});" +
             "new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i],t=m.target;" +
-            "if(t.nodeType===1){var b=t.closest&&t.closest('button,a');if(b)pend.push(b)}" +
+            "if(t.nodeType===1){var b=t.closest&&t.closest('button,a');if(b)pend.push(b);if(t.id==='tabs'||t.closest&&t.closest('#tabs'))full=1}" +
             "for(var j=0;j<m.addedNodes.length;j++){if(m.addedNodes[j].nodeType===1)pend.push(m.addedNodes[j])}}" +
-            "if(pend.length>400){pend=[];full=1}tick()}).observe(document,{childList:true,subtree:true});" +
+            "if(pend.length>400){pend=[];full=1}tick()}).observe(document,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-selected']});" +
             "window.addEventListener('hashchange',guard);" +
-            "document.addEventListener('click',function(e){var t=e.target&&e.target.closest?e.target.closest('[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"]'):null;" +
-            "if(t){e.preventDefault();e.stopImmediatePropagation()}},true);" +
+            "document.addEventListener('change',function(e){if(e.target&&e.target.id==='scope-sel'){full=1;tick()}},true);" +
+            "document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a[href*=\"retailers=\"],[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"]'):null;if(!a)return;" +
+            "if(!own){e.preventDefault();e.stopImmediatePropagation();return}" +
+            "var href=a.getAttribute('href')||'';if(href.indexOf('retailers=')>=0){var h2='';try{h2=decodeURIComponent(href.split('#')[1]||'')}catch(x){}" +
+            "if(h2.indexOf('retailers='+own+'~')!==0){e.preventDefault();e.stopImmediatePropagation();location.hash='retailers='+encodeURIComponent(own)+'~all'}}},true);" +
             "})();";
+
+    // State-lock script with the signed-in user's state.
+    private String stateLockScript() {
+        String st = profile().optString("state", "");
+        return "window.BI_STATE=" + JSONObject.quote(st) + ";" + STATE_LOCK_JS;
+    }
 
     // Loads the BI Assistant (search + chatbot) from the dashboard site. A daily version keeps it fresh.
     private static final String ASSIST_LOADER_JS =
