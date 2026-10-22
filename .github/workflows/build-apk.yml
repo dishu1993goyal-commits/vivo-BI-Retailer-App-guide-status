@@ -22,20 +22,29 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build release APK
-        run: gradle :app:assembleRelease --no-daemon
+      - name: Build admin and state APKs
+        run: gradle :app:assembleAdminRelease :app:assembleStateRelease --no-daemon
 
-      - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk vivo-BI-Dashboard.apk
+      - name: Rename APKs
+        run: |
+          cp app/build/outputs/apk/admin/release/app-admin-release.apk vivo-BI-Dashboard.apk
+          cp app/build/outputs/apk/state/release/app-state-release.apk vivo-BI-States.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: vivo-BI-Dashboard-apk
-          path: vivo-BI-Dashboard.apk
+          name: vivo-BI-apks
+          path: |
+            vivo-BI-Dashboard.apk
+            vivo-BI-States.apk
 
       - name: Publish to Releases (easy phone download)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: vivo BI Dashboard APK (build ${{ github.run_number }})
-          files: vivo-BI-Dashboard.apk
+          name: vivo BI apps (build ${{ github.run_number }})
+          body: |
+            vivo-BI-Dashboard.apk = Admin app (full access)
+            vivo-BI-States.apk = State app (view only)
+          files: |
+            vivo-BI-Dashboard.apk
+            vivo-BI-States.apk

@@ -55,8 +55,9 @@ public class MainActivity extends Activity {
     private static final String APP_HOST = "vivo-business-innovation-dashboard-22.netlify.app";
     private static final int FILE_CHOOSER_REQUEST = 1001;
 
-    // SHA-256 of the app password (the password itself is not stored in the app)
-    private static final String PASSWORD_SHA256 = "e90006efb1935ad651efa74b10b58270650d34be833a320228eef0437dad2403";
+    // SHA-256 of the app password, set per app version in app/build.gradle (the password itself is not stored)
+    private static final String PASSWORD_SHA256 = BuildConfig.PASSWORD_SHA256;
+    private static final boolean STATE_APP = BuildConfig.STATE_APP;
     private static final long RELOCK_AFTER_MS = 5 * 60 * 1000; // re-ask after 5 min in background
     private static final int MAX_ATTEMPTS = 5;
     private static final long LOCKOUT_MS = 30 * 1000;
@@ -269,13 +270,13 @@ public class MainActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
-                view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
+                view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
             }
 
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
+                view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
             }
 
             @Override
@@ -293,6 +294,11 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (STATE_APP) { // no imports in the state app
+                    callback.onReceiveValue(null);
+                    Toast.makeText(MainActivity.this, "Import is not available in this app", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
                 if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                 filePathCallback = callback;
                 // The page asks for ".xlsx" etc. — Android's picker only understands MIME types,
@@ -314,9 +320,13 @@ public class MainActivity extends Activity {
         });
 
         // Bridge that receives files created inside the page (blob:/data: downloads) and saves them
-        webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+        if (!STATE_APP) webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            if (STATE_APP) { // no exports/downloads in the state app
+                Toast.makeText(this, "Download is not available in this app", Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (url.startsWith("blob:") || url.startsWith("data:")) {
                 String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
                 webView.evaluateJavascript("window.__bidlSend && window.__bidlSend("
@@ -387,6 +397,24 @@ public class MainActivity extends Activity {
             "if(a&&grab(a)){e.preventDefault();e.stopImmediatePropagation()}},true);" +
             "var oc=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){" +
             "if(!this.isConnected&&grab(this))return;return oc.apply(this,arguments)};" +
+            "})();";
+
+    // State app only: hides admin tools (import, edit leaders, export & share), the Active
+    // retailers tab and every link to retailer IDs, and sends any retailers page back to overview.
+    private static final String STATE_LOCK_JS =
+            "(function(){if(window.__bist)return;window.__bist=1;" +
+            "var css='#data-tools,#unlock-b,#exmenu,#imodal,#umodal,#lmodal,#cmodal,#tmodal,[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"],input[type=file]{display:none!important}';" +
+            "function addCss(){if(document.getElementById('bist-css'))return;var s=document.createElement('style');s.id='bist-css';s.textContent=css;(document.head||document.documentElement).appendChild(s)}" +
+            "var bad=/(import data|export|edit leaders|save updated file|shareable copy|blank template|common all-states|common file|active retailers|unlock my state|retailer ids|save png|excel)/i;" +
+            "function scrub(){addCss();var els=document.querySelectorAll('button,a');for(var i=0;i<els.length;i++){var e=els[i];if(e.__bis)continue;" +
+            "if(bad.test((e.textContent||'')+' '+(e.title||''))){e.style.setProperty('display','none','important');e.__bis=1}}}" +
+            "function guard(){var h='';try{h=decodeURIComponent(location.hash.slice(1))}catch(x){}if(/^(retailers|retv|ret)\\b/i.test(h)){location.hash=''}}" +
+            "var q=0;function tick(){if(q)return;q=1;setTimeout(function(){q=0;scrub();guard()},60)}" +
+            "addCss();tick();document.addEventListener('DOMContentLoaded',tick);" +
+            "new MutationObserver(tick).observe(document.documentElement,{childList:true,subtree:true});" +
+            "window.addEventListener('hashchange',guard);" +
+            "document.addEventListener('click',function(e){var t=e.target&&e.target.closest?e.target.closest('[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"]'):null;" +
+            "if(t){e.preventDefault();e.stopImmediatePropagation()}},true);" +
             "})();";
 
     private static String mimeFor(String name, String given) {

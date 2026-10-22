@@ -10,8 +10,34 @@ android {
         applicationId 'com.vivo.bidashboard'
         minSdk 24
         targetSdk 34
-        versionCode 3
-        versionName '1.2'
+        versionCode 4
+        versionName '1.3'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    flavorDimensions 'role'
+    productFlavors {
+        // Admin app: full dashboard (import, export, active retailers). Installs over the existing app.
+        admin {
+            dimension 'role'
+            applicationId 'com.vivo.bidashboard'
+            resValue 'string', 'app_name', 'vivo BI Dashboard'
+            buildConfigField 'boolean', 'STATE_APP', 'false'
+            // SHA-256 of vivoBI@2026
+            buildConfigField 'String', 'PASSWORD_SHA256', '"e90006efb1935ad651efa74b10b58270650d34be833a320228eef0437dad2403"'
+        }
+        // State app: view-only — no import/export/edit tools, no active retailer details.
+        state {
+            dimension 'role'
+            applicationId 'com.vivo.bidashboard.state'
+            resValue 'string', 'app_name', 'vivo BI States'
+            buildConfigField 'boolean', 'STATE_APP', 'true'
+            // SHA-256 of vivoState@2026
+            buildConfigField 'String', 'PASSWORD_SHA256', '"3577b5f173d6ace1cbff153510cb8b3eef4003706b6ba05152056b0e5268f376"'
+        }
     }
 
     signingConfigs {
