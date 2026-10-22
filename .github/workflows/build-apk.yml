@@ -23,7 +23,14 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build admin and state APKs
-        run: gradle :app:assembleAdminRelease :app:assembleStateRelease --no-daemon
+        run: |
+          set -o pipefail
+          gradle :app:assembleAdminRelease :app:assembleStateRelease --no-daemon 2>&1 | tee build.log
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          grep -E "error:|e: |What went wrong|Could not|> |requires|incompatible|cannot find symbol|symbol:|location:" build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Rename APKs
         run: |
