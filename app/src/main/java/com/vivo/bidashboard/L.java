@@ -214,6 +214,9 @@ final class L {
                 "आपका राज्य तय करता है कि कौन से एक्टिव रिटेलर ID दिखेंगे। बदलने के लिए BI एडमिन से कहें।");
         put("call", "Call", "कॉल करें");
         put("change_state", "Change state", "राज्य बदलें");
+        put("admin_insights", "Admin insights", "एडमिन इनसाइट्स");
+        put("access_insights", "Access logs & insights", "एक्सेस लॉग और इनसाइट्स");
+        put("support_report", "Support desk report", "सपोर्ट डेस्क रिपोर्ट");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

@@ -1139,6 +1139,7 @@ public class MainActivity extends FragmentActivity {
     private void showProfile() {
         unlocked = false;
         inProfile = true;
+        inAdminPage = false;
         JSONObject p = profile();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
@@ -1204,7 +1205,8 @@ public class MainActivity extends FragmentActivity {
         if (!STATE_APP) {
             LinearLayout adm = card(page, tr("sec_admin"));
             row(adm, "👥", tr("registered_users"), "", v -> showUsers("state", ""));
-            row(adm, "🕒", tr("access_logs"), "", v -> showLogs(null, "all"));
+            row(adm, "📊", tr("access_insights"), "", v -> showAdminPage("logs"));
+            row(adm, "🎧", tr("support_report"), "", v -> showAdminPage("support"));
         }
 
         LinearLayout help = card(page, tr("sec_tools"));
@@ -1742,6 +1744,63 @@ public class MainActivity extends FragmentActivity {
             String data = res.optString("data"), name = res.optString("name", "attachment"), mime = res.optString("mime", "");
             new Thread(() -> new DownloadBridge().save(data, name, mime)).start();
         });
+    }
+
+    // ---------- Admin app: insights page (access logs + support desk analytics) ----------
+    private WebView adminWeb;
+    private boolean inAdminPage = false;
+
+    private class AdminBridge {
+        @JavascriptInterface
+        public String getAuth() {
+            if (STATE_APP) return "{}";
+            return obj("username", sessionUser(), "token", sessionToken()).toString();
+        }
+    }
+
+    private void showAdminPage(String tab) {
+        if (STATE_APP) return;
+        inProfile = true;
+        unlocked = false;
+        inAdminPage = true;
+        if (adminWeb == null) {
+            adminWeb = new WebView(this);
+            WebSettings ws = adminWeb.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            adminWeb.addJavascriptInterface(new AdminBridge(), "BIApp");
+            adminWeb.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+            adminWeb.setWebViewClient(new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    Uri u = request.getUrl();
+                    if (u.getHost() != null && u.getHost().endsWith(APP_HOST)) return false;
+                    openExternally(u);
+                    return true;
+                }
+
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
+                }
+            });
+            adminWeb.setDownloadListener((url, ua, cd, mime, len) -> {
+                if (url.startsWith("blob:") || url.startsWith("data:")) {
+                    String name = URLUtil.guessFileName(url, cd, mime);
+                    adminWeb.evaluateJavascript("window.__bidlSend&&window.__bidlSend(" + JSONObject.quote(url) + "," + JSONObject.quote(name) + ")", null);
+                }
+            });
+        }
+        if (adminWeb.getParent() != null) ((ViewGroup) adminWeb.getParent()).removeView(adminWeb);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F3F4F9"));
+        page.addView(profileHeaderBar(tr("admin_insights"), () -> { inAdminPage = false; showProfile(); }));
+        page.addView(adminWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
+        detachWebView();
+        setContentView(page);
+        adminWeb.loadUrl(START_URL + "admin.html?v=" + System.currentTimeMillis() + "#" + tab);
     }
 
     // ---------- Admin app: registered users and access log ----------
@@ -2440,6 +2499,7 @@ public class MainActivity extends FragmentActivity {
         // Bridge that receives files created inside the page (blob:/data: downloads) and saves them
         // (state app: only the own-state Active retailers Excel export gets through, checked in the page)
         webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+        webView.addJavascriptInterface(new AIBridge(), "BIAI");
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             if (STATE_APP) {
@@ -2595,10 +2655,12 @@ public class MainActivity extends FragmentActivity {
 
     // Loads the BI Assistant (search + chatbot) from the dashboard site. A daily version keeps it fresh.
     private static final String ASSIST_LOADER_JS =
-            "(function(){if(window.BIAssist||document.getElementById('bia-loader'))return;" +
+            "(function(){var need=2.0;if(window.BIAssist&&parseFloat(window.BIAssist.version||'0')>=need)return;" +
+            "if(window.BIAssist){try{delete window.BIAssist}catch(e){window.BIAssist=undefined}var o=document.getElementById('bia-loader');if(o)o.remove()}" +
+            "if(document.getElementById('bia-loader'))return;" +
             "window.BI_APP='" + (BuildConfig.STATE_APP ? "state" : "admin") + "';" +
             "var s=document.createElement('script');s.id='bia-loader';" +
-            "s.src='/assistant.js?v='+new Date().toISOString().slice(0,10);" +
+            "s.src='/assistant.js?v='+Date.now();" +
             "(document.head||document.documentElement).appendChild(s);})();";
 
     private static String mimeFor(String name, String given) {
@@ -2616,6 +2678,32 @@ public class MainActivity extends FragmentActivity {
             case "json": return "application/json";
             case "txt": return "text/plain";
             default: return "application/octet-stream";
+        }
+    }
+
+    // Lets the assistant in the page ask the free AI through the accounts service (the session stays in the app).
+    private class AIBridge {
+        private void reply(String id, JSONObject res, boolean ok, String err) {
+            try {
+                if (!res.has("ok")) res.put("ok", ok);
+                if (!ok && !res.has("error")) res.put("error", err);
+            } catch (Exception ignored) { }
+            final String js = "window.__biaiCb&&window.__biaiCb(" + JSONObject.quote(id) + "," + JSONObject.quote(res.toString()) + ")";
+            ui.post(() -> { if (webView != null) webView.evaluateJavascript(js, null); });
+        }
+
+        @JavascriptInterface
+        public void status(String id) {
+            ui.post(() -> callAuth(sessionBody("action", "ai-status"), (ok, res, err) -> reply(id, res, ok, err)));
+        }
+
+        @JavascriptInterface
+        public void ask(String id, String question, String context, String history) {
+            org.json.JSONArray h;
+            try { h = new org.json.JSONArray(history == null ? "[]" : history); } catch (Exception e) { h = new org.json.JSONArray(); }
+            final org.json.JSONArray hist = h;
+            ui.post(() -> callAuth(sessionBody("action", "ai-ask", "question", question, "context", context, "history", hist),
+                    (ok, res, err) -> reply(id, res, ok, err)));
         }
     }
 
@@ -2694,6 +2782,11 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     public void onBackPressed() {
+        if (inAdminPage) {
+            inAdminPage = false;
+            showProfile();
+            return;
+        }
         if (inProfile) {
             openDashboard();
             return;
