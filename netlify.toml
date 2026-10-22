@@ -5,3 +5,9 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+# The apps load assistant.js with a daily ?v= version, so a day of caching is safe.
+[[headers]]
+  for = "/assistant.js"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

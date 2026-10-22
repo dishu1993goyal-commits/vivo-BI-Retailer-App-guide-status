@@ -77,8 +77,18 @@
   };
 
   // ---------------- hidden copy of the dashboard for reading data ----------------
-  var frame = null, frameReady = null;
+  // The copy is created only when an answer needs data, and removed after 90 s idle to free memory.
+  var frame = null, frameReady = null, frameIdle = null;
+  var FRAME_IDLE_MS = 90000;
+  function releaseFrame() {
+    if (frameIdle) clearTimeout(frameIdle);
+    frameIdle = null;
+    if (frame) { try { frame.src = "about:blank"; } catch (e) { } frame.remove(); }
+    frame = null; frameReady = null;
+  }
+  function touchFrame() { if (frameIdle) clearTimeout(frameIdle); frameIdle = setTimeout(releaseFrame, FRAME_IDLE_MS); }
   function harvester() {
+    touchFrame();
     if (frameReady) return frameReady;
     frameReady = new Promise(function (resolve, reject) {
       frame = el("iframe");
@@ -87,8 +97,8 @@
       frame.src = location.origin + location.pathname;
       frame.onload = async function () {
         var w = frame.contentWindow;
-        var ok = await waitFor(function () { return w.document.querySelector("#tabs [data-t]") && w.document.querySelector("#per-sel option"); }, 20000);
-        if (ok) resolve(w); else { frameReady = null; reject(new Error("load")); }
+        var ok = await waitFor(function () { return w.document.querySelector("#tabs [data-t]") && w.document.querySelector("#per-sel option"); }, 30000);
+        if (ok) resolve(w); else { releaseFrame(); reject(new Error("load")); }
       };
       D.body.appendChild(frame);
     });
@@ -211,7 +221,7 @@
     D.body.appendChild(ov);
     return p;
   }
-  function closeAll() { var o = D.getElementById("bia-ov"); if (o) o.remove(); }
+  function closeAll() { var o = D.getElementById("bia-ov"); if (o) o.remove(); if (frame) touchFrame(); }
 
   // ---------------- SEARCH ----------------
   function searchIndex() {
@@ -303,7 +313,6 @@
     send.onclick = submit; chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
     bot("👋 Hi! I'm your BI Assistant. I read the live dashboard (" + (periodLabel() || "selected period") + ") and can explain rankings, scores, KPI logic and what to do next.\n\nWhat would you like to know?");
     menu();
-    harvester().catch(function () { });          // start loading data in the background
     if (question) ask(question);
   }
   function scroll() { if (chatBody) chatBody.scrollTop = chatBody.scrollHeight; }
@@ -327,7 +336,7 @@
   }
   function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
   async function working(fn) {
-    busy = true; var t = el("div", "bia-typing", "Reading the dashboard…"); chatBody.appendChild(t); scroll();
+    busy = true; var t = el("div", "bia-typing", frameReady ? "Reading the dashboard…" : "Reading the dashboard… (first answer takes a few seconds)"); chatBody.appendChild(t); scroll();
     try { await fn(); } catch (e) { bot("Sorry, I couldn't read that part of the dashboard right now. Please check your internet and try again."); }
     t.remove(); busy = false; scroll();
   }
@@ -569,5 +578,5 @@
     menu();
   }
 
-  window.BIAssist = { openSearch: openSearch, openChat: openChat, findOnPage: findOnPage, version: "1.0" };
+  window.BIAssist = { openSearch: openSearch, openChat: openChat, findOnPage: findOnPage, version: "1.1" };
 })();
