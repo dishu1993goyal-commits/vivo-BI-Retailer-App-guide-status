@@ -137,6 +137,9 @@ final class L {
         put("size_normal", "Normal", "सामान्य");
         put("size_large", "Large", "बड़ा");
         put("size_xlarge", "Extra large", "बहुत बड़ा");
+        put("search", "Search", "खोजें");
+        put("assistant", "BI Assistant", "BI असिस्टेंट");
+        put("assistant_loading", "Dashboard is still loading. Please try again in a moment.", "डैशबोर्ड लोड हो रहा है। थोड़ी देर में फिर कोशिश करें।");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

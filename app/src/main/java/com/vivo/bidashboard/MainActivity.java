@@ -884,6 +884,8 @@ public class MainActivity extends FragmentActivity {
         name.setTextColor(Color.parseColor("#111111"));
         name.setPadding(dp(10), 0, 0, 0);
         bar.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+        bar.addView(barButton("🔍", tr("search"), "openSearch"));
+        bar.addView(barButton("💬", tr("assistant"), "openChat"));
         topAvatar = new FrameLayout(this);
         topAvatar.setContentDescription(tr("profile"));
         topAvatar.setOnClickListener(v -> showProfile());
@@ -893,6 +895,33 @@ public class MainActivity extends FragmentActivity {
         dashboardRoot.addView(bar, new LinearLayout.LayoutParams(-1, dp(48)));
         dashboardRoot.addView(webView, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(dashboardRoot);
+    }
+
+    // Search and chatbot come from assistant.js on the dashboard site (loaded into the page).
+    private TextView barButton(String icon, String label, String fn) {
+        TextView b = new TextView(this);
+        b.setText(icon);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        b.setGravity(Gravity.CENTER);
+        b.setContentDescription(label);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(42), dp(40)));
+        b.setBackgroundResource(android.R.drawable.list_selector_background);
+        b.setOnClickListener(v -> openAssistant(fn));
+        return b;
+    }
+
+    private void openAssistant(String fn) {
+        if (webView == null) return;
+        webView.evaluateJavascript(ASSIST_LOADER_JS, null);
+        webView.evaluateJavascript("(function(){if(window.BIAssist){BIAssist." + fn + "();return 'ok';}return 'wait';})()", r -> {
+            if (r != null && r.contains("wait")) {
+                // assistant still loading: try again shortly
+                ui.postDelayed(() -> webView.evaluateJavascript(
+                        "(function(){if(window.BIAssist){BIAssist." + fn + "();return 'ok';}return 'wait';})()", r2 -> {
+                            if (r2 != null && r2.contains("wait")) Toast.makeText(this, tr("assistant_loading"), Toast.LENGTH_SHORT).show();
+                        }), 1500);
+            }
+        });
     }
 
     private void applySettings() {
@@ -1497,6 +1526,7 @@ public class MainActivity extends FragmentActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
+                if (url != null && url.startsWith(START_URL)) view.evaluateJavascript(ASSIST_LOADER_JS, null);
             }
 
             @Override
@@ -1640,6 +1670,14 @@ public class MainActivity extends FragmentActivity {
             "document.addEventListener('click',function(e){var t=e.target&&e.target.closest?e.target.closest('[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"]'):null;" +
             "if(t){e.preventDefault();e.stopImmediatePropagation()}},true);" +
             "})();";
+
+    // Loads the BI Assistant (search + chatbot) from the dashboard site. A daily version keeps it fresh.
+    private static final String ASSIST_LOADER_JS =
+            "(function(){if(window.BIAssist||document.getElementById('bia-loader'))return;" +
+            "window.BI_APP='" + (BuildConfig.STATE_APP ? "state" : "admin") + "';" +
+            "var s=document.createElement('script');s.id='bia-loader';" +
+            "s.src='/assistant.js?v='+new Date().toISOString().slice(0,10);" +
+            "(document.head||document.documentElement).appendChild(s);})();";
 
     private static String mimeFor(String name, String given) {
         if (given != null && !given.isEmpty() && !given.equals("application/octet-stream")) return given;
