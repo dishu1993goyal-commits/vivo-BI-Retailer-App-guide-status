@@ -70,6 +70,21 @@ function newSession(rec, t) {
   return token;
 }
 
+// ---------- Access log ----------
+const LOG_KEEP = 2000;  // max entries returned per day
+// Date in India (UTC+5:30) so "today" matches the admin's day.
+export function istDate(t) { return new Date(t + 5.5 * 3600 * 1000).toISOString().slice(0, 10); }
+const clip = (v, n) => String(v || "").slice(0, n);
+async function logEvent(store, t, app, rec, event, b) {
+  if (!store.list) return;   // logging needs a listable store
+  const key = `log:${istDate(t)}:${app}:${t}-${randomBytes(3).toString("hex")}`;
+  await store.set(key, {
+    ts: t, app, event, username: rec ? rec.username : clip(b.username, 30),
+    fullName: rec ? rec.fullName : "", phone: rec ? rec.phone : "",
+    device: clip(b.device, 60), ver: clip(b.ver, 20),
+  });
+}
+
 function publicProfile(rec) {
   return {
     username: rec.username, fullName: rec.fullName, phone: rec.phone,
@@ -140,8 +155,10 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       createdAt: t, fails: 0, lockUntil: 0, sessions: [],
     };
     const token = newSession(rec, t);
+    rec.lastSeen = t;
     await store.set(uKeyOf(key), rec);
     await store.set(pKeyOf(phone), { key });
+    await logEvent(store, t, app, rec, "signup", b);
     return json(200, { ok: true, username, fullName: name, token, profile: publicProfile(rec) });
   }
 
@@ -159,9 +176,10 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       await store.set(uKeyOf(key), rec);
       return json(401, { ok: false, error: "User name or password is incorrect." });
     }
-    rec.fails = 0; rec.lockUntil = 0;
+    rec.fails = 0; rec.lockUntil = 0; rec.lastSeen = t;
     const token = newSession(rec, t);
     await store.set(uKeyOf(key), rec);
+    await logEvent(store, t, app, rec, "login", b);
     return json(200, { ok: true, username: rec.username, fullName: rec.fullName, token, profile: publicProfile(rec) });
   }
 
@@ -181,6 +199,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     // A reset logs the account out on every phone.
     Object.assign(rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t, sessions: [] });
     await store.set(uKeyOf(idx.key), rec);
+    await logEvent(store, t, app, rec, "password-reset", b);
     return json(200, { ok: true, username: rec.username });
   }
 
@@ -191,8 +210,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   }
 
   // ---------- Actions for a logged-in user (user name + session token) ----------
-  const SESSION_ACTIONS = ["me", "update-profile", "change-password", "upload-photo", "get-photo",
-    "remove-photo", "logout", "delete-account"];
+  const SESSION_ACTIONS = ["me", "ping", "update-profile", "change-password", "upload-photo", "get-photo",
+    "remove-photo", "logout", "delete-account", "admin-users", "admin-logs"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -203,6 +222,42 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const photoKey = `photo:${app}:${key}`;
 
     if (b.action === "me") return json(200, { ok: true, profile: publicProfile(rec) });
+
+    // App opened (or brought back after a while) by a logged-in user.
+    if (b.action === "ping") {
+      rec.lastSeen = t;
+      await save();
+      await logEvent(store, t, app, rec, "open", b);
+      return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+
+    // ---------- Admin app only ----------
+    if (b.action === "admin-users" || b.action === "admin-logs") {
+      if (app !== "admin") return json(403, { ok: false, error: "Only the admin app can see this." });
+      if (!store.list) return json(500, { ok: false, error: "Not available." });
+      if (b.action === "admin-users") {
+        const which = b.which === "admin" ? "admin" : "state";
+        const keys = await store.list(`user:${which}:`);
+        const users = [];
+        for (const k of keys) {
+          const u = await store.get(k);
+          if (!u) continue;
+          users.push({ username: u.username, fullName: u.fullName, phone: u.phone, email: u.email || "",
+            state: u.state || "", designation: u.designation || "", createdAt: u.createdAt || 0,
+            lastSeen: u.lastSeen || 0, loggedInPhones: (u.sessions || []).length });
+        }
+        users.sort((a, c) => (c.lastSeen || c.createdAt) - (a.lastSeen || a.createdAt));
+        return json(200, { ok: true, which, users });
+      }
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(String(b.date || "")) ? b.date : istDate(t);
+      const only = b.which === "admin" || b.which === "state" ? b.which : null;
+      const keys = await store.list(`log:${date}:` + (only ? only + ":" : ""));
+      const logs = [];
+      keys.sort((x, y) => Number(y.split(":")[3].split("-")[0]) - Number(x.split(":")[3].split("-")[0]));
+      for (const k of keys.slice(0, LOG_KEEP)) { const e = await store.get(k); if (e) logs.push(e); }
+      logs.sort((x, y) => y.ts - x.ts);
+      return json(200, { ok: true, date, logs, total: keys.length });
+    }
 
     if (b.action === "update-profile") {
       const p = b.profile || {};
@@ -254,6 +309,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action === "logout") {
       rec.sessions = (rec.sessions || []).filter((x) => x.h !== th);
       await save();
+      await logEvent(store, t, app, rec, "logout", b);
       return json(200, { ok: true });
     }
 

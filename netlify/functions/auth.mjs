@@ -9,6 +9,13 @@ export default async (req) => {
     get: (k) => blobs.get(k, { type: "json" }),
     set: (k, v) => blobs.setJSON(k, v),
     delete: (k) => blobs.delete(k),
+    list: async (prefix) => {
+      const keys = [];
+      for await (const page of blobs.list({ prefix, paginate: true })) {
+        for (const x of page.blobs) keys.push(x.key);
+      }
+      return keys;
+    },
   };
   try {
     return await handle(req, { store });
