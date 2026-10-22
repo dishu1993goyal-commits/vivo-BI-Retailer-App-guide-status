@@ -1,9 +1,20 @@
 package com.vivo.bidashboard;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
+import android.os.Build;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.webkit.JavascriptInterface;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import org.json.JSONObject;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -256,6 +267,18 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
+            }
+
+            @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
                     String html = "<html><body style='font-family:sans-serif;text-align:center;padding-top:40%;color:#333'>"
@@ -272,8 +295,16 @@ public class MainActivity extends Activity {
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                 if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                 filePathCallback = callback;
+                // The page asks for ".xlsx" etc. — Android's picker only understands MIME types,
+                // so open the picker for all files and let the page validate the choice.
+                Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                pick.addCategory(Intent.CATEGORY_OPENABLE);
+                pick.setType("*/*");
+                if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
+                    pick.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+                }
                 try {
-                    startActivityForResult(params.createIntent(), FILE_CHOOSER_REQUEST);
+                    startActivityForResult(Intent.createChooser(pick, "Choose file"), FILE_CHOOSER_REQUEST);
                 } catch (ActivityNotFoundException e) {
                     filePathCallback = null;
                     return false;
@@ -282,9 +313,14 @@ public class MainActivity extends Activity {
             }
         });
 
+        // Bridge that receives files created inside the page (blob:/data: downloads) and saves them
+        webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             if (url.startsWith("blob:") || url.startsWith("data:")) {
-                Toast.makeText(this, "This download type isn't supported in the app", Toast.LENGTH_SHORT).show();
+                String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                webView.evaluateJavascript("window.__bidlSend && window.__bidlSend("
+                        + JSONObject.quote(url) + "," + JSONObject.quote(name) + ")", null);
                 return;
             }
             try {
@@ -318,11 +354,130 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == FILE_CHOOSER_REQUEST && filePathCallback != null) {
-            filePathCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            Uri[] result = null;
+            if (resultCode == RESULT_OK && data != null) {
+                if (data.getClipData() != null) {
+                    int n = data.getClipData().getItemCount();
+                    result = new Uri[n];
+                    for (int i = 0; i < n; i++) result[i] = data.getClipData().getItemAt(i).getUri();
+                } else if (data.getData() != null) {
+                    result = new Uri[]{data.getData()};
+                }
+            }
+            filePathCallback.onReceiveValue(result);
             filePathCallback = null;
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    // Catches downloads the page creates itself (<a download href="blob:..."> and data: links),
+    // reads the file contents and hands them to AndroidDL.save(). Revokes are delayed so the
+    // page's own cleanup can't delete the file before it has been read.
+    private static final String DOWNLOAD_HOOK_JS =
+            "(function(){if(window.__bidl)return;window.__bidl=1;" +
+            "var rv=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=function(u){setTimeout(function(){rv(u)},120000)};" +
+            "window.__bidlSend=function(href,name){fetch(href).then(function(r){return r.blob()}).then(function(b){" +
+            "var fr=new FileReader();fr.onloadend=function(){var s=String(fr.result);var i=s.indexOf(',');" +
+            "AndroidDL.save(s.substring(i+1),name||'download',b.type||'')};fr.onerror=function(){AndroidDL.fail('read')};" +
+            "fr.readAsDataURL(b)})['catch'](function(e){AndroidDL.fail(String(e))})};" +
+            "function grab(a){var h=a.href||'';if(a.hasAttribute('download')&&(h.indexOf('blob:')===0||h.indexOf('data:')===0)){" +
+            "window.__bidlSend(h,a.getAttribute('download')||a.download||'');return true}return false}" +
+            "document.addEventListener('click',function(e){var t=e.target;var a=t&&t.closest?t.closest('a'):null;" +
+            "if(a&&grab(a)){e.preventDefault();e.stopImmediatePropagation()}},true);" +
+            "var oc=HTMLAnchorElement.prototype.click;HTMLAnchorElement.prototype.click=function(){" +
+            "if(!this.isConnected&&grab(this))return;return oc.apply(this,arguments)};" +
+            "})();";
+
+    private static String mimeFor(String name, String given) {
+        if (given != null && !given.isEmpty() && !given.equals("application/octet-stream")) return given;
+        String ext = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "";
+        switch (ext) {
+            case "xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            case "xls": return "application/vnd.ms-excel";
+            case "csv": return "text/csv";
+            case "zip": return "application/zip";
+            case "png": return "image/png";
+            case "jpg": case "jpeg": return "image/jpeg";
+            case "pdf": return "application/pdf";
+            case "html": case "htm": return "text/html";
+            case "json": return "application/json";
+            case "txt": return "text/plain";
+            default: return "application/octet-stream";
+        }
+    }
+
+    private class DownloadBridge {
+        @JavascriptInterface
+        public void save(String base64, String rawName, String mime) {
+            String name = rawName == null ? "" : rawName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+            if (name.isEmpty()) name = "download";
+            String type = mimeFor(name, mime);
+            try {
+                byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+                Uri saved = null;
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                    cv.put(MediaStore.MediaColumns.MIME_TYPE, type);
+                    cv.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                    ContentResolver cr = getContentResolver();
+                    saved = cr.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                    if (saved == null) throw new Exception("Could not create file");
+                    try (OutputStream os = cr.openOutputStream(saved)) {
+                        os.write(bytes);
+                    }
+                } else {
+                    File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                    if (dir != null && !dir.exists()) dir.mkdirs();
+                    File f = new File(dir, name);
+                    try (FileOutputStream os = new FileOutputStream(f)) {
+                        os.write(bytes);
+                    }
+                }
+                final Uri uri = saved;
+                final String fname = name;
+                runOnUiThread(() -> afterSave(uri, fname, type));
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                        "Couldn't save file: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }
+
+        @JavascriptInterface
+        public void fail(String reason) {
+            runOnUiThread(() -> Toast.makeText(MainActivity.this,
+                    "Download failed, please try again", Toast.LENGTH_LONG).show());
+        }
+    }
+
+    private void afterSave(Uri uri, String name, String type) {
+        if (uri == null) {
+            Toast.makeText(this, "Saved " + name, Toast.LENGTH_LONG).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Saved to Downloads")
+                .setMessage(name)
+                .setPositiveButton("Share", (d, w) -> {
+                    Intent s = new Intent(Intent.ACTION_SEND);
+                    s.setType(type);
+                    s.putExtra(Intent.EXTRA_STREAM, uri);
+                    s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(s, "Share " + name));
+                })
+                .setNeutralButton("Open", (d, w) -> {
+                    Intent o = new Intent(Intent.ACTION_VIEW);
+                    o.setDataAndType(uri, type);
+                    o.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    try {
+                        startActivity(o);
+                    } catch (ActivityNotFoundException e) {
+                        Toast.makeText(this, "No app found to open this file", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("OK", null)
+                .show();
     }
 
     @Override
