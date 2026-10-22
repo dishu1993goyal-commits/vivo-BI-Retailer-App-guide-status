@@ -20,7 +20,7 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.10.2'
 
       - name: Build admin and state APKs
         run: |
@@ -30,7 +30,7 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          grep -E "error:|e: |What went wrong|Could not|> |requires|incompatible|cannot find symbol|symbol:|location:" build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+          grep -E "error:|e: |What went wrong|Could not|> |requires|incompatible|cannot find symbol|symbol:|location:|Dependency|  [0-9]\. |minCompileSdk|minAgpVersion" build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Rename APKs
         run: |
