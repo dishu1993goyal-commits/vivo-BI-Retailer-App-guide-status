@@ -1,6 +1,5 @@
 package com.vivo.bidashboard;
 
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
@@ -48,16 +47,31 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.fragment.app.FragmentActivity;
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.widget.ProgressBar;
+import com.truecaller.android.sdk.common.TrueException;
+import com.truecaller.android.sdk.common.VerificationCallback;
+import com.truecaller.android.sdk.common.VerificationDataBundle;
+import com.truecaller.android.sdk.common.models.TrueProfile;
+import com.truecaller.android.sdk.oAuth.CodeVerifierUtil;
+import com.truecaller.android.sdk.oAuth.TcOAuthCallback;
+import com.truecaller.android.sdk.oAuth.TcOAuthData;
+import com.truecaller.android.sdk.oAuth.TcOAuthError;
+import com.truecaller.android.sdk.oAuth.TcSdk;
+import com.truecaller.android.sdk.oAuth.TcSdkOptions;
+import java.math.BigInteger;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.List;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputFilter;
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
 
-public class MainActivity extends Activity {
+public class MainActivity extends FragmentActivity {
 
     private static final String START_URL = "https://vivo-business-innovation-dashboard-22.netlify.app/";
     private static final String APP_HOST = "vivo-business-innovation-dashboard-22.netlify.app";
@@ -80,6 +94,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        initTruecaller();
         startAuth();
     }
 
@@ -91,6 +106,12 @@ public class MainActivity extends Activity {
 
     private String verifiedPhone() {
         return getSharedPreferences("auth", MODE_PRIVATE).getString("verified_phone", null);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        try { TcSdk.clear(); } catch (Exception ignored) { }
     }
 
     @Override
@@ -123,53 +144,116 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---------- Mobile number + OTP (once per phone) ----------
-    private static final String OTP_URL = START_URL + "api/otp";
-    private static final int RESEND_SECONDS = 30;
+    // ---------- Mobile verification with Truecaller (once per phone) ----------
+    // Truecaller users: one-tap consent. Others: Truecaller sends a free missed call or OTP.
     private final Handler ui = new Handler(Looper.getMainLooper());
-    private Runnable resendTick;
+    private ActivityResultLauncher<Intent> tcLauncher;
+    private boolean tcReady = false;
+    private String tcState;
+    private TextView tcStatus;          // status line on the current verification screen
+    private String pendingPhone, pendingName;
+    private static final int PERM_REQUEST = 2001;
 
-    private interface ApiResult { void done(boolean ok, String error); }
-
-    // POSTs to the OTP service on the same Netlify site, off the main thread.
-    private void callOtpApi(JSONObject body, ApiResult cb) {
-        new Thread(() -> {
-            boolean ok = false;
-            String err = "No internet connection. Please try again.";
-            HttpURLConnection c = null;
+    private void initTruecaller() {
+        tcLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), r -> {
             try {
-                c = (HttpURLConnection) new URL(OTP_URL).openConnection();
-                c.setRequestMethod("POST");
-                c.setConnectTimeout(15000);
-                c.setReadTimeout(25000);
-                c.setDoOutput(true);
-                c.setRequestProperty("Content-Type", "application/json");
-                c.setRequestProperty("X-BI-App", "1");
-                try (OutputStream os = c.getOutputStream()) {
-                    os.write(body.toString().getBytes(StandardCharsets.UTF_8));
-                }
-                int code = c.getResponseCode();
-                InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
-                StringBuilder sb = new StringBuilder();
-                if (in != null) {
-                    try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-                        String line;
-                        while ((line = r.readLine()) != null) sb.append(line);
-                    }
-                }
-                JSONObject res = new JSONObject(sb.length() > 0 ? sb.toString() : "{}");
-                ok = res.optBoolean("ok", false);
-                err = res.optString("error", ok ? "" : "Something went wrong (" + code + "). Please try again.");
+                TcSdk.getInstance().onActivityResultObtained(this, r.getResultCode(), r.getData());
             } catch (Exception e) {
-                // keep the "No internet" message
-            } finally {
-                if (c != null) c.disconnect();
+                showManualVerify("Truecaller could not finish. Verify with missed call / OTP instead.");
             }
-            final boolean fOk = ok;
-            final String fErr = err;
-            ui.post(() -> cb.done(fOk, fErr));
-        }).start();
+        });
+        try {
+            TcSdkOptions options = new TcSdkOptions.Builder(this, tcOAuthCallback)
+                    .sdkOptions(TcSdkOptions.OPTION_VERIFY_ALL_USERS)
+                    .consentHeadingOption(TcSdkOptions.SDK_CONSENT_HEADING_LOG_IN_TO)
+                    .loginTextPrefix(TcSdkOptions.LOGIN_TEXT_PREFIX_TO_GET_STARTED)
+                    .footerType(TcSdkOptions.FOOTER_TYPE_ANOTHER_MOBILE_NO)
+                    .ctaText(TcSdkOptions.CTA_TEXT_PROCEED)
+                    .buttonShapeOptions(TcSdkOptions.BUTTON_SHAPE_ROUNDED)
+                    .consentMode(TcSdkOptions.CONSENT_MODE_BOTTOMSHEET)
+                    .build();
+            TcSdk.init(options);
+            tcReady = true;
+        } catch (Exception e) {
+            tcReady = false;
+        }
     }
+
+    private void markVerified(String phone) {
+        getSharedPreferences("auth", MODE_PRIVATE).edit()
+                .putString("verified_phone", phone == null || phone.isEmpty() ? "verified" : phone).apply();
+        Toast.makeText(this, "Mobile number verified", Toast.LENGTH_SHORT).show();
+        showLogin();
+    }
+
+    private void setStatus(String text, boolean error) {
+        if (tcStatus == null) return;
+        tcStatus.setTextColor(Color.parseColor(error ? "#C62828" : "#2E7D32"));
+        tcStatus.setText(text);
+    }
+
+    private final TcOAuthCallback tcOAuthCallback = new TcOAuthCallback() {
+        @Override
+        public void onSuccess(TcOAuthData data) {
+            if (tcState != null && data.getState() != null && !tcState.equals(data.getState())) {
+                setStatus("Verification could not be confirmed. Please try again.", true);
+                return;
+            }
+            markVerified("truecaller");
+        }
+
+        @Override
+        public void onFailure(TcOAuthError error) {
+            showManualVerify("Truecaller login was cancelled or failed. You can verify with a missed call / OTP.");
+        }
+
+        @Override
+        public void onVerificationRequired(TcOAuthError error) {
+            showManualVerify(null);
+        }
+    };
+
+    private final VerificationCallback tcVerifyCallback = new VerificationCallback() {
+        @Override
+        public void onRequestSuccess(int type, VerificationDataBundle bundle) {
+            TrueProfile profile = new TrueProfile.Builder(pendingName, "").build();
+            switch (type) {
+                case VerificationCallback.TYPE_MISSED_CALL_INITIATED:
+                    showWaiting("You will get a missed call on +91 " + pendingPhone
+                            + ". Don't answer it — it is verified automatically.");
+                    break;
+                case VerificationCallback.TYPE_MISSED_CALL_RECEIVED:
+                    setStatus("Missed call received. Verifying…", false);
+                    TcSdk.getInstance().verifyMissedCall(profile, tcVerifyCallback);
+                    break;
+                case VerificationCallback.TYPE_OTP_INITIATED:
+                case VerificationCallback.TYPE_IM_OTP_INITIATED:
+                    showTcOtpEntry();
+                    break;
+                case VerificationCallback.TYPE_OTP_RECEIVED:
+                case VerificationCallback.TYPE_IM_OTP_RECEIVED: {
+                    String otp = bundle == null ? null : bundle.getString(VerificationDataBundle.KEY_OTP);
+                    if (otp != null && !otp.isEmpty()) {
+                        setStatus("OTP received. Verifying…", false);
+                        TcSdk.getInstance().verifyOtp(profile, otp, tcVerifyCallback);
+                    }
+                    break;
+                }
+                case VerificationCallback.TYPE_PROFILE_VERIFIED_BEFORE:
+                    markVerified("+91" + pendingPhone);
+                    break;
+                default: // verification complete
+                    markVerified("+91" + pendingPhone);
+                    break;
+            }
+        }
+
+        @Override
+        public void onRequestFailure(int type, TrueException e) {
+            String m = e == null ? null : e.getExceptionMessage();
+            setStatus((m == null || m.isEmpty()) ? "Verification failed. Please try again." : m, true);
+        }
+    };
 
     private LinearLayout authHeader(String subtitle) {
         LinearLayout box = new LinearLayout(this);
@@ -259,8 +343,53 @@ public class MainActivity extends Activity {
 
     private void showOtpLogin() {
         unlocked = false;
-        if (resendTick != null) ui.removeCallbacks(resendTick);
-        LinearLayout box = authHeader("Enter your mobile number to get an OTP");
+        if (!tcReady) {
+            showManualVerify(null);
+            return;
+        }
+        boolean oauth = false;
+        try { oauth = TcSdk.getInstance().isOAuthFlowUsable(); } catch (Exception ignored) { }
+        if (!oauth) {
+            showManualVerify(null);
+            return;
+        }
+        LinearLayout box = authHeader("Verify your mobile number to continue");
+        Button tc = authButton("Verify with Truecaller");
+        box.addView(tc, new LinearLayout.LayoutParams(-1, dp(52)));
+        tcStatus = authMsg(box);
+        TextView other = new TextView(this);
+        other.setText("Use missed call / OTP instead");
+        other.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        other.setTextColor(Color.parseColor("#4D5BF9"));
+        other.setGravity(Gravity.CENTER);
+        other.setPadding(0, dp(18), 0, dp(8));
+        other.setOnClickListener(v -> showManualVerify(null));
+        box.addView(other, new LinearLayout.LayoutParams(-1, -2));
+        tc.setOnClickListener(v -> startTruecallerConsent());
+        showScreen(box, null);
+        startTruecallerConsent();
+    }
+
+    private void startTruecallerConsent() {
+        try {
+            tcState = new BigInteger(130, new SecureRandom()).toString(32);
+            TcSdk.getInstance().setOAuthState(tcState);
+            TcSdk.getInstance().setOAuthScopes(new String[]{"profile", "phone"});
+            String verifier = CodeVerifierUtil.Companion.generateRandomCodeVerifier();
+            String challenge = CodeVerifierUtil.Companion.getCodeChallenge(verifier);
+            if (challenge != null) TcSdk.getInstance().setCodeChallenge(challenge);
+            TcSdk.getInstance().getAuthorizationCode(this, tcLauncher);
+        } catch (Exception e) {
+            showManualVerify("Truecaller is not available. Verify with missed call / OTP.");
+        }
+    }
+
+    private void showManualVerify(String note) {
+        unlocked = false;
+        LinearLayout box = authHeader("Enter your name and mobile number. You'll get a free missed call or OTP to verify.");
+
+        EditText name = authField("Your name", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS, 40);
+        box.addView(name, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -273,132 +402,105 @@ public class MainActivity extends Activity {
         row.addView(cc);
         EditText phone = authField("10-digit mobile number", InputType.TYPE_CLASS_PHONE, 10);
         row.addView(phone, new LinearLayout.LayoutParams(0, -2, 1f));
-        box.addView(row, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+        rp.topMargin = dp(12);
+        box.addView(row, rp);
 
-        TextView msg = authMsg(box);
-        Button send = authButton("Send OTP");
+        tcStatus = authMsg(box);
+        if (note != null) setStatus(note, true);
+        Button go = authButton("Verify mobile number");
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(52));
         bp.topMargin = dp(12);
-        box.addView(send, bp);
+        box.addView(go, bp);
 
-        Runnable doSend = () -> {
-            String digits = phone.getText().toString().replaceAll("\\D", "");
-            if (!digits.matches("[6-9]\\d{9}")) {
-                msg.setTextColor(Color.parseColor("#C62828"));
-                msg.setText("Enter a valid 10-digit mobile number.");
-                return;
-            }
+        go.setOnClickListener(v -> {
+            String n = name.getText().toString().trim();
+            String d = phone.getText().toString().replaceAll("\\D", "");
+            if (n.length() < 2) { setStatus("Please enter your name.", true); return; }
+            if (!d.matches("[6-9]\\d{9}")) { setStatus("Enter a valid 10-digit mobile number.", true); return; }
+            if (!tcReady) { setStatus("Verification service is not available in this app build.", true); return; }
             hideKeyboard(phone);
-            send.setEnabled(false);
-            send.setText("Sending OTP…");
-            msg.setText("");
-            try {
-                callOtpApi(new JSONObject().put("action", "send").put("phone", digits), (ok, error) -> {
-                    send.setEnabled(true);
-                    send.setText("Send OTP");
-                    if (ok) {
-                        showOtpEntry(digits);
-                    } else {
-                        msg.setTextColor(Color.parseColor("#C62828"));
-                        msg.setText(error);
-                    }
-                });
-            } catch (Exception ignored) { }
-        };
-        send.setOnClickListener(v -> doSend.run());
-        phone.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        phone.setOnEditorActionListener((v, a, e) -> { doSend.run(); return true; });
-        showScreen(box, phone);
+            pendingName = n;
+            pendingPhone = d;
+            setStatus("Requesting verification…", false);
+            requestPermsThenVerify();
+        });
+        showScreen(box, name);
     }
 
-    private void showOtpEntry(String digits) {
-        LinearLayout box = authHeader("Enter the 6-digit OTP sent to +91 " + digits);
+    // Missed-call verification needs call permissions; if refused, Truecaller sends an OTP instead.
+    private void requestPermsThenVerify() {
+        List<String> need = new ArrayList<>();
+        need.add(Manifest.permission.READ_PHONE_STATE);
+        need.add(Manifest.permission.READ_CALL_LOG);
+        if (Build.VERSION.SDK_INT >= 26) need.add(Manifest.permission.ANSWER_PHONE_CALLS);
+        else need.add(Manifest.permission.CALL_PHONE);
+        List<String> missing = new ArrayList<>();
+        for (String p : need) {
+            if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) missing.add(p);
+        }
+        if (missing.isEmpty()) {
+            doRequestVerification();
+        } else {
+            requestPermissions(missing.toArray(new String[0]), PERM_REQUEST);
+        }
+    }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == PERM_REQUEST) doRequestVerification();
+    }
+
+    private void doRequestVerification() {
+        try {
+            TcSdk.getInstance().requestVerification("IN", pendingPhone, tcVerifyCallback, this);
+        } catch (Exception e) {
+            setStatus("Could not start verification: " + e.getMessage(), true);
+        }
+    }
+
+    private void showWaiting(String text) {
+        LinearLayout box = authHeader(text);
+        ProgressBar pb = new ProgressBar(this);
+        box.addView(pb, new LinearLayout.LayoutParams(-2, -2));
+        tcStatus = authMsg(box);
+        TextView back = new TextView(this);
+        back.setText("Change number");
+        back.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        back.setTextColor(Color.parseColor("#4D5BF9"));
+        back.setGravity(Gravity.CENTER);
+        back.setPadding(0, dp(18), 0, dp(8));
+        back.setOnClickListener(v -> showManualVerify(null));
+        box.addView(back, new LinearLayout.LayoutParams(-1, -2));
+        showScreen(box, null);
+    }
+
+    private void showTcOtpEntry() {
+        LinearLayout box = authHeader("Enter the OTP sent to +91 " + pendingPhone);
         EditText otp = authField("OTP", InputType.TYPE_CLASS_NUMBER, 6);
         otp.setGravity(Gravity.CENTER);
         otp.setLetterSpacing(0.3f);
         box.addView(otp, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView msg = authMsg(box);
+        tcStatus = authMsg(box);
         Button verify = authButton("Verify OTP");
         LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(52));
         bp.topMargin = dp(12);
         box.addView(verify, bp);
-
-        TextView resend = new TextView(this);
-        resend.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        resend.setGravity(Gravity.CENTER);
-        resend.setPadding(0, dp(16), 0, dp(8));
-        box.addView(resend, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView change = new TextView(this);
-        change.setText("Change number");
-        change.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        change.setTextColor(Color.parseColor("#4D5BF9"));
-        change.setGravity(Gravity.CENTER);
-        change.setPadding(0, dp(8), 0, dp(8));
-        change.setOnClickListener(v -> showOtpLogin());
-        box.addView(change, new LinearLayout.LayoutParams(-1, -2));
-
-        final int[] left = {RESEND_SECONDS};
-        resendTick = new Runnable() {
-            @Override public void run() {
-                if (left[0] > 0) {
-                    resend.setText("Resend OTP in " + left[0] + "s");
-                    resend.setTextColor(Color.parseColor("#888888"));
-                    resend.setEnabled(false);
-                    left[0]--;
-                    ui.postDelayed(this, 1000);
-                } else {
-                    resend.setText("Resend OTP");
-                    resend.setTextColor(Color.parseColor("#4D5BF9"));
-                    resend.setEnabled(true);
-                }
-            }
-        };
-        ui.post(resendTick);
-        resend.setOnClickListener(v -> {
-            if (left[0] > 0) return;
-            resend.setEnabled(false);
-            resend.setText("Sending…");
-            try {
-                callOtpApi(new JSONObject().put("action", "send").put("phone", digits), (ok, error) -> {
-                    msg.setTextColor(Color.parseColor(ok ? "#2E7D32" : "#C62828"));
-                    msg.setText(ok ? "A new OTP has been sent." : error);
-                    left[0] = ok ? RESEND_SECONDS : 0;
-                    ui.removeCallbacks(resendTick);
-                    ui.post(resendTick);
-                });
-            } catch (Exception ignored) { }
-        });
-
+        TextView back = new TextView(this);
+        back.setText("Change number");
+        back.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        back.setTextColor(Color.parseColor("#4D5BF9"));
+        back.setGravity(Gravity.CENTER);
+        back.setPadding(0, dp(18), 0, dp(8));
+        back.setOnClickListener(v -> showManualVerify(null));
+        box.addView(back, new LinearLayout.LayoutParams(-1, -2));
         Runnable doVerify = () -> {
             String code = otp.getText().toString().trim();
-            if (!code.matches("\\d{6}")) {
-                msg.setTextColor(Color.parseColor("#C62828"));
-                msg.setText("Enter the 6-digit OTP.");
-                return;
-            }
+            if (code.length() < 4) { setStatus("Enter the OTP.", true); return; }
             hideKeyboard(otp);
-            verify.setEnabled(false);
-            verify.setText("Verifying…");
-            try {
-                callOtpApi(new JSONObject().put("action", "verify").put("phone", digits).put("otp", code), (ok, error) -> {
-                    verify.setEnabled(true);
-                    verify.setText("Verify OTP");
-                    if (ok) {
-                        ui.removeCallbacks(resendTick);
-                        getSharedPreferences("auth", MODE_PRIVATE).edit()
-                                .putString("verified_phone", "+91" + digits).apply();
-                        Toast.makeText(this, "Mobile number verified", Toast.LENGTH_SHORT).show();
-                        showLogin();
-                    } else {
-                        otp.setText("");
-                        msg.setTextColor(Color.parseColor("#C62828"));
-                        msg.setText(error);
-                    }
-                });
-            } catch (Exception ignored) { }
+            setStatus("Verifying…", false);
+            TcSdk.getInstance().verifyOtp(new TrueProfile.Builder(pendingName, "").build(), code, tcVerifyCallback);
         };
         verify.setOnClickListener(v -> doVerify.run());
         otp.setImeOptions(EditorInfo.IME_ACTION_DONE);

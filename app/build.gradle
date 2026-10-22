@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace 'com.vivo.bidashboard'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId 'com.vivo.bidashboard'
         minSdk 24
         targetSdk 34
-        versionCode 5
-        versionName '1.4'
+        versionCode 6
+        versionName '1.5'
     }
 
     buildFeatures {
@@ -25,6 +25,8 @@ android {
             dimension 'role'
             applicationId 'com.vivo.bidashboard'
             resValue 'string', 'app_name', 'vivo BI Dashboard'
+            // Truecaller Client ID for com.vivo.bidashboard (from developer.truecaller.com)
+            manifestPlaceholders = [tcClientId: 'TC_CLIENT_ID_ADMIN']
             buildConfigField 'boolean', 'STATE_APP', 'false'
             // SHA-256 of vivoBI@2026
             buildConfigField 'String', 'PASSWORD_SHA256', '"e90006efb1935ad651efa74b10b58270650d34be833a320228eef0437dad2403"'
@@ -34,6 +36,8 @@ android {
             dimension 'role'
             applicationId 'com.vivo.bidashboard.state'
             resValue 'string', 'app_name', 'vivo BI States'
+            // Truecaller Client ID for com.vivo.bidashboard.state (from developer.truecaller.com)
+            manifestPlaceholders = [tcClientId: 'TC_CLIENT_ID_STATE']
             buildConfigField 'boolean', 'STATE_APP', 'true'
             // SHA-256 of vivoState@2026
             buildConfigField 'String', 'PASSWORD_SHA256', '"3577b5f173d6ace1cbff153510cb8b3eef4003706b6ba05152056b0e5268f376"'
@@ -60,4 +64,10 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation 'com.truecaller.android.sdk:truecaller-sdk:3.2.1'
+    implementation 'androidx.fragment:fragment:1.8.5'
+    implementation 'androidx.activity:activity:1.9.3'
 }

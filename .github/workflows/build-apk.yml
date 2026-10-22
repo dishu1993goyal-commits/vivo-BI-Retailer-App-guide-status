@@ -38,6 +38,7 @@ jobs:
             vivo-BI-States.apk
 
       - name: Publish to Releases (easy phone download)
+        if: github.ref == 'refs/heads/apk-build'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
