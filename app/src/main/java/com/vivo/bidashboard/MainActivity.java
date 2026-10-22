@@ -46,6 +46,23 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.Outline;
+import android.media.ExifInterface;
+import android.text.TextUtils;
+import android.view.ViewOutlineProvider;
+import android.view.WindowManager;
+import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
+import android.widget.Spinner;
+import android.widget.Switch;
+import com.truecaller.android.sdk.oAuth.CodeVerifierUtil;
+import java.io.ByteArrayOutputStream;
+import java.security.SecureRandom;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -82,50 +99,124 @@ public class MainActivity extends FragmentActivity {
     private static final String APP_ID = STATE_APP ? "state" : "admin";
     // Accounts live on the same Netlify site as the dashboard, so every app and phone shares them.
     private static final String AUTH_URL = START_URL + "api/auth";
-    private static final long RELOCK_AFTER_MS = 5 * 60 * 1000; // ask to log in again after 5 min in background
+    private static final String DOWNLOAD_URL = "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/"
+            + (STATE_APP ? "vivo-BI-States.apk" : "vivo-BI-Dashboard.apk");
+    private static final int PHOTO_REQUEST = 1002;
+    private static final int[] TEXT_ZOOMS = {85, 100, 115, 130};
+    private static final String[] TEXT_ZOOM_KEYS = {"size_small", "size_normal", "size_large", "size_xlarge"};
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
-    private boolean unlocked = false;
-    private long backgroundedAt = 0;
+    private boolean unlocked = false;      // dashboard (not a login/profile screen) is showing
+    private boolean inProfile = false;     // a profile screen is showing over the dashboard
+    private LinearLayout dashboardRoot;
+    private FrameLayout topAvatar;
+
+    private String tr(String key) { return L.t(this, key); }
+    private String trf(String key, Object... a) { return L.f(this, key, a); }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initTruecaller();
-        showLoginScreen(null);
+        // Stay logged in until the user taps Log out.
+        if (sessionToken() != null) {
+            openDashboard();
+            refreshProfile();
+        } else {
+            showLoginScreen(null);
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        try { TcSdk.clear(); } catch (Exception ignored) { }
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        backgroundedAt = System.currentTimeMillis();
-    }
-
-    @Override
-    protected void onStart() {
-        super.onStart();
-        if (unlocked && backgroundedAt > 0 && System.currentTimeMillis() - backgroundedAt > RELOCK_AFTER_MS) {
-            showLoginScreen(null);
-        }
+        try { TcSdk.clear(); } catch (Throwable ignored) { }
     }
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
-    private String lastUsername() {
-        return getSharedPreferences("auth", MODE_PRIVATE).getString("last_username", "");
+    // ---------- Session and profile cache (on this phone) ----------
+    private SharedPreferences authPrefs() { return getSharedPreferences("auth", MODE_PRIVATE); }
+    private SharedPreferences settings() { return getSharedPreferences("settings", MODE_PRIVATE); }
+
+    private String sessionUser() { return authPrefs().getString("session_user", null); }
+    private String sessionToken() { return authPrefs().getString("session_token", null); }
+    private String lastUsername() { return authPrefs().getString("last_username", ""); }
+
+    private JSONObject profile() {
+        try { return new JSONObject(authPrefs().getString("profile", "{}")); } catch (Exception e) { return new JSONObject(); }
     }
 
-    private void rememberUsername(String u) {
-        getSharedPreferences("auth", MODE_PRIVATE).edit().putString("last_username", u).apply();
+    private void saveProfile(JSONObject p) {
+        if (p != null) authPrefs().edit().putString("profile", p.toString()).apply();
+    }
+
+    private void saveSession(JSONObject res) {
+        String u = res.optString("username", "");
+        authPrefs().edit()
+                .putString("session_user", u)
+                .putString("session_token", res.optString("token", ""))
+                .putString("last_username", u)
+                .apply();
+        saveProfile(res.optJSONObject("profile"));
+    }
+
+    private void clearSession() {
+        authPrefs().edit().remove("session_user").remove("session_token").remove("profile").remove("photo").remove("photo_version").apply();
+    }
+
+    private Bitmap cachedPhoto() {
+        String b64 = authPrefs().getString("photo", null);
+        if (b64 == null || b64.isEmpty()) return null;
+        try {
+            byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+        } catch (Throwable e) {
+            return null;
+        }
+    }
+
+    private JSONObject sessionBody(Object... kv) {
+        JSONObject o = obj(kv);
+        try {
+            o.put("username", sessionUser());
+            o.put("token", sessionToken());
+        } catch (Exception ignored) { }
+        return o;
+    }
+
+    // Updates the profile from the server (another phone may have changed it) and checks the session.
+    private void refreshProfile() {
+        callAuth(sessionBody("action", "me"), (ok, res, err) -> {
+            if (ok) {
+                JSONObject p = res.optJSONObject("profile");
+                saveProfile(p);
+                syncPhoto(p == null ? 0 : p.optLong("photoVersion", 0));
+                updateTopAvatar();
+            } else if (res.optBoolean("loggedOut", false)) {
+                clearSession();
+                showLoginScreen(tr("logged_out_elsewhere"));
+            }
+        });
+    }
+
+    private void syncPhoto(long version) {
+        long have = authPrefs().getLong("photo_version", 0);
+        if (version == have) return;
+        if (version == 0) {
+            authPrefs().edit().remove("photo").putLong("photo_version", 0).apply();
+            updateTopAvatar();
+            return;
+        }
+        callAuth(sessionBody("action", "get-photo"), (ok, res, err) -> {
+            if (!ok) return;
+            authPrefs().edit().putString("photo", res.optString("photo", ""))
+                    .putLong("photo_version", res.optLong("photoVersion", 0)).apply();
+            updateTopAvatar();
+        });
     }
 
     // ---------- Accounts service (POST /api/auth) ----------
@@ -134,17 +225,18 @@ public class MainActivity extends FragmentActivity {
     private interface AuthResult { void done(boolean ok, JSONObject res, String error); }
 
     private void callAuth(JSONObject body, AuthResult cb) {
+        final String noNet = tr("no_internet");
         new Thread(() -> {
             boolean ok = false;
             JSONObject res = new JSONObject();
-            String err = "No internet connection. Please try again.";
+            String err = noNet;
             HttpURLConnection c = null;
             try {
                 body.put("app", APP_ID);
                 c = (HttpURLConnection) new URL(AUTH_URL).openConnection();
                 c.setRequestMethod("POST");
                 c.setConnectTimeout(15000);
-                c.setReadTimeout(25000);
+                c.setReadTimeout(30000);
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type", "application/json");
                 c.setRequestProperty("X-BI-App", "1");
@@ -188,13 +280,11 @@ public class MainActivity extends FragmentActivity {
     }
 
     // ---------- Truecaller mobile verification (sign up and forgot password) ----------
-    // Truecaller gives a free missed call, or an OTP (by SMS or in the Truecaller app).
     private boolean tcReady = false;
     private TextView tcStatus;
     private String pendingPhone, pendingName;
     private Runnable onPhoneVerified, onVerifyBack;
     private static final int PERM_REQUEST = 2001;
-
     private ActivityResultLauncher<Intent> tcLauncher;
     private String tcState, tcVerifier;
     private Runnable verifyTimeout;
@@ -205,7 +295,7 @@ public class MainActivity extends FragmentActivity {
             try {
                 TcSdk.getInstance().onActivityResultObtained(this, r.getResultCode(), r.getData());
             } catch (Throwable e) {
-                manualVerification("Truecaller could not finish. Trying missed call / OTP…");
+                manualVerification(tr("tc_failed"));
             }
         });
         try {
@@ -223,22 +313,20 @@ public class MainActivity extends FragmentActivity {
         }
     }
 
-    // One-tap login for people with the Truecaller app; the server confirms the number.
     private final TcOAuthCallback tcOAuthCallback = new TcOAuthCallback() {
         @Override
         public void onSuccess(TcOAuthData data) {
             if (tcState != null && data.getState() != null && !tcState.equals(data.getState())) {
-                setStatus("Truecaller login could not be confirmed. Please try again.", true);
+                setStatus(tr("verify_failed"), true);
                 return;
             }
-            setStatus("Confirming your number with Truecaller…", false);
+            setStatus(tr("confirming_tc"), false);
             callAuth(obj("action", "tc-exchange", "code", data.getAuthorizationCode(), "codeVerifier", tcVerifier),
                     (ok, res, err) -> {
                         if (!ok) { setStatus(err, true); return; }
                         String tcPhone = res.optString("phone", "");
                         if (!tcPhone.equals(pendingPhone)) {
-                            setStatus("Your Truecaller number is +91 " + tcPhone + ", not +91 " + pendingPhone
-                                    + ". Enter +91 " + tcPhone + ", or tap again and choose 'Use another number' in Truecaller.", true);
+                            setStatus(trf("tc_mismatch", tcPhone, pendingPhone, tcPhone), true);
                             return;
                         }
                         phoneVerified();
@@ -247,9 +335,7 @@ public class MainActivity extends FragmentActivity {
 
         @Override
         public void onFailure(TcOAuthError error) {
-            String m = error == null ? "" : error.getErrorMessage();
-            manualVerification("Truecaller login didn't finish" + (m == null || m.isEmpty() ? "" : " (" + m + ")")
-                    + ". Trying missed call / OTP…");
+            manualVerification(tr("tc_failed"));
         }
 
         @Override
@@ -266,10 +352,7 @@ public class MainActivity extends FragmentActivity {
 
     // Verifies that the user owns `phone` (10 digits), then runs onVerified. `back` returns to the form.
     private void startPhoneVerification(String name, String phone, Runnable onVerified, Runnable back) {
-        if (!tcReady) {
-            setStatus("Mobile verification is not available. Please update the app.", true);
-            return;
-        }
+        if (!tcReady) { setStatus(tr("tc_unavailable"), true); return; }
         pendingName = name;
         pendingPhone = phone;
         onPhoneVerified = onVerified;
@@ -277,13 +360,13 @@ public class MainActivity extends FragmentActivity {
         boolean oauth = false;
         try { oauth = TcSdk.getInstance().isOAuthFlowUsable(); } catch (Throwable ignored) { }
         if (oauth) {
-            setStatus("Opening Truecaller…", false);
+            setStatus(tr("opening_tc"), false);
             try {
-                tcState = Long.toHexString(new java.security.SecureRandom().nextLong());
-                tcVerifier = com.truecaller.android.sdk.oAuth.CodeVerifierUtil.Companion.generateRandomCodeVerifier();
+                tcState = Long.toHexString(new SecureRandom().nextLong());
+                tcVerifier = CodeVerifierUtil.Companion.generateRandomCodeVerifier();
                 TcSdk.getInstance().setOAuthState(tcState);
                 TcSdk.getInstance().setOAuthScopes(new String[]{"openid", "profile", "phone"});
-                String challenge = com.truecaller.android.sdk.oAuth.CodeVerifierUtil.Companion.getCodeChallenge(tcVerifier);
+                String challenge = CodeVerifierUtil.Companion.getCodeChallenge(tcVerifier);
                 if (challenge != null) TcSdk.getInstance().setCodeChallenge(challenge);
                 TcSdk.getInstance().getAuthorizationCode(this, tcLauncher);
                 return;
@@ -296,7 +379,7 @@ public class MainActivity extends FragmentActivity {
 
     // Missed call / OTP from Truecaller, for people without the Truecaller app.
     private void manualVerification(String note) {
-        setStatus(note != null ? note : "Asking for permissions to detect the missed call…", false);
+        setStatus(note != null ? note : tr("perm_missed_call"), false);
         List<String> need = new ArrayList<>();
         need.add(Manifest.permission.READ_PHONE_STATE);
         need.add(Manifest.permission.READ_CALL_LOG);
@@ -317,20 +400,19 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void doRequestVerification() {
-        setStatus("Contacting Truecaller for a missed call / OTP…", false);
+        setStatus(tr("contacting_tc"), false);
         startVerifyTimeout();
         try {
             TcSdk.getInstance().requestVerification("IN", pendingPhone, tcVerifyCallback, this);
         } catch (Throwable e) {
             stopVerifyTimeout();
-            setStatus("Could not start verification: " + e.getMessage(), true);
+            setStatus(tr("verify_failed") + " " + e.getMessage(), true);
         }
     }
 
     private void startVerifyTimeout() {
         stopVerifyTimeout();
-        verifyTimeout = () -> setStatus("Truecaller did not respond. Check that your number is added as a test number "
-                + "in the Truecaller console (until it's approved), your internet is on, then tap the button again.", true);
+        verifyTimeout = () -> setStatus(tr("tc_no_reply"), true);
         ui.postDelayed(verifyTimeout, VERIFY_TIMEOUT_MS);
     }
 
@@ -349,15 +431,14 @@ public class MainActivity extends FragmentActivity {
         @Override
         public void onRequestSuccess(int type, VerificationDataBundle bundle) {
             stopVerifyTimeout();
-            TrueProfile profile = new TrueProfile.Builder(pendingName, "").build();
+            TrueProfile tp = new TrueProfile.Builder(pendingName, "").build();
             switch (type) {
                 case VerificationCallback.TYPE_MISSED_CALL_INITIATED:
-                    showWaiting("You will get a missed call on +91 " + pendingPhone
-                            + ". Don't answer it — it is verified automatically.");
+                    showWaiting(trf("missed_call_wait", pendingPhone));
                     break;
                 case VerificationCallback.TYPE_MISSED_CALL_RECEIVED:
-                    setStatus("Missed call received. Verifying…", false);
-                    TcSdk.getInstance().verifyMissedCall(profile, tcVerifyCallback);
+                    setStatus(tr("missed_call_got"), false);
+                    TcSdk.getInstance().verifyMissedCall(tp, tcVerifyCallback);
                     break;
                 case VerificationCallback.TYPE_OTP_INITIATED:
                 case VerificationCallback.TYPE_IM_OTP_INITIATED:
@@ -367,8 +448,8 @@ public class MainActivity extends FragmentActivity {
                 case VerificationCallback.TYPE_IM_OTP_RECEIVED: {
                     String otp = bundle == null ? null : bundle.getString(VerificationDataBundle.KEY_OTP);
                     if (otp != null && !otp.isEmpty()) {
-                        setStatus("OTP received. Verifying…", false);
-                        TcSdk.getInstance().verifyOtp(profile, otp, tcVerifyCallback);
+                        setStatus(tr("otp_got"), false);
+                        TcSdk.getInstance().verifyOtp(tp, otp, tcVerifyCallback);
                     }
                     break;
                 }
@@ -382,36 +463,33 @@ public class MainActivity extends FragmentActivity {
         public void onRequestFailure(int type, TrueException e) {
             stopVerifyTimeout();
             String m = e == null ? null : e.getExceptionMessage();
-            setStatus((m == null || m.isEmpty()) ? "Verification failed. Please try again." : m, true);
+            setStatus((m == null || m.isEmpty()) ? tr("verify_failed") : m, true);
         }
     };
 
     private void showWaiting(String text) {
         LinearLayout box = authHeader(text);
-        ProgressBar pb = new ProgressBar(this);
-        box.addView(pb, new LinearLayout.LayoutParams(-2, -2));
+        box.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
         tcStatus = authMsg(box);
-        box.addView(linkText("Cancel", v -> { if (onVerifyBack != null) onVerifyBack.run(); }));
+        box.addView(linkText(tr("cancel"), v -> { if (onVerifyBack != null) onVerifyBack.run(); }));
         showScreen(box, null);
     }
 
     private void showTcOtpEntry(boolean inTruecaller) {
-        LinearLayout box = authHeader(inTruecaller
-                ? "Enter the OTP sent to your Truecaller app on +91 " + pendingPhone
-                : "Enter the OTP sent to +91 " + pendingPhone);
-        EditText otp = authField("OTP", InputType.TYPE_CLASS_NUMBER, 6);
+        LinearLayout box = authHeader(trf(inTruecaller ? "otp_sent_tc" : "otp_sent", pendingPhone));
+        EditText otp = authField(tr("otp"), InputType.TYPE_CLASS_NUMBER, 6);
         otp.setGravity(Gravity.CENTER);
         otp.setLetterSpacing(0.3f);
         box.addView(otp, new LinearLayout.LayoutParams(-1, -2));
         tcStatus = authMsg(box);
-        Button verify = authButton("Verify OTP");
+        Button verify = authButton(tr("verify_otp"));
         box.addView(verify, buttonParams());
-        box.addView(linkText("Cancel", v -> { if (onVerifyBack != null) onVerifyBack.run(); }));
+        box.addView(linkText(tr("cancel"), v -> { if (onVerifyBack != null) onVerifyBack.run(); }));
         Runnable doVerify = () -> {
             String code = otp.getText().toString().trim();
-            if (code.length() < 4) { setStatus("Enter the OTP.", true); return; }
+            if (code.length() < 4) { setStatus(tr("enter_otp"), true); return; }
             hideKeyboard(otp);
-            setStatus("Verifying…", false);
+            setStatus(tr("verifying"), false);
             TcSdk.getInstance().verifyOtp(new TrueProfile.Builder(pendingName, "").build(), code, tcVerifyCallback);
         };
         verify.setOnClickListener(v -> doVerify.run());
@@ -421,16 +499,19 @@ public class MainActivity extends FragmentActivity {
     }
 
     // ---------- Screen building helpers ----------
+    private static final int BRAND = Color.parseColor("#4D5BF9");
+    private static final int BRAND2 = Color.parseColor("#9152E0");
+
     private LinearLayout authHeader(String subtitle) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER_HORIZONTAL);
-        box.setPadding(dp(28), dp(48), dp(28), dp(28));
+        box.setPadding(dp(28), dp(40), dp(28), dp(28));
         box.setBackgroundColor(Color.WHITE);
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.mipmap.ic_launcher);
-        box.addView(logo, new LinearLayout.LayoutParams(dp(84), dp(84)));
+        box.addView(logo, new LinearLayout.LayoutParams(dp(80), dp(80)));
 
         TextView title = new TextView(this);
         title.setText(R.string.app_name);
@@ -439,7 +520,7 @@ public class MainActivity extends FragmentActivity {
         title.setTextColor(Color.parseColor("#111111"));
         title.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
-        tp.topMargin = dp(12);
+        tp.topMargin = dp(10);
         box.addView(title, tp);
 
         TextView sub = new TextView(this);
@@ -449,7 +530,7 @@ public class MainActivity extends FragmentActivity {
         sub.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
         sp.topMargin = dp(6);
-        sp.bottomMargin = dp(20);
+        sp.bottomMargin = dp(18);
         box.addView(sub, sp);
         return box;
     }
@@ -480,6 +561,15 @@ public class MainActivity extends FragmentActivity {
         box.addView(field, lp);
     }
 
+    private TextView fieldLabel(String text) {
+        TextView l = new TextView(this);
+        l.setText(text);
+        l.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        l.setTextColor(Color.parseColor("#666666"));
+        l.setPadding(dp(4), dp(4), 0, dp(4));
+        return l;
+    }
+
     private View phoneRow(EditText phone) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -496,7 +586,7 @@ public class MainActivity extends FragmentActivity {
 
     private CheckBox showPasswordBox(EditText... fields) {
         CheckBox show = new CheckBox(this);
-        show.setText("Show password");
+        show.setText(tr("show_password"));
         show.setTextColor(Color.parseColor("#555555"));
         show.setOnCheckedChangeListener((b, checked) -> {
             for (EditText f : fields) {
@@ -515,8 +605,7 @@ public class MainActivity extends FragmentActivity {
         b.setAllCaps(false);
         b.setTextColor(Color.WHITE);
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{Color.parseColor("#4D5BF9"), Color.parseColor("#9152E0")});
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, new int[]{BRAND, BRAND2});
         bg.setCornerRadius(dp(10));
         b.setBackground(bg);
         return b;
@@ -532,7 +621,7 @@ public class MainActivity extends FragmentActivity {
         TextView t = new TextView(this);
         t.setText(text);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        t.setTextColor(Color.parseColor("#4D5BF9"));
+        t.setTextColor(BRAND);
         t.setGravity(Gravity.CENTER);
         t.setPadding(0, dp(14), 0, dp(6));
         t.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
@@ -550,11 +639,12 @@ public class MainActivity extends FragmentActivity {
         return m;
     }
 
-    private void showScreen(LinearLayout box, View focus) {
+    private void showScreen(View box, View focus) {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(Color.WHITE);
         scroll.addView(box);
+        detachWebView();
         setContentView(scroll);
         if (focus != null) focus.requestFocus();
     }
@@ -570,34 +660,54 @@ public class MainActivity extends FragmentActivity {
         else if (b.getTag() != null) b.setText((CharSequence) b.getTag());
     }
 
-    // ---------- Login: user name + password (every time the app opens) ----------
+    private TextView languageLink(Runnable redraw) {
+        return linkText("🌐 " + tr("language") + ": " + L.langName(this), v -> chooseLanguage(redraw));
+    }
+
+    private void chooseLanguage(Runnable redraw) {
+        int cur = "hi".equals(L.lang(this)) ? 1 : 0;
+        new AlertDialog.Builder(this)
+                .setTitle(tr("language"))
+                .setSingleChoiceItems(L.LANG_NAMES, cur, (d, which) -> {
+                    L.setLang(this, L.LANG_CODES[which]);
+                    d.dismiss();
+                    redraw.run();
+                })
+                .setNegativeButton(tr("cancel"), null)
+                .show();
+    }
+
+    // ---------- Login: user name + password (only after logout or on a new phone) ----------
     private void showLoginScreen(String info) {
         unlocked = false;
-        LinearLayout box = authHeader("Log in with your user name and password");
-        EditText user = authField("User name", TEXT_PLAIN, 30);
+        inProfile = false;
+        LinearLayout box = authHeader(tr("login_sub"));
+        EditText user = authField(tr("username"), TEXT_PLAIN, 30);
         user.setText(lastUsername());
         addField(box, user);
-        EditText pass = authField("Password", TEXT_PASSWORD, 64);
+        EditText pass = authField(tr("password"), TEXT_PASSWORD, 64);
         addField(box, pass);
         box.addView(showPasswordBox(pass));
         tcStatus = authMsg(box);
         if (info != null) setStatus(info, false);
-        Button login = authButton("Log in");
+        Button login = authButton(tr("login"));
         box.addView(login, buttonParams());
-        box.addView(linkText("Forgot password?", v -> showForgot()));
-        box.addView(linkText("New user? Sign up", v -> showSignup()));
+        box.addView(linkText(tr("forgot"), v -> showForgot()));
+        box.addView(linkText(tr("new_user"), v -> showSignup()));
+        box.addView(languageLink(() -> showLoginScreen(info)));
 
         Runnable doLogin = () -> {
             String u = user.getText().toString().trim();
             String p = pass.getText().toString();
-            if (u.isEmpty() || p.isEmpty()) { setStatus("Enter your user name and password.", true); return; }
+            if (u.isEmpty() || p.isEmpty()) { setStatus(tr("enter_user_pass"), true); return; }
             hideKeyboard(pass);
-            busy(login, "Logging in…");
+            busy(login, tr("logging_in"));
             callAuth(obj("action", "login", "username", u, "password", p), (ok, res, err) -> {
                 busy(login, null);
                 if (ok) {
-                    rememberUsername(res.optString("username", u));
-                    unlock();
+                    saveSession(res);
+                    openDashboard();
+                    syncPhoto(profile().optLong("photoVersion", 0));
                 } else {
                     pass.setText("");
                     setStatus(err, true);
@@ -615,13 +725,13 @@ public class MainActivity extends FragmentActivity {
 
     private void showSignup() {
         unlocked = false;
-        LinearLayout box = authHeader("Create your account. Your mobile number is verified once with Truecaller.");
-        EditText full = authField("Full name", TEXT_NAME, 40);
-        EditText user = authField("Choose a user name (for login)", TEXT_PLAIN, 30);
-        EditText phone = authField("10-digit mobile number", InputType.TYPE_CLASS_PHONE, 10);
-        EditText pass = authField("Create password (min 6 characters)", TEXT_PASSWORD, 64);
-        EditText pass2 = authField("Confirm password", TEXT_PASSWORD, 64);
-        EditText code = authField("Access code (from your BI admin)", TEXT_PASSWORD, 64);
+        LinearLayout box = authHeader(tr("signup_sub"));
+        EditText full = authField(tr("full_name"), TEXT_NAME, 40);
+        EditText user = authField(tr("choose_username"), TEXT_PLAIN, 30);
+        EditText phone = authField(tr("mobile"), InputType.TYPE_CLASS_PHONE, 10);
+        EditText pass = authField(tr("create_password"), TEXT_PASSWORD, 64);
+        EditText pass2 = authField(tr("confirm_password"), TEXT_PASSWORD, 64);
+        EditText code = authField(tr("access_code"), TEXT_PASSWORD, 64);
         EditText[] all = {full, user, phone, pass, pass2, code};
         for (int i = 0; i < all.length; i++) if (signupDraft[i] != null) all[i].setText(signupDraft[i]);
         addField(box, full);
@@ -632,9 +742,9 @@ public class MainActivity extends FragmentActivity {
         box.addView(showPasswordBox(pass, pass2));
         addField(box, code);
         tcStatus = authMsg(box);
-        Button go = authButton("Verify mobile & create account");
+        Button go = authButton(tr("verify_create"));
         box.addView(go, buttonParams());
-        box.addView(linkText("Already have an account? Log in", v -> {
+        box.addView(linkText(tr("have_account"), v -> {
             signupDraft = new String[6];
             showLoginScreen(null);
         }));
@@ -646,14 +756,14 @@ public class MainActivity extends FragmentActivity {
             String ph = phone.getText().toString().replaceAll("\\D", "");
             String pw = pass.getText().toString();
             String ac = code.getText().toString().trim();
-            if (fn.length() < 2) { setStatus("Please enter your full name.", true); return; }
-            if (un.length() < 3) { setStatus("User name must be at least 3 characters.", true); return; }
-            if (!ph.matches("[6-9]\\d{9}")) { setStatus("Enter a valid 10-digit mobile number.", true); return; }
-            if (pw.length() < 6) { setStatus("Password must be at least 6 characters.", true); return; }
-            if (!pw.equals(pass2.getText().toString())) { setStatus("Passwords do not match.", true); return; }
-            if (ac.isEmpty()) { setStatus("Enter the access code from your BI admin.", true); return; }
+            if (fn.length() < 2) { setStatus(tr("err_name"), true); return; }
+            if (un.length() < 3) { setStatus(tr("err_username"), true); return; }
+            if (!ph.matches("[6-9]\\d{9}")) { setStatus(tr("err_mobile"), true); return; }
+            if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            if (ac.isEmpty()) { setStatus(tr("err_code"), true); return; }
             hideKeyboard(code);
-            busy(go, "Checking…");
+            busy(go, tr("checking"));
             JSONObject details = obj("fullName", fn, "username", un, "phone", ph, "password", pw, "accessCode", ac);
             callAuth(obj("action", "signup-check", "fullName", fn, "username", un, "phone", ph,
                     "password", pw, "accessCode", ac), (ok, res, err) -> {
@@ -666,7 +776,7 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void finishSignup(JSONObject d) {
-        LinearLayout box = authHeader("Mobile verified. Creating your account…");
+        LinearLayout box = authHeader(tr("creating"));
         box.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
         tcStatus = authMsg(box);
         showScreen(box, null);
@@ -677,12 +787,12 @@ public class MainActivity extends FragmentActivity {
         callAuth(d, (ok, res, err) -> {
             if (ok) {
                 signupDraft = new String[6];
-                rememberUsername(res.optString("username", d.optString("username")));
-                Toast.makeText(this, "Account created. Welcome, " + res.optString("fullName", "") + "!", Toast.LENGTH_LONG).show();
-                unlock();
+                saveSession(res);
+                Toast.makeText(this, trf("welcome", res.optString("fullName", "")), Toast.LENGTH_LONG).show();
+                openDashboard();
             } else {
                 setStatus(err, true);
-                box.addView(linkText("Back to sign up", v -> showSignup()));
+                box.addView(linkText(tr("back_signup"), v -> showSignup()));
             }
         });
     }
@@ -690,18 +800,18 @@ public class MainActivity extends FragmentActivity {
     // ---------- Forgot password: re-verify mobile with Truecaller, then set a new password ----------
     private void showForgot() {
         unlocked = false;
-        LinearLayout box = authHeader("Enter the mobile number of your account. We'll verify it with Truecaller, then you can set a new password.");
-        EditText phone = authField("10-digit mobile number", InputType.TYPE_CLASS_PHONE, 10);
+        LinearLayout box = authHeader(tr("forgot_sub"));
+        EditText phone = authField(tr("mobile"), InputType.TYPE_CLASS_PHONE, 10);
         addField(box, phoneRow(phone));
         tcStatus = authMsg(box);
-        Button go = authButton("Verify mobile");
+        Button go = authButton(tr("verify_mobile"));
         box.addView(go, buttonParams());
-        box.addView(linkText("Back to log in", v -> showLoginScreen(null)));
+        box.addView(linkText(tr("back_login"), v -> showLoginScreen(null)));
         go.setOnClickListener(v -> {
             String ph = phone.getText().toString().replaceAll("\\D", "");
-            if (!ph.matches("[6-9]\\d{9}")) { setStatus("Enter a valid 10-digit mobile number.", true); return; }
+            if (!ph.matches("[6-9]\\d{9}")) { setStatus(tr("err_mobile"), true); return; }
             hideKeyboard(phone);
-            busy(go, "Checking…");
+            busy(go, tr("checking"));
             callAuth(obj("action", "reset-check", "phone", ph), (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
@@ -712,28 +822,28 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void showNewPassword(String ph) {
-        LinearLayout box = authHeader("Mobile verified. Set a new password.");
-        EditText pass = authField("New password (min 6 characters)", TEXT_PASSWORD, 64);
-        EditText pass2 = authField("Confirm new password", TEXT_PASSWORD, 64);
+        LinearLayout box = authHeader(tr("new_pw_sub"));
+        EditText pass = authField(tr("new_password"), TEXT_PASSWORD, 64);
+        EditText pass2 = authField(tr("confirm_new_password"), TEXT_PASSWORD, 64);
         addField(box, pass);
         addField(box, pass2);
         box.addView(showPasswordBox(pass, pass2));
         tcStatus = authMsg(box);
-        Button save = authButton("Save new password");
+        Button save = authButton(tr("save_new_password"));
         box.addView(save, buttonParams());
-        box.addView(linkText("Cancel", v -> showLoginScreen(null)));
+        box.addView(linkText(tr("cancel"), v -> showLoginScreen(null)));
         save.setOnClickListener(v -> {
             String pw = pass.getText().toString();
-            if (pw.length() < 6) { setStatus("Password must be at least 6 characters.", true); return; }
-            if (!pw.equals(pass2.getText().toString())) { setStatus("Passwords do not match.", true); return; }
+            if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
             hideKeyboard(pass2);
-            busy(save, "Saving…");
+            busy(save, tr("saving"));
             callAuth(obj("action", "reset", "phone", ph, "newPassword", pw, "phoneVerified", true), (ok, res, err) -> {
                 busy(save, null);
                 if (ok) {
                     String u = res.optString("username", "");
-                    if (!u.isEmpty()) rememberUsername(u);
-                    showLoginScreen("Password changed. Your user name is " + u + ". Please log in.");
+                    if (!u.isEmpty()) authPrefs().edit().putString("last_username", u).apply();
+                    showLoginScreen(trf("pw_changed_login", u));
                 } else {
                     setStatus(err, true);
                 }
@@ -742,16 +852,607 @@ public class MainActivity extends FragmentActivity {
         showScreen(box, pass);
     }
 
-    private void unlock() {
+    // ---------- Dashboard with a slim top bar (logo, name, profile photo) ----------
+    private void detachWebView() {
+        if (webView != null && webView.getParent() != null) ((ViewGroup) webView.getParent()).removeView(webView);
+    }
+
+    private void openDashboard() {
         unlocked = true;
-        backgroundedAt = 0;
-        if (webView == null) {
-            setupWebView();
+        inProfile = false;
+        if (webView == null) setupWebView();
+        applySettings();
+        detachWebView();
+
+        dashboardRoot = new LinearLayout(this);
+        dashboardRoot.setOrientation(LinearLayout.VERTICAL);
+        dashboardRoot.setBackgroundColor(Color.WHITE);
+
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(12), dp(6), dp(10), dp(6));
+        bar.setBackgroundColor(Color.WHITE);
+        bar.setElevation(dp(2));
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.mipmap.ic_launcher);
+        bar.addView(logo, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView name = new TextView(this);
+        name.setText(R.string.app_name);
+        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        name.setTextColor(Color.parseColor("#111111"));
+        name.setPadding(dp(10), 0, 0, 0);
+        bar.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+        topAvatar = new FrameLayout(this);
+        topAvatar.setContentDescription(tr("profile"));
+        topAvatar.setOnClickListener(v -> showProfile());
+        bar.addView(topAvatar, new LinearLayout.LayoutParams(dp(36), dp(36)));
+        updateTopAvatar();
+
+        dashboardRoot.addView(bar, new LinearLayout.LayoutParams(-1, dp(48)));
+        dashboardRoot.addView(webView, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(dashboardRoot);
+    }
+
+    private void applySettings() {
+        if (webView != null) webView.getSettings().setTextZoom(settings().getInt("text_zoom", 100));
+        if (settings().getBoolean("keep_screen_on", false)) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    // Round profile photo, or initials when there is no photo.
+    private void fillAvatar(FrameLayout holder, int sizeDp, int textSp) {
+        holder.removeAllViews();
+        GradientDrawable circle = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BRAND, BRAND2});
+        circle.setShape(GradientDrawable.OVAL);
+        holder.setBackground(circle);
+        holder.setClipToOutline(true);
+        holder.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View view, Outline outline) {
+                outline.setOval(0, 0, view.getWidth(), view.getHeight());
+            }
+        });
+        Bitmap photo = cachedPhoto();
+        if (photo != null) {
+            ImageView iv = new ImageView(this);
+            iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            iv.setImageBitmap(photo);
+            holder.addView(iv, new FrameLayout.LayoutParams(-1, -1));
+        } else {
+            TextView ini = new TextView(this);
+            ini.setText(initials(profile().optString("fullName", sessionUser() == null ? "" : sessionUser())));
+            ini.setTextColor(Color.WHITE);
+            ini.setTypeface(Typeface.DEFAULT_BOLD);
+            ini.setTextSize(TypedValue.COMPLEX_UNIT_SP, textSp);
+            ini.setGravity(Gravity.CENTER);
+            holder.addView(ini, new FrameLayout.LayoutParams(-1, -1));
         }
-        if (webView.getParent() != null) {
-            ((ViewGroup) webView.getParent()).removeView(webView);
+    }
+
+    private static String initials(String name) {
+        String[] parts = name.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (!p.isEmpty() && sb.length() < 2) sb.append(Character.toUpperCase(p.charAt(0)));
         }
-        setContentView(webView);
+        return sb.length() == 0 ? "?" : sb.toString();
+    }
+
+    private void updateTopAvatar() {
+        if (topAvatar != null) fillAvatar(topAvatar, 36, 14);
+    }
+
+    // ---------- Profile section ----------
+    private LinearLayout profileHeaderBar(String title, Runnable back) {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(6), dp(4), dp(12), dp(4));
+        TextView arrow = new TextView(this);
+        arrow.setText("←");
+        arrow.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
+        arrow.setTextColor(Color.parseColor("#111111"));
+        arrow.setPadding(dp(10), dp(4), dp(14), dp(4));
+        arrow.setOnClickListener(v -> back.run());
+        bar.addView(arrow);
+        TextView t = new TextView(this);
+        t.setText(title);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 19);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTextColor(Color.parseColor("#111111"));
+        bar.addView(t);
+        return bar;
+    }
+
+    private LinearLayout card(LinearLayout parent, String sectionTitle) {
+        TextView h = new TextView(this);
+        h.setText(sectionTitle.toUpperCase());
+        h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        h.setTypeface(Typeface.DEFAULT_BOLD);
+        h.setTextColor(Color.parseColor("#7A7F99"));
+        h.setLetterSpacing(0.06f);
+        h.setPadding(dp(20), dp(18), dp(20), dp(6));
+        parent.addView(h);
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dp(14));
+        bg.setStroke(dp(1), Color.parseColor("#E6E8F0"));
+        c.setBackground(bg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.leftMargin = dp(14);
+        lp.rightMargin = dp(14);
+        parent.addView(c, lp);
+        return c;
+    }
+
+    // A tappable row: icon, label, value on the right, and a chevron.
+    private TextView row(LinearLayout card, String icon, String label, String value, View.OnClickListener l) {
+        if (card.getChildCount() > 0) {
+            View div = new View(this);
+            div.setBackgroundColor(Color.parseColor("#EEF0F5"));
+            LinearLayout.LayoutParams dl = new LinearLayout.LayoutParams(-1, dp(1));
+            dl.leftMargin = dp(52);
+            card.addView(div, dl);
+        }
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.HORIZONTAL);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(16), dp(14), dp(14), dp(14));
+        TextView ic = new TextView(this);
+        ic.setText(icon);
+        ic.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        ic.setWidth(dp(36));
+        r.addView(ic);
+        TextView lab = new TextView(this);
+        lab.setText(label);
+        lab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        lab.setTextColor(Color.parseColor("#1A1A2E"));
+        r.addView(lab, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView val = new TextView(this);
+        val.setText(value == null ? "" : value);
+        val.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        val.setTextColor(Color.parseColor("#7A7F99"));
+        val.setPadding(dp(8), 0, dp(4), 0);
+        val.setMaxWidth(dp(170));
+        val.setSingleLine(true);
+        val.setEllipsize(TextUtils.TruncateAt.END);
+        r.addView(val);
+        if (l != null) {
+            TextView chev = new TextView(this);
+            chev.setText("›");
+            chev.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+            chev.setTextColor(Color.parseColor("#B0B4C8"));
+            r.addView(chev);
+            r.setOnClickListener(l);
+            r.setBackgroundResource(android.R.drawable.list_selector_background);
+        }
+        card.addView(r);
+        return val;
+    }
+
+    private String versionText() {
+        try {
+            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+            return pi.versionName + " (" + (Build.VERSION.SDK_INT >= 28 ? pi.getLongVersionCode() : pi.versionCode) + ")";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private void showProfile() {
+        unlocked = false;
+        inProfile = true;
+        JSONObject p = profile();
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setPadding(0, 0, 0, dp(32));
+        page.addView(profileHeaderBar(tr("profile"), this::openDashboard));
+
+        // Header card: photo, name, user name, mobile, app type
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.VERTICAL);
+        head.setGravity(Gravity.CENTER_HORIZONTAL);
+        head.setPadding(dp(16), dp(22), dp(16), dp(20));
+        GradientDrawable hb = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{BRAND, BRAND2});
+        hb.setCornerRadius(dp(18));
+        head.setBackground(hb);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(-1, -2);
+        hlp.leftMargin = dp(14);
+        hlp.rightMargin = dp(14);
+        hlp.topMargin = dp(4);
+        FrameLayout av = new FrameLayout(this);
+        fillAvatar(av, 92, 32);
+        av.setOnClickListener(v -> photoOptions());
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(dp(92), dp(92));
+        head.addView(av, alp);
+        TextView change = new TextView(this);
+        change.setText("📷 " + tr("change_photo"));
+        change.setTextColor(Color.WHITE);
+        change.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        change.setPadding(dp(10), dp(8), dp(10), dp(4));
+        change.setOnClickListener(v -> photoOptions());
+        head.addView(change);
+        TextView nm = new TextView(this);
+        nm.setText(p.optString("fullName", sessionUser()));
+        nm.setTextColor(Color.WHITE);
+        nm.setTextSize(TypedValue.COMPLEX_UNIT_SP, 21);
+        nm.setTypeface(Typeface.DEFAULT_BOLD);
+        nm.setGravity(Gravity.CENTER);
+        head.addView(nm);
+        TextView un = new TextView(this);
+        String phone = p.optString("phone", "");
+        un.setText("@" + sessionUser() + (phone.isEmpty() ? "" : "  ·  " + phone));
+        un.setTextColor(Color.parseColor("#E8E6FF"));
+        un.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        un.setGravity(Gravity.CENTER);
+        head.addView(un);
+        TextView badge = new TextView(this);
+        String sub = tr(STATE_APP ? "state_app" : "admin_app");
+        if (!p.optString("designation").isEmpty()) sub = p.optString("designation") + "  ·  " + sub;
+        if (!p.optString("state").isEmpty()) sub = sub + "  ·  " + p.optString("state");
+        badge.setText(sub);
+        badge.setTextColor(Color.WHITE);
+        badge.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        badge.setPadding(dp(12), dp(5), dp(12), dp(5));
+        GradientDrawable bb = new GradientDrawable();
+        bb.setColor(Color.parseColor("#33FFFFFF"));
+        bb.setCornerRadius(dp(99));
+        badge.setBackground(bb);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-2, -2);
+        blp.topMargin = dp(10);
+        head.addView(badge, blp);
+        page.addView(head, hlp);
+
+        LinearLayout acc = card(page, tr("sec_account"));
+        row(acc, "👤", tr("edit_profile"), p.optString("email", ""), v -> showEditProfile());
+        row(acc, "🔒", tr("change_password"), "", v -> showChangePassword());
+
+        LinearLayout set = card(page, tr("sec_settings"));
+        row(set, "🌐", tr("language"), L.langName(this), v -> chooseLanguage(this::showProfile));
+        int zi = zoomIndex();
+        row(set, "🔠", tr("text_size"), tr(TEXT_ZOOM_KEYS[zi]), v -> chooseTextSize());
+        TextView keepVal = row(set, "💡", tr("keep_screen_on"), "", null);
+        Switch keep = new Switch(this);
+        keep.setChecked(settings().getBoolean("keep_screen_on", false));
+        keep.setOnCheckedChangeListener((b, on) -> {
+            settings().edit().putBoolean("keep_screen_on", on).apply();
+            applySettings();
+        });
+        ((LinearLayout) keepVal.getParent()).addView(keep);
+
+        LinearLayout data = card(page, tr("sec_data"));
+        row(data, "🔄", tr("refresh"), "", v -> { openDashboard(); webView.reload(); });
+        row(data, "🧹", tr("clear_cache"), "", v -> {
+            webView.clearCache(true);
+            Toast.makeText(this, tr("cache_cleared"), Toast.LENGTH_SHORT).show();
+            openDashboard();
+            webView.loadUrl(START_URL);
+        });
+        TextView live = new TextView(this);
+        live.setText(tr("live_data"));
+        live.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        live.setTextColor(Color.parseColor("#7A7F99"));
+        live.setPadding(dp(20), dp(6), dp(20), 0);
+        page.addView(live);
+
+        LinearLayout sup = card(page, tr("sec_support"));
+        row(sup, "📤", tr("share_app"), "", v -> {
+            Intent s = new Intent(Intent.ACTION_SEND);
+            s.setType("text/plain");
+            s.putExtra(Intent.EXTRA_TEXT, trf("share_text", getString(R.string.app_name), DOWNLOAD_URL));
+            startActivity(Intent.createChooser(s, tr("share_app")));
+        });
+        row(sup, "🛡️", tr("privacy"), "", v -> openExternally(Uri.parse(START_URL + "privacy.html")));
+        row(sup, "📄", tr("terms"), "", v -> openExternally(Uri.parse(START_URL + "terms.html")));
+
+        LinearLayout about = card(page, tr("sec_about"));
+        row(about, "ℹ️", tr("app_version"), versionText(), null);
+        long since = p.optLong("createdAt", 0);
+        if (since > 0) {
+            row(about, "📅", tr("member_since"),
+                    new java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH).format(new java.util.Date(since)), null);
+        }
+
+        Button out = new Button(this);
+        out.setText(tr("logout"));
+        out.setAllCaps(false);
+        out.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        out.setTextColor(Color.parseColor("#C62828"));
+        GradientDrawable ob = new GradientDrawable();
+        ob.setColor(Color.WHITE);
+        ob.setCornerRadius(dp(12));
+        ob.setStroke(dp(1), Color.parseColor("#F1C4C4"));
+        out.setBackground(ob);
+        LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(-1, dp(52));
+        olp.setMargins(dp(14), dp(24), dp(14), 0);
+        out.setOnClickListener(v -> confirmLogout());
+        page.addView(out, olp);
+        TextView del = linkText(tr("delete_account"), v -> confirmDelete());
+        del.setTextColor(Color.parseColor("#9E9E9E"));
+        del.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        page.addView(del);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        scroll.addView(page);
+        detachWebView();
+        setContentView(scroll);
+    }
+
+    private int zoomIndex() {
+        int z = settings().getInt("text_zoom", 100);
+        for (int i = 0; i < TEXT_ZOOMS.length; i++) if (TEXT_ZOOMS[i] == z) return i;
+        return 1;
+    }
+
+    private void chooseTextSize() {
+        String[] names = new String[TEXT_ZOOM_KEYS.length];
+        for (int i = 0; i < names.length; i++) names[i] = tr(TEXT_ZOOM_KEYS[i]);
+        new AlertDialog.Builder(this)
+                .setTitle(tr("text_size"))
+                .setSingleChoiceItems(names, zoomIndex(), (d, which) -> {
+                    settings().edit().putInt("text_zoom", TEXT_ZOOMS[which]).apply();
+                    applySettings();
+                    d.dismiss();
+                    showProfile();
+                })
+                .setNegativeButton(tr("cancel"), null)
+                .show();
+    }
+
+    private static final String[] STATES = {"", "Andaman & Nicobar", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar",
+            "Chandigarh", "Chhattisgarh", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu & Kashmir",
+            "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+            "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+            "Uttar Pradesh", "Uttarakhand", "West Bengal", "PAN India / HO"};
+
+    private void showEditProfile() {
+        inProfile = true;
+        JSONObject p = profile();
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        page.addView(profileHeaderBar(tr("edit_profile"), this::showProfile));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(10), dp(22), dp(28));
+        page.addView(box);
+
+        box.addView(fieldLabel(tr("full_name")));
+        EditText full = authField(tr("full_name"), TEXT_NAME, 40);
+        full.setText(p.optString("fullName", ""));
+        addField(box, full);
+        box.addView(fieldLabel(tr("email_optional")));
+        EditText email = authField("name@example.com", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 80);
+        email.setText(p.optString("email", ""));
+        addField(box, email);
+        box.addView(fieldLabel(tr("state_optional")));
+        Spinner state = new Spinner(this);
+        ArrayAdapter<String> ad = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, STATES);
+        state.setAdapter(ad);
+        String cur = p.optString("state", "");
+        for (int i = 0; i < STATES.length; i++) if (STATES[i].equals(cur)) state.setSelection(i);
+        GradientDrawable sbg = new GradientDrawable();
+        sbg.setColor(Color.parseColor("#F5F6FA"));
+        sbg.setCornerRadius(dp(10));
+        sbg.setStroke(dp(1), Color.parseColor("#D8DAE5"));
+        state.setBackground(sbg);
+        state.setPadding(dp(8), dp(12), dp(8), dp(12));
+        addField(box, state);
+        box.addView(fieldLabel(tr("designation_optional")));
+        EditText desig = authField(tr("designation_optional"), TEXT_NAME, 50);
+        desig.setText(p.optString("designation", ""));
+        addField(box, desig);
+
+        TextView ro = new TextView(this);
+        ro.setText("@" + sessionUser() + "  ·  " + p.optString("phone", "") + "\n" + tr("readonly_note"));
+        ro.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        ro.setTextColor(Color.parseColor("#7A7F99"));
+        ro.setPadding(dp(4), dp(6), 0, dp(6));
+        box.addView(ro);
+        tcStatus = authMsg(box);
+        Button save = authButton(tr("save"));
+        box.addView(save, buttonParams());
+        save.setOnClickListener(v -> {
+            hideKeyboard(desig);
+            busy(save, tr("saving"));
+            JSONObject prof = obj("fullName", full.getText().toString().trim(), "email", email.getText().toString().trim(),
+                    "state", (String) state.getSelectedItem(), "designation", desig.getText().toString().trim());
+            callAuth(sessionBody("action", "update-profile", "profile", prof), (ok, res, err) -> {
+                busy(save, null);
+                if (ok) {
+                    saveProfile(res.optJSONObject("profile"));
+                    Toast.makeText(this, tr("saved"), Toast.LENGTH_SHORT).show();
+                    showProfile();
+                } else {
+                    handleSessionError(res, err);
+                }
+            });
+        });
+        showScreen(page, null);
+    }
+
+    private void showChangePassword() {
+        inProfile = true;
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        page.addView(profileHeaderBar(tr("change_password"), this::showProfile));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(10), dp(22), dp(28));
+        page.addView(box);
+        EditText curp = authField(tr("current_password"), TEXT_PASSWORD, 64);
+        EditText np = authField(tr("new_password"), TEXT_PASSWORD, 64);
+        EditText np2 = authField(tr("confirm_new_password"), TEXT_PASSWORD, 64);
+        addField(box, curp);
+        addField(box, np);
+        addField(box, np2);
+        box.addView(showPasswordBox(curp, np, np2));
+        tcStatus = authMsg(box);
+        Button save = authButton(tr("change_password"));
+        box.addView(save, buttonParams());
+        save.setOnClickListener(v -> {
+            String a = np.getText().toString();
+            if (a.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!a.equals(np2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            hideKeyboard(np2);
+            busy(save, tr("saving"));
+            callAuth(sessionBody("action", "change-password", "currentPassword", curp.getText().toString(), "newPassword", a),
+                    (ok, res, err) -> {
+                        busy(save, null);
+                        if (ok) {
+                            Toast.makeText(this, tr("pw_changed"), Toast.LENGTH_LONG).show();
+                            showProfile();
+                        } else {
+                            handleSessionError(res, err);
+                        }
+                    });
+        });
+        showScreen(page, curp);
+    }
+
+    private void handleSessionError(JSONObject res, String err) {
+        if (res.optBoolean("loggedOut", false)) {
+            clearSession();
+            showLoginScreen(tr("logged_out_elsewhere"));
+        } else {
+            setStatus(err, true);
+        }
+    }
+
+    private void photoOptions() {
+        if (cachedPhoto() == null) { pickPhoto(); return; }
+        new AlertDialog.Builder(this)
+                .setTitle(tr("profile_photo"))
+                .setItems(new String[]{tr("change_photo"), tr("remove_photo")}, (d, which) -> {
+                    if (which == 0) pickPhoto();
+                    else callAuth(sessionBody("action", "remove-photo"), (ok, res, err) -> {
+                        if (ok) {
+                            saveProfile(res.optJSONObject("profile"));
+                            authPrefs().edit().remove("photo").putLong("photo_version", 0).apply();
+                            showProfile();
+                        } else {
+                            Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                        }
+                    });
+                })
+                .show();
+    }
+
+    private void pickPhoto() {
+        Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+        pick.setType("image/*");
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        try {
+            startActivityForResult(Intent.createChooser(pick, tr("change_photo")), PHOTO_REQUEST);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(this, tr("photo_failed"), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // Square-crops the chosen image to 320 px JPEG and uploads it.
+    private void uploadPhoto(Uri uri) {
+        Toast.makeText(this, tr("uploading_photo"), Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            String b64 = null;
+            try {
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                try (InputStream in = getContentResolver().openInputStream(uri)) { BitmapFactory.decodeStream(in, null, bounds); }
+                int sample = 1;
+                while (Math.min(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 320) sample *= 2;
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inSampleSize = sample;
+                Bitmap src;
+                try (InputStream in = getContentResolver().openInputStream(uri)) { src = BitmapFactory.decodeStream(in, null, o); }
+                if (src != null) {
+                    src = rotateIfNeeded(uri, src);
+                    int s = Math.min(src.getWidth(), src.getHeight());
+                    Bitmap sq = Bitmap.createBitmap(src, (src.getWidth() - s) / 2, (src.getHeight() - s) / 2, s, s);
+                    Bitmap out = Bitmap.createScaledBitmap(sq, 320, 320, true);
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    out.compress(Bitmap.CompressFormat.JPEG, 82, bos);
+                    b64 = Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP);
+                }
+            } catch (Throwable ignored) { }
+            final String data = b64;
+            ui.post(() -> {
+                if (data == null) { Toast.makeText(this, tr("photo_failed"), Toast.LENGTH_LONG).show(); return; }
+                callAuth(sessionBody("action", "upload-photo", "photo", data), (ok, res, err) -> {
+                    if (ok) {
+                        JSONObject p = res.optJSONObject("profile");
+                        saveProfile(p);
+                        authPrefs().edit().putString("photo", data)
+                                .putLong("photo_version", p == null ? 0 : p.optLong("photoVersion", 0)).apply();
+                        Toast.makeText(this, tr("photo_updated"), Toast.LENGTH_SHORT).show();
+                        showProfile();
+                    } else if (res.optBoolean("loggedOut", false)) {
+                        clearSession();
+                        showLoginScreen(tr("logged_out_elsewhere"));
+                    } else {
+                        Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                    }
+                });
+            });
+        }).start();
+    }
+
+    private Bitmap rotateIfNeeded(Uri uri, Bitmap b) {
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            ExifInterface exif = new ExifInterface(in);
+            int o = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
+            int deg = o == ExifInterface.ORIENTATION_ROTATE_90 ? 90 : o == ExifInterface.ORIENTATION_ROTATE_180 ? 180
+                    : o == ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+            if (deg == 0) return b;
+            Matrix m = new Matrix();
+            m.postRotate(deg);
+            return Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
+        } catch (Throwable e) {
+            return b;
+        }
+    }
+
+    private void confirmLogout() {
+        new AlertDialog.Builder(this)
+                .setTitle(tr("logout"))
+                .setMessage(tr("logout_confirm"))
+                .setPositiveButton(tr("logout"), (d, w) -> {
+                    callAuth(sessionBody("action", "logout"), (ok, res, err) -> { });
+                    clearSession();
+                    if (webView != null) webView.clearHistory();
+                    showLoginScreen(null);
+                })
+                .setNegativeButton(tr("cancel"), null)
+                .show();
+    }
+
+    private void confirmDelete() {
+        EditText pw = authField(tr("password"), TEXT_PASSWORD, 64);
+        FrameLayout wrap = new FrameLayout(this);
+        wrap.setPadding(dp(20), dp(8), dp(20), 0);
+        wrap.addView(pw);
+        new AlertDialog.Builder(this)
+                .setTitle(tr("delete_account"))
+                .setMessage(tr("delete_confirm"))
+                .setView(wrap)
+                .setPositiveButton(tr("delete"), (d, w) ->
+                        callAuth(sessionBody("action", "delete-account", "password", pw.getText().toString()), (ok, res, err) -> {
+                            if (ok) {
+                                clearSession();
+                                authPrefs().edit().remove("last_username").apply();
+                                showLoginScreen(tr("account_deleted"));
+                            } else {
+                                Toast.makeText(this, err, Toast.LENGTH_LONG).show();
+                            }
+                        }))
+                .setNegativeButton(tr("cancel"), null)
+                .show();
     }
 
     private void setupWebView() {
@@ -882,6 +1583,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PHOTO_REQUEST) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) uploadPhoto(data.getData());
+            return;
+        }
         if (requestCode == FILE_CHOOSER_REQUEST && filePathCallback != null) {
             Uri[] result = null;
             if (resultCode == RESULT_OK && data != null) {
@@ -1029,6 +1734,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     public void onBackPressed() {
+        if (inProfile) {
+            openDashboard();
+            return;
+        }
         if (unlocked && webView != null && webView.canGoBack()) {
             webView.goBack();
         } else {
