@@ -140,6 +140,24 @@ final class L {
         put("search", "Search", "खोजें");
         put("assistant", "BI Assistant", "BI असिस्टेंट");
         put("assistant_loading", "Dashboard is still loading. Please try again in a moment.", "डैशबोर्ड लोड हो रहा है। थोड़ी देर में फिर कोशिश करें।");
+        put("sec_admin", "Admin tools", "एडमिन टूल्स");
+        put("registered_users", "Registered users", "रजिस्टर्ड यूज़र");
+        put("access_logs", "Access logs", "एक्सेस लॉग");
+        put("state_app_users", "State app users", "स्टेट ऐप यूज़र");
+        put("admin_app_users", "Admin app users", "एडमिन ऐप यूज़र");
+        put("search_users", "Search name, user name, mobile, state", "नाम, यूज़र नेम, मोबाइल, राज्य खोजें");
+        put("loading", "Loading…", "लोड हो रहा है…");
+        put("joined", "Joined", "जुड़े");
+        put("last_seen", "Last seen", "आख़िरी बार");
+        put("users_count", "Showing %d of %d users · tap a user to call", "%2$d में से %1$d यूज़र · कॉल के लिए टैप करें");
+        put("all_apps", "All", "सभी");
+        put("no_logs", "No activity on this day.", "इस दिन कोई गतिविधि नहीं।");
+        put("logs_count", "%d events by %d users (newest first)", "%2$d यूज़र्स की %1$d गतिविधियाँ (नई पहले)");
+        put("ev_open", "Opened the app", "ऐप खोला");
+        put("ev_login", "Logged in", "लॉग इन किया");
+        put("ev_signup", "Signed up", "साइन अप किया");
+        put("ev_logout", "Logged out", "लॉग आउट किया");
+        put("ev_password_reset", "Reset password", "पासवर्ड रीसेट किया");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

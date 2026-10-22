@@ -191,8 +191,27 @@ public class MainActivity extends FragmentActivity {
     }
 
     // Updates the profile from the server (another phone may have changed it) and checks the session.
+    private long lastPing = 0, backgroundedAt = 0;
+    private static final long REOPEN_LOG_MS = 15 * 60 * 1000;
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        backgroundedAt = System.currentTimeMillis();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Coming back after a while counts as opening the app again (for the access log).
+        if (sessionToken() != null && backgroundedAt > 0 && System.currentTimeMillis() - backgroundedAt > REOPEN_LOG_MS) {
+            refreshProfile();
+        }
+    }
+
     private void refreshProfile() {
-        callAuth(sessionBody("action", "me"), (ok, res, err) -> {
+        lastPing = System.currentTimeMillis();
+        callAuth(sessionBody("action", "ping"), (ok, res, err) -> {
             if (ok) {
                 JSONObject p = res.optJSONObject("profile");
                 saveProfile(p);
@@ -226,8 +245,12 @@ public class MainActivity extends FragmentActivity {
 
     private interface AuthResult { void done(boolean ok, JSONObject res, String error); }
 
+    private final String deviceName = (Build.MANUFACTURER + " " + Build.MODEL).trim();
+    private String appVer = "";
+
     private void callAuth(JSONObject body, AuthResult cb) {
         final String noNet = tr("no_internet");
+        if (appVer.isEmpty()) { try { appVer = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) { } }
         new Thread(() -> {
             boolean ok = false;
             JSONObject res = new JSONObject();
@@ -235,6 +258,8 @@ public class MainActivity extends FragmentActivity {
             HttpURLConnection c = null;
             try {
                 body.put("app", APP_ID);
+                body.put("device", deviceName);
+                body.put("ver", appVer);
                 c = (HttpURLConnection) new URL(AUTH_URL).openConnection();
                 c.setRequestMethod("POST");
                 c.setConnectTimeout(15000);
@@ -1148,6 +1173,12 @@ public class MainActivity extends FragmentActivity {
         head.addView(badge, blp);
         page.addView(head, hlp);
 
+        if (!STATE_APP) {
+            LinearLayout adm = card(page, tr("sec_admin"));
+            row(adm, "👥", tr("registered_users"), "", v -> showUsers("state", ""));
+            row(adm, "🕒", tr("access_logs"), "", v -> showLogs(null, "all"));
+        }
+
         LinearLayout acc = card(page, tr("sec_account"));
         row(acc, "👤", tr("edit_profile"), p.optString("email", ""), v -> showEditProfile());
         row(acc, "🔒", tr("change_password"), "", v -> showChangePassword());
@@ -1223,6 +1254,215 @@ public class MainActivity extends FragmentActivity {
         scroll.addView(page);
         detachWebView();
         setContentView(scroll);
+    }
+
+    // ---------- Admin app: registered users and access log ----------
+    private LinearLayout segmented(String[] labels, int selected, java.util.function.IntConsumer onPick) {
+        LinearLayout seg = new LinearLayout(this);
+        seg.setOrientation(LinearLayout.HORIZONTAL);
+        seg.setPadding(dp(14), dp(4), dp(14), dp(8));
+        for (int i = 0; i < labels.length; i++) {
+            final int idx = i;
+            TextView b = new TextView(this);
+            b.setText(labels[i]);
+            b.setGravity(Gravity.CENTER);
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+            b.setPadding(dp(8), dp(9), dp(8), dp(9));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(99));
+            if (i == selected) { bg.setColor(BRAND); b.setTextColor(Color.WHITE); }
+            else { bg.setColor(Color.WHITE); bg.setStroke(dp(1), Color.parseColor("#D8DAE5")); b.setTextColor(Color.parseColor("#333344")); }
+            b.setBackground(bg);
+            b.setOnClickListener(v -> onPick.accept(idx));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+            lp.setMargins(dp(3), 0, dp(3), 0);
+            seg.addView(b, lp);
+        }
+        return seg;
+    }
+
+    private static String fmtTime(long t, String pattern) {
+        if (t <= 0) return "—";
+        java.text.SimpleDateFormat f = new java.text.SimpleDateFormat(pattern, java.util.Locale.ENGLISH);
+        f.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Kolkata"));
+        return f.format(new java.util.Date(t));
+    }
+
+    private TextView infoLine(String text, int sp, String color, boolean bold) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
+        t.setTextColor(Color.parseColor(color));
+        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+        return t;
+    }
+
+    private LinearLayout listCard() {
+        LinearLayout c = new LinearLayout(this);
+        c.setOrientation(LinearLayout.VERTICAL);
+        c.setPadding(dp(16), dp(12), dp(16), dp(12));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.WHITE);
+        bg.setCornerRadius(dp(12));
+        bg.setStroke(dp(1), Color.parseColor("#E6E8F0"));
+        c.setBackground(bg);
+        return c;
+    }
+
+    private LinearLayout.LayoutParams listCardParams() {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(dp(14), dp(5), dp(14), dp(5));
+        return lp;
+    }
+
+    private void showUsers(String which, String filter) {
+        inProfile = true;
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setPadding(0, 0, 0, dp(24));
+        page.addView(profileHeaderBar(tr("registered_users"), this::showProfile));
+        int sel = "admin".equals(which) ? 1 : 0;
+        page.addView(segmented(new String[]{tr("state_app_users"), tr("admin_app_users")}, sel,
+                i -> showUsers(i == 1 ? "admin" : "state", "")));
+        EditText search = authField(tr("search_users"), TEXT_PLAIN, 40);
+        search.setText(filter);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+        slp.setMargins(dp(14), 0, dp(14), dp(6));
+        page.addView(search, slp);
+        TextView count = infoLine(tr("loading"), 13, "#7A7F99", false);
+        count.setPadding(dp(18), dp(4), dp(18), dp(4));
+        page.addView(count);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        page.addView(list);
+        showScreen(page, null);
+
+        callAuth(sessionBody("action", "admin-users", "which", which), (ok, res, err) -> {
+            if (!ok) { count.setText(err); if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
+            org.json.JSONArray users = res.optJSONArray("users");
+            Runnable render = () -> {
+                list.removeAllViews();
+                String q = search.getText().toString().trim().toLowerCase();
+                int shown = 0;
+                for (int i = 0; users != null && i < users.length(); i++) {
+                    JSONObject u = users.optJSONObject(i);
+                    String hay = (u.optString("fullName") + " " + u.optString("username") + " " + u.optString("phone") + " "
+                            + u.optString("state") + " " + u.optString("designation")).toLowerCase();
+                    if (!q.isEmpty() && !hay.contains(q)) continue;
+                    shown++;
+                    LinearLayout c = listCard();
+                    c.addView(infoLine(u.optString("fullName"), 16, "#1A1A2E", true));
+                    c.addView(infoLine("@" + u.optString("username") + "   📞 " + u.optString("phone"), 14, "#3D47C8", false));
+                    String extra = (u.optString("designation") + (u.optString("state").isEmpty() ? "" : " · " + u.optString("state"))).trim();
+                    if (extra.startsWith("·")) extra = extra.substring(1).trim();
+                    if (!extra.isEmpty()) c.addView(infoLine(extra, 13, "#555566", false));
+                    if (!u.optString("email").isEmpty()) c.addView(infoLine("✉ " + u.optString("email"), 13, "#555566", false));
+                    c.addView(infoLine(tr("joined") + " " + fmtTime(u.optLong("createdAt"), "d MMM yyyy") + "   ·   "
+                            + tr("last_seen") + " " + fmtTime(u.optLong("lastSeen"), "d MMM, h:mm a"), 12, "#7A7F99", false));
+                    final String phone = u.optString("phone");
+                    c.setOnClickListener(v -> {
+                        try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone))); } catch (Exception ignored) { }
+                    });
+                    list.addView(c, listCardParams());
+                }
+                count.setText(trf("users_count", shown, users == null ? 0 : users.length()));
+            };
+            render.run();
+            search.addTextChangedListener(new android.text.TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence a, int b, int c2, int d) { }
+                @Override public void onTextChanged(CharSequence a, int b, int c2, int d) { render.run(); }
+                @Override public void afterTextChanged(android.text.Editable e) { }
+            });
+        });
+    }
+
+    private static final java.util.Map<String, String> EVENT_ICONS = new java.util.HashMap<String, String>() {{
+        put("open", "📲"); put("login", "🔑"); put("signup", "🆕"); put("logout", "🚪"); put("password-reset", "🔁");
+    }};
+
+    private void showLogs(String date, String which) {
+        inProfile = true;
+        if (date == null) date = fmtTime(System.currentTimeMillis(), "yyyy-MM-dd");
+        final String day = date;
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F4F5FA"));
+        page.setPadding(0, 0, 0, dp(24));
+        page.addView(profileHeaderBar(tr("access_logs"), this::showProfile));
+
+        // Day picker: previous / date / next
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setGravity(Gravity.CENTER_VERTICAL);
+        nav.setPadding(dp(14), dp(2), dp(14), dp(6));
+        java.util.Calendar cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Kolkata"));
+        try {
+            java.text.SimpleDateFormat pf = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ENGLISH);
+            pf.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Kolkata"));
+            cal.setTime(pf.parse(day));
+        } catch (Exception ignored) { }
+        long dayMs = cal.getTimeInMillis();
+        TextView prev = infoLine("‹", 26, "#3D47C8", true);
+        prev.setPadding(dp(14), 0, dp(14), 0);
+        prev.setOnClickListener(v -> showLogs(fmtTime(dayMs - 86400000L, "yyyy-MM-dd"), which));
+        TextView label = infoLine("📅 " + fmtTime(dayMs, "EEE, d MMM yyyy"), 16, "#1A1A2E", true);
+        label.setGravity(Gravity.CENTER);
+        label.setOnClickListener(v -> new android.app.DatePickerDialog(this, (dp2, y, m, d) ->
+                showLogs(String.format(java.util.Locale.ENGLISH, "%04d-%02d-%02d", y, m + 1, d), which),
+                cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH), cal.get(java.util.Calendar.DAY_OF_MONTH)).show());
+        TextView next = infoLine("›", 26, "#3D47C8", true);
+        next.setPadding(dp(14), 0, dp(14), 0);
+        next.setOnClickListener(v -> showLogs(fmtTime(dayMs + 86400000L, "yyyy-MM-dd"), which));
+        nav.addView(prev);
+        nav.addView(label, new LinearLayout.LayoutParams(0, -2, 1f));
+        nav.addView(next);
+        page.addView(nav);
+
+        String[] keys = {"all", "state", "admin"};
+        int sel = java.util.Arrays.asList(keys).indexOf(which);
+        page.addView(segmented(new String[]{tr("all_apps"), tr("state_app"), tr("admin_app")}, Math.max(0, sel),
+                i -> showLogs(day, keys[i])));
+        TextView count = infoLine(tr("loading"), 13, "#7A7F99", false);
+        count.setPadding(dp(18), dp(4), dp(18), dp(4));
+        page.addView(count);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        page.addView(list);
+        showScreen(page, null);
+
+        callAuth(sessionBody("action", "admin-logs", "date", day, "which", which), (ok, res, err) -> {
+            if (!ok) { count.setText(err); if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
+            org.json.JSONArray logs = res.optJSONArray("logs");
+            int n = logs == null ? 0 : logs.length();
+            java.util.Set<String> people = new java.util.HashSet<>();
+            for (int i = 0; i < n; i++) {
+                JSONObject e = logs.optJSONObject(i);
+                people.add(e.optString("app") + ":" + e.optString("username"));
+                LinearLayout c = listCard();
+                LinearLayout top = new LinearLayout(this);
+                top.setOrientation(LinearLayout.HORIZONTAL);
+                top.setGravity(Gravity.CENTER_VERTICAL);
+                String ev = e.optString("event");
+                String icon = EVENT_ICONS.containsKey(ev) ? EVENT_ICONS.get(ev) : "•";
+                top.addView(infoLine(icon + "  " + fmtTime(e.optLong("ts"), "h:mm:ss a"), 15, "#1A1A2E", true), new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView badge = infoLine(tr("state".equals(e.optString("app")) ? "state_app" : "admin_app"), 11, "#3D47C8", false);
+                badge.setPadding(dp(8), dp(3), dp(8), dp(3));
+                GradientDrawable bb = new GradientDrawable();
+                bb.setColor(Color.parseColor("#EEF0FF"));
+                bb.setCornerRadius(dp(99));
+                badge.setBackground(bb);
+                top.addView(badge);
+                c.addView(top);
+                String who = e.optString("fullName").isEmpty() ? "@" + e.optString("username")
+                        : e.optString("fullName") + "  (@" + e.optString("username") + ")";
+                c.addView(infoLine(tr("ev_" + ev.replace("-", "_")) + " · " + who, 14, "#333344", false));
+                String meta = (e.optString("phone") + "   " + e.optString("device") + (e.optString("ver").isEmpty() ? "" : "   v" + e.optString("ver"))).trim();
+                if (!meta.isEmpty()) c.addView(infoLine(meta, 12, "#7A7F99", false));
+                list.addView(c, listCardParams());
+            }
+            count.setText(n == 0 ? tr("no_logs") : trf("logs_count", n, people.size()));
+        });
     }
 
     private int zoomIndex() {
@@ -1535,6 +1775,12 @@ public class MainActivity extends FragmentActivity {
             }
 
             @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                super.onPageCommitVisible(view, url);
+                if (STATE_APP) view.evaluateJavascript(STATE_LOCK_JS, null);
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 view.evaluateJavascript(STATE_APP ? STATE_LOCK_JS : DOWNLOAD_HOOK_JS, null);
@@ -1632,6 +1878,16 @@ public class MainActivity extends FragmentActivity {
 
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
+        // State app: hide import/export/admin items before the page draws (not after it finishes loading).
+        if (STATE_APP) {
+            try {
+                if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    androidx.webkit.WebViewCompat.addDocumentStartJavaScript(webView, STATE_LOCK_JS,
+                            java.util.Collections.singleton("https://" + APP_HOST));
+                }
+            } catch (Throwable ignored) { }
+        }
+
         webView.loadUrl(START_URL);
     }
 
@@ -1690,7 +1946,7 @@ public class MainActivity extends FragmentActivity {
     private static final String STATE_LOCK_JS =
             "(function(){if(window.__bist)return;window.__bist=1;" +
             "var css='#data-tools,#unlock-b,#exmenu,#imodal,#umodal,#lmodal,#cmodal,#tmodal,[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"],input[type=file]{display:none!important}';" +
-            "function addCss(){if(document.getElementById('bist-css'))return;var s=document.createElement('style');s.id='bist-css';s.textContent=css;(document.head||document.documentElement).appendChild(s)}" +
+            "function addCss(){if(document.getElementById('bist-css'))return;var r=document.head||document.documentElement;if(!r)return;var s=document.createElement('style');s.id='bist-css';s.textContent=css;r.appendChild(s)}" +
             "var bad=/(import data|export|edit leaders|save updated file|shareable copy|blank template|common all-states|common file|active retailers|unlock my state|retailer ids|save png|excel)/i;" +
             "function check(e){if(e.__bis)return;if(bad.test((e.textContent||'')+' '+(e.title||''))){e.style.setProperty('display','none','important');e.__bis=1}}" +
             "function scan(root){if(!root||root.nodeType!==1)return;if(root.matches('button,a'))check(root);var els=root.querySelectorAll('button,a');for(var i=0;i<els.length;i++)check(els[i])}" +
@@ -1702,7 +1958,7 @@ public class MainActivity extends FragmentActivity {
             "new MutationObserver(function(ms){for(var i=0;i<ms.length;i++){var m=ms[i],t=m.target;" +
             "if(t.nodeType===1){var b=t.closest&&t.closest('button,a');if(b)pend.push(b)}" +
             "for(var j=0;j<m.addedNodes.length;j++){if(m.addedNodes[j].nodeType===1)pend.push(m.addedNodes[j])}}" +
-            "if(pend.length>400){pend=[];full=1}tick()}).observe(document.documentElement,{childList:true,subtree:true});" +
+            "if(pend.length>400){pend=[];full=1}tick()}).observe(document,{childList:true,subtree:true});" +
             "window.addEventListener('hashchange',guard);" +
             "document.addEventListener('click',function(e){var t=e.target&&e.target.closest?e.target.closest('[data-t=\"ret\"],[data-t=\"retv\"],[data-go=\"ret\"],[data-go=\"retv\"],a[href*=\"retailers=\"]'):null;" +
             "if(t){e.preventDefault();e.stopImmediatePropagation()}},true);" +
