@@ -225,9 +225,13 @@ async function supportAction(b, { store, t, app, rec, key }) {
     for (const k of keys) { const x = await store.get(k); if (x) out.push(x); }
     return out.sort((a, c) => c.updatedAt - a.updatedAt);
   };
+  // State users see their own queries and queries about their state; admins see everything.
+  const canSee = (tk) => app === "admin" || sameUser(tk.by, me) ||
+    (!!rec.state && (tk.state === rec.state || (tk.by && tk.by.state === rec.state)));
   const isUnread = (tk, reads) => {
     const last = tk.messages[tk.messages.length - 1];
-    return last && !sameUser(last.by, me) && (reads[tk.id] || 0) < tk.updatedAt;
+    const actor = tk.lastActBy || (last && last.by);
+    return actor && !sameUser(actor, me) && (reads[tk.id] || 0) < tk.updatedAt;
   };
   const cleanAtts = async (ids) => {
     const out = [];
@@ -254,18 +258,24 @@ async function supportAction(b, { store, t, app, rec, key }) {
   if (b.action === "support-att") {
     const a = await store.get(`att:${String(b.id || "").replace(/[^a-z0-9]/gi, "")}`);
     if (!a) return json(404, { ok: false, error: "Attachment not found." });
+    if (app !== "admin" && !sameUser(a.by, me)) {
+      // State users may open an attachment only from a query they can see.
+      const owner = b.ticketId ? await store.get(tKey(b.ticketId)) : null;
+      const inTicket = owner && owner.messages.some((m) => (m.atts || []).some((x) => x.id === a.id));
+      if (!inTicket || !canSee(owner)) return json(403, { ok: false, error: "You can't open this file." });
+    }
     return json(200, { ok: true, name: a.name, mime: a.mime, data: a.data });
   }
 
   if (b.action === "support-unread") {
     const reads = (await store.get(readKey)) || {};
-    const n = (await listTickets()).filter((tk) => isUnread(tk, reads)).length;
+    const n = (await listTickets()).filter((tk) => canSee(tk) && isUnread(tk, reads)).length;
     return json(200, { ok: true, unread: n });
   }
 
   if (b.action === "support-list") {
     const reads = (await store.get(readKey)) || {};
-    const tickets = (await listTickets()).map((tk) => {
+    const tickets = (await listTickets()).filter(canSee).map((tk) => {
       const last = tk.messages[tk.messages.length - 1] || {};
       return { id: tk.id, no: tk.no, topic: tk.topic, subject: tk.subject, status: tk.status, state: tk.state,
         by: tk.by, createdAt: tk.createdAt, updatedAt: tk.updatedAt, count: tk.messages.length,
@@ -285,7 +295,9 @@ async function supportAction(b, { store, t, app, rec, key }) {
     const counter = ((await store.get("ticket-counter")) || { n: 100 }).n + 1;
     await store.set("ticket-counter", { n: counter });
     const id = t.toString(36) + randomBytes(3).toString("hex");
-    const tk = { id, no: counter, topic, kpi: String(b.kpi || "").slice(0, 60), state: String(b.state || me.state || "").slice(0, 40),
+    // A state user's query is always about their own state.
+    const tState = app === "state" && me.state ? me.state : String(b.state || me.state || "").slice(0, 40);
+    const tk = { id, no: counter, topic, kpi: String(b.kpi || "").slice(0, 60), state: tState,
       subject, status: "open", by: me, createdAt: t, updatedAt: t,
       messages: [{ id: "m" + t.toString(36), ts: t, by: me, text, atts: await cleanAtts(b.atts), rating: null }] };
     await store.set(tKey(id), tk);
@@ -293,7 +305,7 @@ async function supportAction(b, { store, t, app, rec, key }) {
   }
 
   const tk = b.id ? await store.get(tKey(b.id)) : null;
-  if (!tk) return json(404, { ok: false, error: "Query not found." });
+  if (!tk || !canSee(tk)) return json(404, { ok: false, error: "Query not found." });
 
   if (b.action === "support-get") {
     const reads = (await store.get(readKey)) || {};
@@ -308,6 +320,7 @@ async function supportAction(b, { store, t, app, rec, key }) {
     if (!text && !atts.length) return json(400, { ok: false, error: "Write a reply or attach a file." });
     tk.messages.push({ id: "m" + t.toString(36) + randomBytes(2).toString("hex"), ts: t, by: me, text, atts, rating: null });
     tk.updatedAt = t;
+    tk.lastActBy = me;
     tk.status = app === "admin" ? "answered" : (sameUser(tk.by, me) ? "open" : tk.status);
     await store.set(tKey(tk.id), tk);
     const reads = (await store.get(readKey)) || {}; reads[tk.id] = t; await store.set(readKey, reads);
@@ -320,15 +333,20 @@ async function supportAction(b, { store, t, app, rec, key }) {
     if (!m || m.by.app !== "admin") return json(400, { ok: false, error: "You can rate admin replies only." });
     const stars = Math.round(Number(b.stars));
     if (!(stars >= 1 && stars <= 5)) return json(400, { ok: false, error: "Choose 1 to 5 stars." });
-    m.rating = { stars, ts: t };
+    m.rating = { stars, ts: t, by: me };
+    // More than 3 stars closes the query; 3 or fewer keeps it open for another reply.
+    tk.status = stars > 3 ? "closed" : "open";
+    tk.updatedAt = t;
+    tk.lastActBy = me;        // admins see the new rating as unread
     await store.set(tKey(tk.id), tk);
-    return json(200, { ok: true, ticket: tk });
+    return json(200, { ok: true, ticket: tk, autoClosed: stars > 3 });
   }
 
   if (b.action === "support-status") {
     if (!(app === "admin" || sameUser(tk.by, me))) return json(403, { ok: false, error: "Not allowed." });
     tk.status = b.status === "closed" ? "closed" : "open";
     tk.updatedAt = t;
+    tk.lastActBy = me;
     await store.set(tKey(tk.id), tk);
     return json(200, { ok: true, ticket: tk });
   }
