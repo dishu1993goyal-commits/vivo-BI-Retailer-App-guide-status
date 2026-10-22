@@ -374,7 +374,7 @@ public class MainActivity extends FragmentActivity {
         try {
             tcState = new BigInteger(130, new SecureRandom()).toString(32);
             TcSdk.getInstance().setOAuthState(tcState);
-            TcSdk.getInstance().setOAuthScopes(new String[]{"profile", "phone"});
+            TcSdk.getInstance().setOAuthScopes(new String[]{"openid", "profile", "phone"});
             String verifier = CodeVerifierUtil.Companion.generateRandomCodeVerifier();
             String challenge = CodeVerifierUtil.Companion.getCodeChallenge(verifier);
             if (challenge != null) TcSdk.getInstance().setCodeChallenge(challenge);

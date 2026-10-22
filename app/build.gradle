@@ -26,7 +26,7 @@ android {
             applicationId 'com.vivo.bidashboard'
             resValue 'string', 'app_name', 'vivo BI Dashboard'
             // Truecaller Client ID for com.vivo.bidashboard (from developer.truecaller.com)
-            manifestPlaceholders = [tcClientId: 'TC_CLIENT_ID_ADMIN']
+            manifestPlaceholders = [tcClientId: 'ch5mnecr-j4xvppaykjcunml3rhj_orhqkvravmrq4e']
             buildConfigField 'boolean', 'STATE_APP', 'false'
             // SHA-256 of vivoBI@2026
             buildConfigField 'String', 'PASSWORD_SHA256', '"e90006efb1935ad651efa74b10b58270650d34be833a320228eef0437dad2403"'
@@ -37,7 +37,7 @@ android {
             applicationId 'com.vivo.bidashboard.state'
             resValue 'string', 'app_name', 'vivo BI States'
             // Truecaller Client ID for com.vivo.bidashboard.state (from developer.truecaller.com)
-            manifestPlaceholders = [tcClientId: 'TC_CLIENT_ID_STATE']
+            manifestPlaceholders = [tcClientId: 'va-4qf3ljrl36tfbtkc3ogxl6rnoazvbjuw6nqcgs4s']
             buildConfigField 'boolean', 'STATE_APP', 'true'
             // SHA-256 of vivoState@2026
             buildConfigField 'String', 'PASSWORD_SHA256', '"3577b5f173d6ace1cbff153510cb8b3eef4003706b6ba05152056b0e5268f376"'
