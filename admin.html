@@ -153,6 +153,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
   // ---------- auth + API ----------
   var AUTH = null;
   try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) {   // opened from the web dashboard: use its admin login
+    try { var w = JSON.parse(localStorage.getItem("biw-auth") || "null"); if (w && w.app === "admin" && w.token) AUTH = { username: w.username, token: w.token }; } catch (e) { }
+  }
   function api(body) {
     if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Open this page from the BI Admin app." });
     return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
@@ -571,7 +574,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     };
   }
 
-  if (!AUTH) { setTab(TAB); fail("Open this page from the BI Admin app (Profile → Admin tools)."); }
+  if (!AUTH) { setTab(TAB); fail("Open this page from the BI Admin app or the dashboard (Profile → Admin tools), logged in as an admin."); }
   else setTab(TAB);
 })();
 </script>
