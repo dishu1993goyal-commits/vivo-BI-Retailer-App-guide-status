@@ -63,7 +63,8 @@
     return true;
   }
   function clickTab(doc, t) { var b = doc.querySelector('#tabs [data-t="' + t + '"]'); if (b) { b.click(); return true; } return false; }
-  function tabAllowed(t) { return !(APP === "state" && (t === "ret" || t === "retv")); }
+  // State app: Active retailers only when the user's state is known (the app then locks it to that state).
+  function tabAllowed(t) { return !(APP === "state" && !window.BI_STATE && (t === "ret" || t === "retv")); }
 
   // Navigation used by search results and chat buttons (on the visible dashboard).
   var NAV = {
@@ -791,5 +792,5 @@
   }
 
   window.BIAssist = { openSearch: openSearch, openChat: openChat, openCalculator: openCalculator, findOnPage: findOnPage,
-    computePayout: computePayout, version: "1.2" };
+    computePayout: computePayout, version: "1.3" };
 })();
