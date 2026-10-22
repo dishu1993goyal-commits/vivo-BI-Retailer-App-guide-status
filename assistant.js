@@ -105,18 +105,19 @@
     return frameReady;
   }
   // Mirror the period chosen on the visible dashboard so answers match what the user sees.
-  async function prepare(scope) {
+  async function prepare(scope, period) {
     var w = await harvester(), fd = w.document;
     var mp = D.getElementById("per-sel");
-    if (mp && mp.value !== "custom") setSelect(fd, "per-sel", mp.value, false);
+    if (period) setSelect(fd, "per-sel", period, false);
+    else if (mp && mp.value !== "custom") setSelect(fd, "per-sel", mp.value, false);
     setSelect(fd, "kpi-sel", "overall", false);
     setSelect(fd, "scope-sel", scope || "PAN India", true);
     if (fd.location.hash) { try { w.history.replaceState(null, "", w.location.pathname); w.dispatchEvent(new HashChangeEvent("hashchange")); } catch (e) { } }
     await sleep(150);
     return w;
   }
-  async function readRankings() {
-    var w = await prepare("PAN India"), fd = w.document;
+  async function readRankings(period) {
+    var w = await prepare("PAN India", period), fd = w.document;
     clickTab(fd, "rank");
     var table = await waitFor(function () {
       return [].find.call(fd.querySelectorAll("table"), function (t) {
@@ -349,7 +350,10 @@
       { t: "🎯 Key focus areas", fn: answerFocus },
       { t: "📱 Retailer app features", fn: answerFeatures },
       { t: "📘 Dashboard features", fn: answerDashboard },
-      { t: "⚔️ Compare two states", fn: pickCompare }
+      { t: "⚔️ Compare two states", fn: pickCompare },
+      { t: "💰 Schemes & payout", fn: answerSchemes },
+      { t: "🧾 Payout calculator", fn: function () { openCalculator(); }, say: false },
+      { t: "📉 Sales this month vs last", fn: function () { answerSalesTrend(window.BI_STATE || null); } }
     ]);
   }
   function more(extra) { chips((extra || []).concat([{ t: "☰ Main menu", fn: function () { bot("What else would you like to know?"); menu(); } }])); }
@@ -555,6 +559,211 @@
     });
   }
 
+  // ---------------- PAYOUT CALCULATOR ----------------
+  // Achievement % = Achieved ÷ Target × 100. Slab = highest slab whose From % ≤ Achievement %.
+  // Retro: units → achieved × ₹/unit + bonus; value → achieved ₹ × % ÷ 100 + bonus.
+  // Incremental: each band between thresholds (From % × Target ÷ 100) is paid at its own rate, + bonus.
+  function computePayout(o) {
+    var slabs = o.slabs.filter(function (x) { return isFinite(x.from) && isFinite(x.rate); })
+      .sort(function (a, b) { return a.from - b.from; });
+    var T = o.target, A = o.achieved;
+    var ach = T > 0 ? A / T * 100 : 0;
+    var idx = -1;
+    slabs.forEach(function (sl, i) { if (sl.from <= ach + 1e-9) idx = i; });
+    var res = { ach: ach, idx: idx, slabs: slabs, payout: 0, lines: [] };
+    var unitPay = function (qty, rate) { return o.kind === "value" ? qty * rate / 100 : qty * rate; };
+    if (idx >= 0) {
+      var sl = slabs[idx], bonus = sl.bonus || 0;
+      if (o.method === "retro") {
+        var base = unitPay(A, sl.rate);
+        res.lines.push((o.kind === "value" ? "₹" + fmt(A) + " × " + sl.rate + "%" : fmt(A) + " units × ₹" + sl.rate) + " = ₹" + fmt(base));
+        res.payout = base + bonus;
+      } else {
+        var total = 0;
+        for (var i = 0; i <= idx; i++) {
+          var lo = slabs[i].from * T / 100, hi = i + 1 < slabs.length ? slabs[i + 1].from * T / 100 : Infinity;
+          var qty = Math.max(0, Math.min(A, hi) - lo);
+          var amt = unitPay(qty, slabs[i].rate);
+          total += amt;
+          res.lines.push("Band " + slabs[i].from + "%" + (isFinite(hi) ? "–" + slabs[i + 1].from + "%" : "+") + ": " +
+            (o.kind === "value" ? "₹" + fmt(qty) + " × " + slabs[i].rate + "%" : fmt(qty) + " units × ₹" + slabs[i].rate) + " = ₹" + fmt(amt));
+        }
+        res.payout = total + bonus;
+      }
+      if (bonus) res.lines.push("Slab bonus = ₹" + fmt(bonus));
+    }
+    var next = slabs[idx + 1];
+    if (next) {
+      var need = Math.ceil(next.from * T / 100 - A - 1e-9);
+      res.next = { slab: next, need: Math.max(0, need) };
+      var alt = computePayoutNoNext({ kind: o.kind, method: o.method, target: T, achieved: A + Math.max(0, need), slabs: slabs });
+      res.next.payout = alt;
+    }
+    return res;
+  }
+  function computePayoutNoNext(o) { var copy = Object.assign({}, o); var r = computePayoutCore(copy); return r; }
+  function computePayoutCore(o) {
+    var slabs = o.slabs, T = o.target, A = o.achieved, ach = T > 0 ? A / T * 100 : 0, idx = -1;
+    slabs.forEach(function (sl, i) { if (sl.from <= ach + 1e-9) idx = i; });
+    if (idx < 0) return 0;
+    var unitPay = function (qty, rate) { return o.kind === "value" ? qty * rate / 100 : qty * rate; };
+    if (o.method === "retro") return unitPay(A, slabs[idx].rate) + (slabs[idx].bonus || 0);
+    var total = 0;
+    for (var i = 0; i <= idx; i++) {
+      var lo = slabs[i].from * T / 100, hi = i + 1 < slabs.length ? slabs[i + 1].from * T / 100 : Infinity;
+      total += unitPay(Math.max(0, Math.min(A, hi) - lo), slabs[i].rate);
+    }
+    return total + (slabs[idx].bonus || 0);
+  }
+  function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 }); }
+
+  var calcCss = ".bia-form label{display:block;font-size:13px;color:#555;margin:10px 2px 4px}" +
+    ".bia-form input,.bia-form select{width:100%;box-sizing:border-box;border:1px solid #D8DAE5;background:#F5F6FA;border-radius:10px;padding:10px 12px;font-size:15px;font-family:inherit}" +
+    ".bia-seg{display:flex;gap:6px}.bia-seg button{flex:1;border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:9px;font-size:14px;font-family:inherit}" +
+    ".bia-seg button.on{background:#4D5BF9;color:#fff;border-color:#4D5BF9}" +
+    ".bia-slab{display:grid;grid-template-columns:1fr 1fr 1fr 34px;gap:6px;margin-bottom:6px}.bia-slab input{padding:9px 8px;font-size:14px}" +
+    ".bia-slab button{border:0;background:#FDECEC;color:#C62828;border-radius:8px;font-size:16px}" +
+    ".bia-sh{display:grid;grid-template-columns:1fr 1fr 1fr 34px;gap:6px;font-size:11.5px;color:#7A7F99;margin:8px 2px 4px}" +
+    ".bia-btn{width:100%;border:0;border-radius:12px;padding:13px;font-size:16px;color:#fff;background:linear-gradient(135deg,#4D5BF9,#9152E0);margin-top:14px;font-family:inherit}" +
+    ".bia-add{border:1px dashed #9AA1F5;background:#fff;color:#3D47C8;border-radius:10px;padding:8px;width:100%;font-family:inherit;font-size:14px}" +
+    ".bia-result{background:#fff;border:1px solid #E6E8F0;border-radius:14px;padding:14px;margin-top:14px;font-size:14.5px;line-height:1.5}" +
+    ".bia-big{font-size:28px;font-weight:800;color:#2E7D32}.bia-note{font-size:12px;color:#7A7F99;margin-top:8px}";
+
+  function openCalculator() {
+    var p = overlay("Payout calculator", "Tentative scheme payout for any month");
+    if (!D.getElementById("bia-calc-css")) { var st = el("style"); st.id = "bia-calc-css"; st.textContent = calcCss; D.head.appendChild(st); }
+    var body = el("div", "bia-body bia-form"); p.appendChild(body);
+    var saved = {}; try { saved = JSON.parse(localStorage.getItem("bia-calc") || "{}"); } catch (e) { }
+    var state = { kind: saved.kind || "units", method: saved.method || "retro",
+      slabs: saved.slabs || [{ from: 80, rate: 100, bonus: 0 }, { from: 90, rate: 150, bonus: 0 }, { from: 100, rate: 200, bonus: 0 }, { from: 110, rate: 250, bonus: 1000 }] };
+
+    function seg(labelTxt, options, key) {
+      body.appendChild(el("label", null, labelTxt));
+      var sg = el("div", "bia-seg");
+      options.forEach(function (o) {
+        var b = el("button", state[key] === o[0] ? "on" : "", o[1]);
+        b.onclick = function () { state[key] = o[0]; render(); };
+        sg.appendChild(b);
+      });
+      body.appendChild(sg);
+    }
+    var tIn, aIn, mIn;
+    function render() {
+      var tv = tIn ? tIn.value : (saved.target || ""), av = aIn ? aIn.value : (saved.achieved || ""), mv = mIn ? mIn.value : (saved.month || "");
+      body.innerHTML = "";
+      body.appendChild(el("label", null, "Month (optional)"));
+      mIn = el("input"); mIn.type = "month"; mIn.value = mv; body.appendChild(mIn);
+      seg("Scheme type", [["units", "Units (₹ per unit)"], ["value", "Value (% of ₹)"]], "kind");
+      seg("Payout method", [["retro", "Retro (usual)"], ["incremental", "Incremental"]], "method");
+      var u = state.kind === "value" ? "₹" : "units";
+      body.appendChild(el("label", null, "Target (" + u + ")"));
+      tIn = el("input"); tIn.type = "number"; tIn.inputMode = "decimal"; tIn.placeholder = "e.g. 500"; tIn.value = tv; body.appendChild(tIn);
+      body.appendChild(el("label", null, "Achieved (" + u + ")"));
+      aIn = el("input"); aIn.type = "number"; aIn.inputMode = "decimal"; aIn.placeholder = "e.g. 470"; aIn.value = av; body.appendChild(aIn);
+      body.appendChild(el("label", null, "Slabs"));
+      var sh = el("div", "bia-sh");
+      ["From %", state.kind === "value" ? "Payout %" : "₹ per unit", "Bonus ₹", ""].forEach(function (h) { sh.appendChild(el("div", null, h)); });
+      body.appendChild(sh);
+      state.slabs.forEach(function (sl, i) {
+        var r = el("div", "bia-slab");
+        ["from", "rate", "bonus"].forEach(function (k) {
+          var inp = el("input"); inp.type = "number"; inp.inputMode = "decimal"; inp.value = sl[k] == null ? "" : sl[k];
+          inp.oninput = function () { sl[k] = inp.value === "" ? (k === "bonus" ? 0 : NaN) : parseFloat(inp.value); };
+          r.appendChild(inp);
+        });
+        var del = el("button", null, "×"); del.onclick = function () { state.slabs.splice(i, 1); render(); };
+        r.appendChild(del); body.appendChild(r);
+      });
+      var add = el("button", "bia-add", "+ Add slab");
+      add.onclick = function () { var last = state.slabs[state.slabs.length - 1]; state.slabs.push({ from: last ? last.from + 10 : 100, rate: last ? last.rate : 0, bonus: 0 }); render(); };
+      body.appendChild(add);
+      var go = el("button", "bia-btn", "Calculate payout");
+      var out = el("div");
+      go.onclick = function () { calc(out); };
+      body.appendChild(go); body.appendChild(out);
+      body.appendChild(el("div", "bia-note", "Tentative estimate using the slabs you enter. Actual payout follows the official scheme circular and final achievement data."));
+    }
+    function calc(out) {
+      var T = parseFloat(tIn.value), A = parseFloat(aIn.value);
+      out.innerHTML = "";
+      if (!(T > 0) || !(A >= 0)) { out.appendChild(el("div", "bia-result", "Enter a target above 0 and the achieved figure.")); return; }
+      if (!state.slabs.length) { out.appendChild(el("div", "bia-result", "Add at least one slab.")); return; }
+      try { localStorage.setItem("bia-calc", JSON.stringify({ kind: state.kind, method: state.method, slabs: state.slabs, target: tIn.value, achieved: aIn.value, month: mIn.value })); } catch (e) { }
+      var r = computePayout({ kind: state.kind, method: state.method, target: T, achieved: A, slabs: state.slabs });
+      var u = state.kind === "value" ? "₹" : " units";
+      var box = el("div", "bia-result");
+      var h = (mIn.value ? "<b>" + esc(new Date(mIn.value + "-01").toLocaleString("en-IN", { month: "long", year: "numeric" })) + "</b><br>" : "") +
+        "Achievement: <b>" + (Math.round(r.ach * 10) / 10) + "%</b> (" + fmt(A) + " of " + fmt(T) + (state.kind === "value" ? " ₹" : " units") + ")<br>";
+      if (r.idx < 0) {
+        h += "Below the first slab (" + r.slabs[0].from + "%), so payout is <b>₹0</b>.<div class='bia-big'>₹0</div>";
+      } else {
+        var sl = r.slabs[r.idx];
+        h += "Slab reached: <b>" + sl.from + "%</b> → " + (state.kind === "value" ? sl.rate + "% of value" : "₹" + sl.rate + " per unit") + (sl.bonus ? " + ₹" + fmt(sl.bonus) + " bonus" : "") +
+          "<br>Method: <b>" + (state.method === "retro" ? "Retro (whole achievement at slab rate)" : "Incremental (each band at its own rate)") + "</b>" +
+          "<div class='bia-big'>₹" + fmt(r.payout) + "</div>" + r.lines.map(function (l) { return "• " + esc(l); }).join("<br>");
+      }
+      if (r.next) {
+        h += "<br><br>🎯 <b>Next slab " + r.next.slab.from + "%:</b> sell <b>" + fmt(r.next.need) + (state.kind === "value" ? " ₹ more" : " more units") +
+          "</b> → payout about <b>₹" + fmt(r.next.payout) + "</b> (+₹" + fmt(r.next.payout - r.payout) + ")";
+      } else if (r.idx >= 0) h += "<br><br>🏆 Highest slab reached.";
+      box.innerHTML = h; out.appendChild(box);
+      box.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    render();
+  }
+
+  // ---------------- SCHEMES, PAYOUT AND SALES ----------------
+  function answerSchemes() {
+    bot("<b>💰 How schemes and payouts work</b><br><br>" +
+      "<b>Why schemes matter:</b> they reward retailers for hitting sell-out targets, push focus models, and give a clear reason to sell more before month end. Announcing them in the Retailer App on day 1, and showing payouts there, also lifts the app-usage KPI.<br><br>" +
+      "<b>Achievement %</b> = Achieved ÷ Target × 100<br>" +
+      "<b>Slab</b> = the highest slab whose From % ≤ Achievement %. Below the first slab the payout is ₹0.<br><br>" +
+      "<b>Retro payout (usual):</b> the whole achievement is paid at the reached slab's rate.<br>• Units: Achieved units × slab ₹/unit + slab bonus<br>• Value: Achieved ₹ × slab % ÷ 100 + slab bonus<br><br>" +
+      "<b>Incremental payout:</b> each band between thresholds is paid at its own rate.<br>• Threshold = From % × Target ÷ 100<br>• Payout = Σ (units in band × band rate) + bonus<br><br>" +
+      "<b>Next-slab nudge:</b> Units needed = ⌈Next From % × Target ÷ 100⌉ − Achieved<br><br>" +
+      "<b>Example (retro, units):</b> target 500, achieved 470 → 94% → 90% slab at ₹150 → 470 × 150 = <b>₹70,500</b>. 30 more units reach the 100% slab.", true);
+    more([{ t: "🧾 Open payout calculator", fn: function () { openCalculator(); }, say: false },
+      { t: "📱 Show payouts in the app", fn: answerFeatures }]);
+  }
+
+  function answerSalesTrend(state) {
+    return working(async function () {
+      var ps = [].map.call(D.querySelectorAll("#per-sel option"), function (o) { return o.value; }).filter(function (v) { return /^m:/.test(v); });
+      var cur = (D.getElementById("per-sel") || {}).value || "";
+      var mi = ps.indexOf(cur); if (mi < 1) mi = ps.indexOf("m:2026-10");
+      if (mi < 1) mi = ps.length - 1;
+      var thisM = ps[mi], prevM = ps[mi - 1];
+      var a = await readRankings(thisM), b = await readRankings(prevM);
+      cache.at = 0;   // cached rankings were for another period
+      var label = function (v) { var o = D.querySelector('#per-sel option[value="' + v + '"]'); return o ? o.textContent.trim() : v; };
+      var avg = function (r) { var v = r ? r.rows.filter(function (x) { return x.kpis.sales != null; }) : []; return v.length ? v.reduce(function (s, x) { return s + x.kpis.sales; }, 0) / v.length : null; };
+      var pick = function (r) { var x = r && r.rows.find(function (y) { return y.state === state; }); return x ? x.kpis.sales : null; };
+      var aV = state ? pick(a) : avg(a), bV = state ? pick(b) : avg(b);
+      var h = "<b>📉 Sales: " + esc(label(thisM)) + " vs " + esc(label(prevM)) + " · " + esc(state || "PAN India (average of states)") + "</b><br>";
+      if (aV != null && bV != null) {
+        h += "Sales target achievement: <b>" + pct(bV) + "</b> → <b>" + pct(aV) + "</b> (" + (aV >= bV ? "+" : "") + ((aV - bV) * 100).toFixed(1) + " pts)<br>";
+        if (!state && a && b) {
+          var drops = a.rows.map(function (x) { var y = b.rows.find(function (z) { return z.state === x.state; }); return y && x.kpis.sales != null && y.kpis.sales != null ? { s: x.state, d: x.kpis.sales - y.kpis.sales } : null; })
+            .filter(Boolean).sort(function (p, q) { return p.d - q.d; }).slice(0, 4);
+          if (drops.length && drops[0].d < 0) h += "Biggest falls: " + drops.filter(function (x) { return x.d < 0; }).map(function (x) { return esc(x.s) + " (" + (x.d * 100).toFixed(0) + " pts)"; }).join(", ") + "<br>";
+        }
+      } else h += "The dashboard doesn't have sales achievement for both months yet.<br>";
+      if (aV != null && bV != null && aV >= bV) h += "<br>✅ In this data " + esc(label(thisM)) + " is <b>not lower</b> than " + esc(label(prevM)) + " for " + esc(state || "PAN India") + ". If your actual sell-out volume fell, it can still happen with lower targets, so check volumes too.<br>";
+      h += "<br><b>Common reasons for a weaker month</b><br>" +
+        "• Festive timing: buying shifts into the festive weeks (e.g. Diwali), so the month before or after looks softer.<br>" +
+        "• Scheme gaps: a month without a strong scheme, or a late announcement, slows sell-out.<br>" +
+        "• Higher targets: achievement % falls when targets rise faster than sales.<br>" +
+        "• Stock and model availability: missing focus models or late supply.<br>" +
+        "• Fewer store visits: low visit coverage usually shows up in sales next.<br>" +
+        "• Competition offers in the same weeks.<br><br>" +
+        "<b>What to do:</b> announce the next scheme in the app on day 1, track target vs achievement weekly, fix stock gaps and cover every store each month." +
+        "<div style='color:#7A7F99;font-size:12px;margin-top:6px'>The dashboard holds target achievement %, not unit volumes or last year's sales, so year-on-year volume can't be compared here.</div>";
+      bot(h, true);
+      more([{ t: "💰 Schemes & payout", fn: answerSchemes }, { t: "🧾 Payout calculator", fn: function () { openCalculator(); }, say: false },
+        state ? { t: "How can " + state + " improve?", fn: function () { answerImprove(state); } } : { t: "🎯 Key focus areas", fn: answerFocus }]);
+    });
+  }
+
   // Free-text questions: match states, KPIs and intent words.
   function ask(q) {
     me(q);
@@ -566,6 +775,9 @@
       if (found.length >= 2) return answerCompare(found[0], found[1]);
       return pickCompare();
     }
+    if (has(/\b(payout calc|calculator|calculate (my )?payout|tentative payout)\b/)) { openCalculator(); return; }
+    if (has(/\b(slab|payout|scheme|retro|incremental|incentive)\b/) && !has(/\b(app|feature)\b/)) return answerSchemes();
+    if (has(/\b(sales|volume|sell|growth|less|lower|drop|decline)\b/) && has(/\b(month|october|september|november|august|last year|year|previous|compared|why)\b/)) return answerSalesTrend(state);
     if (has(/\b(calculat|formula|weight|logic|how is .*score|scor(e|ing) work|points? work|framework)/)) return answerCalc();
     if (has(/\b(improve|increase|better|boost|raise|up rank|climb|action|plan|what (should|can)|measures?|steps?)\b/)) return answerImprove(state || "PAN India");
     if (has(/\b(focus|priority|priorities|key area|weak|lagging|problem|attention)\b/) && !state) return answerFocus();
@@ -578,5 +790,6 @@
     menu();
   }
 
-  window.BIAssist = { openSearch: openSearch, openChat: openChat, findOnPage: findOnPage, version: "1.1" };
+  window.BIAssist = { openSearch: openSearch, openChat: openChat, openCalculator: openCalculator, findOnPage: findOnPage,
+    computePayout: computePayout, version: "1.2" };
 })();
