@@ -11,3 +11,8 @@
   for = "/assistant.js"
   [headers.values]
     Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/states.json"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"

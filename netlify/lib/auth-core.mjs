@@ -116,6 +116,141 @@ export async function truecallerPhone(app, code, codeVerifier, fetchImpl = fetch
   return { ok: true, phone, name };
 }
 
+// ---------- Support desk ----------
+export const SUPPORT_TOPICS = ["Overview", "Rankings", "Trends", "Retailer app usage", "Active retailers", "Support desk KPI",
+  "Action plan", "KPI framework / calculation", "Sales target", "Customer visit", "Competition", "v-Notice",
+  "Schemes & payout", "Data mismatch", "App issue", "Other"];
+const MAX_ATT_BYTES = 4 * 1024 * 1024;          // 4 MB per file
+const ATT_TYPES = { pdf: "application/pdf", xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", csv: "text/csv",
+  doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", txt: "text/plain" };
+
+function who(app, rec) { return { app, username: rec.username, fullName: rec.fullName, state: rec.state || "" }; }
+const sameUser = (a, b) => a && b && a.app === b.app && userKey(a.username) === userKey(b.username);
+
+async function supportAction(b, { store, t, app, rec, key }) {
+  const me = who(app, rec);
+  const readKey = `sread:${app}:${key}`;
+  const tKey = (id) => `ticket:${String(id).replace(/[^a-z0-9]/gi, "")}`;
+  const listTickets = async () => {
+    const keys = store.list ? await store.list("ticket:") : [];
+    const out = [];
+    for (const k of keys) { const x = await store.get(k); if (x) out.push(x); }
+    return out.sort((a, c) => c.updatedAt - a.updatedAt);
+  };
+  const isUnread = (tk, reads) => {
+    const last = tk.messages[tk.messages.length - 1];
+    return last && !sameUser(last.by, me) && (reads[tk.id] || 0) < tk.updatedAt;
+  };
+  const cleanAtts = async (ids) => {
+    const out = [];
+    for (const id of (Array.isArray(ids) ? ids : []).slice(0, 5)) {
+      const a = await store.get(`att:${String(id).replace(/[^a-z0-9]/gi, "")}`);
+      if (a && sameUser(a.by, me)) out.push({ id: a.id, name: a.name, mime: a.mime, size: a.size });
+    }
+    return out;
+  };
+
+  if (b.action === "support-upload") {
+    const name = String(b.name || "file").replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+    const ext = (name.split(".").pop() || "").toLowerCase();
+    if (!ATT_TYPES[ext]) return json(400, { ok: false, error: "This file type isn't allowed. Use PDF, Excel, Word, PowerPoint, CSV, TXT or an image." });
+    const data = String(b.data || "");
+    if (!/^[A-Za-z0-9+/=]+$/.test(data)) return json(400, { ok: false, error: "Invalid file." });
+    const size = Math.floor(data.length * 3 / 4);
+    if (size > MAX_ATT_BYTES) return json(400, { ok: false, error: "File is larger than 4 MB." });
+    const id = t.toString(36) + randomBytes(5).toString("hex");
+    await store.set(`att:${id}`, { id, name, mime: ATT_TYPES[ext], size, data, by: me, at: t });
+    return json(200, { ok: true, att: { id, name, mime: ATT_TYPES[ext], size } });
+  }
+
+  if (b.action === "support-att") {
+    const a = await store.get(`att:${String(b.id || "").replace(/[^a-z0-9]/gi, "")}`);
+    if (!a) return json(404, { ok: false, error: "Attachment not found." });
+    return json(200, { ok: true, name: a.name, mime: a.mime, data: a.data });
+  }
+
+  if (b.action === "support-unread") {
+    const reads = (await store.get(readKey)) || {};
+    const n = (await listTickets()).filter((tk) => isUnread(tk, reads)).length;
+    return json(200, { ok: true, unread: n });
+  }
+
+  if (b.action === "support-list") {
+    const reads = (await store.get(readKey)) || {};
+    const tickets = (await listTickets()).map((tk) => {
+      const last = tk.messages[tk.messages.length - 1] || {};
+      return { id: tk.id, no: tk.no, topic: tk.topic, subject: tk.subject, status: tk.status, state: tk.state,
+        by: tk.by, createdAt: tk.createdAt, updatedAt: tk.updatedAt, count: tk.messages.length,
+        last: { by: last.by, text: String(last.text || "").slice(0, 120), ts: last.ts },
+        mine: sameUser(tk.by, me), unread: isUnread(tk, reads),
+        rating: tk.messages.filter((m) => m.rating).map((m) => m.rating.stars).pop() || 0 };
+    });
+    return json(200, { ok: true, tickets, topics: SUPPORT_TOPICS });
+  }
+
+  if (b.action === "support-create") {
+    const subject = String(b.subject || "").trim().slice(0, 120);
+    const text = String(b.text || "").trim().slice(0, 4000);
+    if (subject.length < 3) return json(400, { ok: false, error: "Please enter a short subject." });
+    if (!text) return json(400, { ok: false, error: "Please describe your query." });
+    const topic = SUPPORT_TOPICS.includes(b.topic) ? b.topic : "Other";
+    const counter = ((await store.get("ticket-counter")) || { n: 100 }).n + 1;
+    await store.set("ticket-counter", { n: counter });
+    const id = t.toString(36) + randomBytes(3).toString("hex");
+    const tk = { id, no: counter, topic, kpi: String(b.kpi || "").slice(0, 60), state: String(b.state || me.state || "").slice(0, 40),
+      subject, status: "open", by: me, createdAt: t, updatedAt: t,
+      messages: [{ id: "m" + t.toString(36), ts: t, by: me, text, atts: await cleanAtts(b.atts), rating: null }] };
+    await store.set(tKey(id), tk);
+    return json(200, { ok: true, ticket: tk });
+  }
+
+  const tk = b.id ? await store.get(tKey(b.id)) : null;
+  if (!tk) return json(404, { ok: false, error: "Query not found." });
+
+  if (b.action === "support-get") {
+    const reads = (await store.get(readKey)) || {};
+    reads[tk.id] = t;
+    await store.set(readKey, reads);
+    return json(200, { ok: true, ticket: tk, canRate: sameUser(tk.by, me) });
+  }
+
+  if (b.action === "support-reply") {
+    const text = String(b.text || "").trim().slice(0, 4000);
+    const atts = await cleanAtts(b.atts);
+    if (!text && !atts.length) return json(400, { ok: false, error: "Write a reply or attach a file." });
+    tk.messages.push({ id: "m" + t.toString(36) + randomBytes(2).toString("hex"), ts: t, by: me, text, atts, rating: null });
+    tk.updatedAt = t;
+    tk.status = app === "admin" ? "answered" : (sameUser(tk.by, me) ? "open" : tk.status);
+    await store.set(tKey(tk.id), tk);
+    const reads = (await store.get(readKey)) || {}; reads[tk.id] = t; await store.set(readKey, reads);
+    return json(200, { ok: true, ticket: tk });
+  }
+
+  if (b.action === "support-rate") {
+    if (!sameUser(tk.by, me)) return json(403, { ok: false, error: "Only the person who raised this query can rate replies." });
+    const m = tk.messages.find((x) => x.id === b.msgId);
+    if (!m || m.by.app !== "admin") return json(400, { ok: false, error: "You can rate admin replies only." });
+    const stars = Math.round(Number(b.stars));
+    if (!(stars >= 1 && stars <= 5)) return json(400, { ok: false, error: "Choose 1 to 5 stars." });
+    m.rating = { stars, ts: t };
+    await store.set(tKey(tk.id), tk);
+    return json(200, { ok: true, ticket: tk });
+  }
+
+  if (b.action === "support-status") {
+    if (!(app === "admin" || sameUser(tk.by, me))) return json(403, { ok: false, error: "Not allowed." });
+    tk.status = b.status === "closed" ? "closed" : "open";
+    tk.updatedAt = t;
+    await store.set(tKey(tk.id), tk);
+    return json(200, { ok: true, ticket: tk });
+  }
+
+  return json(400, { ok: false, error: "Unknown action" });
+}
+
 // store: { get(key) -> object|null, set(key, object), delete(key) }
 export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch }) {
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
@@ -142,6 +277,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (!phone) return json(400, { ok: false, error: "Enter a valid 10-digit mobile number." });
     const pwErr = passwordProblem(b.password);
     if (pwErr) return json(400, { ok: false, error: pwErr });
+    const userState = String(b.state || "").trim().slice(0, 40);
+    if (app === "state" && !userState) return json(400, { ok: false, error: "Please select your state." });
     if (await store.get(uKeyOf(key))) return json(409, { ok: false, error: "This user name is taken. Please choose another." });
     if (await store.get(pKeyOf(phone))) {
       return json(409, { ok: false, error: "This mobile number already has an account. Use Login, or Forgot password." });
@@ -152,7 +289,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const username = String(b.username).trim().replace(/\s+/g, " ");
     const rec = {
       username, fullName: name, phone, ...hashPassword(b.password),
-      createdAt: t, fails: 0, lockUntil: 0, sessions: [],
+      createdAt: t, fails: 0, lockUntil: 0, sessions: [], state: userState,
     };
     const token = newSession(rec, t);
     rec.lastSeen = t;
@@ -211,7 +348,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
 
   // ---------- Actions for a logged-in user (user name + session token) ----------
   const SESSION_ACTIONS = ["me", "ping", "update-profile", "change-password", "upload-photo", "get-photo",
-    "remove-photo", "logout", "delete-account", "admin-users", "admin-logs"];
+    "remove-photo", "logout", "delete-account", "admin-users", "admin-logs", "admin-set-state", "set-state-once",
+    "support-list", "support-get", "support-create", "support-reply", "support-rate", "support-status",
+    "support-upload", "support-att", "support-unread"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -231,7 +370,34 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       return json(200, { ok: true, profile: publicProfile(rec) });
     }
 
+    // Existing state-app users pick their state once.
+    if (b.action === "set-state-once") {
+      if (app !== "state") return json(400, { ok: false, error: "Not needed." });
+      if (rec.state) return json(400, { ok: false, error: "Your state is already set. Ask an admin to change it." });
+      const st = String(b.state || "").trim().slice(0, 40);
+      if (!st) return json(400, { ok: false, error: "Please select your state." });
+      rec.state = st; await save();
+      return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+
+    // ---------- Support desk (shared by state and admin users) ----------
+    if (b.action.startsWith("support-")) {
+      return supportAction(b, { store, t, app, rec, key });
+    }
+
     // ---------- Admin app only ----------
+    if (b.action === "admin-set-state") {
+      if (app !== "admin") return json(403, { ok: false, error: "Only the admin app can do this." });
+      const which = b.which === "admin" ? "admin" : "state";
+      const uk = userKey(b.target);
+      const u = uk ? await store.get(`user:${which}:${uk}`) : null;
+      if (!u) return json(404, { ok: false, error: "User not found." });
+      u.state = String(b.state || "").trim().slice(0, 40);
+      u.updatedAt = t;
+      await store.set(`user:${which}:${uk}`, u);
+      return json(200, { ok: true });
+    }
+
     if (b.action === "admin-users" || b.action === "admin-logs") {
       if (app !== "admin") return json(403, { ok: false, error: "Only the admin app can see this." });
       if (!store.list) return json(500, { ok: false, error: "Not available." });
@@ -265,7 +431,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       if (fullName.length < 2) return json(400, { ok: false, error: "Please enter your full name." });
       const email = String(p.email ?? rec.email ?? "").trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { ok: false, error: "Enter a valid email address." });
-      const vals = { fullName, email, state: String(p.state ?? rec.state ?? "").trim(), designation: String(p.designation ?? rec.designation ?? "").trim() };
+      // A state-app user's state decides which retailer IDs they see, so only an admin can change it.
+      const newState = app === "state" ? (rec.state || "") : String(p.state ?? rec.state ?? "").trim();
+      const vals = { fullName, email, state: newState, designation: String(p.designation ?? rec.designation ?? "").trim() };
       for (const [k, max] of Object.entries(PROFILE_LIMITS)) {
         if (vals[k].length > max) return json(400, { ok: false, error: `${k} is too long.` });
       }
