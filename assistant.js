@@ -19,6 +19,7 @@
   async function waitFor(fn, ms) { var t = Date.now(); while (Date.now() - t < (ms || 8000)) { try { var v = fn(); if (v) return v; } catch (e) { } await sleep(120); } return null; }
 
   var KPI = [
+    { k: "new", name: "New retailer implementation", short: "New impl.", col: 0 },
     { k: "app", name: "Retailer app usage", short: "Retailer app", col: 2 },
     { k: "sales", name: "Sales target achievement", short: "Sales target", col: 3 },
     { k: "visit", name: "Customer visit efficiency", short: "Customer visit", col: 4 },
@@ -106,11 +107,30 @@
     return frameReady;
   }
   // Mirror the period chosen on the visible dashboard so answers match what the user sees.
+  // Answers use the whole year by default (not the period filter on screen); the user can switch.
+  var AP = null;
+  function periodOptions(re) { return [].filter.call(D.querySelectorAll("#per-sel option"), function (o) { return re.test(o.value); }); }
+  function yearPeriod() { var o = periodOptions(/^y:/).pop(); return o ? o.value : ((D.getElementById("per-sel") || {}).value || ""); }
+  function curAP() { if (!AP) AP = yearPeriod(); return AP; }
+  function labelOf(v) { var o = [].find.call(D.querySelectorAll("#per-sel option"), function (x) { return x.value === v; }); return o ? o.textContent.trim() : v; }
+  function apLabel() { return labelOf(curAP()); }
+  // Latest quarter that has started (used where exact KPI points matter).
+  function curQuarter() {
+    var now = new Date(), y = now.getFullYear(), q = Math.ceil((now.getMonth() + 1) / 3);
+    var qs = periodOptions(/^q:/).map(function (o) { return o.value; });
+    var cur = qs.filter(function (v) { return v.slice(2) <= y + "-" + q; }).pop();
+    return cur || qs.pop() || curAP();
+  }
+  function pointsPeriod() { return /^y:/.test(curAP()) ? curQuarter() : curAP(); }
+  function recentMonths(n) {
+    var now = new Date(), cur = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    var ms = periodOptions(/^m:/).map(function (o) { return o.value; }).filter(function (v) { return v.slice(2) <= cur; });
+    return ms.slice(-n);
+  }
+
   async function prepare(scope, period) {
     var w = await harvester(), fd = w.document;
-    var mp = D.getElementById("per-sel");
-    if (period) setSelect(fd, "per-sel", period, false);
-    else if (mp && mp.value !== "custom") setSelect(fd, "per-sel", mp.value, false);
+    setSelect(fd, "per-sel", period || curAP(), false);
     setSelect(fd, "kpi-sel", "overall", false);
     setSelect(fd, "scope-sel", scope || "PAN India", true);
     if (fd.location.hash) { try { w.history.replaceState(null, "", w.location.pathname); w.dispatchEvent(new HashChangeEvent("hashchange")); } catch (e) { } }
@@ -123,18 +143,21 @@
     var table = await waitFor(function () {
       return [].find.call(fd.querySelectorAll("table"), function (t) {
         var h = [].map.call(t.querySelectorAll("thead th"), function (x) { return x.textContent.trim(); });
-        return h.indexOf("State") >= 0 && h.indexOf("Score") >= 0 ? t : null;
+        return h.indexOf("State") >= 0 && (h.indexOf("Score") >= 0 || h.indexOf("Year score") >= 0) ? t : null;
       });
     }, 8000);
     if (!table) return null;
     var head = [].map.call(table.querySelectorAll("thead th"), function (x) { return x.textContent.trim(); });
     var iState = head.indexOf("State"), iScore = head.indexOf("Score"), iChg = head.indexOf("Change");
+    if (iScore < 0) iScore = head.indexOf("Year score");
+    var qCols = head.map(function (h, i) { return /^Q\d-\d{4} score$/.test(h) ? i : -1; }).filter(function (i) { return i >= 0; });
     var iPrev = head.findIndex(function (h) { return / rank$/i.test(h) && h !== "#"; });
     var rows = [].map.call(table.querySelectorAll("tbody tr"), function (tr) {
       var c = [].map.call(tr.children, function (td) { return td.textContent.trim(); });
       var r = { rank: num(c[0]), state: c[iState], score: num(c[iScore]), prev: iPrev >= 0 ? num(c[iPrev]) : null,
         change: iChg >= 0 ? c[iChg] : "", kpis: {} };
-      KPI.forEach(function (k) { var i = head.indexOf(k.short); if (i >= 0) r.kpis[k.k] = num(c[i]) / 100; });
+      KPI.forEach(function (k) { var i = head.indexOf(k.short); if (i >= 0 && num(c[i]) != null) r.kpis[k.k] = num(c[i]) / 100; });
+      r.quarters = qCols.map(function (i) { return [head[i].replace(" score", ""), num(c[i])]; });
       return r;
     }).filter(function (r) { return r.state; });
     return { period: periodLabel(fd), head: head, prevLabel: iPrev >= 0 ? head[iPrev] : "", rows: rows };
@@ -313,10 +336,74 @@
     inb.appendChild(chatInput); inb.appendChild(send); p.appendChild(inb);
     function submit() { var v = chatInput.value.trim(); if (!v || busy) return; chatInput.value = ""; ask(v); }
     send.onclick = submit; chatInput.addEventListener("keydown", function (e) { if (e.key === "Enter") submit(); });
-    bot("👋 Hi! I'm your BI Assistant. I read the live dashboard (" + (periodLabel() || "selected period") + ") and can explain rankings, scores, KPI logic and what to do next.\n\nWhat would you like to know?");
+    var hello = bot("👋 Hi! I'm your BI Assistant. I read the whole dashboard (" + (apLabel() || "full year") + ") and can explain rankings, scores, KPI logic, schemes and what to do next.\n\nTap an option or type any question.");
     menu();
+    bridgeCall("status", []).then(function (r) {
+      AI.on = !!(r && r.ok && r.ai);
+      if (AI.on) hello.textContent += "\n\n🤖 AI is on: ask anything, including general smartphone market questions.";
+    });
     if (question) ask(question);
   }
+  var AI = { on: null, hist: [], ctx: null, ctxAt: 0 };
+  window.__biaiPending = window.__biaiPending || {};
+  window.__biaiCb = function (id, json) {
+    var f = window.__biaiPending[id]; if (!f) return; delete window.__biaiPending[id];
+    try { f(typeof json === "string" ? JSON.parse(json) : json); } catch (e) { f(null); }
+  };
+  function bridgeCall(method, args) {
+    return new Promise(function (res) {
+      if (!window.BIAI || !window.BIAI[method]) { res(null); return; }
+      var id = "r" + Math.random().toString(36).slice(2);
+      window.__biaiPending[id] = res;
+      try { window.BIAI[method].apply(window.BIAI, [id].concat(args || [])); } catch (e) { delete window.__biaiPending[id]; res(null); return; }
+      setTimeout(function () { if (window.__biaiPending[id]) { delete window.__biaiPending[id]; res({ ok: false, error: "AI took too long." }); } }, 60000);
+    });
+  }
+  // Compact text of the dashboard for the AI: whole year, each quarter, recent months, weights, action plan.
+  async function aiContext() {
+    if (AI.ctx && Date.now() - AI.ctxAt < 600000) return AI.ctx;
+    var parts = ["App: " + (APP === "state" ? "State app" : "Admin app") + (window.BI_STATE ? "; user's state: " + window.BI_STATE : "") +
+      "; today: " + new Date().toDateString()];
+    var W = await readWeights();
+    if (W) parts.push("KPI weights (" + W.quarter + "): " + Object.keys(W.k).map(function (k) { return k + " " + W.k[k].w; }).join(", "));
+    parts.push("Columns: rank. state score | " + KPI.map(function (k) { return k.short + "%"; }).join(" ") + " | change vs previous (- = KPI not in that period)");
+    var ps = [yearPeriod()].concat(periodOptions(/^q:/).map(function (o) { return o.value; }), recentMonths(2));
+    ps = ps.filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+    for (var i = 0; i < ps.length; i++) {
+      var r = await rankings(ps[i]); if (!r || !r.rows.length) continue;
+      parts.push("== " + r.period);
+      r.rows.forEach(function (x) {
+        parts.push(x.rank + ". " + x.state + " " + x.score + " | " + KPI.map(function (k) { return x.kpis[k.k] == null ? "-" : Math.round(x.kpis[k.k] * 1000) / 10; }).join(" ") + (x.change ? " | " + x.change : ""));
+      });
+    }
+    try {
+      var plan = await readPlan(window.BI_STATE || "PAN India");
+      if (plan && plan.kpi) parts.push("Action plan (" + (window.BI_STATE || "PAN India") + ", " + apLabel() + "): fix first " + plan.kpi + " – " + plan.loss + ". " + plan.actions.join(" "));
+    } catch (e) { }
+    AI.ctx = parts.join("\n"); AI.ctxAt = Date.now();
+    return AI.ctx;
+  }
+  function renderAI(t) {
+    var h = esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^\s*[-*•]\s+/gm, "• ").replace(/^#+\s*(.+)$/gm, "<b>$1</b>").replace(/\n/g, "<br>");
+    return "<div style='font-size:11px;color:#7A7F99;margin-bottom:4px'>🤖 AI answer · may contain mistakes</div>" + h;
+  }
+  async function aiAnswer(q) {
+    busy = true;
+    var t = el("div", "bia-typing", AI.ctx ? "Thinking…" : "Thinking… (reading the whole year first, about 10 seconds)");
+    chatBody.appendChild(t); scroll();
+    var ctx = ""; try { ctx = await aiContext(); } catch (e) { }
+    var r = await bridgeCall("ask", [q, ctx, JSON.stringify(AI.hist.slice(-6))]);
+    t.remove(); busy = false;
+    if (r && r.ok) {
+      AI.hist.push({ q: q, a: r.text });
+      bot(renderAI(r.text), true);
+      more([{ t: "🏆 Rankings", fn: answerRankings }, { t: "🚀 Improve rank", fn: function () { pickState("improve"); } }]);
+    } else {
+      if (r && r.notConfigured) AI.on = false;
+      askBuiltIn(q);
+    }
+  }
+
   function scroll() { if (chatBody) chatBody.scrollTop = chatBody.scrollHeight; }
   function bubble(cls, content, html) { var m = el("div", "bia-msg " + cls); if (html) m.innerHTML = content; else m.textContent = content; chatBody.appendChild(m); scroll(); return m; }
   function bot(t, html) { return bubble("bia-bot", t, html); }
@@ -344,6 +431,7 @@
   }
   function menu() {
     chips([
+      { t: "📅 Period: " + (apLabel() || "Year"), fn: pickPeriod },
       { t: "🏆 State rankings", fn: answerRankings },
       { t: "📍 A state's performance", fn: pickState },
       { t: "🧮 How is the score calculated?", fn: answerCalc },
@@ -359,12 +447,23 @@
   }
   function more(extra) { chips((extra || []).concat([{ t: "☰ Main menu", fn: function () { bot("What else would you like to know?"); menu(); } }])); }
 
-  var cache = { rank: null, at: 0, period: "" };
-  async function rankings() {
-    var p = (D.getElementById("per-sel") || {}).value;
-    if (cache.rank && cache.period === p && Date.now() - cache.at < 120000) return cache.rank;
-    var r = await readRankings(); if (r) { cache = { rank: r, at: Date.now(), period: p }; }
+  var rcache = {};
+  async function rankings(p) {
+    p = p || curAP();
+    var c = rcache[p];
+    if (c && Date.now() - c.at < 300000) return c.r;
+    var r = await readRankings(p);
+    // A quarter without KPIs falls back to the year table: treat it as no data.
+    if (r && /^q:/.test(p) && r.head.indexOf("Year score") >= 0) r = null;
+    if (r) rcache[p] = { r: r, at: Date.now() };
     return r;
+  }
+  function pickPeriod() {
+    bot("Which period should I use? (Now: " + apLabel() + ")");
+    var opts = [yearPeriod()].concat(periodOptions(/^q:/).map(function (o) { return o.value; }), recentMonths(3));
+    chips(opts.filter(function (v, i, a) { return v && a.indexOf(v) === i; }).map(function (v) {
+      return { t: labelOf(v), fn: function () { AP = v; AI.ctx = null; bot("✅ Now answering for <b>" + esc(labelOf(v)) + "</b>.", true); menu(); } };
+    }));
   }
   function findState(text) {
     var n = norm(text), states = mainStates();
@@ -415,17 +514,25 @@
   function answerState(state) {
     if (state === "PAN India") return answerFocus();
     return working(async function () {
-      var r = await rankings(), W = await readWeights();
+      var r = await rankings(), W = await readWeights(), isYear = /^y:/.test(curAP());
       var row = r && r.rows.find(function (x) { return x.state === state; });
-      if (!row) { bot("I couldn't find " + state + " in the rankings for this period."); more(); return; }
-      var L = kpiLines(row, W), sorted = L.slice().sort(function (a, b) { return b.lost - a.lost; });
+      if (!row) { bot("I couldn't find " + state + " in the rankings for " + apLabel() + "."); more([{ t: "📅 Change period", fn: pickPeriod }]); return; }
+      var L = kpiLines(row, W), sorted = L.slice().sort(function (a, b) { return isYear ? a.a - b.a : b.lost - a.lost; });
       var strong = L.slice().sort(function (a, b) { return b.a - a.a; })[0], weak = sorted[0];
       var above = r.rows.find(function (x) { return x.rank === row.rank - 1; });
       var h = "<b>📍 " + esc(state) + " · " + esc(r.period) + "</b><br>Rank <b>#" + row.rank + "</b> of " + r.rows.length +
         " with score <b>" + row.score + "</b>" + (row.prev ? " (was #" + row.prev + ", change " + esc(row.change) + ")" : "") + "<table>" +
-        L.map(function (x) { return "<tr><td>" + esc(x.k.short) + "</td><td style='text-align:right'>" + pct(x.a) + "</td><td style='text-align:right'>" + x.pts.toFixed(1) + "/" + x.w + "</td></tr>"; }).join("") +
-        "</table>💪 Strongest: <b>" + esc(strong.k.name) + "</b> (" + pct(strong.a) + ")<br>⚠️ Losing most points: <b>" + esc(weak.k.name) + "</b> (−" + weak.lost.toFixed(1) + " pts)";
+        L.map(function (x) { return "<tr><td>" + esc(x.k.short) + "</td><td style='text-align:right'>" + pct(x.a) + "</td>" + (isYear ? "" : "<td style='text-align:right'>" + x.pts.toFixed(1) + "/" + x.w + "</td>") + "</tr>"; }).join("") +
+        "</table>💪 Strongest: <b>" + esc(strong.k.name) + "</b> (" + pct(strong.a) + ")<br>⚠️ " + (isYear ? "Weakest" : "Losing most points") + ": <b>" + esc(weak.k.name) + "</b> (" + (isYear ? pct(weak.a) : "−" + weak.lost.toFixed(1) + " pts") + ")";
       if (above) h += "<br>⬆️ To overtake #" + above.rank + " " + esc(above.state) + " needs <b>+" + Math.max(0.1, above.score - row.score + 0.1).toFixed(1) + " pts</b>.";
+      if (isYear) {
+        var qs = periodOptions(/^q:/).map(function (o) { return o.value; }), trend = [];
+        for (var qi = 0; qi < qs.length; qi++) {
+          var qr = await rankings(qs[qi]); var x = qr && qr.rows.find(function (y) { return y.state === state; });
+          if (x) trend.push(esc(labelOf(qs[qi]).replace("-", " ")) + ": <b>#" + x.rank + "</b> of " + qr.rows.length + " · score " + x.score);
+        }
+        if (trend.length) h += "<br><br>📈 <b>Quarter by quarter</b><br>" + trend.join("<br>");
+      }
       bot(h, true);
       more([{ t: "How can " + state + " improve?", fn: function () { answerImprove(state); } },
         { t: "Compare with #1", fn: function () { answerCompare(state, r.rows[0].state === state ? r.rows[1].state : r.rows[0].state); } },
@@ -435,7 +542,7 @@
 
   function answerImprove(state) {
     return working(async function () {
-      var r = await rankings(), W = await readWeights();
+      var r = await rankings(pointsPeriod()), W = await readWeights();
       var plan = await readPlan(state);
       var h = "<b>🚀 Improvement plan · " + esc(state) + "</b>";
       if (plan && plan.kpi) {
@@ -447,7 +554,7 @@
       if (row) {
         var L = kpiLines(row, W).sort(function (a, b) { return b.lost - a.lost; });
         var w0 = L[0];
-        h += "<br><br><b>📐 What the numbers say</b><br>Each +10% in <b>" + esc(w0.k.short) + "</b> adds <b>+" + (w0.w * 0.1).toFixed(1) + " pts</b> (weight " + w0.w + ").";
+        h += "<br><br><b>📐 What the numbers say (" + esc(r.period) + ")</b><br>Each +10% in <b>" + esc(w0.k.short) + "</b> adds <b>+" + (w0.w * 0.1).toFixed(1) + " pts</b> (weight " + w0.w + ").";
         var target = [1, 3, 5].map(function (n) { var t = r.rows.find(function (x) { return x.rank === row.rank - n; }); return t ? "#" + t.rank + " needs +" + Math.max(0.1, t.score - row.score + 0.1).toFixed(1) + " pts" : null; }).filter(Boolean);
         if (target.length) h += "<br>To climb: " + target.join(" · ");
         if (!plan || !plan.actions.length) h += "<br>" + (TIPS[w0.k.k] || []).map(function (a) { return "• " + esc(a); }).join("<br>");
@@ -462,7 +569,7 @@
 
   function answerCalc() {
     return working(async function () {
-      var W = await readWeights(), r = await rankings();
+      var W = await readWeights(), r = await rankings(pointsPeriod());
       var names = { app: "Retailer app usage", sales: "Sales target achievement", visit: "Customer visit efficiency", comp: "Competition management / Support desk", vnotice: "v-Notice utilization", "new": "New retailer onboarding" };
       var keys = W ? Object.keys(W.k) : [];
       var h = "<b>🧮 How the BI KPI score is calculated</b>" + (W && W.quarter ? " (" + esc(W.quarter.replace("-", " ")) + " framework)" : "") +
@@ -475,7 +582,7 @@
       }
       if (r && r.rows.length) {
         var x = r.rows[0], L = kpiLines(x, W);
-        h += "<br><b>Example: " + esc(x.state) + "</b> (#1)<br>" + L.map(function (l) { return pct(Math.min(1, l.a)) + " × " + l.w; }).join(" + ") + " = <b>" + L.reduce(function (s, l) { return s + l.pts; }, 0).toFixed(1) + "</b> (dashboard shows " + x.score + ")";
+        h += "<br><b>Example: " + esc(x.state) + "</b> (#1, " + esc(r.period) + ")<br>" + L.map(function (l) { return pct(Math.min(1, l.a)) + " × " + l.w; }).join(" + ") + " = <b>" + L.reduce(function (s, l) { return s + l.pts; }, 0).toFixed(1) + "</b> (dashboard shows " + x.score + ")";
       }
       bot(h, true);
       more([{ t: "📱 How app usage is measured", fn: answerFeatures },
@@ -734,8 +841,7 @@
       var mi = ps.indexOf(cur); if (mi < 1) mi = ps.indexOf("m:2026-10");
       if (mi < 1) mi = ps.length - 1;
       var thisM = ps[mi], prevM = ps[mi - 1];
-      var a = await readRankings(thisM), b = await readRankings(prevM);
-      cache.at = 0;   // cached rankings were for another period
+      var a = await rankings(thisM), b = await rankings(prevM);
       var label = function (v) { var o = D.querySelector('#per-sel option[value="' + v + '"]'); return o ? o.textContent.trim() : v; };
       var avg = function (r) { var v = r ? r.rows.filter(function (x) { return x.kpis.sales != null; }) : []; return v.length ? v.reduce(function (s, x) { return s + x.kpis.sales; }, 0) / v.length : null; };
       var pick = function (r) { var x = r && r.rows.find(function (y) { return y.state === state; }); return x ? x.kpis.sales : null; };
@@ -765,9 +871,17 @@
     });
   }
 
-  // Free-text questions: match states, KPIs and intent words.
+  // Typed questions go to the AI when it's on; otherwise (or if it fails) to the built-in answers.
   function ask(q) {
     me(q);
+    var n = norm(q);
+    if (/\b(payout calc|calculator|calculate (my )?payout|tentative payout)\b/.test(n)) { openCalculator(); return; }
+    if (AI.on && window.BIAI) return aiAnswer(q);
+    askBuiltIn(q);
+  }
+
+  // Built-in answers: match states, KPIs and intent words.
+  function askBuiltIn(q) {
     var n = norm(q), state = findState(q);
     var has = function (re) { return re.test(n); };
     if (has(/\b(hi|hello|hey|namaste|menu|help|start)\b/) && n.split(" ").length <= 3) { bot("Here's what I can help with:"); menu(); return; }
@@ -792,5 +906,5 @@
   }
 
   window.BIAssist = { openSearch: openSearch, openChat: openChat, openCalculator: openCalculator, findOnPage: findOnPage,
-    computePayout: computePayout, version: "1.3" };
+    computePayout: computePayout, version: "2.0" };
 })();

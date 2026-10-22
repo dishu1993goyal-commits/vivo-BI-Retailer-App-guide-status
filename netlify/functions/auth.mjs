@@ -18,7 +18,7 @@ export default async (req) => {
     },
   };
   try {
-    return await handle(req, { store });
+    return await handle(req, { store, env: { GEMINI_API_KEY: Netlify.env.get("GEMINI_API_KEY"), GEMINI_MODEL: Netlify.env.get("GEMINI_MODEL") } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: "Server error, please try again." }), {
       status: 500,
