@@ -48,6 +48,14 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.InputFilter;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class MainActivity extends Activity {
 
@@ -72,7 +80,17 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        showLogin();
+        startAuth();
+    }
+
+    // Mobile must be verified by OTP once on this phone; the password is asked every time.
+    private void startAuth() {
+        if (verifiedPhone() == null) showOtpLogin();
+        else showLogin();
+    }
+
+    private String verifiedPhone() {
+        return getSharedPreferences("auth", MODE_PRIVATE).getString("verified_phone", null);
     }
 
     @Override
@@ -85,7 +103,7 @@ public class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         if (unlocked && backgroundedAt > 0 && System.currentTimeMillis() - backgroundedAt > RELOCK_AFTER_MS) {
-            showLogin();
+            startAuth();
         }
     }
 
@@ -105,6 +123,290 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ---------- Mobile number + OTP (once per phone) ----------
+    private static final String OTP_URL = START_URL + "api/otp";
+    private static final int RESEND_SECONDS = 30;
+    private final Handler ui = new Handler(Looper.getMainLooper());
+    private Runnable resendTick;
+
+    private interface ApiResult { void done(boolean ok, String error); }
+
+    // POSTs to the OTP service on the same Netlify site, off the main thread.
+    private void callOtpApi(JSONObject body, ApiResult cb) {
+        new Thread(() -> {
+            boolean ok = false;
+            String err = "No internet connection. Please try again.";
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL(OTP_URL).openConnection();
+                c.setRequestMethod("POST");
+                c.setConnectTimeout(15000);
+                c.setReadTimeout(25000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.setRequestProperty("X-BI-App", "1");
+                try (OutputStream os = c.getOutputStream()) {
+                    os.write(body.toString().getBytes(StandardCharsets.UTF_8));
+                }
+                int code = c.getResponseCode();
+                InputStream in = code < 400 ? c.getInputStream() : c.getErrorStream();
+                StringBuilder sb = new StringBuilder();
+                if (in != null) {
+                    try (BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = r.readLine()) != null) sb.append(line);
+                    }
+                }
+                JSONObject res = new JSONObject(sb.length() > 0 ? sb.toString() : "{}");
+                ok = res.optBoolean("ok", false);
+                err = res.optString("error", ok ? "" : "Something went wrong (" + code + "). Please try again.");
+            } catch (Exception e) {
+                // keep the "No internet" message
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            final boolean fOk = ok;
+            final String fErr = err;
+            ui.post(() -> cb.done(fOk, fErr));
+        }).start();
+    }
+
+    private LinearLayout authHeader(String subtitle) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(dp(28), dp(64), dp(28), dp(28));
+        box.setBackgroundColor(Color.WHITE);
+
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.mipmap.ic_launcher);
+        box.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(96)));
+
+        TextView title = new TextView(this);
+        title.setText(R.string.app_name);
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(Color.parseColor("#111111"));
+        title.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-1, -2);
+        tp.topMargin = dp(16);
+        box.addView(title, tp);
+
+        TextView sub = new TextView(this);
+        sub.setText(subtitle);
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        sub.setTextColor(Color.parseColor("#666666"));
+        sub.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2);
+        sp.topMargin = dp(6);
+        sp.bottomMargin = dp(24);
+        box.addView(sub, sp);
+        return box;
+    }
+
+    private EditText authField(String hint, int inputType, int maxLen) {
+        EditText f = new EditText(this);
+        f.setHint(hint);
+        f.setSingleLine(true);
+        f.setInputType(inputType);
+        f.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        f.setPadding(dp(16), dp(14), dp(16), dp(14));
+        f.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maxLen)});
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.parseColor("#F5F6FA"));
+        bg.setCornerRadius(dp(10));
+        bg.setStroke(dp(1), Color.parseColor("#D8DAE5"));
+        f.setBackground(bg);
+        return f;
+    }
+
+    private Button authButton(String text) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
+        GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.parseColor("#4D5BF9"), Color.parseColor("#9152E0")});
+        bg.setCornerRadius(dp(10));
+        b.setBackground(bg);
+        return b;
+    }
+
+    private TextView authMsg(LinearLayout box) {
+        TextView m = new TextView(this);
+        m.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        m.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = dp(8);
+        box.addView(m, lp);
+        return m;
+    }
+
+    private void showScreen(LinearLayout box, View focus) {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Color.WHITE);
+        scroll.addView(box);
+        setContentView(scroll);
+        if (focus != null) focus.requestFocus();
+    }
+
+    private void hideKeyboard(View v) {
+        ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE))
+                .hideSoftInputFromWindow(v.getWindowToken(), 0);
+    }
+
+    private void showOtpLogin() {
+        unlocked = false;
+        if (resendTick != null) ui.removeCallbacks(resendTick);
+        LinearLayout box = authHeader("Enter your mobile number to get an OTP");
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView cc = new TextView(this);
+        cc.setText("+91");
+        cc.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        cc.setTextColor(Color.parseColor("#111111"));
+        cc.setPadding(dp(4), 0, dp(12), 0);
+        row.addView(cc);
+        EditText phone = authField("10-digit mobile number", InputType.TYPE_CLASS_PHONE, 10);
+        row.addView(phone, new LinearLayout.LayoutParams(0, -2, 1f));
+        box.addView(row, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView msg = authMsg(box);
+        Button send = authButton("Send OTP");
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(52));
+        bp.topMargin = dp(12);
+        box.addView(send, bp);
+
+        Runnable doSend = () -> {
+            String digits = phone.getText().toString().replaceAll("\\D", "");
+            if (!digits.matches("[6-9]\\d{9}")) {
+                msg.setTextColor(Color.parseColor("#C62828"));
+                msg.setText("Enter a valid 10-digit mobile number.");
+                return;
+            }
+            hideKeyboard(phone);
+            send.setEnabled(false);
+            send.setText("Sending OTP…");
+            msg.setText("");
+            try {
+                callOtpApi(new JSONObject().put("action", "send").put("phone", digits), (ok, error) -> {
+                    send.setEnabled(true);
+                    send.setText("Send OTP");
+                    if (ok) {
+                        showOtpEntry(digits);
+                    } else {
+                        msg.setTextColor(Color.parseColor("#C62828"));
+                        msg.setText(error);
+                    }
+                });
+            } catch (Exception ignored) { }
+        };
+        send.setOnClickListener(v -> doSend.run());
+        phone.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        phone.setOnEditorActionListener((v, a, e) -> { doSend.run(); return true; });
+        showScreen(box, phone);
+    }
+
+    private void showOtpEntry(String digits) {
+        LinearLayout box = authHeader("Enter the 6-digit OTP sent to +91 " + digits);
+
+        EditText otp = authField("OTP", InputType.TYPE_CLASS_NUMBER, 6);
+        otp.setGravity(Gravity.CENTER);
+        otp.setLetterSpacing(0.3f);
+        box.addView(otp, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView msg = authMsg(box);
+        Button verify = authButton("Verify OTP");
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(-1, dp(52));
+        bp.topMargin = dp(12);
+        box.addView(verify, bp);
+
+        TextView resend = new TextView(this);
+        resend.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        resend.setGravity(Gravity.CENTER);
+        resend.setPadding(0, dp(16), 0, dp(8));
+        box.addView(resend, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView change = new TextView(this);
+        change.setText("Change number");
+        change.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        change.setTextColor(Color.parseColor("#4D5BF9"));
+        change.setGravity(Gravity.CENTER);
+        change.setPadding(0, dp(8), 0, dp(8));
+        change.setOnClickListener(v -> showOtpLogin());
+        box.addView(change, new LinearLayout.LayoutParams(-1, -2));
+
+        final int[] left = {RESEND_SECONDS};
+        resendTick = new Runnable() {
+            @Override public void run() {
+                if (left[0] > 0) {
+                    resend.setText("Resend OTP in " + left[0] + "s");
+                    resend.setTextColor(Color.parseColor("#888888"));
+                    resend.setEnabled(false);
+                    left[0]--;
+                    ui.postDelayed(this, 1000);
+                } else {
+                    resend.setText("Resend OTP");
+                    resend.setTextColor(Color.parseColor("#4D5BF9"));
+                    resend.setEnabled(true);
+                }
+            }
+        };
+        ui.post(resendTick);
+        resend.setOnClickListener(v -> {
+            if (left[0] > 0) return;
+            resend.setEnabled(false);
+            resend.setText("Sending…");
+            try {
+                callOtpApi(new JSONObject().put("action", "send").put("phone", digits), (ok, error) -> {
+                    msg.setTextColor(Color.parseColor(ok ? "#2E7D32" : "#C62828"));
+                    msg.setText(ok ? "A new OTP has been sent." : error);
+                    left[0] = ok ? RESEND_SECONDS : 0;
+                    ui.removeCallbacks(resendTick);
+                    ui.post(resendTick);
+                });
+            } catch (Exception ignored) { }
+        });
+
+        Runnable doVerify = () -> {
+            String code = otp.getText().toString().trim();
+            if (!code.matches("\\d{6}")) {
+                msg.setTextColor(Color.parseColor("#C62828"));
+                msg.setText("Enter the 6-digit OTP.");
+                return;
+            }
+            hideKeyboard(otp);
+            verify.setEnabled(false);
+            verify.setText("Verifying…");
+            try {
+                callOtpApi(new JSONObject().put("action", "verify").put("phone", digits).put("otp", code), (ok, error) -> {
+                    verify.setEnabled(true);
+                    verify.setText("Verify OTP");
+                    if (ok) {
+                        ui.removeCallbacks(resendTick);
+                        getSharedPreferences("auth", MODE_PRIVATE).edit()
+                                .putString("verified_phone", "+91" + digits).apply();
+                        Toast.makeText(this, "Mobile number verified", Toast.LENGTH_SHORT).show();
+                        showLogin();
+                    } else {
+                        otp.setText("");
+                        msg.setTextColor(Color.parseColor("#C62828"));
+                        msg.setText(error);
+                    }
+                });
+            } catch (Exception ignored) { }
+        };
+        verify.setOnClickListener(v -> doVerify.run());
+        otp.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        otp.setOnEditorActionListener((v, a, e) -> { doVerify.run(); return true; });
+        showScreen(box, otp);
+    }
+
+    // ---------- Password (every time the app opens) ----------
     private void showLogin() {
         unlocked = false;
 
