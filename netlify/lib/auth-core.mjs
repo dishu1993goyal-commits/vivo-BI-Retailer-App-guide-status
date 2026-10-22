@@ -59,6 +59,25 @@ function checkPassword(pw, rec) {
 
 const maskPhone = (p) => p.slice(0, 3) + " ******" + p.slice(-4);
 
+const MAX_SESSIONS = 5;               // phones a user can stay logged in on at once
+const MAX_PHOTO_BASE64 = 300 * 1024;  // ~220 KB JPEG
+const PROFILE_LIMITS = { fullName: 40, email: 80, state: 40, designation: 50 };
+
+// Creates a login session; only its hash is stored.
+function newSession(rec, t) {
+  const token = randomBytes(32).toString("hex");
+  rec.sessions = [{ h: sha256(token), at: t }, ...(rec.sessions || [])].slice(0, MAX_SESSIONS);
+  return token;
+}
+
+function publicProfile(rec) {
+  return {
+    username: rec.username, fullName: rec.fullName, phone: rec.phone,
+    email: rec.email || "", state: rec.state || "", designation: rec.designation || "",
+    createdAt: rec.createdAt || 0, photoVersion: rec.photoVersion || 0,
+  };
+}
+
 // Truecaller one-tap login: swap the app's authorization code for the user's verified number.
 export async function truecallerPhone(app, code, codeVerifier, fetchImpl = fetch) {
   const form = new URLSearchParams({
@@ -116,12 +135,14 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
 
     if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
     const username = String(b.username).trim().replace(/\s+/g, " ");
-    await store.set(uKeyOf(key), {
+    const rec = {
       username, fullName: name, phone, ...hashPassword(b.password),
-      createdAt: t, fails: 0, lockUntil: 0,
-    });
+      createdAt: t, fails: 0, lockUntil: 0, sessions: [],
+    };
+    const token = newSession(rec, t);
+    await store.set(uKeyOf(key), rec);
     await store.set(pKeyOf(phone), { key });
-    return json(200, { ok: true, username, fullName: name });
+    return json(200, { ok: true, username, fullName: name, token, profile: publicProfile(rec) });
   }
 
   if (b.action === "login") {
@@ -138,8 +159,10 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       await store.set(uKeyOf(key), rec);
       return json(401, { ok: false, error: "User name or password is incorrect." });
     }
-    if (rec.fails || rec.lockUntil) { rec.fails = 0; rec.lockUntil = 0; await store.set(uKeyOf(key), rec); }
-    return json(200, { ok: true, username: rec.username, fullName: rec.fullName });
+    rec.fails = 0; rec.lockUntil = 0;
+    const token = newSession(rec, t);
+    await store.set(uKeyOf(key), rec);
+    return json(200, { ok: true, username: rec.username, fullName: rec.fullName, token, profile: publicProfile(rec) });
   }
 
   // Forgot password: check the number has an account, then (after Truecaller
@@ -155,7 +178,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
     const pwErr = passwordProblem(b.newPassword);
     if (pwErr) return json(400, { ok: false, error: pwErr });
-    Object.assign(rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t });
+    // A reset logs the account out on every phone.
+    Object.assign(rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t, sessions: [] });
     await store.set(uKeyOf(idx.key), rec);
     return json(200, { ok: true, username: rec.username });
   }
@@ -164,6 +188,82 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const r = await truecallerPhone(app, b.code, b.codeVerifier, tcFetch);
     if (!r.ok) return json(400, { ok: false, error: r.error });
     return json(200, { ok: true, phone: r.phone.slice(3), name: r.name });
+  }
+
+  // ---------- Actions for a logged-in user (user name + session token) ----------
+  const SESSION_ACTIONS = ["me", "update-profile", "change-password", "upload-photo", "get-photo",
+    "remove-photo", "logout", "delete-account"];
+  if (SESSION_ACTIONS.includes(b.action)) {
+    const key = userKey(b.username);
+    const rec = key ? await store.get(uKeyOf(key)) : null;
+    const th = sha256(String(b.token || ""));
+    const sess = rec && (rec.sessions || []).find((x) => x.h === th);
+    if (!sess) return json(401, { ok: false, error: "You have been logged out. Please log in again.", loggedOut: true });
+    const save = () => store.set(uKeyOf(key), rec);
+    const photoKey = `photo:${app}:${key}`;
+
+    if (b.action === "me") return json(200, { ok: true, profile: publicProfile(rec) });
+
+    if (b.action === "update-profile") {
+      const p = b.profile || {};
+      const fullName = String(p.fullName ?? rec.fullName).trim();
+      if (fullName.length < 2) return json(400, { ok: false, error: "Please enter your full name." });
+      const email = String(p.email ?? rec.email ?? "").trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { ok: false, error: "Enter a valid email address." });
+      const vals = { fullName, email, state: String(p.state ?? rec.state ?? "").trim(), designation: String(p.designation ?? rec.designation ?? "").trim() };
+      for (const [k, max] of Object.entries(PROFILE_LIMITS)) {
+        if (vals[k].length > max) return json(400, { ok: false, error: `${k} is too long.` });
+      }
+      Object.assign(rec, vals, { updatedAt: t });
+      await save();
+      return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+
+    if (b.action === "change-password") {
+      if (!checkPassword(b.currentPassword, rec)) return json(400, { ok: false, error: "Current password is incorrect." });
+      const pwErr = passwordProblem(b.newPassword);
+      if (pwErr) return json(400, { ok: false, error: pwErr });
+      // Keep this phone logged in; log out the others.
+      Object.assign(rec, hashPassword(b.newPassword), { sessions: [sess], passwordChangedAt: t });
+      await save();
+      return json(200, { ok: true });
+    }
+
+    if (b.action === "upload-photo") {
+      const data = String(b.photo || "");
+      if (!/^[A-Za-z0-9+/=\r\n]+$/.test(data) || data.length < 100) return json(400, { ok: false, error: "Invalid photo." });
+      if (data.length > MAX_PHOTO_BASE64) return json(400, { ok: false, error: "Photo is too large." });
+      await store.set(photoKey, { data, at: t });
+      rec.photoVersion = t;
+      await save();
+      return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+
+    if (b.action === "get-photo") {
+      const ph = await store.get(photoKey);
+      return json(200, { ok: true, photo: ph ? ph.data : "", photoVersion: rec.photoVersion || 0 });
+    }
+
+    if (b.action === "remove-photo") {
+      await store.delete(photoKey);
+      rec.photoVersion = 0;
+      await save();
+      return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+
+    if (b.action === "logout") {
+      rec.sessions = (rec.sessions || []).filter((x) => x.h !== th);
+      await save();
+      return json(200, { ok: true });
+    }
+
+    if (b.action === "delete-account") {
+      if (!checkPassword(b.password, rec)) return json(400, { ok: false, error: "Password is incorrect." });
+      await store.delete(photoKey);
+      await store.delete(pKeyOf(rec.phone));
+      await store.delete(uKeyOf(key));
+      return json(200, { ok: true });
+    }
   }
 
   return json(400, { ok: false, error: "Unknown action" });
