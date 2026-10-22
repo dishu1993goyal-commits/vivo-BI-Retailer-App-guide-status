@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BI Admin Insights</title>
+<style>
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--info:#2F80ED;
+  --state:#4D5BF9;--admin:#F2994A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:16px 16px 54px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.brand{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.brand .logo{background:#fff;border-radius:12px;padding:6px 10px;height:46px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.brand .logo img{height:34px;width:auto;display:block}
+.hero h1{margin:14px 0 2px;font-size:22px;letter-spacing:.2px;position:relative;z-index:1}
+.hero p{margin:0;opacity:.85;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-38px auto 0;padding:0 12px 40px;position:relative;z-index:2}
+.tabs{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08)}
+.tabs button{flex:1;border:0;background:none;padding:11px 8px;border-radius:10px;font:600 14px inherit;color:var(--ink2);display:flex;align-items:center;justify-content:center;gap:7px}
+.tabs button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.35)}
+.tabs svg{width:18px;height:18px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px}
+.bar select,.bar input{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;font:14px inherit;color:var(--ink)}
+.bar select{flex:1;min-width:150px}
+.bar .dates{display:none;gap:8px;width:100%}.bar .dates.on{display:flex}.bar .dates input{flex:1}
+.btn{border:0;border-radius:10px;padding:10px 14px;font:600 14px inherit;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn svg{width:16px;height:16px}
+.range{font-size:12px;color:var(--mut);margin:2px 2px 10px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);position:relative;overflow:hidden}
+.tile .ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.tile .ic svg{width:19px;height:19px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}
+.tile span{font-size:12px;color:var(--mut)}
+.tile small{display:block;font-size:11px;margin-top:3px;color:var(--ink2)}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card h3 svg{width:18px;height:18px;color:var(--brand)}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:700px){.grid2{grid-template-columns:1fr 1fr}.grid2 .card{margin-top:0}}
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.insights{list-style:none;margin:0;padding:0}
+.insights li{display:flex;gap:10px;padding:9px 0;border-bottom:1px dashed var(--line);font-size:14px;line-height:1.4}
+.insights li:last-child{border:0}
+.insights .dot{flex:none;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px 6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.pill{display:inline-block;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700}
+.p-state{background:#EEF0FF;color:var(--state)}.p-admin{background:#FFF1E6;color:#C2650A}
+.p-open{background:#FFF4E5;color:#B26A00}.p-answered{background:#E6F4EA;color:var(--ok)}.p-closed{background:#EEE;color:#616161}
+.stars{color:#F5A623;letter-spacing:1px}
+.muted{color:var(--mut)}
+.empty{padding:30px 10px;text-align:center;color:var(--mut)}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.search{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:14px inherit;margin-bottom:8px}
+.gauge{display:flex;align-items:center;gap:14px}
+.gauge .big{font-size:30px;font-weight:800}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="brand"><div class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></div></div>
+  <h1 id="title">Admin insights</h1>
+  <p id="subtitle">Access logs and support desk analytics</p>
+</div>
+<div class="wrap">
+  <div class="tabs">
+    <button data-tab="logs" id="tab-logs"></button>
+    <button data-tab="support" id="tab-support"></button>
+  </div>
+  <div class="bar">
+    <select id="period" aria-label="Period">
+      <option value="today">Today</option>
+      <option value="yesterday">Yesterday</option>
+      <option value="7" selected>Last 7 days</option>
+      <option value="30">Last 30 days</option>
+      <option value="month">This month</option>
+      <option value="lastmonth">Last month</option>
+      <option value="90">Last 90 days</option>
+      <option value="custom">Custom dates…</option>
+    </select>
+    <button class="btn sec" id="refresh" aria-label="Refresh"></button>
+    <button class="btn pri" id="export"></button>
+    <div class="dates" id="dates"><input type="date" id="from" aria-label="From"><input type="date" id="to" aria-label="To"></div>
+  </div>
+  <div class="range" id="range"></div>
+  <div id="view"></div>
+  <div class="foot">vivo Business Innovation · BI Admin insights · times in IST</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // ---------- icons (simple line icons) ----------
+  var P = {
+    activity: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M16 14.6c2.8.2 4.8 2 5.5 5.4"/>',
+    login: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M10 16l4-4-4-4M14 12H4"/>',
+    userplus: '<circle cx="10" cy="8" r="4"/><path d="M3 21c.9-4 3.7-6 7-6s6.1 2 7 6M19 7v6M16 10h6"/>',
+    logout: '<path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M14 16l4-4-4-4M18 12H8"/>',
+    map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
+    sleep: '<path d="M21 13.5A8.5 8.5 0 1 1 10.5 3 6.5 6.5 0 0 0 21 13.5z"/>',
+    repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>',
+    headset: '<path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13" width="4.5" height="7" rx="2"/><rect x="17" y="13" width="4.5" height="7" rx="2"/><path d="M19 20c0 1.5-2 2.5-5 2.5"/>',
+    inbox: '<path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l2 3h4l2-3h5"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.6"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
+    alert: '<path d="M12 3 2 20h20z"/><path d="M12 9v5M12 17.5v.5"/>',
+    smile: '<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    hour: '<circle cx="12" cy="12" r="9"/><path d="M12 6v6h5"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    phone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
+    bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    download: '<path d="M12 3v12M7 10l5 5 5-5M4 21h16"/>',
+    refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
+    tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+    shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>'
+  };
+  function ic(n, color) { return '<svg viewBox="0 0 24 24" fill="none" stroke="' + (color || "currentColor") + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + (P[n] || "") + "</svg>"; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var istHour = function (t) { return new Date(t + 5.5 * 3600000).getUTCHours(); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function hrs(ms) { if (ms == null || isNaN(ms)) return "—"; var h = ms / 3600000; return h < 1 ? Math.max(1, Math.round(h * 60)) + " min" : h < 48 ? (Math.round(h * 10) / 10) + " h" : (Math.round(h / 24 * 10) / 10) + " days"; }
+
+  // ---------- auth + API ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Open this page from the BI Admin app." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: "admin", username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+
+  // ---------- period ----------
+  function istToday() { return istDay(Date.now()); }
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function range() {
+    var v = $("period").value, t = istToday();
+    if (v === "today") return [t, t];
+    if (v === "yesterday") return [addDays(t, -1), addDays(t, -1)];
+    if (v === "month") return [t.slice(0, 8) + "01", t];
+    if (v === "lastmonth") { var first = t.slice(0, 8) + "01", lastEnd = addDays(first, -1); return [lastEnd.slice(0, 8) + "01", lastEnd]; }
+    if (v === "custom") { var f = $("from").value || addDays(t, -6), to = $("to").value || t; return f <= to ? [f, to] : [to, f]; }
+    return [addDays(t, -(parseInt(v, 10) - 1)), t];
+  }
+  function daysIn(a, b) { var out = [], d = a; while (d <= b && out.length < 400) { out.push(d); d = addDays(d, 1); } return out; }
+  function rangeText(r) { return r[0] === r[1] ? dayLabel(r[0]) + " " + r[0].slice(0, 4) : dayLabel(r[0]) + " – " + dayLabel(r[1]) + " " + r[1].slice(0, 4); }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.ceil(max / step) * step;
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - 44) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).slice(0, 20)) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+  function download(blob, name) {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+
+  // ---------- state ----------
+  var TAB = /support/.test(location.hash) ? "support" : "logs";
+  var DATA = { logs: null, support: null }, LAST = { logs: "", support: "" }, exportFn = null;
+  $("tab-logs").innerHTML = ic("activity") + "Access logs";
+  $("tab-support").innerHTML = ic("headset") + "Support desk";
+  $("refresh").innerHTML = ic("refresh");
+  $("export").innerHTML = ic("download") + "Export Excel";
+
+  function setTab(t) {
+    TAB = t;
+    [].forEach.call(document.querySelectorAll(".tabs button"), function (b) { b.classList.toggle("on", b.dataset.tab === t); });
+    $("title").textContent = t === "logs" ? "Access insights" : "Support desk insights";
+    $("subtitle").textContent = t === "logs" ? "Who opened the BI apps, when, and how often" : "Queries, resolution speed and satisfaction";
+    try { history.replaceState(null, "", "#" + t); } catch (e) { }
+    load(false);
+  }
+  [].forEach.call(document.querySelectorAll(".tabs button"), function (b) { b.onclick = function () { setTab(b.dataset.tab); }; });
+  $("period").onchange = function () { $("dates").classList.toggle("on", this.value === "custom"); if (this.value !== "custom") load(false); };
+  $("from").onchange = $("to").onchange = function () { if ($("from").value && $("to").value) load(false); };
+  $("refresh").onclick = function () { load(true); };
+  $("export").onclick = function () { if (exportFn) exportFn(); };
+
+  function loading(msg) { $("view").innerHTML = '<div class="loading"><div class="spin"></div>' + esc(msg) + "</div>"; exportFn = null; }
+  function fail(msg) { $("view").innerHTML = '<div class="err">' + esc(msg) + "</div>"; exportFn = null; }
+
+  function load(force) {
+    var r = range(); $("range").textContent = rangeText(r);
+    if (TAB === "logs") {
+      var key = r.join("|");
+      if (!force && DATA.logs && LAST.logs === key) return renderLogs(DATA.logs, r);
+      loading("Loading access logs…");
+      api({ action: "admin-logs-range", from: r[0], to: r[1] }).then(function (res) {
+        if (!res.ok) return fail(res.error || "Couldn't load logs.");
+        DATA.logs = res; LAST.logs = key; if (TAB === "logs") renderLogs(res, r);
+      });
+    } else {
+      if (!force && DATA.support) return renderSupport(DATA.support, r);
+      loading("Loading support desk…");
+      api({ action: "admin-support-data" }).then(function (res) {
+        if (!res.ok) return fail(res.error || "Couldn't load support desk.");
+        DATA.support = res; if (TAB === "support") renderSupport(res, r);
+      });
+    }
+  }
+
+  // ---------- ACCESS LOGS ----------
+  var EV = { open: "Opened app", login: "Logged in", signup: "Signed up", logout: "Logged out", "password-reset": "Reset password" };
+  function renderLogs(res, r) {
+    var logs = res.logs || [], users = res.users || [];
+    var days = daysIn(r[0], r[1]);
+    var uk = function (e) { return e.app + ":" + String(e.username || "").toLowerCase(); };
+    var activeEv = logs.filter(function (e) { return e.event === "open" || e.event === "login" || e.event === "signup"; });
+    var opens = logs.filter(function (e) { return e.event === "open"; });
+    var activeUsers = {}; activeEv.forEach(function (e) { var k = uk(e); (activeUsers[k] = activeUsers[k] || { e: e, n: 0, last: 0 }).n++; activeUsers[k].last = Math.max(activeUsers[k].last, e.ts); });
+    var nActive = Object.keys(activeUsers).length;
+    var stateUsers = users.filter(function (u) { return u.app === "state"; });
+    var inactive = stateUsers.filter(function (u) { return !activeUsers["state:" + u.username.toLowerCase()]; })
+      .sort(function (a, b) { return (b.lastSeen || 0) - (a.lastSeen || 0); });
+    var activeStates = {}; activeEv.forEach(function (e) { if (e.app === "state" && e.state) activeStates[e.state] = 1; });
+    var signups = logs.filter(function (e) { return e.event === "signup"; }).length;
+    var logins = logs.filter(function (e) { return e.event === "login"; }).length;
+    var logouts = logs.filter(function (e) { return e.event === "logout"; }).length;
+
+    // daily + hourly
+    var perDay = { state: days.map(function () { return 0; }), admin: days.map(function () { return 0; }) };
+    var hours = new Array(24).fill(0);
+    activeEv.forEach(function (e) { var i = days.indexOf(istDay(e.ts)); if (i >= 0) perDay[e.app === "admin" ? "admin" : "state"][i]++; hours[istHour(e.ts)]++; });
+    var peakH = hours.indexOf(Math.max.apply(null, hours));
+    var dayTot = days.map(function (_, i) { return perDay.state[i] + perDay.admin[i]; });
+    var busiest = dayTot.indexOf(Math.max.apply(null, dayTot));
+    // by state (unique users), versions, devices
+    var stUsers = {}; Object.keys(activeUsers).forEach(function (k) { var e = activeUsers[k].e; if (e.app === "state") { var s = e.state || "Not set"; stUsers[s] = (stUsers[s] || 0) + 1; } });
+    var latestVer = {}; logs.forEach(function (e) { var k = uk(e); if (e.ver && (!latestVer[k] || latestVer[k].ts < e.ts)) latestVer[k] = { v: e.ver, ts: e.ts }; });
+    var verCount = count(Object.keys(latestVer).map(function (k) { return latestVer[k].v; }), function (v) { return "v" + v; });
+    var verList = topN(verCount, 8).sort(function (a, b) { return b[0].localeCompare(a[0], undefined, { numeric: true }); });
+    var newest = verList.length ? verList[0][0] : "";
+    var oldUsers = Object.keys(latestVer).filter(function (k) { return "v" + latestVer[k].v !== newest; }).length;
+    var devices = topN(count(opens, function (e) { return e.device; }), 6);
+    var topUsers = Object.keys(activeUsers).map(function (k) { return activeUsers[k]; }).sort(function (a, b) { return b.n - a.n; });
+    var appSplit = [["State app", activeEv.filter(function (e) { return e.app === "state"; }).length, "#4D5BF9"], ["Admin app", activeEv.filter(function (e) { return e.app === "admin"; }).length, "#F2994A"]];
+
+    var h = '<div class="tiles">' +
+      tile("activity", "#4D5BF9", "#EEF0FF", fmtN(opens.length), "App opens", fmtN(days.length) + " day" + (days.length > 1 ? "s" : "")) +
+      tile("users", "#1E9E61", "#E6F6EE", fmtN(nActive), "Active users", stateUsers.length ? pct(Object.keys(activeUsers).filter(function (k) { return /^state:/.test(k); }).length, stateUsers.length) + "% of state users" : "") +
+      tile("login", "#2F80ED", "#E8F1FD", fmtN(logins), "Logins", "") +
+      tile("userplus", "#9152E0", "#F3EAFB", fmtN(signups), "New sign-ups", fmtN(users.length) + " registered") +
+      tile("repeat", "#E69A00", "#FFF4E0", nActive ? fmtN(activeEv.length / nActive) : "—", "Visits per active user", "") +
+      tile("map", "#0FA3B1", "#E3F7F8", fmtN(Object.keys(activeStates).length), "States active", "") +
+      tile("sleep", "#D93B3B", "#FDECEC", fmtN(inactive.length), "Inactive state users", "no activity in period") +
+      tile("logout", "#616161", "#EEEEEE", fmtN(logouts), "Log outs", "") + "</div>";
+
+    var ins = [];
+    if (activeEv.length) {
+      ins.push(["⏰", "#EEF0FF", "Peak usage around <b>" + (peakH % 12 || 12) + " " + (peakH < 12 ? "AM" : "PM") + "</b> (" + hours[peakH] + " visits). Share updates just before this hour."]);
+      if (days.length > 1) ins.push(["📅", "#E8F1FD", "Busiest day: <b>" + dayLabel(days[busiest]) + "</b> with " + dayTot[busiest] + " visits."]);
+      var topSt = topN(stUsers, 1)[0]; if (topSt) ins.push(["📍", "#E3F7F8", "Most active state: <b>" + esc(topSt[0]) + "</b> (" + topSt[1] + " users)."]);
+      if (topUsers[0]) ins.push(["🏅", "#FFF4E0", "Most engaged: <b>" + esc(topUsers[0].e.fullName || topUsers[0].e.username) + "</b> (" + topUsers[0].n + " visits)."]);
+    }
+    if (inactive.length) ins.push(["😴", "#FDECEC", "<b>" + inactive.length + "</b> registered state user" + (inactive.length > 1 ? "s" : "") + " didn't open the app in this period. Nudge them in the state group."]);
+    if (oldUsers && newest) ins.push(["⬆️", "#F3EAFB", "<b>" + oldUsers + "</b> user" + (oldUsers > 1 ? "s are" : " is") + " not on the latest app (" + esc(newest) + "). Share the QR code again."]);
+    if (!ins.length) ins.push(["ℹ️", "#EEF0FF", "No activity recorded in this period yet."]);
+    h += card("bulb", "Key insights", "", '<ul class="insights">' + ins.map(function (x) { return '<li><span class="dot" style="background:' + x[1] + '">' + x[0] + "</span><span>" + x[2] + "</span></li>"; }).join("") + "</ul>");
+
+    h += card("chart", "Daily activity", "Opens, logins and sign-ups per day (IST)",
+      colBars(days.map(dayLabel), [{ name: "State app", color: "#4D5BF9", values: perDay.state }, { name: "Admin app", color: "#F2994A", values: perDay.admin }], { maxLabels: 8 }));
+    h += '<div class="grid2">' +
+      card("hour", "Time of day", "When people open the apps", colBars(hours.map(function (_, i) { return i % 3 === 0 ? (i % 12 || 12) + (i < 12 ? "a" : "p") : ""; }), [{ name: "Visits", color: "#9152E0", values: hours }], { h: 140, maxLabels: 24 })) +
+      card("phone", "App split", "Share of activity", donut(appSplit, fmtN(activeEv.length), "visits")) + "</div>";
+    h += '<div class="grid2">' +
+      card("map", "Active users by state", "Unique state-app users active in period", hBars(topN(stUsers, 12), "#4D5BF9")) +
+      card("tag", "App versions in use", "Latest version seen per user", hBars(verList, "#1E9E61", { lw: 70 })) + "</div>";
+    if (devices.length) h += card("phone", "Top devices", "", hBars(devices, "#0FA3B1", { lw: 140 }));
+
+    h += card("users", "Most active users", "Visits = opens + logins + sign-ups",
+      table(["User", "State", "App", "Visits", "Last seen"], topUsers.slice(0, 15).map(function (u) {
+        return ["<b>" + esc(u.e.fullName || u.e.username) + '</b><br><span class="muted">@' + esc(u.e.username) + "</span>", esc(u.e.state || "—"),
+          '<span class="pill p-' + u.e.app + '">' + (u.e.app === "admin" ? "Admin" : "State") + "</span>", fmtN(u.n), dt(u.last)];
+      }), [3]));
+    h += card("sleep", "Inactive state users", "Registered, but no activity in this period",
+      table(["User", "State", "Mobile", "Last seen"], inactive.slice(0, 40).map(function (u) {
+        return ["<b>" + esc(u.fullName) + '</b><br><span class="muted">@' + esc(u.username) + "</span>", esc(u.state || "—"), esc(u.phone), dt(u.lastSeen)];
+      })));
+    h += card("list", "Activity log", fmtN(logs.length) + " events · newest first",
+      '<input class="search" id="logq" placeholder="Search name, user, state, event, device">' + '<div id="logtbl"></div>');
+    $("view").innerHTML = h;
+
+    function drawLog() {
+      var q = ($("logq").value || "").toLowerCase();
+      var rows = logs.filter(function (e) { return !q || [e.fullName, e.username, e.state, EV[e.event] || e.event, e.device, e.phone, e.app].join(" ").toLowerCase().indexOf(q) >= 0; });
+      $("logtbl").innerHTML = table(["Time", "User", "Event", "Details"], rows.slice(0, 200).map(function (e) {
+        return [dt(e.ts), "<b>" + esc(e.fullName || e.username) + '</b><br><span class="muted">' + esc(e.state || "") + "</span>",
+          '<span class="pill p-' + e.app + '">' + esc(EV[e.event] || e.event) + "</span>", '<span class="muted">' + esc([e.phone, e.device, e.ver ? "v" + e.ver : ""].filter(Boolean).join(" · ")) + "</span>"];
+      })) + (rows.length > 200 ? '<div class="sub" style="margin-top:6px">Showing 200 of ' + rows.length + ". Export to see all.</div>" : "");
+    }
+    $("logq").oninput = drawLog; drawLog();
+
+    exportFn = function () {
+      var summary = [["Metric", "Value"], ["Period", rangeText(r)], ["App opens", opens.length], ["Active users", nActive], ["Logins", logins],
+        ["New sign-ups", signups], ["Log outs", logouts], ["Visits per active user", nActive ? Math.round(activeEv.length / nActive * 10) / 10 : 0],
+        ["States active", Object.keys(activeStates).length], ["Registered users", users.length], ["Inactive state users", inactive.length],
+        ["Peak hour (IST)", activeEv.length ? peakH + ":00" : ""], ["Users not on latest app", oldUsers], ["Exported", dt(Date.now())]];
+      var daily = [["Date", "State app visits", "Admin app visits", "Total"]].concat(days.map(function (d, i) { return [d, perDay.state[i], perDay.admin[i], dayTot[i]]; }));
+      var bySt = [["State", "Active users"]].concat(topN(stUsers, 100));
+      var usr = [["Name", "User name", "App", "State", "Mobile", "Visits in period", "Last seen"]].concat(
+        users.map(function (u) { var a = activeUsers[u.app + ":" + u.username.toLowerCase()]; return [u.fullName, u.username, u.app, u.state, u.phone, a ? a.n : 0, u.lastSeen ? dt(u.lastSeen) : ""]; }));
+      var lg = [["Date", "Time (IST)", "Event", "App", "Name", "User name", "State", "Mobile", "Device", "App version"]].concat(logs.map(function (e) {
+        return [istDay(e.ts), dfmt(e.ts, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }), EV[e.event] || e.event, e.app, e.fullName, e.username, e.state, e.phone, e.device, e.ver];
+      }));
+      download(xlsx([{ name: "Summary", rows: summary }, { name: "Daily", rows: daily }, { name: "By state", rows: bySt }, { name: "Users", rows: usr }, { name: "Access log", rows: lg }]),
+        "BI_Access_Logs_" + r[0] + "_to_" + r[1] + ".xlsx");
+    };
+  }
+
+  // ---------- SUPPORT DESK ----------
+  function renderSupport(res, r) {
+    var all = res.tickets || [];
+    var from = Date.parse(r[0] + "T00:00:00+05:30"), to = Date.parse(r[1] + "T23:59:59+05:30");
+    var T = all.filter(function (t) { return t.createdAt >= from && t.createdAt <= to; });
+    var days = daysIn(r[0], r[1]);
+    var isAdmin = function (m) { return m.by && m.by.app === "admin"; };
+    var rows = T.map(function (t) {
+      var first = t.messages.find(isAdmin), ratings = t.messages.filter(function (m) { return isAdmin(m) && m.rating; });
+      var rating = ratings.length ? ratings[ratings.length - 1].rating.stars : 0;
+      return { t: t, firstMs: first ? first.ts - t.createdAt : null, rating: rating, replies: t.messages.filter(isAdmin).length,
+        atts: t.messages.reduce(function (s, m) { return s + (m.atts ? m.atts.length : 0); }, 0) };
+    });
+    var st = count(T, function (t) { return t.status; });
+    var open = st.open || 0, answered = st.answered || 0, closed = st.closed || 0;
+    var resolved = answered + closed;
+    var resp = rows.filter(function (x) { return x.firstMs != null; }).map(function (x) { return x.firstMs; }).sort(function (a, b) { return a - b; });
+    var avgResp = resp.length ? resp.reduce(function (s, v) { return s + v; }, 0) / resp.length : null;
+    var medResp = resp.length ? resp[Math.floor(resp.length / 2)] : null;
+    var rated = rows.filter(function (x) { return x.rating; });
+    var avgRating = rated.length ? rated.reduce(function (s, x) { return s + x.rating; }, 0) / rated.length : null;
+    var dist = [1, 2, 3, 4, 5].map(function (s) { return rated.filter(function (x) { return x.rating === s; }).length; });
+    var prom = dist[4], det = dist[0] + dist[1] + dist[2];
+    var nps = rated.length ? Math.round((prom - det) / rated.length * 100) : null;
+    var csat = rated.length ? Math.round((dist[3] + dist[4]) / rated.length * 100) : null;
+    var low = rows.filter(function (x) { return x.rating && x.rating <= 2; });
+    var unrated = rows.filter(function (x) { return x.replies && !x.rating; }).length;
+    var perDay = days.map(function (d) { return T.filter(function (t) { return istDay(t.createdAt) === d; }).length; });
+    var perDayClosed = days.map(function (d) { return T.filter(function (t) { return t.status !== "open" && istDay(t.updatedAt) === d; }).length; });
+    var topics = topN(count(T, function (t) { return t.topic; }), 10), states = topN(count(T, function (t) { return t.state || (t.by && t.by.state) || "PAN India"; }), 12);
+    // admin performance
+    var adm = {};
+    T.forEach(function (t) {
+      t.messages.forEach(function (m, i) {
+        if (!isAdmin(m)) return;
+        var k = m.by.username, a = adm[k] = adm[k] || { name: m.by.fullName || k, replies: 0, firsts: [], ratings: [] };
+        a.replies++;
+        if (t.messages.findIndex(isAdmin) === i) a.firsts.push(m.ts - t.createdAt);
+        if (m.rating) a.ratings.push(m.rating.stars);
+      });
+    });
+    var admList = Object.keys(adm).map(function (k) { var a = adm[k]; return { name: a.name, replies: a.replies,
+      first: a.firsts.length ? a.firsts.reduce(function (s, v) { return s + v; }, 0) / a.firsts.length : null,
+      rating: a.ratings.length ? a.ratings.reduce(function (s, v) { return s + v; }, 0) / a.ratings.length : null, n: a.ratings.length }; })
+      .sort(function (a, b) { return b.replies - a.replies; });
+    var openAge = rows.filter(function (x) { return x.t.status === "open"; }).sort(function (a, b) { return a.t.createdAt - b.t.createdAt; });
+    var npsColor = nps == null ? "#7A7F99" : nps >= 30 ? "#1E9E61" : nps >= 0 ? "#E69A00" : "#D93B3B";
+
+    var h = '<div class="tiles">' +
+      tile("inbox", "#4D5BF9", "#EEF0FF", fmtN(T.length), "Queries raised", fmtN(all.length) + " all time") +
+      tile("alert", "#E69A00", "#FFF4E0", fmtN(open), "Open", open ? "awaiting reply" : "all handled") +
+      tile("check", "#1E9E61", "#E6F6EE", T.length ? pct(resolved, T.length) + "%" : "—", "Resolution rate", fmtN(answered) + " answered · " + fmtN(closed) + " closed") +
+      tile("clock", "#2F80ED", "#E8F1FD", hrs(avgResp), "Avg first response", medResp != null ? "median " + hrs(medResp) : "") +
+      tile("star", "#F5A623", "#FFF6E5", avgRating ? avgRating.toFixed(1) + " ★" : "—", "Avg rating", fmtN(rated.length) + " rated") +
+      tile("smile", npsColor, "#F1F2F8", nps == null ? "—" : (nps > 0 ? "+" : "") + nps, "NPS", "5★ promoters − 1–3★ detractors") +
+      tile("smile", "#1E9E61", "#E6F6EE", csat == null ? "—" : csat + "%", "CSAT", "share of 4–5★") +
+      tile("alert", "#D93B3B", "#FDECEC", fmtN(low.length), "Low ratings", "1–2★ · " + fmtN(unrated) + " unrated") + "</div>";
+
+    var ins = [];
+    if (T.length) {
+      if (topics[0]) ins.push(["🏷️", "#EEF0FF", "Most asked topic: <b>" + esc(topics[0][0]) + "</b> (" + topics[0][1] + " queries). Consider a guide or FAQ for it."]);
+      if (states[0]) ins.push(["📍", "#E3F7F8", "Most queries from <b>" + esc(states[0][0]) + "</b> (" + states[0][1] + ")."]);
+      if (open) ins.push(["⏳", "#FFF4E0", "<b>" + open + "</b> open quer" + (open > 1 ? "ies" : "y") + (openAge[0] ? ", oldest waiting <b>" + hrs(Date.now() - openAge[0].t.createdAt) + "</b>" : "") + "."]);
+      if (avgResp != null) ins.push(["⚡", "#E8F1FD", "First reply takes <b>" + hrs(avgResp) + "</b> on average" + (avgResp > 24 * 3600000 ? " — aim for under 24 h." : ".")]);
+      if (low.length) ins.push(["⚠️", "#FDECEC", "<b>" + low.length + "</b> low-rated quer" + (low.length > 1 ? "ies" : "y") + ". Review them below and follow up."]);
+      if (nps != null) ins.push(["😊", "#E6F6EE", "NPS is <b>" + (nps > 0 ? "+" : "") + nps + "</b>" + (nps >= 30 ? " — users are happy with resolutions." : nps >= 0 ? " — room to improve answer quality." : " — more unhappy than happy users; check low ratings.")]);
+    } else ins.push(["ℹ️", "#EEF0FF", "No queries raised in this period."]);
+    h += card("bulb", "Key insights", "", '<ul class="insights">' + ins.map(function (x) { return '<li><span class="dot" style="background:' + x[1] + '">' + x[0] + "</span><span>" + x[2] + "</span></li>"; }).join("") + "</ul>");
+
+    h += card("chart", "Queries over time", "Raised vs answered/closed per day",
+      colBars(days.map(dayLabel), [{ name: "Raised", color: "#4D5BF9", values: perDay }, { name: "Answered / closed", color: "#1E9E61", values: perDayClosed }], { maxLabels: 8 }));
+    h += '<div class="grid2">' +
+      card("check", "Status", "Current status of queries raised in period", donut([["Open", open, "#E69A00"], ["Answered", answered, "#1E9E61"], ["Closed", closed, "#9E9E9E"]], fmtN(T.length), "queries")) +
+      card("star", "Rating distribution", "Latest rating per query", hBars([5, 4, 3, 2, 1].map(function (s) { return [s + " ★", dist[s - 1], s >= 4 ? "#1E9E61" : s === 3 ? "#E69A00" : "#D93B3B"]; }), "#F5A623", { lw: 50 })) + "</div>";
+    h += '<div class="grid2">' +
+      card("tag", "Queries by topic", "", hBars(topics, "#9152E0", { lw: 150 })) +
+      card("map", "Queries by state", "", hBars(states, "#4D5BF9")) + "</div>";
+    h += card("shield", "Admin performance", "Replies, first-response time and ratings per admin",
+      table(["Admin", "Replies", "Avg first reply", "Avg rating"], admList.map(function (a) {
+        return ["<b>" + esc(a.name) + "</b>", fmtN(a.replies), hrs(a.first), a.rating ? '<span class="stars">' + a.rating.toFixed(1) + " ★</span> <span class='muted'>(" + a.n + ")</span>" : "—"];
+      }), [1, 2, 3]));
+    h += card("alert", "Low-rated queries", "1–2★ — follow up with these users",
+      table(["Query", "Raised by", "Rating"], low.map(function (x) {
+        return ["<b>#" + x.t.no + " " + esc(x.t.subject) + '</b><br><span class="muted">' + esc(x.t.topic) + "</span>", esc(x.t.by.fullName) + '<br><span class="muted">' + esc(x.t.state || "") + "</span>", '<span class="stars">' + "★★★★★".slice(0, x.rating) + "☆☆☆☆☆".slice(0, 5 - x.rating) + "</span>"];
+      })));
+    h += card("clock", "Open queries by age", "Oldest first",
+      table(["Query", "Raised by", "Waiting"], openAge.map(function (x) {
+        return ["<b>#" + x.t.no + " " + esc(x.t.subject) + '</b><br><span class="muted">' + esc(x.t.topic) + "</span>", esc(x.t.by.fullName) + '<br><span class="muted">' + esc(x.t.state || "") + "</span>", hrs(Date.now() - x.t.createdAt)];
+      }), [2]));
+    h += card("list", "All queries in period", fmtN(T.length) + " queries",
+      table(["Query", "Status", "Replies", "Rating"], rows.map(function (x) {
+        return ["<b>#" + x.t.no + " " + esc(x.t.subject) + '</b><br><span class="muted">' + esc(x.t.by.fullName) + " · " + esc(x.t.state || "") + " · " + dt(x.t.createdAt) + "</span>",
+          '<span class="pill p-' + x.t.status + '">' + esc(x.t.status) + "</span>", fmtN(x.replies), x.rating ? '<span class="stars">' + x.rating + "★</span>" : "—"];
+      }), [2, 3]));
+    $("view").innerHTML = h;
+
+    exportFn = function () {
+      var summary = [["Metric", "Value"], ["Period", rangeText(r)], ["Queries raised", T.length], ["Open", open], ["Answered", answered], ["Closed", closed],
+        ["Resolution rate %", T.length ? pct(resolved, T.length) : 0], ["Avg first response (hours)", avgResp != null ? Math.round(avgResp / 360000) / 10 : ""],
+        ["Median first response (hours)", medResp != null ? Math.round(medResp / 360000) / 10 : ""], ["Rated queries", rated.length],
+        ["Avg rating", avgRating ? Math.round(avgRating * 100) / 100 : ""], ["NPS (5★ − 1–3★)", nps == null ? "" : nps], ["CSAT % (4–5★)", csat == null ? "" : csat],
+        ["Low ratings (1–2★)", low.length], ["Answered but unrated", unrated], ["5★", dist[4]], ["4★", dist[3]], ["3★", dist[2]], ["2★", dist[1]], ["1★", dist[0]], ["Exported", dt(Date.now())]];
+      var q = [["Query #", "Raised on", "Raised by", "User name", "State", "Topic", "KPI", "Subject", "Status", "Messages", "Admin replies", "First reply (hours)", "Rating", "Attachments", "Last update"]].concat(rows.map(function (x) {
+        var t = x.t; return [t.no, dt(t.createdAt), t.by.fullName, t.by.username, t.state || t.by.state || "", t.topic, t.kpi || "", t.subject, t.status, t.messages.length, x.replies,
+          x.firstMs != null ? Math.round(x.firstMs / 360000) / 10 : "", x.rating || "", x.atts, dt(t.updatedAt)];
+      }));
+      var msgs = [["Query #", "Time", "From", "Role", "State", "Message", "Attachments", "Rating"]];
+      T.forEach(function (t) { t.messages.forEach(function (m) { msgs.push([t.no, dt(m.ts), m.by.fullName, m.by.app === "admin" ? "Admin" : "State user", m.by.state || "", m.text || "", (m.atts || []).map(function (a) { return a.name; }).join(", "), m.rating ? m.rating.stars : ""]); }); });
+      var ap = [["Admin", "Replies", "Avg first reply (hours)", "Avg rating", "Ratings"]].concat(admList.map(function (a) { return [a.name, a.replies, a.first != null ? Math.round(a.first / 360000) / 10 : "", a.rating ? Math.round(a.rating * 100) / 100 : "", a.n]; }));
+      var tp = [["Topic", "Queries"]].concat(topics), sp = [["State", "Queries"]].concat(states);
+      download(xlsx([{ name: "Summary", rows: summary }, { name: "Queries", rows: q }, { name: "Messages", rows: msgs }, { name: "Admin performance", rows: ap }, { name: "By topic", rows: tp }, { name: "By state", rows: sp }]),
+        "BI_Support_Desk_" + r[0] + "_to_" + r[1] + ".xlsx");
+    };
+  }
+
+  if (!AUTH) { setTab(TAB); fail("Open this page from the BI Admin app (Profile → Admin tools)."); }
+  else setTab(TAB);
+})();
+</script>
+</body>
+</html>
