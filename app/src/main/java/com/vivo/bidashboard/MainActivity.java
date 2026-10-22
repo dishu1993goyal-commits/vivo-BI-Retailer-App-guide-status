@@ -195,21 +195,68 @@ public class MainActivity extends FragmentActivity {
     private Runnable onPhoneVerified, onVerifyBack;
     private static final int PERM_REQUEST = 2001;
 
+    private ActivityResultLauncher<Intent> tcLauncher;
+    private String tcState, tcVerifier;
+    private Runnable verifyTimeout;
+    private static final long VERIFY_TIMEOUT_MS = 25000;
+
     private void initTruecaller() {
+        tcLauncher = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), r -> {
+            try {
+                TcSdk.getInstance().onActivityResultObtained(this, r.getResultCode(), r.getData());
+            } catch (Throwable e) {
+                manualVerification("Truecaller could not finish. Trying missed call / OTP…");
+            }
+        });
         try {
-            TcSdkOptions options = new TcSdkOptions.Builder(this, new TcOAuthCallback() {
-                @Override public void onSuccess(TcOAuthData data) { }
-                @Override public void onFailure(TcOAuthError error) { }
-                @Override public void onVerificationRequired(TcOAuthError error) { }
-            })
+            TcSdkOptions options = new TcSdkOptions.Builder(this, tcOAuthCallback)
                     .sdkOptions(TcSdkOptions.OPTION_VERIFY_ALL_USERS)
+                    .consentHeadingOption(TcSdkOptions.SDK_CONSENT_HEADING_LOG_IN_TO)
+                    .footerType(TcSdkOptions.FOOTER_TYPE_ANOTHER_MOBILE_NO)
+                    .ctaText(TcSdkOptions.CTA_TEXT_PROCEED)
+                    .consentMode(TcSdkOptions.CONSENT_MODE_BOTTOMSHEET)
                     .build();
             TcSdk.init(options);
             tcReady = true;
-        } catch (Exception e) {
+        } catch (Throwable e) {
             tcReady = false;
         }
     }
+
+    // One-tap login for people with the Truecaller app; the server confirms the number.
+    private final TcOAuthCallback tcOAuthCallback = new TcOAuthCallback() {
+        @Override
+        public void onSuccess(TcOAuthData data) {
+            if (tcState != null && data.getState() != null && !tcState.equals(data.getState())) {
+                setStatus("Truecaller login could not be confirmed. Please try again.", true);
+                return;
+            }
+            setStatus("Confirming your number with Truecaller…", false);
+            callAuth(obj("action", "tc-exchange", "code", data.getAuthorizationCode(), "codeVerifier", tcVerifier),
+                    (ok, res, err) -> {
+                        if (!ok) { setStatus(err, true); return; }
+                        String tcPhone = res.optString("phone", "");
+                        if (!tcPhone.equals(pendingPhone)) {
+                            setStatus("Your Truecaller number is +91 " + tcPhone + ", not +91 " + pendingPhone
+                                    + ". Enter +91 " + tcPhone + ", or tap again and choose 'Use another number' in Truecaller.", true);
+                            return;
+                        }
+                        phoneVerified();
+                    });
+        }
+
+        @Override
+        public void onFailure(TcOAuthError error) {
+            String m = error == null ? "" : error.getErrorMessage();
+            manualVerification("Truecaller login didn't finish" + (m == null || m.isEmpty() ? "" : " (" + m + ")")
+                    + ". Trying missed call / OTP…");
+        }
+
+        @Override
+        public void onVerificationRequired(TcOAuthError error) {
+            manualVerification(null);
+        }
+    };
 
     private void setStatus(String text, boolean error) {
         if (tcStatus == null) return;
@@ -227,7 +274,29 @@ public class MainActivity extends FragmentActivity {
         pendingPhone = phone;
         onPhoneVerified = onVerified;
         onVerifyBack = back;
-        setStatus("Starting mobile verification…", false);
+        boolean oauth = false;
+        try { oauth = TcSdk.getInstance().isOAuthFlowUsable(); } catch (Throwable ignored) { }
+        if (oauth) {
+            setStatus("Opening Truecaller…", false);
+            try {
+                tcState = Long.toHexString(new java.security.SecureRandom().nextLong());
+                tcVerifier = com.truecaller.android.sdk.oAuth.CodeVerifierUtil.Companion.generateRandomCodeVerifier();
+                TcSdk.getInstance().setOAuthState(tcState);
+                TcSdk.getInstance().setOAuthScopes(new String[]{"openid", "profile", "phone"});
+                String challenge = com.truecaller.android.sdk.oAuth.CodeVerifierUtil.Companion.getCodeChallenge(tcVerifier);
+                if (challenge != null) TcSdk.getInstance().setCodeChallenge(challenge);
+                TcSdk.getInstance().getAuthorizationCode(this, tcLauncher);
+                return;
+            } catch (Throwable e) {
+                // fall through to missed call / OTP
+            }
+        }
+        manualVerification(null);
+    }
+
+    // Missed call / OTP from Truecaller, for people without the Truecaller app.
+    private void manualVerification(String note) {
+        setStatus(note != null ? note : "Asking for permissions to detect the missed call…", false);
         List<String> need = new ArrayList<>();
         need.add(Manifest.permission.READ_PHONE_STATE);
         need.add(Manifest.permission.READ_CALL_LOG);
@@ -248,11 +317,26 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void doRequestVerification() {
+        setStatus("Contacting Truecaller for a missed call / OTP…", false);
+        startVerifyTimeout();
         try {
             TcSdk.getInstance().requestVerification("IN", pendingPhone, tcVerifyCallback, this);
-        } catch (Exception e) {
+        } catch (Throwable e) {
+            stopVerifyTimeout();
             setStatus("Could not start verification: " + e.getMessage(), true);
         }
+    }
+
+    private void startVerifyTimeout() {
+        stopVerifyTimeout();
+        verifyTimeout = () -> setStatus("Truecaller did not respond. Check that your number is added as a test number "
+                + "in the Truecaller console (until it's approved), your internet is on, then tap the button again.", true);
+        ui.postDelayed(verifyTimeout, VERIFY_TIMEOUT_MS);
+    }
+
+    private void stopVerifyTimeout() {
+        if (verifyTimeout != null) ui.removeCallbacks(verifyTimeout);
+        verifyTimeout = null;
     }
 
     private void phoneVerified() {
@@ -264,6 +348,7 @@ public class MainActivity extends FragmentActivity {
     private final VerificationCallback tcVerifyCallback = new VerificationCallback() {
         @Override
         public void onRequestSuccess(int type, VerificationDataBundle bundle) {
+            stopVerifyTimeout();
             TrueProfile profile = new TrueProfile.Builder(pendingName, "").build();
             switch (type) {
                 case VerificationCallback.TYPE_MISSED_CALL_INITIATED:
@@ -295,6 +380,7 @@ public class MainActivity extends FragmentActivity {
 
         @Override
         public void onRequestFailure(int type, TrueException e) {
+            stopVerifyTimeout();
             String m = e == null ? null : e.getExceptionMessage();
             setStatus((m == null || m.isEmpty()) ? "Verification failed. Please try again." : m, true);
         }
