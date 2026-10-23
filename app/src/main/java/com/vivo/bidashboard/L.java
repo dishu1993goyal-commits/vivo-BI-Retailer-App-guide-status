@@ -281,6 +281,12 @@ final class L {
         put("notif_support_msg", "You have %d unread support desk update(s).", "सपोर्ट डेस्क में %d नए अपडेट हैं।");
         put("notif_update_title", "⬆️ App update available", "⬆️ ऐप अपडेट उपलब्ध");
         put("notif_update_msg", "Version %s is ready. Tap to update.", "वर्ज़न %s तैयार है। अपडेट करने के लिए टैप करें।");
+        // v4.5: messages and feature usability matrix
+        put("messages", "Messages", "मैसेज");
+        put("feature_matrix", "Feature usability", "फ़ीचर उपयोग");
+        put("matrix_popup", "Please tick the features your state uses and confirm your row.", "कृपया अपने राज्य में इस्तेमाल होने वाले फ़ीचर टिक करें और अपनी पंक्ति कन्फ़र्म करें।");
+        put("matrix_update", "Update my state", "मेरा राज्य अपडेट करें");
+        put("notif_chat_title", "New message from %s", "%s का नया मैसेज");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

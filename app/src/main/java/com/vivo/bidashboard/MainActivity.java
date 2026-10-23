@@ -178,7 +178,7 @@ public class MainActivity extends FragmentActivity {
 
     private void clearSession() {
         authPrefs().edit().remove("session_user").remove("session_token").remove("profile").remove("photo").remove("photo_version")
-                .remove("survey_badge").remove("support_unread").apply();
+                .remove("survey_badge").remove("support_unread").remove("chat_unread").apply();
         try { NotifyWorker.cancel(this); } catch (Throwable ignored) { }
     }
 
@@ -952,6 +952,7 @@ public class MainActivity extends FragmentActivity {
         bar.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
         bar.addView(barButton("🔍", tr("search"), "openSearch"));
         bar.addView(barButton("💬", tr("assistant"), "openChat"));
+        bar.addView(badgeButton("✉️", tr("messages"), false, v -> showToolPage("chat.html", tr("messages"), "#list")));
         bar.addView(badgeButton("📋", tr("surveys"), true, v -> showSurveyPage("#list")));
         bar.addView(supportButton());
         topAvatar = new FrameLayout(this);
@@ -1224,6 +1225,8 @@ public class MainActivity extends FragmentActivity {
         }
 
         LinearLayout help = card(page, tr("sec_tools"));
+        row(help, "✉️", tr("messages"), "", v -> showToolPage("chat.html", tr("messages"), "#list"));
+        row(help, "🧩", tr("feature_matrix"), "", v -> showToolPage("matrix.html", tr("feature_matrix"), "#list"));
         row(help, "📋", STATE_APP ? tr("surveys") : tr("survey_manager"), "", v -> showSurveyPage("#list"));
         row(help, "🔳", tr("scan_qr"), "", v -> scanWebLogin());
         row(help, "🎧", tr("support_desk"), "", v -> showSupportList("all"));
@@ -2069,7 +2072,7 @@ public class MainActivity extends FragmentActivity {
     // ---------- Surveys (survey.html, shared with the web; admins build, state users answer) ----------
     private WebView surveyWeb;
     private boolean inSurveyPage = false;
-    private TextView surveyBadge;
+    private TextView surveyBadge, chatBadge;
     private long lastNotify = 0;
 
     private class SurveyBridge {
@@ -2080,7 +2083,10 @@ public class MainActivity extends FragmentActivity {
         public void surveysChanged() { ui.post(MainActivity.this::refreshNotify); }
     }
 
-    private void showSurveyPage(String hash) {
+    private void showSurveyPage(String hash) { showToolPage("survey.html", STATE_APP ? tr("surveys") : tr("survey_manager"), hash); }
+
+    // Shared web pages used by both apps and the website: survey.html, chat.html, matrix.html.
+    private void showToolPage(String file, String title, String hash) {
         if (sessionToken() == null) return;
         inProfile = true;
         unlocked = false;
@@ -2125,17 +2131,17 @@ public class MainActivity extends FragmentActivity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.parseColor("#F3F4F9"));
-        page.addView(profileHeaderBar(STATE_APP ? tr("surveys") : tr("survey_manager"), this::surveyBack));
+        page.addView(profileHeaderBar(title, this::surveyBack));
         page.addView(surveyWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
         detachWebView();
         setContentView(page);
-        surveyWeb.loadUrl(START_URL + "survey.html?v=" + System.currentTimeMillis() + (hash == null ? "#list" : hash));
+        surveyWeb.loadUrl(START_URL + file + "?v=" + System.currentTimeMillis() + (hash == null ? "#list" : hash));
     }
 
     // Back inside the survey page first (editor → list), then leave it.
     private void surveyBack() {
         if (surveyWeb == null) { closeSurveyPage(); return; }
-        surveyWeb.evaluateJavascript("(window.__surveyBack&&window.__surveyBack())?1:0", v -> { if (!"1".equals(v)) closeSurveyPage(); });
+        surveyWeb.evaluateJavascript("(function(){var f=window.__pageBack||window.__surveyBack;return f&&f()?1:0})()", v -> { if (!"1".equals(v)) closeSurveyPage(); });
     }
 
     private void closeSurveyPage() {
@@ -2168,8 +2174,8 @@ public class MainActivity extends FragmentActivity {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, dp(16), Gravity.TOP | Gravity.END);
         lp.setMargins(0, dp(2), dp(1), 0);
         f.addView(b, lp);
-        if (survey) surveyBadge = b;
-        setBadge(b, authPrefs().getInt(survey ? "survey_badge" : "support_unread", 0));
+        if (survey) surveyBadge = b; else chatBadge = b;
+        setBadge(b, authPrefs().getInt(survey ? "survey_badge" : "chat_unread", 0));
         f.setOnClickListener(click);
         return f;
     }
@@ -2190,10 +2196,16 @@ public class MainActivity extends FragmentActivity {
             JSONObject sv = res.optJSONObject("surveys");
             if (sv == null) sv = new JSONObject();
             int n = STATE_APP ? sv.optInt("pending", 0) : sv.optInt("newResponses", 0);
-            authPrefs().edit().putInt("support_unread", su).putInt("survey_badge", n).apply();
+            JSONObject chat = res.optJSONObject("chat");
+            int cu = chat == null ? 0 : chat.optInt("unread", 0);
+            authPrefs().edit().putInt("support_unread", su).putInt("survey_badge", n).putInt("chat_unread", cu).apply();
             setBadge(supportBadge, su);
             setBadge(surveyBadge, n);
-            if (STATE_APP && unlocked) surveyPopup(sv.optJSONArray("surveys"), sv.optInt("pending", 0));
+            setBadge(chatBadge, cu);
+            if (STATE_APP && unlocked) {
+                surveyPopup(sv.optJSONArray("surveys"), sv.optInt("pending", 0));
+                matrixPopup(res.optJSONObject("matrix"));
+            }
         });
     }
 
@@ -2222,6 +2234,20 @@ public class MainActivity extends FragmentActivity {
         } catch (Exception ignored) { }
     }
 
+    private void matrixPopup(JSONObject mx) {
+        if (mx == null || !mx.optBoolean("pending")) return;
+        String id = mx.optString("id");
+        long at = mx.optLong("announcedAt");
+        if (settings().getLong("mx_seen_" + id, 0) == at) return;
+        settings().edit().putLong("mx_seen_" + id, at).apply();
+        new AlertDialog.Builder(this)
+                .setTitle("🧩 " + tr("feature_matrix"))
+                .setMessage(mx.optString("title") + "\n\n" + tr("matrix_popup"))
+                .setPositiveButton(tr("matrix_update"), (d, w) -> showToolPage("matrix.html", tr("feature_matrix"), "#list"))
+                .setNegativeButton(tr("later"), null)
+                .show();
+    }
+
     private void askNotificationPermission() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                 && !settings().getBoolean("asked_notif", false)) {
@@ -2246,6 +2272,9 @@ public class MainActivity extends FragmentActivity {
         if (open.startsWith("survey:")) showSurveyPage("#s=" + open.substring(7));
         else if (open.equals("surveys")) showSurveyPage("#list");
         else if (open.equals("support")) showSupportList("all");
+        else if (open.startsWith("chat:")) showToolPage("chat.html", tr("messages"), "#c=" + Uri.encode(open.substring(5)));
+        else if (open.equals("chat")) showToolPage("chat.html", tr("messages"), "#list");
+        else if (open.equals("matrix")) showToolPage("matrix.html", tr("feature_matrix"), "#list");
         else if (open.equals("update")) checkForUpdate(true);
     }
 

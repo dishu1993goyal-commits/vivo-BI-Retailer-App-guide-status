@@ -115,6 +115,24 @@ public class NotifyWorker extends Worker {
             n.edit().putInt("resp", nr).apply();
             auth.edit().putInt("survey_badge", nr).apply();
         }
+        JSONObject chat = res.optJSONObject("chat");
+        if (chat != null) {
+            auth.edit().putInt("chat_unread", chat.optInt("unread")).apply();
+            JSONObject last = chat.optJSONObject("latest");
+            if (last != null && last.optLong("ts") > n.getLong("chat_ts", 0)) {
+                n.edit().putLong("chat_ts", last.optLong("ts")).apply();
+                JSONObject peer = last.optJSONObject("peer");
+                String who = peer == null ? "" : peer.optString("fullName");
+                String topic = last.optString("topic", "");
+                post(c, 1600, "✉️ " + L.f(c, "notif_chat_title", who), ("General".equals(topic) || topic.isEmpty() ? "" : topic + " · ") + last.optString("text"),
+                        peer == null ? "chat" : "chat:" + peer.optString("id"));
+            }
+        }
+        JSONObject mx = res.optJSONObject("matrix");
+        if (mx != null && mx.optBoolean("pending") && n.getLong("mx_" + mx.optString("id"), 0) != mx.optLong("announcedAt")) {
+            n.edit().putLong("mx_" + mx.optString("id"), mx.optLong("announcedAt")).apply();
+            post(c, 1500, "🧩 " + L.t(c, "feature_matrix"), L.t(c, "matrix_popup"), "matrix");
+        }
         int su = res.optInt("supportUnread");
         if (su > n.getInt("support", 0)) post(c, 1800, L.t(c, "support_desk"), L.f(c, "notif_support_msg", su), "support");
         n.edit().putInt("support", su).apply();
