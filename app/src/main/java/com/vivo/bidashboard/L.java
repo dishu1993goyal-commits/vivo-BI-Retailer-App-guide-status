@@ -345,6 +345,19 @@ final class L {
         put("wa_verify_save", "Verify on WhatsApp & save", "WhatsApp पर वेरिफ़ाई करें और सेव करें");
         put("wa_no_whatsapp", "No WhatsApp on that mobile? Ask an admin instead", "उस मोबाइल पर WhatsApp नहीं है? एडमिन से अनुरोध करें");
         put("pw_changed_wa", "Password changed. Log in with your new password.", "पासवर्ड बदल गया। नए पासवर्ड से लॉग इन करें।");
+        // v4.9: email code for state users
+        put("send_code", "Send code", "कोड भेजें");
+        put("resend_code", "Resend code", "कोड फिर से भेजें");
+        put("sending", "Sending…", "भेज रहे हैं…");
+        put("email_code", "6-digit code from your email", "ईमेल पर आया 6 अंकों का कोड");
+        put("code_sent_to", "Code sent to %s — check inbox and spam. Valid for 10 minutes.", "कोड %s पर भेजा गया — इनबॉक्स और स्पैम देखें। 10 मिनट तक मान्य।");
+        put("code_sent_check", "Code sent — check inbox and spam.", "कोड भेजा गया — इनबॉक्स और स्पैम देखें।");
+        put("err_send_code", "Tap Send code to verify your email.", "अपना ईमेल वेरिफ़ाई करने के लिए कोड भेजें दबाएँ।");
+        put("err_email_code", "Enter the 6-digit code from your email.", "ईमेल पर आया 6 अंकों का कोड डालें।");
+        put("forgot_email_sub", "We'll email a code to the address on your account.", "हम आपके अकाउंट के ईमेल पर एक कोड भेजेंगे।");
+        put("account_email", "Account email", "अकाउंट का ईमेल");
+        put("no_email_access", "No access to that email? Ask an admin instead", "उस ईमेल तक पहुँच नहीं? एडमिन से अनुरोध करें");
+        put("pw_changed_email", "Password changed. Log in with your vChat ID and new password.", "पासवर्ड बदल गया। अपनी vChat ID और नए पासवर्ड से लॉग इन करें।");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

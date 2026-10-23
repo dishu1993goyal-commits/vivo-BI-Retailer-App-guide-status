@@ -975,6 +975,35 @@ public class MainActivity extends FragmentActivity {
         box.addView(showPasswordBox(pass, pass2));
         addField(box, phoneRow(phone));
         addField(box, email);
+        // Email code (shown when the admin's email verification is on)
+        Button sendCode = new Button(this);
+        sendCode.setText(tr("send_code"));
+        sendCode.setAllCaps(false);
+        EditText ecode = authField(tr("email_code"), InputType.TYPE_CLASS_NUMBER, 6);
+        LinearLayout erow = new LinearLayout(this);
+        erow.setOrientation(LinearLayout.VERTICAL);
+        erow.addView(sendCode, new LinearLayout.LayoutParams(-2, -2));
+        addField(erow, ecode);
+        ecode.setVisibility(View.GONE);
+        erow.setVisibility(emailOtpOn() ? View.VISIBLE : View.GONE);
+        box.addView(erow);
+        final String[] sentTo = {""};
+        refreshAuthConfig(() -> erow.setVisibility(emailOtpOn() ? View.VISIBLE : View.GONE));
+        sendCode.setOnClickListener(v -> {
+            String em = email.getText().toString().trim();
+            if (!em.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
+            sendCode.setEnabled(false);
+            sendCode.setText(tr("sending"));
+            callAuth(obj("action", "email-otp-send", "email", em, "purpose", "signup"), (ok, res, err) -> {
+                sendCode.setEnabled(true);
+                sendCode.setText(tr("resend_code"));
+                if (!ok) { setStatus(err, true); return; }
+                sentTo[0] = em.toLowerCase();
+                ecode.setVisibility(View.VISIBLE);
+                ecode.requestFocus();
+                setStatus(trf("code_sent_to", em), false);
+            });
+        });
         addField(box, accessCodeRow(code));
         tcStatus = authMsg(box);
         Button go = authButton(tr("create_account"));
@@ -991,9 +1020,14 @@ public class MainActivity extends FragmentActivity {
             if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
             if (!ph.matches("[6-9]\\d{9}")) { setStatus(tr("err_vchat_mobile"), true); return; }
             if (!em.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
+            if (emailOtpOn()) {
+                if (!em.toLowerCase().equals(sentTo[0])) { setStatus(tr("err_send_code"), true); return; }
+                if (!ecode.getText().toString().trim().matches("\\d{6}")) { setStatus(tr("err_email_code"), true); return; }
+            }
             if (ac.isEmpty()) { setStatus(tr("err_code_vchat"), true); return; }
             hideKeyboard(code);
-            JSONObject sd = obj("action", "signup", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac);
+            JSONObject sd = obj("action", "signup", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac,
+                    "emailOtp", ecode.getText().toString().trim());
             if (waRequired()) {
                 busy(go, tr("checking"));
                 JSONObject chk = obj("action", "signup-check", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac);
@@ -1096,12 +1130,66 @@ public class MainActivity extends FragmentActivity {
         LinearLayout wait = authHeader(tr("checking"));
         wait.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
         showScreen(wait, null);
-        refreshAuthConfig(() -> { if (waRequired()) showForgotWa(); else if (tcRequired()) showForgotTc(); else showResetRequest(); });
+        refreshAuthConfig(() -> { if (emailOtpOn()) showForgotEmail(); else if (waRequired()) showForgotWa(); else if (tcRequired()) showForgotTc(); else showResetRequest(); });
     }
 
     // ---------- Truecaller switch (set by admins, stored on the server) ----------
     private boolean tcRequired() { return settings().getBoolean("tc_required", true); }
     private boolean waRequired() { return settings().getBoolean("wa_required", false); }
+    private boolean emailOtpOn() { return STATE_APP && settings().getBoolean("email_otp", false); }
+
+    // Forgot password with an email code (state users).
+    private void showForgotEmail() {
+        LinearLayout box = authHeader(tr("forgot_email_sub"));
+        EditText email = authField(tr("account_email"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 80);
+        EditText otp = authField(tr("email_code"), InputType.TYPE_CLASS_NUMBER, 6);
+        EditText pass = authField(tr("new_password"), TEXT_PASSWORD, 64);
+        EditText pass2 = authField(tr("confirm_new_password"), TEXT_PASSWORD, 64);
+        addField(box, email);
+        LinearLayout step2 = new LinearLayout(this);
+        step2.setOrientation(LinearLayout.VERTICAL);
+        step2.setVisibility(View.GONE);
+        box.addView(step2);
+        addField(step2, otp);
+        addField(step2, pass);
+        addField(step2, pass2);
+        step2.addView(showPasswordBox(pass, pass2));
+        tcStatus = authMsg(box);
+        Button go = authButton(tr("send_code"));
+        box.addView(go, buttonParams());
+        box.addView(linkText(tr("no_email_access"), v -> showResetRequest()));
+        box.addView(linkText(tr("back_login"), v -> showLoginScreen(null)));
+        final boolean[] sent = {false};
+        go.setOnClickListener(v -> {
+            String em = email.getText().toString().trim();
+            if (!em.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
+            if (!sent[0]) {
+                busy(go, tr("sending"));
+                callAuth(obj("action", "email-otp-send", "email", em, "purpose", "reset"), (ok, res, err) -> {
+                    busy(go, null);
+                    if (!ok) { setStatus(err, true); return; }
+                    sent[0] = true;
+                    step2.setVisibility(View.VISIBLE);
+                    go.setText(tr("save_new_password"));
+                    setStatus(tr("code_sent_check"), false);
+                    otp.requestFocus();
+                });
+                return;
+            }
+            String pw = pass.getText().toString();
+            if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            hideKeyboard(pass2);
+            busy(go, tr("saving"));
+            callAuth(obj("action", "reset-email", "email", em, "otp", otp.getText().toString().trim(), "newPassword", pw), (ok, res, err) -> {
+                busy(go, null);
+                if (!ok) { setStatus(err, true); return; }
+                if (!res.optString("vchatId").isEmpty()) authPrefs().edit().putString("last_vchat", res.optString("vchatId")).apply();
+                showLoginScreen(tr("pw_changed_email"));
+            });
+        });
+        showScreen(box, email);
+    }
 
     // ---------- "Verify on WhatsApp": the user sends one message from their own WhatsApp (free) ----------
     private interface WaDone { void ok(String code, String secret); }
@@ -1211,7 +1299,8 @@ public class MainActivity extends FragmentActivity {
 
     private void refreshAuthConfig(Runnable then) {
         callAuth(obj("action", "auth-config"), (ok, res, err) -> {
-            if (ok) settings().edit().putBoolean("tc_required", res.optBoolean("tcRequired", true)).putBoolean("wa_required", res.optBoolean("waRequired", false)).apply();
+            if (ok) settings().edit().putBoolean("tc_required", res.optBoolean("tcRequired", true)).putBoolean("wa_required", res.optBoolean("waRequired", false))
+                    .putBoolean("email_otp", res.optBoolean("emailOtp", false)).apply();
             if (then != null) then.run();
         });
     }
