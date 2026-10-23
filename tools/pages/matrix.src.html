@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Feature Usability</title>
+<style>
+/*@@CSS@@*/
+/* matrix */
+.mx{overflow:auto;max-height:70vh;border-radius:12px;border:1px solid var(--line);background:#fff;margin-top:8px}
+.mx table{border-collapse:separate;border-spacing:0;font-size:12.5px;width:max-content;min-width:100%}
+.mx th,.mx td{border-bottom:1px solid #EEF0F6;border-right:1px solid #F3F4F9;padding:0;text-align:center;white-space:nowrap}
+.mx thead th{position:sticky;top:0;z-index:2;background:#1B1F5E;color:#fff;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0;padding:8px 6px;max-width:110px;white-space:normal;line-height:1.25;vertical-align:bottom}
+.mx th.sc,.mx td.sc{position:sticky;left:0;z-index:1;background:#fff;text-align:left;padding:7px 10px;font-weight:700;min-width:120px;max-width:150px;white-space:normal;box-shadow:2px 0 4px rgba(20,24,51,.06)}
+.mx thead th.sc{z-index:3;background:#1B1F5E;color:#fff}
+.mx tfoot td{position:sticky;bottom:0;background:#F7F8FC;font-weight:800;font-size:11.5px;padding:7px 4px;color:var(--ink2);z-index:1}
+.mx tfoot td.sc{z-index:2;background:#F7F8FC}
+.mx td.c{width:46px;height:36px}
+.mx td.c span{display:inline-flex;width:24px;height:24px;border-radius:7px;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+.mx td.c.y span{background:#E6F4EA;color:#1E9E61}
+.mx td.c.n span{background:#F3F4F9;color:#C5C8D8}
+.mx td.c.ed{cursor:pointer}.mx td.c.ed:hover span{outline:2px solid #BFC5FA}
+.mx tr.mine td{background:#FFFBEA}.mx tr.mine td.sc{background:#FFF4CC}
+.mx td.tot{font-weight:800;color:var(--ink2);padding:0 8px;min-width:44px}
+.mx td.sc small{display:block;font-weight:500;color:var(--mut);font-size:10.5px}
+.ok-dot{color:var(--ok)}
+.frz{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:4px 11px;font-size:12.5px;font-weight:700}
+.frz.on{background:#FDECEC;color:#B3402F}.frz.off{background:#E6F4EA;color:var(--ok)}
+.myrow .fr{display:flex;align-items:center;gap:10px;padding:12px 4px;border-bottom:1px solid #F0F1F6;font-size:15px}
+.myrow .fr:last-child{border-bottom:0}
+.myrow .fr .lab{flex:1}
+.myrow.lock .fr{opacity:.75}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.prev{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+.prev table{font-size:12px}
+.prev td,.prev th{padding:5px 7px;white-space:nowrap}
+.legend2{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:8px;flex-wrap:wrap}
+.legend2 span{display:inline-flex;align-items:center;gap:5px}
+.legend2 i{display:inline-flex;width:16px;height:16px;border-radius:5px;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:800}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧩</span></div>
+  <h1 id="h1">Feature usability</h1><p id="h2">Loading…</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading matrix…</div></div>
+
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+
+  var VIEW = $("view"), D = null, EDIT = false, ARCH = null, busy = 0, timer = 0;
+  var STATES = [];
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  var DEFAULT_FEATURES = ["Payment & collection", "Order management", "VBA incentive", "Scheme announcement", "Scheme payout", "Notifications", "v-Notice", "Stock / inventory", "Retailer onboarding"];
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  function fail(m) { VIEW.innerHTML = '<div class="err">' + esc(m) + '</div><div style="text-align:center;margin-top:14px"><button class="btn sec" id="rt">Try again</button></div>'; $("rt").onclick = function () { load(); }; }
+  window.__pageBack = window.__surveyBack = function () { if (ARCH) { ARCH = null; render(); return true; } return false; };
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") load(true); });
+
+  function load(bg) {
+    clearTimeout(timer);
+    if (!AUTH || !AUTH.token) { hero("Feature usability", ""); fail("Please log in to the BI app or dashboard first."); return; }
+    if (!bg) VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading matrix…</div>';
+    api({ action: "matrix-get" }).then(function (r) {
+      if (!r.ok) { if (!bg) fail(r.error); return; }
+      var sig = JSON.stringify([r.matrix, r.rows]);
+      var changedNow = !D || sig !== JSON.stringify([D.matrix, D.rows]);
+      D = r;
+      if (!ARCH && !busy && changedNow) render();
+      timer = setTimeout(function () { load(true); }, 20000);
+    });
+  }
+
+  function render() {
+    if (ARCH) return renderArch();
+    var m = D.matrix;
+    if (!m) {
+      hero("Feature usability", ADMIN ? "Import the states × features Excel to start" : "Nothing to fill yet");
+      VIEW.innerHTML = ADMIN ? importCard(true) + archCard() : '<div class="card empty"><div class="big">🧩</div>No feature usability matrix yet. You\'ll be notified when a BI admin shares one.</div>';
+      if (ADMIN) bindImport(); bindArch(); return;
+    }
+    var rows = D.rows, F = m.features;
+    var done = rows.filter(function (r) { return r.confirmed; }).length;
+    var use = F.map(function (f) { return rows.filter(function (r) { return r.cells[f]; }).length; });
+    var avg = rows.length ? rows.reduce(function (a, r) { return a + F.filter(function (f) { return r.cells[f]; }).length; }, 0) / rows.length : 0;
+    var topI = use.indexOf(Math.max.apply(null, use));
+    hero(m.title, (m.frozen ? "🔒 Frozen — view only" : "✏️ Open — each state updates its own row") + " · updated " + dt(m.updatedAt));
+    var html = "";
+    html += '<div class="row" style="margin-bottom:10px"><span class="frz ' + (m.frozen ? "on" : "off") + '">' + (m.frozen ? "🔒 Frozen by " + esc(m.frozenBy) + " · " + dt(m.frozenAt) : "✏️ Open for updates") + "</span></div>";
+    html += '<div class="tiles">' + tileS("✅", "#E6F4EA", done + "/" + rows.length, "States confirmed", pct(done, rows.length) + "%") +
+      tileS("🧩", "#EEF0FF", F.length, "Features") + tileS("📊", "#FFF4E5", Math.round(avg * 10) / 10, "Avg features / state") +
+      tileS("🏆", "#F4EEFF", '<span style="font-size:15px;line-height:1.25;display:block;color:var(--ink);font-weight:800">' + (F.length ? esc(F[topI]) : "—") + "</span>", "Most used", F.length ? use[topI] + "/" + rows.length + " states" : "") + "</div>";
+    // state user: own row
+    if (!ADMIN) {
+      var mine = rows.find(function (r) { return r.state === D.myState; });
+      if (!mine) html += '<div class="notice" style="margin-top:12px">Your state (' + esc((D.me && D.me.state) || "not set") + ") isn't in this matrix, so you can only view it. Ask a BI admin to add it.</div>";
+      else {
+        var lock = !D.canEditMine;
+        html += '<div class="card myrow' + (lock ? " lock" : "") + '"><h3>📍 ' + esc(mine.state) + " — your state</h3><div class=\"sub\">" +
+          (lock ? "🔒 Frozen by BI admin — view only" : "Tick every feature your state's retailers currently use. Changes save instantly.") +
+          (mine.at ? " · last update by " + esc(mine.by) + " " + dt(mine.at) : "") + "</div>" +
+          F.map(function (f, i) { return '<label class="fr"><span class="lab">' + esc(f) + '</span><label class="tg"><input type="checkbox" data-f="' + i + '"' + (mine.cells[f] ? " checked" : "") + (lock ? " disabled" : "") + "><i></i></label></label>"; }).join("") +
+          (lock ? "" : mine.confirmed ? '<div class="notice info" style="margin-top:10px">✅ Confirmed ' + dt(mine.confirmedAt) + ". You can still change ticks until the admin freezes the matrix.</div>" :
+            '<button class="btn ok block" id="cf" style="margin-top:12px">✅ Confirm my state\'s row</button>') + "</div>";
+      }
+    }
+    // admin toolbar
+    if (ADMIN) {
+      html += '<div class="toolbar">' + (m.frozen ? '<button class="btn sec" id="fz">🔓 Unfreeze</button>' : '<button class="btn pri" id="fz">🔒 Freeze matrix</button>') +
+        '<button class="btn ' + (EDIT ? "ok" : "ghost") + '" id="ed">' + (EDIT ? "✓ Done editing" : "✏️ Edit cells") + '</button><button class="btn sec" id="ex">⬇ Export Excel</button>' +
+        (!m.frozen ? '<button class="btn ghost" id="rm">🔔 Remind states</button>' : "") + "</div>";
+      if (EDIT) html += '<div class="notice info">Edit mode: tap any cell to tick / untick it for that state' + (m.frozen ? " (allowed for admins even when frozen)" : "") + ".</div>";
+    } else html += '<div class="toolbar"><button class="btn sec" id="ex">⬇ Download matrix</button></div>';
+    // table
+    html += '<div class="card"><h3>🧩 Matrix — all states</h3><div class="sub">' + rows.length + " states × " + F.length + ' features</div><input class="searchin" id="sq" placeholder="Filter states…"><div class="mx" id="mx"></div>' +
+      '<div class="legend2"><span><i style="background:#E6F4EA;color:#1E9E61">✓</i>Using</span><span><i style="background:#F3F4F9;color:#C5C8D8">–</i>Not using</span><span><span class="ok-dot">●</span> Row confirmed</span>' + (!ADMIN ? '<span><i style="background:#FFF4CC"></i>Your state</span>' : "") + "</div></div>";
+    // charts
+    html += '<div class="card"><h3>📊 Feature adoption</h3><div class="sub">Share of states using each feature</div>' +
+      hBars(F.map(function (f, i) { var p = pct(use[i], rows.length); return [f, p, p >= 70 ? "#1E9E61" : p >= 40 ? "#E69A00" : "#E05757", use[i]]; }).sort(function (a, b) { return b[1] - a[1]; }), "#4D5BF9", { lw: 140, rw: 84, fmt: function (v, it) { return v + "% (" + it[3] + "/" + rows.length + ")"; } }) + "</div>";
+    var pend = rows.filter(function (r) { return !r.confirmed; });
+    if (pend.length && !m.frozen) html += '<div class="card"><h3>⏳ Not confirmed yet (' + pend.length + ')</h3><div class="sub">States that haven\'t confirmed their row</div><div class="stchips">' + pend.map(function (r) { return "<label>" + esc(r.state) + (r.at ? " · edited" : "") + "</label>"; }).join("") + "</div></div>";
+    if (ADMIN) html += importCard(false) + archCard();
+    html += '<div class="foot">Imported by ' + esc(m.createdBy) + " · " + dt(m.createdAt) + ". Data syncs live across the apps and the web.</div>";
+    VIEW.innerHTML = html;
+    drawTable();
+    $("sq").oninput = drawTable;
+    $("ex").onclick = function () { exportMatrix(m, rows); };
+    [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (c) { c.onchange = function () { setCell(D.myState, F[+c.dataset.f], c.checked, c); }; });
+    if ($("cf")) $("cf").onclick = confirmRow;
+    if (ADMIN) {
+      $("fz").onclick = freeze; $("ed").onclick = function () { EDIT = !EDIT; render(); };
+      if ($("rm")) $("rm").onclick = function () { api({ action: "matrix-remind" }).then(function (r) { toast(r.ok ? "Reminder sent. States with unconfirmed rows get a fresh notification." : r.error); }); };
+      bindImport(); bindArch();
+    }
+  }
+  function drawTable() {
+    var m = D.matrix, F = m.features, q = ($("sq") && $("sq").value.trim().toLowerCase()) || "";
+    var rows = D.rows.filter(function (r) { return !q || r.state.toLowerCase().indexOf(q) >= 0; });
+    var canAll = ADMIN && EDIT;
+    var h = '<table><thead><tr><th class="sc">State</th>' + F.map(function (f) { return "<th>" + esc(f) + "</th>"; }).join("") + "<th>Total</th></tr></thead><tbody>";
+    rows.forEach(function (r) {
+      var mine = !ADMIN && r.state === D.myState, ed = canAll || (mine && D.canEditMine);
+      var n = F.filter(function (f) { return r.cells[f]; }).length;
+      h += '<tr class="' + (mine ? "mine" : "") + '"><td class="sc">' + (r.confirmed ? '<span class="ok-dot" title="Confirmed">● </span>' : "") + esc(r.state) + (r.at ? "<small>" + esc(r.by) + " · " + dt(r.at) + "</small>" : "") + "</td>" +
+        F.map(function (f, i) { var y = r.cells[f]; return '<td class="c ' + (y ? "y" : "n") + (ed ? " ed" : "") + '"' + (ed ? ' data-s="' + esc(r.state) + '" data-i="' + i + '"' : "") + "><span>" + (y ? "✓" : "–") + "</span></td>"; }).join("") +
+        '<td class="tot">' + n + "/" + F.length + "</td></tr>";
+    });
+    h += '</tbody><tfoot><tr><td class="sc">States using</td>' + F.map(function (f) { return "<td>" + D.rows.filter(function (r) { return r.cells[f]; }).length + "/" + D.rows.length + "</td>"; }).join("") + "<td></td></tr></tfoot></table>";
+    $("mx").innerHTML = h;
+    [].forEach.call($("mx").querySelectorAll("td.ed"), function (td) {
+      td.onclick = function () { var r = D.rows.find(function (x) { return x.state === td.dataset.s; }), f = F[+td.dataset.i]; setCell(r.state, f, !r.cells[f], null); };
+    });
+  }
+  function setCell(state, f, val, input) {
+    var r = D.rows.find(function (x) { return x.state === state; }); if (!r) return;
+    var before = r.cells[f]; r.cells[f] = val; busy++;
+    if ($("mx")) drawTable();
+    var c = {}; c[f] = val;
+    api({ action: "matrix-set", state: state, cells: c }).then(function (res) {
+      busy--;
+      if (!res.ok) { r.cells[f] = before; if (input) input.checked = before; toast(res.error); if (res.frozen) load(); else drawTable(); return; }
+      r.at = res.row.at; r.by = res.row.by; changed();
+      if ($("mx")) drawTable();
+    });
+  }
+  function confirmRow() {
+    var b = $("cf"); b.disabled = true;
+    api({ action: "matrix-set", cells: {}, confirm: true }).then(function (r) { if (!r.ok) { b.disabled = false; toast(r.error); return; } toast("Thanks! Your state's row is confirmed."); changed(); load(); });
+  }
+  function freeze() {
+    var m = D.matrix, pend = D.rows.filter(function (r) { return !r.confirmed; }).length;
+    if (m.frozen) return sheet("Unfreeze the matrix?", "State users will be able to change their rows again.", [["🔓", "Unfreeze", function () { doFreeze(false); }]]);
+    sheet("Freeze the matrix?", (pend ? pend + " state(s) haven't confirmed yet. " : "All states have confirmed. ") + "After freezing, states can only view it. Admins can still edit cells.", [["🔒", "Freeze now", function () { doFreeze(true); }]]);
+  }
+  function doFreeze(on) { api({ action: "matrix-freeze", frozen: on }).then(function (r) { toast(r.ok ? (on ? "🔒 Matrix frozen" : "Matrix unfrozen") : r.error); changed(); load(); }); }
+  function exportMatrix(m, rows) {
+    var head = ["State"].concat(m.features, ["Total", "Confirmed", "Last updated by", "Last updated (IST)"]);
+    var data = [head].concat(rows.map(function (r) { return [r.state].concat(m.features.map(function (f) { return r.cells[f] ? "✓" : ""; }), [m.features.filter(function (f) { return r.cells[f]; }).length, r.confirmed ? "Yes" : "No", r.by || "", r.at ? dt(r.at) : ""]); }));
+    data.push(["States using"].concat(m.features.map(function (f) { return rows.filter(function (r) { return r.cells[f]; }).length; })));
+    var info = [["Matrix", m.title], ["Status", m.frozen ? "Frozen by " + m.frozenBy + " on " + dt(m.frozenAt) : "Open"], ["Imported by", m.createdBy + " · " + dt(m.createdAt)], ["Exported", dt(Date.now())]];
+    download(xlsx([{ name: "Matrix", rows: data }, { name: "Info", rows: info }]), (m.title.replace(/[^\w]+/g, "_").slice(0, 40) + "_" + istDay(Date.now()) + ".xlsx").replace(/_+/g, "_"));
+    toast("Excel exported");
+  }
+
+  // ---------- import (admins) ----------
+  var PARSED = null;
+  function importCard(first) {
+    return '<div class="card" id="imp"><h3>📥 ' + (first ? "Import the matrix" : "Import a new matrix") + '</h3><div class="sub">Excel (.xlsx / .xls) or CSV · states in the first column, features in the first row' + (first ? "" : " · replaces the current matrix (it stays in History)") + '</div>' +
+      '<div class="row"><button class="btn pri" id="pick">📂 Choose Excel file</button><button class="btn sec" id="tpl">⬇ Download template</button></div>' +
+      '<div class="muted" style="font-size:12.5px;margin-top:8px">Cells with ✓, 1, Y, Yes, X or True start as ticked. Empty cells start unticked.</div><div id="pv"></div></div>';
+  }
+  function bindImport() {
+    if (!$("pick")) return;
+    $("tpl").onclick = function () {
+      var sts = STATES.length ? STATES : ["Bihar", "MHA", "Kerala"];
+      download(xlsx([{ name: "Matrix", rows: [["State"].concat(DEFAULT_FEATURES)].concat(sts.map(function (s) { return [s]; })) }]), "Feature_usability_template.xlsx");
+    };
+    $("pick").onclick = function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+      inp.onchange = function () { var f = inp.files[0]; if (f) readFile(f); };
+      inp.click();
+    };
+  }
+  var sheetJs = null;
+  function loadSheetJs() {
+    if (window.XLSX) return Promise.resolve();
+    if (!sheetJs) sheetJs = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = res; s.onerror = function () { sheetJs = null; rej(); }; document.head.appendChild(s); });
+    return sheetJs;
+  }
+  function csvRows(text) {
+    var out = [], row = [], cur = "", q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true; else if (ch === ",") { row.push(cur); cur = ""; } else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cur); out.push(row); row = []; cur = ""; } else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); out.push(row); }
+    return out;
+  }
+  function readFile(f) {
+    $("pv").innerHTML = '<div class="loading"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>";
+    var isCsv = /\.csv$/i.test(f.name), fr = new FileReader();
+    fr.onload = function () {
+      var go2 = function (aoa) { parse(aoa, f.name); };
+      if (isCsv) return go2(csvRows(String(fr.result).replace(/^﻿/, "")));
+      loadSheetJs().then(function () {
+        try { var wb = window.XLSX.read(new Uint8Array(fr.result), { type: "array" }); go2(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false })); }
+        catch (e) { $("pv").innerHTML = '<div class="err">Couldn\'t read this Excel file. Save it as .xlsx or CSV and try again.</div>'; }
+      }).catch(function () { $("pv").innerHTML = '<div class="err">Couldn\'t load the Excel reader (check internet), or save the file as CSV.</div>'; });
+    };
+    if (isCsv) fr.readAsText(f); else fr.readAsArrayBuffer(f);
+  }
+  var YES = /^(1|y|yes|true|✓|✔|☑|x|tick|ticked|done|using|use|active)$/i;
+  function parse(aoa, name) {
+    aoa = aoa.filter(function (r) { return r && r.some(function (c) { return String(c).trim(); }); });
+    if (aoa.length < 2) { $("pv").innerHTML = '<div class="err">The sheet needs a header row with features and at least one state row.</div>'; return; }
+    var head = aoa[0].map(function (c) { return String(c).trim(); }), cols = [];
+    head.forEach(function (h, i) { if (i > 0 && h) cols.push([i, h]); });
+    var states = [], cells = {};
+    aoa.slice(1).forEach(function (r) {
+      var s = String(r[0] || "").trim(); if (!s || /^(total|states using)/i.test(s)) return;
+      if (states.indexOf(s) >= 0) return;
+      states.push(s); cells[s] = {};
+      cols.forEach(function (c) { if (YES.test(String(r[c[0]] == null ? "" : r[c[0]]).trim())) cells[s][c[1]] = true; });
+    });
+    var features = cols.map(function (c) { return c[1]; }).filter(function (f, i, a) { return a.indexOf(f) === i && !/^(total|confirmed|last updated)/i.test(f); });
+    if (!features.length || !states.length) { $("pv").innerHTML = '<div class="err">No features (first row) or states (first column) found.</div>'; return; }
+    PARSED = { features: features, states: states, cells: cells };
+    var ticked = states.reduce(function (a, s) { return a + Object.keys(cells[s]).length; }, 0);
+    var unknown = STATES.length ? states.filter(function (s) { return !STATES.some(function (x) { return x.toLowerCase().replace(/\W/g, "") === s.toLowerCase().replace(/\W/g, ""); }); }) : [];
+    $("pv").innerHTML = '<div class="notice info" style="margin-top:10px">Found <b>' + states.length + " states</b> × <b>" + features.length + " features</b>" + (ticked ? " · " + ticked + " cells already ticked" : "") + " in " + esc(name) + ".</div>" +
+      (unknown.length ? '<div class="notice">These names don\'t match any registered state, so no state user can edit them: <b>' + esc(unknown.join(", ")) + "</b>. Use the same state names as at sign-up.</div>" : "") +
+      '<div class="prev"><table><thead><tr><th>State</th>' + features.map(function (f) { return "<th>" + esc(f) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      states.slice(0, 40).map(function (s) { return "<tr><td><b>" + esc(s) + "</b></td>" + features.map(function (f) { return "<td style=\"text-align:center\">" + (cells[s][f] ? "✓" : "") + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>" +
+      '<input class="tx" id="mt" maxlength="100" style="margin-top:10px" placeholder="Title, e.g. Current features usability — Oct 2026" value="Current features usability — ' + esc(new Date().toLocaleString("en-IN", { month: "short", year: "numeric" })) + '">' +
+      '<button class="btn pri block" id="doimp" style="margin-top:10px">🚀 Import & share with all states</button>';
+    $("doimp").onclick = function () {
+      var go3 = function () {
+        var b = $("doimp"); b.disabled = true; b.textContent = "Importing…";
+        api({ action: "matrix-import", title: $("mt").value, features: PARSED.features, states: PARSED.states, cells: PARSED.cells }).then(function (r) {
+          if (!r.ok) { b.disabled = false; b.textContent = "🚀 Import & share with all states"; toast(r.error); return; }
+          toast("Imported. State users are being notified."); PARSED = null; EDIT = false; changed(); load();
+        });
+      };
+      if (D.matrix) sheet("Replace the current matrix?", "\"" + D.matrix.title + "\" and everyone's ticks move to History. States start fresh on the new matrix.", [["🚀", "Yes, import", go3]]);
+      else go3();
+    };
+  }
+
+  // ---------- history (admins) ----------
+  function archCard() {
+    if (!ADMIN || !D.archive || !D.archive.length) return "";
+    return '<div class="card"><h3>🗂️ History</h3><div class="sub">Earlier matrices with their final ticks</div>' + D.archive.map(function (a) { return '<div class="cl" data-a="' + a.id + '" style="display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid #F0F1F6;cursor:pointer"><span><b>' + esc(a.title) + "</b><br><small class=\"muted\">" + dOnly(a.createdAt) + " – " + dOnly(a.archivedAt) + (a.frozen ? " · 🔒" : "") + '</small></span><span class="muted">›</span></div>'; }).join("") + "</div>";
+  }
+  function bindArch() { [].forEach.call(VIEW.querySelectorAll("[data-a]"), function (el) { el.onclick = function () { api({ action: "matrix-arch", id: el.dataset.a }).then(function (r) { if (!r.ok) { toast(r.error); return; } ARCH = r.archived; render(); window.scrollTo(0, 0); }); }; }); }
+  function renderArch() {
+    var a = ARCH;
+    hero(a.title, "History · " + dOnly(a.createdAt) + " – " + dOnly(a.archivedAt));
+    var F = a.features;
+    VIEW.innerHTML = '<button class="back" id="bk">‹ Current matrix</button><div class="toolbar"><button class="btn sec" id="ex">⬇ Export Excel</button></div><div class="card"><div class="mx"><table><thead><tr><th class="sc">State</th>' + F.map(function (f) { return "<th>" + esc(f) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      a.rows.map(function (r) { return '<tr><td class="sc">' + (r.confirmed ? '<span class="ok-dot">● </span>' : "") + esc(r.state) + "</td>" + F.map(function (f) { return '<td class="c ' + (r.cells[f] ? "y" : "n") + '"><span>' + (r.cells[f] ? "✓" : "–") + "</span></td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div></div>";
+    $("bk").onclick = function () { ARCH = null; render(); };
+    $("ex").onclick = function () { exportMatrix(a, a.rows); };
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

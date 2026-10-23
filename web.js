@@ -161,7 +161,7 @@
     ".biw-frame{position:fixed;inset:0;z-index:2147482700;background:#F3F4F9;display:flex;flex-direction:column}" +
     ".biw-frame .bar{background:#0b0b0c;color:#e6cf86;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid #c9a227}" +
     ".biw-frame iframe{flex:1;border:0;width:100%}" +
-    "@media(max-width:560px){html.biw-web .rp .top .sbfoot2{display:none!important}.biw-bar{top:13px;right:8px;padding:3px}.biw-bar button{width:34px;height:34px;font-size:16px}.biw-av{width:30px;height:30px}}";
+    "@media(max-width:560px){html.biw-web .rp .top .sbfoot2{display:none!important}.biw-bar{top:13px;right:8px;padding:3px}.biw-bar button{width:31px;height:32px;font-size:15px}.biw-av{width:29px;height:29px}}";
   function css() { if (!document.getElementById("biw-css")) { var s = el("style"); s.id = "biw-css"; s.textContent = CSS; document.head.appendChild(s); } }
 
   var ROOT = el("div"); ROOT.id = "biw-root";
@@ -454,20 +454,22 @@
   }
 
   // ---------- TOP BAR ----------
-  var barEl = null, badgeEl = null, svBadgeEl = null;
+  var barEl = null, badgeEl = null, svBadgeEl = null, chBadgeEl = null;
   function buildBar() {
     if (barEl) barEl.remove();
     barEl = el("div", "biw-bar");
     barEl.innerHTML = '<button title="Search" aria-label="Search">🔍</button><button title="BI Assistant" aria-label="BI Assistant">💬</button>' +
+      '<button title="Messages" aria-label="Messages">✉️<span class="biw-badge" id="biw-cb"></span></button>' +
       '<button title="Surveys" aria-label="Surveys">📋<span class="biw-badge" id="biw-sb"></span></button>' +
       '<button title="Support desk" aria-label="Support desk">🎧<span class="biw-badge"></span></button><button title="Profile" aria-label="Profile & settings"><span class="biw-av"></span></button>';
     var b = barEl.querySelectorAll("button");
     b[0].onclick = function () { assistant("openSearch"); };
     b[1].onclick = function () { assistant("openChat"); };
-    b[2].onclick = function () { openSurveys(); };
-    b[3].onclick = function () { openSupport(); };
-    b[4].onclick = function () { openDrawer(); };
-    badgeEl = barEl.querySelectorAll(".biw-badge")[1]; svBadgeEl = barEl.querySelector("#biw-sb");
+    b[2].onclick = function () { openTool("chat"); };
+    b[3].onclick = function () { openSurveys(); };
+    b[4].onclick = function () { openSupport(); };
+    b[5].onclick = function () { openDrawer(); };
+    badgeEl = barEl.querySelectorAll(".biw-badge")[2]; svBadgeEl = barEl.querySelector("#biw-sb"); chBadgeEl = barEl.querySelector("#biw-cb");
     ROOT.appendChild(barEl);
     paintAvatar(barEl.querySelector(".biw-av"));
   }
@@ -490,8 +492,22 @@
       setBadge(badgeEl, res.supportUnread || 0);
       var sv = res.surveys || {};
       setBadge(svBadgeEl, isAdmin() ? (sv.newResponses || 0) : (sv.pending || 0));
-      if (!isAdmin()) surveyPopup(sv.surveys || []);
+      setBadge(chBadgeEl, (res.chat && res.chat.unread) || 0);
+      if (!isAdmin()) { surveyPopup(sv.surveys || []); matrixPopup(res.matrix); }
     });
+  }
+  // Feature usability matrix shared (or re-announced) and this state hasn't confirmed its row yet.
+  function matrixPopup(mx) {
+    if (!mx || !mx.pending || document.querySelector(".biw-frame,.biw-sd,.biw-ov,.biw-login")) return;
+    var seen = store("biw-mxseen") || {};
+    if (seen[mx.id] === mx.announcedAt) return;
+    seen[mx.id] = mx.announcedAt; store("biw-mxseen", seen);
+    var ov = el("div", "biw-ov"); ov.style.alignItems = "center"; ov.style.justifyContent = "center";
+    ov.innerHTML = '<div class="biw-svpop"><div class="ic">🧩</div><div class="biw-eyebrow" style="color:#8a6a1f">Feature usability</div><h3>' + esc(mx.title) + "</h3>" +
+      '<div class="biw-mut">Please tick the features your state uses and confirm your row.</div><button class="biw-btn biw-dark" id="mx-go">Update my state</button><a class="biw-link" id="mx-later">Later</a></div>';
+    ROOT.appendChild(ov);
+    ov.querySelector("#mx-go").onclick = function () { ov.remove(); openTool("matrix"); };
+    ov.querySelector("#mx-later").onclick = function () { ov.remove(); };
   }
   // New (or re-announced) survey: show a card once per announcement on this browser.
   function surveyPopup(list) {
@@ -509,18 +525,20 @@
     ov.querySelector("#sv-go").onclick = function () { ov.remove(); openSurveys("#s=" + s.id); };
     ov.querySelector("#sv-later").onclick = function () { ov.remove(); };
   }
-  // ---------- SURVEYS (shared page, also used by the apps) ----------
+  // ---------- SURVEYS, MESSAGES, FEATURE MATRIX (shared pages, also used by the apps) ----------
   var svFrame = null;
-  function openSurveys(hash) {
+  var TOOLS = { survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"] };
+  function openSurveys(hash) { openTool("survey", hash); }
+  function openTool(name, hash) {
     closeDrawer();
     if (svFrame) svFrame.remove();
-    var f = el("div", "biw-frame"); svFrame = f;
-    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? "Survey manager" : "Surveys") + '</b></div><iframe title="Surveys" src="survey.html?v=' + Date.now() + (hash || "#list") + '"></iframe>';
+    var tl = TOOLS[name], f = el("div", "biw-frame"); svFrame = f;
+    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? tl[2] : tl[1]) + '</b></div><iframe title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
     ROOT.appendChild(f);
     var ifr = f.querySelector("iframe");
     f.querySelector(".biw-back").onclick = function () {
       var w = ifr.contentWindow, handled = false;
-      try { handled = w && w.__surveyBack && w.__surveyBack(); } catch (e) { }
+      try { var fn = w && (w.__pageBack || w.__surveyBack); handled = fn && fn(); } catch (e) { }
       if (!handled) { f.remove(); svFrame = null; refreshBadge(); }
     };
   }
@@ -583,7 +601,7 @@
     var p = PROFILE, admin = isAdmin();
     var ph = store("biw-photo");
     var adminItems = [["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
-    var helpItems = [["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
+    var helpItems = [["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
     var supItems = [["📲", "Get the State app", "APK", function () { location.href = APP_LINKS.state; }], admin ? ["📲", "Get the Admin app", "APK", function () { location.href = APP_LINKS.admin; }] : null,

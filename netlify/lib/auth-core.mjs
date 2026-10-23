@@ -2,6 +2,8 @@
 // wrapper so it can be tested. Passwords are stored only as salted scrypt hashes.
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { surveyAction } from "./survey-core.mjs";
+import { chatAction } from "./chat-core.mjs";
+import { matrixAction } from "./matrix-core.mjs";
 
 // SHA-256 of the sign-up access codes (vivoBI@2026 for admin, vivoState@2026 for state).
 const ACCESS_CODE_SHA256 = {
@@ -580,7 +582,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "support-list", "support-get", "support-create", "support-reply", "support-rate", "support-status",
     "support-upload", "support-att", "support-unread", "ai-ask", "ai-status", "admin-logs-range", "admin-support-data",
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
-    "survey-status", "survey-remind", "survey-results", "survey-ai"];
+    "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
+    "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -629,9 +632,13 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const ctx = surveyCtx();
       const sv = await surveyAction({ action: "survey-notify" }, ctx);
       const su = await (await supportAction({ action: "support-unread" }, { store, t, app, rec, key })).json();
-      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0 });
+      const chat = await chatAction({ action: "chat-notify" }, ctx);
+      const matrix = await matrixAction({ action: "matrix-notify" }, ctx);
+      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix });
     }
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
+    if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());
+    if (b.action.startsWith("matrix-")) return matrixAction(b, surveyCtx());
 
     // A logged-in app approves (or declines) a web login shown as a QR code.
     if (b.action === "qr-approve") {

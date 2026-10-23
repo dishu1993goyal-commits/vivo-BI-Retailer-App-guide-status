@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<title>BI Messages</title>
+<style>
+/*@@CSS@@*/
+/* chat */
+.cl{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.cl:hover{border-color:#D6D9F7}
+.av{width:44px;height:44px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;background:linear-gradient(135deg,#4D5BF9,#9152E0)}
+.av.ad{background:linear-gradient(135deg,#E6CF86,#C9A227);color:#111}
+.cl .mid{flex:1;min-width:0}
+.cl .nm{font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
+.cl .pv{font-size:13px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.cl.un .pv{color:var(--ink);font-weight:600}
+.cl .rt{text-align:right;flex:none;font-size:11.5px;color:var(--mut)}
+.cl .ub{display:inline-block;min-width:20px;height:20px;border-radius:99px;background:#E53935;color:#fff;font-size:11px;font-weight:700;line-height:20px;text-align:center;padding:0 6px;margin-top:4px}
+.role{font-size:10.5px;font-weight:700;border-radius:99px;padding:1px 7px;background:#EEF0FF;color:#3D47C8}
+.role.ad{background:#FFF4D6;color:#8A6A1F}
+.grp{font-size:11.5px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin:16px 4px 2px}
+body.conv{height:100vh;height:100dvh;overflow:hidden}
+body.conv .hero{display:none}
+body.conv .wrap{margin:0 auto;padding:0;height:100%;display:flex;flex-direction:column;max-width:860px}
+.chead{display:flex;align-items:center;gap:10px;padding:10px 12px;background:linear-gradient(135deg,var(--navy),#3A3FB8 60%,var(--brand2));color:#fff;flex:none}
+.chead button{border:0;background:rgba(255,255,255,.16);color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer}
+.chead .av{width:38px;height:38px;font-size:13px;border:2px solid rgba(255,255,255,.5)}
+.chead b{display:block;font-size:15.5px}.chead small{font-size:12px;opacity:.85}
+.msgs{flex:1;overflow-y:auto;padding:10px 12px 6px;background:#EEF0F7}
+.day{text-align:center;margin:12px 0 6px}.day span{background:#DCDFEE;color:#4A4F6A;font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 10px}
+.bub{max-width:82%;margin:4px 0;padding:8px 11px 6px;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(20,24,51,.08);font-size:14.5px;line-height:1.4;word-wrap:break-word;white-space:pre-wrap;position:relative}
+.bub.me{margin-left:auto;background:#DDE2FF;border-bottom-right-radius:4px}
+.bub.them{border-bottom-left-radius:4px}
+.bub .tm{display:block;text-align:right;font-size:10.5px;color:var(--mut);margin-top:3px}
+.bub .tk{color:#9AA1C0;margin-left:3px}.bub .tk.seen{color:#2F80ED}
+.ctxc{display:block;border-left:3px solid var(--brand);background:rgba(77,91,249,.07);border-radius:6px;padding:5px 8px;margin-bottom:6px;font-size:12px;color:#2B33A6;white-space:normal}
+.ctxc b{font-size:12.5px}
+.bub .fb{display:flex;align-items:center;gap:6px;border:1px solid #C9CDF7;background:#fff;color:#2B33A6;border-radius:8px;padding:6px 9px;margin:4px 0;font-size:13px;cursor:pointer;width:100%;text-align:left;white-space:normal}
+.comp{flex:none;background:#fff;border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
+.topics{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.topics::-webkit-scrollbar{display:none}
+.topics button{flex:none;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:99px;padding:6px 11px;font:600 12.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.topics button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ctxf{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.ctxf select,.ctxf input{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:8px 9px;font-size:13px;color:var(--ink)}
+.ctxf .full{grid-column:1/-1}
+.sugg{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+.sugg::-webkit-scrollbar{display:none}
+.sugg button{flex:none;border:1px dashed #9AA1F5;background:#F7F8FF;color:#2B33A6;border-radius:10px;padding:6px 10px;font-size:12.5px;cursor:pointer;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow{display:flex;gap:8px;align-items:flex-end}
+.crow textarea{flex:1;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:20px;padding:10px 14px;font:15px inherit;resize:none;max-height:120px;min-height:42px;line-height:1.35}
+.crow .ib{width:42px;height:42px;border-radius:50%;border:0;font-size:18px;cursor:pointer;flex:none}
+.crow .att{background:#F1F2FA;color:var(--ink2);padding:0;margin:0;display:block}
+.crow .snd{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.patt{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.patt span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:4px 6px 4px 10px;font-size:12.5px;display:flex;align-items:center;gap:4px}
+.patt span button{border:0;background:none;color:#C62828;cursor:pointer;font-size:14px}
+.ctxtog{border:0;background:none;color:var(--brand);font:600 12px inherit;cursor:pointer;padding:0 2px 6px}
+@media(min-width:700px){.bub{max-width:68%}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">✉️</span></div>
+  <h1 id="h1">Messages</h1><p id="h2">Loading…</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading messages…</div></div>
+
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+
+  var TOPIC_ICON = { "General": "💬", "Rankings": "🏆", "Growth": "📈", "Retailer IDs": "🆔", "Improvement areas": "🎯", "Data mismatch": "⚠️", "Overview": "🏠",
+    "Trends": "📉", "Retailer app usage": "📱", "Active retailers": "👥", "Schemes & payout": "💰", "Action plan": "🗂️", "Support desk KPI": "🎧" };
+  var TOPICS = Object.keys(TOPIC_ICON);
+  var KPIS = ["Overall BI KPI score", "Retailer app usage", "Sales target achievement", "Customer visit efficiency", "Competition management", "Support desk",
+    "v-Notice utilization", "Scheme announcement", "Scheme payout", "Announcements & notifications", "App visits", "New retailer implementation"];
+  var PAGES = ["Overview", "Rankings", "Trends", "Retailer app", "Active retailers", "Support desk", "Action plan", "Roadmap", "Growth", "Compare", "Onboarded", "Other"];
+  var FIELDS = { "Rankings": ["state", "period", "kpi"], "Growth": ["state", "period", "kpi"], "Retailer IDs": ["state", "ids"], "Improvement areas": ["state", "period", "kpi"],
+    "Data mismatch": ["state", "period", "page", "kpi", "shown", "expected"], "Overview": ["state", "period"], "Trends": ["state", "period", "kpi"], "Retailer app usage": ["state", "period"],
+    "Active retailers": ["state", "period", "ids"], "Schemes & payout": ["state", "period"], "Action plan": ["state", "period", "kpi"], "Support desk KPI": ["state", "period"] };
+  var SUGG = {
+    "General": ["Hi, I need help with the dashboard.", "Can we discuss this today?", "Thank you!"],
+    "Rankings": ["Why did our rank change this period?", "What should we improve to move up in the rankings?", "Can you share the ranking calculation for our state?"],
+    "Growth": ["Growth looks lower than expected — can you check?", "Which KPI is pulling our growth down?", "Please share the growth trend vs last quarter."],
+    "Retailer IDs": ["These retailer IDs are missing from the active list:", "Please check whether these retailer IDs are counted:", "New retailer IDs to be added:"],
+    "Improvement areas": ["Which KPI should we focus on first?", "Please suggest an action plan for our weakest KPI.", "What target should we set for next month?"],
+    "Data mismatch": ["The dashboard figure doesn't match our records.", "Retailer count on the dashboard is different from our report.", "Score looks wrong for this KPI — please verify."],
+    "Overview": ["Please explain our overall score this period."], "Trends": ["The trend dropped suddenly — any reason?"],
+    "Retailer app usage": ["App usage is low in our state — any support available?", "Which features count towards app usage?"],
+    "Active retailers": ["Active retailer count looks low — please check.", "How is an active retailer counted?"],
+    "Schemes & payout": ["Payout calculation doesn't match — please check.", "When will the scheme payout be credited?"],
+    "Action plan": ["Sharing our action plan for this month.", "Please review our action plan."],
+    "Support desk KPI": ["How is the support desk KPI calculated?"]
+  };
+  var Y = new Date().getFullYear(), PERIODS = ["Q1 " + Y, "Q2 " + Y, "Q3 " + Y, "Q4 " + Y, "Year " + Y, "Q4 " + (Y - 1), "Year " + (Y - 1)];
+  var curQ = "Q" + (Math.floor(new Date().getMonth() / 3) + 1) + " " + Y;
+  var STATES = [];
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+
+  var VIEW = $("view"), ME = null, CHATS = null, CONTACTS = null, CUR = null, timer = 0;
+  function initials(n) { var p = String(n || "?").trim().split(/\s+/); return ((p[0] || "?")[0] + (p[1] ? p[1][0] : "")).toUpperCase(); }
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  function fail(m) { VIEW.innerHTML = '<div class="err">' + esc(m) + "</div>"; }
+  function ago(t) {
+    if (!t) return ""; var d = Date.now() - t;
+    if (d < 60000) return "now"; if (istDay(t) === istDay(Date.now())) return dfmt(t, { hour: "numeric", minute: "2-digit" });
+    if (istDay(t) === istDay(Date.now() - 86400000)) return "Yesterday"; return dfmt(t, { day: "numeric", month: "short" });
+  }
+  function roleChip(p) { return '<span class="role' + (p.app === "admin" ? " ad" : "") + '">' + (p.app === "admin" ? "BI Admin" : esc(p.state || "State")) + "</span>"; }
+  function go(h) { if (location.hash === h) route(); else location.hash = h; }
+  window.__pageBack = window.__surveyBack = function () { if (/^#(c|new)/.test(location.hash)) { go("#list"); return true; } return false; };
+  window.addEventListener("hashchange", route);
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") tick(true); });
+
+  function route() {
+    clearTimeout(timer);
+    document.body.classList.remove("conv");
+    if (!AUTH || !AUTH.token) { hero("Messages", ""); fail("Please log in to the BI app or dashboard first."); return; }
+    var m = /^#c=([\w:.\- %]+)/.exec(location.hash);
+    if (m) return openChat(decodeURIComponent(m[1]));
+    if (location.hash === "#new") return showContacts();
+    showList();
+  }
+  function tick(now) {
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      if (document.visibilityState !== "visible") { tick(); return; }
+      if (CUR) poll(); else if (!/^#new/.test(location.hash)) loadList(true);
+    }, now ? 50 : CUR ? 4000 : 12000);
+  }
+
+  // ---------- conversation list ----------
+  function showList() {
+    CUR = null;
+    hero("Messages", ADMIN ? "Chat with state teams and other admins" : "Chat with BI admins about your dashboard");
+    if (!CHATS) VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading messages…</div>';
+    else renderList();
+    loadList(false);
+  }
+  function loadList(bg) {
+    api({ action: "chat-list" }).then(function (r) {
+      if (!r.ok) { if (!bg) fail(r.error); return; }
+      var sig = JSON.stringify(r.chats);
+      ME = r.me;
+      if (bg && CHATS && sig === JSON.stringify(CHATS)) { tick(); return; }
+      CHATS = r.chats;
+      if (!CUR && !/^#new/.test(location.hash)) renderList();
+      tick();
+    });
+  }
+  function renderList() {
+    var un = CHATS.filter(function (c) { return c.unread; }).length;
+    var html = '<div class="row" style="margin-bottom:6px"><button class="btn pri grow" id="nw">✏️ New message</button></div>';
+    if (CHATS.length > 4) html += '<input class="searchin" id="sq" placeholder="Search chats…">';
+    html += '<div id="cls"></div>';
+    VIEW.innerHTML = html;
+    $("nw").onclick = function () { go("#new"); };
+    if ($("sq")) $("sq").oninput = drawChats;
+    drawChats();
+    $("h2").textContent = un ? un + " unread chat" + (un > 1 ? "s" : "") : (ADMIN ? "Chat with state teams and other admins" : "Chat with BI admins about your dashboard");
+  }
+  function drawChats() {
+    var q = $("sq") ? $("sq").value.trim().toLowerCase() : "";
+    var list = CHATS.filter(function (c) { return !q || (c.peer.fullName + " " + c.peer.state + " " + c.lastText).toLowerCase().indexOf(q) >= 0; });
+    $("cls").innerHTML = list.length ? list.map(function (c) {
+      var p = c.peer;
+      return '<div class="cl' + (c.unread ? " un" : "") + '" data-id="' + esc(p.id) + '"><div class="av' + (p.app === "admin" ? " ad" : "") + '">' + esc(initials(p.fullName)) + '</div><div class="mid"><div class="nm">' + esc(p.fullName) + " " + roleChip(p) + '</div><div class="pv">' +
+        (c.lastFrom === (ME && ME.id) ? "You: " : "") + (c.lastTopic && c.lastTopic !== "General" ? (TOPIC_ICON[c.lastTopic] || "") + " " : "") + esc(c.lastText) + '</div></div><div class="rt">' + ago(c.lastTs) + (c.unread ? '<br><span class="ub">' + c.unread + "</span>" : "") + "</div></div>";
+    }).join("") : '<div class="card empty"><div class="big">💬</div>' + (q ? "No chats match your search." : ADMIN ? "No chats yet. Tap <b>New message</b> to message a state team." : "No chats yet. Tap <b>New message</b> to ask a BI admin about rankings, growth, retailer IDs or data mismatches.") + "</div>";
+    [].forEach.call($("cls").querySelectorAll(".cl"), function (el) { el.onclick = function () { go("#c=" + encodeURIComponent(el.dataset.id)); }; });
+  }
+
+  // ---------- new message: pick a person ----------
+  function showContacts() {
+    CUR = null;
+    hero("New message", ADMIN ? "Pick a state user or admin" : "Pick a BI admin");
+    VIEW.innerHTML = '<button class="back" id="bk">‹ Messages</button><div class="row"><input class="searchin grow" id="cq" placeholder="Search by name or state…">' +
+      (ADMIN ? '<select class="tx" id="cst" style="width:auto;padding:9px"><option value="">All</option><option value="__admin">Admins</option></select>' : "") + '</div><div id="cts"><div class="loading"><div class="spin"></div></div></div>';
+    $("bk").onclick = function () { go("#list"); };
+    var draw = function () {
+      var q = $("cq").value.trim().toLowerCase(), st = $("cst") ? $("cst").value : "";
+      var list = CONTACTS.filter(function (c) { return (!q || (c.fullName + " " + c.username + " " + c.state + " " + c.designation).toLowerCase().indexOf(q) >= 0) && (!st || (st === "__admin" ? c.app === "admin" : c.app === "state" && c.state === st)); });
+      var html = "", g = null;
+      list.forEach(function (c) {
+        var grp = c.app === "admin" ? "BI Admins" : (c.state || "No state");
+        if (grp !== g) { html += '<div class="grp">' + esc(grp) + "</div>"; g = grp; }
+        html += '<div class="cl" data-id="' + esc(c.id) + '"><div class="av' + (c.app === "admin" ? " ad" : "") + '">' + esc(initials(c.fullName)) + '</div><div class="mid"><div class="nm">' + esc(c.fullName) + " " + roleChip(c) + '</div><div class="pv">@' + esc(c.username) + (c.designation ? " · " + esc(c.designation) : "") + '</div></div><div class="rt">' + (c.lastSeen ? "seen " + ago(c.lastSeen) : "") + "</div></div>";
+      });
+      $("cts").innerHTML = html || '<div class="card empty">No one found.</div>';
+      [].forEach.call($("cts").querySelectorAll(".cl"), function (el) { el.onclick = function () { go("#c=" + encodeURIComponent(el.dataset.id)); }; });
+    };
+    var fill = function () {
+      if ($("cst")) { var sts = {}; CONTACTS.forEach(function (c) { if (c.app === "state" && c.state) sts[c.state] = 1; }); $("cst").innerHTML = '<option value="">All</option><option value="__admin">Admins</option>' + Object.keys(sts).sort().map(function (s) { return "<option>" + esc(s) + "</option>"; }).join(""); $("cst").onchange = draw; }
+      $("cq").oninput = draw; draw();
+    };
+    if (CONTACTS) fill();
+    api({ action: "chat-contacts" }).then(function (r) { if (!r.ok) { $("cts").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } CONTACTS = r.contacts; if ($("cq")) fill(); });
+  }
+
+  // ---------- conversation ----------
+  var DRAFT = { topic: "General", ctx: {}, atts: [], showCtx: true };
+  function openChat(peerId) {
+    CUR = { peer: { id: peerId, fullName: "…", app: /^admin:/.test(peerId) ? "admin" : "state" }, msgs: [], lastTs: 0, peerRead: 0 };
+    DRAFT = { topic: "General", ctx: {}, atts: [], showCtx: true };
+    document.body.classList.add("conv");
+    VIEW.innerHTML = '<div class="chead"><button id="bk" aria-label="Back">‹</button><div class="av" id="pav"></div><div style="flex:1;min-width:0"><b id="pnm">…</b><small id="psub"></small></div></div>' +
+      '<div class="msgs" id="msgs"><div class="loading"><div class="spin"></div></div></div><div class="comp" id="comp"></div>';
+    $("bk").onclick = function () { go("#list"); };
+    drawComposer();
+    api({ action: "chat-get", peer: peerId }).then(function (r) {
+      if (!CUR || CUR.peer.id !== peerId) return;
+      if (!r.ok) { $("msgs").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; $("comp").innerHTML = ""; return; }
+      CUR.peer = r.peer; ME = r.me; CUR.msgs = r.messages; CUR.peerRead = r.peerRead;
+      CUR.lastTs = r.messages.length ? r.messages[r.messages.length - 1].ts : 0;
+      DRAFT.ctx.state = DRAFT.ctx.state || (ADMIN ? r.peer.state : ME.state) || "";
+      DRAFT.ctx.period = DRAFT.ctx.period || curQ;
+      head(); drawMsgs(true); drawComposer(); changed(); tick();
+    });
+  }
+  function head() {
+    var p = CUR.peer;
+    $("pav").textContent = initials(p.fullName); $("pav").className = "av" + (p.app === "admin" ? " ad" : "");
+    $("pnm").textContent = p.fullName;
+    $("psub").textContent = (p.app === "admin" ? "BI Admin" : (p.state || "State user")) + (p.designation ? " · " + p.designation : "") + (p.lastSeen ? " · seen " + ago(p.lastSeen) : "");
+  }
+  function poll() {
+    if (!CUR) return;
+    var id = CUR.peer.id;
+    api({ action: "chat-get", peer: id, since: Math.max(0, CUR.lastTs - 15000) }).then(function (r) {
+      if (!CUR || CUR.peer.id !== id) return;
+      if (r.ok) {
+        var have = {}; CUR.msgs.forEach(function (m) { have[m.id] = 1; });
+        var fresh = r.messages.filter(function (m) { return !have[m.id]; });
+        var seenChanged = r.peerRead !== CUR.peerRead;
+        CUR.peerRead = r.peerRead; CUR.peer = r.peer;
+        if (fresh.length) { CUR.msgs = CUR.msgs.concat(fresh).sort(function (x, y) { return x.ts - y.ts; }); CUR.lastTs = CUR.msgs[CUR.msgs.length - 1].ts; drawMsgs(true); changed(); }
+        else if (seenChanged) drawMsgs(false);
+      }
+      tick();
+    });
+  }
+  function ctxLine(m) {
+    if (!m.topic || m.topic === "General") return "";
+    var c = m.ctx || {}, bits = [c.state, c.period, c.kpi, c.page ? "Page: " + c.page : ""].filter(Boolean);
+    var extra = (c.ids ? "<br>IDs: " + esc(c.ids) : "") + (c.shown || c.expected ? "<br>Dashboard shows: <b>" + esc(c.shown || "—") + "</b> · Should be: <b>" + esc(c.expected || "—") + "</b>" : "");
+    return '<span class="ctxc"><b>' + (TOPIC_ICON[m.topic] || "💬") + " " + esc(m.topic) + "</b>" + (bits.length ? " · " + esc(bits.join(" · ")) : "") + extra + "</span>";
+  }
+  function drawMsgs(scroll) {
+    var box = $("msgs"); if (!box) return;
+    var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+    if (!CUR.msgs.length) { box.innerHTML = '<div class="empty" style="padding-top:40px"><div class="big">👋</div>Say hello to ' + esc(CUR.peer.fullName) + '.<br><span style="font-size:13px">Pick a topic below (Rankings, Growth, Retailer IDs, Data mismatch…) so they get the full context.</span></div>'; return; }
+    var html = "", day = "";
+    CUR.msgs.forEach(function (m) {
+      var d = istDay(m.ts);
+      if (d !== day) { day = d; html += '<div class="day"><span>' + (d === istDay(Date.now()) ? "Today" : d === istDay(Date.now() - 86400000) ? "Yesterday" : dOnly(m.ts)) + "</span></div>"; }
+      var mine = ME && m.from === ME.id;
+      html += '<div class="bub ' + (mine ? "me" : "them") + '">' + ctxLine(m) + esc(m.text) +
+        (m.atts || []).map(function (a) { return '<button class="fb" data-a="' + esc(JSON.stringify(a)) + '">📎 ' + esc(a.name) + "</button>"; }).join("") +
+        '<span class="tm">' + dfmt(m.ts, { hour: "numeric", minute: "2-digit" }) + (mine ? '<span class="tk' + (CUR.peerRead >= m.ts ? ' seen">✓✓' : '">✓') + "</span>" : "") + "</span></div>";
+    });
+    box.innerHTML = html;
+    [].forEach.call(box.querySelectorAll(".fb"), function (b) { b.onclick = function () { getAtt(JSON.parse(b.dataset.a)); }; });
+    if (scroll || nearBottom) box.scrollTop = box.scrollHeight;
+  }
+  function getAtt(a) {
+    toast("Downloading " + a.name + "…");
+    api({ action: "chat-att", peer: CUR.peer.id, id: a.id }).then(function (r) {
+      if (!r.ok) { toast(r.error); return; }
+      if (window.AndroidDL && window.AndroidDL.save) window.AndroidDL.save(r.data, r.name, r.mime); else download(b64ToBlob(r.data, r.mime), r.name);
+    });
+  }
+  function opt(list, val, ph) { return '<option value="">' + esc(ph) + "</option>" + list.map(function (x) { return "<option" + (x === val ? " selected" : "") + ">" + esc(x) + "</option>"; }).join(""); }
+  function drawComposer() {
+    var c = $("comp"); if (!c) return;
+    var keep = $("txt") ? $("txt").value : "";
+    var f = FIELDS[DRAFT.topic] || [], cx = DRAFT.ctx, sts = STATES.length ? STATES : (cx.state ? [cx.state] : []);
+    var fields = "";
+    if (f.length && DRAFT.showCtx) {
+      fields = '<div class="ctxf">' + f.map(function (k) {
+        if (k === "state") return '<select data-c="state">' + opt(ADMIN ? sts : (ME && ME.state ? [ME.state] : sts), cx.state, "State") + "</select>";
+        if (k === "period") return '<select data-c="period">' + opt(PERIODS, cx.period, "Period") + "</select>";
+        if (k === "kpi") return '<select data-c="kpi">' + opt(KPIS, cx.kpi, "KPI (optional)") + "</select>";
+        if (k === "page") return '<select data-c="page">' + opt(PAGES, cx.page, "Dashboard page") + "</select>";
+        if (k === "ids") return '<input class="full" data-c="ids" maxlength="300" placeholder="Retailer ID(s), comma separated" value="' + esc(cx.ids || "") + '">';
+        if (k === "shown") return '<input data-c="shown" maxlength="80" placeholder="Dashboard shows" value="' + esc(cx.shown || "") + '">';
+        if (k === "expected") return '<input data-c="expected" maxlength="80" placeholder="Should be" value="' + esc(cx.expected || "") + '">';
+        return "";
+      }).join("") + "</div>";
+    }
+    c.innerHTML = '<div class="topics">' + TOPICS.map(function (t) { return '<button data-t="' + esc(t) + '" class="' + (DRAFT.topic === t ? "on" : "") + '">' + TOPIC_ICON[t] + " " + esc(t) + "</button>"; }).join("") + "</div>" +
+      (f.length ? '<button class="ctxtog" id="ctog">' + (DRAFT.showCtx ? "▾ Details (state, period, KPI…)" : "▸ Add details (state, period, KPI…)") + "</button>" : "") + fields +
+      '<div class="sugg">' + (SUGG[DRAFT.topic] || []).map(function (s) { return "<button>" + esc(s) + "</button>"; }).join("") + "</div>" +
+      (DRAFT.atts.length ? '<div class="patt">' + DRAFT.atts.map(function (a, i) { return "<span>📎 " + esc(a.name) + '<button data-rm="' + i + '">✕</button></span>'; }).join("") + "</div>" : "") +
+      '<div class="crow"><button class="ib att" id="atb" title="Attach file" aria-label="Attach file">📎</button><textarea id="txt" rows="1" maxlength="2000" placeholder="Type a message"></textarea><button class="ib snd" id="snd" aria-label="Send">➤</button></div>';
+    var t = $("txt"); t.value = keep; autoGrow(t);
+    t.oninput = function () { autoGrow(t); };
+    t.onkeydown = function (e) { if (e.key === "Enter" && !e.shiftKey && window.matchMedia("(min-width:700px)").matches) { e.preventDefault(); send(); } };
+    [].forEach.call(c.querySelectorAll(".topics button"), function (b) { b.onclick = function () { DRAFT.topic = b.dataset.t; DRAFT.showCtx = true; drawComposer(); var on = c.querySelector(".topics .on"); if (on) on.scrollIntoView({ inline: "center", block: "nearest" }); }; });
+    [].forEach.call(c.querySelectorAll("[data-c]"), function (i) { var h = function () { DRAFT.ctx[i.dataset.c] = i.value; }; i.oninput = h; i.onchange = h; });
+    [].forEach.call(c.querySelectorAll(".sugg button"), function (b) { b.onclick = function () { t.value = b.textContent + (/:$/.test(b.textContent) ? " " : ""); autoGrow(t); t.focus(); }; });
+    [].forEach.call(c.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { DRAFT.atts.splice(+b.dataset.rm, 1); drawComposer(); }; });
+    if ($("ctog")) $("ctog").onclick = function () { DRAFT.showCtx = !DRAFT.showCtx; drawComposer(); };
+    $("snd").onclick = send; $("atb").onclick = attach;
+  }
+  function autoGrow(t) { t.style.height = "auto"; t.style.height = Math.min(120, t.scrollHeight) + "px"; }
+  function attach() {
+    if (DRAFT.atts.length >= 5) { toast("Up to 5 files per message."); return; }
+    var inp = document.createElement("input"); inp.type = "file";
+    inp.accept = ".pdf,.xls,.xlsx,.csv,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.txt,image/*";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      if (f.size > 4 * 1024 * 1024) { toast("File is larger than 4 MB."); return; }
+      toast("Uploading " + f.name + "…");
+      var fr = new FileReader();
+      fr.onload = function () {
+        api({ action: "support-upload", name: f.name, data: String(fr.result).split(",")[1] }).then(function (r) {
+          if (!r.ok) { toast(r.error); return; }
+          DRAFT.atts.push(r.att); drawComposer();
+        });
+      };
+      fr.readAsDataURL(f);
+    };
+    inp.click();
+  }
+  function send() {
+    var t = $("txt"), text = t.value.trim();
+    if (!text && !DRAFT.atts.length) { t.focus(); return; }
+    var f = FIELDS[DRAFT.topic] || [], ctx = {};
+    f.forEach(function (k) { if (DRAFT.ctx[k]) ctx[k] = DRAFT.ctx[k]; });
+    var b = $("snd"); b.disabled = true;
+    api({ action: "chat-send", peer: CUR.peer.id, text: text, topic: DRAFT.topic, ctx: ctx, atts: DRAFT.atts.map(function (a) { return a.id; }) }).then(function (r) {
+      b.disabled = false;
+      if (!r.ok) { toast(r.error); return; }
+      t.value = ""; DRAFT.atts = []; DRAFT.showCtx = false; DRAFT.ctx.ids = ""; DRAFT.ctx.shown = ""; DRAFT.ctx.expected = "";
+      CUR.msgs.push(r.message); CUR.lastTs = r.message.ts; CHATS = null;
+      drawComposer(); drawMsgs(true); changed(); $("txt").focus();
+    });
+  }
+
+  route();
+})();
+</script>
+</body>
+</html>
