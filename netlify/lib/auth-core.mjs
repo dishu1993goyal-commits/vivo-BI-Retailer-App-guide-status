@@ -417,6 +417,11 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const profOut = async (r) => Object.assign(publicProfile(r), { linkRequired: await linkRequired(r) });
   const authCfg = async () => Object.assign({ tcRequired: true }, (await store.get("config:auth")) || {});
   // Email code for state users: on when the Brevo key is in Netlify, unless an admin switched it off.
+  // The Brevo key can come from Netlify, or be saved by an admin on the Account security page.
+  if (!(env.BREVO_API_KEY && env.OTP_FROM_EMAIL)) {
+    const ec = await store.get("config:email");
+    if (ec && ec.apiKey && ec.from) env = Object.assign({}, env, { BREVO_API_KEY: ec.apiKey, OTP_FROM_EMAIL: ec.from, OTP_FROM_NAME: ec.name || env.OTP_FROM_NAME });
+  }
   const emailReady = !!(env.BREVO_API_KEY && env.OTP_FROM_EMAIL);
   const emailOn = async () => emailReady && (await authCfg()).emailRequired !== false;
   if (b.action === "auth-config") {
@@ -674,7 +679,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
-    "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
+    "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -777,7 +782,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     }
 
     // ---------- Account security (admins): Truecaller switch + password reset requests ----------
-    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide" || b.action === "admin-email-test") {
+    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide" || b.action === "admin-email-test" || b.action === "admin-email-config") {
       if (app !== "admin") return json(403, { ok: false, error: "Only BI admins can do this." });
       if (b.action === "admin-set-auth") {
         const c = Object.assign({}, await authCfg(), { updatedBy: rec.username, updatedAt: t });
@@ -787,6 +792,15 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         const ev = "emailRequired" in b ? (c.emailRequired ? "email-otp-on" : "email-otp-off") : (c.tcRequired ? "truecaller-on" : "truecaller-off");
         await logEvent(store, t, app, rec, ev, { device: "by " + rec.username, ver: "" });
         return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailRequired: c.emailRequired !== false });
+      }
+      if (b.action === "admin-email-config") {
+        if (b.clear === true) { await store.delete("config:email"); return json(200, { ok: true }); }
+        const key = String(b.apiKey || "").trim(), from = normEmail(b.from);
+        if (!/^xkeysib-[A-Za-z0-9-]{20,}$/.test(key)) return json(400, { ok: false, error: "That doesn't look like a Brevo API key (it starts with xkeysib-)." });
+        if (!from) return json(400, { ok: false, error: "Enter the sender email you confirmed in Brevo." });
+        await store.set("config:email", { apiKey: key, from, name: String(b.name || "vivo BI Dashboard").slice(0, 60), savedBy: rec.username, savedAt: t });
+        await logEvent(store, t, app, rec, "email-key-saved", { device: "by " + rec.username, ver: "" });
+        return json(200, { ok: true });
       }
       if (b.action === "admin-email-test") {
         const to = normEmail(b.email);
@@ -819,6 +833,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         .sort((x, y) => (x.status === "pending" ? 0 : 1) - (y.status === "pending" ? 0 : 1) || y.at - x.at);
       const c = await authCfg();
       return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailReady, emailRequired: c.emailRequired !== false, emailFrom: env.OTP_FROM_EMAIL || "",
+        emailKeyEnd: env.BREVO_API_KEY ? String(env.BREVO_API_KEY).slice(-4) : "", emailSavedHere: !!(await store.get("config:email")),
         updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
     }
 

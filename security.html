@@ -415,10 +415,14 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<div class="notice info" style="margin-top:10px">You can turn this on and off any time — no app update needed. Existing users and passwords are not affected. On the website, Forgot password always uses an admin-approved request.</div></div>';
     var eo = D.emailReady && D.emailRequired;
     html += '<div class="card"><div class="sw"><div class="big ' + (eo ? "on" : "off") + '">✉️</div><div style="flex:1"><b>Email code for state users</b><span class="muted" style="font-size:13px">' +
-      (!D.emailReady ? "Not set up yet — add the free Brevo key in Netlify (BREVO_API_KEY and OTP_FROM_EMAIL). Until then state sign-up works without the email code." :
+      (!D.emailReady ? "Not set up yet — paste your free Brevo API key below. Until then state sign-up works without the email code." :
         eo ? "ON — state users verify their email with a 6-digit code at sign-up, and can reset their password with an email code." : "OFF — state sign-up doesn't ask for an email code.") +
       '</span></div><label class="tg lg"><input type="checkbox" id="em"' + (eo ? " checked" : "") + (D.emailReady ? "" : " disabled") + "><i></i></label></div>" +
-      (D.emailReady ? '<div class="muted" style="font-size:12.5px;margin-top:10px">Sent from <b>' + esc(D.emailFrom) + '</b> · free plan: 300 emails/day</div><div class="row" style="margin-top:8px"><button class="btn sec sm" id="emt">✉️ Send a test email</button></div>' : "") + "</div>";
+      (D.emailReady ? '<div class="muted" style="font-size:12.5px;margin-top:10px">Sent from <b>' + esc(D.emailFrom) + "</b> · key …" + esc(D.emailKeyEnd) + ' · free plan: 300 emails/day</div><div class="row" style="margin-top:8px"><button class="btn sec sm" id="emt">✉️ Send a test email</button>' +
+        (D.emailSavedHere ? '<button class="btn ghost sm" id="emk">🔑 Change key</button>' : "") + "</div>" : "") +
+      '<div id="ekf" style="display:' + (D.emailReady ? "none" : "block") + ';margin-top:12px"><label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:0 2px 4px">Brevo API key (starts with xkeysib-)</label><input class="tx" id="ek" type="password" autocomplete="off" placeholder="xkeysib-…">' +
+      '<label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 4px">Sender email (the one you confirmed in Brevo)</label><input class="tx" id="ef" type="email" placeholder="name@company.com" value="' + esc(D.emailFrom || "") + '">' +
+      '<button class="btn pri sm" id="eks" style="margin-top:10px">Save key</button><div class="muted" style="font-size:12px;margin-top:6px">Stored safely on the server — it is never shown again or sent to the apps.</div></div></div>';
     html += '<div class="seg" style="margin-top:14px"><button data-t="pending" class="' + (TAB === "pending" ? "on" : "") + '">Pending<span class="n">' + pend.length + '</span></button><button data-t="done" class="' + (TAB === "done" ? "on" : "") + '">Handled (30 days)<span class="n">' + done.length + "</span></button></div>";
     var list = TAB === "pending" ? pend : done;
     if (!list.length) html += '<div class="card empty"><div class="big">' + (TAB === "pending" ? "🎉" : "📭") + "</div>" + (TAB === "pending" ? "No pending password reset requests." : "Nothing handled in the last 30 days.") + "</div>";
@@ -443,6 +447,11 @@ td.n,th.n{text-align:right;white-space:nowrap}
       var want = this.checked; this.checked = !want;
       sheet(want ? "Turn the email code ON?" : "Turn the email code OFF?", want ? "State users will need a code from their email to sign up." : "State users can sign up without an email code.",
         [["✉️", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", emailRequired: want }).then(function (r) { toast(r.ok ? "Email code " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
+    };
+    if ($("emk")) $("emk").onclick = function () { $("ekf").style.display = "block"; };
+    if ($("eks")) $("eks").onclick = function () {
+      var b = this; b.disabled = true;
+      api({ action: "admin-email-config", apiKey: $("ek").value, from: $("ef").value }).then(function (r) { b.disabled = false; toast(r.ok ? "Key saved ✓ — now send a test email" : r.error); if (r.ok) load(true); });
     };
     if ($("emt")) $("emt").onclick = function () {
       sheet("Send a test email", "We'll send a sample code email so you can check it arrives (also check spam).", [["✉️", "Send", function (ov) {
