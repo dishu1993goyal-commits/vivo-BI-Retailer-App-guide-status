@@ -416,9 +416,12 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const linkRequired = async (r) => app === "state" && !r.vchatId && Object.keys((await directory(store)).rows).length > 0;
   const profOut = async (r) => Object.assign(publicProfile(r), { linkRequired: await linkRequired(r) });
   const authCfg = async () => Object.assign({ tcRequired: true }, (await store.get("config:auth")) || {});
+  // Email code for state users: on when the Brevo key is in Netlify, unless an admin switched it off.
+  const emailReady = !!(env.BREVO_API_KEY && env.OTP_FROM_EMAIL);
+  const emailOn = async () => emailReady && (await authCfg()).emailRequired !== false;
   if (b.action === "auth-config") {
     const c = await authCfg();
-    return json(200, { ok: true, tcRequired: c.tcRequired !== false });
+    return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailOtp: app === "state" && await emailOn() });
   }
 
   // ---------- Forgot password by request: the user asks, a BI admin approves ----------
@@ -477,10 +480,11 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (pwErr) return json(400, { ok: false, error: pwErr });
     const bad = await checkEmailOtp("reset", email, b.otp);
     if (bad) return json(400, { ok: false, error: bad });
-    Object.assign(found.rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t, sessions: [] });
+    if (found.rec.disabled) return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
+    Object.assign(found.rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t, sessions: [], emailVerified: true });
     await store.set(uKeyOf(found.key), found.rec);
-    await logEvent(store, t, app, found.rec, "password-reset", b);
-    return json(200, { ok: true, username: found.rec.username });
+    await logEvent(store, t, app, found.rec, "password-reset", { device: "email code", ver: "" });
+    return json(200, { ok: true, username: found.rec.username, vchatId: found.rec.vchatId || "" });
   }
 
   // ---------- State users: sign up with the vChat ID from the admin's allowed list ----------
@@ -504,9 +508,16 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (await store.get(uKeyOf(key))) return json(409, { ok: false, error: "This user name is taken. Please choose another.", field: "username" });
     if (await store.get(pKeyOf(v.phone))) return json(409, { ok: false, error: "This vChat mobile number already has an older account. Log in with that user name and password — you'll be asked to link your vChat ID.", field: "phone" });
     if (b.action === "signup-check") return json(200, { ok: true });
+    let emailOk = false;
+    if (await emailOn()) {
+      if (!String(b.emailOtp || "").trim()) return json(400, { ok: false, error: "Tap Send code and enter the code we emailed you.", field: "emailOtp" });
+      const bad = await checkEmailOtp("signup", email, b.emailOtp);
+      if (bad) return json(400, { ok: false, error: bad, field: "emailOtp" });
+      emailOk = true;
+    }
     const username = String(b.username).trim().replace(/\s+/g, " ");
     const rec = { username, fullName: v.row.name, phone: v.phone, ...hashPassword(b.password), createdAt: t, fails: 0, lockUntil: 0, sessions: [],
-      state: v.row.state, email, emailVerified: false, phoneVerified: false, vchatId: v.row.vchatId, vchatVerified: true, signupVia: b.via === "web" ? "web" : "app" };
+      state: v.row.state, email, emailVerified: emailOk, phoneVerified: false, vchatId: v.row.vchatId, vchatVerified: true, signupVia: b.via === "web" ? "web" : "app" };
     const token = newSession(rec, t);
     rec.lastSeen = t;
     await store.set(uKeyOf(key), rec);
@@ -663,7 +674,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
-    "admin-security", "admin-set-auth", "admin-pwreq-decide", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
+    "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -766,13 +777,22 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     }
 
     // ---------- Account security (admins): Truecaller switch + password reset requests ----------
-    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide") {
+    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide" || b.action === "admin-email-test") {
       if (app !== "admin") return json(403, { ok: false, error: "Only BI admins can do this." });
       if (b.action === "admin-set-auth") {
-        const c = { tcRequired: b.tcRequired !== false, updatedBy: rec.username, updatedAt: t };
+        const c = Object.assign({}, await authCfg(), { updatedBy: rec.username, updatedAt: t });
+        if ("tcRequired" in b) c.tcRequired = b.tcRequired !== false;
+        if ("emailRequired" in b) c.emailRequired = b.emailRequired !== false;
         await store.set("config:auth", c);
-        await logEvent(store, t, app, rec, c.tcRequired ? "truecaller-on" : "truecaller-off", { device: "by " + rec.username, ver: "" });
-        return json(200, { ok: true, tcRequired: c.tcRequired });
+        const ev = "emailRequired" in b ? (c.emailRequired ? "email-otp-on" : "email-otp-off") : (c.tcRequired ? "truecaller-on" : "truecaller-off");
+        await logEvent(store, t, app, rec, ev, { device: "by " + rec.username, ver: "" });
+        return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailRequired: c.emailRequired !== false });
+      }
+      if (b.action === "admin-email-test") {
+        const to = normEmail(b.email);
+        if (!to) return json(400, { ok: false, error: "Enter a valid email address." });
+        const r = await sendEmailOtp(env, to, "123456", "signup", mailFetch);
+        return json(r.ok ? 200 : 502, r.ok ? { ok: true } : { ok: false, error: r.error });
       }
       if (b.action === "admin-pwreq-decide") {
         const which = b.which === "admin" ? "admin" : "state", uk = userKey(b.target);
@@ -798,7 +818,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
           own: q.app === app && q.key === key }))
         .sort((x, y) => (x.status === "pending" ? 0 : 1) - (y.status === "pending" ? 0 : 1) || y.at - x.at);
       const c = await authCfg();
-      return json(200, { ok: true, tcRequired: c.tcRequired !== false, updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
+      return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailReady, emailRequired: c.emailRequired !== false, emailFrom: env.OTP_FROM_EMAIL || "",
+        updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
     }
 
     // ---------- Admin app only ----------

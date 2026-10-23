@@ -368,13 +368,30 @@
       '<label>Create password (min 6 characters)</label><input id="s-p" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>vChat registered mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="s-ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>' +
-      '<label>Email</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
+      '<label>Email</label><div style="display:flex;gap:8px"><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com" style="flex:1"><button type="button" id="s-es" class="biw-btn biw-gold" style="display:none;width:auto;margin:0;padding:0 14px;white-space:nowrap">Send code</button></div>' +
+      '<div id="s-ecw" style="display:none"><label>Code sent to your email</label><input id="s-ec" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="letter-spacing:6px;text-align:center;font-size:18px"><div class="biw-mut" id="s-ecm" style="margin-top:4px"></div></div>' +
       codeField("s-ac") +
       '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
       '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
     roleSeg(c, "state", function (r) { if (r === "admin") showSignup("admin"); });
     var look = bindVchat(c, function (st) { okState = st; });
     bindCodeInfo(c, "s-ac");
+    // Email code (free, via Brevo) when switched on.
+    var emailOtp = false, sentTo = "";
+    api({ app: "state", action: "auth-config" }, false).then(function (r) { emailOtp = !!(r && r.emailOtp); if (emailOtp && c.isConnected) c.querySelector("#s-es").style.display = ""; });
+    var es = c.querySelector("#s-es");
+    es.onclick = function () {
+      var em = c.querySelector("#s-e").value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { msg(c, "#s-m", "Enter a valid email address first."); return; }
+      es.disabled = true; es.textContent = "Sending…";
+      api({ app: "state", action: "email-otp-send", email: em, purpose: "signup" }, false).then(function (r) {
+        es.disabled = false; es.textContent = "Resend";
+        if (!r.ok) { msg(c, "#s-m", r.error); return; }
+        sentTo = em.toLowerCase(); c.querySelector("#s-ecw").style.display = ""; c.querySelector("#s-ecm").textContent = "Code sent to " + em + " — check inbox and spam. Valid for 10 minutes.";
+        msg(c, "#s-m", "", true); c.querySelector("#s-ec").focus();
+      });
+    };
+    c.querySelector("#s-e").addEventListener("input", function () { if (sentTo && this.value.trim().toLowerCase() !== sentTo) { sentTo = ""; c.querySelector("#s-ecw").style.display = "none"; es.textContent = "Send code"; } });
     var go = c.querySelector("#s-go");
     go.onclick = function () {
       look();
@@ -383,12 +400,15 @@
       var err = !v.vchatId ? "Enter your vChat ID." : !okState ? "Enter a vChat ID from the allowed list (the state fills in automatically)." :
         v.username.length < 3 ? "User name must be at least 3 characters." : v.password.length < 6 ? "Password must be at least 6 characters." :
         v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !/^[6-9]\d{9}$/.test(v.phone) ? "Enter your 10-digit vChat registered mobile number." :
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address." : !v.accessCode ? "Enter the access code (tap i to see how)." : "";
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address." :
+        emailOtp && !sentTo ? "Tap Send code to verify your email." : emailOtp && !/^\d{6}$/.test(c.querySelector("#s-ec").value.trim()) ? "Enter the 6-digit code from your email." :
+        !v.accessCode ? "Enter the access code (tap i to see how)." : "";
       if (err) { msg(c, "#s-m", err); return; }
+      if (emailOtp) v.emailOtp = c.querySelector("#s-ec").value.trim();
       go.disabled = true; go.textContent = "Creating account…";
       api(Object.assign({ app: "state", action: "signup", via: "web" }, v), false).then(function (res) {
         go.disabled = false; go.textContent = "Create account";
-        if (!res.ok) { msg(c, "#s-m", res.error); var f = { vchatId: "#v-id", username: "#s-u", password: "#s-p", phone: "#s-ph", email: "#s-e", accessCode: "#s-ac" }[res.field]; if (f) c.querySelector(f).focus(); return; }
+        if (!res.ok) { msg(c, "#s-m", res.error); var f = { vchatId: "#v-id", username: "#s-u", password: "#s-p", phone: "#s-ph", email: "#s-e", accessCode: "#s-ac", emailOtp: "#s-ec" }[res.field]; if (f) c.querySelector(f).focus(); return; }
         AUTH = { app: "state", username: res.username, token: res.token };
         store("biw-auth", AUTH); store("biw-role", "state"); store("biw-last-vchat", v.vchatId); saveProfile(res.profile);
         loginEl.remove(); loginEl = null; toast("Account created. Welcome, " + (res.fullName || "") + "!");
@@ -424,10 +444,15 @@
 
   // ---------- FORGOT PASSWORD ----------
   // Forgot password: the user chooses a new password and a BI admin approves the request.
-  function showForgot(role) {
+  function showForgot(role, forceRequest) {
     var pend = store("biw-pwreq");
     if (pend && pend.reqId) return showResetStatus(pend);
     role = role || store("biw-role") || "state";
+    if (!forceRequest && role === "state") {
+      var cw = authCard('<h1>Forgot <em>password?</em></h1><div class="biw-note">Checking…</div>');
+      api({ app: "state", action: "auth-config" }, false).then(function (r) { if (!cw.isConnected) return; if (r && r.emailOtp) showForgotEmail("state"); else showForgot("state", true); });
+      return;
+    }
     var c = authCard('<h1>Forgot <em>password?</em></h1><p>Choose a new password. A BI admin checks the request (usually by calling you) and approves it.</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
       '<label>vChat ID, user name or mobile number</label><input id="f-u" maxlength="40" autocomplete="username">' +
@@ -436,7 +461,7 @@
       '<label>Message for the admin (optional)</label><input id="f-n" maxlength="200" placeholder="e.g. Changed my phone">' +
       '<div class="biw-msg" id="f-m"></div><button class="biw-btn biw-dark" id="f-go">Send reset request</button><a class="biw-link" id="f-back">Back to log in</a>');
     c.querySelector("#f-u").value = store("biw-last-user") || "";
-    roleSeg(c, role, function (r) { role = r; });
+    roleSeg(c, role, function (r) { if (r === "state" && role !== "state" && !forceRequest) { showForgot("state"); return; } role = r; });
     c.querySelector("#f-back").onclick = function () { showLogin(); };
     var go = c.querySelector("#f-go");
     go.onclick = function () {
@@ -458,7 +483,7 @@
     var c = authCard('<h1>Reset <em>request</em></h1><div id="r-box"><div class="biw-note">Checking…</div></div>' +
       '<button class="biw-btn biw-dark" id="r-chk">Check status</button><a class="biw-link" id="r-new">Send a new request</a><a class="biw-link" id="f-back">Back to log in</a>');
     c.querySelector("#f-back").onclick = function () { showLogin(); };
-    c.querySelector("#r-new").onclick = function () { store("biw-pwreq", null); showForgot(q.app); };
+    c.querySelector("#r-new").onclick = function () { store("biw-pwreq", null); showForgot(q.app, true); };
     var check = function () {
       api({ app: q.app, action: "reset-status", username: q.username, reqId: q.reqId }, false).then(function (r) {
         var box = c.querySelector("#r-box"); if (!box) return;
@@ -485,9 +510,9 @@
       '<div id="f-step2" style="display:none"><label>Code sent to your email</label><input id="f-otp" inputmode="numeric" maxlength="6" style="letter-spacing:6px;text-align:center;font-size:20px">' +
       '<label>New password (min 6 characters)</label><input id="f-p" type="password" maxlength="64"><label>Confirm new password</label><input id="f-p2" type="password" maxlength="64"></div>' +
       '<div class="biw-msg" id="f-m"></div><button class="biw-btn biw-dark" id="f-go">Send code</button>' +
-      '<div class="biw-note" style="font-size:12px">No email on your account? Use <b>Forgot password</b> in the mobile app (Truecaller), then add your email in Edit profile.</div>' +
-      '<a class="biw-link" id="f-back">Back to log in</a>');
-    roleSeg(c, role, function (r) { role = r; });
+      '<a class="biw-link" id="f-req">No access to that email? Ask an admin instead</a><a class="biw-link" id="f-back">Back to log in</a>');
+    roleSeg(c, role, function (r) { if (r !== "state") { showForgot(r, true); return; } role = r; });
+    c.querySelector("#f-req").onclick = function () { showForgot(role, true); };
     var sent = false, go = c.querySelector("#f-go");
     go.onclick = function () {
       var email = c.querySelector("#f-e").value.trim();
@@ -509,8 +534,8 @@
       api({ app: role, action: "reset-email", email: email, otp: c.querySelector("#f-otp").value, newPassword: pw }, false).then(function (res) {
         go.disabled = false;
         if (!res.ok) { msg(c, "#f-m", res.error); return; }
-        store("biw-role", role); store("biw-last-user", res.username);
-        showLogin("Password changed. Your user name is " + res.username + ". Please log in.");
+        store("biw-role", role); store("biw-last-user", res.username); if (res.vchatId) store("biw-last-vchat", res.vchatId);
+        showLogin(res.vchatId ? "Password changed. Log in with your vChat ID " + res.vchatId + "." : "Password changed. Your user name is " + res.username + ". Please log in.");
       });
     };
     c.querySelector("#f-back").onclick = function () { showLogin(); };

@@ -53,6 +53,12 @@
       '</span></div><label class="tg lg"><input type="checkbox" id="tc"' + (on ? " checked" : "") + "><i></i></label></div>" +
       (D.updatedBy ? '<div class="muted" style="font-size:12px;margin-top:10px">Last changed by ' + esc(D.updatedBy) + " · " + dt(D.updatedAt) + "</div>" : "") +
       '<div class="notice info" style="margin-top:10px">You can turn this on and off any time — no app update needed. Existing users and passwords are not affected. On the website, Forgot password always uses an admin-approved request.</div></div>';
+    var eo = D.emailReady && D.emailRequired;
+    html += '<div class="card"><div class="sw"><div class="big ' + (eo ? "on" : "off") + '">✉️</div><div style="flex:1"><b>Email code for state users</b><span class="muted" style="font-size:13px">' +
+      (!D.emailReady ? "Not set up yet — add the free Brevo key in Netlify (BREVO_API_KEY and OTP_FROM_EMAIL). Until then state sign-up works without the email code." :
+        eo ? "ON — state users verify their email with a 6-digit code at sign-up, and can reset their password with an email code." : "OFF — state sign-up doesn't ask for an email code.") +
+      '</span></div><label class="tg lg"><input type="checkbox" id="em"' + (eo ? " checked" : "") + (D.emailReady ? "" : " disabled") + "><i></i></label></div>" +
+      (D.emailReady ? '<div class="muted" style="font-size:12.5px;margin-top:10px">Sent from <b>' + esc(D.emailFrom) + '</b> · free plan: 300 emails/day</div><div class="row" style="margin-top:8px"><button class="btn sec sm" id="emt">✉️ Send a test email</button></div>' : "") + "</div>";
     html += '<div class="seg" style="margin-top:14px"><button data-t="pending" class="' + (TAB === "pending" ? "on" : "") + '">Pending<span class="n">' + pend.length + '</span></button><button data-t="done" class="' + (TAB === "done" ? "on" : "") + '">Handled (30 days)<span class="n">' + done.length + "</span></button></div>";
     var list = TAB === "pending" ? pend : done;
     if (!list.length) html += '<div class="card empty"><div class="big">' + (TAB === "pending" ? "🎉" : "📭") + "</div>" + (TAB === "pending" ? "No pending password reset requests." : "Nothing handled in the last 30 days.") + "</div>";
@@ -72,6 +78,16 @@
       sheet(want ? "Turn Truecaller verification ON?" : "Turn Truecaller verification OFF?",
         want ? "New app users must verify their mobile with Truecaller again, and Forgot password re-verifies the mobile." : "New app users can sign up without mobile verification (the access code still applies). Forgot password will send a request for an admin to approve.",
         [[want ? "✅" : "⏸️", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", tcRequired: want }).then(function (r) { toast(r.ok ? "Truecaller verification " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
+    };
+    if ($("em")) $("em").onchange = function () {
+      var want = this.checked; this.checked = !want;
+      sheet(want ? "Turn the email code ON?" : "Turn the email code OFF?", want ? "State users will need a code from their email to sign up." : "State users can sign up without an email code.",
+        [["✉️", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", emailRequired: want }).then(function (r) { toast(r.ok ? "Email code " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
+    };
+    if ($("emt")) $("emt").onclick = function () {
+      sheet("Send a test email", "We'll send a sample code email so you can check it arrives (also check spam).", [["✉️", "Send", function (ov) {
+        api({ action: "admin-email-test", email: ov.querySelector("input").value }).then(function (r) { toast(r.ok ? "Test email sent ✓" : r.error); });
+      }]], '<input class="tx" type="email" placeholder="your email" style="margin-top:12px">');
     };
     [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-ok]"), function (b) {
