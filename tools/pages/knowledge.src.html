@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Knowledge</title>
+<style>
+/*@@CSS@@*/
+.kbs{display:flex;gap:8px;margin-top:4px}
+.kcats{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}.kcats::-webkit-scrollbar{display:none}
+.kcats button{flex:none;border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 12px;font:600 12.5px inherit;color:var(--ink2);cursor:pointer}
+.kcats button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ka{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;display:flex;gap:12px;align-items:flex-start;transition:transform .12s}
+.ka:hover{transform:translateY(-1px)}
+.ka .ki{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.ka .kt{font-weight:700;font-size:15.5px;line-height:1.3}
+.ka .kd{font-size:13px;color:var(--mut);margin-top:3px;line-height:1.4}
+.ka .km{font-size:11.5px;color:var(--mut);margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.art{background:var(--card);border-radius:18px;padding:18px 18px 22px;margin-top:10px;box-shadow:0 2px 12px rgba(20,24,51,.06);font-size:15px;line-height:1.6;color:var(--ink)}
+.art h2{font-size:21px;line-height:1.25;margin:0 0 4px}
+.art h3{font-size:17px;margin:22px 0 6px;color:#2B33A6}
+.art h4{font-size:15px;margin:16px 0 4px}
+.art p{margin:8px 0}
+.art ul,.art ol{margin:6px 0;padding-left:22px}.art li{margin:3px 0}
+.art .lead{font-size:15.5px;color:var(--ink2);border-left:4px solid var(--brand);padding:4px 0 4px 12px;margin:12px 0}
+.art table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+.art th,.art td{border:1px solid #E3E5EE;padding:7px 9px;text-align:left;vertical-align:top}
+.art th{background:#F3F4FD;font-weight:700}
+.art code,.art pre{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;background:#F3F4FA;border-radius:6px}
+.art code{padding:1px 5px}.art pre{padding:10px 12px;overflow-x:auto;white-space:pre}
+.art figure{margin:14px 0}.art figure svg,.art figure img{width:100%;height:auto;display:block;border-radius:12px;border:1px solid #E6E8F2;background:#fff}
+.art figcaption{font-size:12px;color:var(--mut);margin-top:5px;text-align:center}
+.tip{background:#E6F4EA;border-radius:12px;padding:10px 12px;margin:12px 0;font-size:14px;color:#14532d}
+.warnb{background:#FFF4E5;border-radius:12px;padding:10px 12px;margin:12px 0;font-size:14px;color:#6b4300}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch;margin:12px 0}
+.flow .st{flex:1 1 130px;background:#F5F6FF;border:1px solid #DCDFF8;border-radius:12px;padding:9px 10px;position:relative;font-size:13px;line-height:1.35}
+.flow .st b{display:block;font-size:13.5px;color:#2B33A6;margin-bottom:2px}
+.flow .st .no{position:absolute;top:-8px;left:-6px;background:var(--brand);color:#fff;border-radius:99px;font-size:11px;font-weight:800;width:20px;height:20px;display:flex;align-items:center;justify-content:center}
+.flow .ar{display:flex;align-items:center;color:#9AA1F5;font-weight:800;font-size:18px}
+@media(max-width:520px){.flow{flex-direction:column}.flow .ar{justify-content:center;transform:rotate(90deg);height:14px}}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:10px 0}
+.kgrid>div{border:1px solid #E6E8F2;border-radius:12px;padding:10px;background:#FBFBFE;font-size:13px;line-height:1.35}
+.kgrid>div b{display:block;font-size:13.5px;margin-bottom:3px}
+.kgrid svg{width:100%;height:56px;display:block;margin-bottom:6px}
+.chk li{list-style:none;margin-left:-20px;padding-left:26px;position:relative}.chk li:before{content:"✓";position:absolute;left:4px;color:var(--ok);font-weight:800}
+.kbar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px}
+.ed .tx{margin-top:4px}
+.ed label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:12px 2px 2px}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.thumbs .p{position:relative;width:96px;height:72px;border-radius:9px;overflow:hidden;background:#EEF0F6;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mut)}
+.thumbs .p img{width:100%;height:100%;object-fit:cover}
+.thumbs .p span{position:absolute;left:3px;bottom:3px;background:rgba(0,0,0,.6);color:#fff;border-radius:5px;padding:0 5px;font-size:10.5px}
+.thumbs .p button{position:absolute;top:3px;right:3px;border:0;background:rgba(0,0,0,.55);color:#fff;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px}
+.thumbs .add{border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);font-weight:700;cursor:pointer}
+.toc{background:#F7F8FC;border-radius:12px;padding:10px 14px;margin:12px 0;font-size:13.5px}
+.toc a{color:var(--brand);text-decoration:none;display:block;padding:2px 0}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📚</span></div>
+  <h1 id="h1">Knowledge</h1><p id="h2">Learn BI, AI, dashboards and Power BI — step by step</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), DATA = { articles: [], read: {}, categories: [] }, CAT = "All", Q = "", CUR = null, PICS = {};
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+
+  // ================= illustrations (original drawings) =================
+  var F = 'font-family="Segoe UI,Roboto,Arial,sans-serif"';
+  function svgLoop() {
+    var s = ["Measure", "Understand", "Decide", "Act"], c = ["#4D5BF9", "#1E9E61", "#E69A00", "#E05757"], d = ["Collect sales, app & field data", "Find the why behind the numbers", "Choose what to change", "Do it, then measure again"];
+    var g = '<svg viewBox="0 0 520 300" ' + F + '><rect width="520" height="300" fill="#fff"/><circle cx="260" cy="150" r="92" fill="none" stroke="#E3E5F5" stroke-width="22"/>';
+    var pos = [[260, 40], [400, 150], [260, 262], [120, 150]];
+    pos.forEach(function (p, i) { g += '<rect x="' + (p[0] - 72) + '" y="' + (p[1] - 26) + '" width="144" height="52" rx="12" fill="' + c[i] + '"/><text x="' + p[0] + '" y="' + (p[1] - 4) + '" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">' + (i + 1) + ". " + s[i] + '</text><text x="' + p[0] + '" y="' + (p[1] + 14) + '" fill="#fff" font-size="9.5" text-anchor="middle">' + d[i] + "</text>"; });
+    g += '<text x="260" y="146" font-size="14" font-weight="800" fill="#2B33A6" text-anchor="middle">BI decision loop</text><text x="260" y="164" font-size="10.5" fill="#6B7090" text-anchor="middle">weekly, not month-end</text>';
+    g += '<path d="M338 62 Q380 85 392 118" stroke="#9AA1F5" stroke-width="3" fill="none" marker-end="url(#ah)"/><path d="M392 182 Q380 222 338 240" stroke="#9AA1F5" stroke-width="3" fill="none" marker-end="url(#ah)"/><path d="M182 240 Q140 222 128 182" stroke="#9AA1F5" stroke-width="3" fill="none" marker-end="url(#ah)"/><path d="M128 118 Q140 85 182 62" stroke="#9AA1F5" stroke-width="3" fill="none" marker-end="url(#ah)"/>';
+    return g + '<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#9AA1F5"/></marker></defs></svg>';
+  }
+  function svgPipeline() {
+    var st = [["📥", "Sources", "Sell-out, DMS, retailer app, Excel"], ["🧹", "Clean", "Remove duplicates, fix codes"], ["🧩", "Model", "Link stores, states, dates"], ["🧮", "KPIs", "Growth %, active %, rank"], ["📊", "Dashboards", "HO view · state view"], ["🔔", "Alerts", "Push, email, AI summary"]];
+    var g = '<svg viewBox="0 0 640 200" ' + F + '><rect width="640" height="200" fill="#fff"/>';
+    st.forEach(function (s, i) { var x = 12 + i * 105; g += '<rect x="' + x + '" y="40" width="92" height="108" rx="12" fill="' + (i === 4 ? "#4D5BF9" : "#F3F4FD") + '" stroke="#DCDFF8"/><text x="' + (x + 46) + '" y="76" font-size="24" text-anchor="middle">' + s[0] + '</text><text x="' + (x + 46) + '" y="100" font-size="12.5" font-weight="700" text-anchor="middle" fill="' + (i === 4 ? "#fff" : "#2B33A6") + '">' + s[1] + "</text>" + wrapT(s[2], x + 46, 116, 15, i === 4 ? "#E8EAFF" : "#6B7090", 9) + (i < 5 ? '<path d="M' + (x + 94) + ' 94 h9" stroke="#9AA1F5" stroke-width="3" marker-end="url(#a2)"/>' : ""); });
+    g += '<rect x="12" y="160" width="616" height="28" rx="8" fill="#E6F4EA"/><text x="320" y="178" font-size="11.5" fill="#14532d" text-anchor="middle">Automated: set up once → refreshes on schedule → every user sees the same numbers on web &amp; app</text>';
+    g += '<text x="320" y="24" font-size="13" font-weight="800" fill="#1F2340" text-anchor="middle">Automated dashboard pipeline</text>';
+    return g + '<defs><marker id="a2" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#9AA1F5"/></marker></defs></svg>';
+  }
+  function wrapT(t, x, y, lh, col, fs) { var w = t.split(" "), lines = [], cur = ""; w.forEach(function (x2) { if ((cur + " " + x2).trim().length > 15) { lines.push(cur.trim()); cur = x2; } else cur += " " + x2; }); lines.push(cur.trim()); return lines.slice(0, 3).map(function (l, i) { return '<text x="' + x + '" y="' + (y + i * (lh - 3)) + '" font-size="' + fs + '" fill="' + col + '" text-anchor="middle">' + esc(l) + "</text>"; }).join(""); }
+  function svgPbiDesktop() {
+    var g = '<svg viewBox="0 0 680 420" ' + F + '><rect width="680" height="420" fill="#F3F2F1"/>';
+    // title bar + ribbon
+    g += '<rect width="680" height="26" fill="#2B2B2B"/><text x="12" y="17" fill="#fff" font-size="11">Sales_Review.pbix — Power BI Desktop (illustration)</text>';
+    g += '<rect y="26" width="680" height="58" fill="#fff" stroke="#E1DFDD"/>';
+    ["File", "Home", "Insert", "Modeling", "View", "Help"].forEach(function (t, i) { g += '<text x="' + (14 + i * 58) + '" y="42" font-size="11" fill="' + (i === 1 ? "#B3800B" : "#323130") + '" font-weight="' + (i === 1 ? 700 : 400) + '">' + t + "</text>"; });
+    g += '<rect x="64" y="46" width="34" height="2" fill="#F2C811"/>';
+    [["Get data", "⬇"], ["Transform", "🧹"], ["Refresh", "⟳"], ["New visual", "📊"], ["New measure", "Σ"], ["Publish", "⇪"]].forEach(function (b, i) { var x = 14 + i * 74; g += '<rect x="' + x + '" y="52" width="66" height="28" rx="4" fill="#FAF9F8" stroke="#E1DFDD"/><text x="' + (x + 33) + '" y="70" font-size="10" text-anchor="middle" fill="#323130">' + b[1] + " " + b[0] + "</text>"; });
+    // left view switch
+    g += '<rect y="84" width="34" height="306" fill="#fff" stroke="#E1DFDD"/>';
+    ["📊", "▦", "⛓"].forEach(function (t, i) { g += '<rect x="4" y="' + (94 + i * 36) + '" width="26" height="28" rx="4" fill="' + (i === 0 ? "#F3F2F1" : "#fff") + '"/><text x="17" y="' + (113 + i * 36) + '" font-size="13" text-anchor="middle">' + t + "</text>"; });
+    // canvas
+    g += '<rect x="44" y="94" width="430" height="286" fill="#fff" stroke="#E1DFDD"/>';
+    [["Sell-out units", "1.24 L", "▲ 8.2% vs LY", "#1E9E61"], ["App active %", "71%", "▼ 3 pts", "#E05757"], ["Guide status", "86%", "Target 90%", "#E69A00"]].forEach(function (k, i) { var x = 54 + i * 140; g += '<rect x="' + x + '" y="104" width="130" height="62" rx="6" fill="#FAFAFE" stroke="#E6E8F2"/><text x="' + (x + 10) + '" y="122" font-size="10" fill="#6B7090">' + k[0] + '</text><text x="' + (x + 10) + '" y="144" font-size="18" font-weight="800" fill="#1F2340">' + k[1] + '</text><text x="' + (x + 10) + '" y="159" font-size="9.5" fill="' + k[3] + '">' + k[2] + "</text>"; });
+    g += '<text x="54" y="186" font-size="10.5" font-weight="700" fill="#323130">Sell-out by state</text>';
+    [70, 58, 52, 44, 37, 30].forEach(function (v, i) { g += '<rect x="96" y="' + (194 + i * 17) + '" width="' + v * 1.6 + '" height="11" rx="2" fill="#4D5BF9"/><text x="92" y="' + (203 + i * 17) + '" font-size="8.5" text-anchor="end" fill="#605E5C">State ' + String.fromCharCode(65 + i) + "</text>"; });
+    g += '<text x="290" y="186" font-size="10.5" font-weight="700" fill="#323130">Weekly trend</text><polyline points="290,290 315,276 340,282 365,262 390,258 415,244 440,236 462,228" fill="none" stroke="#1E9E61" stroke-width="2.5"/><line x1="290" y1="300" x2="462" y2="300" stroke="#E1DFDD"/>';
+    g += '<rect x="54" y="316" width="408" height="54" rx="6" fill="#FAFAFE" stroke="#E6E8F2"/><text x="64" y="333" font-size="9.5" font-weight="700" fill="#323130">State    Units    Growth %    Rank</text><text x="64" y="349" font-size="9.5" fill="#605E5C">State A  18,240   +12.4%      1</text><text x="64" y="363" font-size="9.5" fill="#605E5C">State B  15,910   +6.1%       2</text>';
+    // panes
+    g += '<rect x="482" y="84" width="96" height="306" fill="#fff" stroke="#E1DFDD"/><text x="490" y="100" font-size="10" font-weight="700">Visualizations</text>';
+    for (var i = 0; i < 12; i++) g += '<rect x="' + (490 + (i % 4) * 21) + '" y="' + (108 + Math.floor(i / 4) * 21) + '" width="17" height="17" rx="2" fill="' + (i === 1 ? "#F2C811" : "#F3F2F1") + '" stroke="#E1DFDD"/>';
+    g += '<text x="490" y="190" font-size="9" fill="#605E5C">X-axis: State</text><text x="490" y="204" font-size="9" fill="#605E5C">Y-axis: Units</text><text x="490" y="218" font-size="9" fill="#605E5C">Filters: Month</text>';
+    g += '<rect x="584" y="84" width="96" height="306" fill="#fff" stroke="#E1DFDD"/><text x="592" y="100" font-size="10" font-weight="700">Data</text>';
+    ["▸ Sales", "   ☑ Units", "   ☐ Value", "   Σ Growth %", "▸ Stores", "▸ States", "▸ Calendar"].forEach(function (t, i) { g += '<text x="592" y="' + (118 + i * 15) + '" font-size="9" fill="#323130">' + t + "</text>"; });
+    // page tabs
+    g += '<rect y="390" width="680" height="30" fill="#fff" stroke="#E1DFDD"/><rect x="40" y="394" width="70" height="22" fill="#F3F2F1"/><text x="75" y="409" font-size="10" text-anchor="middle" font-weight="700">Overview</text><text x="140" y="409" font-size="10" text-anchor="middle">State</text><text x="196" y="409" font-size="10" text-anchor="middle">Retailers</text><text x="244" y="409" font-size="12" text-anchor="middle" fill="#605E5C">+</text>';
+    // callouts
+    var co = [[150, 66, "1"], [258, 140, "2"], [530, 150, "3"], [632, 150, "4"], [17, 140, "5"], [75, 405, "6"]];
+    co.forEach(function (c) { g += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="10" fill="#E05757"/><text x="' + c[0] + '" y="' + (c[1] + 4) + '" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">' + c[2] + "</text>"; });
+    return g + "</svg>";
+  }
+  function svgModel() {
+    var g = '<svg viewBox="0 0 560 250" ' + F + '><rect width="560" height="250" fill="#fff"/>';
+    var box = function (x, y, t, rows, col) { var h = 26 + rows.length * 15; var s = '<rect x="' + x + '" y="' + y + '" width="130" height="' + h + '" rx="8" fill="#fff" stroke="' + col + '" stroke-width="2"/><rect x="' + x + '" y="' + y + '" width="130" height="22" rx="8" fill="' + col + '"/><text x="' + (x + 65) + '" y="' + (y + 15) + '" font-size="11.5" font-weight="700" fill="#fff" text-anchor="middle">' + t + "</text>"; rows.forEach(function (r, i) { s += '<text x="' + (x + 10) + '" y="' + (y + 38 + i * 15) + '" font-size="10" fill="#323130">' + r + "</text>"; }); return s; };
+    g += box(215, 80, "Sales (fact)", ["Date", "Store ID", "Model", "Units", "Value"], "#4D5BF9");
+    g += box(20, 14, "Calendar", ["Date", "Week", "Month", "FY"], "#1E9E61") + box(410, 14, "Stores", ["Store ID", "Retailer", "City", "State"], "#E69A00") + box(20, 160, "Products", ["Model", "Series", "Price band"], "#8E5CF6") + box(410, 160, "Targets", ["State", "Month", "Target units"], "#E05757");
+    [[150, 50, 215, 110], [410, 50, 345, 110], [150, 190, 215, 160], [410, 190, 345, 160]].forEach(function (l) { g += '<line x1="' + l[0] + '" y1="' + l[1] + '" x2="' + l[2] + '" y2="' + l[3] + '" stroke="#9AA1F5" stroke-width="2"/><text x="' + (l[0] + (l[2] - l[0]) * .2) + '" y="' + (l[1] + (l[3] - l[1]) * .2 - 4) + '" font-size="10" fill="#6B7090">1</text><text x="' + (l[0] + (l[2] - l[0]) * .8) + '" y="' + (l[1] + (l[3] - l[1]) * .8 - 4) + '" font-size="10" fill="#6B7090">∞</text>'; });
+    return g + '<text x="280" y="242" font-size="11" fill="#6B7090" text-anchor="middle">Star schema: one fact table in the middle, lookup (dimension) tables around it</text></svg>';
+  }
+  function svgOurApp() {
+    var g = '<svg viewBox="0 0 640 330" ' + F + '><rect width="640" height="330" fill="#EEF0F7"/>';
+    // phone
+    g += '<rect x="20" y="10" width="170" height="310" rx="22" fill="#1F2340"/><rect x="28" y="22" width="154" height="286" rx="14" fill="#F3F4F9"/><rect x="28" y="22" width="154" height="64" rx="14" fill="#4D5BF9"/><text x="40" y="46" font-size="10" fill="#fff" font-weight="700">vivo BI States</text><text x="40" y="64" font-size="9" fill="#E3E6FF">Your state · this month</text>';
+    [["Rank", "#4"], ["Growth", "+9%"]].forEach(function (k, i) { var x = 36 + i * 74; g += '<rect x="' + x + '" y="94" width="66" height="44" rx="8" fill="#fff"/><text x="' + (x + 8) + '" y="110" font-size="8.5" fill="#6B7090">' + k[0] + '</text><text x="' + (x + 8) + '" y="128" font-size="14" font-weight="800" fill="#1F2340">' + k[1] + "</text>"; });
+    g += '<rect x="36" y="146" width="140" height="70" rx="8" fill="#fff"/>';
+    [30, 44, 38, 52, 47, 60].forEach(function (v, i) { g += '<rect x="' + (46 + i * 21) + '" y="' + (208 - v) + '" width="13" height="' + v + '" rx="2" fill="#9AA1F5"/>'; });
+    ["📍 Market visits", "📋 Surveys", "💬 Chat"].forEach(function (t, i) { g += '<rect x="36" y="' + (224 + i * 26) + '" width="140" height="20" rx="6" fill="#fff"/><text x="44" y="' + (238 + i * 26) + '" font-size="9" fill="#323130">' + t + "</text>"; });
+    // web
+    g += '<rect x="210" y="10" width="410" height="310" rx="10" fill="#fff" stroke="#D9DCEA"/><rect x="210" y="10" width="410" height="24" rx="10" fill="#E9EBF4"/><circle cx="224" cy="22" r="4" fill="#E05757"/><circle cx="236" cy="22" r="4" fill="#E69A00"/><circle cx="248" cy="22" r="4" fill="#1E9E61"/><text x="270" y="26" font-size="9" fill="#6B7090">BI dashboard — web (HO view)</text>';
+    [["States", "28"], ["Active retailers", "64%"], ["Visits this month", "412"], ["Avg score", "71"]].forEach(function (k, i) { var x = 222 + i * 99; g += '<rect x="' + x + '" y="44" width="90" height="48" rx="8" fill="#F5F6FF"/><text x="' + (x + 8) + '" y="60" font-size="8.5" fill="#6B7090">' + k[0] + '</text><text x="' + (x + 8) + '" y="80" font-size="15" font-weight="800" fill="#1F2340">' + k[1] + "</text>"; });
+    g += '<rect x="222" y="102" width="200" height="130" rx="8" fill="#F5F6FF"/><text x="230" y="118" font-size="9.5" font-weight="700">State ranking</text>';
+    [90, 80, 72, 60, 52, 40].forEach(function (v, i) { g += '<rect x="262" y="' + (126 + i * 17) + '" width="' + v * 1.5 + '" height="11" rx="2" fill="' + (i < 2 ? "#1E9E61" : i < 4 ? "#E69A00" : "#E05757") + '"/>'; });
+    g += '<rect x="430" y="102" width="178" height="130" rx="8" fill="#F5F6FF"/><text x="438" y="118" font-size="9.5" font-weight="700">Trend</text><polyline points="440,215 465,200 490,206 515,186 540,180 565,166 598,150" fill="none" stroke="#4D5BF9" stroke-width="2.5"/>';
+    g += '<rect x="222" y="242" width="386" height="66" rx="8" fill="#F4EEFF"/><text x="232" y="260" font-size="9.5" font-weight="700" fill="#5B3FBF">✨ AI summary</text><text x="232" y="276" font-size="9" fill="#4A4F6A">3 states fell below 60% app activity; stock gaps in 2 states.</text><text x="232" y="292" font-size="9" fill="#4A4F6A">Suggested: retailer app training in State E and F this week.</text>';
+    return g + "</svg>";
+  }
+  function mini(kind) {
+    var B = "#4D5BF9", G = "#1E9E61", O = "#E69A00", R = "#E05757", s = '<svg viewBox="0 0 150 56">';
+    if (kind === "bar") [34, 26, 20, 14].forEach(function (v, i) { s += '<rect x="4" y="' + (4 + i * 13) + '" width="' + v * 4 + '" height="9" rx="2" fill="' + B + '"/>'; });
+    if (kind === "col") [20, 30, 26, 40, 34, 46].forEach(function (v, i) { s += '<rect x="' + (8 + i * 23) + '" y="' + (52 - v) + '" width="15" height="' + v + '" rx="2" fill="' + B + '"/>'; });
+    if (kind === "line") s += '<polyline points="4,46 28,38 52,42 76,26 100,30 124,14 146,10" fill="none" stroke="' + G + '" stroke-width="3"/><polyline points="4,48 28,46 52,44 76,40 100,38 124,34 146,32" fill="none" stroke="#C4C8E8" stroke-width="2" stroke-dasharray="4 3"/>';
+    if (kind === "donut") s += '<circle cx="75" cy="28" r="20" fill="none" stroke="' + B + '" stroke-width="10" stroke-dasharray="70 126"/><circle cx="75" cy="28" r="20" fill="none" stroke="' + O + '" stroke-width="10" stroke-dasharray="35 126" stroke-dashoffset="-70"/><circle cx="75" cy="28" r="20" fill="none" stroke="#D5D8E8" stroke-width="10" stroke-dasharray="21 126" stroke-dashoffset="-105"/>';
+    if (kind === "stack") [[40, 30, 20], [30, 40, 18], [50, 26, 14]].forEach(function (r, i) { var x = 4; r.forEach(function (v, j) { s += '<rect x="' + x + '" y="' + (5 + i * 16) + '" width="' + v * 1.5 + '" height="11" fill="' + [B, O, "#D5D8E8"][j] + '"/>'; x += v * 1.5; }); });
+    if (kind === "table") for (var i = 0; i < 4; i++) s += '<rect x="4" y="' + (4 + i * 13) + '" width="142" height="11" fill="' + (i ? "#F3F4FD" : "#DCDFF8") + '"/><rect x="104" y="' + (6 + i * 13) + '" width="' + (i ? 12 + i * 8 : 0) + '" height="7" fill="' + (i === 3 ? R : G) + '"/>';
+    if (kind === "kpi") s += '<rect x="4" y="4" width="142" height="48" rx="8" fill="#F5F6FF"/><text x="12" y="20" font-size="9" fill="#6B7090">Sell-out units</text><text x="12" y="40" font-size="17" font-weight="800" fill="#1F2340">1,24,560</text><text x="96" y="40" font-size="10" font-weight="700" fill="' + G + '">▲ 8.2%</text>';
+    if (kind === "rag") [["On track", G], ["Watch", O], ["Off track", R]].forEach(function (r, i) { s += '<circle cx="12" cy="' + (10 + i * 17) + '" r="6" fill="' + r[1] + '"/><text x="24" y="' + (14 + i * 17) + '" font-size="10" fill="#323130">' + r[0] + "</text>"; });
+    if (kind === "prog") s += '<text x="4" y="14" font-size="9.5" fill="#323130">Guide status 86% of 90% target</text><rect x="4" y="22" width="142" height="12" rx="6" fill="#EEF0F6"/><rect x="4" y="22" width="122" height="12" rx="6" fill="' + O + '"/><line x1="131" y1="18" x2="131" y2="38" stroke="#1F2340" stroke-width="2"/>';
+    if (kind === "spark") s += '<text x="4" y="20" font-size="9.5" fill="#323130">State A</text><polyline points="60,24 72,18 84,22 96,12 108,16 120,8 132,10" fill="none" stroke="' + B + '" stroke-width="2"/><text x="4" y="44" font-size="9.5" fill="#323130">State B</text><polyline points="60,36 72,40 84,38 96,44 108,42 120,48 132,46" fill="none" stroke="' + R + '" stroke-width="2"/>';
+    if (kind === "map") { [[30, 14, 22], [60, 26, 16], [96, 18, 12], [118, 36, 8], [44, 40, 10]].forEach(function (c) { s += '<circle cx="' + c[0] + '" cy="' + c[1] + '" r="' + c[2] / 2 + '" fill="' + B + '" fill-opacity=".55"/>'; }); }
+    if (kind === "scatter") [[14, 44], [26, 38], [40, 36], [52, 30], [66, 28], [80, 20], [96, 22], [110, 14], [128, 10], [70, 42]].forEach(function (p, i) { s += '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4" fill="' + (i === 9 ? R : B) + '"/>'; });
+    if (kind === "rank") ["1  State C  ▲2", "2  State A  ▼1", "3  State F  ="].forEach(function (t, i) { s += '<text x="4" y="' + (16 + i * 16) + '" font-size="10.5" fill="#323130">' + t + "</text>"; });
+    return s + "</svg>";
+  }
+  function fig(svg, cap) { return "<figure>" + svg + (cap ? "<figcaption>" + cap + "</figcaption>" : "") + "</figure>"; }
+  function flow(steps) { return '<div class="flow">' + steps.map(function (s, i) { return (i ? '<div class="ar">→</div>' : "") + '<div class="st"><span class="no">' + (i + 1) + "</span><b>" + s[0] + "</b>" + s[1] + "</div>"; }).join("") + "</div>"; }
+
+  // ================= built-in articles =================
+  var BUILT = [
+    { id: "b-bi", icon: "📊", bg: "#EEF0FF", category: "BI reports", mins: 6, title: "Why BI reports matter for vivo", summary: "What business intelligence is, what it gives HO and state teams, and how a weekly decision loop beats month-end surprises.",
+      html: function () { return '<p class="lead">Business Intelligence (BI) turns raw data — sell-out, retailer app usage, guide status, field visits — into a clear picture that tells each team <b>where we stand, why, and what to do next</b>.</p>' +
+        "<h3>What a BI report gives us</h3><ul><li><b>One version of the truth</b> — HO and every state look at the same numbers, calculated the same way. No more “my Excel says something else”.</li><li><b>Speed</b> — problems show up in days, not at month-end closing.</li><li><b>Focus</b> — rankings and RAG colours show which states, retailers and models need attention first.</li><li><b>Accountability</b> — each KPI has an owner, a target and a trend, so progress is visible.</li><li><b>Evidence for decisions</b> — schemes, stock allocation and training are planned on facts, not opinions.</li></ul>" +
+        fig(svgLoop(), "The BI decision loop — run it every week") +
+        "<h3>Reports vs dashboards vs analysis</h3><table><tr><th>Type</th><th>Answers</th><th>Example</th></tr><tr><td>Report</td><td>What happened?</td><td>Monthly state-wise sell-out and growth %</td></tr><tr><td>Dashboard</td><td>How are we doing right now?</td><td>Live ranking, app active %, visits today</td></tr><tr><td>Analysis</td><td>Why did it happen, what next?</td><td>Why retailer app usage fell in two states</td></tr><tr><td>AI insight</td><td>What should I look at first?</td><td>Auto summary of the 3 biggest changes</td></tr></table>" +
+        "<h3>A real-life example</h3><p>Retailer app activity in a state drops from 72% to 61% in two weeks. Without BI this is found at month-end. With the dashboard, the state team sees the red tile in week one, a field visit finds that a login issue started after an update, IT fixes it, and activity recovers before the month closes.</p>" +
+        '<div class="tip">💡 A good report is <b>short, comparable and actionable</b>: compare with last year / last month / target, and end with the action.</div>' +
+        "<h3>What makes data trustworthy</h3><ul class=\"chk\"><li>Clear source and refresh time shown on every page</li><li>The same KPI formula everywhere (written down)</li><li>Master data kept clean — store codes, state names, model names</li><li>Exceptions explained, not hidden</li></ul>"; } },
+    { id: "b-ai", icon: "✨", bg: "#F4EEFF", category: "AI for BI", mins: 5, title: "How AI makes BI faster and smarter", summary: "Summaries, anomaly alerts, forecasting, natural-language questions and visit scoring — and the rules for using AI safely.",
+      html: function () { return '<p class="lead">AI does not replace reports — it <b>reads them for you</b>, points to what changed, and suggests where to act. People still decide.</p>' +
+        '<div class="kgrid"><div><b>📝 Auto summaries</b>Turns a dashboard into 5 plain-language lines for a review meeting.</div><div><b>🚨 Anomaly alerts</b>Flags a sudden drop or spike that a person might miss.</div><div><b>📈 Forecasting</b>Projects month-end sell-out from the run-rate so far.</div><div><b>💬 Ask in plain words</b>“Which states improved app usage this month?”</div><div><b>🧭 Root-cause hints</b>Links a fall in sales to stock, EMI or competitor activity.</div><div><b>🏅 Scoring</b>Scores market visits and states on activity and quality.</div></div>' +
+        "<h3>Where AI is used in our BI app</h3><table><tr><th>Feature</th><th>What Gemini does</th></tr><tr><td>Ask AI</td><td>Answers questions about the dashboard data</td></tr><tr><td>Surveys</td><td>Summarises answers and themes from comments</td></tr><tr><td>Market visits</td><td>Scores each visit (0–10) and scores states with reasons and actions</td></tr><tr><td>Chat</td><td>Helps answer common questions on rankings, growth and data</td></tr></table>" +
+        flow([["Data", "Numbers + field feedback"], ["Prompt", "Clear question with context"], ["AI draft", "Summary, score, suggestions"], ["Human check", "Verify numbers, add judgement"], ["Action", "Share, assign, follow up"]]) +
+        '<h3>Rules for using AI well</h3><ul class="chk"><li>Check every number the AI mentions against the dashboard</li><li>Ask specific questions — state, period, KPI</li><li>Never paste passwords, customer phone numbers or Aadhaar details into prompts</li><li>Use AI to <i>prioritise</i>; the final call stays with the team</li></ul>' +
+        '<div class="warnb">⚠️ AI can be confidently wrong. If a result looks surprising, open the underlying data before acting.</div>'; } },
+    { id: "b-auto", icon: "⚙️", bg: "#E6F4EA", category: "Dashboards", mins: 7, title: "Automated & customised dashboards — the process flow", summary: "How data moves from source files to a live dashboard for every role, and how our web & app dashboard does it.",
+      html: function () { return '<p class="lead">An <b>automated</b> dashboard is set up once and then refreshes by itself. A <b>customised</b> dashboard shows each person the view that fits their role — HO sees all India, a state team sees its own state.</p>' +
+        fig(svgPipeline(), "From source data to action") +
+        "<h3>Step-by-step process flow</h3>" + flow([["Collect", "Sell-out, DMS, retailer app, guide status, visits"], ["Upload / connect", "Excel import or a scheduled connection"], ["Clean & validate", "Fix codes, remove duplicates, check totals"], ["Model", "Link stores, states, models and dates"], ["Calculate KPIs", "Growth, active %, rank, scores"], ["Publish by role", "HO view, state view, retailer view"], ["Alert & act", "Notifications, AI summary, follow-up"]]) +
+        "<h3>Manual vs automated</h3><table><tr><th></th><th>Manual Excel</th><th>Automated dashboard</th></tr><tr><td>Time per refresh</td><td>Hours, every time</td><td>Minutes, once set up</td></tr><tr><td>Errors</td><td>Copy-paste & formula mistakes</td><td>Same logic every refresh</td></tr><tr><td>Who sees it</td><td>Whoever gets the email</td><td>Everyone, on web & app, by role</td></tr><tr><td>History</td><td>Scattered files</td><td>Trends kept automatically</td></tr></table>" +
+        "<h3>How our BI dashboard works</h3>" + fig(svgOurApp(), "Illustration: the state app (left) and the HO web dashboard (right)") +
+        "<ol><li>HO imports the latest Excel or data file once.</li><li>The server stores it and every user sees the update on web and app — no re-sharing.</li><li>State users automatically see only their state; admins see all.</li><li>Notifications tell users when new data, surveys or app updates arrive.</li><li>AI summaries and scores highlight what changed.</li></ol>" +
+        "<h3>Ways to customise a dashboard</h3><ul><li><b>Role-based views</b> — HO, state, zone.</li><li><b>Filters</b> — period, state, model, retailer type.</li><li><b>Targets & thresholds</b> — set the RAG colours per KPI.</li><li><b>Drill-down</b> — India → state → city → store.</li><li><b>Alerts</b> — notify when a KPI crosses a threshold.</li></ul>" +
+        '<div class="tip">💡 Design rule: the top row answers “are we OK?” (3–5 KPI cards), the middle explains “where?” (rankings, trends), the bottom gives “details” (tables).</div>'; } },
+    { id: "b-pbi", icon: "🟨", bg: "#FFF8DB", category: "Power BI", mins: 10, title: "Power BI step by step", summary: "From Get data to a shared, auto-refreshing report — Power Query, data model, DAX measures, visuals, publishing and row-level security.",
+      html: function () { return '<p class="lead">Power BI is Microsoft\'s tool for building interactive reports. You build in <b>Power BI Desktop</b> (free, Windows) and share through the <b>Power BI Service</b> (app.powerbi.com) and the Power BI mobile app.</p>' +
+        "<h3>The end-to-end flow</h3>" + flow([["Get data", "Excel, SharePoint, SQL, web"], ["Transform", "Power Query: clean & shape"], ["Model", "Relationships, star schema"], ["Measures", "DAX formulas for KPIs"], ["Visualise", "Cards, bars, lines, tables, slicers"], ["Publish", "To a workspace in the Service"], ["Refresh & share", "Scheduled refresh, app, RLS"]]) +
+        "<h3>The Power BI Desktop screen</h3>" + fig(svgPbiDesktop(), "Illustration of the main areas (not an actual screenshot). Admins can add real screenshots in their own articles.") +
+        "<table><tr><th>#</th><th>Area</th><th>Use it to</th></tr><tr><td>1</td><td>Ribbon (Home)</td><td>Get data, Transform data, Refresh, New measure, Publish</td></tr><tr><td>2</td><td>Report canvas</td><td>Place and arrange visuals</td></tr><tr><td>3</td><td>Visualizations pane</td><td>Choose the chart type and map fields to axes</td></tr><tr><td>4</td><td>Data (Fields) pane</td><td>Tables, columns and measures in your model</td></tr><tr><td>5</td><td>View switch</td><td>Report, Table (data) and Model views</td></tr><tr><td>6</td><td>Page tabs</td><td>Separate pages: Overview, State, Retailers</td></tr></table>" +
+        "<h3>Step 1 — Get data</h3><p>Home → <b>Get data</b> → Excel workbook (or SharePoint folder for files that are replaced every month). Pick the sheets and click <b>Transform Data</b> rather than Load, so you can clean first.</p>" +
+        "<h3>Step 2 — Clean in Power Query</h3><ul><li>Promote headers, set data types (date, whole number, text).</li><li>Trim spaces and fix case in state and store names.</li><li>Remove blank rows and duplicates; filter out test data.</li><li>Unpivot month columns into rows (Date, Value) so trends work.</li><li>Every step is recorded — next month just click Refresh.</li></ul>" +
+        "<h3>Step 3 — Build the model</h3>" + fig(svgModel(), "Star schema — the recommended model shape") + "<p>Keep transactions (sales) in one <b>fact</b> table and descriptions (stores, products, dates, targets) in <b>dimension</b> tables. Link them one-to-many in Model view. Always add a Calendar table and mark it as the date table.</p>" +
+        "<h3>Step 4 — Write measures (DAX)</h3><pre>Units = SUM ( Sales[Units] )\nUnits LY = CALCULATE ( [Units], SAMEPERIODLASTYEAR ( Calendar[Date] ) )\nGrowth % = DIVIDE ( [Units] - [Units LY], [Units LY] )\nAch % = DIVIDE ( [Units], SUM ( Targets[Target units] ) )\nState Rank = RANKX ( ALL ( Stores[State] ), [Units] )</pre><p>Use measures (not calculated columns) for anything that is summed, averaged or compared. <code>DIVIDE</code> avoids divide-by-zero errors.</p>" +
+        "<h3>Step 5 — Design the visuals</h3><ul><li>Top row: KPI cards — Units, Growth %, Ach %, App active %.</li><li>Middle: bar chart by state (sorted), line chart by week.</li><li>Slicers: Month, State, Series. Keep 1–3 slicers.</li><li>Bottom: table with conditional formatting (green/amber/red).</li><li>Use the same colours for the same meaning on every page.</li></ul>" +
+        "<h3>Step 6 — Publish & refresh</h3><ol><li>Home → <b>Publish</b> → choose a workspace.</li><li>In the Service, open the dataset → <b>Schedule refresh</b> (for files on a PC this needs an on-premises data gateway; files on SharePoint/OneDrive refresh without one).</li><li>Create an <b>App</b> from the workspace to share a clean, read-only version.</li></ol>" +
+        "<h3>Step 7 — Row-level security (RLS)</h3><p>Modeling → <b>Manage roles</b> → create a role “State” with a filter on Stores[State] = the user's state (or use a user-to-state mapping table with <code>USERPRINCIPALNAME()</code>). In the Service assign people to the role. Each state team then sees only its own data in the same report.</p>" +
+        '<div class="tip">💡 Checklist before sharing: totals match the source file · slicers reset correctly · last refresh date shown · mobile layout set (View → Mobile layout).</div>'; } },
+    { id: "b-kpi", icon: "🎯", bg: "#FFF4E5", category: "KPIs & charts", mins: 6, title: "KPI indicators & the right chart for each job", summary: "How to define a good KPI, the indicator types (cards, RAG, arrows, progress, sparklines) and which chart to use when.",
+      html: function () { return '<p class="lead">A KPI (Key Performance Indicator) is a number that tells you if you are winning. The way you <b>show</b> it decides whether people understand it in 3 seconds or ignore it.</p>' +
+        "<h3>Define every KPI the same way</h3><table><tr><th>Field</th><th>Example: Retailer app active %</th></tr><tr><td>Definition</td><td>Retailers who used the app at least once in the period ÷ all registered retailers</td></tr><tr><td>Formula</td><td>Active retailers / Registered retailers × 100</td></tr><tr><td>Source</td><td>Retailer app usage log, registration master</td></tr><tr><td>Frequency</td><td>Weekly, month-to-date</td></tr><tr><td>Target & RAG</td><td>Green ≥ 75%, Amber 60–75%, Red &lt; 60%</td></tr><tr><td>Owner</td><td>State BI lead</td></tr></table>" +
+        "<h3>Indicator types</h3><div class=\"kgrid\">" +
+        [["kpi", "KPI card", "Big number + change vs last year or target."], ["rag", "RAG status", "Green/amber/red against agreed thresholds."], ["prog", "Progress to target", "Bar with a target marker — achievement at a glance."], ["spark", "Sparklines", "Tiny trend lines beside each state or store."], ["rank", "Rank & movement", "Position with ▲▼ change since last period."], ["table", "Table with data bars", "Detail with conditional formatting."]].map(function (k) { return "<div>" + mini(k[0]) + "<b>" + k[1] + "</b>" + k[2] + "</div>"; }).join("") + "</div>" +
+        "<h3>Which chart when?</h3><div class=\"kgrid\">" +
+        [["bar", "Compare items", "Bar (sorted) — states, retailers, models."], ["line", "Trend over time", "Line — weekly sell-out vs last year (dashed)."], ["col", "Period values", "Column — month-wise totals."], ["donut", "Share of total", "Donut — only 2–5 parts."], ["stack", "Share across groups", "Stacked bar — mix by state."], ["map", "Geography", "Bubble map — visits or sales by city."], ["scatter", "Relationship", "Scatter — footfall vs sales; spot outliers (red)."], ["table", "Exact values", "Table — when people need the numbers."]].map(function (k) { return "<div>" + mini(k[0]) + "<b>" + k[1] + "</b>" + k[2] + "</div>"; }).join("") + "</div>" +
+        "<h3>Common mistakes to avoid</h3><ul><li>Pie charts with 8+ slices — use a sorted bar.</li><li>3D charts and heavy gradients — they distort values.</li><li>Bars that don't start at zero.</li><li>Too many colours — use colour only to mean something (good / bad / highlight).</li><li>Numbers without comparison — always show vs LY, LM or target.</li></ul>" +
+        "<h3>Key KPIs for vivo Business Innovation</h3><table><tr><th>KPI</th><th>Best shown as</th></tr><tr><td>Sell-out growth % vs LY</td><td>KPI card + line trend</td></tr><tr><td>State ranking</td><td>Sorted bar with RAG colours</td></tr><tr><td>Retailer app active %</td><td>Progress to target + sparkline per state</td></tr><tr><td>Guide status completion %</td><td>Progress bar + table of pending retailers</td></tr><tr><td>Market visits & score</td><td>Scorecard bar + map of visits</td></tr><tr><td>Feature usability</td><td>Matrix (heatmap) — state × feature</td></tr></table>"; } },
+    { id: "b-sum", icon: "🧭", bg: "#E8F6FB", category: "BI reports", mins: 3, title: "Summary & checklist — BI in one page", summary: "The short version of everything: the flow, the rules, and a checklist for every report or dashboard you build.",
+      html: function () { return '<p class="lead">Use this page as a quick reference before you build or present any report.</p>' +
+        flow([["Ask", "What decision will this report support?"], ["Collect", "Right source, latest data"], ["Clean", "Codes, duplicates, totals"], ["Calculate", "Agreed KPI formulas"], ["Show", "Right chart, RAG, comparison"], ["Explain", "3 insights + AI summary"], ["Act", "Owner, action, date"]]) +
+        '<h3>Report checklist</h3><ul class="chk"><li>Title says what and for which period</li><li>Source and last refresh shown</li><li>Totals match the source</li><li>Every KPI compared with LY / LM / target</li><li>Sorted rankings, consistent colours</li><li>No more than 5–7 visuals per page</li><li>Works on a phone screen</li><li>Ends with actions and owners</li></ul>' +
+        '<h3>Field (market visit) checklist</h3><ul class="chk"><li>Punch in at the store, punch out when leaving</li><li>Fill sales, stock, promoters, EMI and competition</li><li>Write specific feedback on our system & apps</li><li>Take clear photos — store front, display, issue</li><li>Agree a next action and follow-up date</li></ul>' +
+        '<h3>Where to learn more</h3><ul><li>Microsoft Learn — free Power BI learning paths</li><li>Power BI Desktop “Get started” samples</li><li>Articles added by HO in this Knowledge section</li></ul>' +
+        '<div class="tip">💡 Remember: <b>data → insight → action</b>. A report nobody acts on is just a file.</div>'; } }
+  ];
+  var CAT_ICON = { "BI reports": ["📊", "#EEF0FF"], "AI for BI": ["✨", "#F4EEFF"], "Dashboards": ["⚙️", "#E6F4EA"], "Power BI": ["🟨", "#FFF8DB"], "KPIs & charts": ["🎯", "#FFF4E5"], "SOPs & payout": ["🧾", "#E8F6FB"], "Market hygiene": ["🧼", "#FDECEC"], "Other": ["📄", "#F1F2F6"] };
+
+  // ================= list =================
+  function load(then) {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in to the BI app or dashboard first.</div>'; return; }
+    api({ action: "kb-list" }).then(function (r) {
+      if (r.ok) DATA = r;
+      then ? then() : route();
+    });
+  }
+  function all() {
+    var mine = (DATA.articles || []).map(function (a) { var ic = CAT_ICON[a.category] || CAT_ICON.Other; return { id: a.id, custom: true, icon: ic[0], bg: ic[1], category: a.category, title: a.title, summary: a.summary, pinned: a.pinned, updatedAt: a.updatedAt, by: a.createdBy, images: a.images }; });
+    return mine.filter(function (a) { return a.pinned; }).concat(BUILT, mine.filter(function (a) { return !a.pinned; }));
+  }
+  function route() { var h = (location.hash || "").replace(/^#/, ""); var a = h && all().find(function (x) { return x.id === h; }); if (a) openArt(a, true); else showList(); }
+  function showList() {
+    CUR = null; hero("Knowledge", "Learn BI, AI, dashboards and Power BI — step by step");
+    var cats = ["All"].concat(DATA.categories && DATA.categories.length ? DATA.categories : Object.keys(CAT_ICON));
+    var list = all(), read = DATA.read || {};
+    var nRead = list.filter(function (a) { return read[a.id]; }).length;
+    VIEW.innerHTML = '<div class="kbs"><input class="tx" id="q" placeholder="🔍 Search articles" value="' + esc(Q) + '" style="flex:1">' + (ADMIN ? '<button class="btn pri" id="new">＋ Article</button>' : "") + "</div>" +
+      '<div class="kcats">' + cats.filter(function (c) { return c === "All" || list.some(function (a) { return a.category === c; }); }).map(function (c) { return '<button data-c="' + esc(c) + '" class="' + (CAT === c ? "on" : "") + '">' + esc(c) + "</button>"; }).join("") + "</div>" +
+      '<div class="kbar"><span class="muted" style="font-size:12.5px">' + nRead + " of " + list.length + ' read</span></div><div class="prog" style="margin-top:4px"><i style="width:' + (list.length ? Math.round(nRead / list.length * 100) : 0) + '%"></i></div><div id="kl"></div>';
+    var draw = function () {
+      var q = Q.toLowerCase(), rows = list.filter(function (a) { return (CAT === "All" || a.category === CAT) && (!q || (a.title + " " + a.summary + " " + a.category).toLowerCase().indexOf(q) >= 0); });
+      $("kl").innerHTML = rows.length ? rows.map(function (a) {
+        return '<div class="ka" data-id="' + a.id + '"><div class="ki" style="background:' + a.bg + '">' + a.icon + '</div><div style="flex:1;min-width:0"><div class="kt">' + esc(a.title) + '</div><div class="kd">' + esc(a.summary || "") + '</div><div class="km"><span class="chip">' + esc(a.category) + "</span>" +
+          (a.mins ? "<span>⏱ " + a.mins + " min read</span>" : "") + (a.custom ? "<span>By " + esc(a.by || "HO") + " · " + dOnly(a.updatedAt) + "</span>" : "<span>Built-in guide</span>") + (a.pinned ? '<span class="chip warn">📌 Pinned</span>' : "") +
+          (read[a.id] ? '<span class="chip done">✓ Read</span>' : a.custom ? '<span class="chip new">New</span>' : "") + "</div></div></div>";
+      }).join("") : '<div class="card empty"><div class="big">📚</div>No articles match.</div>';
+      [].forEach.call($("kl").querySelectorAll(".ka"), function (c) { c.onclick = function () { openArt(rows.find(function (a) { return a.id === c.dataset.id; })); }; });
+    };
+    $("q").oninput = function () { Q = this.value; draw(); };
+    [].forEach.call(VIEW.querySelectorAll(".kcats button"), function (b) { b.onclick = function () { CAT = b.dataset.c; [].forEach.call(VIEW.querySelectorAll(".kcats button"), function (x) { x.classList.toggle("on", x === b); }); draw(); }; });
+    if ($("new")) $("new").onclick = function () { editArt(null); };
+    draw();
+  }
+  window.__pageBack = window.__surveyBack = function () { if (CUR) { history.replaceState(null, "", location.pathname + location.search); showList(); return true; } return false; };
+
+  // ================= read =================
+  function md(t, imgs, artId) {
+    var lines = esc(t).split(/\r?\n/), out = [], list = null;
+    var inl = function (s) { return s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|\s)_(.+?)_(?=\s|$)/g, "$1<i>$2</i>").replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\[image (\d+)\]/gi, function (m, n) { var id = imgs[+n - 1]; return id ? '<figure><img alt="" data-img="' + id + '" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><figcaption>Image ' + n + "</figcaption></figure>" : m; }); };
+    var close = function () { if (list) { out.push("</" + list + ">"); list = null; } };
+    lines.forEach(function (l) {
+      var m;
+      if ((m = l.match(/^###\s+(.*)/))) { close(); out.push("<h4>" + inl(m[1]) + "</h4>"); }
+      else if ((m = l.match(/^##\s+(.*)/))) { close(); out.push("<h3>" + inl(m[1]) + "</h3>"); }
+      else if ((m = l.match(/^\s*[-*•]\s+(.*)/))) { if (list !== "ul") { close(); out.push("<ul>"); list = "ul"; } out.push("<li>" + inl(m[1]) + "</li>"); }
+      else if ((m = l.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== "ol") { close(); out.push("<ol>"); list = "ol"; } out.push("<li>" + inl(m[1]) + "</li>"); }
+      else if (!l.trim()) close();
+      else { close(); out.push("<p>" + inl(l) + "</p>"); }
+    });
+    close(); return out.join("");
+  }
+  function openArt(a, fromHash) {
+    CUR = a; window.scrollTo(0, 0);
+    if (!fromHash) try { history.replaceState(null, "", "#" + a.id); } catch (e) { }
+    hero(a.category, a.custom ? "By " + (a.by || "HO") + " · updated " + dOnly(a.updatedAt) : "Built-in guide · " + a.mins + " min read");
+    VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← All articles</button><div class="art" id="art"><div class="loading"><div class="spin"></div></div></div>';
+    $("bk").onclick = function () { window.__pageBack(); };
+    var finish = function (html, full) {
+      $("art").innerHTML = "<h2>" + esc(a.title) + "</h2>" + html + '<div class="row" style="margin-top:18px;justify-content:space-between"><span class="chip done">✓ Marked as read</span>' +
+        (ADMIN && a.custom ? '<span class="row"><button class="btn sec sm" id="ed">✏️ Edit</button><button class="btn danger sm" id="dl">Delete</button></span>' : "") + "</div>";
+      if (!(DATA.read || {})[a.id]) { api({ action: "kb-read", id: a.id }); DATA.read = DATA.read || {}; DATA.read[a.id] = Date.now(); changed(); }
+      if ($("ed")) $("ed").onclick = function () { editArt(full); };
+      if ($("dl")) $("dl").onclick = function () { sheet("Delete this article?", a.title, [["🗑️", "Delete", function () { api({ action: "kb-delete", id: a.id }).then(function (r) { if (!r.ok) return toast(r.error); toast("Deleted"); load(function () { window.__pageBack(); }); }); }, "red"]]); };
+      // headings → table of contents for long built-in guides
+      var hs = $("art").querySelectorAll("h3");
+      if (hs.length >= 4) { var toc = '<div class="toc"><b>On this page</b>'; [].forEach.call(hs, function (h, i) { h.id = "s" + i; toc += '<a href="javascript:void 0" data-s="s' + i + '">' + esc(h.textContent) + "</a>"; }); $("art").querySelector("h2").insertAdjacentHTML("afterend", toc + "</div>"); [].forEach.call($("art").querySelectorAll("[data-s]"), function (x) { x.onclick = function () { $(x.dataset.s).scrollIntoView({ behavior: "smooth" }); }; }); }
+      [].forEach.call($("art").querySelectorAll("img[data-img]"), function (im) { loadImg(a.id, im.dataset.img, im); });
+    };
+    if (!a.custom) return finish(a.html(), null);
+    api({ action: "kb-get", id: a.id }).then(function (r) {
+      if (!r.ok) { $("art").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var x = r.article, imgs = x.images || [], used = {};
+      String(x.body).replace(/\[image (\d+)\]/gi, function (m, n) { used[+n - 1] = 1; });
+      var rest = imgs.filter(function (id, i) { return !used[i]; });
+      finish((x.summary ? '<p class="lead">' + esc(x.summary) + "</p>" : "") + md(x.body, imgs, x.id) + rest.map(function (id) { return '<figure><img alt="" data-img="' + id + '" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></figure>'; }).join(""), x);
+    });
+  }
+  function loadImg(artId, id, im) {
+    if (PICS[id]) { im.src = PICS[id]; zoom(im); return; }
+    im.style.minHeight = "120px";
+    api({ action: "kb-att", article: artId, id: id }).then(function (r) { if (r.ok) { PICS[id] = "data:" + r.mime + ";base64," + r.data; im.src = PICS[id]; im.style.minHeight = ""; zoom(im); } });
+  }
+  function zoom(im) { im.style.cursor = "zoom-in"; im.onclick = function () { var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="' + im.src + '" style="max-width:96vw;max-height:90vh;border-radius:10px;background:#fff">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }; }
+
+  // ================= editor (admins) =================
+  function editArt(x) {
+    CUR = { id: "edit" }; window.scrollTo(0, 0);
+    var a = x || { title: "", category: "BI reports", summary: "", body: "", images: [], pinned: false }, imgs = (a.images || []).slice();
+    hero(x ? "Edit article" : "New article", "Visible to all state and admin users on web & app");
+    var cats = DATA.categories && DATA.categories.length ? DATA.categories : Object.keys(CAT_ICON);
+    VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Back</button><div class="card ed"><label>Title</label><input class="tx" id="et" maxlength="140" value="' + esc(a.title) + '" placeholder="e.g. How to read the state ranking">' +
+      '<label>Category</label><select class="tx" id="ec">' + cats.map(function (c) { return "<option" + (c === a.category ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>" +
+      '<label>Short summary (shown in the list)</label><input class="tx" id="es" maxlength="300" value="' + esc(a.summary || "") + '">' +
+      '<label>Article text</label><textarea class="tx" id="eb" style="min-height:260px;font-family:inherit" placeholder="Write the article…">' + esc(a.body) + "</textarea>" +
+      '<div class="muted" style="font-size:12px;margin-top:4px">Formatting: <code>## Heading</code> · <code>- bullet</code> · <code>1. step</code> · <code>**bold**</code> · put <code>[image 1]</code> where picture 1 should appear (others show at the end).</div>' +
+      '<label>Pictures / screenshots (up to 12)</label><div class="thumbs" id="th"></div>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:14px;font-size:14px;color:var(--ink)"><input type="checkbox" id="ep"' + (a.pinned ? " checked" : "") + "> 📌 Pin to the top</label>" +
+      '<div class="row" style="margin-top:14px"><button class="btn pri grow" id="esv">Save & publish</button></div></div>';
+    $("bk").onclick = function () { if (x) openArt(all().find(function (q) { return q.id === x.id; }) || { id: x.id, custom: true, title: x.title, category: x.category, updatedAt: x.updatedAt }); else showList(); };
+    var drawTh = function () {
+      $("th").innerHTML = imgs.map(function (id, i) { return '<div class="p" data-p="' + id + '">' + (PICS[id] ? '<img alt="" src="' + PICS[id] + '">' : "…") + "<span>image " + (i + 1) + '</span><button data-rm="' + i + '">✕</button></div>'; }).join("") + (imgs.length < 12 ? '<div class="p add" id="ad">＋ Add</div>' : "");
+      [].forEach.call($("th").querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { imgs.splice(+b.dataset.rm, 1); drawTh(); }; });
+      [].forEach.call($("th").querySelectorAll(".p[data-p]"), function (d) { if (!PICS[d.dataset.p] && x) api({ action: "kb-att", article: x.id, id: d.dataset.p }).then(function (r) { if (r.ok) { PICS[d.dataset.p] = "data:" + r.mime + ";base64," + r.data; drawTh(); } }); });
+      if ($("ad")) $("ad").onclick = function () {
+        var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+        inp.onchange = function () { [].slice.call(inp.files, 0, 12 - imgs.length).forEach(upload); };
+        inp.click();
+      };
+    };
+    var upload = function (f) {
+      var img = new Image(), url = URL.createObjectURL(f);
+      img.onload = function () {
+        var k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        var d = c.toDataURL("image/jpeg", 0.82);
+        api({ action: "support-upload", name: "kb-" + Date.now() + ".jpg", data: d.split(",")[1] }).then(function (r) { if (!r.ok) return toast(r.error); PICS[r.att.id] = d; imgs.push(r.att.id); drawTh(); });
+      };
+      img.onerror = function () { toast("Couldn't read " + f.name); };
+      img.src = url;
+    };
+    drawTh();
+    $("esv").onclick = function () {
+      var b = this; b.disabled = true; b.textContent = "Saving…";
+      api({ action: "kb-save", article: { id: x ? x.id : "", title: $("et").value, category: $("ec").value, summary: $("es").value, body: $("eb").value, images: imgs, pinned: $("ep").checked } }).then(function (r) {
+        b.disabled = false; b.textContent = "Save & publish";
+        if (!r.ok) return toast(r.error);
+        toast("Published"); changed();
+        load(function () { var n = all().find(function (q) { return q.id === r.article.id; }); openArt(n); });
+      });
+    };
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

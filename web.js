@@ -668,14 +668,16 @@
     barEl.innerHTML = '<button title="Search" aria-label="Search">🔍</button><button title="BI Assistant" aria-label="BI Assistant">💬</button>' +
       '<button title="Messages" aria-label="Messages">✉️<span class="biw-badge" id="biw-cb"></span></button>' +
       '<button title="Surveys" aria-label="Surveys">📋<span class="biw-badge" id="biw-sb"></span></button>' +
+      '<button title="Market visits" aria-label="Market visits">📍</button>' +
       '<button title="Support desk" aria-label="Support desk">🎧<span class="biw-badge"></span></button><button title="Profile" aria-label="Profile & settings"><span class="biw-av"></span></button>';
     var b = barEl.querySelectorAll("button");
     b[0].onclick = function () { assistant("openSearch"); };
     b[1].onclick = function () { assistant("openChat"); };
     b[2].onclick = function () { openTool("chat"); };
     b[3].onclick = function () { openSurveys(); };
-    b[4].onclick = function () { openSupport(); };
-    b[5].onclick = function () { openDrawer(); };
+    b[4].onclick = function () { openTool("visits"); };
+    b[5].onclick = function () { openSupport(); };
+    b[6].onclick = function () { openDrawer(); };
     badgeEl = barEl.querySelectorAll(".biw-badge")[2]; svBadgeEl = barEl.querySelector("#biw-sb"); chBadgeEl = barEl.querySelector("#biw-cb");
     ROOT.appendChild(barEl);
     paintAvatar(barEl.querySelector(".biw-av"));
@@ -739,13 +741,13 @@
   }
   // ---------- SURVEYS, MESSAGES, FEATURE MATRIX (shared pages, also used by the apps) ----------
   var svFrame = null;
-  var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"] };
+  var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"], visits: ["visits.html", "Market visits", "Market visits"], knowledge: ["knowledge.html", "Knowledge", "Knowledge"] };
   function openSurveys(hash) { openTool("survey", hash); }
   function openTool(name, hash) {
     closeDrawer();
     if (svFrame) svFrame.remove();
     var tl = TOOLS[name], f = el("div", "biw-frame"); svFrame = f;
-    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? tl[2] : tl[1]) + '</b></div><iframe title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
+    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? tl[2] : tl[1]) + '</b></div><iframe allow="geolocation; camera" title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
     ROOT.appendChild(f);
     var ifr = f.querySelector("iframe");
     f.querySelector(".biw-back").onclick = function () {
@@ -813,7 +815,7 @@
     var p = PROFILE, admin = isAdmin();
     var ph = store("biw-photo");
     var adminItems = [["🪪", "vChat directory", "", function () { openTool("directory"); }], ["🛡️", "Account security", PWREQ ? PWREQ + " reset request" + (PWREQ > 1 ? "s" : "") : "", function () { openTool("security"); }], ["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
-    var helpItems = [["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
+    var helpItems = [["📍", "Market visits", admin ? "Team tracker & scorecard" : "Punch in / out at stores", function () { openTool("visits"); }], ["📚", "Knowledge", "BI, AI, dashboards, Power BI", function () { openTool("knowledge"); }], ["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
     var supItems = [["📲", "Get the State app", "APK", function () { location.href = APP_LINKS.state; }], admin ? ["📲", "Get the Admin app", "APK", function () { location.href = APP_LINKS.admin; }] : null,

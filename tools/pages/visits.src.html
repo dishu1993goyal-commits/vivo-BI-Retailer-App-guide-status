@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Market Visits</title>
+<style>
+/*@@CSS@@*/
+.fs{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.fs h4{margin:0 0 4px;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.fs .hint{font-size:12px;color:var(--mut);margin-bottom:6px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:420px){.g2{grid-template-columns:1fr}}
+.fl{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 4px}
+.fl .req{color:var(--bad)}
+.yn2{display:flex;gap:8px}.yn2 button{flex:1;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:10px;padding:10px;font:600 14px inherit;cursor:pointer;color:var(--ink2)}
+.yn2 button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.chips2{display:flex;flex-wrap:wrap;gap:6px}.chips2 button{border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;color:var(--ink2)}
+.chips2 button.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.live{background:linear-gradient(135deg,#0F7B4F,#1E9E61);color:#fff;border-radius:16px;padding:16px;box-shadow:0 8px 22px rgba(30,158,97,.3)}
+.live .tm{font-size:34px;font-weight:800;letter-spacing:1px;margin:4px 0}
+.live small{opacity:.9}
+.live a{color:#fff}
+.gps{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px;padding:9px 11px;border-radius:10px;background:#F1F2FA}
+.gps.ok{background:#E6F4EA;color:#14532d}.gps.bad{background:#FDECEC;color:#8c2f22}.gps.warn{background:#FFF4E5;color:#7a4b00}
+.ph{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ph .p{position:relative;width:86px;height:86px;border-radius:10px;overflow:hidden;background:#EEF0F6;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--mut)}
+.ph .p img{width:100%;height:100%;object-fit:cover}
+.ph .p button{position:absolute;top:3px;right:3px;border:0;background:rgba(0,0,0,.55);color:#fff;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px}
+.ph .add{border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);font-weight:700;cursor:pointer;flex-direction:column;gap:2px;font-size:12px}
+.ph .add b{font-size:22px}
+.sugg2{border:1px solid var(--line);border-radius:10px;margin-top:4px;overflow:hidden;background:#fff}
+.sugg2 div{padding:9px 11px;border-top:1px solid #F0F1F6;cursor:pointer;font-size:13.5px}.sugg2 div:first-child{border-top:0}.sugg2 div:hover{background:#F3F4FD}
+.vc{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer;display:flex;gap:12px;align-items:center}
+.vc .ic2{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.vc .mid{flex:1;min-width:0}.vc .nm{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vc .mt{font-size:12.5px;color:var(--mut);margin-top:2px}
+.vc .rt{text-align:right;font-size:12px;flex:none}
+#map{height:340px;border-radius:12px;margin-top:8px;z-index:1}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:4px 10px;font-size:13.5px}
+.kv div:nth-child(odd){color:var(--mut)}
+.aibox{white-space:pre-wrap;font-size:14px;line-height:1.5}
+.card.ai{border:1px solid #DCD4FF;background:linear-gradient(180deg,#FBFAFF,#fff)}
+.sticky2{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 35%);padding:16px 0 10px;z-index:5;display:flex;gap:8px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📍</span></div>
+  <h1 id="h1">Market visits</h1><p id="h2">Loading…</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), CFG = null, OPEN = null, TAB = ls("vis-tab") || "visit", STATES = [], timerT = 0, saveT = 0, dirty = false;
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  var TYPES = ["Retailer", "Multi-brand outlet", "Large format store", "vivo exclusive store", "Distributor", "Other"];
+  var PURPOSES = ["Routine visit", "Training", "Launch / pre-booking", "Festival", "Issue follow-up", "Hygiene check", "App feedback"];
+  var EMI = ["Loan rejections", "High down payment", "Finance partner not available", "Documentation issues", "Low EMI awareness", "Other"];
+  var COMP = ["Samsung", "Xiaomi / Redmi", "OPPO", "realme", "OnePlus", "Apple", "Motorola", "iQOO", "Nothing", "Other"];
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  var SKEW = 0; // server clock minus this device clock, so timers don't depend on the phone's time setting
+  function mnt(a, b) { return Math.max(0, Math.round(((b || Date.now() + SKEW) - a) / 60000)); }
+  function hm(m) { return m >= 60 ? Math.floor(m / 60) + " h " + (m % 60) + " min" : m + " min"; }
+  function gmap(g) { return g ? "https://www.google.com/maps?q=" + g.lat + "," + g.lng : ""; }
+  window.__pageBack = window.__surveyBack = function () { return false; };
+  window.addEventListener("beforeunload", function () { if (OPEN && dirty) saveDraft(true); });
+
+  // ---------- GPS ----------
+  function getGeo() {
+    return new Promise(function (res, rej) {
+      if (!navigator.geolocation) return rej("This device can't share location.");
+      navigator.geolocation.getCurrentPosition(function (p) { res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }); },
+        function (e) { rej(e.code === 1 ? "Location permission is off. Allow location for this app/site and try again." : e.code === 3 ? "Location took too long. Move to an open spot and try again." : "Couldn't get your location. Turn on GPS and try again."); },
+        { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });
+    });
+  }
+
+  // ---------- load ----------
+  function load() {
+    if (!AUTH || !AUTH.token) { hero("Market visits", ""); VIEW.innerHTML = '<div class="err">Please log in to the BI app or dashboard first.</div>'; return; }
+    api({ action: "visit-config" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      CFG = r; OPEN = r.open; if (r.now) SKEW = r.now - Date.now(); render();
+    });
+  }
+  function render() {
+    clearInterval(timerT);
+    var tabs = [["visit", OPEN ? "● In store" : "＋ New visit"], ["mine", "My visits"]];
+    if (ADMIN) tabs.push(["team", "Team"], ["score", "Scorecard"], ["rules", "Rules"]);
+    if (!tabs.some(function (t) { return t[0] === TAB; })) TAB = "visit";
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { if (OPEN && dirty) saveDraft(true); TAB = b.dataset.t; ls("vis-tab", TAB); render(); }; });
+    ({ visit: OPEN ? showOpen : showNew, mine: showMine, team: showTeam, score: showScore, rules: showRules })[TAB]();
+  }
+
+  // ---------- NEW VISIT: store details + punch in ----------
+  function showNew() {
+    hero("Market visits", "Add the store, punch in when you reach it, and punch out when you leave.");
+    var st = CFG.me.state;
+    var p = $("pane");
+    p.innerHTML = '<div class="fs"><h4>🏪 Store details</h4><div class="hint">Type the store name — stores already visited in your state appear as suggestions.</div>' +
+      '<label class="fl">Store name <span class="req">*</span></label><input class="tx" id="s-name" maxlength="80" autocomplete="off" placeholder="e.g. Shree Mobiles"><div id="sg"></div>' +
+      '<div class="g2"><div><label class="fl">Area / market <span class="req">*</span></label><input class="tx" id="s-area" maxlength="60" placeholder="e.g. Andheri West"></div><div><label class="fl">Town / city <span class="req">*</span></label><input class="tx" id="s-city" maxlength="60"></div></div>' +
+      '<div class="g2"><div><label class="fl">District</label><input class="tx" id="s-district" maxlength="60"></div><div><label class="fl">State <span class="req">*</span></label>' +
+      (ADMIN ? '<select class="tx" id="s-state"><option value="">Choose state</option>' + STATES.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + "</select>" : '<input class="tx" id="s-state" value="' + esc(st) + '" readonly style="background:#EEF0F6">') + "</div></div>" +
+      '<label class="fl">Full address</label><input class="tx" id="s-address" maxlength="200">' +
+      '<div class="g2"><div><label class="fl">Retailer ID (if any)</label><input class="tx" id="s-retailerId" maxlength="40"></div><div><label class="fl">Store type</label><select class="tx" id="s-type">' + TYPES.map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select></div></div>" +
+      '<div class="g2"><div><label class="fl">Owner / manager name</label><input class="tx" id="s-owner" maxlength="60"></div><div><label class="fl">Owner phone</label><input class="tx" id="s-phone" inputmode="numeric" maxlength="15"></div></div>' +
+      '<label class="fl">Purpose of visit</label><select class="tx" id="s-purpose">' + PURPOSES.map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select>" +
+      '<div class="gps" id="gps">📍 Your location is captured when you punch in.</div></div>' +
+      '<div class="notice info">A visit counts as <b>valid</b> when you stay at least <b>' + CFG.rules.minMinutes + " min</b>, punch out within <b>" + CFG.rules.maxDriftM + " m</b> of where you punched in, and add at least <b>" + CFG.rules.minPhotos + " photo" + (CFG.rules.minPhotos === 1 ? "" : "s") + "</b>.</div>" +
+      '<div class="sticky2"><button class="btn ok block" id="pin" style="font-size:16px;padding:14px">📍 Punch in at this store</button></div>';
+    var name = $("s-name"), sgT = 0;
+    name.oninput = function () {
+      clearTimeout(sgT); var q = name.value.trim(); if (q.length < 2) { $("sg").innerHTML = ""; return; }
+      sgT = setTimeout(function () {
+        api({ action: "visit-stores", q: q, state: ADMIN ? $("s-state").value : "" }).then(function (r) {
+          if (!$("sg")) return;
+          if (!r.ok || !r.stores.length) { $("sg").innerHTML = ""; return; }
+          $("sg").innerHTML = '<div class="sugg2">' + r.stores.slice(0, 6).map(function (s, i) { return '<div data-i="' + i + '"><b>' + esc(s.name) + "</b> · " + esc(s.area) + ", " + esc(s.city) + ' <span class="muted" style="font-size:12px">· ' + s.visits + " visit" + (s.visits === 1 ? "" : "s") + "</span></div>"; }).join("") + "</div>";
+          [].forEach.call($("sg").querySelectorAll("[data-i]"), function (d) { d.onclick = function () { var s = r.stores[+d.dataset.i]; name.value = s.name; $("s-area").value = s.area || ""; $("s-city").value = s.city || ""; $("s-district").value = s.district || ""; $("s-retailerId").value = s.retailerId || ""; $("sg").innerHTML = ""; }; });
+        });
+      }, 400);
+    };
+    $("pin").onclick = function () {
+      var store = {}; ["name", "area", "city", "district", "state", "address", "retailerId", "type", "owner", "phone", "purpose"].forEach(function (k) { store[k] = $("s-" + k).value.trim(); });
+      if (store.name.length < 2) return toast("Enter the store name."); if (!store.area) return toast("Enter the area / market."); if (!store.city) return toast("Enter the town / city."); if (!store.state) return toast("Choose the state.");
+      var b = $("pin"), g = $("gps"); b.disabled = true; b.textContent = "Getting your location…"; g.className = "gps"; g.textContent = "📍 Getting your location…";
+      getGeo().then(function (geo) {
+        g.className = "gps " + (geo.acc > 150 ? "warn" : "ok"); g.textContent = "📍 Location found (accuracy " + geo.acc + " m)" + (geo.acc > 150 ? " — low accuracy, but continuing" : "");
+        b.textContent = "Punching in…";
+        api({ action: "visit-start", store: store, geo: geo, via: window.BIApp ? "app" : "web", device: navigator.userAgent.slice(0, 60) }).then(function (r) {
+          b.disabled = false; b.textContent = "📍 Punch in at this store";
+          if (!r.ok) { if (r.open) { OPEN = r.open; render(); } toast(r.error); return; }
+          if (r.now) SKEW = r.now - Date.now(); OPEN = r.visit; FORM = {}; PHOTOS = []; changed(); toast("Punched in at " + store.name); render();
+        });
+      }).catch(function (e) { b.disabled = false; b.textContent = "📍 Punch in at this store"; g.className = "gps bad"; g.textContent = "⚠️ " + e; });
+    };
+  }
+
+  // ---------- OPEN VISIT: form, photos, punch out ----------
+  var FORM = null, PHOTOS = null, LOCALPIC = {};
+  function showOpen() {
+    var v = OPEN; if (!FORM) FORM = JSON.parse(JSON.stringify(v.form || {})); if (!PHOTOS) PHOTOS = (v.photos || []).slice();
+    hero(v.store.name, v.store.area + ", " + v.store.city + " · " + v.state);
+    var p = $("pane");
+    var yn = function (k) { return '<div class="yn2" data-yn="' + k + '"><button data-v="Yes" class="' + (FORM[k] === "Yes" ? "on" : "") + '">Yes</button><button data-v="No" class="' + (FORM[k] === "No" ? "on" : "") + '">No</button></div>'; };
+    var multi = function (k, opts) { return '<div class="chips2" data-m="' + k + '">' + opts.map(function (o) { return '<button data-v="' + esc(o) + '" class="' + ((FORM[k] || []).indexOf(o) >= 0 ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div>"; };
+    var tx = function (k, ph, big) { return big ? '<textarea class="tx" data-f="' + k + '" placeholder="' + esc(ph) + '" style="min-height:80px">' + esc(FORM[k] || "") + "</textarea>" : '<input class="tx" data-f="' + k + '" placeholder="' + esc(ph) + '" value="' + esc(FORM[k] || "") + '">'; };
+    var nm = function (k, ph) { return '<input class="tx" type="number" inputmode="decimal" min="0" data-n="' + k + '" placeholder="' + esc(ph) + '" value="' + (FORM[k] == null ? "" : FORM[k]) + '">'; };
+    p.innerHTML = '<div class="live"><small>In store since ' + dfmt(v.in.t, { hour: "numeric", minute: "2-digit" }) + (v.repeat ? " · repeat store" + (v.storeDistance != null ? " (" + v.storeDistance + " m from its tagged spot)" : "") : " · new store tagged") + '</small><div class="tm" id="tmr">' + hm(mnt(v.in.t)) + '</div><small>📍 Punch-in location ' + (v.in.acc ? "±" + v.in.acc + " m · " : "") + '<a href="' + gmap(v.in) + '" target="_blank" rel="noopener">view on map</a> · minimum ' + CFG.rules.minMinutes + " min for a valid visit</small></div>" +
+      '<div class="fs"><h4>💰 Store business</h4><div class="g2"><div><label class="fl">Total monthly sales (units, all brands)</label>' + nm("salesUnits", "e.g. 150") + '</div><div><label class="fl">Monthly sales value (₹)</label>' + nm("salesValue", "e.g. 2500000") + '</div></div><div class="g2"><div><label class="fl">vivo promoters (VBA) at store</label>' + nm("vbaCount", "e.g. 2") + '</div><div><label class="fl">Approx. daily footfall</label>' + nm("footfall", "e.g. 40") + "</div></div></div>" +
+      '<div class="fs"><h4>📦 Stock & support</h4><label class="fl">Any model stock issue?</label>' + yn("stockIssue") + '<div data-show="stockIssue"><label class="fl">Which models are short?</label>' + tx("stockModels", "e.g. V40 Pro 12/256, Y29") + '</div><label class="fl">NPL support required?</label>' + yn("nplSupport") + '<div data-show="nplSupport"><label class="fl">What support?</label>' + tx("nplNote", "Details") + "</div></div>" +
+      '<div class="fs"><h4>💳 EMI & offers</h4><label class="fl">Any major issue selling through EMI?</label>' + yn("emiIssue") + '<div data-show="emiIssue"><label class="fl">What issues?</label>' + multi("emiIssues", EMI) + '<label class="fl">Details</label>' + tx("emiNote", "e.g. Bajaj approvals low for new customers") + '</div><label class="fl">Current offers / cashback / V-Shield visible at counter?</label>' + yn("offersVisible") + "</div>" +
+      '<div class="fs"><h4>⚔️ Competition</h4><label class="fl">Competitors active here</label>' + multi("competitors", COMP) + '<label class="fl">Competitor offers / activity</label>' + tx("competitorNote", "e.g. Samsung no-cost EMI + ₹2,000 exchange", true) + "</div>" +
+      '<div class="fs"><h4>📱 Feedback on our system & apps <span class="req" style="color:var(--bad)">*</span></h4><div class="hint">Most important for HO — be specific (what works, what doesn\'t, what retailers ask for).</div><label class="fl">Retailer app usage at this store</label>' + multi1("appUsage", ["Daily", "Weekly", "Rarely", "Not using"]) +
+      '<label class="fl">Retailer\'s rating of our app</label><div class="stars" data-r="appRating">' + [1, 2, 3, 4, 5].map(function (i) { return '<button type="button" data-v="' + i + '" class="' + (FORM.appRating >= i ? "on" : "") + '">★</button>'; }).join("") + '</div><label class="fl">Feedback on our system & apps</label>' + tx("appFeedback", "e.g. OTP login slow; scheme payout status not visible; wants Hindi option", true) + "</div>" +
+      '<div class="fs"><h4>🗣️ Retailer & product feedback</h4><label class="fl">Retailer feedback</label>' + tx("retailerFeedback", "Margins, schemes, support, service…", true) + '<label class="fl">Product feedback (customers & retailer)</label>' + tx("productFeedback", "e.g. customers ask for better low-light camera in Y series", true) + "</div>" +
+      '<div class="fs"><h4>🎯 Outcome</h4><label class="fl">Improvement areas</label>' + tx("improvement", "What should improve at this store?", true) + '<label class="fl">Outcome of the visit</label>' + tx("outcome", "What was done / agreed?", true) + '<div class="g2"><div><label class="fl">Next action</label>' + tx("nextAction", "e.g. send VBA training") + '</div><div><label class="fl">Follow-up date</label><input class="tx" type="date" data-f="followUp" value="' + esc(FORM.followUp || "") + '"></div></div></div>' +
+      '<div class="fs"><h4>📷 Photos <span class="req" style="color:var(--bad)">' + (CFG.rules.minPhotos ? "*" : "") + '</span></h4><div class="hint">Store front, vivo display, training, issues — at least ' + CFG.rules.minPhotos + ' (up to 6). Photos are compressed automatically.</div><div class="ph" id="ph"></div></div>' +
+      '<div class="muted" id="svst" style="font-size:12px;text-align:center;margin-top:10px">Your answers are saved automatically.</div>' +
+      '<div class="sticky2"><button class="btn ghost" id="cx">✕</button><button class="btn sec" id="sv">Save</button><button class="btn danger grow" id="pout" style="background:#B3402F;color:#fff;border:0;font-size:15px">📍 Punch out</button></div>';
+    bindForm(); drawPhotos(); refreshShow();
+    timerT = setInterval(function () { var e = $("tmr"); if (e) e.textContent = hm(mnt(v.in.t)); }, 15000);
+    $("sv").onclick = function () { saveDraft(false); };
+    $("cx").onclick = function () { sheet("Cancel this visit?", "The visit and its answers will be deleted.", [["✕", "Yes, cancel the visit", function () { api({ action: "visit-cancel", id: v.id }).then(function (r) { if (!r.ok) return toast(r.error); OPEN = null; FORM = PHOTOS = null; dirty = false; changed(); render(); }); }, "red"]]); };
+    $("pout").onclick = punchOut;
+  }
+  function multi1(k, opts) { return '<div class="chips2" data-one="' + k + '">' + opts.map(function (o) { return '<button data-v="' + esc(o) + '" class="' + (FORM[k] === o ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div>"; }
+  function touch() { dirty = true; clearTimeout(saveT); saveT = setTimeout(function () { saveDraft(true); }, 4000); var s = $("svst"); if (s) s.textContent = "Saving…"; }
+  function refreshShow() { [].forEach.call(document.querySelectorAll("[data-show]"), function (d) { d.style.display = FORM[d.dataset.show] === "Yes" ? "" : "none"; }); }
+  function bindForm() {
+    var p = $("pane");
+    [].forEach.call(p.querySelectorAll("[data-f]"), function (i) { i.oninput = i.onchange = function () { FORM[i.dataset.f] = i.value; touch(); }; });
+    [].forEach.call(p.querySelectorAll("[data-n]"), function (i) { i.oninput = function () { FORM[i.dataset.n] = i.value === "" ? "" : Number(i.value); touch(); }; });
+    [].forEach.call(p.querySelectorAll("[data-yn]"), function (g) { [].forEach.call(g.children, function (b) { b.onclick = function () { var k = g.dataset.yn; FORM[k] = FORM[k] === b.dataset.v ? "" : b.dataset.v; [].forEach.call(g.children, function (x) { x.classList.toggle("on", FORM[k] === x.dataset.v); }); refreshShow(); touch(); }; }); });
+    [].forEach.call(p.querySelectorAll("[data-m]"), function (g) { [].forEach.call(g.children, function (b) { b.onclick = function () { var k = g.dataset.m, a = (FORM[k] || []).slice(), i = a.indexOf(b.dataset.v); if (i >= 0) a.splice(i, 1); else a.push(b.dataset.v); FORM[k] = a; b.classList.toggle("on", i < 0); touch(); }; }); });
+    [].forEach.call(p.querySelectorAll("[data-one]"), function (g) { [].forEach.call(g.children, function (b) { b.onclick = function () { var k = g.dataset.one; FORM[k] = FORM[k] === b.dataset.v ? "" : b.dataset.v; [].forEach.call(g.children, function (x) { x.classList.toggle("on", FORM[k] === x.dataset.v); }); touch(); }; }); });
+    [].forEach.call(p.querySelectorAll("[data-r] button"), function (b) { b.onclick = function () { FORM.appRating = +b.dataset.v; [].forEach.call(b.parentNode.children, function (x) { x.classList.toggle("on", +x.dataset.v <= FORM.appRating); }); touch(); }; });
+  }
+  function saveDraft(quiet) {
+    if (!OPEN) return Promise.resolve();
+    clearTimeout(saveT);
+    return api({ action: "visit-save", id: OPEN.id, form: FORM, photos: PHOTOS }).then(function (r) {
+      var s = $("svst");
+      if (!r.ok) { if (s) s.textContent = "Not saved: " + r.error; if (!quiet) toast(r.error); return; }
+      dirty = false; OPEN = r.visit; if (s) s.textContent = "Saved " + dfmt(Date.now(), { hour: "numeric", minute: "2-digit" }); if (!quiet) toast("Saved");
+    });
+  }
+  function drawPhotos() {
+    var box = $("ph"); if (!box) return;
+    box.innerHTML = PHOTOS.map(function (id, i) { return '<div class="p" data-p="' + id + '">' + (LOCALPIC[id] ? '<img alt="" src="' + LOCALPIC[id] + '">' : "📷") + '<button data-rm="' + i + '" aria-label="Remove photo">✕</button></div>'; }).join("") +
+      (PHOTOS.length < 6 ? '<div class="p add" id="addp"><b>＋</b>Add photo</div>' : "");
+    [].forEach.call(box.querySelectorAll("[data-rm]"), function (b) { b.onclick = function (e) { e.stopPropagation(); PHOTOS.splice(+b.dataset.rm, 1); drawPhotos(); touch(); }; });
+    [].forEach.call(box.querySelectorAll(".p[data-p]"), function (d) { if (!LOCALPIC[d.dataset.p]) loadThumb(d.dataset.p, d); });
+    if ($("addp")) $("addp").onclick = pickPhoto;
+  }
+  function loadThumb(id, el) {
+    api({ action: "support-att", id: id }).then(function (r) {
+      if (!r.ok || !/^image/.test(r.mime)) return;
+      LOCALPIC[id] = "data:" + r.mime + ";base64," + r.data;
+      if (el.firstChild && el.firstChild.nodeType === 3) el.removeChild(el.firstChild);
+      if (!el.querySelector("img")) el.insertAdjacentHTML("afterbegin", '<img alt="" src="' + LOCALPIC[id] + '">');
+    });
+  }
+  function pickPhoto() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "environment");
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      var add = $("addp"); if (add) add.innerHTML = '<div class="spin" style="width:22px;height:22px;margin:0"></div>';
+      var img = new Image(), url = URL.createObjectURL(f);
+      img.onload = function () {
+        var max = 1280, k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        var g = c.getContext("2d"); g.drawImage(img, 0, 0, c.width, c.height);
+        // time + store stamp on the photo as evidence
+        var stamp = OPEN.store.name + " · " + dfmt(Date.now(), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+        g.fillStyle = "rgba(0,0,0,.55)"; g.fillRect(0, c.height - 34, c.width, 34); g.fillStyle = "#fff"; g.font = "bold 16px sans-serif"; g.fillText(stamp.slice(0, 70), 10, c.height - 11);
+        URL.revokeObjectURL(url);
+        var data = c.toDataURL("image/jpeg", 0.72);
+        api({ action: "support-upload", name: "visit-" + Date.now() + ".jpg", data: data.split(",")[1] }).then(function (r) {
+          if (!r.ok) { toast(r.error); drawPhotos(); return; }
+          LOCALPIC[r.att.id] = data; PHOTOS.push(r.att.id); drawPhotos(); touch();
+        });
+      };
+      img.onerror = function () { toast("Couldn't read this photo."); drawPhotos(); };
+      img.src = url;
+    };
+    inp.click();
+  }
+  function punchOut() {
+    var hasFb = (FORM.appFeedback || FORM.retailerFeedback || FORM.productFeedback || "").trim();
+    if (!hasFb) return toast("Add feedback on our system & apps (or retailer/product feedback) first.");
+    if (PHOTOS.length < CFG.rules.minPhotos) return toast("Add at least " + CFG.rules.minPhotos + " photo(s) first.");
+    var m = mnt(OPEN.in.t);
+    var go = function () {
+      var b = $("pout"); b.disabled = true; b.textContent = "Getting location…";
+      getGeo().then(function (geo) {
+        b.textContent = "Punching out…";
+        api({ action: "visit-end", id: OPEN.id, form: FORM, photos: PHOTOS, geo: geo }).then(function (r) {
+          b.disabled = false; b.textContent = "📍 Punch out";
+          if (!r.ok) return toast(r.error);
+          var v = r.visit; OPEN = null; FORM = PHOTOS = null; dirty = false; changed();
+          $("pane").innerHTML = '<div class="card done"><div class="ck" style="' + (v.valid ? "" : "background:linear-gradient(135deg,#F2A93B,#E69A00)") + '">' + (v.valid ? "✓" : "!") + '</div><h2 style="margin:0 0 6px">' + (v.valid ? "Valid visit recorded" : "Visit recorded — not valid") + '</h2><div class="muted">' + esc(v.store.name) + " · " + hm(v.minutes) + " · quality " + v.quality + "/100</div>" +
+            (v.valid ? "" : '<div class="notice" style="margin-top:12px;text-align:left">' + v.invalidWhy.map(esc).join("<br>") + "</div>") + '<button class="btn pri" id="nx" style="margin-top:14px">＋ Start next visit</button></div>';
+          $("nx").onclick = function () { TAB = "visit"; render(); };
+          hero("Market visits", "Visit saved " + dt(Date.now()));
+        });
+      }).catch(function (e) { b.disabled = false; b.textContent = "📍 Punch out"; toast(e); });
+    };
+    if (m < CFG.rules.minMinutes) sheet("Only " + m + " min at this store", "Visits shorter than " + CFG.rules.minMinutes + " min are saved but marked not valid.", [["📍", "Punch out anyway", go]]);
+    else go();
+  }
+
+  // ---------- MY VISITS ----------
+  function rangeBar(id) {
+    var t = istDay(Date.now()), f = t.slice(0, 8) + "01";
+    return '<div class="row" id="' + id + '" style="margin-top:4px"><input class="tx" type="date" data-k="from" value="' + f + '" style="flex:1;min-width:130px;padding:9px"><input class="tx" type="date" data-k="to" value="' + t + '" style="flex:1;min-width:130px;padding:9px"></div>';
+  }
+  function readRange(id) { var r = {}; [].forEach.call($(id).querySelectorAll("[data-k]"), function (i) { r[i.dataset.k] = i.value; }); return r; }
+  function visitCard(v) {
+    var c = v.status === "open" ? (v.stale ? ["⏳", "#FFF4E5", "Not punched out"] : ["🟢", "#E6F4EA", "In store now"]) : v.valid ? ["✅", "#E6F4EA", "Valid"] : ["⚠️", "#FFF4E5", "Not valid"];
+    return '<div class="vc" data-id="' + v.id + '"><div class="ic2" style="background:' + c[1] + '">' + c[0] + '</div><div class="mid"><div class="nm">' + esc(v.store.name) + '</div><div class="mt">' + esc(v.store.area + ", " + v.store.city) + " · " + esc(v.state) + (ADMIN ? " · " + esc(v.by.fullName) : "") + "</div><div class=\"mt\">" + dt(v.in.t) + (v.minutes != null ? " · " + hm(v.minutes) : "") + " · 📷 " + (v.photos || []).length + '</div></div><div class="rt"><span class="chip ' + (v.status === "open" ? "warn" : v.valid ? "live" : "warn") + '">' + c[2] + "</span>" + (v.quality != null ? '<div class="muted" style="margin-top:4px">Q ' + v.quality + (v.ai ? " · AI " + v.ai.score + "/10" : "") + "</div>" : "") + "</div></div>";
+  }
+  function showMine() {
+    hero("My visits", "Your market visits and their status");
+    $("pane").innerHTML = rangeBar("rg") + '<div id="ml"><div class="loading"><div class="spin"></div></div></div>';
+    var go = function () {
+      var r = readRange("rg");
+      api({ action: "visit-list", from: r.from, to: r.to, user: ADMIN ? AUTH.username : "" }).then(function (x) {
+        if (!$("ml")) return;
+        if (!x.ok) { $("ml").innerHTML = '<div class="err">' + esc(x.error) + "</div>"; return; }
+        var list = ADMIN ? x.visits.filter(function (v) { return v.by.username.toLowerCase() === AUTH.username.toLowerCase(); }) : x.visits;
+        var closed = list.filter(function (v) { return v.status === "closed"; }), valid = closed.filter(function (v) { return v.valid; }).length;
+        $("ml").innerHTML = '<div class="tiles" style="margin-top:10px">' + tileS("📍", "#EEF0FF", list.length, "Visits") + tileS("✅", "#E6F4EA", closed.length ? Math.round(valid / closed.length * 100) + "%" : "—", "Valid") +
+          tileS("⏱️", "#FFF4E5", closed.length ? hm(Math.round(closed.reduce(function (a, v) { return a + v.minutes; }, 0) / closed.length)) : "—", "Avg time") + tileS("⭐", "#F4EEFF", closed.length ? Math.round(closed.reduce(function (a, v) { return a + v.quality; }, 0) / closed.length) : "—", "Avg quality") + "</div>" +
+          (list.length ? list.map(visitCard).join("") : '<div class="card empty"><div class="big">📍</div>No visits in this period. Tap <b>＋ New visit</b> when you reach a store.</div>');
+        bindCards($("ml"), list);
+      });
+    };
+    [].forEach.call($("rg").querySelectorAll("input"), function (i) { i.onchange = go; });
+    go();
+  }
+  function bindCards(root, list) { [].forEach.call(root.querySelectorAll(".vc"), function (c) { c.onclick = function () { showVisit(list.find(function (v) { return v.id === c.dataset.id; })); }; }); }
+  function showVisit(v) {
+    var f = v.form || {};
+    var row = function (k, val) { return val == null || val === "" || (Array.isArray(val) && !val.length) ? "" : "<div>" + esc(k) + "</div><div>" + esc(Array.isArray(val) ? val.join(", ") : val) + "</div>"; };
+    var body = '<div class="kv" style="margin-top:10px">' + row("Visitor", v.by.fullName + " (" + (v.by.app === "admin" ? "HO admin" : v.state) + ")") + row("Store", v.store.name + " · " + (v.store.type || "")) + row("Address", [v.store.address, v.store.area, v.store.city, v.store.district, v.state].filter(Boolean).join(", ")) +
+      row("Retailer ID", v.store.retailerId) + row("Owner", [v.store.owner, v.store.phone].filter(Boolean).join(" · ")) + row("Purpose", v.store.purpose) + row("Punch in", dt(v.in.t) + (v.in.acc ? " (±" + v.in.acc + " m)" : "")) + row("Punch out", v.out ? dt(v.out.t) + (v.out.acc ? " (±" + v.out.acc + " m)" : "") : "—") +
+      row("Time at store", v.minutes != null ? hm(v.minutes) : "") + row("Moved between punches", v.drift != null ? v.drift + " m" : "") + row("Status", v.status === "open" ? "In progress" : v.valid ? "Valid" : "Not valid — " + (v.invalidWhy || []).join("; ")) + row("Quality score", v.quality != null ? v.quality + "/100" : "") +
+      row("Monthly sales", [f.salesUnits != null ? f.salesUnits + " units" : "", f.salesValue != null ? "₹" + fmtN(f.salesValue) : ""].filter(Boolean).join(" · ")) + row("VBA promoters", f.vbaCount) + row("Daily footfall", f.footfall) + row("Stock issue", f.stockIssue ? f.stockIssue + (f.stockModels ? " — " + f.stockModels : "") : "") +
+      row("NPL support", f.nplSupport ? f.nplSupport + (f.nplNote ? " — " + f.nplNote : "") : "") + row("EMI issue", f.emiIssue ? f.emiIssue + ((f.emiIssues || []).length ? " — " + f.emiIssues.join(", ") : "") + (f.emiNote ? ". " + f.emiNote : "") : "") + row("Offers visible", f.offersVisible) +
+      row("Competitors", (f.competitors || []).join(", ") + (f.competitorNote ? " — " + f.competitorNote : "")) + row("Retailer app usage", f.appUsage) + row("App rating", f.appRating ? f.appRating + "/5" : "") + row("Feedback on our system & apps", f.appFeedback) + row("Retailer feedback", f.retailerFeedback) +
+      row("Product feedback", f.productFeedback) + row("Improvement areas", f.improvement) + row("Outcome", f.outcome) + row("Next action", [f.nextAction, f.followUp ? "by " + dOnly(Date.parse(f.followUp)) : ""].filter(Boolean).join(" ")) + "</div>" +
+      (v.ai ? '<div class="notice info" style="margin-top:10px"><b>AI review: ' + v.ai.score + "/10</b> · " + esc(v.ai.summary) + ((v.ai.issues || []).length ? "<br>Issues: " + esc(v.ai.issues.join(", ")) : "") + "</div>" : "") +
+      '<div class="row" style="margin-top:10px">' + (v.in ? '<a class="btn sec sm" target="_blank" rel="noopener" href="' + gmap(v.in) + '">📍 Punch-in map</a>' : "") + (v.out ? '<a class="btn sec sm" target="_blank" rel="noopener" href="' + gmap(v.out) + '">📍 Punch-out map</a>' : "") + "</div>" +
+      '<div class="ph" id="vph">' + (v.photos || []).map(function (id) { return '<div class="p" data-p="' + id + '">' + (LOCALPIC[id] ? '<img alt="" src="' + LOCALPIC[id] + '">' : "📷") + "</div>"; }).join("") + "</div>";
+    var acts = [];
+    if (ADMIN && v.status === "closed") acts.push(["✨", v.ai ? "Re-run AI review" : "AI review of this visit", function () { aiOne(v); }]);
+    if (ADMIN) acts.push(["🗑️", "Delete visit", function () { api({ action: "visit-cancel", id: v.id }).then(function (r) { toast(r.ok ? "Deleted" : r.error); render(); }); }, "red"]);
+    var ov = sheet(v.store.name, v.store.area + ", " + v.store.city, acts, body);
+    ov.querySelector(".sheet").style.maxWidth = "640px";
+    [].forEach.call(ov.querySelectorAll(".p[data-p]"), function (d) {
+      d.style.cursor = "pointer"; d.onclick = function () { if (LOCALPIC[d.dataset.p]) { var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="' + LOCALPIC[d.dataset.p] + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); } };
+      if (!LOCALPIC[d.dataset.p]) api({ action: "support-att", id: d.dataset.p }).then(function (r) { if (r.ok) { LOCALPIC[d.dataset.p] = "data:" + r.mime + ";base64," + r.data; d.innerHTML = '<img alt="" src="' + LOCALPIC[d.dataset.p] + '">'; } });
+    });
+  }
+  function aiOne(v) { toast("AI is reviewing the visit…"); api({ action: "visit-ai-one", id: v.id }).then(function (r) { if (!r.ok) return toast(r.error); v.ai = r.ai; toast("AI score " + r.ai.score + "/10"); showVisit(v); }); }
+
+  // ---------- TEAM (admins) ----------
+  var TEAM = null;
+  function showTeam() {
+    hero("Team visits", "Where state BI teams and HO are in the market, with evidence");
+    $("pane").innerHTML = '<div class="card"><h3>🟢 In the market now</h3><div id="live" class="muted">Loading…</div></div>' +
+      '<div class="card"><h3>🔎 All visits</h3>' + rangeBar("tr") + '<div class="row" style="margin-top:8px"><select class="tx" id="tst" style="flex:1;min-width:140px;padding:9px"><option value="">All states</option>' + STATES.map(function (s) { return "<option>" + esc(s) + "</option>"; }).join("") + '</select><input class="tx" id="tq" placeholder="Search person or store" style="flex:1;min-width:140px;padding:9px"></div>' +
+      '<div class="row" style="margin-top:8px"><button class="btn pri sm" id="tex">⬇ Export Excel</button><button class="btn sec sm" id="tai">✨ AI-score unscored visits</button><button class="btn ghost sm" id="tmap">🗺️ Map</button></div><div id="tsum"></div><div id="mapw"></div><div id="tl"></div></div>';
+    api({ action: "visit-live" }).then(function (r) {
+      if (!$("live")) return;
+      $("live").innerHTML = !r.ok ? esc(r.error) : r.visits.length ? r.visits.map(visitCard).join("") : "Nobody is punched in right now.";
+      if (r.ok) bindCards($("live"), r.visits);
+    });
+    var go = function () {
+      var rg = readRange("tr");
+      $("tl").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+      api({ action: "visit-list", from: rg.from, to: rg.to, state: $("tst").value }).then(function (r) { if (!$("tl")) return; if (!r.ok) { $("tl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } TEAM = r; drawTeam(); });
+    };
+    [].forEach.call($("tr").querySelectorAll("input"), function (i) { i.onchange = go; }); $("tst").onchange = go; $("tq").oninput = drawTeam;
+    $("tex").onclick = function () { if (TEAM) exportVisits(filtered()); };
+    $("tai").onclick = aiBatch; $("tmap").onclick = showMap;
+    go();
+  }
+  function filtered() { var q = ($("tq") && $("tq").value.trim().toLowerCase()) || ""; return TEAM.visits.filter(function (v) { return !q || (v.by.fullName + " " + v.by.username + " " + v.store.name + " " + v.store.area + " " + v.store.city).toLowerCase().indexOf(q) >= 0; }); }
+  function drawTeam() {
+    if (!TEAM || !$("tl")) return;
+    var list = filtered(), closed = list.filter(function (v) { return v.status === "closed"; }), valid = closed.filter(function (v) { return v.valid; }).length, people = {};
+    list.forEach(function (v) { people[v.by.username.toLowerCase()] = 1; });
+    $("tsum").innerHTML = '<div class="tiles" style="margin-top:10px">' + tileS("📍", "#EEF0FF", list.length, "Visits") + tileS("✅", "#E6F4EA", closed.length ? Math.round(valid / closed.length * 100) + "%" : "—", "Valid") + tileS("👥", "#FFF4E5", Object.keys(people).length, "People active") + tileS("📷", "#F4EEFF", list.reduce(function (a, v) { return a + (v.photos || []).length; }, 0), "Photos") + "</div>";
+    $("tl").innerHTML = list.length ? list.slice(0, 300).map(visitCard).join("") + (list.length > 300 ? '<div class="muted" style="font-size:12px;margin-top:6px">Showing 300 — export for all.</div>' : "") : '<div class="empty">No visits in this period.</div>';
+    bindCards($("tl"), list);
+  }
+  var leaflet = null;
+  function loadLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (!leaflet) leaflet = new Promise(function (res, rej) {
+      var c = document.createElement("link"); c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c);
+      var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = res; s.onerror = function () { leaflet = null; rej(); }; document.head.appendChild(s);
+    });
+    return leaflet;
+  }
+  function showMap() {
+    if (!TEAM) return; var list = filtered().filter(function (v) { return v.in; });
+    if (!list.length) return toast("No visits with location in this view.");
+    $("mapw").innerHTML = '<div id="map"></div><div class="legend"><span><i style="background:#1E9E61"></i>Valid</span><span><i style="background:#E69A00"></i>Not valid</span><span><i style="background:#4D5BF9"></i>In progress</span></div>';
+    loadLeaflet().then(function () {
+      var m = window.L.map("map"); window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "&copy; OpenStreetMap contributors" }).addTo(m);
+      var pts = list.map(function (v) {
+        var col = v.status === "open" ? "#4D5BF9" : v.valid ? "#1E9E61" : "#E69A00";
+        window.L.circleMarker([v.in.lat, v.in.lng], { radius: 7, color: "#fff", weight: 2, fillColor: col, fillOpacity: 0.95 }).addTo(m)
+          .bindPopup("<b>" + esc(v.store.name) + "</b><br>" + esc(v.store.area) + "<br>" + esc(v.by.fullName) + " · " + dt(v.in.t) + (v.minutes != null ? " · " + v.minutes + " min" : ""));
+        return [v.in.lat, v.in.lng];
+      });
+      m.fitBounds(pts, { padding: [24, 24], maxZoom: 14 });
+    }).catch(function () { $("mapw").innerHTML = '<div class="err">Map couldn\'t load (check internet).</div>'; });
+  }
+  function aiBatch() {
+    if (!TEAM) return;
+    var todo = filtered().filter(function (v) { return v.status === "closed" && !v.ai; });
+    if (!todo.length) return toast("All visits in this view already have an AI score.");
+    var n = 0, stop = false, ov = sheet("AI scoring " + todo.length + " visits", "Gemini reviews each visit (about 5 seconds each). Keep this open.", [["⏹", "Stop", function () { stop = true; }]], '<div class="prog" style="margin-top:12px"><i id="aip" style="width:0"></i></div><div class="muted" id="ait" style="margin-top:6px;font-size:13px"></div>');
+    var next = function () {
+      if (stop || n >= todo.length || !ov.isConnected) { if (ov.isConnected) ov.remove(); toast("AI scored " + n + " visit(s)"); drawTeam(); return; }
+      var v = todo[n];
+      api({ action: "visit-ai-one", id: v.id }).then(function (r) {
+        if (!r.ok) { stop = true; toast(r.error); }
+        else { v.ai = r.ai; n++; }
+        var p = $("aip"); if (p) p.style.width = Math.round(n / todo.length * 100) + "%"; var t = $("ait"); if (t) t.textContent = n + " of " + todo.length + " done";
+        setTimeout(next, 4500);
+      });
+    };
+    next();
+  }
+  function exportVisits(list) {
+    var head = ["Visit ID", "State", "Visitor", "Role", "Mobile", "Store", "Store type", "Retailer ID", "Owner", "Owner phone", "Address", "Area", "City", "District", "Purpose", "Punch in (IST)", "Punch out (IST)", "Minutes", "Valid", "Why not valid", "Moved (m)",
+      "Punch-in lat", "Punch-in long", "Punch-in accuracy (m)", "Punch-in map", "Punch-out lat", "Punch-out long", "Punch-out map", "Photos", "Quality /100", "AI score /10", "AI summary",
+      "Monthly sales (units)", "Monthly sales (Rs)", "VBA promoters", "Daily footfall", "Stock issue", "Models short", "NPL support", "NPL note", "EMI issue", "EMI issues", "EMI note", "Offers visible", "Competitors", "Competitor note",
+      "Retailer app usage", "App rating /5", "Feedback on our system & apps", "Retailer feedback", "Product feedback", "Improvement areas", "Outcome", "Next action", "Follow-up date"];
+    var rows = [head].concat(list.map(function (v) { var f = v.form || {}; return [v.id, v.state, v.by.fullName, v.by.app === "admin" ? "HO admin" : "State BI", v.by.phone || "", v.store.name, v.store.type || "", v.store.retailerId || "", v.store.owner || "", v.store.phone || "", v.store.address || "", v.store.area, v.store.city, v.store.district || "", v.store.purpose || "",
+      dt(v.in.t), v.out ? dt(v.out.t) : "", v.minutes != null ? v.minutes : "", v.status === "open" ? "In progress" : v.valid ? "Yes" : "No", (v.invalidWhy || []).join("; "), v.drift != null ? v.drift : "",
+      v.in.lat, v.in.lng, v.in.acc != null ? v.in.acc : "", gmap(v.in), v.out ? v.out.lat : "", v.out ? v.out.lng : "", gmap(v.out), (v.photos || []).length, v.quality != null ? v.quality : "", v.ai ? v.ai.score : "", v.ai ? v.ai.summary : "",
+      f.salesUnits != null ? f.salesUnits : "", f.salesValue != null ? f.salesValue : "", f.vbaCount != null ? f.vbaCount : "", f.footfall != null ? f.footfall : "", f.stockIssue || "", f.stockModels || "", f.nplSupport || "", f.nplNote || "", f.emiIssue || "", (f.emiIssues || []).join("; "), f.emiNote || "", f.offersVisible || "", (f.competitors || []).join("; "), f.competitorNote || "",
+      f.appUsage || "", f.appRating || "", f.appFeedback || "", f.retailerFeedback || "", f.productFeedback || "", f.improvement || "", f.outcome || "", f.nextAction || "", f.followUp || ""]; }));
+    download(xlsx([{ name: "Visits", rows: rows }]), "Market_visits_" + istDay(Date.now()) + ".xlsx"); toast("Excel exported");
+  }
+
+  // ---------- SCORECARD (admins) ----------
+  function showScore() {
+    hero("State scorecard", "How actively each state's BI team is in the market, and the quality of what they collect");
+    $("pane").innerHTML = rangeBar("sr") + '<div id="sc"><div class="loading"><div class="spin"></div></div></div>';
+    var go = function () {
+      var rg = readRange("sr");
+      api({ action: "visit-stats", from: rg.from, to: rg.to }).then(function (r) { if (!$("sc")) return; if (!r.ok) { $("sc").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } drawScore(r); });
+    };
+    [].forEach.call($("sr").querySelectorAll("input"), function (i) { i.onchange = go; });
+    go();
+  }
+  function drawScore(r) {
+    var act = r.states.filter(function (s) { return s.visits; }), tot = r.total;
+    var html = '<div class="tiles" style="margin-top:10px">' + tileS("📍", "#EEF0FF", tot, "Visits") + tileS("🗺️", "#E6F4EA", act.length + "/" + r.states.length, "States active") +
+      tileS("👥", "#FFF4E5", act.reduce(function (a, s) { return a + s.people; }, 0), "People active") + tileS("🏪", "#F4EEFF", act.reduce(function (a, s) { return a + s.stores; }, 0), "Stores covered") + "</div>";
+    html += '<div class="card"><h3>🏆 State score (0–100)</h3><div class="sub">Activity 40 (visits per person vs the best state) · Quality 25 · Valid visits 20 · Team coverage 15</div>' +
+      hBars(r.states.slice(0, 30).map(function (s) { return [s.state, s.score, s.score >= 70 ? "#1E9E61" : s.score >= 40 ? "#E69A00" : "#E05757"]; }), "#4D5BF9", { lw: 120, rw: 40 }) + "</div>";
+    html += '<div class="card"><h3>📊 Details by state</h3><div class="tscroll"><table><thead><tr><th>State</th><th class="n">Score</th><th class="n">Visits</th><th class="n">Per person</th><th class="n">Valid %</th><th class="n">Avg min</th><th class="n">Quality</th><th class="n">AI /10</th><th class="n">People</th><th class="n">Stock</th><th class="n">NPL</th><th class="n">EMI</th></tr></thead><tbody>' +
+      r.states.map(function (s) { return "<tr><td><b>" + esc(s.state) + '</b></td><td class="n"><b>' + s.score + '</b></td><td class="n">' + s.visits + (s.adminVisits ? ' <span class="muted">(' + s.adminVisits + " HO)</span>" : "") + '</td><td class="n">' + s.perPerson + '</td><td class="n">' + s.validPct + '</td><td class="n">' + s.avgMinutes + '</td><td class="n">' + s.avgQuality + '</td><td class="n">' + (s.avgAi != null ? s.avgAi : "—") + '</td><td class="n">' + s.people + "/" + s.registered + '</td><td class="n">' + s.stockIssues + '</td><td class="n">' + s.nplNeeds + '</td><td class="n">' + s.emiIssues + "</td></tr>"; }).join("") +
+      '</tbody></table></div><button class="btn sec sm" id="sx" style="margin-top:10px">⬇ Export scorecard</button></div>';
+    html += '<div class="card ai"><h3>✨ Gemini analysis & scoring</h3><div class="sub">Reads the state numbers and the field feedback, then scores each state out of 10 with reasons and actions for HO</div><div class="aibox" id="ait">' + (r.lastAi ? esc(r.lastAi.text) : "") + "</div>" +
+      (r.lastAi ? '<div class="muted" style="font-size:12px;margin-top:6px">Last run by ' + esc(r.lastAi.by) + " · " + dt(r.lastAi.at) + (r.lastAi.from ? " · period " + esc(r.lastAi.from) + " to " + esc(r.lastAi.to) : "") + "</div>" : "") + '<button class="btn pri sm" id="aib" style="margin-top:10px">' + (r.lastAi ? "Run again for this period" : "Generate analysis") + "</button></div>";
+    $("sc").innerHTML = html;
+    $("sx").onclick = function () {
+      download(xlsx([{ name: "State scorecard", rows: [["Rank", "State", "Score", "Visits", "State-team visits", "HO visits", "Visits per person", "Valid %", "Avg minutes", "Avg quality", "Avg AI /10", "People active", "Registered", "Coverage %", "Stores", "Photos", "Stock issues", "NPL needs", "EMI issues"]].concat(r.states.map(function (s, i) { return [i + 1, s.state, s.score, s.visits, s.stateVisits, s.adminVisits, s.perPerson, s.validPct, s.avgMinutes, s.avgQuality, s.avgAi != null ? s.avgAi : "", s.people, s.registered, s.coveragePct, s.stores, s.photos, s.stockIssues, s.nplNeeds, s.emiIssues]; })) }]), "Visit_scorecard_" + r.from + "_to_" + r.to + ".xlsx");
+    };
+    $("aib").onclick = function () {
+      var b = this; b.disabled = true; b.textContent = "Collecting feedback…"; $("ait").textContent = "";
+      api({ action: "visit-list", from: r.from, to: r.to }).then(function (l) {
+        var by = {}; (l.visits || []).filter(function (v) { return v.status === "closed"; }).forEach(function (v) { (by[v.state] = by[v.state] || []).push(v); });
+        var lines = ["Period " + r.from + " to " + r.to + ". Scoring rule in the app: activity 40, quality 25, valid 20, coverage 15."];
+        r.states.forEach(function (s) {
+          lines.push(s.state + ": app score " + s.score + "/100, visits " + s.visits + " (" + s.adminVisits + " by HO), per person " + s.perPerson + ", valid " + s.validPct + "%, avg " + s.avgMinutes + " min, quality " + s.avgQuality + ", AI avg " + (s.avgAi != null ? s.avgAi : "n/a") + ", people " + s.people + "/" + s.registered + ", stock issues " + s.stockIssues + ", NPL " + s.nplNeeds + ", EMI " + s.emiIssues);
+          (by[s.state] || []).slice(0, 6).forEach(function (v) { var f = v.form; var fb = [f.appFeedback, f.retailerFeedback, f.productFeedback].filter(Boolean).join(" | ").replace(/\s+/g, " ").slice(0, 260); if (fb) lines.push("  - " + v.store.city + ": " + fb); });
+        });
+        b.textContent = "Gemini is analysing…";
+        api({ action: "visit-ai-states", context: lines.join("\n"), from: r.from, to: r.to }).then(function (x) { b.disabled = false; b.textContent = "Run again for this period"; $("ait").textContent = x.ok ? x.text : (x.error || "AI not available."); });
+      });
+    };
+  }
+
+  // ---------- RULES (admins) ----------
+  function showRules() {
+    hero("Visit rules", "What counts as a valid visit");
+    var r = CFG.rules;
+    $("pane").innerHTML = '<div class="card"><h3>⚙️ Valid visit rules</h3><div class="sub">Changes apply to visits punched out from now on.</div>' +
+      '<label class="fl">Minimum time at the store (minutes)</label><input class="tx" id="r1" type="number" min="1" max="240" value="' + r.minMinutes + '">' +
+      '<label class="fl">Maximum distance between punch in and punch out (metres)</label><input class="tx" id="r2" type="number" min="50" max="5000" value="' + r.maxDriftM + '">' +
+      '<label class="fl">Minimum photos per visit</label><input class="tx" id="r3" type="number" min="0" max="6" value="' + r.minPhotos + '">' +
+      '<label class="fl">Show as "not punched out" after (hours)</label><input class="tx" id="r4" type="number" min="1" max="24" value="' + r.maxHours + '">' +
+      '<button class="btn pri" id="rs" style="margin-top:12px">Save rules</button></div>' +
+      '<div class="notice info">Evidence captured on every visit: GPS at punch in and punch out (with accuracy), server time (not the phone\'s clock), photos stamped with store name and time, and the distance moved between punches. Location is read only at punch in and punch out — never in the background.</div>';
+    $("rs").onclick = function () { api({ action: "visit-config", set: { minMinutes: $("r1").value, maxDriftM: $("r2").value, minPhotos: $("r3").value, maxHours: $("r4").value } }).then(function (x) { if (!x.ok) return toast(x.error); CFG.rules = x.rules; toast("Rules saved"); }); };
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

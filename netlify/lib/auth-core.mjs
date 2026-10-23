@@ -3,6 +3,8 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { surveyAction } from "./survey-core.mjs";
 import { chatAction } from "./chat-core.mjs";
+import { visitAction } from "./visit-core.mjs";
+import { kbAction } from "./kb-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
 
@@ -693,6 +695,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
+    "visit-config", "visit-stores", "visit-start", "visit-save", "visit-end", "visit-cancel", "visit-get", "visit-list", "visit-live", "visit-stats", "visit-ai-one", "visit-ai-states",
+    "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
@@ -778,6 +782,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());
     if (b.action.startsWith("matrix-")) return matrixAction(b, surveyCtx());
+    if (b.action.startsWith("visit-")) return visitAction(b, surveyCtx());
+    if (b.action.startsWith("kb-")) return kbAction(b, surveyCtx());
 
     // A logged-in app approves (or declines) a web login shown as a QR code.
     if (b.action === "qr-approve") {
