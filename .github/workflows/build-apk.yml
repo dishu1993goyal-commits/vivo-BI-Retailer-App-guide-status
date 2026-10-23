@@ -30,7 +30,7 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          grep -E "error:|e: |What went wrong|Could not|> |requires|incompatible|cannot find symbol|symbol:|location:|Dependency|  [0-9]\. |minCompileSdk|minAgpVersion" build.log | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+          { grep -E -A2 "error:|cannot find symbol|What went wrong" build.log; grep -E "Could not|requires|incompatible|minCompileSdk|minAgpVersion" build.log; } | grep -v "^> Task" | head -40 | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Rename APKs
         run: |
