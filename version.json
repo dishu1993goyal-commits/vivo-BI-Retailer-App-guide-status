@@ -1,9 +1,9 @@
 {
-  "versionCode": 21,
-  "versionName": "4.8",
+  "versionCode": 22,
+  "versionName": "4.9",
   "notes": [
-    "Verify on WhatsApp (free): confirm your mobile by sending one WhatsApp message when signing up, linking your vChat ID or resetting your password",
-    "Forgot password: reset it yourself after verifying on WhatsApp"
+    "State users: verify your email with a code when signing up",
+    "Forgot password: reset it yourself with a code sent to your email"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
