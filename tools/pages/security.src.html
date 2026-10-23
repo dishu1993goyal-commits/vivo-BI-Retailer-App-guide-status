@@ -49,7 +49,7 @@
     $("h2").textContent = "Truecaller verification " + (D.tcRequired ? "ON" : "OFF") + " · " + pend.length + " pending reset request" + (pend.length === 1 ? "" : "s");
     var on = D.tcRequired;
     var html = '<div class="card"><div class="sw"><div class="big ' + (on ? "on" : "off") + '">' + (on ? "✅" : "⏸️") + '</div><div style="flex:1"><b>Require Truecaller verification</b><span class="muted" style="font-size:13px">' +
-      (on ? "ON — new app users verify their mobile with Truecaller. Forgot password re-verifies the mobile." : "OFF — app sign-up needs only user name, password and access code. Forgot password sends a request to admins.") +
+      (on ? "ON — new Admin-app users verify their mobile with Truecaller. Forgot password in the apps re-verifies the mobile." : "OFF — Admin-app sign-up needs only user name, password and access code. Forgot password sends a request to admins.") + " State users always sign up with their vChat ID (see vChat directory)." +
       '</span></div><label class="tg lg"><input type="checkbox" id="tc"' + (on ? " checked" : "") + "><i></i></label></div>" +
       (D.updatedBy ? '<div class="muted" style="font-size:12px;margin-top:10px">Last changed by ' + esc(D.updatedBy) + " · " + dt(D.updatedAt) + "</div>" : "") +
       '<div class="notice info" style="margin-top:10px">You can turn this on and off any time — no app update needed. Existing users and passwords are not affected. On the website, Forgot password always uses an admin-approved request.</div></div>';

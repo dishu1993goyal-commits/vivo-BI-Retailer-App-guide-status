@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>vChat Directory</title>
+<style>
+/*@@CSS@@*/
+.vr{display:flex;gap:10px;align-items:flex-start;background:var(--card);border-radius:12px;padding:11px 13px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.vr .mid{flex:1;min-width:0}
+.vr .nm{font-weight:700;font-size:15px}
+.vr .mt{font-size:12.5px;color:var(--mut);margin-top:2px}
+.vr .ac{display:flex;gap:4px}
+.vr .ac button{border:0;background:#F1F2FA;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:15px}
+.prev{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+.prev td,.prev th{padding:5px 7px;white-space:nowrap;font-size:12px}
+.form2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.form2 input,.form2 select{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:10px;padding:10px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🪪</span></div>
+  <h1>vChat directory</h1><p id="h2">Allowed state users for sign-up</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), D = null, Q = "", ST = "", SHOW = "all", PARSED = null;
+  var STATES = [];
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  window.__pageBack = window.__surveyBack = function () { return false; };
+  function code(name, mob) { return String(name || "").toLowerCase().replace(/[^a-z]/g, "").slice(0, 4) + String(mob || "").replace(/\D/g, "").slice(-4); }
+  function load() {
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">Only BI admins can open this page.</div>'; return; }
+    api({ action: "vdir-get" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } D = r; render(); });
+  }
+  function render() {
+    var rows = D.rows, reg = rows.filter(function (r) { return r.reg; }).length, sts = {};
+    rows.forEach(function (r) { sts[r.state] = 1; });
+    $("h2").textContent = rows.length ? rows.length + " allowed users · " + reg + " registered" + (D.importedAt ? " · updated " + dt(D.importedAt) : "") : "Import the allowed state users to enable state sign-up";
+    var html = '<div class="tiles">' + tileS("🪪", "#EEF0FF", rows.length, "Allowed users") + tileS("✅", "#E6F4EA", reg, "Registered", rows.length ? pct(reg, rows.length) + "%" : "") +
+      tileS("⏳", "#FFF4E5", rows.length - reg, "Not registered yet") + tileS("🗺️", "#F4EEFF", Object.keys(sts).length, "States") + "</div>";
+    html += '<div class="card"><h3>📥 Import allowed users</h3><div class="sub">Excel (.xlsx) or CSV with columns: <b>vChat ID, State, Name, Mobile</b> (mobile registered on vChat)</div>' +
+      '<div class="row"><button class="btn pri" id="pick">📂 Choose Excel file</button><button class="btn sec" id="tpl">⬇ Template</button>' + (rows.length ? '<button class="btn ghost" id="ex">⬇ Export list</button>' : "") + "</div>" +
+      '<div class="notice info" style="margin-top:10px">State users sign up with their vChat ID. Their state is taken from this list and can\'t be changed. The mobile they enter must match this list, and their access code is the <b>first 4 letters of the name</b> (small letters) + <b>last 4 digits of the mobile</b> — e.g. Priya Sharma, 98765 43211 → <b>priy3211</b>.</div><div id="pv"></div></div>';
+    if (D.unlinked && D.unlinked.length) {
+      html += '<div class="card"><h3>⚠️ Older accounts without vChat ID (' + D.unlinked.length + ')</h3><div class="sub">These must link a vChat ID from this list at their next login, or they can\'t use the app. Disable any that look fake.</div>' +
+        D.unlinked.map(function (u, i) { return '<div class="vr"><div class="mid"><div class="nm">' + esc(u.fullName) + (u.disabled ? ' <span class="chip closed">Disabled</span>' : "") + '</div><div class="mt">@' + esc(u.username) + " · " + esc(u.phone) + " · " + esc(u.state || "no state") + " · joined " + dOnly(u.createdAt) + "</div></div>" +
+          (u.disabled ? "" : '<div class="ac"><button data-dis="' + i + '" title="Disable">🚫</button></div>') + "</div>"; }).join("") + "</div>";
+    }
+    html += '<div class="card"><h3>👥 Allowed users</h3><div class="row" style="margin-top:6px"><input class="searchin grow" id="q" placeholder="Search vChat ID, name, mobile…" value="' + esc(Q) + '" style="margin:0">' +
+      '<select class="tx" id="st" style="width:auto;padding:9px"><option value="">All states</option>' + Object.keys(sts).sort().map(function (s) { return "<option" + (ST === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" +
+      '<div class="seg" style="margin-top:8px;box-shadow:none;background:#F1F2FA"><button data-s="all" class="' + (SHOW === "all" ? "on" : "") + '">All</button><button data-s="reg" class="' + (SHOW === "reg" ? "on" : "") + '">Registered</button><button data-s="no" class="' + (SHOW === "no" ? "on" : "") + '">Not registered</button></div>' +
+      '<button class="btn sec sm" id="add" style="margin-top:8px">＋ Add one user</button><div id="addf"></div><div id="list"></div></div>';
+    VIEW.innerHTML = html;
+    $("pick").onclick = pick; $("tpl").onclick = template; if ($("ex")) $("ex").onclick = exportList;
+    $("q").oninput = function () { Q = this.value; drawList(); };
+    $("st").onchange = function () { ST = this.value; drawList(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-s]"), function (b) { b.onclick = function () { SHOW = b.dataset.s; render(); }; });
+    $("add").onclick = function () { editForm(null); };
+    [].forEach.call(VIEW.querySelectorAll("[data-dis]"), function (b) {
+      b.onclick = function () { var u = D.unlinked[+b.dataset.dis]; sheet("Disable " + u.fullName + "?", "They'll be logged out and can't log in.", [["🚫", "Disable", function () { api({ action: "admin-set-disabled", target: u.username, disabled: true, reason: "No vChat ID" }).then(function (r) { toast(r.ok ? "Disabled" : r.error); load(); }); }, "red"]]); };
+    });
+    drawList();
+  }
+  function drawList() {
+    var q = Q.trim().toLowerCase();
+    var list = D.rows.filter(function (r) { return (!ST || r.state === ST) && (SHOW === "all" || (SHOW === "reg" ? r.reg : !r.reg)) && (!q || (r.vchatId + " " + r.name + " " + r.mobile + " " + (r.reg ? r.reg.username : "")).toLowerCase().indexOf(q) >= 0); });
+    $("list").innerHTML = (list.length ? "" : '<div class="empty">No users match.</div>') + list.slice(0, 400).map(function (r) {
+      var i = D.rows.indexOf(r);
+      return '<div class="vr"><div class="mid"><div class="nm">' + esc(r.name) + ' <span class="chip">' + esc(r.state) + "</span>" + (r.reg ? (r.reg.disabled ? ' <span class="chip closed">Disabled</span>' : ' <span class="chip live">✓ Registered</span>') : ' <span class="chip warn">Not registered</span>') + "</div>" +
+        '<div class="mt">vChat ID <b>' + esc(r.vchatId) + "</b> · 📞 " + esc(r.mobile) + " · code " + esc(code(r.name, r.mobile)) + "</div>" +
+        (r.reg ? '<div class="mt">@' + esc(r.reg.username) + " · joined " + dOnly(r.reg.createdAt) + (r.reg.lastSeen ? " · seen " + dt(r.reg.lastSeen) : "") + "</div>" : "") + "</div>" +
+        '<div class="ac"><button data-e="' + i + '" title="Edit">✏️</button>' + (r.reg ? '<button data-u="' + i + '" title="Release vChat ID">🔓</button>' : "") + '<button data-d="' + i + '" title="Remove">🗑</button></div></div>';
+    }).join("") + (list.length > 400 ? '<div class="muted" style="font-size:12px;margin-top:6px">Showing 400 — use search or the state filter.</div>' : "");
+    [].forEach.call($("list").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { editForm(D.rows[+b.dataset.e]); }; });
+    [].forEach.call($("list").querySelectorAll("[data-d]"), function (b) {
+      b.onclick = function () { var r = D.rows[+b.dataset.d]; sheet("Remove " + r.name + " from the list?", r.reg ? "Their existing account keeps working (disable it from Registered users if needed). New sign-ups with this vChat ID will be refused." : "New sign-ups with this vChat ID will be refused.", [["🗑", "Remove", function () { api({ action: "vdir-delete", vchatId: r.vchatId }).then(function (x) { toast(x.ok ? "Removed" : x.error); load(); }); }, "red"]]); };
+    });
+    [].forEach.call($("list").querySelectorAll("[data-u]"), function (b) {
+      b.onclick = function () { var r = D.rows[+b.dataset.u]; sheet("Release vChat ID " + r.vchatId + "?", "Use this if the wrong person registered with it. Account @" + r.reg.username + " will be disabled and the vChat ID can be registered again.", [["🔓", "Release & disable account", function () { api({ action: "vdir-unlink", vchatId: r.vchatId }).then(function (x) { toast(x.ok ? "Released" : x.error); load(); }); }, "red"]]); };
+    });
+  }
+  function editForm(r) {
+    var sts = STATES.length ? STATES : [];
+    $("addf").innerHTML = '<div class="form2"><input id="f-id" placeholder="vChat ID" value="' + esc(r ? r.vchatId : "") + '"><select id="f-st"><option value="">State</option>' + sts.map(function (s) { return "<option" + (r && r.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + (r && sts.indexOf(r.state) < 0 ? "<option selected>" + esc(r.state) + "</option>" : "") + "</select>" +
+      '<input id="f-nm" placeholder="Name (as on vChat)" value="' + esc(r ? r.name : "") + '"><input id="f-mb" placeholder="vChat mobile" inputmode="numeric" value="' + esc(r ? r.mobile : "") + '"></div><div class="row" style="margin-top:8px"><button class="btn pri sm" id="f-sv">' + (r ? "Save" : "Add") + '</button><button class="btn ghost sm" id="f-cx">Cancel</button></div>';
+    $("f-cx").onclick = function () { $("addf").innerHTML = ""; };
+    $("f-sv").onclick = function () {
+      api({ action: "vdir-upsert", oldId: r ? r.vchatId : "", vchatId: $("f-id").value, state: $("f-st").value, name: $("f-nm").value, mobile: $("f-mb").value }).then(function (x) { if (!x.ok) { toast(x.error); return; } toast("Saved"); load(); });
+    };
+  }
+  function template() { download(xlsx([{ name: "vChat users", rows: [["vChat ID", "State", "Name", "Mobile"], ["VC1001", STATES[0] || "Bihar", "Ravi Kumar", "9876543210"]] }]), "vChat_allowed_users_template.xlsx"); }
+  function exportList() {
+    download(xlsx([{ name: "vChat users", rows: [["vChat ID", "State", "Name", "Mobile", "Access code", "Registered", "User name", "Joined (IST)", "Last seen (IST)"]].concat(D.rows.map(function (r) {
+      return [r.vchatId, r.state, r.name, r.mobile, code(r.name, r.mobile), r.reg ? (r.reg.disabled ? "Disabled" : "Yes") : "No", r.reg ? r.reg.username : "", r.reg ? dt(r.reg.createdAt) : "", r.reg && r.reg.lastSeen ? dt(r.reg.lastSeen) : ""]; })) }]), "vChat_allowed_users_" + istDay(Date.now()) + ".xlsx");
+  }
+  // ---------- import ----------
+  var sheetJs = null;
+  function loadSheetJs() {
+    if (window.XLSX) return Promise.resolve();
+    if (!sheetJs) sheetJs = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = res; s.onerror = function () { sheetJs = null; rej(); }; document.head.appendChild(s); });
+    return sheetJs;
+  }
+  function csvRows(text) {
+    var out = [], row = [], cur = "", q = false;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true; else if (ch === ",") { row.push(cur); cur = ""; } else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cur); out.push(row); row = []; cur = ""; } else cur += ch;
+    }
+    if (cur || row.length) { row.push(cur); out.push(row); }
+    return out;
+  }
+  function pick() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      $("pv").innerHTML = '<div class="loading"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>";
+      var isCsv = /\.csv$/i.test(f.name), fr = new FileReader();
+      fr.onload = function () {
+        if (isCsv) return parse(csvRows(String(fr.result).replace(/^﻿/, "")), f.name);
+        loadSheetJs().then(function () {
+          try { var wb = window.XLSX.read(new Uint8Array(fr.result), { type: "array" }); parse(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }), f.name); }
+          catch (e) { $("pv").innerHTML = '<div class="err">Couldn\'t read this Excel file. Save it as .xlsx or CSV and try again.</div>'; }
+        }).catch(function () { $("pv").innerHTML = '<div class="err">Couldn\'t load the Excel reader (check internet), or save the file as CSV.</div>'; });
+      };
+      if (isCsv) fr.readAsText(f); else fr.readAsArrayBuffer(f);
+    };
+    inp.click();
+  }
+  function parse(aoa, name) {
+    aoa = aoa.filter(function (r) { return r && r.some(function (c) { return String(c).trim(); }); });
+    if (aoa.length < 2) { $("pv").innerHTML = '<div class="err">The sheet needs a header row and at least one user.</div>'; return; }
+    var head = aoa[0].map(function (c) { return String(c).trim().toLowerCase(); });
+    var find = function (re, def) { var i = head.findIndex(function (h) { return re.test(h); }); return i >= 0 ? i : def; };
+    var ci = { id: find(/vchat|v-chat|id/, 0), st: find(/state/, 1), nm: find(/name/, 2), mb: find(/mobile|phone|number|contact/, 3) };
+    var rows = [], bad = 0, seen = {};
+    aoa.slice(1).forEach(function (r) {
+      var o = { vchatId: String(r[ci.id] || "").trim(), state: String(r[ci.st] || "").trim(), name: String(r[ci.nm] || "").trim(), mobile: String(r[ci.mb] || "").replace(/\D/g, "").slice(-10) };
+      if (!o.vchatId || !o.state || !o.name || !/^[6-9]\d{9}$/.test(o.mobile) || seen[o.vchatId.toLowerCase()]) { bad++; return; }
+      seen[o.vchatId.toLowerCase()] = 1; rows.push(o);
+    });
+    if (!rows.length) { $("pv").innerHTML = '<div class="err">No valid rows found. Columns needed: vChat ID, State, Name, Mobile (10 digits).</div>'; return; }
+    PARSED = rows;
+    var norm = function (s) { return s.toLowerCase().replace(/\W/g, ""); };
+    var unknown = STATES.length ? Object.keys(rows.reduce(function (m, r) { if (!STATES.some(function (x) { return norm(x) === norm(r.state); })) m[r.state] = 1; return m; }, {})) : [];
+    $("pv").innerHTML = '<div class="notice info" style="margin-top:10px">Found <b>' + rows.length + " users</b> in " + esc(name) + (bad ? " · " + bad + " rows skipped (missing data, bad mobile or duplicate vChat ID)" : "") + ".</div>" +
+      (unknown.length ? '<div class="notice">These state names don\'t match the dashboard states, so the dashboard won\'t filter correctly for them: <b>' + esc(unknown.join(", ")) + "</b>. Use the same names as on the dashboard.</div>" : "") +
+      '<div class="prev"><table><thead><tr><th>vChat ID</th><th>State</th><th>Name</th><th>Mobile</th><th>Access code</th></tr></thead><tbody>' +
+      rows.slice(0, 50).map(function (r) { return "<tr><td>" + esc(r.vchatId) + "</td><td>" + esc(r.state) + "</td><td>" + esc(r.name) + "</td><td>" + esc(r.mobile) + "</td><td>" + esc(code(r.name, r.mobile)) + "</td></tr>"; }).join("") + "</tbody></table></div>" +
+      (D.rows.length ? '<div class="seg" style="margin-top:10px;box-shadow:none;background:#F1F2FA"><button data-m="merge" class="on">Add / update (keep others)</button><button data-m="replace">Replace whole list</button></div>' : "") +
+      '<button class="btn pri block" id="doimp" style="margin-top:10px">📥 Import ' + rows.length + " users</button>";
+    var mode = "merge";
+    [].forEach.call($("pv").querySelectorAll("[data-m]"), function (b) { b.onclick = function () { mode = b.dataset.m; [].forEach.call($("pv").querySelectorAll("[data-m]"), function (x) { x.classList.toggle("on", x === b); }); }; });
+    $("doimp").onclick = function () {
+      var go2 = function () {
+        var b = $("doimp"); b.disabled = true; b.textContent = "Importing…";
+        api({ action: "vdir-import", rows: PARSED, mode: D.rows.length ? mode : "replace" }).then(function (r) {
+          if (!r.ok) { b.disabled = false; b.textContent = "📥 Import"; toast(r.error); return; }
+          toast("Imported " + r.imported + " users · list now has " + r.total); PARSED = null; load();
+        });
+      };
+      if (mode === "replace" && D.rows.length) sheet("Replace the whole list?", "Users not in this file are removed from the allowed list (their existing accounts keep working).", [["📥", "Replace", go2]]);
+      else go2();
+    };
+  }
+  load();
+})();
+</script>
+</body>
+</html>

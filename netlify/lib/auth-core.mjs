@@ -4,6 +4,7 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 import { surveyAction } from "./survey-core.mjs";
 import { chatAction } from "./chat-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
+import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
 
 // SHA-256 of the sign-up access codes (vivoBI@2026 for admin, vivoState@2026 for state).
 const ACCESS_CODE_SHA256 = {
@@ -205,7 +206,7 @@ function publicProfile(rec) {
   return {
     username: rec.username, fullName: rec.fullName, phone: rec.phone,
     email: rec.email || "", state: rec.state || "", designation: rec.designation || "",
-    createdAt: rec.createdAt || 0, photoVersion: rec.photoVersion || 0,
+    createdAt: rec.createdAt || 0, photoVersion: rec.photoVersion || 0, vchatId: rec.vchatId || "",
   };
 }
 
@@ -411,6 +412,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   }
 
   // ---------- Admin switch: is Truecaller verification required in the apps? (default: yes) ----------
+  // Older state accounts must link a vChat ID — but only once the admin has imported the vChat list.
+  const linkRequired = async (r) => app === "state" && !r.vchatId && Object.keys((await directory(store)).rows).length > 0;
+  const profOut = async (r) => Object.assign(publicProfile(r), { linkRequired: await linkRequired(r) });
   const authCfg = async () => Object.assign({ tcRequired: true }, (await store.get("config:auth")) || {});
   if (b.action === "auth-config") {
     const c = await authCfg();
@@ -419,7 +423,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
 
   // ---------- Forgot password by request: the user asks, a BI admin approves ----------
   if (b.action === "reset-request") {
-    const key = userKey(b.username);
+    let key = null;
+    if (app === "state") { const v = await store.get(`vchat:${vKey(b.username)}`); if (v) key = v.key; }
+    if (!key) key = userKey(b.username);
     let rec = key ? await store.get(uKeyOf(key)) : null, rk = key;
     if (!rec && normalizePhone(b.username)) { const idx = await store.get(pKeyOf(normalizePhone(b.username))); if (idx) { rk = idx.key; rec = await store.get(uKeyOf(idx.key)); } }
     if (!rec) return json(404, { ok: false, error: "No account found with this user name or mobile number." });
@@ -477,6 +483,40 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     return json(200, { ok: true, username: found.rec.username });
   }
 
+  // ---------- State users: sign up with the vChat ID from the admin's allowed list ----------
+  if (b.action === "vchat-lookup") {
+    if (app !== "state") return json(400, { ok: false, error: "Not needed." });
+    const v = await checkVchat(store, normalizePhone, { vchatId: b.vchatId }, { lookupOnly: true });
+    if (v.error) return json(v.taken ? 409 : 404, { ok: false, error: v.error, field: v.field });
+    return json(200, { ok: true, state: v.row.state, vchatId: v.row.vchatId });
+  }
+  if ((b.action === "signup-check" || b.action === "signup") && app === "state") {
+    if (!b.vchatId) return json(400, { ok: false, error: "State sign-up now uses your vChat ID. Please update the app (or refresh the web page) and try again." });
+    const v = await checkVchat(store, normalizePhone, b);
+    if (v.error) return json(v.taken ? 409 : 400, { ok: false, error: v.error, field: v.field });
+    const key = userKey(b.username);
+    if (!key) return json(400, { ok: false, error: "User name must be 3–30 letters/numbers (spaces, . _ - allowed).", field: "username" });
+    const pwErr = passwordProblem(b.password);
+    if (pwErr) return json(400, { ok: false, error: pwErr, field: "password" });
+    const email = normEmail(b.email);
+    if (!email) return json(400, { ok: false, error: "Enter a valid email address.", field: "email" });
+    if (await store.get(eKeyOf(email))) return json(409, { ok: false, error: "This email already has an account.", field: "email" });
+    if (await store.get(uKeyOf(key))) return json(409, { ok: false, error: "This user name is taken. Please choose another.", field: "username" });
+    if (await store.get(pKeyOf(v.phone))) return json(409, { ok: false, error: "This vChat mobile number already has an older account. Log in with that user name and password — you'll be asked to link your vChat ID.", field: "phone" });
+    if (b.action === "signup-check") return json(200, { ok: true });
+    const username = String(b.username).trim().replace(/\s+/g, " ");
+    const rec = { username, fullName: v.row.name, phone: v.phone, ...hashPassword(b.password), createdAt: t, fails: 0, lockUntil: 0, sessions: [],
+      state: v.row.state, email, emailVerified: false, phoneVerified: false, vchatId: v.row.vchatId, vchatVerified: true, signupVia: b.via === "web" ? "web" : "app" };
+    const token = newSession(rec, t);
+    rec.lastSeen = t;
+    await store.set(uKeyOf(key), rec);
+    await store.set(pKeyOf(v.phone), { key });
+    await store.set(eKeyOf(email), { key });
+    await store.set(`vchat:${v.key}`, { key });
+    await logEvent(store, t, app, rec, "signup", b);
+    return json(200, { ok: true, username, fullName: rec.fullName, token, profile: publicProfile(rec) });
+  }
+
   // Checks done before the user spends time on mobile verification.
   if (b.action === "signup-check" || b.action === "signup") {
     if (sha256(String(b.accessCode || "")) !== ACCESS_CODE_SHA256[app]) {
@@ -527,11 +567,15 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   }
 
   if (b.action === "login") {
-    const key = userKey(b.username);
+    // State users log in with their vChat ID (older accounts can still use their user name until linked).
+    let key = null;
+    if (app === "state" && b.vchatId) { const v = await store.get(`vchat:${vKey(b.vchatId)}`); if (v) key = v.key; }
+    if (!key) key = userKey(b.username || b.vchatId);
     const rec = key ? await store.get(uKeyOf(key)) : null;
-    if (!rec) return json(401, { ok: false, error: "User name or password is incorrect." });
+    const badLogin = app === "state" ? "vChat ID or password is incorrect." : "User name or password is incorrect.";
+    if (!rec) return json(401, { ok: false, error: badLogin });
     if (rec.disabled) {
-      if (!checkPassword(b.password, rec)) return json(401, { ok: false, error: "User name or password is incorrect." });
+      if (!checkPassword(b.password, rec)) return json(401, { ok: false, error: badLogin });
       return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
     }
     if (rec.lockUntil && t < rec.lockUntil) {
@@ -542,13 +586,13 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       rec.fails = (rec.fails || 0) + 1;
       if (rec.fails >= MAX_LOGIN_FAILS) { rec.fails = 0; rec.lockUntil = t + LOCK_MS; }
       await store.set(uKeyOf(key), rec);
-      return json(401, { ok: false, error: "User name or password is incorrect." });
+      return json(401, { ok: false, error: badLogin });
     }
     rec.fails = 0; rec.lockUntil = 0; rec.lastSeen = t;
     const token = newSession(rec, t);
     await store.set(uKeyOf(key), rec);
     await logEvent(store, t, app, rec, "login", b);
-    return json(200, { ok: true, username: rec.username, fullName: rec.fullName, token, profile: publicProfile(rec) });
+    return json(200, { ok: true, username: rec.username, fullName: rec.fullName, token, profile: await profOut(rec) });
   }
 
   // Forgot password: check the number has an account, then (after Truecaller
@@ -619,7 +663,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
-    "admin-security", "admin-set-auth", "admin-pwreq-decide"];
+    "admin-security", "admin-set-auth", "admin-pwreq-decide", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -628,17 +672,41 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (rec && rec.disabled) return json(401, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", loggedOut: true, disabled: true });
     if (!sess) return json(401, { ok: false, error: "You have been logged out. Please log in again.", loggedOut: true });
     const save = () => store.set(uKeyOf(key), rec);
+    // Older state accounts must link a vChat ID from the allowed list before using anything else.
+    if (app === "state" && !rec.vchatId && !["me", "ping", "vchat-link", "logout", "delete-account", "get-photo"].includes(b.action) && await linkRequired(rec)) {
+      return json(403, { ok: false, needsLink: true, error: "Please link your vChat ID to continue." });
+    }
+    if (b.action === "vchat-link") {
+      if (app !== "state") return json(400, { ok: false, error: "Not needed." });
+      if (rec.vchatId) return json(400, { ok: false, error: "Your vChat ID is already linked." });
+      const v = await checkVchat(store, normalizePhone, b, { ownKey: key });
+      if (v.error) return json(v.taken ? 409 : 400, { ok: false, error: v.error, field: v.field });
+      if (v.phone !== rec.phone) {
+        const other = await store.get(pKeyOf(v.phone));
+        if (other && other.key !== key) return json(409, { ok: false, error: "This vChat mobile number is used by another account. Ask your BI admin.", field: "phone" });
+        if (rec.phone) await store.delete(pKeyOf(rec.phone));
+        await store.set(pKeyOf(v.phone), { key });
+      }
+      Object.assign(rec, { vchatId: v.row.vchatId, vchatVerified: true, state: v.row.state, fullName: v.row.name, phone: v.phone, linkedAt: t });
+      await save();
+      await store.set(`vchat:${v.key}`, { key });
+      await logEvent(store, t, app, rec, "vchat-linked", b);
+      return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+    if (b.action.startsWith("vdir-")) return vchatAdminAction(b, { store, t, app, rec, pool, normalizePhone, logEvent });
     const surveyCtx = () => ({ store, t, app, rec, key, who, sameUser, userKey, pool, logEvent, askAI, env, aiFetch });
     const photoKey = `photo:${app}:${key}`;
 
-    if (b.action === "me") return json(200, { ok: true, profile: publicProfile(rec) });
+    if (b.action === "me") return json(200, { ok: true, profile: await profOut(rec) });
 
     // App opened (or brought back after a while) by a logged-in user.
     if (b.action === "ping") {
       rec.lastSeen = t;
+      // The vChat list decides a state user's state: follow it if an admin re-imported a change.
+      if (app === "state" && rec.vchatId) { const row = (await directory(store)).rows[vKey(rec.vchatId)]; if (row && row.state && row.state !== rec.state) rec.state = row.state; }
       await save();
       await logEvent(store, t, app, rec, "open", b);
-      return json(200, { ok: true, profile: publicProfile(rec) });
+      return json(200, { ok: true, profile: await profOut(rec) });
     }
 
     if (b.action === "ai-status") return json(200, { ok: true, ai: !!env.GEMINI_API_KEY });
@@ -806,7 +874,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
           if (!u) continue;
           users.push({ username: u.username, fullName: u.fullName, phone: u.phone, email: u.email || "",
             state: u.state || "", designation: u.designation || "", createdAt: u.createdAt || 0,
-            lastSeen: u.lastSeen || 0, loggedInPhones: (u.sessions || []).length, disabled: !!u.disabled,
+            lastSeen: u.lastSeen || 0, loggedInPhones: (u.sessions || []).length, disabled: !!u.disabled, vchatId: u.vchatId || "",
             disabledAt: u.disabledAt || 0, disabledBy: u.disabledBy || "", disabledReason: u.disabledReason || "" });
         }
         users.sort((a, c) => (c.lastSeen || c.createdAt) - (a.lastSeen || a.createdAt));

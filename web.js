@@ -54,6 +54,7 @@
   function isAdmin() { return AUTH && AUTH.app === "admin"; }
   function saveProfile(p) { if (p) { PROFILE = p; store("biw-profile", p); } }
   function sessionLost(res) {
+    if (res && res.needsLink && AUTH && AUTH.app === "state") { PROFILE.linkRequired = true; showLinkVchat(); return true; }
     if (res && res.loggedOut) { logoutLocal(); showLogin(res.disabled ? res.error : "You were logged out (password changed or reset). Please log in again.", !!res.disabled); return true; }
     return false;
   }
@@ -186,7 +187,7 @@
       '<div class="biw-logo"><img src="brand-logo.png" alt="vivo Business Innovation"></div>' +
       '<h1>BI KPI <em>Dashboard</em></h1><p>Log in with your app user name and password</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
-      '<label>User name</label><input id="biw-u" autocomplete="username" maxlength="30">' +
+      '<label>User name</label><input id="biw-u" autocomplete="username" maxlength="40">' +
       '<label>Password</label><input id="biw-p" type="password" autocomplete="current-password" maxlength="64">' +
       '<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="biw-sp" style="width:auto"> Show password</label>' +
       '<div class="biw-msg" id="biw-lm"></div>' +
@@ -199,20 +200,27 @@
     ROOT.appendChild(loginEl);
     var u = loginEl.querySelector("#biw-u"), p = loginEl.querySelector("#biw-p"), m = loginEl.querySelector("#biw-lm"), go = loginEl.querySelector("#biw-go");
     u.value = store("biw-last-user") || "";
-    function setRole(r) { role = r; [].forEach.call(loginEl.querySelectorAll("[data-r]"), function (b) { b.classList.toggle("on", b.dataset.r === r); }); }
+    var ulab = loginEl.querySelector("#biw-u").previousElementSibling;
+    function setRole(r) {
+      role = r; [].forEach.call(loginEl.querySelectorAll("[data-r]"), function (b) { b.classList.toggle("on", b.dataset.r === r); });
+      ulab.textContent = r === "state" ? "vChat ID" : "User name";
+      u.value = (r === "state" ? store("biw-last-vchat") : store("biw-last-user")) || ""; u.placeholder = r === "state" ? "Your vChat ID" : "";
+    }
     [].forEach.call(loginEl.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { setRole(b.dataset.r); }; });
     setRole(role);
     loginEl.querySelector("#biw-sp").onchange = function () { p.type = this.checked ? "text" : "password"; };
     if (info) { m.className = "biw-msg " + (isError ? "err" : "ok"); m.textContent = info; }
     else if (store("biw-pwreq")) { m.className = "biw-msg ok"; m.innerHTML = '⏳ Password reset request sent. <a style="color:#8a6a1f;font-weight:700;cursor:pointer" id="biw-rs">Check status</a>'; m.querySelector("#biw-rs").onclick = function () { showForgot(); }; }
     function doLogin() {
-      if (!u.value.trim() || !p.value) { m.className = "biw-msg err"; m.textContent = "Enter your user name and password."; return; }
+      if (!u.value.trim() || !p.value) { m.className = "biw-msg err"; m.textContent = role === "state" ? "Enter your vChat ID and password." : "Enter your user name and password."; return; }
       go.disabled = true; go.textContent = "Logging in…";
-      api({ app: role, action: "login", username: u.value.trim(), password: p.value }, false).then(function (res) {
+      var idv = u.value.trim();
+      api({ app: role, action: "login", username: idv, vchatId: role === "state" ? idv : undefined, password: p.value }, false).then(function (res) {
         go.disabled = false; go.textContent = "Log in";
         if (!res.ok) { m.className = "biw-msg err"; m.textContent = res.error || "Login failed."; p.value = ""; return; }
         AUTH = { app: role, username: res.username, token: res.token };
         store("biw-auth", AUTH); store("biw-role", role); store("biw-last-user", res.username);
+        if (role === "state" && res.profile && res.profile.vchatId) store("biw-last-vchat", res.profile.vchatId);
         saveProfile(res.profile); store("biw-pwreq", null);
         loginEl.remove(); loginEl = null;
         startSession(true);
@@ -290,6 +298,7 @@
 
   function showSignup(role) {
     role = role || "state";
+    if (role === "state") return showStateSignup();
     var c = authCard('<h1>Create <em>account</em></h1><p>Use the access code from your BI admin.</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
       '<label>Full name</label><input id="s-n" maxlength="40" autocomplete="name">' +
@@ -302,7 +311,7 @@
       '<label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64">' +
       '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
       '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
-    roleSeg(c, role, function (r) { role = r; c.querySelector("#s-stw").style.display = r === "state" ? "" : "none"; });
+    roleSeg(c, role, function (r) { if (r === "state") { showStateSignup(); return; } role = r; c.querySelector("#s-stw").style.display = "none"; });
     var go = c.querySelector("#s-go");
     go.onclick = function () {
       var v = { fullName: c.querySelector("#s-n").value.trim(), username: c.querySelector("#s-u").value.trim(), phone: c.querySelector("#s-ph").value.replace(/\D/g, ""),
@@ -328,6 +337,91 @@
     c.querySelector("#s-back").onclick = function () { showLogin(); };
   }
 
+  // ---------- STATE USERS: sign up with vChat ID (admin's allowed list decides the state) ----------
+  var CODE_INFO = '<div class="biw-note" id="ac-info" style="display:none;margin-top:6px">🔑 <b>Access code</b> = first 4 letters of your name as on vChat (small letters, no spaces) + last 4 digits of your vChat registered mobile.<br>Example: <b>Ravi Kumar</b>, mobile 98765 4<b>3210</b> → <b>ravi3210</b></div>';
+  function codeField(id) { return '<label style="display:flex;align-items:center;gap:6px">Access code <button type="button" id="' + id + '-i" title="How to make the access code" style="border:1px solid #c9a227;background:#fff7e0;color:#8a6a1f;border-radius:50%;width:22px;height:22px;font:700 13px Georgia,serif;cursor:pointer;padding:0">i</button></label><input id="' + id + '" maxlength="20" autocomplete="off" autocapitalize="none" placeholder="e.g. ravi3210">' + CODE_INFO; }
+  function bindCodeInfo(c, id) { c.querySelector("#" + id + "-i").onclick = function () { var b = c.querySelector("#ac-info"); b.style.display = b.style.display === "none" ? "" : "none"; }; }
+  // vChat ID box: looks the ID up and fills the (locked) state.
+  function bindVchat(c, onState) {
+    var inp = c.querySelector("#v-id"), st = c.querySelector("#v-st"), info = c.querySelector("#v-msg"), last = "", seq = 0;
+    var look = function () {
+      var v = inp.value.trim(); if (v === last) return; last = v; st.value = ""; onState(null);
+      if (!v) { info.textContent = ""; return; }
+      var my = ++seq; info.className = "biw-msg"; info.textContent = "Checking vChat ID…";
+      api({ app: "state", action: "vchat-lookup", vchatId: v }, false).then(function (r) {
+        if (my !== seq) return;
+        if (!r.ok) { info.className = "biw-msg err"; info.textContent = r.error; return; }
+        st.value = r.state; info.className = "biw-msg ok"; info.textContent = "✓ vChat ID found"; onState(r.state);
+      });
+    };
+    var tmr = 0; inp.oninput = function () { clearTimeout(tmr); st.value = ""; onState(null); tmr = setTimeout(look, 600); };
+    inp.onblur = look;
+    return look;
+  }
+  function showStateSignup() {
+    var okState = null;
+    var c = authCard('<h1>Create <em>account</em></h1><p>State users sign up with their vChat ID.</p>' +
+      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+      '<label>vChat ID</label><input id="v-id" maxlength="40" autocomplete="off" autocapitalize="none" placeholder="Your vChat ID"><div class="biw-msg" id="v-msg" style="text-align:left;margin-top:4px"></div>' +
+      '<label>State (from vChat)</label><input id="v-st" readonly placeholder="Filled automatically from your vChat ID" style="background:#f3efe3;color:#5c4300;font-weight:600">' +
+      '<label>Choose a user name</label><input id="s-u" maxlength="30" autocomplete="username">' +
+      '<label>Create password (min 6 characters)</label><input id="s-p" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>vChat registered mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="s-ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>' +
+      '<label>Email</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
+      codeField("s-ac") +
+      '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
+      '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
+    roleSeg(c, "state", function (r) { if (r === "admin") showSignup("admin"); });
+    var look = bindVchat(c, function (st) { okState = st; });
+    bindCodeInfo(c, "s-ac");
+    var go = c.querySelector("#s-go");
+    go.onclick = function () {
+      look();
+      var v = { vchatId: c.querySelector("#v-id").value.trim(), username: c.querySelector("#s-u").value.trim(), password: c.querySelector("#s-p").value,
+        phone: c.querySelector("#s-ph").value.replace(/\D/g, ""), email: c.querySelector("#s-e").value.trim(), accessCode: c.querySelector("#s-ac").value.trim() };
+      var err = !v.vchatId ? "Enter your vChat ID." : !okState ? "Enter a vChat ID from the allowed list (the state fills in automatically)." :
+        v.username.length < 3 ? "User name must be at least 3 characters." : v.password.length < 6 ? "Password must be at least 6 characters." :
+        v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !/^[6-9]\d{9}$/.test(v.phone) ? "Enter your 10-digit vChat registered mobile number." :
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address." : !v.accessCode ? "Enter the access code (tap i to see how)." : "";
+      if (err) { msg(c, "#s-m", err); return; }
+      go.disabled = true; go.textContent = "Creating account…";
+      api(Object.assign({ app: "state", action: "signup", via: "web" }, v), false).then(function (res) {
+        go.disabled = false; go.textContent = "Create account";
+        if (!res.ok) { msg(c, "#s-m", res.error); var f = { vchatId: "#v-id", username: "#s-u", password: "#s-p", phone: "#s-ph", email: "#s-e", accessCode: "#s-ac" }[res.field]; if (f) c.querySelector(f).focus(); return; }
+        AUTH = { app: "state", username: res.username, token: res.token };
+        store("biw-auth", AUTH); store("biw-role", "state"); store("biw-last-vchat", v.vchatId); saveProfile(res.profile);
+        loginEl.remove(); loginEl = null; toast("Account created. Welcome, " + (res.fullName || "") + "!");
+        startSession(true);
+      });
+    };
+    c.querySelector("#s-back").onclick = function () { showLogin(); };
+  }
+  // Older state accounts (made before vChat sign-up) link their vChat ID once.
+  function showLinkVchat() {
+    var okState = null;
+    var c = authCard('<h1>Link your <em>vChat ID</em></h1><p>One-time step: confirm your vChat details to keep using the dashboard. Your state comes from vChat.</p>' +
+      '<label>vChat ID</label><input id="v-id" maxlength="40" autocomplete="off" autocapitalize="none"><div class="biw-msg" id="v-msg" style="text-align:left;margin-top:4px"></div>' +
+      '<label>State (from vChat)</label><input id="v-st" readonly placeholder="Filled automatically" style="background:#f3efe3;color:#5c4300;font-weight:600">' +
+      '<label>vChat registered mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="l-ph" inputmode="numeric" maxlength="10"></div>' +
+      codeField("l-ac") + '<div class="biw-msg" id="l-m"></div><button class="biw-btn biw-dark" id="l-go">Link vChat ID</button><a class="biw-link" id="l-out">Log out</a>');
+    var look = bindVchat(c, function (st) { okState = st; });
+    bindCodeInfo(c, "l-ac");
+    c.querySelector("#l-out").onclick = function () { api({ action: "logout" }); logoutLocal(); showLogin(); };
+    var go = c.querySelector("#l-go");
+    go.onclick = function () {
+      look();
+      if (!okState) return msg(c, "#l-m", "Enter a vChat ID from the allowed list.");
+      go.disabled = true;
+      api({ action: "vchat-link", vchatId: c.querySelector("#v-id").value.trim(), phone: c.querySelector("#l-ph").value, accessCode: c.querySelector("#l-ac").value.trim() }).then(function (r) {
+        go.disabled = false;
+        if (!r.ok) { if (!sessionLost(r)) msg(c, "#l-m", r.error); return; }
+        r.profile.linkRequired = false; saveProfile(r.profile); store("biw-last-vchat", r.profile.vchatId);
+        loginEl.remove(); loginEl = null; toast("vChat ID linked. Next time log in with your vChat ID."); startSession(true);
+      });
+    };
+  }
+
   // ---------- FORGOT PASSWORD ----------
   // Forgot password: the user chooses a new password and a BI admin approves the request.
   function showForgot(role) {
@@ -336,7 +430,7 @@
     role = role || store("biw-role") || "state";
     var c = authCard('<h1>Forgot <em>password?</em></h1><p>Choose a new password. A BI admin checks the request (usually by calling you) and approves it.</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
-      '<label>User name or mobile number</label><input id="f-u" maxlength="30" autocomplete="username">' +
+      '<label>vChat ID, user name or mobile number</label><input id="f-u" maxlength="40" autocomplete="username">' +
       '<label>New password (min 6 characters)</label><input id="f-p" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Confirm new password</label><input id="f-p2" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Message for the admin (optional)</label><input id="f-n" maxlength="200" placeholder="e.g. Changed my phone">' +
@@ -347,7 +441,7 @@
     var go = c.querySelector("#f-go");
     go.onclick = function () {
       var u = c.querySelector("#f-u").value.trim(), p = c.querySelector("#f-p").value;
-      if (!u) return msg(c, "#f-m", "Enter your user name or mobile number.");
+      if (!u) return msg(c, "#f-m", "Enter your vChat ID, user name or mobile number.");
       if (p.length < 6) return msg(c, "#f-m", "Password must be at least 6 characters.");
       if (p !== c.querySelector("#f-p2").value) return msg(c, "#f-m", "Passwords don't match.");
       go.disabled = true; go.textContent = "Sending…";
@@ -429,6 +523,7 @@
     mount();
     var go = function () {
       if (AUTH.app === "state") {
+        if (PROFILE.linkRequired) { showLinkVchat(); return; }
         if (!PROFILE.state) { askState(); return; }
         applyStateLock(PROFILE.state);
       }
@@ -579,7 +674,7 @@
   }
   // ---------- SURVEYS, MESSAGES, FEATURE MATRIX (shared pages, also used by the apps) ----------
   var svFrame = null;
-  var TOOLS = { security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"] };
+  var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"] };
   function openSurveys(hash) { openTool("survey", hash); }
   function openTool(name, hash) {
     closeDrawer();
@@ -652,7 +747,7 @@
   function openDrawer() {
     var p = PROFILE, admin = isAdmin();
     var ph = store("biw-photo");
-    var adminItems = [["🛡️", "Account security", PWREQ ? PWREQ + " reset request" + (PWREQ > 1 ? "s" : "") : "", function () { openTool("security"); }], ["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
+    var adminItems = [["🪪", "vChat directory", "", function () { openTool("directory"); }], ["🛡️", "Account security", PWREQ ? PWREQ + " reset request" + (PWREQ > 1 ? "s" : "") : "", function () { openTool("security"); }], ["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
     var helpItems = [["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
