@@ -232,7 +232,7 @@ public class MainActivity extends FragmentActivity {
                 updateTopAvatar();
             } else if (res.optBoolean("loggedOut", false)) {
                 clearSession();
-                showLoginScreen(tr("logged_out_elsewhere"));
+                if (res.optBoolean("disabled")) { showLoginScreen(null); setStatus(res.optString("error"), true); } else showLoginScreen(tr("logged_out_elsewhere"));
             }
         });
     }
@@ -2154,7 +2154,9 @@ public class MainActivity extends FragmentActivity {
                     if (!q.isEmpty() && !hay.contains(q)) continue;
                     shown++;
                     LinearLayout c = listCard();
-                    c.addView(infoLine(u.optString("fullName"), 16, "#1A1A2E", true));
+                    boolean dis = u.optBoolean("disabled");
+                    c.addView(infoLine(u.optString("fullName") + (dis ? "   🚫 " + tr("disabled") : ""), 16, dis ? "#B3402F" : "#1A1A2E", true));
+                    if (dis) c.setAlpha(0.8f);
                     c.addView(infoLine("@" + u.optString("username") + "   📞 " + u.optString("phone"), 14, "#3D47C8", false));
                     String extra = (u.optString("designation") + (u.optString("state").isEmpty() ? "" : " · " + u.optString("state"))).trim();
                     if (extra.startsWith("·")) extra = extra.substring(1).trim();
@@ -2162,13 +2164,20 @@ public class MainActivity extends FragmentActivity {
                     if (!u.optString("email").isEmpty()) c.addView(infoLine("✉ " + u.optString("email"), 13, "#555566", false));
                     c.addView(infoLine(tr("joined") + " " + fmtTime(u.optLong("createdAt"), "d MMM yyyy") + "   ·   "
                             + tr("last_seen") + " " + fmtTime(u.optLong("lastSeen"), "d MMM, h:mm a"), 12, "#7A7F99", false));
+                    if (dis) c.addView(infoLine(trf("disabled_by", u.optString("disabledBy"), fmtTime(u.optLong("disabledAt"), "d MMM, h:mm a"))
+                            + (u.optString("disabledReason").isEmpty() ? "" : " · " + u.optString("disabledReason")), 12, "#B3402F", false));
                     final String phone = u.optString("phone");
                     final String uname = u.optString("username");
                     final String ustate = u.optString("state");
                     c.setOnClickListener(v -> new AlertDialog.Builder(this)
                             .setTitle(u.optString("fullName") + " (@" + uname + ")")
-                            .setItems(new String[]{"📞 " + tr("call") + " " + phone, "📍 " + tr("change_state") + (ustate.isEmpty() ? "" : " (" + ustate + ")")}, (d, w) -> {
-                                if (w == 0) {
+                            .setItems("state".equals(which)
+                                    ? new String[]{"📞 " + tr("call") + " " + phone, "📍 " + tr("change_state") + (ustate.isEmpty() ? "" : " (" + ustate + ")"),
+                                        dis ? "✅ " + tr("enable_account") : "🚫 " + tr("disable_account")}
+                                    : new String[]{"📞 " + tr("call") + " " + phone, "📍 " + tr("change_state") + (ustate.isEmpty() ? "" : " (" + ustate + ")")}, (d, w) -> {
+                                if (w == 2) {
+                                    confirmDisable(uname, u.optString("fullName"), !dis, () -> showUsers(which, search.getText().toString()));
+                                } else if (w == 0) {
                                     try { startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone))); } catch (Exception ignored) { }
                                 } else {
                                     String[] items = dashboardStates();
@@ -2196,8 +2205,28 @@ public class MainActivity extends FragmentActivity {
         });
     }
 
+    // Admin: disable (logs the user out everywhere, blocks login) or re-enable a state user.
+    private void confirmDisable(String uname, String fullName, boolean disable, Runnable after) {
+        EditText reason = authField(tr("reason_optional"), TEXT_NAME, 120);
+        FrameLayout wrap = new FrameLayout(this);
+        wrap.setPadding(dp(20), dp(8), dp(20), 0);
+        if (disable) wrap.addView(reason);
+        new AlertDialog.Builder(this)
+                .setTitle((disable ? tr("disable_account") : tr("enable_account")) + ": " + fullName)
+                .setMessage(disable ? tr("disable_confirm") : tr("enable_confirm"))
+                .setView(disable ? wrap : null)
+                .setPositiveButton(disable ? tr("disable") : tr("enable"), (d, w) ->
+                        callAuth(sessionBody("action", "admin-set-disabled", "target", uname, "disabled", disable, "reason", reason.getText().toString().trim()),
+                                (ok, res, err) -> {
+                                    Toast.makeText(this, ok ? tr(disable ? "account_disabled" : "account_enabled") : err, Toast.LENGTH_SHORT).show();
+                                    if (ok) after.run();
+                                }))
+                .setNegativeButton(tr("cancel"), null)
+                .show();
+    }
+
     private static final java.util.Map<String, String> EVENT_ICONS = new java.util.HashMap<String, String>() {{
-        put("open", "📲"); put("login", "🔑"); put("signup", "🆕"); put("logout", "🚪"); put("password-reset", "🔁");
+        put("open", "📲"); put("login", "🔑"); put("signup", "🆕"); put("logout", "🚪"); put("password-reset", "🔁"); put("disabled", "🚫"); put("enabled", "✅");
     }};
 
     private void showLogs(String date, String which) {
@@ -2503,7 +2532,7 @@ public class MainActivity extends FragmentActivity {
     private void handleSessionError(JSONObject res, String err) {
         if (res.optBoolean("loggedOut", false)) {
             clearSession();
-            showLoginScreen(tr("logged_out_elsewhere"));
+            if (res.optBoolean("disabled")) { showLoginScreen(null); setStatus(res.optString("error"), true); } else showLoginScreen(tr("logged_out_elsewhere"));
         } else {
             setStatus(err, true);
         }
@@ -2577,7 +2606,7 @@ public class MainActivity extends FragmentActivity {
                         showProfile();
                     } else if (res.optBoolean("loggedOut", false)) {
                         clearSession();
-                        showLoginScreen(tr("logged_out_elsewhere"));
+                        if (res.optBoolean("disabled")) { showLoginScreen(null); setStatus(res.optString("error"), true); } else showLoginScreen(tr("logged_out_elsewhere"));
                     } else {
                         Toast.makeText(this, err, Toast.LENGTH_LONG).show();
                     }

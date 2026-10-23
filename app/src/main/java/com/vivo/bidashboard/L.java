@@ -225,6 +225,18 @@ final class L {
         put("rate_hint", "4–5★ closes the query · 1–3★ keeps it open for another reply", "4–5★ पर सवाल बंद · 1–3★ पर दोबारा जवाब के लिए खुला रहेगा");
         put("rated_closed", "Thanks! Rating saved and query closed.", "धन्यवाद! रेटिंग सेव हुई और सवाल बंद हो गया।");
         put("rated_open", "Thanks! Query stays open so an admin can help further.", "धन्यवाद! सवाल खुला है ताकि एडमिन आगे मदद कर सकें।");
+        put("disabled", "Disabled", "निष्क्रिय");
+        put("disabled_by", "Disabled by %s · %s", "%s ने निष्क्रिय किया · %s");
+        put("disable_account", "Disable account", "अकाउंट निष्क्रिय करें");
+        put("enable_account", "Enable account", "अकाउंट फिर से चालू करें");
+        put("disable", "Disable", "निष्क्रिय करें");
+        put("enable", "Enable", "चालू करें");
+        put("reason_optional", "Reason (optional)", "कारण (वैकल्पिक)");
+        put("disable_confirm", "They'll be logged out of the app and web, and can't log in until you enable the account again.",
+                "उन्हें ऐप और वेब से लॉग आउट कर दिया जाएगा, और जब तक आप अकाउंट चालू नहीं करते, वे लॉग इन नहीं कर पाएँगे।");
+        put("enable_confirm", "They'll be able to log in again with their user name and password.", "वे अपने यूज़र नेम और पासवर्ड से फिर से लॉग इन कर पाएँगे।");
+        put("account_disabled", "Account disabled", "अकाउंट निष्क्रिय किया गया");
+        put("account_enabled", "Account enabled", "अकाउंट चालू किया गया");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 
