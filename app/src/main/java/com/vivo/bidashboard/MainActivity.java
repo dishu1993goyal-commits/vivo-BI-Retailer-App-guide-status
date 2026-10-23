@@ -804,6 +804,8 @@ public class MainActivity extends FragmentActivity {
         EditText pass = authField(tr("create_password"), TEXT_PASSWORD, 64);
         EditText pass2 = authField(tr("confirm_password"), TEXT_PASSWORD, 64);
         EditText code = authField(tr("access_code"), TEXT_PASSWORD, 64);
+        EditText aEmail = authField(tr("email_required"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 80);
+        EditText aCode = authField(tr("email_code"), InputType.TYPE_CLASS_NUMBER, 6);
         EditText[] all = {full, user, phone, pass, pass2, code};
         for (int i = 0; i < all.length; i++) if (signupDraft[i] != null) all[i].setText(signupDraft[i]);
         addField(box, full);
@@ -818,9 +820,38 @@ public class MainActivity extends FragmentActivity {
         addField(box, pass);
         addField(box, pass2);
         box.addView(showPasswordBox(pass, pass2));
+        // Email + code (when the admin's email verification is on)
+        LinearLayout erow = new LinearLayout(this);
+        erow.setOrientation(LinearLayout.VERTICAL);
+        addField(erow, aEmail);
+        Button aSend = new Button(this);
+        aSend.setText(tr("send_code"));
+        aSend.setAllCaps(false);
+        erow.addView(aSend, new LinearLayout.LayoutParams(-2, -2));
+        addField(erow, aCode);
+        aCode.setVisibility(View.GONE);
+        erow.setVisibility(emailOtpOn() ? View.VISIBLE : View.GONE);
+        box.addView(erow);
+        final String[] aSent = {""};
+        aSend.setOnClickListener(v -> {
+            String em = aEmail.getText().toString().trim();
+            if (!em.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
+            aSend.setEnabled(false);
+            aSend.setText(tr("sending"));
+            callAuth(obj("action", "email-otp-send", "email", em, "purpose", "signup"), (ok, res, err) -> {
+                aSend.setEnabled(true);
+                aSend.setText(tr("resend_code"));
+                if (!ok) { setStatus(err, true); return; }
+                aSent[0] = em.toLowerCase();
+                aCode.setVisibility(View.VISIBLE);
+                aCode.requestFocus();
+                setStatus(trf("code_sent_to", em), false);
+            });
+        });
         addField(box, code);
         tcStatus = authMsg(box);
-        Button go = authButton(needTc ? tr("verify_create") : tr("create_account"));
+        Button go = authButton(needTc && !emailOtpOn() ? tr("verify_create") : tr("create_account"));
+        refreshAuthConfig(() -> { erow.setVisibility(emailOtpOn() ? View.VISIBLE : View.GONE); go.setText(tcRequired() && !emailOtpOn() ? tr("verify_create") : tr("create_account")); });
         box.addView(go, buttonParams());
         box.addView(linkText(tr("have_account"), v -> {
             signupDraft = new String[6];
@@ -843,14 +874,24 @@ public class MainActivity extends FragmentActivity {
             if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
             if (STATE_APP && st.isEmpty()) { setStatus(tr("err_state"), true); return; }
             if (ac.isEmpty()) { setStatus(tr("err_code"), true); return; }
+            final boolean useEmail = emailOtpOn();
+            String aem = aEmail.getText().toString().trim();
+            if (useEmail) {
+                if (!aem.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
+                if (!aem.toLowerCase().equals(aSent[0])) { setStatus(tr("err_send_code"), true); return; }
+                if (!aCode.getText().toString().trim().matches("\\d{6}")) { setStatus(tr("err_email_code"), true); return; }
+            }
             hideKeyboard(code);
             busy(go, tr("checking"));
-            JSONObject details = obj("fullName", fn, "username", un, "phone", ph, "password", pw, "accessCode", ac, "state", st);
+            JSONObject details = useEmail
+                    ? obj("fullName", fn, "username", un, "phone", ph, "password", pw, "accessCode", ac, "state", st, "email", aem, "emailOtp", aCode.getText().toString().trim())
+                    : obj("fullName", fn, "username", un, "phone", ph, "password", pw, "accessCode", ac, "state", st);
             callAuth(obj("action", "signup-check", "fullName", fn, "username", un, "phone", ph,
-                    "password", pw, "accessCode", ac, "state", st), (ok, res, err) -> {
+                    "password", pw, "accessCode", ac, "state", st, "email", useEmail ? aem : ""), (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
-                if (waRequired()) startWaVerify("signup", obj("phone", ph), (wc, ws) -> {
+                if (useEmail) finishSignup(details, false);
+                else if (waRequired()) startWaVerify("signup", obj("phone", ph), (wc, ws) -> {
                     try { details.put("waCode", wc); details.put("waSecret", ws); } catch (Exception ignored) { }
                     finishSignup(details, false);
                 }, this::showSignup);
@@ -1136,7 +1177,7 @@ public class MainActivity extends FragmentActivity {
     // ---------- Truecaller switch (set by admins, stored on the server) ----------
     private boolean tcRequired() { return settings().getBoolean("tc_required", true); }
     private boolean waRequired() { return settings().getBoolean("wa_required", false); }
-    private boolean emailOtpOn() { return STATE_APP && settings().getBoolean("email_otp", false); }
+    private boolean emailOtpOn() { return settings().getBoolean("email_otp", false); }
 
     // Forgot password with an email code (state users).
     private void showForgotEmail() {
@@ -1185,7 +1226,8 @@ public class MainActivity extends FragmentActivity {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
                 if (!res.optString("vchatId").isEmpty()) authPrefs().edit().putString("last_vchat", res.optString("vchatId")).apply();
-                showLoginScreen(tr("pw_changed_email"));
+                else authPrefs().edit().putString("last_username", res.optString("username")).apply();
+                showLoginScreen(STATE_APP ? tr("pw_changed_email") : trf("pw_changed_login", res.optString("username")));
             });
         });
         showScreen(box, email);

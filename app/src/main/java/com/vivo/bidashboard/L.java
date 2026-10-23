@@ -46,7 +46,7 @@ final class L {
         put("err_pw_short", "Password must be at least 6 characters.", "पासवर्ड कम से कम 6 अक्षर का होना चाहिए।");
         put("err_pw_match", "Passwords do not match.", "पासवर्ड मेल नहीं खाते।");
         put("err_code", "Enter the access code from your BI admin.", "BI एडमिन से मिला एक्सेस कोड डालें।");
-        put("creating", "Mobile verified. Creating your account…", "मोबाइल वेरिफ़ाई हुआ। अकाउंट बन रहा है…");
+        put("creating", "Creating your account…", "अकाउंट बन रहा है…");
         put("back_signup", "Back to sign up", "साइन अप पर वापस जाएँ");
         put("welcome", "Account created. Welcome, %s!", "अकाउंट बन गया। स्वागत है, %s!");
         // Forgot password
