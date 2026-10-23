@@ -5,7 +5,6 @@ import { surveyAction } from "./survey-core.mjs";
 import { chatAction } from "./chat-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
-import { waReady, waStart, waStatus, waConsume, waConnect, digits10 } from "./wa-core.mjs";
 
 // SHA-256 of the sign-up access codes (vivoBI@2026 for admin, vivoState@2026 for state).
 const ACCESS_CODE_SHA256 = {
@@ -388,7 +387,7 @@ async function supportAction(b, { store, t, app, rec, key }) {
 }
 
 // store: { get(key) -> object|null, set(key, object), delete(key) }
-export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch, waFetch = fetch }) {
+export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch }) {
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
   if (req.headers.get("x-bi-app") !== "1") return json(403, { ok: false, error: "Not allowed" });
 
@@ -417,60 +416,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const linkRequired = async (r) => app === "state" && !r.vchatId && Object.keys((await directory(store)).rows).length > 0;
   const profOut = async (r) => Object.assign(publicProfile(r), { linkRequired: await linkRequired(r) });
   const authCfg = async () => Object.assign({ tcRequired: true }, (await store.get("config:auth")) || {});
-  // WhatsApp verification is on only when an admin switched it on AND the Meta keys are in Netlify.
-  const waOn = async () => (await authCfg()).waRequired === true && waReady(env);
   if (b.action === "auth-config") {
     const c = await authCfg();
-    return json(200, { ok: true, tcRequired: c.tcRequired !== false, waRequired: await waOn() });
-  }
-
-  // ---------- "Verify on WhatsApp" ----------
-  if (b.action === "wa-start") {
-    if (!(await waOn())) return json(400, { ok: false, error: "WhatsApp verification is not switched on." });
-    const purpose = ["signup", "link", "reset"].includes(b.purpose) ? b.purpose : "";
-    let phone = "", masked = "";
-    if (purpose === "reset") {
-      let k = null;
-      if (app === "state") { const v = await store.get(`vchat:${vKey(b.username)}`); if (v) k = v.key; }
-      if (!k) k = userKey(b.username);
-      let r = k ? await store.get(uKeyOf(k)) : null;
-      if (!r && normalizePhone(b.username)) { const idx = await store.get(pKeyOf(normalizePhone(b.username))); if (idx) r = await store.get(uKeyOf(idx.key)); }
-      if (!r) return json(404, { ok: false, error: app === "state" ? "No account found with this vChat ID, user name or mobile." : "No account found with this user name or mobile." });
-      if (r.disabled) return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
-      phone = digits10(r.phone); masked = "******" + phone.slice(-4);
-    } else if (app === "state") {
-      const row = (await directory(store)).rows[vKey(b.vchatId)];
-      if (!row) return json(400, { ok: false, error: "This vChat ID doesn't exist in the allowed list.", field: "vchatId" });
-      if (digits10(b.phone) !== digits10(row.mobile)) return json(400, { ok: false, error: "This mobile number doesn't match the one registered with this vChat ID.", field: "phone" });
-      phone = digits10(row.mobile);
-    } else {
-      phone = digits10(b.phone);
-      if (purpose === "signup" && (await store.get(pKeyOf("+91" + phone)))) return json(409, { ok: false, error: "This mobile number already has an account. Use Login, or Forgot password.", field: "phone" });
-    }
-    const r = await waStart(store, env, t, { app, purpose, phone, device: b.device });
-    if (r.error) return json(400, { ok: false, error: r.error });
-    return json(200, { ok: true, ...r, masked });
-  }
-  if (b.action === "wa-status") return json(200, { ok: true, ...(await waStatus(store, t, b)) });
-
-  // Forgot password, self-service: verified on WhatsApp from the account's own mobile.
-  if (b.action === "reset-wa") {
-    if (!(await waOn())) return json(400, { ok: false, error: "WhatsApp verification is not switched on." });
-    let k = null;
-    if (app === "state") { const v = await store.get(`vchat:${vKey(b.username)}`); if (v) k = v.key; }
-    if (!k) k = userKey(b.username);
-    let r = k ? await store.get(uKeyOf(k)) : null;
-    if (!r && normalizePhone(b.username)) { const idx = await store.get(pKeyOf(normalizePhone(b.username))); if (idx) { k = idx.key; r = await store.get(uKeyOf(k)); } }
-    if (!r) return json(404, { ok: false, error: "Account not found." });
-    if (r.disabled) return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
-    const pwErr = passwordProblem(b.newPassword);
-    if (pwErr) return json(400, { ok: false, error: pwErr });
-    const bad = await waConsume(store, t, { code: b.waCode, secret: b.waSecret, phone: r.phone, purpose: "reset", app });
-    if (bad) return json(400, { ok: false, error: bad });
-    Object.assign(r, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t, sessions: [] });
-    await store.set(uKeyOf(k), r);
-    await logEvent(store, t, app, r, "password-reset", { device: "WhatsApp verified", ver: "" });
-    return json(200, { ok: true, username: r.username, vchatId: r.vchatId || "" });
+    return json(200, { ok: true, tcRequired: c.tcRequired !== false });
   }
 
   // ---------- Forgot password by request: the user asks, a BI admin approves ----------
@@ -556,14 +504,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (await store.get(uKeyOf(key))) return json(409, { ok: false, error: "This user name is taken. Please choose another.", field: "username" });
     if (await store.get(pKeyOf(v.phone))) return json(409, { ok: false, error: "This vChat mobile number already has an older account. Log in with that user name and password — you'll be asked to link your vChat ID.", field: "phone" });
     if (b.action === "signup-check") return json(200, { ok: true });
-    let waVerified = false;
-    if (await waOn()) {
-      const bad = await waConsume(store, t, { code: b.waCode, secret: b.waSecret, phone: v.phone, purpose: "signup", app });
-      if (bad) return json(400, { ok: false, error: bad, field: "wa" });
-      waVerified = true;
-    }
     const username = String(b.username).trim().replace(/\s+/g, " ");
-    const rec = { waVerified, username, fullName: v.row.name, phone: v.phone, ...hashPassword(b.password), createdAt: t, fails: 0, lockUntil: 0, sessions: [],
+    const rec = { username, fullName: v.row.name, phone: v.phone, ...hashPassword(b.password), createdAt: t, fails: 0, lockUntil: 0, sessions: [],
       state: v.row.state, email, emailVerified: false, phoneVerified: false, vchatId: v.row.vchatId, vchatVerified: true, signupVia: b.via === "web" ? "web" : "app" };
     const token = newSession(rec, t);
     rec.lastSeen = t;
@@ -605,11 +547,6 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const bad = await checkEmailOtp("signup", signupEmail, b.emailOtp);
       if (bad) return json(400, { ok: false, error: bad });
       emailVerified = true;
-    } else if (await waOn()) {
-      // WhatsApp verification replaces Truecaller / the open web sign-up when switched on.
-      const bad = await waConsume(store, t, { code: b.waCode, secret: b.waSecret, phone, purpose: "signup", app });
-      if (bad) return json(400, { ok: false, error: bad, field: "wa" });
-      b.phoneVerified = true; b.via = b.via === "web" ? "web-wa" : "app-wa";
     } else if (b.via === "web") {
       // Web sign-up without OTP: the access code (checked above) is the gate.
     } else if (b.phoneVerified !== true && (await authCfg()).tcRequired !== false) return json(400, { ok: false, error: "Mobile number is not verified." });
@@ -617,7 +554,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const rec = {
       username, fullName: name, phone, ...hashPassword(b.password),
       createdAt: t, fails: 0, lockUntil: 0, sessions: [], state: userState,
-      email: signupEmail || "", emailVerified, phoneVerified: b.phoneVerified === true && b.via !== "web", phoneVerifiedVia: /wa$/.test(String(b.via || "")) ? "whatsapp" : b.phoneVerified === true ? "truecaller" : "",
+      email: signupEmail || "", emailVerified, phoneVerified: b.phoneVerified === true && b.via !== "web",
       signupVia: emailVerified || b.via === "web" ? "web" : "app",
     };
     const token = newSession(rec, t);
@@ -726,7 +663,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
-    "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-wa-connect", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
+    "admin-security", "admin-set-auth", "admin-pwreq-decide", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -744,10 +681,6 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       if (rec.vchatId) return json(400, { ok: false, error: "Your vChat ID is already linked." });
       const v = await checkVchat(store, normalizePhone, b, { ownKey: key });
       if (v.error) return json(v.taken ? 409 : 400, { ok: false, error: v.error, field: v.field });
-      if (await waOn()) {
-        const bad = await waConsume(store, t, { code: b.waCode, secret: b.waSecret, phone: v.phone, purpose: "link", app });
-        if (bad) return json(400, { ok: false, error: bad, field: "wa" });
-      }
       if (v.phone !== rec.phone) {
         const other = await store.get(pKeyOf(v.phone));
         if (other && other.key !== key) return json(409, { ok: false, error: "This vChat mobile number is used by another account. Ask your BI admin.", field: "phone" });
@@ -833,22 +766,14 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     }
 
     // ---------- Account security (admins): Truecaller switch + password reset requests ----------
-    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide" || b.action === "admin-wa-connect") {
+    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide") {
       if (app !== "admin") return json(403, { ok: false, error: "Only BI admins can do this." });
       if (b.action === "admin-set-auth") {
-        const old = await authCfg();
-        const c = Object.assign({}, old, { updatedBy: rec.username, updatedAt: t });
-        if ("tcRequired" in b) c.tcRequired = b.tcRequired !== false;
-        if ("waRequired" in b) {
-          if (b.waRequired === true && !waReady(env)) return json(400, { ok: false, error: "Add the WhatsApp keys (WA_NUMBER, WA_VERIFY_TOKEN, WA_APP_SECRET) in Netlify first." });
-          c.waRequired = b.waRequired === true;
-        }
+        const c = { tcRequired: b.tcRequired !== false, updatedBy: rec.username, updatedAt: t };
         await store.set("config:auth", c);
-        const ev = "waRequired" in b ? (c.waRequired ? "whatsapp-on" : "whatsapp-off") : (c.tcRequired ? "truecaller-on" : "truecaller-off");
-        await logEvent(store, t, app, rec, ev, { device: "by " + rec.username, ver: "" });
-        return json(200, { ok: true, tcRequired: c.tcRequired !== false, waRequired: c.waRequired === true });
+        await logEvent(store, t, app, rec, c.tcRequired ? "truecaller-on" : "truecaller-off", { device: "by " + rec.username, ver: "" });
+        return json(200, { ok: true, tcRequired: c.tcRequired });
       }
-      if (b.action === "admin-wa-connect") return json(200, await waConnect(env, b.pin, waFetch));
       if (b.action === "admin-pwreq-decide") {
         const which = b.which === "admin" ? "admin" : "state", uk = userKey(b.target);
         const qk = `pwreq:${which}:${uk}`, q = uk ? await store.get(qk) : null;
@@ -873,11 +798,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
           own: q.app === app && q.key === key }))
         .sort((x, y) => (x.status === "pending" ? 0 : 1) - (y.status === "pending" ? 0 : 1) || y.at - x.at);
       const c = await authCfg();
-      const wks = (await store.list("walog:")).sort().slice(-20);
-      const waLog = (await pool(wks, 20, (k) => store.get(k))).filter(Boolean).reverse();
-      return json(200, { ok: true, tcRequired: c.tcRequired !== false, waRequired: c.waRequired === true, waReady: waReady(env),
-        waNumber: env.WA_NUMBER ? String(env.WA_NUMBER).replace(/\D/g, "") : "", canConnect: !!(env.WA_TOKEN && env.WA_PHONE_ID), waLog,
-        updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
+      return json(200, { ok: true, tcRequired: c.tcRequired !== false, updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
     }
 
     // ---------- Admin app only ----------
