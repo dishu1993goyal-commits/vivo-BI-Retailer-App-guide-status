@@ -849,9 +849,18 @@ public class MainActivity extends FragmentActivity {
             });
         });
         addField(box, code);
+        TextView invite = infoLine(tr("admin_invite_note"), 13, "#5C4300", false);
+        invite.setPadding(dp(4), dp(6), dp(4), dp(6));
+        box.addView(invite);
+        Runnable applyMode = () -> {
+            erow.setVisibility(emailOtpOn() ? View.VISIBLE : View.GONE);
+            code.setVisibility(adminByEmail() ? View.GONE : View.VISIBLE);
+            invite.setVisibility(adminByEmail() ? View.VISIBLE : View.GONE);
+        };
+        applyMode.run();
         tcStatus = authMsg(box);
         Button go = authButton(needTc && !emailOtpOn() ? tr("verify_create") : tr("create_account"));
-        refreshAuthConfig(() -> { erow.setVisibility(emailOtpOn() ? View.VISIBLE : View.GONE); go.setText(tcRequired() && !emailOtpOn() ? tr("verify_create") : tr("create_account")); });
+        refreshAuthConfig(() -> { applyMode.run(); go.setText(tcRequired() && !emailOtpOn() ? tr("verify_create") : tr("create_account")); });
         box.addView(go, buttonParams());
         box.addView(linkText(tr("have_account"), v -> {
             signupDraft = new String[6];
@@ -873,7 +882,7 @@ public class MainActivity extends FragmentActivity {
             if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
             if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
             if (STATE_APP && st.isEmpty()) { setStatus(tr("err_state"), true); return; }
-            if (ac.isEmpty()) { setStatus(tr("err_code"), true); return; }
+            if (ac.isEmpty() && !adminByEmail()) { setStatus(tr("err_code"), true); return; }
             final boolean useEmail = emailOtpOn();
             String aem = aEmail.getText().toString().trim();
             if (useEmail) {
@@ -1178,6 +1187,7 @@ public class MainActivity extends FragmentActivity {
     private boolean tcRequired() { return settings().getBoolean("tc_required", true); }
     private boolean waRequired() { return settings().getBoolean("wa_required", false); }
     private boolean emailOtpOn() { return settings().getBoolean("email_otp", false); }
+    private boolean adminByEmail() { return !STATE_APP && settings().getBoolean("admin_email_signup", false); }
 
     // Forgot password with an email code (state users).
     private void showForgotEmail() {
@@ -1342,7 +1352,7 @@ public class MainActivity extends FragmentActivity {
     private void refreshAuthConfig(Runnable then) {
         callAuth(obj("action", "auth-config"), (ok, res, err) -> {
             if (ok) settings().edit().putBoolean("tc_required", res.optBoolean("tcRequired", true)).putBoolean("wa_required", res.optBoolean("waRequired", false))
-                    .putBoolean("email_otp", res.optBoolean("emailOtp", false)).apply();
+                    .putBoolean("email_otp", res.optBoolean("emailOtp", false)).putBoolean("admin_email_signup", res.optBoolean("adminEmailSignup", false)).apply();
             if (then != null) then.run();
         });
     }

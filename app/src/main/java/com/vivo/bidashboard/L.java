@@ -358,6 +358,8 @@ final class L {
         put("account_email", "Account email", "अकाउंट का ईमेल");
         put("no_email_access", "No access to that email? Ask an admin instead", "उस ईमेल तक पहुँच नहीं? एडमिन से अनुरोध करें");
         put("pw_changed_email", "Password changed. Log in with your vChat ID and new password.", "पासवर्ड बदल गया। अपनी vChat ID और नए पासवर्ड से लॉग इन करें।");
+        put("admin_invite_note", "Admin sign-up is by invitation: use the email a BI admin added under Allowed admin emails, then verify it with the code we email you.",
+                "एडमिन साइन-अप सिर्फ़ आमंत्रण से: वही ईमेल इस्तेमाल करें जो BI एडमिन ने Allowed admin emails में जोड़ा है, फिर ईमेल पर आए कोड से वेरिफ़ाई करें।");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

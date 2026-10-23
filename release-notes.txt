@@ -1,2 +1,2 @@
-State users: verify your email with a code when signing up
-Forgot password: reset it yourself with a code sent to your email
+Admins: sign up with an allowed email + email code (no access code)
+Forgot password: admins can reset with an email code too
