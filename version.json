@@ -1,10 +1,10 @@
 {
-  "versionCode": 18,
-  "versionName": "4.5",
+  "versionCode": 19,
+  "versionName": "4.6",
   "notes": [
-    "New Messages: chat directly with BI admins / state teams, with topics like Rankings, Growth, Retailer IDs, Improvement areas and Data mismatch",
-    "New Feature usability matrix: tick the features your state uses and confirm your row",
-    "Notifications for new messages and the feature matrix"
+    "Forgot password: send a reset request that a BI admin approves (when Truecaller verification is off)",
+    "Admins: new Account security page — turn Truecaller verification on/off and approve password reset requests",
+    "Notifications for password reset requests (admins)"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
