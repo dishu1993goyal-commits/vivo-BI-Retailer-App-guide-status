@@ -1,10 +1,10 @@
 {
-  "versionCode": 19,
-  "versionName": "4.6",
+  "versionCode": 20,
+  "versionName": "4.7",
   "notes": [
-    "Forgot password: send a reset request that a BI admin approves (when Truecaller verification is off)",
-    "Admins: new Account security page — turn Truecaller verification on/off and approve password reset requests",
-    "Notifications for password reset requests (admins)"
+    "State users: sign up and log in with your vChat ID (state is filled in from vChat)",
+    "Older state accounts: link your vChat ID once to continue",
+    "Admins: new vChat directory — import the Excel of allowed state users"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
