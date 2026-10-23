@@ -299,19 +299,22 @@
   function showSignup(role) {
     role = role || "state";
     if (role === "state") return showStateSignup();
-    var c = authCard('<h1>Create <em>account</em></h1><p>Use the access code from your BI admin.</p>' +
+    var c = authCard('<h1>Create <em>account</em></h1><p>Create your admin account.</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
       '<label>Full name</label><input id="s-n" maxlength="40" autocomplete="name">' +
       '<label>Choose a user name (for login)</label><input id="s-u" maxlength="30" autocomplete="username">' +
       '<label>Mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="s-ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>' +
-      '<label>Email (optional)</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
+      '<label id="s-el">Email (optional)</label><div style="display:flex;gap:8px"><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com" style="flex:1"><button type="button" id="s-es" class="biw-btn biw-gold" style="display:none;width:auto;margin:0;padding:0 14px;white-space:nowrap">Send code</button></div>' +
+      '<div id="s-ecw" style="display:none"><label>Code sent to your email</label><input id="s-ec" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="letter-spacing:6px;text-align:center;font-size:18px"><div class="biw-mut" id="s-ecm" style="margin-top:4px"></div></div>' +
       '<div id="s-stw"><label>Your state</label><select id="s-st"><option value="">Select your state</option>' + STATES.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + "</select></div>" +
       '<label>Create password (min 6 characters)</label><input id="s-p" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
-      '<label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64">' +
+      '<div id="s-acw"><label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64"></div>' +
+      '<div class="biw-note" id="s-adn" style="display:none;font-size:12.5px">Admin sign-up is by invitation: use the email a BI admin added under <b>Allowed admin emails</b>, then verify it with the code we email you.</div>' +
       '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
       '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
     roleSeg(c, role, function (r) { if (r === "state") { showStateSignup(); return; } role = r; c.querySelector("#s-stw").style.display = "none"; });
+    var em = bindEmailCode(c, "admin");
     var go = c.querySelector("#s-go");
     go.onclick = function () {
       var v = { fullName: c.querySelector("#s-n").value.trim(), username: c.querySelector("#s-u").value.trim(), phone: c.querySelector("#s-ph").value.replace(/\D/g, ""),
@@ -321,9 +324,11 @@
         !/^[6-9]\d{9}$/.test(v.phone) ? "Enter a valid 10-digit mobile number." :
         v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address, or leave it empty." :
         role === "state" && !v.state ? "Please select your state." : v.password.length < 6 ? "Password must be at least 6 characters." :
-        v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !v.accessCode ? "Enter the access code from your BI admin." : "";
+        v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !v.accessCode && !em.byEmail() ? "Enter the access code from your BI admin." : em.problem(v.email);
       if (err) { msg(c, "#s-m", err); return; }
       if (!v.email) delete v.email;
+      if (em.on()) v.emailOtp = em.code();
+      if (em.byEmail()) delete v.accessCode;
       go.disabled = true; go.textContent = "Creating account…";
       api(Object.assign({ app: role, action: "signup", via: "web" }, v), false).then(function (res) {
         go.disabled = false; go.textContent = "Create account";
@@ -335,6 +340,41 @@
       });
     };
     c.querySelector("#s-back").onclick = function () { showLogin(); };
+  }
+
+  // Email code helper for sign-up forms (#s-e, #s-es, #s-ecw, #s-ec, #s-ecm, #s-m).
+  function bindEmailCode(c, role) {
+    var on = false, byEmail = false, sentTo = "", es = c.querySelector("#s-es");
+    api({ app: role, action: "auth-config" }, false).then(function (r) {
+      on = !!(r && r.emailOtp); byEmail = !!(r && r.adminEmailSignup); if (!c.isConnected) return;
+      if (byEmail && c.querySelector("#s-acw")) { c.querySelector("#s-acw").style.display = "none"; c.querySelector("#s-adn").style.display = ""; }
+      if (!on) return;
+      es.style.display = ""; var l = c.querySelector("#s-el"); if (l) l.textContent = "Email";
+    });
+    es.onclick = function () {
+      var e = c.querySelector("#s-e").value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { msg(c, "#s-m", "Enter a valid email address first."); return; }
+      es.disabled = true; es.textContent = "Sending…";
+      api({ app: role, action: "email-otp-send", email: e, purpose: "signup" }, false).then(function (r) {
+        es.disabled = false; es.textContent = "Resend";
+        if (!r.ok) { msg(c, "#s-m", r.error); return; }
+        sentTo = e.toLowerCase(); c.querySelector("#s-ecw").style.display = ""; c.querySelector("#s-ecm").textContent = "Code sent to " + e + " — check inbox and spam. Valid for 10 minutes.";
+        msg(c, "#s-m", "", true); c.querySelector("#s-ec").focus();
+      });
+    };
+    c.querySelector("#s-e").addEventListener("input", function () { if (sentTo && this.value.trim().toLowerCase() !== sentTo) { sentTo = ""; c.querySelector("#s-ecw").style.display = "none"; es.textContent = "Send code"; } });
+    return {
+      on: function () { return on; },
+      byEmail: function () { return byEmail; },
+      code: function () { return c.querySelector("#s-ec").value.trim(); },
+      problem: function (email) {
+        if (!on) return "";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "")) return "Enter your email address.";
+        if (!sentTo) return "Tap Send code to verify your email.";
+        if (!/^\d{6}$/.test(c.querySelector("#s-ec").value.trim())) return "Enter the 6-digit code from your email.";
+        return "";
+      }
+    };
   }
 
   // ---------- STATE USERS: sign up with vChat ID (admin's allowed list decides the state) ----------
@@ -448,9 +488,9 @@
     var pend = store("biw-pwreq");
     if (pend && pend.reqId) return showResetStatus(pend);
     role = role || store("biw-role") || "state";
-    if (!forceRequest && role === "state") {
+    if (!forceRequest) {
       var cw = authCard('<h1>Forgot <em>password?</em></h1><div class="biw-note">Checking…</div>');
-      api({ app: "state", action: "auth-config" }, false).then(function (r) { if (!cw.isConnected) return; if (r && r.emailOtp) showForgotEmail("state"); else showForgot("state", true); });
+      api({ app: role, action: "auth-config" }, false).then(function (r) { if (!cw.isConnected) return; if (r && r.emailOtp) showForgotEmail(role); else showForgot(role, true); });
       return;
     }
     var c = authCard('<h1>Forgot <em>password?</em></h1><p>Choose a new password. A BI admin checks the request (usually by calling you) and approves it.</p>' +
@@ -461,7 +501,7 @@
       '<label>Message for the admin (optional)</label><input id="f-n" maxlength="200" placeholder="e.g. Changed my phone">' +
       '<div class="biw-msg" id="f-m"></div><button class="biw-btn biw-dark" id="f-go">Send reset request</button><a class="biw-link" id="f-back">Back to log in</a>');
     c.querySelector("#f-u").value = store("biw-last-user") || "";
-    roleSeg(c, role, function (r) { if (r === "state" && role !== "state" && !forceRequest) { showForgot("state"); return; } role = r; });
+    roleSeg(c, role, function (r) { if (r !== role && !forceRequest) { showForgot(r); return; } role = r; });
     c.querySelector("#f-back").onclick = function () { showLogin(); };
     var go = c.querySelector("#f-go");
     go.onclick = function () {
@@ -511,7 +551,7 @@
       '<label>New password (min 6 characters)</label><input id="f-p" type="password" maxlength="64"><label>Confirm new password</label><input id="f-p2" type="password" maxlength="64"></div>' +
       '<div class="biw-msg" id="f-m"></div><button class="biw-btn biw-dark" id="f-go">Send code</button>' +
       '<a class="biw-link" id="f-req">No access to that email? Ask an admin instead</a><a class="biw-link" id="f-back">Back to log in</a>');
-    roleSeg(c, role, function (r) { if (r !== "state") { showForgot(r, true); return; } role = r; });
+    roleSeg(c, role, function (r) { if (r !== role) { showForgot(r); return; } role = r; });
     c.querySelector("#f-req").onclick = function () { showForgot(role, true); };
     var sent = false, go = c.querySelector("#f-go");
     go.onclick = function () {

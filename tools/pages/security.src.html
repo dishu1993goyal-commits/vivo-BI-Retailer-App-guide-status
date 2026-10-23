@@ -63,6 +63,10 @@
       '<div id="ekf" style="display:' + (D.emailReady ? "none" : "block") + ';margin-top:12px"><label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:0 2px 4px">Brevo API key (starts with xkeysib-)</label><input class="tx" id="ek" type="password" autocomplete="off" placeholder="xkeysib-…">' +
       '<label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 4px">Sender email (the one you confirmed in Brevo)</label><input class="tx" id="ef" type="email" placeholder="name@company.com" value="' + esc(D.emailFrom || "") + '">' +
       '<button class="btn pri sm" id="eks" style="margin-top:10px">Save key</button><div class="muted" style="font-size:12px;margin-top:6px">Stored safely on the server — it is never shown again or sent to the apps.</div></div></div>';
+    // Allowed admin emails
+    html += '<div class="card"><h3>👤 Allowed admin emails</h3><div class="sub">' + (D.emailReady ? "Only these emails can sign up as admin (verified with an email code). No access code is needed." : "Used once the email service above is set up. Until then admin sign-up uses the access code.") + "</div>" +
+      '<div class="row"><input class="tx grow" id="ae" type="email" placeholder="name@company.com" style="flex:1;min-width:180px"><button class="btn pri sm" id="aea">＋ Add</button></div>' +
+      ((D.adminEmails || []).length ? (D.adminEmails || []).map(function (e) { return '<div class="row" style="justify-content:space-between;padding:8px 2px;border-bottom:1px solid #F0F1F6"><span>' + esc(e) + '</span><button class="btn ghost sm" data-ar="' + esc(e) + '">Remove</button></div>'; }).join("") : '<div class="muted" style="font-size:13px;margin-top:8px">No emails yet — add the email of each new admin before they sign up.</div>') + "</div>";
     html += '<div class="seg" style="margin-top:14px"><button data-t="pending" class="' + (TAB === "pending" ? "on" : "") + '">Pending<span class="n">' + pend.length + '</span></button><button data-t="done" class="' + (TAB === "done" ? "on" : "") + '">Handled (30 days)<span class="n">' + done.length + "</span></button></div>";
     var list = TAB === "pending" ? pend : done;
     if (!list.length) html += '<div class="card empty"><div class="big">' + (TAB === "pending" ? "🎉" : "📭") + "</div>" + (TAB === "pending" ? "No pending password reset requests." : "Nothing handled in the last 30 days.") + "</div>";
@@ -88,6 +92,13 @@
       sheet(want ? "Turn the email code ON?" : "Turn the email code OFF?", want ? "State users will need a code from their email to sign up." : "State users can sign up without an email code.",
         [["✉️", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", emailRequired: want }).then(function (r) { toast(r.ok ? "Email code " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
     };
+    $("aea").onclick = function () {
+      var v = $("ae").value.trim(); if (!v) { toast("Enter an email"); return; }
+      api({ action: "admin-admin-emails", add: v }).then(function (r) { toast(r.ok ? "Added — they can now sign up as admin" : r.error); if (r.ok) load(true); });
+    };
+    [].forEach.call(VIEW.querySelectorAll("[data-ar]"), function (b) {
+      b.onclick = function () { var e = b.dataset.ar; sheet("Remove " + e + "?", "They won't be able to sign up as admin. An existing account stays active (disable it from Registered users if needed).", [["🗑", "Remove", function () { api({ action: "admin-admin-emails", remove: e }).then(function (r) { toast(r.ok ? "Removed" : r.error); load(true); }); }, "red"]]); };
+    });
     if ($("emk")) $("emk").onclick = function () { $("ekf").style.display = "block"; };
     if ($("eks")) $("eks").onclick = function () {
       var b = this; b.disabled = true;

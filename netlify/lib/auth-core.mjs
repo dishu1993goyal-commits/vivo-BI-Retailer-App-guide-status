@@ -426,7 +426,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const emailOn = async () => emailReady && (await authCfg()).emailRequired !== false;
   if (b.action === "auth-config") {
     const c = await authCfg();
-    return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailOtp: app === "state" && await emailOn() });
+    // Admin sign-up: email from the allowed list + email code (no access code) whenever email sending works.
+    return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailOtp: app === "admin" ? emailReady : await emailOn(), adminEmailSignup: app === "admin" && emailReady });
   }
 
   // ---------- Forgot password by request: the user asks, a BI admin approves ----------
@@ -464,6 +465,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const purpose = b.purpose === "reset" ? "reset" : "signup";
     if (purpose === "reset" && !(await findByEmail(store, app, email))) return json(404, { ok: false, error: "No account uses this email. Use the app's Forgot password (Truecaller), or sign up." });
     if (purpose === "signup" && (await store.get(eKeyOf(email)))) return json(409, { ok: false, error: "This email already has an account. Log in or use Forgot password." });
+    if (purpose === "signup" && app === "admin" && !((await authCfg()).adminEmails || []).includes(email)) return json(403, { ok: false, error: "This email isn't on the allowed admin list. Ask an existing BI admin to add it." });
     const rl = (await store.get(`eotprl:${email}`)) || { s: [] };
     const day = rl.s.filter((x) => t - x < 86400000), recent = day.filter((x) => t - x < 15 * 60000);
     if (recent.length >= 3 || day.length >= 8) return json(429, { ok: false, error: "Too many codes requested. Please try again later." });
@@ -535,7 +537,12 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
 
   // Checks done before the user spends time on mobile verification.
   if (b.action === "signup-check" || b.action === "signup") {
-    if (sha256(String(b.accessCode || "")) !== ACCESS_CODE_SHA256[app]) {
+    const adminByEmail = app === "admin" && emailReady;
+    if (adminByEmail) {
+      const em = normEmail(b.email);
+      if (!em) return json(400, { ok: false, error: "Enter your email address.", field: "email" });
+      if (!((await authCfg()).adminEmails || []).includes(em)) return json(403, { ok: false, error: "This email isn't on the allowed admin list. Ask an existing BI admin to add it (Account security → Allowed admin emails).", field: "email" });
+    } else if (sha256(String(b.accessCode || "")) !== ACCESS_CODE_SHA256[app]) {
       return json(400, { ok: false, error: "Wrong access code. Ask your BI admin for the code." });
     }
     const name = String(b.fullName || "").trim();
@@ -549,7 +556,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const userState = String(b.state || "").trim().slice(0, 40);
     if (app === "state" && !userState) return json(400, { ok: false, error: "Please select your state." });
     const signupEmail = b.email ? normEmail(b.email) : null;
-    if (b.email && !signupEmail) return json(400, { ok: false, error: "Enter a valid email address." });
+    if (b.email && !signupEmail) return json(400, { ok: false, error: "Enter a valid email address.", field: "email" });
+    const needEmailCode = app === "admin" ? emailReady : await emailOn();
+    if (needEmailCode && !signupEmail) return json(400, { ok: false, error: "Enter your email address.", field: "email" });
     if (signupEmail && (await store.get(eKeyOf(signupEmail)))) return json(409, { ok: false, error: "This email already has an account. Log in or use Forgot password." });
     if (await store.get(uKeyOf(key))) return json(409, { ok: false, error: "This user name is taken. Please choose another." });
     if (await store.get(pKeyOf(phone))) {
@@ -558,7 +567,12 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action === "signup-check") return json(200, { ok: true });
 
     let emailVerified = false;
-    if (b.emailOtp != null) {           // web sign-up: email code instead of Truecaller
+    if (needEmailCode) {               // email code (free) replaces Truecaller / open web sign-up
+      if (!String(b.emailOtp || "").trim()) return json(400, { ok: false, error: "Tap Send code and enter the code we emailed you.", field: "emailOtp" });
+      const bad = await checkEmailOtp("signup", signupEmail, b.emailOtp);
+      if (bad) return json(400, { ok: false, error: bad, field: "emailOtp" });
+      emailVerified = true;
+    } else if (b.emailOtp != null) {           // web sign-up: email code instead of Truecaller
       if (!signupEmail) return json(400, { ok: false, error: "Enter your email address." });
       const bad = await checkEmailOtp("signup", signupEmail, b.emailOtp);
       if (bad) return json(400, { ok: false, error: bad });
@@ -679,7 +693,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
-    "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
+    "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -782,7 +796,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     }
 
     // ---------- Account security (admins): Truecaller switch + password reset requests ----------
-    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide" || b.action === "admin-email-test" || b.action === "admin-email-config") {
+    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide" || b.action === "admin-email-test" || b.action === "admin-email-config" || b.action === "admin-admin-emails") {
       if (app !== "admin") return json(403, { ok: false, error: "Only BI admins can do this." });
       if (b.action === "admin-set-auth") {
         const c = Object.assign({}, await authCfg(), { updatedBy: rec.username, updatedAt: t });
@@ -792,6 +806,18 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         const ev = "emailRequired" in b ? (c.emailRequired ? "email-otp-on" : "email-otp-off") : (c.tcRequired ? "truecaller-on" : "truecaller-off");
         await logEvent(store, t, app, rec, ev, { device: "by " + rec.username, ver: "" });
         return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailRequired: c.emailRequired !== false });
+      }
+      if (b.action === "admin-admin-emails") {
+        const c = await authCfg();
+        let list = (c.adminEmails || []).slice();
+        const add = (Array.isArray(b.add) ? b.add : [b.add]).map(normEmail).filter(Boolean);
+        const rem = (Array.isArray(b.remove) ? b.remove : [b.remove]).map(normEmail).filter(Boolean);
+        if (b.add && !add.length) return json(400, { ok: false, error: "Enter a valid email address." });
+        add.forEach((e) => { if (!list.includes(e)) list.push(e); });
+        list = list.filter((e) => !rem.includes(e)).slice(0, 200);
+        await store.set("config:auth", Object.assign({}, c, { adminEmails: list, updatedBy: rec.username, updatedAt: t }));
+        await logEvent(store, t, app, rec, "admin-emails", { device: (add.length ? "+" + add.join(",") : "") + (rem.length ? " -" + rem.join(",") : ""), ver: "" });
+        return json(200, { ok: true, adminEmails: list });
       }
       if (b.action === "admin-email-config") {
         if (b.clear === true) { await store.delete("config:email"); return json(200, { ok: true }); }
@@ -833,7 +859,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         .sort((x, y) => (x.status === "pending" ? 0 : 1) - (y.status === "pending" ? 0 : 1) || y.at - x.at);
       const c = await authCfg();
       return json(200, { ok: true, tcRequired: c.tcRequired !== false, emailReady, emailRequired: c.emailRequired !== false, emailFrom: env.OTP_FROM_EMAIL || "",
-        emailKeyEnd: env.BREVO_API_KEY ? String(env.BREVO_API_KEY).slice(-4) : "", emailSavedHere: !!(await store.get("config:email")),
+        adminEmails: c.adminEmails || [], emailKeyEnd: env.BREVO_API_KEY ? String(env.BREVO_API_KEY).slice(-4) : "", emailSavedHere: !!(await store.get("config:email")),
         updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
     }
 
