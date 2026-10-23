@@ -1,10 +1,9 @@
 {
-  "versionCode": 20,
-  "versionName": "4.7",
+  "versionCode": 21,
+  "versionName": "4.8",
   "notes": [
-    "State users: sign up and log in with your vChat ID (state is filled in from vChat)",
-    "Older state accounts: link your vChat ID once to continue",
-    "Admins: new vChat directory — import the Excel of allowed state users"
+    "Verify on WhatsApp (free): confirm your mobile by sending one WhatsApp message when signing up, linking your vChat ID or resetting your password",
+    "Forgot password: reset it yourself after verifying on WhatsApp"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
