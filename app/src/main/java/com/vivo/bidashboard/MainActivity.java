@@ -127,7 +127,7 @@ public class MainActivity extends FragmentActivity {
         NotifyWorker.ensureChannel(this);
         // Stay logged in until the user taps Log out.
         if (sessionToken() != null) {
-            if (STATE_APP && profile().optString("vchatId", "").isEmpty()) showLinkVchat();
+            if (STATE_APP && profile().optBoolean("linkRequired", false)) showLinkVchat();
             else if (STATE_APP && profile().optString("state", "").isEmpty()) showPickState();
             else openDashboard();
             refreshProfile();
@@ -232,7 +232,7 @@ public class MainActivity extends FragmentActivity {
                 JSONObject p = res.optJSONObject("profile");
                 saveProfile(p);
                 if (STATE_APP && p != null) {
-                    if (p.optString("vchatId", "").isEmpty()) { if (!inLink) showLinkVchat(); return; }
+                    if (p.optBoolean("linkRequired", false)) { if (!inLink) showLinkVchat(); return; }
                     if (inLink) { inLink = false; openDashboard(); }
                 }
                 refreshSupportBadge();
@@ -769,8 +769,8 @@ public class MainActivity extends FragmentActivity {
                     authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply();
                     if (STATE_APP) {
                         String vc = profile().optString("vchatId", "");
-                        if (vc.isEmpty()) { showLinkVchat(); return; }
-                        authPrefs().edit().putString("last_vchat", vc).apply();
+                        if (profile().optBoolean("linkRequired", false)) { showLinkVchat(); return; }
+                        if (!vc.isEmpty()) authPrefs().edit().putString("last_vchat", vc).apply();
                     }
                     if (STATE_APP && profile().optString("state", "").isEmpty()) { showPickState(); return; }
                     openDashboard();
