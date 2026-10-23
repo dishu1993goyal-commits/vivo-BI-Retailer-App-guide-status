@@ -122,15 +122,20 @@ public class MainActivity extends FragmentActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         initTruecaller();
+        initQr();
         fetchStates();
+        NotifyWorker.ensureChannel(this);
         // Stay logged in until the user taps Log out.
         if (sessionToken() != null) {
             if (STATE_APP && profile().optString("state", "").isEmpty()) showPickState();
             else openDashboard();
             refreshProfile();
+            NotifyWorker.schedule(this);
+            ui.postDelayed(() -> checkForUpdate(false), 2500);
         } else {
             showLoginScreen(null);
         }
+        handleIntent(getIntent());
     }
 
     @Override
@@ -167,10 +172,14 @@ public class MainActivity extends FragmentActivity {
                 .putString("last_username", u)
                 .apply();
         saveProfile(res.optJSONObject("profile"));
+        NotifyWorker.schedule(this);
+        ui.postDelayed(this::askNotificationPermission, 1500);
     }
 
     private void clearSession() {
-        authPrefs().edit().remove("session_user").remove("session_token").remove("profile").remove("photo").remove("photo_version").apply();
+        authPrefs().edit().remove("session_user").remove("session_token").remove("profile").remove("photo").remove("photo_version")
+                .remove("survey_badge").remove("support_unread").apply();
+        try { NotifyWorker.cancel(this); } catch (Throwable ignored) { }
     }
 
     private Bitmap cachedPhoto() {
@@ -209,7 +218,10 @@ public class MainActivity extends FragmentActivity {
         // Coming back after a while counts as opening the app again (for the access log).
         if (sessionToken() != null && backgroundedAt > 0 && System.currentTimeMillis() - backgroundedAt > REOPEN_LOG_MS) {
             refreshProfile();
+        } else if (sessionToken() != null && backgroundedAt > 0 && System.currentTimeMillis() - lastNotify > 2 * 60 * 1000L) {
+            refreshNotify();
         }
+        if (sessionToken() != null && backgroundedAt > 0) checkForUpdate(false);
     }
 
     private void refreshProfile() {
@@ -940,6 +952,7 @@ public class MainActivity extends FragmentActivity {
         bar.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
         bar.addView(barButton("🔍", tr("search"), "openSearch"));
         bar.addView(barButton("💬", tr("assistant"), "openChat"));
+        bar.addView(badgeButton("📋", tr("surveys"), true, v -> showSurveyPage("#list")));
         bar.addView(supportButton());
         topAvatar = new FrameLayout(this);
         topAvatar.setContentDescription(tr("profile"));
@@ -1140,6 +1153,7 @@ public class MainActivity extends FragmentActivity {
         unlocked = false;
         inProfile = true;
         inAdminPage = false;
+        inSurveyPage = false;
         JSONObject p = profile();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
@@ -1210,6 +1224,8 @@ public class MainActivity extends FragmentActivity {
         }
 
         LinearLayout help = card(page, tr("sec_tools"));
+        row(help, "📋", STATE_APP ? tr("surveys") : tr("survey_manager"), "", v -> showSurveyPage("#list"));
+        row(help, "🔳", tr("scan_qr"), "", v -> scanWebLogin());
         row(help, "🎧", tr("support_desk"), "", v -> showSupportList("all"));
         row(help, "🧾", tr("payout_calc"), "", v -> { openDashboard(); openAssistant("openCalculator"); });
 
@@ -1257,6 +1273,7 @@ public class MainActivity extends FragmentActivity {
 
         LinearLayout about = card(page, tr("sec_about"));
         row(about, "ℹ️", tr("app_version"), versionText(), null);
+        row(about, "⬆️", tr("check_update"), "", v -> checkForUpdate(true));
         long since = p.optLong("createdAt", 0);
         if (since > 0) {
             row(about, "📅", tr("member_since"),
@@ -1336,15 +1353,7 @@ public class MainActivity extends FragmentActivity {
 
     private void refreshSupportBadge() {
         if (sessionToken() == null) return;
-        callAuth(sessionBody("action", "support-unread"), (ok, res, err) -> {
-            if (!ok) return;
-            int n = res.optInt("unread", 0);
-            authPrefs().edit().putInt("support_unread", n).apply();
-            if (supportBadge != null) {
-                supportBadge.setText(n > 9 ? "9+" : String.valueOf(n));
-                supportBadge.setVisibility(n > 0 ? View.VISIBLE : View.GONE);
-            }
-        });
+        refreshNotify();
     }
 
     private TextView chip(String text, String bg, String fg) {
@@ -2055,6 +2064,369 @@ public class MainActivity extends FragmentActivity {
         detachWebView();
         setContentView(page);
         adminWeb.loadUrl(START_URL + "admin.html?v=" + System.currentTimeMillis() + "#" + tab);
+    }
+
+    // ---------- Surveys (survey.html, shared with the web; admins build, state users answer) ----------
+    private WebView surveyWeb;
+    private boolean inSurveyPage = false;
+    private TextView surveyBadge;
+    private long lastNotify = 0;
+
+    private class SurveyBridge {
+        @JavascriptInterface
+        public String getAuth() { return obj("app", APP_ID, "username", sessionUser(), "token", sessionToken()).toString(); }
+
+        @JavascriptInterface
+        public void surveysChanged() { ui.post(MainActivity.this::refreshNotify); }
+    }
+
+    private void showSurveyPage(String hash) {
+        if (sessionToken() == null) return;
+        inProfile = true;
+        unlocked = false;
+        inAdminPage = false;
+        inSurveyPage = true;
+        if (surveyWeb == null) {
+            surveyWeb = new WebView(this);
+            WebSettings ws = surveyWeb.getSettings();
+            ws.setJavaScriptEnabled(true);
+            ws.setDomStorageEnabled(true);
+            surveyWeb.addJavascriptInterface(new SurveyBridge(), "BIApp");
+            surveyWeb.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+            surveyWeb.setWebViewClient(new WebViewClient() {
+                @Override
+                public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                    Uri u = request.getUrl();
+                    if (u.getHost() != null && u.getHost().endsWith(APP_HOST)) return false;
+                    openExternally(u);
+                    return true;
+                }
+            });
+            surveyWeb.setWebChromeClient(new WebChromeClient() {
+                // Survey answers can include photos and documents (both apps).
+                @Override
+                public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                    if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                    filePathCallback = callback;
+                    Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+                    pick.addCategory(Intent.CATEGORY_OPENABLE);
+                    pick.setType("*/*");
+                    try {
+                        startActivityForResult(Intent.createChooser(pick, tr("choose_file")), FILE_CHOOSER_REQUEST);
+                    } catch (ActivityNotFoundException e) {
+                        filePathCallback = null;
+                        return false;
+                    }
+                    return true;
+                }
+            });
+        }
+        if (surveyWeb.getParent() != null) ((ViewGroup) surveyWeb.getParent()).removeView(surveyWeb);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F3F4F9"));
+        page.addView(profileHeaderBar(STATE_APP ? tr("surveys") : tr("survey_manager"), this::surveyBack));
+        page.addView(surveyWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
+        detachWebView();
+        setContentView(page);
+        surveyWeb.loadUrl(START_URL + "survey.html?v=" + System.currentTimeMillis() + (hash == null ? "#list" : hash));
+    }
+
+    // Back inside the survey page first (editor → list), then leave it.
+    private void surveyBack() {
+        if (surveyWeb == null) { closeSurveyPage(); return; }
+        surveyWeb.evaluateJavascript("(window.__surveyBack&&window.__surveyBack())?1:0", v -> { if (!"1".equals(v)) closeSurveyPage(); });
+    }
+
+    private void closeSurveyPage() {
+        inSurveyPage = false;
+        openDashboard();
+        refreshNotify();
+    }
+
+    private View badgeButton(String emoji, String desc, boolean survey, View.OnClickListener click) {
+        FrameLayout f = new FrameLayout(this);
+        f.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
+        f.setBackgroundResource(android.R.drawable.list_selector_background);
+        f.setContentDescription(desc);
+        TextView ic = new TextView(this);
+        ic.setText(emoji);
+        ic.setTextSize(TypedValue.COMPLEX_UNIT_SP, 19);
+        ic.setGravity(Gravity.CENTER);
+        f.addView(ic, new FrameLayout.LayoutParams(-1, -1));
+        TextView b = new TextView(this);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10);
+        b.setTypeface(Typeface.DEFAULT_BOLD);
+        b.setGravity(Gravity.CENTER);
+        GradientDrawable bb = new GradientDrawable();
+        bb.setColor(Color.parseColor("#E53935"));
+        bb.setCornerRadius(dp(99));
+        b.setBackground(bb);
+        b.setPadding(dp(4), 0, dp(4), 0);
+        b.setMinWidth(dp(16));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, dp(16), Gravity.TOP | Gravity.END);
+        lp.setMargins(0, dp(2), dp(1), 0);
+        f.addView(b, lp);
+        if (survey) surveyBadge = b;
+        setBadge(b, authPrefs().getInt(survey ? "survey_badge" : "support_unread", 0));
+        f.setOnClickListener(click);
+        return f;
+    }
+
+    private void setBadge(TextView b, int n) {
+        if (b == null) return;
+        b.setText(n > 9 ? "9+" : String.valueOf(n));
+        b.setVisibility(n > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    // One call for both badges, plus the "new survey" pop-up for state users.
+    private void refreshNotify() {
+        if (sessionToken() == null) return;
+        lastNotify = System.currentTimeMillis();
+        callAuth(sessionBody("action", "notify"), (ok, res, err) -> {
+            if (!ok) { if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
+            int su = res.optInt("supportUnread", 0);
+            JSONObject sv = res.optJSONObject("surveys");
+            if (sv == null) sv = new JSONObject();
+            int n = STATE_APP ? sv.optInt("pending", 0) : sv.optInt("newResponses", 0);
+            authPrefs().edit().putInt("support_unread", su).putInt("survey_badge", n).apply();
+            setBadge(supportBadge, su);
+            setBadge(surveyBadge, n);
+            if (STATE_APP && unlocked) surveyPopup(sv.optJSONArray("surveys"), sv.optInt("pending", 0));
+        });
+    }
+
+    private void surveyPopup(org.json.JSONArray list, int pending) {
+        if (list == null) return;
+        try {
+            JSONObject seen = new JSONObject(settings().getString("survey_seen", "{}"));
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject s = list.getJSONObject(i);
+                String id = s.optString("id");
+                long at = s.optLong("announcedAt");
+                if (!s.optBoolean("isNew") || seen.optLong(id) == at) continue;
+                seen.put(id, at);
+                settings().edit().putString("survey_seen", seen.toString()).apply();
+                long by = s.optLong("closesAt", 0);
+                String msg = s.optString("title") + "\n\n" + (by > 0 ? trf("survey_by", fmtTime(by, "d MMM, h:mm a")) : tr("survey_quick"))
+                        + (pending > 1 ? "\n" + trf("surveys_waiting", pending) : "");
+                new AlertDialog.Builder(this)
+                        .setTitle("📋 " + tr("new_survey"))
+                        .setMessage(msg)
+                        .setPositiveButton(tr("answer_now"), (d, w) -> showSurveyPage("#s=" + id))
+                        .setNegativeButton(tr("later"), null)
+                        .show();
+                return;
+            }
+        } catch (Exception ignored) { }
+    }
+
+    private void askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && !settings().getBoolean("asked_notif", false)) {
+            settings().edit().putBoolean("asked_notif", true).apply();
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1010);
+        }
+    }
+
+    // Opens what a phone notification (or a QR link) points to.
+    private void handleIntent(Intent intent) {
+        if (intent == null) return;
+        Uri data = intent.getData();
+        if (data != null && APP_HOST.equals(data.getHost()) && "/qr".equals(data.getPath())) {
+            intent.setData(null);
+            ui.postDelayed(() -> handleQrText(data.toString()), 400);
+            return;
+        }
+        String open = intent.getStringExtra("open");
+        if (open == null) return;
+        intent.removeExtra("open");
+        if (sessionToken() == null) return;
+        if (open.startsWith("survey:")) showSurveyPage("#s=" + open.substring(7));
+        else if (open.equals("surveys")) showSurveyPage("#list");
+        else if (open.equals("support")) showSupportList("all");
+        else if (open.equals("update")) checkForUpdate(true);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
+    }
+
+    // ---------- Web login by QR code ----------
+    private ActivityResultLauncher<com.journeyapps.barcodescanner.ScanOptions> qrLauncher;
+
+    private void initQr() {
+        qrLauncher = registerForActivityResult(new com.journeyapps.barcodescanner.ScanContract(), r -> {
+            if (r.getContents() != null) handleQrText(r.getContents());
+        });
+    }
+
+    private void scanWebLogin() {
+        com.journeyapps.barcodescanner.ScanOptions o = new com.journeyapps.barcodescanner.ScanOptions();
+        o.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE);
+        o.setPrompt(tr("qr_prompt"));
+        o.setBeepEnabled(false);
+        o.setOrientationLocked(true);
+        o.setCaptureActivity(ScanActivity.class);
+        try { qrLauncher.launch(o); } catch (Exception e) { Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show(); }
+    }
+
+    private void handleQrText(String text) {
+        Uri u = Uri.parse(text.trim());
+        String id = u != null && APP_HOST.equals(u.getHost()) && "/qr".equals(u.getPath()) ? u.getQueryParameter("c") : null;
+        if (id == null || !id.matches("[a-f0-9]{8,40}")) { Toast.makeText(this, tr("qr_invalid"), Toast.LENGTH_LONG).show(); return; }
+        if (sessionToken() == null) { Toast.makeText(this, tr("qr_login_first"), Toast.LENGTH_LONG).show(); return; }
+        callAuth(sessionBody("action", "qr-approve", "qrId", id), (ok, res, err) -> {
+            if (!ok) { if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); else new AlertDialog.Builder(this).setMessage(err).setPositiveButton("OK", null).show(); return; }
+            String who = profile().optString("fullName", sessionUser());
+            new AlertDialog.Builder(this)
+                    .setTitle("🔳 " + tr("qr_confirm_title"))
+                    .setMessage(trf("qr_confirm_msg", res.optString("device", "Web browser"), who + " (@" + sessionUser() + ")",
+                            STATE_APP ? tr("state_user") : tr("admin_user")))
+                    .setPositiveButton(tr("qr_allow"), (d, w) -> callAuth(sessionBody("action", "qr-approve", "qrId", id, "confirm", true), (ok2, r2, e2) ->
+                            Toast.makeText(this, ok2 ? tr("qr_done") : e2, Toast.LENGTH_LONG).show()))
+                    .setNegativeButton(tr("qr_decline"), (d, w) -> callAuth(sessionBody("action", "qr-approve", "qrId", id, "decline", true), (a, b, c) -> { }))
+                    .show();
+        });
+    }
+
+    // ---------- App updates (version.json on the site is updated with every release) ----------
+    private File pendingApk = null;
+
+    private void checkForUpdate(boolean manual) {
+        long now = System.currentTimeMillis();
+        if (!manual && now - settings().getLong("upd_checked", 0) < 3 * 3600 * 1000L) return;
+        settings().edit().putLong("upd_checked", now).apply();
+        if (manual) Toast.makeText(this, tr("upd_checking"), Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            JSONObject v = Net.getJson(START_URL + "version.json?t=" + now);
+            ui.post(() -> {
+                if (isFinishing()) return;
+                if (v == null) { if (manual) Toast.makeText(this, tr("no_internet"), Toast.LENGTH_LONG).show(); return; }
+                int code = v.optInt("versionCode"), mine = BuildConfig.VERSION_CODE;
+                if (code <= mine) { if (manual) Toast.makeText(this, trf("upd_latest", BuildConfig.VERSION_NAME), Toast.LENGTH_LONG).show(); return; }
+                boolean force = v.optInt("minVersionCode", 0) > mine;
+                if (!manual && !force && settings().getInt("upd_snooze_code", 0) == code && now < settings().getLong("upd_snooze_until", 0)) return;
+                showUpdateDialog(v, force);
+            });
+        }).start();
+    }
+
+    private void showUpdateDialog(JSONObject v, boolean force) {
+        StringBuilder notes = new StringBuilder();
+        org.json.JSONArray arr = v.optJSONArray("notes");
+        for (int i = 0; arr != null && i < arr.length() && i < 8; i++) notes.append("\n• ").append(arr.optString(i));
+        JSONObject apk = v.optJSONObject("apk");
+        String url = apk != null ? apk.optString(APP_ID, DOWNLOAD_URL) : DOWNLOAD_URL;
+        int code = v.optInt("versionCode");
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle("⬆️ " + tr("upd_title"))
+                .setMessage(trf("upd_msg", v.optString("versionName"), BuildConfig.VERSION_NAME) + (notes.length() > 0 ? "\n\n" + tr("upd_whats_new") + notes : ""))
+                .setCancelable(!force)
+                .setPositiveButton(tr("upd_now"), (d, w) -> downloadUpdate(url));
+        if (!force) b.setNegativeButton(tr("later"), (d, w) -> settings().edit().putInt("upd_snooze_code", code)
+                .putLong("upd_snooze_until", System.currentTimeMillis() + 24 * 3600 * 1000L).apply());
+        b.show();
+    }
+
+    private void downloadUpdate(String url) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(14), dp(22), dp(4));
+        ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        pb.setMax(100);
+        pb.setIndeterminate(true);
+        pb.setProgressTintList(android.content.res.ColorStateList.valueOf(BRAND));
+        TextView tv = infoLine(tr("upd_downloading"), 13, "#555555", false);
+        box.addView(pb, new LinearLayout.LayoutParams(-1, dp(18)));
+        box.addView(tv);
+        final boolean[] cancelled = {false};
+        AlertDialog dlg = new AlertDialog.Builder(this).setTitle("⬆️ " + tr("upd_title")).setView(box).setCancelable(false)
+                .setNegativeButton(tr("cancel"), (d, w) -> cancelled[0] = true).show();
+        new Thread(() -> {
+            File dir = new File(getCacheDir(), "updates");
+            File out = new File(dir, "vivo-bi-update.apk");
+            HttpURLConnection c = null;
+            try {
+                dir.mkdirs();
+                c = (HttpURLConnection) new URL(url).openConnection();
+                c.setInstanceFollowRedirects(true);
+                c.setConnectTimeout(20000);
+                c.setReadTimeout(30000);
+                if (c.getResponseCode() != 200) throw new Exception("HTTP " + c.getResponseCode());
+                long total = c.getContentLengthLong(), got = 0;
+                try (InputStream in = c.getInputStream(); FileOutputStream os = new FileOutputStream(out)) {
+                    byte[] buf = new byte[32 * 1024];
+                    int n, last = -1;
+                    while ((n = in.read(buf)) > 0) {
+                        if (cancelled[0]) throw new InterruptedException();
+                        os.write(buf, 0, n);
+                        got += n;
+                        if (total > 0) {
+                            int p = (int) (got * 100 / total);
+                            if (p != last) {
+                                last = p;
+                                final long g = got;
+                                ui.post(() -> { pb.setIndeterminate(false); pb.setProgress(p); tv.setText(trf("upd_progress", p, g / 1048576.0, total / 1048576.0)); });
+                            }
+                        }
+                    }
+                }
+                ui.post(() -> { dlg.dismiss(); installApk(out); });
+            } catch (InterruptedException e) {
+                out.delete();
+            } catch (Exception e) {
+                out.delete();
+                ui.post(() -> {
+                    dlg.dismiss();
+                    Toast.makeText(this, tr("upd_failed"), Toast.LENGTH_LONG).show();
+                    openExternally(Uri.parse(url));
+                });
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }).start();
+    }
+
+    private void installApk(File f) {
+        if (Build.VERSION.SDK_INT >= 26 && !getPackageManager().canRequestPackageInstalls()) {
+            pendingApk = f;
+            new AlertDialog.Builder(this)
+                    .setTitle(tr("upd_allow_title"))
+                    .setMessage(tr("upd_allow_msg"))
+                    .setPositiveButton(tr("upd_open_settings"), (d, w) -> {
+                        try {
+                            startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName())));
+                        } catch (ActivityNotFoundException e) { openExternally(Uri.parse(DOWNLOAD_URL)); }
+                    })
+                    .setNegativeButton(tr("cancel"), (d, w) -> pendingApk = null)
+                    .show();
+            return;
+        }
+        try {
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".files", f);
+            Intent i = new Intent(Intent.ACTION_VIEW);
+            i.setDataAndType(uri, "application/vnd.android.package-archive");
+            i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+        } catch (Exception e) {
+            openExternally(Uri.parse(DOWNLOAD_URL));
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Back from "Install unknown apps" settings: continue the update.
+        if (pendingApk != null && (Build.VERSION.SDK_INT < 26 || getPackageManager().canRequestPackageInstalls())) {
+            File f = pendingApk;
+            pendingApk = null;
+            installApk(f);
+        }
     }
 
     // ---------- Admin app: registered users and access log ----------
@@ -3066,6 +3438,10 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     public void onBackPressed() {
+        if (inSurveyPage) {
+            surveyBack();
+            return;
+        }
         if (inAdminPage) {
             inAdminPage = false;
             showProfile();

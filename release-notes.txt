@@ -1,0 +1,4 @@
+New Survey tool: answer surveys from BI admins (admins can create surveys and see results)
+Log in to the web dashboard by scanning a QR code (Profile → Scan web login QR)
+Notifications for new surveys, support desk replies and app updates
+One-tap in-app updates

@@ -56,3 +56,30 @@ jobs:
           files: |
             vivo-BI-Dashboard.apk
             vivo-BI-States.apk
+
+      # Tells installed apps that a new version is out: updates version.json on the live site.
+      - name: Announce the update to the apps
+        if: github.ref == 'refs/heads/apk-build'
+        continue-on-error: true
+        run: |
+          VC=$(grep -oP "versionCode \K\d+" app/build.gradle)
+          VN=$(grep -oP "versionName '\K[^']+" app/build.gradle)
+          git fetch origin site --depth 1
+          git worktree add ../site FETCH_HEAD
+          python3 - "$VC" "$VN" <<'PY'
+          import json, sys
+          vc, vn = int(sys.argv[1]), sys.argv[2]
+          notes = [l.strip() for l in open("release-notes.txt", encoding="utf-8") if l.strip()] if __import__("os").path.exists("release-notes.txt") else []
+          base = "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/"
+          try: old = json.load(open("../site/version.json"))
+          except Exception: old = {}
+          data = {"versionCode": vc, "versionName": vn, "notes": notes[:8],
+                  "apk": {"admin": base + "vivo-BI-Dashboard.apk", "state": base + "vivo-BI-States.apk"},
+                  "minVersionCode": old.get("minVersionCode", 0)}
+          json.dump(data, open("../site/version.json", "w"), indent=2, ensure_ascii=False)
+          PY
+          cd ../site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git diff --cached --quiet || (git commit -m "Announce app v$VN to installed apps" && git push origin HEAD:site)

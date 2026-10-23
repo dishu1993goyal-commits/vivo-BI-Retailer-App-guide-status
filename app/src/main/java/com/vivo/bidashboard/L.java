@@ -237,6 +237,50 @@ final class L {
         put("enable_confirm", "They'll be able to log in again with their user name and password.", "वे अपने यूज़र नेम और पासवर्ड से फिर से लॉग इन कर पाएँगे।");
         put("account_disabled", "Account disabled", "अकाउंट निष्क्रिय किया गया");
         put("account_enabled", "Account enabled", "अकाउंट चालू किया गया");
+        // v4.4: surveys, web QR login, updates, notifications
+        put("surveys", "Surveys", "सर्वे");
+        put("survey_manager", "Survey manager", "सर्वे मैनेजर");
+        put("new_survey", "New survey from BI admin", "BI एडमिन का नया सर्वे");
+        put("survey_by", "Please answer by %s", "कृपया %s तक जवाब दें");
+        put("survey_quick", "It takes only a few minutes.", "इसमें बस कुछ मिनट लगेंगे।");
+        put("surveys_waiting", "%d surveys are waiting for you", "%d सर्वे आपका इंतज़ार कर रहे हैं");
+        put("answer_now", "Answer now", "अभी जवाब दें");
+        put("later", "Later", "बाद में");
+        put("choose_file", "Choose file", "फ़ाइल चुनें");
+        put("scan_qr", "Scan web login QR", "वेब लॉग इन QR स्कैन करें");
+        put("qr_prompt", "Scan the QR code on the dashboard login page", "डैशबोर्ड लॉग इन पेज पर दिख रहा QR कोड स्कैन करें");
+        put("qr_invalid", "This is not a vivo BI web login code.", "यह vivo BI वेब लॉग इन कोड नहीं है।");
+        put("qr_login_first", "Log in to the app first, then scan the code again.", "पहले ऐप में लॉग इन करें, फिर कोड दोबारा स्कैन करें।");
+        put("qr_confirm_title", "Log in on the web?", "वेब पर लॉग इन करें?");
+        put("qr_confirm_msg", "Device: %1$s\n\nThe web dashboard will open as %2$s (%3$s). Allow only if this is your own computer or screen.",
+                "डिवाइस: %1$s\n\nवेब डैशबोर्ड %2$s (%3$s) के रूप में खुलेगा। तभी अनुमति दें जब यह आपका अपना कंप्यूटर या स्क्रीन हो।");
+        put("qr_allow", "Allow", "अनुमति दें");
+        put("qr_decline", "Decline", "मना करें");
+        put("qr_done", "Done — the web dashboard is now logged in.", "हो गया — वेब डैशबोर्ड में लॉग इन हो गया।");
+        put("state_user", "State user", "स्टेट यूज़र");
+        put("admin_user", "Admin user", "एडमिन यूज़र");
+        put("check_update", "Check for updates", "अपडेट देखें");
+        put("upd_checking", "Checking for updates…", "अपडेट देख रहे हैं…");
+        put("upd_latest", "You have the latest version (%s).", "आपके पास नया वर्ज़न (%s) है।");
+        put("upd_title", "Update available", "अपडेट उपलब्ध है");
+        put("upd_msg", "Version %1$s is ready (you have %2$s).", "वर्ज़न %1$s तैयार है (आपके पास %2$s है)।");
+        put("upd_whats_new", "What's new:", "नया क्या है:");
+        put("upd_now", "Update now", "अभी अपडेट करें");
+        put("upd_downloading", "Downloading the update…", "अपडेट डाउनलोड हो रहा है…");
+        put("upd_progress", "%1$d%% · %2$.1f of %3$.1f MB", "%1$d%% · %3$.1f में से %2$.1f MB");
+        put("upd_failed", "Download didn't finish. Opening the download link instead.", "डाउनलोड पूरा नहीं हुआ। डाउनलोड लिंक खोल रहे हैं।");
+        put("upd_allow_title", "Allow app updates", "ऐप अपडेट की अनुमति दें");
+        put("upd_allow_msg", "To install the update, turn on \"Allow from this source\" for this app on the next screen, then come back.",
+                "अपडेट इंस्टॉल करने के लिए अगली स्क्रीन पर इस ऐप के लिए \"इस सोर्स से अनुमति दें\" चालू करें, फिर वापस आएँ।");
+        put("upd_open_settings", "Open settings", "सेटिंग्स खोलें");
+        put("notif_channel", "BI updates", "BI अपडेट");
+        put("notif_channel_desc", "New surveys, support replies and app updates", "नए सर्वे, सपोर्ट जवाब और ऐप अपडेट");
+        put("notif_survey_title", "📋 New survey from BI admin", "📋 BI एडमिन का नया सर्वे");
+        put("notif_resp_title", "📋 New survey answers", "📋 सर्वे के नए जवाब");
+        put("notif_resp_msg", "%d survey(s) have new answers. Tap to see results.", "%d सर्वे में नए जवाब आए हैं। नतीजे देखने के लिए टैप करें।");
+        put("notif_support_msg", "You have %d unread support desk update(s).", "सपोर्ट डेस्क में %d नए अपडेट हैं।");
+        put("notif_update_title", "⬆️ App update available", "⬆️ ऐप अपडेट उपलब्ध");
+        put("notif_update_msg", "Version %s is ready. Tap to update.", "वर्ज़न %s तैयार है। अपडेट करने के लिए टैप करें।");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 
