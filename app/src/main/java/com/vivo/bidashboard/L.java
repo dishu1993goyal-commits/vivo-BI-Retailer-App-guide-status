@@ -331,6 +331,20 @@ final class L {
         put("vchat_linked", "vChat ID linked. Next time log in with your vChat ID.", "vChat ID जुड़ गई। अगली बार vChat ID से लॉग इन करें।");
         put("vchat_user_or_mobile", "vChat ID, user name or mobile number", "vChat ID, यूज़र नेम या मोबाइल नंबर");
         put("vchat_directory", "vChat directory", "vChat डायरेक्टरी");
+        // v4.8: Verify on WhatsApp
+        put("wa_preparing", "Preparing WhatsApp verification…", "WhatsApp वेरिफ़िकेशन तैयार हो रहा है…");
+        put("wa_send_from_this", "Send this message on WhatsApp from the mobile number you entered:", "आपने जो मोबाइल नंबर डाला है, उसके WhatsApp से यह मैसेज भेजें:");
+        put("wa_send_from_masked", "Send this message on WhatsApp from your registered mobile (%s):", "अपने रजिस्टर्ड मोबाइल (%s) के WhatsApp से यह मैसेज भेजें:");
+        put("wa_open", "Open WhatsApp & send", "WhatsApp खोलें और भेजें");
+        put("wa_waiting", "⏳ Waiting for your WhatsApp message… Send it as it is, then come back here.", "⏳ आपके WhatsApp मैसेज का इंतज़ार… मैसेज जैसा है वैसा भेजें, फिर यहाँ वापस आएँ।");
+        put("wa_not_installed", "WhatsApp isn't installed on this phone.", "इस फ़ोन में WhatsApp इंस्टॉल नहीं है।");
+        put("wa_verified", "✅ Mobile verified on WhatsApp", "✅ WhatsApp पर मोबाइल वेरिफ़ाई हुआ");
+        put("wa_mismatch", "The message came from a different WhatsApp number (%s). Send it from the WhatsApp on the correct mobile.", "मैसेज किसी दूसरे WhatsApp नंबर (%s) से आया। सही मोबाइल के WhatsApp से भेजें।");
+        put("wa_expired", "The code expired. Please try again.", "कोड की समय-सीमा खत्म हो गई। कृपया फिर से कोशिश करें।");
+        put("forgot_wa_sub", "Verify on WhatsApp from your registered mobile, then your new password is saved.", "अपने रजिस्टर्ड मोबाइल के WhatsApp से वेरिफ़ाई करें, फिर नया पासवर्ड सेव हो जाएगा।");
+        put("wa_verify_save", "Verify on WhatsApp & save", "WhatsApp पर वेरिफ़ाई करें और सेव करें");
+        put("wa_no_whatsapp", "No WhatsApp on that mobile? Ask an admin instead", "उस मोबाइल पर WhatsApp नहीं है? एडमिन से अनुरोध करें");
+        put("pw_changed_wa", "Password changed. Log in with your new password.", "पासवर्ड बदल गया। नए पासवर्ड से लॉग इन करें।");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

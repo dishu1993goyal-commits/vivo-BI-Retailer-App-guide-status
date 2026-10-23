@@ -795,7 +795,8 @@ public class MainActivity extends FragmentActivity {
     private void showSignup() {
         unlocked = false;
         if (STATE_APP) { showStateSignup(); return; }
-        final boolean needTc = tcRequired();
+        final boolean needTc = tcRequired() && !waRequired();
+        refreshAuthConfig(null);
         LinearLayout box = authHeader(needTc ? tr("signup_sub") : tr("signup_sub_plain"));
         EditText full = authField(tr("full_name"), TEXT_NAME, 40);
         EditText user = authField(tr("choose_username"), TEXT_PLAIN, 30);
@@ -849,7 +850,11 @@ public class MainActivity extends FragmentActivity {
                     "password", pw, "accessCode", ac, "state", st), (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
-                if (needTc) startPhoneVerification(fn, ph, () -> finishSignup(details, true), this::showSignup);
+                if (waRequired()) startWaVerify("signup", obj("phone", ph), (code, secret) -> {
+                    try { details.put("waCode", code); details.put("waSecret", secret); } catch (Exception ignored) { }
+                    finishSignup(details, false);
+                }, this::showSignup);
+                else if (needTc) startPhoneVerification(fn, ph, () -> finishSignup(details, true), this::showSignup);
                 else finishSignup(details, false);
             });
         });
@@ -953,6 +958,7 @@ public class MainActivity extends FragmentActivity {
     private void showStateSignup() {
         unlocked = false;
         vchatState = null;
+        refreshAuthConfig(null);
         LinearLayout box = authHeader(tr("signup_sub_vchat"));
         EditText vid = authField(tr("vchat_id"), TEXT_PLAIN, 40);
         addField(box, vid);
@@ -987,8 +993,22 @@ public class MainActivity extends FragmentActivity {
             if (!em.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
             if (ac.isEmpty()) { setStatus(tr("err_code_vchat"), true); return; }
             hideKeyboard(code);
+            JSONObject sd = obj("action", "signup", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac);
+            if (waRequired()) {
+                busy(go, tr("checking"));
+                JSONObject chk = obj("action", "signup-check", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac);
+                callAuth(chk, (ok0, r0, e0) -> {
+                    busy(go, null);
+                    if (!ok0) { setStatus(e0, true); return; }
+                    startWaVerify("signup", obj("vchatId", id, "phone", ph), (wc, ws) -> {
+                        try { sd.put("waCode", wc); sd.put("waSecret", ws); } catch (Exception ignored) { }
+                        stateSignupFinal(sd, id);
+                    }, this::showStateSignup);
+                });
+                return;
+            }
             busy(go, tr("saving"));
-            callAuth(obj("action", "signup", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac), (ok, res, err) -> {
+            callAuth(sd, (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
                 saveSession(res);
@@ -998,6 +1018,20 @@ public class MainActivity extends FragmentActivity {
             });
         });
         showScreen(box, vid);
+    }
+
+    private void stateSignupFinal(JSONObject sd, String id) {
+        LinearLayout w = authHeader(tr("saving"));
+        w.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
+        tcStatus = authMsg(w);
+        showScreen(w, null);
+        callAuth(sd, (ok, res, err) -> {
+            if (!ok) { setStatus(err, true); w.addView(linkText(tr("back_signup"), v -> showStateSignup())); return; }
+            saveSession(res);
+            authPrefs().edit().putString("last_vchat", res.optJSONObject("profile") != null ? res.optJSONObject("profile").optString("vchatId", id) : id).apply();
+            Toast.makeText(this, trf("welcome", res.optString("fullName", "")), Toast.LENGTH_LONG).show();
+            openDashboard();
+        });
     }
 
     // Older state accounts link their vChat ID once (nothing else works until they do).
@@ -1026,10 +1060,24 @@ public class MainActivity extends FragmentActivity {
         go.setOnClickListener(v -> {
             if (vchatState == null) { setStatus(tr("err_vchat_lookup"), true); return; }
             hideKeyboard(code);
-            busy(go, tr("saving"));
-            callAuth(sessionBody("action", "vchat-link", "vchatId", vid.getText().toString().trim(),
-                    "phone", phone.getText().toString().replaceAll("\\D", ""), "accessCode", code.getText().toString().trim()), (ok, res, err) -> {
-                busy(go, null);
+            String lid = vid.getText().toString().trim(), lph = phone.getText().toString().replaceAll("\\D", ""), lac = code.getText().toString().trim();
+            if (waRequired()) {
+                startWaVerify("link", obj("vchatId", lid, "phone", lph), (wc, ws) -> doLink(lid, lph, lac, wc, ws, null), this::showLinkVchat);
+                return;
+            }
+            doLink(lid, lph, lac, null, null, go);
+        });
+        showScreen(box, vid);
+        refreshAuthConfig(null);
+    }
+
+    private void doLink(String lid, String lph, String lac, String wc, String ws, Button go) {
+        if (go != null) busy(go, tr("saving"));
+        else { LinearLayout w = authHeader(tr("saving")); w.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2)); tcStatus = authMsg(w); showScreen(w, null); }
+        {
+            callAuth(sessionBody("action", "vchat-link", "vchatId", lid, "phone", lph, "accessCode", lac, "waCode", wc == null ? "" : wc, "waSecret", ws == null ? "" : ws), (ok, res, err) -> {
+                if (go != null) busy(go, null);
+                if (!ok && go == null) { new AlertDialog.Builder(this).setMessage(err).setPositiveButton("OK", (d, w2) -> showLinkVchat()).setCancelable(false).show(); return; }
                 if (!ok) { if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); else setStatus(err, true); return; }
                 saveProfile(res.optJSONObject("profile"));
                 authPrefs().edit().putString("last_vchat", profile().optString("vchatId")).apply();
@@ -1038,8 +1086,7 @@ public class MainActivity extends FragmentActivity {
                 if (webView != null) { detachWebView(); webView.destroy(); webView = null; }   // rebuild with the vChat state lock
                 openDashboard();
             });
-        });
-        showScreen(box, vid);
+        }
     }
 
     // ---------- Forgot password: re-verify mobile with Truecaller, then set a new password ----------
@@ -1049,15 +1096,122 @@ public class MainActivity extends FragmentActivity {
         LinearLayout wait = authHeader(tr("checking"));
         wait.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
         showScreen(wait, null);
-        refreshAuthConfig(() -> { if (tcRequired()) showForgotTc(); else showResetRequest(); });
+        refreshAuthConfig(() -> { if (waRequired()) showForgotWa(); else if (tcRequired()) showForgotTc(); else showResetRequest(); });
     }
 
     // ---------- Truecaller switch (set by admins, stored on the server) ----------
     private boolean tcRequired() { return settings().getBoolean("tc_required", true); }
+    private boolean waRequired() { return settings().getBoolean("wa_required", false); }
+
+    // ---------- "Verify on WhatsApp": the user sends one message from their own WhatsApp (free) ----------
+    private interface WaDone { void ok(String code, String secret); }
+    private Runnable waPoll;
+
+    private void startWaVerify(String purpose, JSONObject req, WaDone done, Runnable back) {
+        LinearLayout box = authHeader(tr("wa_preparing"));
+        box.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
+        tcStatus = authMsg(box);
+        showScreen(box, null);
+        try { req.put("action", "wa-start"); req.put("purpose", purpose); } catch (Exception ignored) { }
+        callAuth(req, (ok, res, err) -> {
+            if (!ok) {
+                new AlertDialog.Builder(this).setMessage(err).setPositiveButton("OK", (d, w) -> back.run()).setCancelable(false).show();
+                return;
+            }
+            String code = res.optString("code"), secret = res.optString("secret"), link = res.optString("waLink"), text = res.optString("text");
+            String masked = res.optString("masked", "");
+            LinearLayout b2 = authHeader(masked.isEmpty() ? tr("wa_send_from_this") : trf("wa_send_from_masked", masked));
+            TextView msgView = infoLine(text, 24, "#111111", true);
+            msgView.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+            msgView.setGravity(Gravity.CENTER);
+            msgView.setPadding(0, dp(10), 0, dp(10));
+            b2.addView(msgView);
+            Button open = authButton(tr("wa_open"));
+            open.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#25D366")));
+            b2.addView(open, buttonParams());
+            TextView status = infoLine(tr("wa_waiting"), 14, "#555555", false);
+            status.setGravity(Gravity.CENTER);
+            status.setPadding(0, dp(12), 0, dp(4));
+            b2.addView(status);
+            tcStatus = authMsg(b2);
+            b2.addView(linkText(tr("cancel"), v -> { stopWaPoll(); back.run(); }));
+            open.setOnClickListener(v -> {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(link))); }
+                catch (ActivityNotFoundException e) { Toast.makeText(this, tr("wa_not_installed"), Toast.LENGTH_LONG).show(); }
+            });
+            showScreen(b2, null);
+            stopWaPoll();
+            waPoll = new Runnable() {
+                @Override
+                public void run() {
+                    callAuth(obj("action", "wa-status", "code", code, "secret", secret), (ok2, r2, e2) -> {
+                        if (waPoll != this) return;
+                        String st = r2.optString("status");
+                        if ("verified".equals(st)) { stopWaPoll(); Toast.makeText(MainActivity.this, tr("wa_verified"), Toast.LENGTH_SHORT).show(); done.ok(code, secret); return; }
+                        if ("mismatch".equals(st)) {
+                            stopWaPoll();
+                            new AlertDialog.Builder(MainActivity.this).setMessage(trf("wa_mismatch", r2.optString("from", ""))).setPositiveButton("OK", (d, w) -> back.run()).setCancelable(false).show();
+                            return;
+                        }
+                        if ("expired".equals(st) || "missing".equals(st)) {
+                            stopWaPoll();
+                            new AlertDialog.Builder(MainActivity.this).setMessage(tr("wa_expired")).setPositiveButton("OK", (d, w) -> back.run()).setCancelable(false).show();
+                            return;
+                        }
+                        ui.postDelayed(this, 2500);
+                    });
+                }
+            };
+            ui.postDelayed(waPoll, 2500);
+            // Open WhatsApp straight away to save a tap.
+            open.performClick();
+        });
+    }
+
+    private void stopWaPoll() { if (waPoll != null) ui.removeCallbacks(waPoll); waPoll = null; }
+
+    // Forgot password with WhatsApp: verify from the registered mobile, then the new password is saved.
+    private void showForgotWa() {
+        LinearLayout box = authHeader(tr("forgot_wa_sub"));
+        EditText user = authField(STATE_APP ? tr("vchat_user_or_mobile") : tr("user_or_mobile"), TEXT_PLAIN, 40);
+        user.setText(STATE_APP ? authPrefs().getString("last_vchat", "") : lastUsername());
+        EditText pass = authField(tr("new_password"), TEXT_PASSWORD, 64);
+        EditText pass2 = authField(tr("confirm_new_password"), TEXT_PASSWORD, 64);
+        addField(box, user);
+        addField(box, pass);
+        addField(box, pass2);
+        box.addView(showPasswordBox(pass, pass2));
+        tcStatus = authMsg(box);
+        Button go = authButton(tr("wa_verify_save"));
+        go.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.parseColor("#25D366")));
+        box.addView(go, buttonParams());
+        box.addView(linkText(tr("wa_no_whatsapp"), v -> showResetRequest()));
+        box.addView(linkText(tr("back_login"), v -> showLoginScreen(null)));
+        go.setOnClickListener(v -> {
+            String u = user.getText().toString().trim(), pw = pass.getText().toString();
+            if (u.isEmpty()) { setStatus(tr("err_user_or_mobile"), true); return; }
+            if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            hideKeyboard(pass2);
+            startWaVerify("reset", obj("username", u), (code, secret) -> {
+                LinearLayout w = authHeader(tr("saving"));
+                w.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
+                tcStatus = authMsg(w);
+                showScreen(w, null);
+                callAuth(obj("action", "reset-wa", "username", u, "newPassword", pw, "waCode", code, "waSecret", secret), (ok, res, err) -> {
+                    if (!ok) { setStatus(err, true); w.addView(linkText(tr("back_login"), x -> showLoginScreen(null))); return; }
+                    if (!res.optString("vchatId").isEmpty()) authPrefs().edit().putString("last_vchat", res.optString("vchatId")).apply();
+                    else authPrefs().edit().putString("last_username", res.optString("username")).apply();
+                    showLoginScreen(tr("pw_changed_wa"));
+                });
+            }, this::showForgotWa);
+        });
+        showScreen(box, user.getText().length() > 0 ? pass : user);
+    }
 
     private void refreshAuthConfig(Runnable then) {
         callAuth(obj("action", "auth-config"), (ok, res, err) -> {
-            if (ok) settings().edit().putBoolean("tc_required", res.optBoolean("tcRequired", true)).apply();
+            if (ok) settings().edit().putBoolean("tc_required", res.optBoolean("tcRequired", true)).putBoolean("wa_required", res.optBoolean("waRequired", false)).apply();
             if (then != null) then.run();
         });
     }
