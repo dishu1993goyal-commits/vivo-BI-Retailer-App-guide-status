@@ -352,7 +352,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
 
   // ---------- ACCESS LOGS ----------
-  var EV = { open: "Opened app", login: "Logged in", signup: "Signed up", logout: "Logged out", "password-reset": "Reset password", disabled: "Account disabled", enabled: "Account enabled" };
+  var EV = { open: "Opened app", login: "Logged in", signup: "Signed up", logout: "Logged out", "password-reset": "Reset password", disabled: "Account disabled", enabled: "Account enabled", "qr-login": "QR web login", "reset-requested": "Password reset requested", "truecaller-on": "Truecaller ON", "truecaller-off": "Truecaller OFF", "survey-published": "Survey published", "survey-response": "Survey answered", "matrix-imported": "Matrix imported", "matrix-frozen": "Matrix frozen", "matrix-unfrozen": "Matrix unfrozen" };
   function renderLogs(res, r) {
     var logs = res.logs || [], users = res.users || [];
     var days = daysIn(r[0], r[1]);

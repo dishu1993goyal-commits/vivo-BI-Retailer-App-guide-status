@@ -204,6 +204,7 @@
     setRole(role);
     loginEl.querySelector("#biw-sp").onchange = function () { p.type = this.checked ? "text" : "password"; };
     if (info) { m.className = "biw-msg " + (isError ? "err" : "ok"); m.textContent = info; }
+    else if (store("biw-pwreq")) { m.className = "biw-msg ok"; m.innerHTML = '⏳ Password reset request sent. <a style="color:#8a6a1f;font-weight:700;cursor:pointer" id="biw-rs">Check status</a>'; m.querySelector("#biw-rs").onclick = function () { showForgot(); }; }
     function doLogin() {
       if (!u.value.trim() || !p.value) { m.className = "biw-msg err"; m.textContent = "Enter your user name and password."; return; }
       go.disabled = true; go.textContent = "Logging in…";
@@ -212,7 +213,7 @@
         if (!res.ok) { m.className = "biw-msg err"; m.textContent = res.error || "Login failed."; p.value = ""; return; }
         AUTH = { app: role, username: res.username, token: res.token };
         store("biw-auth", AUTH); store("biw-role", role); store("biw-last-user", res.username);
-        saveProfile(res.profile);
+        saveProfile(res.profile); store("biw-pwreq", null);
         loginEl.remove(); loginEl = null;
         startSession(true);
       });
@@ -328,12 +329,58 @@
   }
 
   // ---------- FORGOT PASSWORD ----------
-  function showForgot() {
-    var c = authCard('<h1>Forgot <em>password?</em></h1>' +
-      '<div class="biw-note" style="font-size:14px">Reset it in the mobile app: open the <a href="' + APP_LINKS.state + '">State app</a> or <a href="' + APP_LINKS.admin + '">Admin app</a> → <b>Forgot password?</b> and verify your mobile with Truecaller. Then log in here with the new password.<br><br>' +
-      "If you can't use the app, raise it with your BI admin.</div>" +
-      '<a class="biw-link" id="f-back">Back to log in</a>');
+  // Forgot password: the user chooses a new password and a BI admin approves the request.
+  function showForgot(role) {
+    var pend = store("biw-pwreq");
+    if (pend && pend.reqId) return showResetStatus(pend);
+    role = role || store("biw-role") || "state";
+    var c = authCard('<h1>Forgot <em>password?</em></h1><p>Choose a new password. A BI admin checks the request (usually by calling you) and approves it.</p>' +
+      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+      '<label>User name or mobile number</label><input id="f-u" maxlength="30" autocomplete="username">' +
+      '<label>New password (min 6 characters)</label><input id="f-p" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>Confirm new password</label><input id="f-p2" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>Message for the admin (optional)</label><input id="f-n" maxlength="200" placeholder="e.g. Changed my phone">' +
+      '<div class="biw-msg" id="f-m"></div><button class="biw-btn biw-dark" id="f-go">Send reset request</button><a class="biw-link" id="f-back">Back to log in</a>');
+    c.querySelector("#f-u").value = store("biw-last-user") || "";
+    roleSeg(c, role, function (r) { role = r; });
     c.querySelector("#f-back").onclick = function () { showLogin(); };
+    var go = c.querySelector("#f-go");
+    go.onclick = function () {
+      var u = c.querySelector("#f-u").value.trim(), p = c.querySelector("#f-p").value;
+      if (!u) return msg(c, "#f-m", "Enter your user name or mobile number.");
+      if (p.length < 6) return msg(c, "#f-m", "Password must be at least 6 characters.");
+      if (p !== c.querySelector("#f-p2").value) return msg(c, "#f-m", "Passwords don't match.");
+      go.disabled = true; go.textContent = "Sending…";
+      api({ app: role, action: "reset-request", username: u, newPassword: p, note: c.querySelector("#f-n").value, via: "web", device: browserName() }, false).then(function (r) {
+        go.disabled = false; go.textContent = "Send reset request";
+        if (!r.ok) return msg(c, "#f-m", r.error || "Couldn't send the request.");
+        var q = { app: role, username: r.username, reqId: r.reqId, at: Date.now() };
+        store("biw-pwreq", q); store("biw-role", role); store("biw-last-user", r.username);
+        showResetStatus(q);
+      });
+    };
+  }
+  function showResetStatus(q) {
+    var c = authCard('<h1>Reset <em>request</em></h1><div id="r-box"><div class="biw-note">Checking…</div></div>' +
+      '<button class="biw-btn biw-dark" id="r-chk">Check status</button><a class="biw-link" id="r-new">Send a new request</a><a class="biw-link" id="f-back">Back to log in</a>');
+    c.querySelector("#f-back").onclick = function () { showLogin(); };
+    c.querySelector("#r-new").onclick = function () { store("biw-pwreq", null); showForgot(q.app); };
+    var check = function () {
+      api({ app: q.app, action: "reset-status", username: q.username, reqId: q.reqId }, false).then(function (r) {
+        var box = c.querySelector("#r-box"); if (!box) return;
+        if (!r.ok) { store("biw-pwreq", null); box.innerHTML = '<div class="biw-note">This request is no longer available. Send a new one if you still need it.</div>'; return; }
+        if (r.status === "approved") {
+          store("biw-pwreq", null);
+          box.innerHTML = '<div class="biw-note" style="background:#e9f7ef;border-color:#a8dcbc;color:#1d6b43">✅ Approved' + (r.decidedAt ? " " + fmtTime(r.decidedAt) : "") + ". Log in as <b>" + esc(r.username) + "</b> with the new password you chose.</div>";
+          c.querySelector("#r-chk").textContent = "Go to log in"; c.querySelector("#r-chk").onclick = function () { showLogin("Request approved — log in with your new password."); };
+          c.querySelector("#r-new").style.display = "none";
+        } else if (r.status === "rejected") {
+          store("biw-pwreq", null);
+          box.innerHTML = '<div class="biw-note" style="background:#fdecec;border-color:#f2c4c4;color:#8c2f22">✕ Not approved' + (r.reason ? ": " + esc(r.reason) : "") + ". Your password is unchanged. Contact your BI admin or send a new request.</div>";
+        } else box.innerHTML = '<div class="biw-note">⏳ Waiting for a BI admin to approve the new password for <b>' + esc(r.username) + "</b> (sent " + fmtTime(q.at) + "). The admin may call you to confirm.</div>";
+      });
+    };
+    c.querySelector("#r-chk").onclick = check; check();
   }
 
   // (email-code password reset, kept for later if an email service is added)
@@ -454,7 +501,7 @@
   }
 
   // ---------- TOP BAR ----------
-  var barEl = null, badgeEl = null, svBadgeEl = null, chBadgeEl = null;
+  var barEl = null, badgeEl = null, svBadgeEl = null, chBadgeEl = null, PWREQ = 0;
   function buildBar() {
     if (barEl) barEl.remove();
     barEl = el("div", "biw-bar");
@@ -493,6 +540,11 @@
       var sv = res.surveys || {};
       setBadge(svBadgeEl, isAdmin() ? (sv.newResponses || 0) : (sv.pending || 0));
       setBadge(chBadgeEl, (res.chat && res.chat.unread) || 0);
+      if (isAdmin()) {
+        var pr = res.pwreq || 0;
+        if (pr > PWREQ && !document.querySelector(".biw-frame,.biw-ov")) toast("🛡️ " + pr + " password reset request" + (pr > 1 ? "s" : "") + " waiting — Profile → Account security");
+        PWREQ = pr; var av = barEl && barEl.querySelector(".biw-av"); if (av) av.parentNode.style.boxShadow = pr ? "0 0 0 2px #e53935" : "";
+      }
       if (!isAdmin()) { surveyPopup(sv.surveys || []); matrixPopup(res.matrix); }
     });
   }
@@ -527,7 +579,7 @@
   }
   // ---------- SURVEYS, MESSAGES, FEATURE MATRIX (shared pages, also used by the apps) ----------
   var svFrame = null;
-  var TOOLS = { survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"] };
+  var TOOLS = { security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"] };
   function openSurveys(hash) { openTool("survey", hash); }
   function openTool(name, hash) {
     closeDrawer();
@@ -600,7 +652,7 @@
   function openDrawer() {
     var p = PROFILE, admin = isAdmin();
     var ph = store("biw-photo");
-    var adminItems = [["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
+    var adminItems = [["🛡️", "Account security", PWREQ ? PWREQ + " reset request" + (PWREQ > 1 ? "s" : "") : "", function () { openTool("security"); }], ["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
     var helpItems = [["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];

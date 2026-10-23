@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Account Security</title>
+<style>
+/*@@CSS@@*/
+.sw{display:flex;align-items:center;gap:14px}
+.sw .big{font-size:30px;width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex:none}
+.sw .big.on{background:#E6F4EA}.sw .big.off{background:#FDECEC}
+.sw b{font-size:17px;display:block}
+.tg.lg i{width:54px;height:30px}.tg.lg i:after{width:26px;height:26px}.tg.lg input:checked+i:after{left:26px}
+.rq{background:var(--card);border-radius:14px;padding:13px 14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--warn)}
+.rq.approved{border-left-color:var(--ok)}.rq.rejected{border-left-color:var(--bad)}
+.rq .nm{font-weight:700;font-size:15.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.rq .mt{font-size:12.5px;color:var(--mut);margin-top:3px}
+.rq .note{background:#F7F8FC;border-radius:9px;padding:8px 10px;font-size:13.5px;margin-top:8px;white-space:pre-wrap}
+.rq .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.rq a.call{color:var(--brand);font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🛡️</span></div>
+  <h1 id="h1">Account security</h1><p id="h2">Loading…</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), D = null, TAB = "pending", timer = 0;
+  window.__pageBack = window.__surveyBack = function () { return false; };
+  function load(bg) {
+    clearTimeout(timer);
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">Only BI admins can open this page.</div>'; $("h2").textContent = ""; return; }
+    if (!bg) VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "admin-security" }).then(function (r) {
+      if (!r.ok) { if (!bg) VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var changedNow = !D || JSON.stringify(r) !== JSON.stringify(D);
+      D = r; if (changedNow) render();
+      timer = setTimeout(function () { load(true); }, 20000);
+    });
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") load(true); });
+  function render() {
+    var pend = D.requests.filter(function (q) { return q.status === "pending"; }), done = D.requests.filter(function (q) { return q.status !== "pending"; });
+    $("h2").textContent = "Truecaller verification " + (D.tcRequired ? "ON" : "OFF") + " · " + pend.length + " pending reset request" + (pend.length === 1 ? "" : "s");
+    var on = D.tcRequired;
+    var html = '<div class="card"><div class="sw"><div class="big ' + (on ? "on" : "off") + '">' + (on ? "✅" : "⏸️") + '</div><div style="flex:1"><b>Require Truecaller verification</b><span class="muted" style="font-size:13px">' +
+      (on ? "ON — new app users verify their mobile with Truecaller. Forgot password re-verifies the mobile." : "OFF — app sign-up needs only user name, password and access code. Forgot password sends a request to admins.") +
+      '</span></div><label class="tg lg"><input type="checkbox" id="tc"' + (on ? " checked" : "") + "><i></i></label></div>" +
+      (D.updatedBy ? '<div class="muted" style="font-size:12px;margin-top:10px">Last changed by ' + esc(D.updatedBy) + " · " + dt(D.updatedAt) + "</div>" : "") +
+      '<div class="notice info" style="margin-top:10px">You can turn this on and off any time — no app update needed. Existing users and passwords are not affected. On the website, Forgot password always uses an admin-approved request.</div></div>';
+    html += '<div class="seg" style="margin-top:14px"><button data-t="pending" class="' + (TAB === "pending" ? "on" : "") + '">Pending<span class="n">' + pend.length + '</span></button><button data-t="done" class="' + (TAB === "done" ? "on" : "") + '">Handled (30 days)<span class="n">' + done.length + "</span></button></div>";
+    var list = TAB === "pending" ? pend : done;
+    if (!list.length) html += '<div class="card empty"><div class="big">' + (TAB === "pending" ? "🎉" : "📭") + "</div>" + (TAB === "pending" ? "No pending password reset requests." : "Nothing handled in the last 30 days.") + "</div>";
+    list.forEach(function (q, i) {
+      html += '<div class="rq ' + q.status + '"><div class="nm">' + esc(q.fullName) + ' <span class="chip' + (q.app === "admin" ? " warn" : "") + '">' + (q.app === "admin" ? "Admin" : esc(q.state || "State")) + "</span>" +
+        (q.status !== "pending" ? '<span class="chip ' + (q.status === "approved" ? "live" : "closed") + '">' + (q.status === "approved" ? "✓ Approved" : "✕ Rejected") + "</span>" : "") + "</div>" +
+        '<div class="mt">@' + esc(q.username) + (q.designation ? " · " + esc(q.designation) : "") + ' · <a class="call" href="tel:' + esc(q.phone) + '">📞 ' + esc(q.phone) + "</a></div>" +
+        '<div class="mt">Requested ' + dt(q.at) + " · via " + esc(q.via || "app") + (q.device ? " · " + esc(q.device) : "") + "</div>" +
+        (q.note ? '<div class="note">' + esc(q.note) + "</div>" : "") +
+        (q.status === "pending" ? (q.own ? '<div class="notice" style="margin-top:8px">This is your own request — another admin must approve it.</div>' :
+          '<div class="acts"><button class="btn ok sm" data-ok="' + i + '">✓ Approve</button><button class="btn danger sm" data-no="' + i + '">✕ Reject</button></div>') :
+          '<div class="mt">' + (q.status === "approved" ? "Approved" : "Rejected") + " by " + esc(q.decidedBy) + " · " + dt(q.decidedAt) + (q.reason ? " · " + esc(q.reason) : "") + "</div>") + "</div>";
+    });
+    VIEW.innerHTML = html;
+    $("tc").onchange = function () {
+      var want = this.checked; this.checked = !want;
+      sheet(want ? "Turn Truecaller verification ON?" : "Turn Truecaller verification OFF?",
+        want ? "New app users must verify their mobile with Truecaller again, and Forgot password re-verifies the mobile." : "New app users can sign up without mobile verification (the access code still applies). Forgot password will send a request for an admin to approve.",
+        [[want ? "✅" : "⏸️", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", tcRequired: want }).then(function (r) { toast(r.ok ? "Truecaller verification " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
+    };
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-ok]"), function (b) {
+      b.onclick = function () {
+        var q = list[+b.dataset.ok];
+        sheet("Approve new password for " + q.fullName + "?", "Call " + q.phone + " first to make sure the request is really from them. After approval they log in with the new password they chose, and are logged out everywhere else.",
+          [["✓", "Approve", function () { decide(q, true, ""); }]]);
+      };
+    });
+    [].forEach.call(VIEW.querySelectorAll("[data-no]"), function (b) {
+      b.onclick = function () {
+        var q = list[+b.dataset.no];
+        sheet("Reject request from " + q.fullName + "?", "Their password stays the same. They'll see your reason.", [["✕", "Reject", function (ov) { decide(q, false, ov.querySelector("input").value); }, "red"]],
+          '<input class="tx" maxlength="200" placeholder="Reason (optional), e.g. Please call me" style="margin-top:12px">');
+      };
+    });
+  }
+  function decide(q, ok, reason) {
+    api({ action: "admin-pwreq-decide", which: q.app, target: q.username, approve: ok, reason: reason }).then(function (r) { toast(r.ok ? (ok ? "Approved — they can log in with their new password." : "Request rejected.") : r.error); changed(); load(true); });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

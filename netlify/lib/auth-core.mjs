@@ -410,6 +410,40 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     await store.delete(k); return null;
   }
 
+  // ---------- Admin switch: is Truecaller verification required in the apps? (default: yes) ----------
+  const authCfg = async () => Object.assign({ tcRequired: true }, (await store.get("config:auth")) || {});
+  if (b.action === "auth-config") {
+    const c = await authCfg();
+    return json(200, { ok: true, tcRequired: c.tcRequired !== false });
+  }
+
+  // ---------- Forgot password by request: the user asks, a BI admin approves ----------
+  if (b.action === "reset-request") {
+    const key = userKey(b.username);
+    let rec = key ? await store.get(uKeyOf(key)) : null, rk = key;
+    if (!rec && normalizePhone(b.username)) { const idx = await store.get(pKeyOf(normalizePhone(b.username))); if (idx) { rk = idx.key; rec = await store.get(uKeyOf(idx.key)); } }
+    if (!rec) return json(404, { ok: false, error: "No account found with this user name or mobile number." });
+    if (rec.disabled) return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
+    const pwErr = passwordProblem(b.newPassword);
+    if (pwErr) return json(400, { ok: false, error: pwErr });
+    const qk = `pwreq:${app}:${rk}`;
+    const old = await store.get(qk);
+    const recent = ((old && old.history) || []).filter((x) => t - x < 86400000);
+    if (recent.length >= 3) return json(429, { ok: false, error: "Too many requests today. Please contact your BI admin." });
+    const reqId = randomBytes(12).toString("hex");
+    await store.set(qk, { app, key: rk, username: rec.username, fullName: rec.fullName, phone: rec.phone, state: rec.state || "", designation: rec.designation || "",
+      ...hashPassword(b.newPassword), note: clip(b.note, 200), device: clip(b.device, 60), via: clip(b.via, 10) || "app", at: t, status: "pending",
+      rid: sha256(reqId), history: recent.concat([t]) });
+    await logEvent(store, t, app, rec, "reset-requested", b);
+    return json(200, { ok: true, reqId, username: rec.username });
+  }
+  if (b.action === "reset-status") {
+    const key = userKey(b.username);
+    const q = key ? await store.get(`pwreq:${app}:${key}`) : null;
+    if (!q || q.rid !== sha256(String(b.reqId || ""))) return json(404, { ok: false, error: "Request not found." });
+    return json(200, { ok: true, status: q.status, decidedAt: q.decidedAt || 0, reason: q.reason || "", username: q.username });
+  }
+
   if (b.action === "email-otp-send") {
     const email = normEmail(b.email);
     if (!email) return json(400, { ok: false, error: "Enter a valid email address." });
@@ -475,7 +509,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       emailVerified = true;
     } else if (b.via === "web") {
       // Web sign-up without OTP: the access code (checked above) is the gate.
-    } else if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
+    } else if (b.phoneVerified !== true && (await authCfg()).tcRequired !== false) return json(400, { ok: false, error: "Mobile number is not verified." });
     const username = String(b.username).trim().replace(/\s+/g, " ");
     const rec = {
       username, fullName: name, phone, ...hashPassword(b.password),
@@ -529,6 +563,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action === "reset-check") return json(200, { ok: true, phone: maskPhone(phone) });
 
     if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
+    if ((await authCfg()).tcRequired === false) return json(400, { ok: false, error: "Mobile verification is turned off. Please update the app and use Forgot password to send a reset request to your BI admin." });
     const pwErr = passwordProblem(b.newPassword);
     if (pwErr) return json(400, { ok: false, error: pwErr });
     // A reset logs the account out on every phone.
@@ -583,7 +618,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "support-upload", "support-att", "support-unread", "ai-ask", "ai-status", "admin-logs-range", "admin-support-data",
     "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
     "survey-status", "survey-remind", "survey-results", "survey-ai", "chat-contacts", "chat-list", "chat-get", "chat-send", "chat-att",
-    "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind"];
+    "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
+    "admin-security", "admin-set-auth", "admin-pwreq-decide"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -634,7 +670,12 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const su = await (await supportAction({ action: "support-unread" }, { store, t, app, rec, key })).json();
       const chat = await chatAction({ action: "chat-notify" }, ctx);
       const matrix = await matrixAction({ action: "matrix-notify" }, ctx);
-      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix });
+      let pwreq = 0;
+      if (app === "admin" && store.list) {
+        const ks = await store.list("pwreq:");
+        pwreq = (await pool(ks, 40, (k) => store.get(k))).filter((q) => q && q.status === "pending" && !(q.app === app && q.key === key)).length;
+      }
+      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq });
     }
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());
@@ -654,6 +695,42 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     // ---------- Support desk (shared by state and admin users) ----------
     if (b.action.startsWith("support-")) {
       return supportAction(b, { store, t, app, rec, key });
+    }
+
+    // ---------- Account security (admins): Truecaller switch + password reset requests ----------
+    if (b.action === "admin-security" || b.action === "admin-set-auth" || b.action === "admin-pwreq-decide") {
+      if (app !== "admin") return json(403, { ok: false, error: "Only BI admins can do this." });
+      if (b.action === "admin-set-auth") {
+        const c = { tcRequired: b.tcRequired !== false, updatedBy: rec.username, updatedAt: t };
+        await store.set("config:auth", c);
+        await logEvent(store, t, app, rec, c.tcRequired ? "truecaller-on" : "truecaller-off", { device: "by " + rec.username, ver: "" });
+        return json(200, { ok: true, tcRequired: c.tcRequired });
+      }
+      if (b.action === "admin-pwreq-decide") {
+        const which = b.which === "admin" ? "admin" : "state", uk = userKey(b.target);
+        const qk = `pwreq:${which}:${uk}`, q = uk ? await store.get(qk) : null;
+        if (!q || q.status !== "pending") return json(404, { ok: false, error: "This request was already handled." });
+        if (which === app && uk === key) return json(403, { ok: false, error: "Another admin must approve your own request." });
+        const u = await store.get(`user:${which}:${uk}`);
+        if (!u) return json(404, { ok: false, error: "Account not found." });
+        if (b.approve === true) {
+          Object.assign(u, { hash: q.hash, salt: q.salt, fails: 0, lockUntil: 0, resetAt: t, sessions: [] });
+          await store.set(`user:${which}:${uk}`, u);
+          await logEvent(store, t, which, u, "password-reset", { device: "approved by " + rec.username, ver: "" });
+        }
+        Object.assign(q, { status: b.approve === true ? "approved" : "rejected", decidedAt: t, decidedBy: rec.username, reason: clip(b.reason, 200) });
+        delete q.hash; delete q.salt;
+        await store.set(qk, q);
+        return json(200, { ok: true, status: q.status });
+      }
+      const ks = await store.list("pwreq:");
+      const reqs = (await pool(ks, 40, (k) => store.get(k))).filter((q) => q && (q.status === "pending" || t - (q.decidedAt || q.at) < 30 * 86400000))
+        .map((q) => ({ app: q.app, username: q.username, fullName: q.fullName, phone: q.phone, state: q.state, designation: q.designation, note: q.note,
+          device: q.device, via: q.via, at: q.at, status: q.status, decidedAt: q.decidedAt || 0, decidedBy: q.decidedBy || "", reason: q.reason || "",
+          own: q.app === app && q.key === key }))
+        .sort((x, y) => (x.status === "pending" ? 0 : 1) - (y.status === "pending" ? 0 : 1) || y.at - x.at);
+      const c = await authCfg();
+      return json(200, { ok: true, tcRequired: c.tcRequired !== false, updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0, requests: reqs });
     }
 
     // ---------- Admin app only ----------
