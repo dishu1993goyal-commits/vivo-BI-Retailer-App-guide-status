@@ -107,6 +107,12 @@ public class MainActivity extends FragmentActivity {
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
+    // Market visits: GPS punch in/out and camera photos inside the shared tool pages.
+    private static final int GEO_REQUEST = 2101, CAM_PERM_REQUEST = 2102;
+    private String geoOrigin;
+    private android.webkit.GeolocationPermissions.Callback geoCallback;
+    private Uri cameraPhotoUri;
+    private boolean pendingImageChooser;
     private boolean unlocked = false;      // dashboard (not a login/profile screen) is showing
     private boolean inProfile = false;     // a profile screen is showing over the dashboard
     private LinearLayout dashboardRoot;
@@ -454,6 +460,17 @@ public class MainActivity extends FragmentActivity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == PERM_REQUEST) doRequestVerification(); // if refused, Truecaller uses OTP instead
+        if (requestCode == GEO_REQUEST && geoCallback != null) {
+            boolean ok = false;
+            for (int r : results) if (r == PackageManager.PERMISSION_GRANTED) ok = true;
+            geoCallback.invoke(geoOrigin, ok, false);
+            geoCallback = null;
+            if (!ok) Toast.makeText(this, tr("location_needed"), Toast.LENGTH_LONG).show();
+        }
+        if (requestCode == CAM_PERM_REQUEST && pendingImageChooser) {
+            pendingImageChooser = false;
+            if (filePathCallback != null) launchFileChooser(true);
+        }
     }
 
     private void doRequestVerification() {
@@ -1515,6 +1532,9 @@ public class MainActivity extends FragmentActivity {
         bar.addView(barButton("💬", tr("assistant"), "openChat"));
         bar.addView(badgeButton("✉️", tr("messages"), false, v -> showToolPage("chat.html", tr("messages"), "#list")));
         bar.addView(badgeButton("📋", tr("surveys"), true, v -> showSurveyPage("#list")));
+        TextView visitBtn = barButton("📍", tr("market_visits"), "");
+        visitBtn.setOnClickListener(v -> showToolPage("visits.html", tr("market_visits"), "#list"));
+        bar.addView(visitBtn);
         bar.addView(supportButton());
         topAvatar = new FrameLayout(this);
         topAvatar.setContentDescription(tr("profile"));
@@ -1789,6 +1809,8 @@ public class MainActivity extends FragmentActivity {
         }
 
         LinearLayout help = card(page, tr("sec_tools"));
+        row(help, "📍", tr("market_visits"), STATE_APP ? tr("visits_sub_state") : tr("visits_sub_admin"), v -> showToolPage("visits.html", tr("market_visits"), "#list"));
+        row(help, "📚", tr("knowledge"), tr("knowledge_sub"), v -> showToolPage("knowledge.html", tr("knowledge"), "#list"));
         row(help, "✉️", tr("messages"), "", v -> showToolPage("chat.html", tr("messages"), "#list"));
         row(help, "🧩", tr("feature_matrix"), "", v -> showToolPage("matrix.html", tr("feature_matrix"), "#list"));
         row(help, "📋", STATE_APP ? tr("surveys") : tr("survey_manager"), "", v -> showSurveyPage("#list"));
@@ -2649,7 +2671,38 @@ public class MainActivity extends FragmentActivity {
 
     private void showSurveyPage(String hash) { showToolPage("survey.html", STATE_APP ? tr("surveys") : tr("survey_manager"), hash); }
 
-    // Shared web pages used by both apps and the website: survey.html, chat.html, matrix.html.
+    // Opens the picker for a web page file input. For images it also offers the camera (photo saved to the app cache).
+    private boolean launchFileChooser(boolean image) {
+        Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
+        pick.addCategory(Intent.CATEGORY_OPENABLE);
+        pick.setType(image ? "image/*" : "*/*");
+        Intent chooser = Intent.createChooser(pick, tr(image ? "take_or_choose_photo" : "choose_file"));
+        cameraPhotoUri = null;
+        if (image && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                File dir = new File(getCacheDir(), "photos");
+                if (!dir.exists()) dir.mkdirs();
+                File f = new File(dir, "visit_" + System.currentTimeMillis() + ".jpg");
+                cameraPhotoUri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".files", f);
+                Intent cam = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                cam.putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri);
+                cam.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cam});
+            } catch (Throwable e) {
+                cameraPhotoUri = null;
+            }
+        }
+        try {
+            startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
+        } catch (ActivityNotFoundException e) {
+            if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+            return false;
+        }
+        return true;
+    }
+
+    // Shared web pages used by both apps and the website: survey.html, chat.html, matrix.html, visits.html, knowledge.html.
     private void showToolPage(String file, String title, String hash) {
         if (sessionToken() == null) return;
         inProfile = true;
@@ -2661,6 +2714,7 @@ public class MainActivity extends FragmentActivity {
             WebSettings ws = surveyWeb.getSettings();
             ws.setJavaScriptEnabled(true);
             ws.setDomStorageEnabled(true);
+            ws.setGeolocationEnabled(true);
             surveyWeb.addJavascriptInterface(new SurveyBridge(), "BIApp");
             surveyWeb.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
             surveyWeb.setWebViewClient(new WebViewClient() {
@@ -2673,21 +2727,32 @@ public class MainActivity extends FragmentActivity {
                 }
             });
             surveyWeb.setWebChromeClient(new WebChromeClient() {
-                // Survey answers can include photos and documents (both apps).
+                // Survey answers can include photos and documents; market visits take photos with the camera.
                 @Override
                 public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
                     if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                     filePathCallback = callback;
-                    Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
-                    pick.addCategory(Intent.CATEGORY_OPENABLE);
-                    pick.setType("*/*");
-                    try {
-                        startActivityForResult(Intent.createChooser(pick, tr("choose_file")), FILE_CHOOSER_REQUEST);
-                    } catch (ActivityNotFoundException e) {
-                        filePathCallback = null;
-                        return false;
+                    boolean image = false;
+                    for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("image")) image = true;
+                    if (image && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        pendingImageChooser = true;
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAM_PERM_REQUEST);
+                        return true;
                     }
-                    return true;
+                    return launchFileChooser(image);
+                }
+
+                // Punch in / punch out read the phone's location (only when the user taps the button).
+                @Override
+                public void onGeolocationPermissionsShowPrompt(String origin, android.webkit.GeolocationPermissions.Callback cb) {
+                    if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                            || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        cb.invoke(origin, true, false);
+                        return;
+                    }
+                    geoOrigin = origin;
+                    geoCallback = cb;
+                    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, GEO_REQUEST);
                 }
             });
         }
@@ -2842,6 +2907,8 @@ public class MainActivity extends FragmentActivity {
         else if (open.startsWith("chat:")) showToolPage("chat.html", tr("messages"), "#c=" + Uri.encode(open.substring(5)));
         else if (open.equals("chat")) showToolPage("chat.html", tr("messages"), "#list");
         else if (open.equals("matrix")) showToolPage("matrix.html", tr("feature_matrix"), "#list");
+        else if (open.equals("visits")) showToolPage("visits.html", tr("market_visits"), "#list");
+        else if (open.equals("knowledge")) showToolPage("knowledge.html", tr("knowledge"), "#list");
         else if (open.equals("security") && !STATE_APP) showToolPage("security.html", tr("account_security"), "#list");
         else if (open.equals("update")) checkForUpdate(true);
     }
@@ -3833,6 +3900,8 @@ public class MainActivity extends FragmentActivity {
                     result = new Uri[]{data.getData()};
                 }
             }
+            if (result == null && resultCode == RESULT_OK && cameraPhotoUri != null) result = new Uri[]{cameraPhotoUri};
+            cameraPhotoUri = null;
             filePathCallback.onReceiveValue(result);
             filePathCallback = null;
             return;

@@ -1,2 +1,3 @@
-Admins: sign up with an allowed email + email code (no access code)
-Forgot password: admins can reset with an email code too
+New: Market visits — punch in / punch out at stores with GPS, store details, stock, promoters, sales, feedback and photos
+Admins: team tracker, map, state scorecard and Gemini AI scoring of visits
+New: Knowledge section — BI reports, AI, automated dashboards, Power BI step by step, KPIs & charts

@@ -286,6 +286,13 @@ final class L {
         put("feature_matrix", "Feature usability", "फ़ीचर उपयोग");
         put("matrix_popup", "Please tick the features your state uses and confirm your row.", "कृपया अपने राज्य में इस्तेमाल होने वाले फ़ीचर टिक करें और अपनी पंक्ति कन्फ़र्म करें।");
         put("matrix_update", "Update my state", "मेरा राज्य अपडेट करें");
+        put("market_visits", "Market visits", "मार्केट विज़िट");
+        put("visits_sub_state", "Punch in / out at stores", "स्टोर पर पंच इन / आउट");
+        put("visits_sub_admin", "Team tracker & scorecard", "टीम ट्रैकर और स्कोरकार्ड");
+        put("knowledge", "Knowledge", "नॉलेज");
+        put("knowledge_sub", "BI, AI, dashboards, Power BI", "BI, AI, डैशबोर्ड, Power BI");
+        put("take_or_choose_photo", "Take or choose a photo", "फ़ोटो लें या चुनें");
+        put("location_needed", "Location permission is needed to punch in and punch out.", "पंच इन और पंच आउट के लिए लोकेशन अनुमति ज़रूरी है।");
         put("notif_chat_title", "New message from %s", "%s का नया मैसेज");
         // v4.6: Truecaller switch, admin-approved password reset
         put("signup_sub_plain", "Create your account with a user name and password.", "यूज़र नेम और पासवर्ड से अपना अकाउंट बनाएँ।");
