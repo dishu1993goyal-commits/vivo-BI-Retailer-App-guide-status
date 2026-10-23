@@ -308,10 +308,19 @@
       '<div id="s-stw"><label>Your state</label><select id="s-st"><option value="">Select your state</option>' + STATES.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + "</select></div>" +
       '<label>Create password (min 6 characters)</label><input id="s-p" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
-      '<label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64">' +
+      '<label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64">' + '<div id="s-wa"></div>' +
       '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
       '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
     roleSeg(c, role, function (r) { if (r === "state") { showStateSignup(); return; } role = r; c.querySelector("#s-stw").style.display = "none"; });
+    var wa = { code: null, secret: null }, waUi = null;
+    refreshWa("admin", function (on) {
+      if (!on || !c.isConnected) return;
+      waUi = waBox(c.querySelector("#s-wa"), "admin", "signup", function () {
+        var ph = c.querySelector("#s-ph").value.replace(/\D/g, "");
+        return /^[6-9]\d{9}$/.test(ph) ? { phone: ph } : "Enter your 10-digit mobile number first.";
+      }, function (code, secret) { wa = { code: code, secret: secret }; });
+      c.querySelector("#s-ph").addEventListener("input", function () { if (waUi.done()) waUi.reset(); });
+    });
     var go = c.querySelector("#s-go");
     go.onclick = function () {
       var v = { fullName: c.querySelector("#s-n").value.trim(), username: c.querySelector("#s-u").value.trim(), phone: c.querySelector("#s-ph").value.replace(/\D/g, ""),
@@ -321,9 +330,11 @@
         !/^[6-9]\d{9}$/.test(v.phone) ? "Enter a valid 10-digit mobile number." :
         v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address, or leave it empty." :
         role === "state" && !v.state ? "Please select your state." : v.password.length < 6 ? "Password must be at least 6 characters." :
-        v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !v.accessCode ? "Enter the access code from your BI admin." : "";
+        v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !v.accessCode ? "Enter the access code from your BI admin." :
+        WA_ON && !wa.code ? "Verify your mobile on WhatsApp (green button) first." : "";
       if (err) { msg(c, "#s-m", err); return; }
       if (!v.email) delete v.email;
+      if (wa.code) { v.waCode = wa.code; v.waSecret = wa.secret; }
       go.disabled = true; go.textContent = "Creating account…";
       api(Object.assign({ app: role, action: "signup", via: "web" }, v), false).then(function (res) {
         go.disabled = false; go.textContent = "Create account";
@@ -335,6 +346,53 @@
       });
     };
     c.querySelector("#s-back").onclick = function () { showLogin(); };
+  }
+
+  // ---------- "Verify on WhatsApp": the user sends a code from their own WhatsApp (free) ----------
+  var WA_ON = false;
+  function refreshWa(role, then) { api({ app: role || "state", action: "auth-config" }, false).then(function (r) { WA_ON = !!(r && r.ok && r.waRequired); then && then(WA_ON); }); }
+  // box: element to render into; getReq(): extra request fields (or a string error); onDone(code, secret)
+  function waBox(box, role, purpose, getReq, onDone) {
+    var st = { code: null, secret: null, done: false, timer: 0 };
+    function idle(msgHtml, isErr) {
+      clearTimeout(st.timer); st.done = false;
+      box.innerHTML = (msgHtml ? '<div class="biw-msg ' + (isErr ? "err" : "ok") + '" style="text-align:left">' + msgHtml + "</div>" : "") +
+        '<button type="button" class="biw-btn" style="background:#25D366;color:#fff;margin-top:8px" id="wa-go">✅ Verify mobile on WhatsApp</button>' +
+        '<div class="biw-mut" style="margin-top:6px">Free · you send one WhatsApp message from this mobile. No OTP to type.</div>';
+      box.querySelector("#wa-go").onclick = start;
+    }
+    function start() {
+      var extra = getReq(); if (typeof extra === "string") { idle(esc(extra), true); return; }
+      box.innerHTML = '<div class="biw-note">Preparing…</div>';
+      api(Object.assign({ app: role, action: "wa-start", purpose: purpose, device: browserName() }, extra), false).then(function (r) {
+        if (!r.ok) { idle(esc(r.error), true); return; }
+        st.code = r.code; st.secret = r.secret;
+        var mobileTxt = r.masked ? "your registered mobile (" + esc(r.masked) + ")" : "this mobile number";
+        box.innerHTML = '<div class="biw-note" style="background:#eafaf0;border-color:#a8e0bd;color:#14532d;text-align:left">' +
+          "<b>Send this message on WhatsApp from " + mobileTxt + ":</b><div style=\"font:700 22px monospace;letter-spacing:2px;margin:8px 0;color:#111\">" + esc(r.text) + "</div>" +
+          '<a class="biw-btn" style="background:#25D366;color:#fff;text-decoration:none;text-align:center" href="' + esc(r.waLink) + '" target="_blank" rel="noopener">Open WhatsApp & send</a>' +
+          '<div id="wa-qr" style="display:none;text-align:center;margin-top:10px"><div class="biw-mut">On a computer? Scan with your phone camera to open WhatsApp:</div><div id="wa-qrc" style="width:170px;height:170px;margin:6px auto;background:#fff;padding:6px;border-radius:10px"></div></div>' +
+          '<div id="wa-st" style="margin-top:8px;font-size:13.5px">⏳ Waiting for your WhatsApp message… (send it as it is, don\'t change the code)</div>' +
+          '<a class="biw-link" id="wa-x" style="margin-top:6px">Cancel / change number</a></div>';
+        box.querySelector("#wa-x").onclick = function () { idle(); };
+        if (!/Android|iPhone|iPad/i.test(navigator.userAgent)) loadQrLib().then(function () { var q = window.qrcode(0, "M"); q.addData(r.waLink); q.make(); var c = box.querySelector("#wa-qrc"); if (c) { c.innerHTML = q.createSvgTag(4, 0); box.querySelector("#wa-qr").style.display = ""; var sv = c.querySelector("svg"); if (sv) { sv.style.width = "158px"; sv.style.height = "158px"; } } }).catch(function () { });
+        poll();
+      });
+    }
+    function poll() {
+      st.timer = setTimeout(function () {
+        if (!box.isConnected) return;
+        api({ app: role, action: "wa-status", code: st.code, secret: st.secret }, false).then(function (r) {
+          if (!box.isConnected) return;
+          if (r.status === "verified") { st.done = true; box.innerHTML = '<div class="biw-note" style="background:#eafaf0;border-color:#a8e0bd;color:#14532d">✅ <b>Mobile verified on WhatsApp</b></div>'; onDone(st.code, st.secret); return; }
+          if (r.status === "mismatch") { idle("The message came from a different WhatsApp number (" + esc(r.from || "") + "). Send it from the WhatsApp on " + (purpose === "reset" ? "your registered mobile" : "the mobile you entered") + ".", true); return; }
+          if (r.status === "expired" || r.status === "missing") { idle("The code expired. Please try again.", true); return; }
+          poll();
+        });
+      }, 2500);
+    }
+    idle();
+    return { reset: function () { idle(); onDone(null, null); }, done: function () { return st.done; } };
   }
 
   // ---------- STATE USERS: sign up with vChat ID (admin's allowed list decides the state) ----------
@@ -369,12 +427,23 @@
       '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>vChat registered mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="s-ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>' +
       '<label>Email</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
-      codeField("s-ac") +
+      codeField("s-ac") + '<div id="s-wa"></div>' +
       '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
       '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
     roleSeg(c, "state", function (r) { if (r === "admin") showSignup("admin"); });
-    var look = bindVchat(c, function (st) { okState = st; });
+    var wa = { code: null, secret: null }, waUi = null;
+    var look = bindVchat(c, function (st) { okState = st; if (waUi && waUi.done()) waUi.reset(); });
     bindCodeInfo(c, "s-ac");
+    refreshWa("state", function (on) {
+      if (!on || !c.isConnected) return;
+      waUi = waBox(c.querySelector("#s-wa"), "state", "signup", function () {
+        var id = c.querySelector("#v-id").value.trim(), ph = c.querySelector("#s-ph").value.replace(/\D/g, "");
+        if (!okState) return "Enter a vChat ID from the allowed list first.";
+        if (!/^[6-9]\d{9}$/.test(ph)) return "Enter your 10-digit vChat registered mobile number first.";
+        return { vchatId: id, phone: ph };
+      }, function (code, secret) { wa = { code: code, secret: secret }; });
+      c.querySelector("#s-ph").addEventListener("input", function () { if (waUi.done()) waUi.reset(); });
+    });
     var go = c.querySelector("#s-go");
     go.onclick = function () {
       look();
@@ -383,8 +452,10 @@
       var err = !v.vchatId ? "Enter your vChat ID." : !okState ? "Enter a vChat ID from the allowed list (the state fills in automatically)." :
         v.username.length < 3 ? "User name must be at least 3 characters." : v.password.length < 6 ? "Password must be at least 6 characters." :
         v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !/^[6-9]\d{9}$/.test(v.phone) ? "Enter your 10-digit vChat registered mobile number." :
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address." : !v.accessCode ? "Enter the access code (tap i to see how)." : "";
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address." : !v.accessCode ? "Enter the access code (tap i to see how)." :
+        WA_ON && !wa.code ? "Verify your mobile on WhatsApp (green button) first." : "";
       if (err) { msg(c, "#s-m", err); return; }
+      if (wa.code) { v.waCode = wa.code; v.waSecret = wa.secret; }
       go.disabled = true; go.textContent = "Creating account…";
       api(Object.assign({ app: "state", action: "signup", via: "web" }, v), false).then(function (res) {
         go.disabled = false; go.textContent = "Create account";
@@ -404,16 +475,27 @@
       '<label>vChat ID</label><input id="v-id" maxlength="40" autocomplete="off" autocapitalize="none"><div class="biw-msg" id="v-msg" style="text-align:left;margin-top:4px"></div>' +
       '<label>State (from vChat)</label><input id="v-st" readonly placeholder="Filled automatically" style="background:#f3efe3;color:#5c4300;font-weight:600">' +
       '<label>vChat registered mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="l-ph" inputmode="numeric" maxlength="10"></div>' +
-      codeField("l-ac") + '<div class="biw-msg" id="l-m"></div><button class="biw-btn biw-dark" id="l-go">Link vChat ID</button><a class="biw-link" id="l-out">Log out</a>');
-    var look = bindVchat(c, function (st) { okState = st; });
+      codeField("l-ac") + '<div id="l-wa"></div><div class="biw-msg" id="l-m"></div><button class="biw-btn biw-dark" id="l-go">Link vChat ID</button><a class="biw-link" id="l-out">Log out</a>');
+    var wa = { code: null, secret: null }, waUi = null;
+    var look = bindVchat(c, function (st) { okState = st; if (waUi && waUi.done()) waUi.reset(); });
     bindCodeInfo(c, "l-ac");
+    refreshWa("state", function (on) {
+      if (!on || !c.isConnected) return;
+      waUi = waBox(c.querySelector("#l-wa"), "state", "link", function () {
+        var ph = c.querySelector("#l-ph").value.replace(/\D/g, "");
+        if (!okState) return "Enter a vChat ID from the allowed list first.";
+        if (!/^[6-9]\d{9}$/.test(ph)) return "Enter your vChat registered mobile number first.";
+        return { vchatId: c.querySelector("#v-id").value.trim(), phone: ph };
+      }, function (code, secret) { wa = { code: code, secret: secret }; });
+    });
     c.querySelector("#l-out").onclick = function () { api({ action: "logout" }); logoutLocal(); showLogin(); };
     var go = c.querySelector("#l-go");
     go.onclick = function () {
       look();
       if (!okState) return msg(c, "#l-m", "Enter a vChat ID from the allowed list.");
+      if (WA_ON && !wa.code) return msg(c, "#l-m", "Verify your mobile on WhatsApp (green button) first.");
       go.disabled = true;
-      api({ action: "vchat-link", vchatId: c.querySelector("#v-id").value.trim(), phone: c.querySelector("#l-ph").value, accessCode: c.querySelector("#l-ac").value.trim() }).then(function (r) {
+      api({ action: "vchat-link", vchatId: c.querySelector("#v-id").value.trim(), phone: c.querySelector("#l-ph").value, accessCode: c.querySelector("#l-ac").value.trim(), waCode: wa.code, waSecret: wa.secret }).then(function (r) {
         go.disabled = false;
         if (!r.ok) { if (!sessionLost(r)) msg(c, "#l-m", r.error); return; }
         r.profile.linkRequired = false; saveProfile(r.profile); store("biw-last-vchat", r.profile.vchatId);
@@ -424,10 +506,15 @@
 
   // ---------- FORGOT PASSWORD ----------
   // Forgot password: the user chooses a new password and a BI admin approves the request.
-  function showForgot(role) {
+  function showForgot(role, forceRequest) {
     var pend = store("biw-pwreq");
     if (pend && pend.reqId) return showResetStatus(pend);
     role = role || store("biw-role") || "state";
+    if (!forceRequest) {
+      var cw = authCard('<h1>Forgot <em>password?</em></h1><div class="biw-note">Checking…</div>');
+      refreshWa(role, function (on) { if (!cw.isConnected) return; if (on) showForgotWa(role); else showForgot(role, true); });
+      return;
+    }
     var c = authCard('<h1>Forgot <em>password?</em></h1><p>Choose a new password. A BI admin checks the request (usually by calling you) and approves it.</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
       '<label>vChat ID, user name or mobile number</label><input id="f-u" maxlength="40" autocomplete="username">' +
@@ -454,11 +541,48 @@
       });
     };
   }
+  // Forgot password with WhatsApp (self-service, no admin needed).
+  function showForgotWa(role) {
+    var wa = { code: null, secret: null };
+    var c = authCard('<h1>Forgot <em>password?</em></h1><p>Verify on WhatsApp from your registered mobile, then set a new password.</p>' +
+      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+      '<label id="fw-l">vChat ID, user name or mobile number</label><input id="fw-u" maxlength="40" autocomplete="username">' +
+      '<label>New password (min 6 characters)</label><input id="fw-p" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>Confirm new password</label><input id="fw-p2" type="password" maxlength="64" autocomplete="new-password">' +
+      '<div id="fw-wa"></div><div class="biw-msg" id="fw-m"></div><button class="biw-btn biw-dark" id="fw-go">Set new password</button>' +
+      '<a class="biw-link" id="fw-req">No WhatsApp on that mobile? Ask an admin instead</a><a class="biw-link" id="f-back">Back to log in</a>');
+    var u = c.querySelector("#fw-u"), ui = null;
+    u.value = (role === "state" ? store("biw-last-vchat") : store("biw-last-user")) || "";
+    var mount2 = function () {
+      ui = waBox(c.querySelector("#fw-wa"), role, "reset", function () { return u.value.trim() ? { username: u.value.trim() } : "Enter your vChat ID, user name or mobile first."; },
+        function (code, secret) { wa = { code: code, secret: secret }; });
+    };
+    roleSeg(c, role, function (r) { if (r !== role) { role = r; c.querySelector("#fw-l").textContent = r === "state" ? "vChat ID, user name or mobile number" : "User name or mobile number"; wa = {}; mount2(); } });
+    mount2();
+    u.addEventListener("input", function () { if (ui && ui.done()) ui.reset(); });
+    c.querySelector("#f-back").onclick = function () { showLogin(); };
+    c.querySelector("#fw-req").onclick = function () { showForgot(role, true); };
+    var go = c.querySelector("#fw-go");
+    go.onclick = function () {
+      var p = c.querySelector("#fw-p").value;
+      if (!u.value.trim()) return msg(c, "#fw-m", "Enter your vChat ID, user name or mobile.");
+      if (p.length < 6) return msg(c, "#fw-m", "Password must be at least 6 characters.");
+      if (p !== c.querySelector("#fw-p2").value) return msg(c, "#fw-m", "Passwords don't match.");
+      if (!wa.code) return msg(c, "#fw-m", "Verify on WhatsApp (green button) first.");
+      go.disabled = true;
+      api({ app: role, action: "reset-wa", username: u.value.trim(), newPassword: p, waCode: wa.code, waSecret: wa.secret }, false).then(function (r) {
+        go.disabled = false;
+        if (!r.ok) return msg(c, "#fw-m", r.error);
+        store("biw-role", role); if (r.vchatId) store("biw-last-vchat", r.vchatId); else store("biw-last-user", r.username);
+        showLogin("Password changed. Log in with your new password.");
+      });
+    };
+  }
   function showResetStatus(q) {
     var c = authCard('<h1>Reset <em>request</em></h1><div id="r-box"><div class="biw-note">Checking…</div></div>' +
       '<button class="biw-btn biw-dark" id="r-chk">Check status</button><a class="biw-link" id="r-new">Send a new request</a><a class="biw-link" id="f-back">Back to log in</a>');
     c.querySelector("#f-back").onclick = function () { showLogin(); };
-    c.querySelector("#r-new").onclick = function () { store("biw-pwreq", null); showForgot(q.app); };
+    c.querySelector("#r-new").onclick = function () { store("biw-pwreq", null); showForgot(q.app, true); };
     var check = function () {
       api({ app: q.app, action: "reset-status", username: q.username, reqId: q.reqId }, false).then(function (r) {
         var box = c.querySelector("#r-box"); if (!box) return;

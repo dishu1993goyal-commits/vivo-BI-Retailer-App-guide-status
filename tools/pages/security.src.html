@@ -53,6 +53,17 @@
       '</span></div><label class="tg lg"><input type="checkbox" id="tc"' + (on ? " checked" : "") + "><i></i></label></div>" +
       (D.updatedBy ? '<div class="muted" style="font-size:12px;margin-top:10px">Last changed by ' + esc(D.updatedBy) + " · " + dt(D.updatedAt) + "</div>" : "") +
       '<div class="notice info" style="margin-top:10px">You can turn this on and off any time — no app update needed. Existing users and passwords are not affected. On the website, Forgot password always uses an admin-approved request.</div></div>';
+    // WhatsApp verification card
+    var wr = D.waRequired && D.waReady;
+    html += '<div class="card"><div class="sw"><div class="big ' + (wr ? "on" : "off") + '" style="background:' + (wr ? "#E6F8EE" : "#F1F2FA") + '">🟢</div><div style="flex:1"><b>Require WhatsApp verification</b><span class="muted" style="font-size:13px">' +
+      (!D.waReady ? "Not set up yet — add the WhatsApp keys in Netlify (see the setup guide). Until then sign-up works as today." :
+        wr ? "ON — state & admin users verify their mobile by sending one WhatsApp message (free) when signing up, linking a vChat ID or resetting a password." :
+          "OFF — ready to switch on. Users will verify their mobile by sending one WhatsApp message.") +
+      '</span></div><label class="tg lg"><input type="checkbox" id="wa"' + (wr ? " checked" : "") + (D.waReady ? "" : " disabled") + "><i></i></label></div>" +
+      (D.waNumber ? '<div class="muted" style="font-size:12.5px;margin-top:10px">Company WhatsApp number: <b>+' + esc(D.waNumber) + "</b></div>" : "") +
+      (D.canConnect ? '<div class="row" style="margin-top:10px"><button class="btn sec sm" id="wac">🔗 Connect WhatsApp number (one time)</button></div>' : "") +
+      (D.waLog && D.waLog.length ? '<div style="margin-top:12px;font-weight:700;font-size:13px">Recent WhatsApp verifications</div>' + D.waLog.slice(0, 10).map(function (l) {
+        return '<div class="mt" style="font-size:12.5px;color:var(--mut);margin-top:3px">' + (l.ok ? "✅" : "⚠️") + " " + dt(l.t) + " · " + esc(l.app) + " " + esc(l.purpose) + " · mobile …" + esc(l.phone) + (l.ok ? "" : " · sent from …" + esc(l.from)) + "</div>"; }).join("") : "") + "</div>";
     html += '<div class="seg" style="margin-top:14px"><button data-t="pending" class="' + (TAB === "pending" ? "on" : "") + '">Pending<span class="n">' + pend.length + '</span></button><button data-t="done" class="' + (TAB === "done" ? "on" : "") + '">Handled (30 days)<span class="n">' + done.length + "</span></button></div>";
     var list = TAB === "pending" ? pend : done;
     if (!list.length) html += '<div class="card empty"><div class="big">' + (TAB === "pending" ? "🎉" : "📭") + "</div>" + (TAB === "pending" ? "No pending password reset requests." : "Nothing handled in the last 30 days.") + "</div>";
@@ -72,6 +83,17 @@
       sheet(want ? "Turn Truecaller verification ON?" : "Turn Truecaller verification OFF?",
         want ? "New app users must verify their mobile with Truecaller again, and Forgot password re-verifies the mobile." : "New app users can sign up without mobile verification (the access code still applies). Forgot password will send a request for an admin to approve.",
         [[want ? "✅" : "⏸️", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", tcRequired: want }).then(function (r) { toast(r.ok ? "Truecaller verification " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
+    };
+    if ($("wa")) $("wa").onchange = function () {
+      var want = this.checked; this.checked = !want;
+      sheet(want ? "Turn WhatsApp verification ON?" : "Turn WhatsApp verification OFF?",
+        want ? "Before switching on, test once: sign up a test user and check that the WhatsApp message is detected (it appears under Recent WhatsApp verifications)." : "Sign-up and Forgot password go back to the previous checks.",
+        [["🟢", want ? "Turn ON" : "Turn OFF", function () { api({ action: "admin-set-auth", waRequired: want }).then(function (r) { toast(r.ok ? "WhatsApp verification " + (want ? "ON" : "OFF") : r.error); changed(); load(true); }); }]]);
+    };
+    if ($("wac")) $("wac").onclick = function () {
+      sheet("Connect the WhatsApp number", "Enter a 6-digit PIN for the number's two-step verification (choose any; keep it safe).", [["🔗", "Connect", function (ov) {
+        api({ action: "admin-wa-connect", pin: ov.querySelector("input").value }).then(function (r) { toast(r.ok ? "Connected ✓" : "Register: " + (r.register || r.error) + (r.subscribe ? " · Subscribe: " + r.subscribe : "")); load(true); });
+      }]], '<input class="tx" inputmode="numeric" maxlength="6" placeholder="6-digit PIN" style="margin-top:12px">');
     };
     [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-ok]"), function (b) {
