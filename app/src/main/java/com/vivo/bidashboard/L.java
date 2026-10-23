@@ -308,6 +308,29 @@ final class L {
         put("reset_pending_login", "⏳ Password reset request sent — tap Forgot password? to check its status.", "⏳ पासवर्ड रीसेट अनुरोध भेजा गया — स्थिति देखने के लिए पासवर्ड भूल गए? पर टैप करें।");
         put("account_security", "Account security", "अकाउंट सुरक्षा");
         put("n_reset_requests", "%d password reset request(s) waiting", "%d पासवर्ड रीसेट अनुरोध बाकी");
+        // v4.7: state users sign up / log in with vChat ID
+        put("vchat_id", "vChat ID", "vChat ID");
+        put("login_sub_vchat", "Log in with your vChat ID and password", "अपनी vChat ID और पासवर्ड से लॉग इन करें");
+        put("enter_vchat_pass", "Enter your vChat ID and password.", "अपनी vChat ID और पासवर्ड डालें।");
+        put("signup_sub_vchat", "Sign up with your vChat ID. Your state is filled in from vChat.", "अपनी vChat ID से साइन अप करें। आपका राज्य vChat से अपने आप भरेगा।");
+        put("vchat_state_hint", "State: filled automatically from your vChat ID", "राज्य: आपकी vChat ID से अपने आप भरेगा");
+        put("state", "State", "राज्य");
+        put("vchat_mobile", "vChat registered mobile number", "vChat में रजिस्टर्ड मोबाइल नंबर");
+        put("email_required", "Email", "ईमेल");
+        put("access_code_vchat", "Access code (tap i for help)", "एक्सेस कोड (मदद के लिए i दबाएँ)");
+        put("access_code_info_title", "How to make the access code", "एक्सेस कोड कैसे बनाएँ");
+        put("access_code_info", "First 4 letters of your name as on vChat (small letters, no spaces) + last 4 digits of your vChat registered mobile number.\n\nExample: Ravi Kumar, mobile 98765 43210 → ravi3210",
+                "vChat में आपके नाम के पहले 4 अक्षर (छोटे अक्षर, बिना स्पेस) + vChat में रजिस्टर्ड मोबाइल के आख़िरी 4 अंक।\n\nउदाहरण: Ravi Kumar, मोबाइल 98765 43210 → ravi3210");
+        put("err_vchat", "Enter your vChat ID.", "अपनी vChat ID डालें।");
+        put("err_vchat_lookup", "Enter a vChat ID from the allowed list — the state fills in automatically.", "अनुमति सूची वाली vChat ID डालें — राज्य अपने आप भरेगा।");
+        put("err_vchat_mobile", "Enter your 10-digit vChat registered mobile number.", "vChat में रजिस्टर्ड 10 अंकों का मोबाइल नंबर डालें।");
+        put("err_email", "Enter a valid email address.", "सही ईमेल पता डालें।");
+        put("err_code_vchat", "Enter the access code (tap i to see how).", "एक्सेस कोड डालें (कैसे बनाएँ, देखने के लिए i दबाएँ)।");
+        put("link_vchat_sub", "One-time step: link your vChat ID to keep using the app. Your state comes from vChat.", "एक बार का काम: ऐप इस्तेमाल करते रहने के लिए अपनी vChat ID जोड़ें। आपका राज्य vChat से आएगा।");
+        put("link_vchat", "Link vChat ID", "vChat ID जोड़ें");
+        put("vchat_linked", "vChat ID linked. Next time log in with your vChat ID.", "vChat ID जुड़ गई। अगली बार vChat ID से लॉग इन करें।");
+        put("vchat_user_or_mobile", "vChat ID, user name or mobile number", "vChat ID, यूज़र नेम या मोबाइल नंबर");
+        put("vchat_directory", "vChat directory", "vChat डायरेक्टरी");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 

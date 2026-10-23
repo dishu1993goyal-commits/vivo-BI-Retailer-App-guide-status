@@ -127,7 +127,8 @@ public class MainActivity extends FragmentActivity {
         NotifyWorker.ensureChannel(this);
         // Stay logged in until the user taps Log out.
         if (sessionToken() != null) {
-            if (STATE_APP && profile().optString("state", "").isEmpty()) showPickState();
+            if (STATE_APP && profile().optString("vchatId", "").isEmpty()) showLinkVchat();
+            else if (STATE_APP && profile().optString("state", "").isEmpty()) showPickState();
             else openDashboard();
             refreshProfile();
             NotifyWorker.schedule(this);
@@ -230,6 +231,10 @@ public class MainActivity extends FragmentActivity {
             if (ok) {
                 JSONObject p = res.optJSONObject("profile");
                 saveProfile(p);
+                if (STATE_APP && p != null) {
+                    if (p.optString("vchatId", "").isEmpty()) { if (!inLink) showLinkVchat(); return; }
+                    if (inLink) { inLink = false; openDashboard(); }
+                }
                 refreshSupportBadge();
                 if (STATE_APP && p != null) {
                     String st = p.optString("state", "");
@@ -733,9 +738,10 @@ public class MainActivity extends FragmentActivity {
     private void showLoginScreen(String info) {
         unlocked = false;
         inProfile = false;
-        LinearLayout box = authHeader(tr("login_sub"));
-        EditText user = authField(tr("username"), TEXT_PLAIN, 30);
-        user.setText(lastUsername());
+        inLink = false;
+        LinearLayout box = authHeader(STATE_APP ? tr("login_sub_vchat") : tr("login_sub"));
+        EditText user = authField(STATE_APP ? tr("vchat_id") : tr("username"), TEXT_PLAIN, 40);
+        user.setText(STATE_APP ? authPrefs().getString("last_vchat", "") : lastUsername());
         addField(box, user);
         EditText pass = authField(tr("password"), TEXT_PASSWORD, 64);
         addField(box, pass);
@@ -753,14 +759,19 @@ public class MainActivity extends FragmentActivity {
         Runnable doLogin = () -> {
             String u = user.getText().toString().trim();
             String p = pass.getText().toString();
-            if (u.isEmpty() || p.isEmpty()) { setStatus(tr("enter_user_pass"), true); return; }
+            if (u.isEmpty() || p.isEmpty()) { setStatus(STATE_APP ? tr("enter_vchat_pass") : tr("enter_user_pass"), true); return; }
             hideKeyboard(pass);
             busy(login, tr("logging_in"));
-            callAuth(obj("action", "login", "username", u, "password", p), (ok, res, err) -> {
+            callAuth(STATE_APP ? obj("action", "login", "username", u, "vchatId", u, "password", p) : obj("action", "login", "username", u, "password", p), (ok, res, err) -> {
                 busy(login, null);
                 if (ok) {
                     saveSession(res);
                     authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply();
+                    if (STATE_APP) {
+                        String vc = profile().optString("vchatId", "");
+                        if (vc.isEmpty()) { showLinkVchat(); return; }
+                        authPrefs().edit().putString("last_vchat", vc).apply();
+                    }
                     if (STATE_APP && profile().optString("state", "").isEmpty()) { showPickState(); return; }
                     openDashboard();
                     refreshSupportBadge();
@@ -783,6 +794,7 @@ public class MainActivity extends FragmentActivity {
 
     private void showSignup() {
         unlocked = false;
+        if (STATE_APP) { showStateSignup(); return; }
         final boolean needTc = tcRequired();
         LinearLayout box = authHeader(needTc ? tr("signup_sub") : tr("signup_sub_plain"));
         EditText full = authField(tr("full_name"), TEXT_NAME, 40);
@@ -866,6 +878,170 @@ public class MainActivity extends FragmentActivity {
         });
     }
 
+    // ---------- State users: vChat ID sign-up (admin's allowed list decides the state) ----------
+    private boolean inLink = false;
+    private String vchatState = null;
+
+    private TextView stateBox(LinearLayout box) {
+        TextView st = authMsg(box);
+        st.setText(tr("vchat_state_hint"));
+        st.setTextColor(Color.parseColor("#7A7F99"));
+        return st;
+    }
+
+    // Looks up the vChat ID and shows its state (locked). Runs after typing stops and when leaving the field.
+    private void bindVchatLookup(EditText id, TextView stateView) {
+        final Runnable[] pending = {null};
+        final String[] last = {""};
+        Runnable look = () -> {
+            String v = id.getText().toString().trim();
+            if (v.equals(last[0])) return;
+            last[0] = v;
+            vchatState = null;
+            if (v.isEmpty()) { stateView.setText(tr("vchat_state_hint")); stateView.setTextColor(Color.parseColor("#7A7F99")); return; }
+            stateView.setText(tr("checking"));
+            callAuth(obj("action", "vchat-lookup", "vchatId", v), (ok, res, err) -> {
+                if (!v.equals(id.getText().toString().trim())) return;
+                if (ok) {
+                    vchatState = res.optString("state");
+                    stateView.setText("🔒 " + tr("state") + ": " + vchatState);
+                    stateView.setTextColor(Color.parseColor("#1E9E61"));
+                } else {
+                    stateView.setText(err);
+                    stateView.setTextColor(Color.parseColor("#C62828"));
+                }
+            });
+        };
+        id.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence c, int a, int b, int d) { }
+            public void onTextChanged(CharSequence c, int a, int b, int d) { }
+            public void afterTextChanged(android.text.Editable e) {
+                vchatState = null;
+                if (pending[0] != null) ui.removeCallbacks(pending[0]);
+                pending[0] = look;
+                ui.postDelayed(look, 700);
+            }
+        });
+        id.setOnFocusChangeListener((v, has) -> { if (!has) look.run(); });
+    }
+
+    private View accessCodeRow(EditText code) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(code, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView i = new TextView(this);
+        i.setText("i");
+        i.setTypeface(Typeface.SERIF, Typeface.BOLD);
+        i.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        i.setTextColor(Color.parseColor("#8A6A1F"));
+        i.setGravity(Gravity.CENTER);
+        GradientDrawable g = new GradientDrawable();
+        g.setShape(GradientDrawable.OVAL);
+        g.setColor(Color.parseColor("#FFF7E0"));
+        g.setStroke(dp(1), Color.parseColor("#C9A227"));
+        i.setBackground(g);
+        i.setContentDescription(tr("access_code_info_title"));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(34), dp(34));
+        lp.leftMargin = dp(8);
+        row.addView(i, lp);
+        i.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("🔑 " + tr("access_code_info_title"))
+                .setMessage(tr("access_code_info")).setPositiveButton("OK", null).show());
+        return row;
+    }
+
+    private void showStateSignup() {
+        unlocked = false;
+        vchatState = null;
+        LinearLayout box = authHeader(tr("signup_sub_vchat"));
+        EditText vid = authField(tr("vchat_id"), TEXT_PLAIN, 40);
+        addField(box, vid);
+        TextView stateView = stateBox(box);
+        EditText user = authField(tr("choose_username"), TEXT_PLAIN, 30);
+        EditText pass = authField(tr("create_password"), TEXT_PASSWORD, 64);
+        EditText pass2 = authField(tr("confirm_password"), TEXT_PASSWORD, 64);
+        EditText phone = authField(tr("vchat_mobile"), InputType.TYPE_CLASS_PHONE, 10);
+        EditText email = authField(tr("email_required"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 80);
+        EditText code = authField(tr("access_code_vchat"), TEXT_PLAIN, 20);
+        addField(box, user);
+        addField(box, pass);
+        addField(box, pass2);
+        box.addView(showPasswordBox(pass, pass2));
+        addField(box, phoneRow(phone));
+        addField(box, email);
+        addField(box, accessCodeRow(code));
+        tcStatus = authMsg(box);
+        Button go = authButton(tr("create_account"));
+        box.addView(go, buttonParams());
+        box.addView(linkText(tr("have_account"), v -> showLoginScreen(null)));
+        bindVchatLookup(vid, stateView);
+        go.setOnClickListener(v -> {
+            String id = vid.getText().toString().trim(), un = user.getText().toString().trim(), pw = pass.getText().toString();
+            String ph = phone.getText().toString().replaceAll("\\D", ""), em = email.getText().toString().trim(), ac = code.getText().toString().trim();
+            if (id.isEmpty()) { setStatus(tr("err_vchat"), true); return; }
+            if (vchatState == null) { setStatus(tr("err_vchat_lookup"), true); return; }
+            if (un.length() < 3) { setStatus(tr("err_username"), true); return; }
+            if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            if (!ph.matches("[6-9]\\d{9}")) { setStatus(tr("err_vchat_mobile"), true); return; }
+            if (!em.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) { setStatus(tr("err_email"), true); return; }
+            if (ac.isEmpty()) { setStatus(tr("err_code_vchat"), true); return; }
+            hideKeyboard(code);
+            busy(go, tr("saving"));
+            callAuth(obj("action", "signup", "vchatId", id, "username", un, "password", pw, "phone", ph, "email", em, "accessCode", ac), (ok, res, err) -> {
+                busy(go, null);
+                if (!ok) { setStatus(err, true); return; }
+                saveSession(res);
+                authPrefs().edit().putString("last_vchat", res.optJSONObject("profile") != null ? res.optJSONObject("profile").optString("vchatId", id) : id).apply();
+                Toast.makeText(this, trf("welcome", res.optString("fullName", "")), Toast.LENGTH_LONG).show();
+                openDashboard();
+            });
+        });
+        showScreen(box, vid);
+    }
+
+    // Older state accounts link their vChat ID once (nothing else works until they do).
+    private void showLinkVchat() {
+        unlocked = false;
+        inProfile = false;
+        inLink = true;
+        vchatState = null;
+        LinearLayout box = authHeader(tr("link_vchat_sub"));
+        EditText vid = authField(tr("vchat_id"), TEXT_PLAIN, 40);
+        addField(box, vid);
+        TextView stateView = stateBox(box);
+        EditText phone = authField(tr("vchat_mobile"), InputType.TYPE_CLASS_PHONE, 10);
+        EditText code = authField(tr("access_code_vchat"), TEXT_PLAIN, 20);
+        addField(box, phoneRow(phone));
+        addField(box, accessCodeRow(code));
+        tcStatus = authMsg(box);
+        Button go = authButton(tr("link_vchat"));
+        box.addView(go, buttonParams());
+        box.addView(linkText(tr("logout"), v -> {
+            callAuth(sessionBody("action", "logout"), (a, b, c) -> { });
+            clearSession();
+            showLoginScreen(null);
+        }));
+        bindVchatLookup(vid, stateView);
+        go.setOnClickListener(v -> {
+            if (vchatState == null) { setStatus(tr("err_vchat_lookup"), true); return; }
+            hideKeyboard(code);
+            busy(go, tr("saving"));
+            callAuth(sessionBody("action", "vchat-link", "vchatId", vid.getText().toString().trim(),
+                    "phone", phone.getText().toString().replaceAll("\\D", ""), "accessCode", code.getText().toString().trim()), (ok, res, err) -> {
+                busy(go, null);
+                if (!ok) { if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); else setStatus(err, true); return; }
+                saveProfile(res.optJSONObject("profile"));
+                authPrefs().edit().putString("last_vchat", profile().optString("vchatId")).apply();
+                inLink = false;
+                Toast.makeText(this, tr("vchat_linked"), Toast.LENGTH_LONG).show();
+                if (webView != null) { detachWebView(); webView.destroy(); webView = null; }   // rebuild with the vChat state lock
+                openDashboard();
+            });
+        });
+        showScreen(box, vid);
+    }
+
     // ---------- Forgot password: re-verify mobile with Truecaller, then set a new password ----------
     private void showForgot() {
         unlocked = false;
@@ -889,7 +1065,7 @@ public class MainActivity extends FragmentActivity {
     // ---------- Forgot password by request (Truecaller switched off): a BI admin approves ----------
     private void showResetRequest() {
         LinearLayout box = authHeader(tr("reset_req_sub"));
-        EditText user = authField(tr("user_or_mobile"), TEXT_PLAIN, 30);
+        EditText user = authField(STATE_APP ? tr("vchat_user_or_mobile") : tr("user_or_mobile"), TEXT_PLAIN, 40);
         user.setText(lastUsername());
         EditText pass = authField(tr("new_password"), TEXT_PASSWORD, 64);
         EditText pass2 = authField(tr("confirm_new_password"), TEXT_PASSWORD, 64);
@@ -1310,6 +1486,7 @@ public class MainActivity extends FragmentActivity {
         if (!STATE_APP) {
             LinearLayout adm = card(page, tr("sec_admin"));
             int pr = authPrefs().getInt("pwreq_pending", 0);
+            row(adm, "🪪", tr("vchat_directory"), "", v -> showToolPage("directory.html", tr("vchat_directory"), "#list"));
             row(adm, "🛡️", tr("account_security"), pr > 0 ? trf("n_reset_requests", pr) : "", v -> showToolPage("security.html", tr("account_security"), "#list"));
             row(adm, "👥", tr("registered_users"), "", v -> showUsers("state", ""));
             row(adm, "📊", tr("access_insights"), "", v -> showAdminPage("logs"));
@@ -2283,7 +2460,7 @@ public class MainActivity extends FragmentActivity {
         if (sessionToken() == null) return;
         lastNotify = System.currentTimeMillis();
         callAuth(sessionBody("action", "notify"), (ok, res, err) -> {
-            if (!ok) { if (res.optBoolean("loggedOut", false)) handleSessionError(res, err); return; }
+            if (!ok) { if (res.optBoolean("loggedOut", false) || res.optBoolean("needsLink", false)) handleSessionError(res, err); return; }
             int su = res.optInt("supportUnread", 0);
             JSONObject sv = res.optJSONObject("surveys");
             if (sv == null) sv = new JSONObject();
@@ -3028,6 +3205,7 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void handleSessionError(JSONObject res, String err) {
+        if (STATE_APP && res.optBoolean("needsLink", false)) { showLinkVchat(); return; }
         if (res.optBoolean("loggedOut", false)) {
             clearSession();
             if (res.optBoolean("disabled")) { showLoginScreen(null); setStatus(res.optString("error"), true); } else showLoginScreen(tr("logged_out_elsewhere"));
@@ -3564,6 +3742,7 @@ public class MainActivity extends FragmentActivity {
 
     @Override
     public void onBackPressed() {
+        if (inLink) { super.onBackPressed(); return; }
         if (inSurveyPage) {
             surveyBack();
             return;
