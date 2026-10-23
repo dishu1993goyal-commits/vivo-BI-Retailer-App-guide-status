@@ -1,7 +1,12 @@
 {
-  "versionCode": 16,
-  "versionName": "4.3",
-  "notes": ["Admins can disable and re-enable state user accounts"],
+  "versionCode": 17,
+  "versionName": "4.4",
+  "notes": [
+    "New Survey tool: answer surveys from BI admins (admins can create surveys and see results)",
+    "Log in to the web dashboard by scanning a QR code (Profile → Scan web login QR)",
+    "Notifications for new surveys, support desk replies and app updates",
+    "One-tap in-app updates"
+  ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
     "state": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-States.apk"
