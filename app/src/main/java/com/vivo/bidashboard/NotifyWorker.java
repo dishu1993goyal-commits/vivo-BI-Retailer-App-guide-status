@@ -133,6 +133,12 @@ public class NotifyWorker extends Worker {
             n.edit().putLong("mx_" + mx.optString("id"), mx.optLong("announcedAt")).apply();
             post(c, 1500, "🧩 " + L.t(c, "feature_matrix"), L.t(c, "matrix_popup"), "matrix");
         }
+        if (!BuildConfig.STATE_APP) {
+            int pr = res.optInt("pwreq");
+            if (pr > n.getInt("pwreq", 0)) post(c, 1400, "🛡️ " + L.t(c, "account_security"), L.f(c, "n_reset_requests", pr), "security");
+            n.edit().putInt("pwreq", pr).apply();
+            auth.edit().putInt("pwreq_pending", pr).apply();
+        }
         int su = res.optInt("supportUnread");
         if (su > n.getInt("support", 0)) post(c, 1800, L.t(c, "support_desk"), L.f(c, "notif_support_msg", su), "support");
         n.edit().putInt("support", su).apply();

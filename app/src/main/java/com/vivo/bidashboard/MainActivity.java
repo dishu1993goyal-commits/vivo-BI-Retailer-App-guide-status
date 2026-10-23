@@ -742,6 +742,8 @@ public class MainActivity extends FragmentActivity {
         box.addView(showPasswordBox(pass));
         tcStatus = authMsg(box);
         if (info != null) setStatus(info, false);
+        else if (!authPrefs().getString("pwreq_id", "").isEmpty()) setStatus(tr("reset_pending_login"), false);
+        refreshAuthConfig(null);
         Button login = authButton(tr("login"));
         box.addView(login, buttonParams());
         box.addView(linkText(tr("forgot"), v -> showForgot()));
@@ -758,6 +760,7 @@ public class MainActivity extends FragmentActivity {
                 busy(login, null);
                 if (ok) {
                     saveSession(res);
+                    authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply();
                     if (STATE_APP && profile().optString("state", "").isEmpty()) { showPickState(); return; }
                     openDashboard();
                     refreshSupportBadge();
@@ -780,7 +783,8 @@ public class MainActivity extends FragmentActivity {
 
     private void showSignup() {
         unlocked = false;
-        LinearLayout box = authHeader(tr("signup_sub"));
+        final boolean needTc = tcRequired();
+        LinearLayout box = authHeader(needTc ? tr("signup_sub") : tr("signup_sub_plain"));
         EditText full = authField(tr("full_name"), TEXT_NAME, 40);
         EditText user = authField(tr("choose_username"), TEXT_PLAIN, 30);
         EditText phone = authField(tr("mobile"), InputType.TYPE_CLASS_PHONE, 10);
@@ -803,7 +807,7 @@ public class MainActivity extends FragmentActivity {
         box.addView(showPasswordBox(pass, pass2));
         addField(box, code);
         tcStatus = authMsg(box);
-        Button go = authButton(tr("verify_create"));
+        Button go = authButton(needTc ? tr("verify_create") : tr("create_account"));
         box.addView(go, buttonParams());
         box.addView(linkText(tr("have_account"), v -> {
             signupDraft = new String[6];
@@ -833,20 +837,21 @@ public class MainActivity extends FragmentActivity {
                     "password", pw, "accessCode", ac, "state", st), (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
-                startPhoneVerification(fn, ph, () -> finishSignup(details), this::showSignup);
+                if (needTc) startPhoneVerification(fn, ph, () -> finishSignup(details, true), this::showSignup);
+                else finishSignup(details, false);
             });
         });
         showScreen(box, full);
     }
 
-    private void finishSignup(JSONObject d) {
+    private void finishSignup(JSONObject d, boolean verified) {
         LinearLayout box = authHeader(tr("creating"));
         box.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
         tcStatus = authMsg(box);
         showScreen(box, null);
         try {
             d.put("action", "signup");
-            d.put("phoneVerified", true);
+            d.put("phoneVerified", verified);
         } catch (Exception ignored) { }
         callAuth(d, (ok, res, err) -> {
             if (ok) {
@@ -864,6 +869,91 @@ public class MainActivity extends FragmentActivity {
     // ---------- Forgot password: re-verify mobile with Truecaller, then set a new password ----------
     private void showForgot() {
         unlocked = false;
+        if (!authPrefs().getString("pwreq_id", "").isEmpty()) { showResetStatus(); return; }
+        LinearLayout wait = authHeader(tr("checking"));
+        wait.addView(new ProgressBar(this), new LinearLayout.LayoutParams(-2, -2));
+        showScreen(wait, null);
+        refreshAuthConfig(() -> { if (tcRequired()) showForgotTc(); else showResetRequest(); });
+    }
+
+    // ---------- Truecaller switch (set by admins, stored on the server) ----------
+    private boolean tcRequired() { return settings().getBoolean("tc_required", true); }
+
+    private void refreshAuthConfig(Runnable then) {
+        callAuth(obj("action", "auth-config"), (ok, res, err) -> {
+            if (ok) settings().edit().putBoolean("tc_required", res.optBoolean("tcRequired", true)).apply();
+            if (then != null) then.run();
+        });
+    }
+
+    // ---------- Forgot password by request (Truecaller switched off): a BI admin approves ----------
+    private void showResetRequest() {
+        LinearLayout box = authHeader(tr("reset_req_sub"));
+        EditText user = authField(tr("user_or_mobile"), TEXT_PLAIN, 30);
+        user.setText(lastUsername());
+        EditText pass = authField(tr("new_password"), TEXT_PASSWORD, 64);
+        EditText pass2 = authField(tr("confirm_new_password"), TEXT_PASSWORD, 64);
+        EditText note = authField(tr("reset_note"), TEXT_PLAIN, 200);
+        addField(box, user);
+        addField(box, pass);
+        addField(box, pass2);
+        box.addView(showPasswordBox(pass, pass2));
+        addField(box, note);
+        tcStatus = authMsg(box);
+        Button go = authButton(tr("send_reset_request"));
+        box.addView(go, buttonParams());
+        box.addView(linkText(tr("back_login"), v -> showLoginScreen(null)));
+        go.setOnClickListener(v -> {
+            String u = user.getText().toString().trim(), pw = pass.getText().toString();
+            if (u.isEmpty()) { setStatus(tr("err_user_or_mobile"), true); return; }
+            if (pw.length() < 6) { setStatus(tr("err_pw_short"), true); return; }
+            if (!pw.equals(pass2.getText().toString())) { setStatus(tr("err_pw_match"), true); return; }
+            hideKeyboard(pass2);
+            busy(go, tr("saving"));
+            callAuth(obj("action", "reset-request", "username", u, "newPassword", pw, "note", note.getText().toString().trim(), "via", "app"), (ok, res, err) -> {
+                busy(go, null);
+                if (!ok) { setStatus(err, true); return; }
+                authPrefs().edit().putString("pwreq_id", res.optString("reqId")).putString("pwreq_user", res.optString("username"))
+                        .putLong("pwreq_at", System.currentTimeMillis()).putString("last_username", res.optString("username")).apply();
+                showResetStatus();
+            });
+        });
+        showScreen(box, user.getText().length() > 0 ? pass : user);
+    }
+
+    private void showResetStatus() {
+        String id = authPrefs().getString("pwreq_id", ""), u = authPrefs().getString("pwreq_user", "");
+        LinearLayout box = authHeader(tr("reset_req_title"));
+        tcStatus = authMsg(box);
+        setStatus(tr("checking"), false);
+        Button chk = authButton(tr("check_status"));
+        box.addView(chk, buttonParams());
+        box.addView(linkText(tr("new_reset_request"), v -> { authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply(); showForgot(); }));
+        box.addView(linkText(tr("back_login"), v -> showLoginScreen(null)));
+        Runnable check = () -> callAuth(obj("action", "reset-status", "username", u, "reqId", id), (ok, res, err) -> {
+            if (!ok) {
+                if (res.has("error") && !res.optBoolean("ok")) { authPrefs().edit().remove("pwreq_id").apply(); setStatus(tr("reset_gone"), true); }
+                else setStatus(err, true);
+                return;
+            }
+            String st = res.optString("status");
+            if ("approved".equals(st)) {
+                authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply();
+                showLoginScreen(trf("reset_approved", u));
+            } else if ("rejected".equals(st)) {
+                authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply();
+                String why = res.optString("reason", "");
+                setStatus(tr("reset_rejected") + (why.isEmpty() ? "" : "\n" + why), true);
+            } else {
+                setStatus(trf("reset_waiting", u, fmtTime(authPrefs().getLong("pwreq_at", System.currentTimeMillis()), "d MMM, h:mm a")), false);
+            }
+        });
+        chk.setOnClickListener(v -> check.run());
+        showScreen(box, null);
+        check.run();
+    }
+
+    private void showForgotTc() {
         LinearLayout box = authHeader(tr("forgot_sub"));
         EditText phone = authField(tr("mobile"), InputType.TYPE_CLASS_PHONE, 10);
         addField(box, phoneRow(phone));
@@ -1219,6 +1309,8 @@ public class MainActivity extends FragmentActivity {
 
         if (!STATE_APP) {
             LinearLayout adm = card(page, tr("sec_admin"));
+            int pr = authPrefs().getInt("pwreq_pending", 0);
+            row(adm, "🛡️", tr("account_security"), pr > 0 ? trf("n_reset_requests", pr) : "", v -> showToolPage("security.html", tr("account_security"), "#list"));
             row(adm, "👥", tr("registered_users"), "", v -> showUsers("state", ""));
             row(adm, "📊", tr("access_insights"), "", v -> showAdminPage("logs"));
             row(adm, "🎧", tr("support_report"), "", v -> showAdminPage("support"));
@@ -2198,7 +2290,10 @@ public class MainActivity extends FragmentActivity {
             int n = STATE_APP ? sv.optInt("pending", 0) : sv.optInt("newResponses", 0);
             JSONObject chat = res.optJSONObject("chat");
             int cu = chat == null ? 0 : chat.optInt("unread", 0);
-            authPrefs().edit().putInt("support_unread", su).putInt("survey_badge", n).putInt("chat_unread", cu).apply();
+            int pr = res.optInt("pwreq", 0);
+            if (!STATE_APP && pr > authPrefs().getInt("pwreq_pending", 0) && unlocked)
+                Toast.makeText(this, "🛡️ " + trf("n_reset_requests", pr), Toast.LENGTH_LONG).show();
+            authPrefs().edit().putInt("support_unread", su).putInt("survey_badge", n).putInt("chat_unread", cu).putInt("pwreq_pending", pr).apply();
             setBadge(supportBadge, su);
             setBadge(surveyBadge, n);
             setBadge(chatBadge, cu);
@@ -2275,6 +2370,7 @@ public class MainActivity extends FragmentActivity {
         else if (open.startsWith("chat:")) showToolPage("chat.html", tr("messages"), "#c=" + Uri.encode(open.substring(5)));
         else if (open.equals("chat")) showToolPage("chat.html", tr("messages"), "#list");
         else if (open.equals("matrix")) showToolPage("matrix.html", tr("feature_matrix"), "#list");
+        else if (open.equals("security") && !STATE_APP) showToolPage("security.html", tr("account_security"), "#list");
         else if (open.equals("update")) checkForUpdate(true);
     }
 
@@ -2628,6 +2724,7 @@ public class MainActivity extends FragmentActivity {
 
     private static final java.util.Map<String, String> EVENT_ICONS = new java.util.HashMap<String, String>() {{
         put("open", "📲"); put("login", "🔑"); put("signup", "🆕"); put("logout", "🚪"); put("password-reset", "🔁"); put("disabled", "🚫"); put("enabled", "✅");
+        put("reset-requested", "🔐"); put("truecaller-on", "🛡️"); put("truecaller-off", "⏸️"); put("qr-login", "🔳");
     }};
 
     private void showLogs(String date, String which) {

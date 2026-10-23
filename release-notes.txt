@@ -1,3 +1,3 @@
-New Messages: chat directly with BI admins / state teams, with topics like Rankings, Growth, Retailer IDs, Improvement areas and Data mismatch
-New Feature usability matrix: tick the features your state uses and confirm your row
-Notifications for new messages and the feature matrix
+Forgot password: send a reset request that a BI admin approves (when Truecaller verification is off)
+Admins: new Account security page — turn Truecaller verification on/off and approve password reset requests
+Notifications for password reset requests (admins)

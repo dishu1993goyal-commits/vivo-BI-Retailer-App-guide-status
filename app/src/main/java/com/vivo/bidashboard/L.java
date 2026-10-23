@@ -287,6 +287,27 @@ final class L {
         put("matrix_popup", "Please tick the features your state uses and confirm your row.", "कृपया अपने राज्य में इस्तेमाल होने वाले फ़ीचर टिक करें और अपनी पंक्ति कन्फ़र्म करें।");
         put("matrix_update", "Update my state", "मेरा राज्य अपडेट करें");
         put("notif_chat_title", "New message from %s", "%s का नया मैसेज");
+        // v4.6: Truecaller switch, admin-approved password reset
+        put("signup_sub_plain", "Create your account with a user name and password.", "यूज़र नेम और पासवर्ड से अपना अकाउंट बनाएँ।");
+        put("create_account", "Create account", "अकाउंट बनाएँ");
+        put("reset_req_sub", "Choose a new password. A BI admin checks the request (usually by calling you) and approves it.",
+                "नया पासवर्ड चुनें। BI एडमिन अनुरोध की जाँच करेंगे (आमतौर पर कॉल करके) और मंज़ूरी देंगे।");
+        put("user_or_mobile", "User name or mobile number", "यूज़र नेम या मोबाइल नंबर");
+        put("err_user_or_mobile", "Enter your user name or mobile number.", "अपना यूज़र नेम या मोबाइल नंबर डालें।");
+        put("reset_note", "Message for the admin (optional)", "एडमिन के लिए संदेश (वैकल्पिक)");
+        put("send_reset_request", "Send reset request", "रीसेट अनुरोध भेजें");
+        put("reset_req_title", "Password reset request", "पासवर्ड रीसेट अनुरोध");
+        put("check_status", "Check status", "स्थिति देखें");
+        put("new_reset_request", "Send a new request", "नया अनुरोध भेजें");
+        put("reset_waiting", "⏳ Waiting for a BI admin to approve the new password for %1$s (sent %2$s). The admin may call you to confirm.",
+                "⏳ %1$s के नए पासवर्ड की मंज़ूरी का इंतज़ार है (भेजा %2$s)। एडमिन पुष्टि के लिए कॉल कर सकते हैं।");
+        put("reset_approved", "✅ Approved. Log in as %s with the new password you chose.", "✅ मंज़ूर। %s के रूप में अपने नए पासवर्ड से लॉग इन करें।");
+        put("reset_rejected", "✕ Not approved. Your password is unchanged. Contact your BI admin or send a new request.",
+                "✕ मंज़ूर नहीं हुआ। आपका पासवर्ड नहीं बदला। BI एडमिन से संपर्क करें या नया अनुरोध भेजें।");
+        put("reset_gone", "This request is no longer available. Send a new one if you still need it.", "यह अनुरोध अब उपलब्ध नहीं है। ज़रूरत हो तो नया भेजें।");
+        put("reset_pending_login", "⏳ Password reset request sent — tap Forgot password? to check its status.", "⏳ पासवर्ड रीसेट अनुरोध भेजा गया — स्थिति देखने के लिए पासवर्ड भूल गए? पर टैप करें।");
+        put("account_security", "Account security", "अकाउंट सुरक्षा");
+        put("n_reset_requests", "%d password reset request(s) waiting", "%d पासवर्ड रीसेट अनुरोध बाकी");
         put("no_internet", "No internet connection. Please try again.", "इंटरनेट कनेक्शन नहीं है। फिर से कोशिश करें।");
     }
 
