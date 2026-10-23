@@ -179,8 +179,8 @@
       '<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="biw-sp" style="width:auto"> Show password</label>' +
       '<div class="biw-msg" id="biw-lm"></div>' +
       '<button class="biw-btn biw-dark" id="biw-go">Log in</button>' +
-      '<div class="biw-note">New user, or forgot your password? Sign-up and password reset need mobile verification with Truecaller, so they are done in the mobile app: ' +
-      '<a href="' + APP_LINKS.state + '">State app</a> · <a href="' + APP_LINKS.admin + '">Admin app</a>. Then log in here with the same user name and password.</div>' +
+      '<a class="biw-link" id="biw-fg">Forgot password?</a><a class="biw-link" id="biw-su"><b>New user? Sign up</b></a>' +
+      '<div class="biw-note" style="font-size:12px">Prefer the mobile app? <a href="' + APP_LINKS.state + '">State app</a> · <a href="' + APP_LINKS.admin + '">Admin app</a> — same login works on both.</div>' +
       "</div>";
     ROOT.appendChild(loginEl);
     var u = loginEl.querySelector("#biw-u"), p = loginEl.querySelector("#biw-p"), m = loginEl.querySelector("#biw-lm"), go = loginEl.querySelector("#biw-go");
@@ -205,8 +205,133 @@
     }
     go.onclick = doLogin;
     p.onkeydown = function (e) { if (e.key === "Enter") doLogin(); };
+    loginEl.querySelector("#biw-su").onclick = function () { showSignup(role); };
+    loginEl.querySelector("#biw-fg").onclick = function () { showForgot(role); };
     setTimeout(function () { (u.value ? p : u).focus(); }, 50);
   }
+  // ---------- SIGN UP (web: email code instead of Truecaller) ----------
+  function authCard(html) {
+    mount(); lock();
+    if (loginEl) loginEl.remove();
+    loginEl = el("div", "biw-login");
+    loginEl.innerHTML = '<div class="biw-lcard biw-f"><div class="biw-logo"><img src="brand-logo.png" alt="vivo Business Innovation"></div>' + html + "</div>";
+    ROOT.appendChild(loginEl);
+    return loginEl;
+  }
+  function roleSeg(c, role, onChange) {
+    function set(r) { role = r; [].forEach.call(c.querySelectorAll("[data-r]"), function (b) { b.classList.toggle("on", b.dataset.r === r); }); onChange(r); }
+    [].forEach.call(c.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { set(b.dataset.r); }; });
+    set(role);
+  }
+  function msg(c, id, text, ok) { var m = c.querySelector(id); m.className = "biw-msg " + (ok ? "ok" : "err"); m.textContent = text; }
+
+  function showSignup(role) {
+    role = role || "state";
+    var c = authCard('<h1>Create <em>account</em></h1><p>Your email is verified with a one-time code.</p>' +
+      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+      '<label>Full name</label><input id="s-n" maxlength="40" autocomplete="name">' +
+      '<label>Choose a user name (for login)</label><input id="s-u" maxlength="30" autocomplete="username">' +
+      '<label>Mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="s-ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>' +
+      '<label>Email</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
+      '<div id="s-stw"><label>Your state</label><select id="s-st"><option value="">Select your state</option>' + STATES.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + "</select></div>" +
+      '<label>Create password (min 6 characters)</label><input id="s-p" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
+      '<label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64">' +
+      '<div id="s-otpw" style="display:none"><label>Code sent to your email</label><input id="s-otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="letter-spacing:6px;text-align:center;font-size:20px"></div>' +
+      '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Send code to email</button>' +
+      '<a class="biw-link" id="s-rs" style="display:none">Resend code</a><a class="biw-link" id="s-back">Already have an account? Log in</a>');
+    roleSeg(c, role, function (r) { role = r; c.querySelector("#s-stw").style.display = r === "state" ? "" : "none"; });
+    var sent = false, go = c.querySelector("#s-go");
+    function vals() {
+      return { fullName: c.querySelector("#s-n").value.trim(), username: c.querySelector("#s-u").value.trim(), phone: c.querySelector("#s-ph").value.replace(/\D/g, ""),
+        email: c.querySelector("#s-e").value.trim(), state: role === "state" ? c.querySelector("#s-st").value : "", password: c.querySelector("#s-p").value,
+        accessCode: c.querySelector("#s-ac").value.trim() };
+    }
+    function validate(v) {
+      if (v.fullName.length < 2) return "Please enter your full name.";
+      if (v.username.length < 3) return "User name must be at least 3 characters.";
+      if (!/^[6-9]\d{9}$/.test(v.phone)) return "Enter a valid 10-digit mobile number.";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return "Enter a valid email address.";
+      if (role === "state" && !v.state) return "Please select your state.";
+      if (v.password.length < 6) return "Password must be at least 6 characters.";
+      if (v.password !== c.querySelector("#s-p2").value) return "Passwords do not match.";
+      if (!v.accessCode) return "Enter the access code from your BI admin.";
+      return "";
+    }
+    function sendCode() {
+      var v = vals(), err = validate(v);
+      if (err) { msg(c, "#s-m", err); return; }
+      go.disabled = true; go.textContent = "Checking…";
+      api(Object.assign({ app: role, action: "signup-check" }, v), false).then(function (res) {
+        if (!res.ok) { go.disabled = false; go.textContent = "Send code to email"; msg(c, "#s-m", res.error); return; }
+        return api({ app: role, action: "email-otp-send", email: v.email, purpose: "signup" }, false).then(function (r2) {
+          go.disabled = false;
+          if (!r2.ok) { go.textContent = "Send code to email"; msg(c, "#s-m", r2.error); return; }
+          sent = true; c.querySelector("#s-otpw").style.display = ""; c.querySelector("#s-rs").style.display = "";
+          go.textContent = "Verify & create account"; msg(c, "#s-m", "Code sent to " + v.email + ". Check inbox and spam.", true);
+          c.querySelector("#s-otp").focus();
+        });
+      });
+    }
+    go.onclick = function () {
+      if (!sent) return sendCode();
+      var v = vals(), err = validate(v), code = c.querySelector("#s-otp").value.replace(/\D/g, "");
+      if (err) { msg(c, "#s-m", err); return; }
+      if (code.length !== 6) { msg(c, "#s-m", "Enter the 6-digit code from your email."); return; }
+      go.disabled = true; go.textContent = "Creating account…";
+      api(Object.assign({ app: role, action: "signup", emailOtp: code }, v), false).then(function (res) {
+        go.disabled = false; go.textContent = "Verify & create account";
+        if (!res.ok) { msg(c, "#s-m", res.error); return; }
+        AUTH = { app: role, username: res.username, token: res.token };
+        store("biw-auth", AUTH); store("biw-role", role); store("biw-last-user", res.username); saveProfile(res.profile);
+        loginEl.remove(); loginEl = null; toast("Account created. Welcome, " + (res.fullName || "") + "!");
+        startSession(true);
+      });
+    };
+    c.querySelector("#s-rs").onclick = function () { sent = false; sendCode(); };
+    c.querySelector("#s-back").onclick = function () { showLogin(); };
+  }
+
+  // ---------- FORGOT PASSWORD (web: email code) ----------
+  function showForgot(role) {
+    role = role || "state";
+    var c = authCard('<h1>Reset <em>password</em></h1><p>We\'ll email a code to the address on your account.</p>' +
+      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+      '<label>Account email</label><input id="f-e" type="email" maxlength="80" autocomplete="email">' +
+      '<div id="f-step2" style="display:none"><label>Code sent to your email</label><input id="f-otp" inputmode="numeric" maxlength="6" style="letter-spacing:6px;text-align:center;font-size:20px">' +
+      '<label>New password (min 6 characters)</label><input id="f-p" type="password" maxlength="64"><label>Confirm new password</label><input id="f-p2" type="password" maxlength="64"></div>' +
+      '<div class="biw-msg" id="f-m"></div><button class="biw-btn biw-dark" id="f-go">Send code</button>' +
+      '<div class="biw-note" style="font-size:12px">No email on your account? Use <b>Forgot password</b> in the mobile app (Truecaller), then add your email in Edit profile.</div>' +
+      '<a class="biw-link" id="f-back">Back to log in</a>');
+    roleSeg(c, role, function (r) { role = r; });
+    var sent = false, go = c.querySelector("#f-go");
+    go.onclick = function () {
+      var email = c.querySelector("#f-e").value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg(c, "#f-m", "Enter a valid email address."); return; }
+      if (!sent) {
+        go.disabled = true; go.textContent = "Sending…";
+        api({ app: role, action: "email-otp-send", email: email, purpose: "reset" }, false).then(function (res) {
+          go.disabled = false;
+          if (!res.ok) { go.textContent = "Send code"; msg(c, "#f-m", res.error); return; }
+          sent = true; c.querySelector("#f-step2").style.display = ""; go.textContent = "Save new password";
+          msg(c, "#f-m", "Code sent. Check inbox and spam.", true);
+        });
+        return;
+      }
+      var pw = c.querySelector("#f-p").value;
+      if (pw.length < 6) { msg(c, "#f-m", "Password must be at least 6 characters."); return; }
+      if (pw !== c.querySelector("#f-p2").value) { msg(c, "#f-m", "Passwords do not match."); return; }
+      go.disabled = true;
+      api({ app: role, action: "reset-email", email: email, otp: c.querySelector("#f-otp").value, newPassword: pw }, false).then(function (res) {
+        go.disabled = false;
+        if (!res.ok) { msg(c, "#f-m", res.error); return; }
+        store("biw-role", role); store("biw-last-user", res.username);
+        showLogin("Password changed. Your user name is " + res.username + ". Please log in.");
+      });
+    };
+    c.querySelector("#f-back").onclick = function () { showLogin(); };
+  }
+
   function logoutLocal() { AUTH = null; PROFILE = {}; store("biw-auth", null); store("biw-profile", null); store("biw-photo", null); }
 
   // ---------- SESSION START ----------

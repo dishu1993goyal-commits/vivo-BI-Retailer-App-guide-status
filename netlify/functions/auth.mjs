@@ -18,7 +18,8 @@ export default async (req) => {
     },
   };
   try {
-    return await handle(req, { store, env: { GEMINI_API_KEY: Netlify.env.get("GEMINI_API_KEY"), GEMINI_MODEL: Netlify.env.get("GEMINI_MODEL") } });
+    return await handle(req, { store, env: { GEMINI_API_KEY: Netlify.env.get("GEMINI_API_KEY"), GEMINI_MODEL: Netlify.env.get("GEMINI_MODEL"),
+      BREVO_API_KEY: Netlify.env.get("BREVO_API_KEY"), OTP_FROM_EMAIL: Netlify.env.get("OTP_FROM_EMAIL"), OTP_FROM_NAME: Netlify.env.get("OTP_FROM_NAME") } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: "Server error, please try again." }), {
       status: 500,

@@ -116,6 +116,33 @@ function dayList(from, to, max) {
   return out;
 }
 
+// ---------- Email OTP (web sign-up / forgot password), sent with Brevo's free plan ----------
+const EOTP_TTL = 10 * 60 * 1000, EOTP_TRIES = 5;
+export function normEmail(e) { const v = String(e || "").trim().toLowerCase(); return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 80 ? v : null; }
+export async function sendEmailOtp(env, to, code, purpose, fetchImpl = fetch) {
+  if (!env.BREVO_API_KEY || !env.OTP_FROM_EMAIL) return { ok: false, error: "Email OTP is not set up yet. Please contact your BI admin." };
+  const what = purpose === "reset" ? "reset your password" : "create your account";
+  const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:420px;margin:auto;border:1px solid #eadfc4;border-radius:14px;overflow:hidden">
+    <div style="background:#0b0b0c;color:#c9a227;padding:14px 18px;font-size:12px;letter-spacing:.18em">VIVO BUSINESS INNOVATION</div>
+    <div style="padding:20px 18px;color:#111"><p style="margin:0 0 10px">Use this code to ${what} on the BI KPI Dashboard:</p>
+    <div style="font-size:32px;font-weight:800;letter-spacing:8px;color:#0b0b0c;background:#fbf9f3;border:1px dashed #c9a227;border-radius:10px;text-align:center;padding:12px">${code}</div>
+    <p style="color:#6b6657;font-size:13px">The code is valid for 10 minutes. Don't share it with anyone. If you didn't ask for it, ignore this email.</p></div></div>`;
+  const r = await fetchImpl("https://api.brevo.com/v3/smtp/email", {
+    method: "POST", headers: { "content-type": "application/json", accept: "application/json", "api-key": env.BREVO_API_KEY },
+    body: JSON.stringify({ sender: { name: env.OTP_FROM_NAME || "vivo BI Dashboard", email: env.OTP_FROM_EMAIL }, to: [{ email: to }],
+      subject: code + " is your vivo BI Dashboard code", htmlContent: html }) });
+  if (r.ok) return { ok: true };
+  const j = await r.json().catch(() => ({}));
+  return { ok: false, error: "Couldn't send the email (" + r.status + (j.message ? ": " + String(j.message).slice(0, 100) : "") + "). Please try again." };
+}
+async function findByEmail(store, app, email) {
+  const idx = await store.get(`email:${app}:${email}`);
+  if (idx) { const u = await store.get(`user:${app}:${idx.key}`); if (u && normEmail(u.email) === email) return { key: idx.key, rec: u }; }
+  if (!store.list) return null;
+  for (const k of await store.list(`user:${app}:`)) { const u = await store.get(k); if (u && normEmail(u.email) === email) return { key: k.split(":").slice(2).join(":"), rec: u }; }
+  return null;
+}
+
 // ---------- Free AI (Google Gemini free tier) ----------
 const AI_DAILY_LIMIT = 40;   // questions per user per day
 const AI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest", "gemini-2.5-flash-lite", "gemini-3.6-flash"];
@@ -355,7 +382,7 @@ async function supportAction(b, { store, t, app, rec, key }) {
 }
 
 // store: { get(key) -> object|null, set(key, object), delete(key) }
-export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch }) {
+export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch }) {
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
   if (req.headers.get("x-bi-app") !== "1") return json(403, { ok: false, error: "Not allowed" });
 
@@ -366,6 +393,51 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const t = now();
   const uKeyOf = (k) => `user:${app}:${k}`;
   const pKeyOf = (p) => `phone:${app}:${p}`;
+  const eKeyOf = (e) => `email:${app}:${e}`;
+  const otpKey = (purpose, e) => `eotp:${purpose}:${app}:${e}`;
+  async function checkEmailOtp(purpose, email, code) {
+    const k = otpKey(purpose, email), rec = await store.get(k);
+    if (!rec || t > rec.exp) { if (rec) await store.delete(k); return "Code expired. Please request a new one."; }
+    if (rec.hash !== sha256(email + ":" + String(code || "").replace(/\D/g, ""))) {
+      rec.tries += 1;
+      if (rec.tries >= EOTP_TRIES) { await store.delete(k); return "Too many wrong codes. Please request a new one."; }
+      await store.set(k, rec); return "Incorrect code. " + (EOTP_TRIES - rec.tries) + " attempts left.";
+    }
+    await store.delete(k); return null;
+  }
+
+  if (b.action === "email-otp-send") {
+    const email = normEmail(b.email);
+    if (!email) return json(400, { ok: false, error: "Enter a valid email address." });
+    const purpose = b.purpose === "reset" ? "reset" : "signup";
+    if (purpose === "reset" && !(await findByEmail(store, app, email))) return json(404, { ok: false, error: "No account uses this email. Use the app's Forgot password (Truecaller), or sign up." });
+    if (purpose === "signup" && (await store.get(eKeyOf(email)))) return json(409, { ok: false, error: "This email already has an account. Log in or use Forgot password." });
+    const rl = (await store.get(`eotprl:${email}`)) || { s: [] };
+    const day = rl.s.filter((x) => t - x < 86400000), recent = day.filter((x) => t - x < 15 * 60000);
+    if (recent.length >= 3 || day.length >= 8) return json(429, { ok: false, error: "Too many codes requested. Please try again later." });
+    const code = String(Math.floor(100000 + (parseInt(randomBytes(4).toString("hex"), 16) % 900000)));
+    const sent = await sendEmailOtp(env, email, code, purpose, mailFetch);
+    if (!sent.ok) return json(502, { ok: false, error: sent.error });
+    await store.set(otpKey(purpose, email), { hash: sha256(email + ":" + code), exp: t + EOTP_TTL, tries: 0 });
+    day.push(t); await store.set(`eotprl:${email}`, { s: day });
+    return json(200, { ok: true });
+  }
+
+  // Web: forgot password with an email code.
+  if (b.action === "reset-email") {
+    const email = normEmail(b.email);
+    if (!email) return json(400, { ok: false, error: "Enter a valid email address." });
+    const found = await findByEmail(store, app, email);
+    if (!found) return json(404, { ok: false, error: "No account uses this email." });
+    const pwErr = passwordProblem(b.newPassword);
+    if (pwErr) return json(400, { ok: false, error: pwErr });
+    const bad = await checkEmailOtp("reset", email, b.otp);
+    if (bad) return json(400, { ok: false, error: bad });
+    Object.assign(found.rec, hashPassword(b.newPassword), { fails: 0, lockUntil: 0, resetAt: t, sessions: [] });
+    await store.set(uKeyOf(found.key), found.rec);
+    await logEvent(store, t, app, found.rec, "password-reset", b);
+    return json(200, { ok: true, username: found.rec.username });
+  }
 
   // Checks done before the user spends time on mobile verification.
   if (b.action === "signup-check" || b.action === "signup") {
@@ -382,22 +454,33 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (pwErr) return json(400, { ok: false, error: pwErr });
     const userState = String(b.state || "").trim().slice(0, 40);
     if (app === "state" && !userState) return json(400, { ok: false, error: "Please select your state." });
+    const signupEmail = b.email ? normEmail(b.email) : null;
+    if (b.email && !signupEmail) return json(400, { ok: false, error: "Enter a valid email address." });
+    if (signupEmail && (await store.get(eKeyOf(signupEmail)))) return json(409, { ok: false, error: "This email already has an account. Log in or use Forgot password." });
     if (await store.get(uKeyOf(key))) return json(409, { ok: false, error: "This user name is taken. Please choose another." });
     if (await store.get(pKeyOf(phone))) {
       return json(409, { ok: false, error: "This mobile number already has an account. Use Login, or Forgot password." });
     }
     if (b.action === "signup-check") return json(200, { ok: true });
 
-    if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
+    let emailVerified = false;
+    if (b.emailOtp != null) {           // web sign-up: email code instead of Truecaller
+      if (!signupEmail) return json(400, { ok: false, error: "Enter your email address." });
+      const bad = await checkEmailOtp("signup", signupEmail, b.emailOtp);
+      if (bad) return json(400, { ok: false, error: bad });
+      emailVerified = true;
+    } else if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
     const username = String(b.username).trim().replace(/\s+/g, " ");
     const rec = {
       username, fullName: name, phone, ...hashPassword(b.password),
       createdAt: t, fails: 0, lockUntil: 0, sessions: [], state: userState,
+      email: signupEmail || "", emailVerified, phoneVerified: !emailVerified, signupVia: emailVerified ? "web" : "app",
     };
     const token = newSession(rec, t);
     rec.lastSeen = t;
     await store.set(uKeyOf(key), rec);
     await store.set(pKeyOf(phone), { key });
+    if (signupEmail) await store.set(eKeyOf(signupEmail), { key });
     await logEvent(store, t, app, rec, "signup", b);
     return json(200, { ok: true, username, fullName: name, token, profile: publicProfile(rec) });
   }
@@ -582,8 +665,16 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       for (const [k, max] of Object.entries(PROFILE_LIMITS)) {
         if (vals[k].length > max) return json(400, { ok: false, error: `${k} is too long.` });
       }
+      const oldE = normEmail(rec.email), newE = normEmail(vals.email);
+      if (newE && newE !== oldE) {
+        const taken = await store.get(eKeyOf(newE));
+        if (taken && taken.key !== key) return json(409, { ok: false, error: "This email is used by another account." });
+      }
       Object.assign(rec, vals, { updatedAt: t });
+      if (newE !== oldE) rec.emailVerified = false;
       await save();
+      if (oldE && oldE !== newE) await store.delete(eKeyOf(oldE));
+      if (newE) await store.set(eKeyOf(newE), { key });
       return json(200, { ok: true, profile: publicProfile(rec) });
     }
 
@@ -630,6 +721,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       if (!checkPassword(b.password, rec)) return json(400, { ok: false, error: "Password is incorrect." });
       await store.delete(photoKey);
       await store.delete(pKeyOf(rec.phone));
+      if (normEmail(rec.email)) await store.delete(eKeyOf(normEmail(rec.email)));
       await store.delete(uKeyOf(key));
       return json(200, { ok: true });
     }
