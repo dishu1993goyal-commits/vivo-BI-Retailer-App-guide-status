@@ -53,7 +53,10 @@
   }
   function isAdmin() { return AUTH && AUTH.app === "admin"; }
   function saveProfile(p) { if (p) { PROFILE = p; store("biw-profile", p); } }
-  function sessionLost(res) { if (res && res.loggedOut) { logoutLocal(); showLogin("You were logged out (password changed or reset). Please log in again."); return true; } return false; }
+  function sessionLost(res) {
+    if (res && res.loggedOut) { logoutLocal(); showLogin(res.disabled ? res.error : "You were logged out (password changed or reset). Please log in again.", !!res.disabled); return true; }
+    return false;
+  }
 
   // ---------- styles (match the dashboard: black + gold) ----------
   var CSS = "" +
@@ -163,7 +166,7 @@
 
   // ---------- LOGIN ----------
   var loginEl = null;
-  function showLogin(info) {
+  function showLogin(info, isError) {
     mount(); lock();
     if (barEl) { barEl.remove(); barEl = null; }
     if (loginEl) loginEl.remove();
@@ -189,7 +192,7 @@
     [].forEach.call(loginEl.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { setRole(b.dataset.r); }; });
     setRole(role);
     loginEl.querySelector("#biw-sp").onchange = function () { p.type = this.checked ? "text" : "password"; };
-    if (info) { m.className = "biw-msg ok"; m.textContent = info; }
+    if (info) { m.className = "biw-msg " + (isError ? "err" : "ok"); m.textContent = info; }
     function doLogin() {
       if (!u.value.trim() || !p.value) { m.className = "biw-msg err"; m.textContent = "Enter your user name and password."; return; }
       go.disabled = true; go.textContent = "Logging in…";
@@ -328,7 +331,7 @@
     if (fresh) { go(); return; }
     // Check the saved session (also records the visit in the access log).
     api({ action: "ping" }).then(function (res) {
-      if (!res.ok) { if (res.loggedOut) { logoutLocal(); showLogin(); } else { go(); } return; }
+      if (!res.ok) { if (res.loggedOut) { logoutLocal(); showLogin(res.disabled ? res.error : "", !!res.disabled); } else { go(); } return; }
       saveProfile(res.profile); go();
     });
   }
@@ -594,11 +597,26 @@
         var list = users.filter(function (u) { return !s || [u.fullName, u.username, u.phone, u.state, u.designation].join(" ").toLowerCase().indexOf(s) >= 0; });
         d.querySelector("#u-c").textContent = "Showing " + list.length + " of " + users.length + " users";
         d.querySelector("#u-l").innerHTML = list.map(function (u, i) {
-          return '<div class="biw-item"><b>' + esc(u.fullName) + '</b><br><span style="color:#8a6a1f">@' + esc(u.username) + '</span> · <a href="tel:' + esc(u.phone) + '">📞 ' + esc(u.phone) + "</a>" +
+          return '<div class="biw-item"' + (u.disabled ? ' style="opacity:.75;border-color:#efc6bf"' : "") + '><b>' + esc(u.fullName) + "</b>" +
+            (u.disabled ? ' <span style="background:#FDECEC;color:#b3402f;border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700">🚫 Disabled</span>' : "") + '<br><span style="color:#8a6a1f">@' + esc(u.username) + '</span> · <a href="tel:' + esc(u.phone) + '">📞 ' + esc(u.phone) + "</a>" +
             ([u.designation, u.state].filter(Boolean).length ? '<div class="biw-mut">' + esc([u.designation, u.state].filter(Boolean).join(" · ")) + "</div>" : "") +
             '<div class="biw-mut">Joined ' + fmtTime(u.createdAt, { day: "numeric", month: "short", year: "numeric" }) + " · Last seen " + fmtTime(u.lastSeen) + "</div>" +
-            '<a class="biw-link" style="text-align:left;margin-top:6px" data-u="' + i + '">📍 Change state' + (u.state ? " (" + esc(u.state) + ")" : "") + "</a></div>";
+            (u.disabled ? '<div class="biw-mut" style="color:#b3402f">Disabled by ' + esc(u.disabledBy || "admin") + " · " + fmtTime(u.disabledAt) + (u.disabledReason ? " · " + esc(u.disabledReason) : "") + "</div>" : "") +
+            '<div style="display:flex;gap:16px;margin-top:6px"><a class="biw-link" style="margin:0" data-u="' + i + '">📍 Change state' + (u.state ? " (" + esc(u.state) + ")" : "") + "</a>" +
+            (which === "state" ? '<a class="biw-link" style="margin:0;color:' + (u.disabled ? "#2e7d5b" : "#b3402f") + '" data-d="' + i + '">' + (u.disabled ? "✅ Enable account" : "🚫 Disable account") + "</a>" : "") + "</div></div>";
         }).join("");
+        [].forEach.call(d.querySelectorAll("[data-d]"), function (a) {
+          a.onclick = function () {
+            var u = list[+a.dataset.d], off = !u.disabled, reason = "";
+            if (off) {
+              reason = prompt("Disable " + u.fullName + " (@" + u.username + ")? They'll be logged out of the app and web and can't log in until you enable them.\n\nReason (optional):", "");
+              if (reason === null) return;
+            } else if (!confirm("Enable " + u.fullName + " (@" + u.username + ") again?")) return;
+            api({ action: "admin-set-disabled", target: u.username, disabled: off, reason: reason }).then(function (r2) {
+              if (r2.ok) { toast(off ? "Account disabled" : "Account enabled"); showUsers(which, d.querySelector("#u-q").value); } else toast(r2.error);
+            });
+          };
+        });
         [].forEach.call(d.querySelectorAll("[data-u]"), function (a) {
           a.onclick = function () {
             var u = list[+a.dataset.u];

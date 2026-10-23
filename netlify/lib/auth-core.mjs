@@ -492,6 +492,10 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
     if (!rec) return json(401, { ok: false, error: "User name or password is incorrect." });
+    if (rec.disabled) {
+      if (!checkPassword(b.password, rec)) return json(401, { ok: false, error: "User name or password is incorrect." });
+      return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
+    }
     if (rec.lockUntil && t < rec.lockUntil) {
       const mins = Math.ceil((rec.lockUntil - t) / 60000);
       return json(429, { ok: false, error: `Too many wrong attempts. Try again in ${mins} min, or use Forgot password.` });
@@ -517,6 +521,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const idx = await store.get(pKeyOf(phone));
     const rec = idx ? await store.get(uKeyOf(idx.key)) : null;
     if (!rec) return json(404, { ok: false, error: "No account found for this mobile number. Please Sign up." });
+    if (rec.disabled) return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
     if (b.action === "reset-check") return json(200, { ok: true, phone: maskPhone(phone) });
 
     if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
@@ -539,12 +544,14 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const SESSION_ACTIONS = ["me", "ping", "update-profile", "change-password", "upload-photo", "get-photo",
     "remove-photo", "logout", "delete-account", "admin-users", "admin-logs", "admin-set-state", "set-state-once",
     "support-list", "support-get", "support-create", "support-reply", "support-rate", "support-status",
-    "support-upload", "support-att", "support-unread", "ai-ask", "ai-status", "admin-logs-range", "admin-support-data"];
+    "support-upload", "support-att", "support-unread", "ai-ask", "ai-status", "admin-logs-range", "admin-support-data",
+    "admin-set-disabled"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
     const th = sha256(String(b.token || ""));
     const sess = rec && (rec.sessions || []).find((x) => x.h === th);
+    if (rec && rec.disabled) return json(401, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", loggedOut: true, disabled: true });
     if (!sess) return json(401, { ok: false, error: "You have been logged out. Please log in again.", loggedOut: true });
     const save = () => store.set(uKeyOf(key), rec);
     const photoKey = `photo:${app}:${key}`;
@@ -587,6 +594,21 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     }
 
     // ---------- Admin app only ----------
+    // Admins can disable / re-enable state-app accounts (disabling logs the user out everywhere).
+    if (b.action === "admin-set-disabled") {
+      if (app !== "admin") return json(403, { ok: false, error: "Only the admin app can do this." });
+      const uk = userKey(b.target);
+      const u = uk ? await store.get(`user:state:${uk}`) : null;
+      if (!u) return json(404, { ok: false, error: "User not found." });
+      const off = b.disabled === true;
+      u.disabled = off;
+      if (off) { u.sessions = []; u.disabledAt = t; u.disabledBy = rec.username; u.disabledReason = String(b.reason || "").slice(0, 120); }
+      else { u.enabledAt = t; u.enabledBy = rec.username; delete u.disabledReason; }
+      await store.set(`user:state:${uk}`, u);
+      await logEvent(store, t, "state", u, off ? "disabled" : "enabled", { device: "by " + rec.username, ver: "" });
+      return json(200, { ok: true, disabled: off });
+    }
+
     if (b.action === "admin-set-state") {
       if (app !== "admin") return json(403, { ok: false, error: "Only the admin app can do this." });
       const which = b.which === "admin" ? "admin" : "state";
@@ -608,7 +630,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         const us = await pool(ks, 40, (k) => store.get(k));
         us.filter(Boolean).forEach((u) => {
           users[which + ":" + userKey(u.username)] = { app: which, username: u.username, fullName: u.fullName, phone: u.phone,
-            state: u.state || "", designation: u.designation || "", createdAt: u.createdAt || 0, lastSeen: u.lastSeen || 0 };
+            state: u.state || "", designation: u.designation || "", createdAt: u.createdAt || 0, lastSeen: u.lastSeen || 0, disabled: !!u.disabled };
         });
       }
       if (b.action === "admin-support-data") {
@@ -644,7 +666,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
           if (!u) continue;
           users.push({ username: u.username, fullName: u.fullName, phone: u.phone, email: u.email || "",
             state: u.state || "", designation: u.designation || "", createdAt: u.createdAt || 0,
-            lastSeen: u.lastSeen || 0, loggedInPhones: (u.sessions || []).length });
+            lastSeen: u.lastSeen || 0, loggedInPhones: (u.sessions || []).length, disabled: !!u.disabled,
+            disabledAt: u.disabledAt || 0, disabledBy: u.disabledBy || "", disabledReason: u.disabledReason || "" });
         }
         users.sort((a, c) => (c.lastSeen || c.createdAt) - (a.lastSeen || a.createdAt));
         return json(200, { ok: true, which, users });

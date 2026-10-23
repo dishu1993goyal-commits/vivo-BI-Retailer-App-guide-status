@@ -352,7 +352,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
 
   // ---------- ACCESS LOGS ----------
-  var EV = { open: "Opened app", login: "Logged in", signup: "Signed up", logout: "Logged out", "password-reset": "Reset password" };
+  var EV = { open: "Opened app", login: "Logged in", signup: "Signed up", logout: "Logged out", "password-reset": "Reset password", disabled: "Account disabled", enabled: "Account enabled" };
   function renderLogs(res, r) {
     var logs = res.logs || [], users = res.users || [];
     var days = daysIn(r[0], r[1]);
