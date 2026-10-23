@@ -850,8 +850,8 @@ public class MainActivity extends FragmentActivity {
                     "password", pw, "accessCode", ac, "state", st), (ok, res, err) -> {
                 busy(go, null);
                 if (!ok) { setStatus(err, true); return; }
-                if (waRequired()) startWaVerify("signup", obj("phone", ph), (code, secret) -> {
-                    try { details.put("waCode", code); details.put("waSecret", secret); } catch (Exception ignored) { }
+                if (waRequired()) startWaVerify("signup", obj("phone", ph), (wc, ws) -> {
+                    try { details.put("waCode", wc); details.put("waSecret", ws); } catch (Exception ignored) { }
                     finishSignup(details, false);
                 }, this::showSignup);
                 else if (needTc) startPhoneVerification(fn, ph, () -> finishSignup(details, true), this::showSignup);
