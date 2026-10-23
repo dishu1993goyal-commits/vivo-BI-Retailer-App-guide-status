@@ -21,3 +21,25 @@
   for = "/web.js"
   [headers.values]
     Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/survey.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/version.json"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/.well-known/assetlinks.json"
+  [headers.values]
+    Content-Type = "application/json"
+
+# Web login QR codes point here; the apps open these links directly when installed.
+[[redirects]]
+  from = "/qr"
+  to = "/qr.html"
+  status = 200

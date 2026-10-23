@@ -1,0 +1,10 @@
+{
+  "versionCode": 16,
+  "versionName": "4.3",
+  "notes": ["Admins can disable and re-enable state user accounts"],
+  "apk": {
+    "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
+    "state": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-States.apk"
+  },
+  "minVersionCode": 0
+}

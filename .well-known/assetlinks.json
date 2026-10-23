@@ -1,0 +1,8 @@
+[
+  {"relation": ["delegate_permission/common.handle_all_urls"],
+   "target": {"namespace": "android_app", "package_name": "com.vivo.bidashboard",
+     "sha256_cert_fingerprints": ["07:0F:5D:92:E3:E4:D7:62:2F:C3:43:58:35:93:BF:7C:87:16:BD:03:5F:EA:3F:F1:4E:58:50:1A:4F:60:05:DD"]}},
+  {"relation": ["delegate_permission/common.handle_all_urls"],
+   "target": {"namespace": "android_app", "package_name": "com.vivo.bidashboard.state",
+     "sha256_cert_fingerprints": ["07:0F:5D:92:E3:E4:D7:62:2F:C3:43:58:35:93:BF:7C:87:16:BD:03:5F:EA:3F:F1:4E:58:50:1A:4F:60:05:DD"]}}
+]

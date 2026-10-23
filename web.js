@@ -149,6 +149,15 @@
     ".biw-rate .q{font-weight:700;color:#5C4300;font-size:14px}.biw-rate .row{display:flex;justify-content:space-around;margin:6px 0 2px}" +
     ".biw-rate .row button{border:0;background:none;font-size:34px;color:#F5A623;cursor:pointer;line-height:1}" +
     ".biw-rate small{color:#8A6D1F;font-size:11px}" +
+    ".biw-svpop{background:#fbf9f3;border:1px solid #c9a227;border-radius:20px;padding:22px 20px 16px;max-width:360px;width:calc(100% - 32px);text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);animation:biwIn .25s ease-out}" +
+    ".biw-svpop .ic{width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#e6cf86,#c9a227);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 10px}" +
+    ".biw-svpop h3{margin:6px 0 6px;font:600 20px Georgia,serif;color:#111}" +
+    ".biw-qr{margin-top:16px;border-top:1px solid #eadfc4;padding-top:14px;text-align:center}" +
+    ".biw-qr .box{width:196px;height:196px;margin:8px auto 4px;background:#fff;border:1px solid #eadfc4;border-radius:14px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;cursor:pointer}" +
+    ".biw-qr .box svg{width:176px;height:176px}" +
+    ".biw-qr .box .ov2{position:absolute;inset:0;background:rgba(251,249,243,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;color:#5c4300;padding:10px;gap:6px}" +
+    ".biw-qr ol{text-align:left;font-size:12.5px;color:#6b6657;margin:8px auto 0;padding-left:20px;max-width:300px;line-height:1.5}" +
+    "@media(min-width:820px){.biw-lcard.wide{max-width:780px;display:flex;gap:26px;align-items:stretch}.biw-lcard.wide .lf{flex:1}.biw-lcard.wide .biw-qr{width:300px;border-top:0;border-left:1px solid #eadfc4;padding:6px 0 0 24px;margin-top:0}}" +
     ".biw-frame{position:fixed;inset:0;z-index:2147482700;background:#F3F4F9;display:flex;flex-direction:column}" +
     ".biw-frame .bar{background:#0b0b0c;color:#e6cf86;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid #c9a227}" +
     ".biw-frame iframe{flex:1;border:0;width:100%}" +
@@ -173,7 +182,7 @@
     var role = store("biw-role") || "state";
     loginEl = el("div", "biw-login");
     loginEl.innerHTML =
-      '<div class="biw-lcard biw-f">' +
+      '<div class="biw-lcard biw-f wide"><div class="lf">' +
       '<div class="biw-logo"><img src="brand-logo.png" alt="vivo Business Innovation"></div>' +
       '<h1>BI KPI <em>Dashboard</em></h1><p>Log in with your app user name and password</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
@@ -184,6 +193,8 @@
       '<button class="biw-btn biw-dark" id="biw-go">Log in</button>' +
       '<a class="biw-link" id="biw-fg">Forgot password?</a><a class="biw-link" id="biw-su"><b>New user? Sign up</b></a>' +
       '<div class="biw-note" style="font-size:12px">Prefer the mobile app? <a href="' + APP_LINKS.state + '">State app</a> · <a href="' + APP_LINKS.admin + '">Admin app</a> — same login works on both.</div>' +
+      '</div><div class="biw-qr"><b style="font-size:15px">Log in with QR code</b><div class="biw-mut">No password needed</div><div class="box" id="biw-qrb"><div class="ov2">Loading…</div></div>' +
+      '<ol><li>Open the <b>vivo BI</b> app on your phone (State or Admin)</li><li>Tap your <b>profile photo → 🔳 Scan web login QR</b></li><li>Point the camera at this code and tap <b>Allow</b></li></ol></div>' +
       "</div>";
     ROOT.appendChild(loginEl);
     var u = loginEl.querySelector("#biw-u"), p = loginEl.querySelector("#biw-p"), m = loginEl.querySelector("#biw-lm"), go = loginEl.querySelector("#biw-go");
@@ -210,7 +221,55 @@
     p.onkeydown = function (e) { if (e.key === "Enter") doLogin(); };
     loginEl.querySelector("#biw-su").onclick = function () { showSignup(role); };
     loginEl.querySelector("#biw-fg").onclick = function () { showForgot(role); };
+    if (window.matchMedia && matchMedia("(max-width:600px)").matches) loginEl.querySelector(".biw-qr").style.display = "none"; else startQr(loginEl);
     setTimeout(function () { (u.value ? p : u).focus(); }, 50);
+  }
+
+  // ---------- QR login (scan with the app) ----------
+  var qrLib = null, qrTimer = 0;
+  function loadQrLib() {
+    if (window.qrcode) return Promise.resolve();
+    if (!qrLib) qrLib = new Promise(function (res, rej) { var s = el("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"; s.onload = res; s.onerror = function () { qrLib = null; rej(); }; document.head.appendChild(s); });
+    return qrLib;
+  }
+  function startQr(owner) {
+    var box = owner.querySelector("#biw-qrb"); if (!box) return;
+    var tries = 0, cur = null;
+    clearTimeout(qrTimer);
+    function overlay(html, click) { var o = box.querySelector(".ov2"); if (!o) { o = el("div", "ov2"); box.appendChild(o); } o.innerHTML = html; box.onclick = click || null; }
+    function fresh() {
+      if (!owner.isConnected) return;
+      tries++; overlay("Loading…");
+      Promise.all([loadQrLib(), api({ app: "state", action: "qr-create", device: browserName() + " · " + (/Windows/.test(navigator.userAgent) ? "Windows" : /Mac/.test(navigator.userAgent) ? "Mac" : /Android/.test(navigator.userAgent) ? "Android" : /iPhone|iPad/.test(navigator.userAgent) ? "iOS" : "Computer") }, false)]).then(function (r) {
+        var res = r[1]; if (!owner.isConnected) return;
+        if (!res.ok) { overlay("Couldn't load QR code.<br><b>Tap to retry</b>", fresh); return; }
+        cur = res;
+        var q = window.qrcode(0, "M"); q.addData(location.origin + "/qr?c=" + res.id); q.make();
+        box.innerHTML = q.createSvgTag(4, 0);
+        box.onclick = null;
+        poll();
+      }).catch(function () { overlay("Couldn't load QR code.<br><b>Tap to retry</b>", fresh); });
+    }
+    function poll() {
+      qrTimer = setTimeout(function () {
+        if (!owner.isConnected || !cur) return;
+        if (document.visibilityState !== "visible") { poll(); return; }
+        api({ app: "state", action: "qr-poll", id: cur.id, secret: cur.secret }, false).then(function (res) {
+          if (!owner.isConnected) return;
+          if (res.ok && res.status === "pending") { poll(); return; }
+          if (res.ok && res.status === "approved") {
+            AUTH = { app: res.app, username: res.username, token: res.token };
+            store("biw-auth", AUTH); store("biw-role", res.app); store("biw-last-user", res.username); saveProfile(res.profile);
+            if (loginEl) { loginEl.remove(); loginEl = null; }
+            toast("Logged in as " + (res.fullName || res.username)); startSession(true); return;
+          }
+          if (res.expired && tries < 6) { fresh(); return; }
+          overlay((res.disabled || res.rejected ? esc(res.error) : "QR code expired.") + "<br><b>Tap to get a new code</b>", function () { tries = 0; fresh(); });
+          if (res.disabled) { var m = owner.querySelector("#biw-lm"); if (m) { m.className = "biw-msg err"; m.textContent = res.error; } }
+        });
+      }, 2000);
+    }
+    fresh();
   }
   // ---------- SIGN UP (web: email code instead of Truecaller) ----------
   function authCard(html) {
@@ -395,18 +454,20 @@
   }
 
   // ---------- TOP BAR ----------
-  var barEl = null, badgeEl = null;
+  var barEl = null, badgeEl = null, svBadgeEl = null;
   function buildBar() {
     if (barEl) barEl.remove();
     barEl = el("div", "biw-bar");
     barEl.innerHTML = '<button title="Search" aria-label="Search">🔍</button><button title="BI Assistant" aria-label="BI Assistant">💬</button>' +
+      '<button title="Surveys" aria-label="Surveys">📋<span class="biw-badge" id="biw-sb"></span></button>' +
       '<button title="Support desk" aria-label="Support desk">🎧<span class="biw-badge"></span></button><button title="Profile" aria-label="Profile & settings"><span class="biw-av"></span></button>';
     var b = barEl.querySelectorAll("button");
     b[0].onclick = function () { assistant("openSearch"); };
     b[1].onclick = function () { assistant("openChat"); };
-    b[2].onclick = function () { openSupport(); };
-    b[3].onclick = function () { openDrawer(); };
-    badgeEl = barEl.querySelector(".biw-badge");
+    b[2].onclick = function () { openSurveys(); };
+    b[3].onclick = function () { openSupport(); };
+    b[4].onclick = function () { openDrawer(); };
+    badgeEl = barEl.querySelectorAll(".biw-badge")[1]; svBadgeEl = barEl.querySelector("#biw-sb");
     ROOT.appendChild(barEl);
     paintAvatar(barEl.querySelector(".biw-av"));
   }
@@ -421,13 +482,49 @@
     if (have && have.v === v) return;
     api({ action: "get-photo" }).then(function (res) { if (res.ok && res.photo) { store("biw-photo", { v: res.photoVersion, data: res.photo }); paintAvatar(barEl && barEl.querySelector(".biw-av")); } });
   }
+  function setBadge(el, n) { if (!el) return; el.textContent = n > 9 ? "9+" : n; el.style.display = n > 0 ? "flex" : "none"; }
   function refreshBadge() {
     if (!AUTH) return;
-    api({ action: "support-unread" }).then(function (res) {
-      if (!res.ok || !badgeEl) return;
-      badgeEl.textContent = res.unread > 9 ? "9+" : res.unread; badgeEl.style.display = res.unread > 0 ? "flex" : "none";
+    api({ action: "notify" }).then(function (res) {
+      if (!res.ok) { sessionLost(res); return; }
+      setBadge(badgeEl, res.supportUnread || 0);
+      var sv = res.surveys || {};
+      setBadge(svBadgeEl, isAdmin() ? (sv.newResponses || 0) : (sv.pending || 0));
+      if (!isAdmin()) surveyPopup(sv.surveys || []);
     });
   }
+  // New (or re-announced) survey: show a card once per announcement on this browser.
+  function surveyPopup(list) {
+    if (document.querySelector(".biw-frame,.biw-sd,.biw-ov,.biw-login")) return;
+    var shown = store("biw-svseen") || {};
+    var s = list.filter(function (x) { return x.isNew && shown[x.id] !== x.announcedAt; })[0];
+    if (!s) return;
+    shown[s.id] = s.announcedAt; store("biw-svseen", shown);
+    var ov = el("div", "biw-ov"); ov.style.alignItems = "center"; ov.style.justifyContent = "center";
+    ov.innerHTML = '<div class="biw-svpop"><div class="ic">📋</div><div class="biw-eyebrow" style="color:#8a6a1f">New survey from BI admin</div><h3>' + esc(s.title) + "</h3>" +
+      (s.closesAt ? '<div class="biw-mut">Please answer by ' + fmtTime(s.closesAt) + "</div>" : '<div class="biw-mut">It takes only a few minutes.</div>') +
+      (list.length > 1 ? '<div class="biw-mut" style="margin-top:4px">' + list.length + " surveys are waiting for you</div>" : "") +
+      '<button class="biw-btn biw-dark" id="sv-go">Answer now</button><a class="biw-link" id="sv-later">Later</a></div>';
+    ROOT.appendChild(ov);
+    ov.querySelector("#sv-go").onclick = function () { ov.remove(); openSurveys("#s=" + s.id); };
+    ov.querySelector("#sv-later").onclick = function () { ov.remove(); };
+  }
+  // ---------- SURVEYS (shared page, also used by the apps) ----------
+  var svFrame = null;
+  function openSurveys(hash) {
+    closeDrawer();
+    if (svFrame) svFrame.remove();
+    var f = el("div", "biw-frame"); svFrame = f;
+    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? "Survey manager" : "Surveys") + '</b></div><iframe title="Surveys" src="survey.html?v=' + Date.now() + (hash || "#list") + '"></iframe>';
+    ROOT.appendChild(f);
+    var ifr = f.querySelector("iframe");
+    f.querySelector(".biw-back").onclick = function () {
+      var w = ifr.contentWindow, handled = false;
+      try { handled = w && w.__surveyBack && w.__surveyBack(); } catch (e) { }
+      if (!handled) { f.remove(); svFrame = null; refreshBadge(); }
+    };
+  }
+  window.addEventListener("message", function (e) { if (e.origin === location.origin && e.data && e.data.biSurvey) refreshBadge(); });
   setInterval(function () { if (AUTH && document.visibilityState === "visible") refreshBadge(); }, 120000);
 
   // ---------- BI ASSISTANT (search, chat, AI, payout calculator) ----------
@@ -486,7 +583,7 @@
     var p = PROFILE, admin = isAdmin();
     var ph = store("biw-photo");
     var adminItems = [["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
-    var helpItems = [["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
+    var helpItems = [["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
     var supItems = [["📲", "Get the State app", "APK", function () { location.href = APP_LINKS.state; }], admin ? ["📲", "Get the Admin app", "APK", function () { location.href = APP_LINKS.admin; }] : null,

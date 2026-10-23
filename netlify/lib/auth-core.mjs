@@ -1,6 +1,7 @@
 // Account logic for the vivo BI apps (Admin and State). Kept separate from the Netlify
 // wrapper so it can be tested. Passwords are stored only as salted scrypt hashes.
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { surveyAction } from "./survey-core.mjs";
 
 // SHA-256 of the sign-up access codes (vivoBI@2026 for admin, vivoState@2026 for state).
 const ACCESS_CODE_SHA256 = {
@@ -59,7 +60,8 @@ function checkPassword(pw, rec) {
 
 const maskPhone = (p) => p.slice(0, 3) + " ******" + p.slice(-4);
 
-const MAX_SESSIONS = 5;               // phones a user can stay logged in on at once
+const QR_TTL = 3 * 60 * 1000;          // web QR login code lifetime
+const MAX_SESSIONS = 8;               // phones + browsers a user can stay logged in on at once
 const MAX_PHOTO_BASE64 = 300 * 1024;  // ~220 KB JPEG
 const PROFILE_LIMITS = { fullName: 40, email: 80, state: 40, designation: 50 };
 
@@ -169,15 +171,15 @@ export function cleanAI(t) {
     !/(IDC|Canalys|Counterpoint|research firms?)[^\n]*(vary|varies|change|differ|estimate)/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
-export async function askAI(env, question, context, history, fetchImpl = fetch) {
+export async function askAI(env, question, context, history, fetchImpl = fetch, opts = {}) {
   if (!env || !env.GEMINI_API_KEY) return { ok: false, error: "AI is not set up yet.", notConfigured: true };
   const contents = [];
   (Array.isArray(history) ? history : []).slice(-6).forEach((h) => {
     if (h && h.q) contents.push({ role: "user", parts: [{ text: String(h.q).slice(0, 600) }] });
     if (h && h.a) contents.push({ role: "model", parts: [{ text: String(h.a).slice(0, 1200) }] });
   });
-  contents.push({ role: "user", parts: [{ text: "DASHBOARD DATA:\n" + String(context || "").slice(0, 14000) + "\n\nQUESTION: " + String(question).slice(0, 800) }] });
-  const body = JSON.stringify({ systemInstruction: { parts: [{ text: AI_SYSTEM }] }, contents,
+  contents.push({ role: "user", parts: [{ text: (opts.label || "DASHBOARD DATA") + ":\n" + String(context || "").slice(0, 14000) + "\n\nQUESTION: " + String(question).slice(0, 800) }] });
+  const body = JSON.stringify({ systemInstruction: { parts: [{ text: opts.system || AI_SYSTEM }] }, contents,
     generationConfig: { temperature: 0.6, maxOutputTokens: 900 } });
   const models = env.GEMINI_MODEL ? [env.GEMINI_MODEL, ...AI_MODELS] : AI_MODELS;
   let last = "";
@@ -540,12 +542,45 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     return json(200, { ok: true, phone: r.phone.slice(3), name: r.name });
   }
 
+  // ---------- QR login for the web portal ----------
+  // The web login page shows a QR code (qr-create) and waits (qr-poll); a logged-in app scans it (qr-approve).
+  if (b.action === "qr-create") {
+    const id = randomBytes(9).toString("hex"), secret = randomBytes(24).toString("hex");
+    await store.set(`qr:${id}`, { sh: sha256(secret), exp: t + QR_TTL, status: "pending", device: clip(b.device, 60), at: t });
+    if (store.list && Math.random() < 0.1) {          // tidy up expired codes now and then
+      const ks = await store.list("qr:");
+      await pool(ks, 20, async (k) => { const q = await store.get(k); if (!q || t > q.exp + 60000) await store.delete(k); });
+    }
+    return json(200, { ok: true, id, secret, ttl: QR_TTL });
+  }
+  if (b.action === "qr-poll") {
+    const k = `qr:${String(b.id || "").replace(/[^a-f0-9]/g, "")}`;
+    const q = await store.get(k);
+    if (!q || q.sh !== sha256(String(b.secret || ""))) return json(404, { ok: false, expired: true, error: "This QR code has expired." });
+    if (q.status === "pending") {
+      if (t > q.exp) { await store.delete(k); return json(410, { ok: false, expired: true, error: "This QR code has expired." }); }
+      return json(200, { ok: true, status: "pending" });
+    }
+    await store.delete(k);           // one-time use
+    if (q.status !== "approved") return json(403, { ok: false, rejected: true, error: "Login was declined on the phone." });
+    const uk = `user:${q.app}:${q.key}`;
+    const u = await store.get(uk);
+    if (!u) return json(404, { ok: false, error: "Account not found." });
+    if (u.disabled) return json(403, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", disabled: true });
+    u.lastSeen = t;
+    const token = newSession(u, t);
+    await store.set(uk, u);
+    await logEvent(store, t, q.app, u, "qr-login", { device: q.device || "Web browser", ver: "web" });
+    return json(200, { ok: true, status: "approved", app: q.app, username: u.username, fullName: u.fullName, token, profile: publicProfile(u) });
+  }
+
   // ---------- Actions for a logged-in user (user name + session token) ----------
   const SESSION_ACTIONS = ["me", "ping", "update-profile", "change-password", "upload-photo", "get-photo",
     "remove-photo", "logout", "delete-account", "admin-users", "admin-logs", "admin-set-state", "set-state-once",
     "support-list", "support-get", "support-create", "support-reply", "support-rate", "support-status",
     "support-upload", "support-att", "support-unread", "ai-ask", "ai-status", "admin-logs-range", "admin-support-data",
-    "admin-set-disabled"];
+    "admin-set-disabled", "notify", "qr-approve", "survey-list", "survey-get", "survey-save", "survey-respond",
+    "survey-status", "survey-remind", "survey-results", "survey-ai"];
   if (SESSION_ACTIONS.includes(b.action)) {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -554,6 +589,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (rec && rec.disabled) return json(401, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", loggedOut: true, disabled: true });
     if (!sess) return json(401, { ok: false, error: "You have been logged out. Please log in again.", loggedOut: true });
     const save = () => store.set(uKeyOf(key), rec);
+    const surveyCtx = () => ({ store, t, app, rec, key, who, sameUser, userKey, pool, logEvent, askAI, env, aiFetch });
     const photoKey = `photo:${app}:${key}`;
 
     if (b.action === "me") return json(200, { ok: true, profile: publicProfile(rec) });
@@ -586,6 +622,26 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       if (!st) return json(400, { ok: false, error: "Please select your state." });
       rec.state = st; await save();
       return json(200, { ok: true, profile: publicProfile(rec) });
+    }
+
+    // Everything the apps / web need for badges and notifications, in one call.
+    if (b.action === "notify") {
+      const ctx = surveyCtx();
+      const sv = await surveyAction({ action: "survey-notify" }, ctx);
+      const su = await (await supportAction({ action: "support-unread" }, { store, t, app, rec, key })).json();
+      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0 });
+    }
+    if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
+
+    // A logged-in app approves (or declines) a web login shown as a QR code.
+    if (b.action === "qr-approve") {
+      const k = `qr:${String(b.qrId || "").replace(/[^a-f0-9]/g, "")}`;
+      const q = await store.get(k);
+      if (!q || q.status !== "pending" || t > q.exp) return json(404, { ok: false, error: "This QR code has expired. Refresh the web page and scan again." });
+      if (b.confirm !== true && b.decline !== true) return json(200, { ok: true, device: q.device || "Web browser", expiresIn: q.exp - t });
+      Object.assign(q, b.decline === true ? { status: "declined" } : { status: "approved", app, key, approvedAt: t });
+      await store.set(k, q);
+      return json(200, { ok: true, approved: b.decline !== true });
     }
 
     // ---------- Support desk (shared by state and admin users) ----------

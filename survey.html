@@ -1,0 +1,1283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BI Surveys</title>
+<style>
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📋</span></div>
+  <h1 id="h1">Surveys</h1><p id="h2">Loading…</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading surveys…</div></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function openAtt(a) {
+    toast("Downloading " + a.name + "…");
+    api({ action: "support-att", id: a.id }).then(function (r) {
+      if (!r.ok) { toast(r.error || "Couldn't open the file."); return; }
+      if (window.AndroidDL && window.AndroidDL.save) window.AndroidDL.save(r.data, r.name, r.mime);
+      else download(b64ToBlob(r.data, r.mime), r.name);
+    });
+  }
+
+  // ---------- question types ----------
+  var TYPES = [
+    ["short", "✏️", "Short answer", "One line of text"], ["long", "📝", "Paragraph", "Long text answer"],
+    ["single", "🔘", "Multiple choice", "Pick one option"], ["multi", "☑️", "Checkboxes", "Pick one or more"],
+    ["dropdown", "🔽", "Dropdown", "Pick one from a list"], ["yesno", "👍", "Yes / No", "Quick yes or no"],
+    ["rating", "⭐", "Star rating", "1 to 5 stars"], ["scale", "📏", "Linear scale", "e.g. 1 to 5 or 1 to 10"],
+    ["nps", "📣", "NPS (0–10)", "How likely to recommend"], ["number", "🔢", "Number", "Counts, amounts, IDs"],
+    ["date", "📅", "Date", "Pick a date"], ["email", "✉️", "Email", "Validated email"],
+    ["phone", "📞", "Mobile number", "10-digit number"], ["file", "📎", "File upload", "Photos, PDF, Excel…"],
+    ["section", "🔖", "Section heading", "Split into parts"]
+  ];
+  var TYPE = {}; TYPES.forEach(function (t) { TYPE[t[0]] = t; });
+  var CHOICE = ["single", "multi", "dropdown", "yesno"];
+  var CATS = ["Feedback", "Data collection", "Training", "Poll", "Audit / checklist", "Other"];
+  var CAT_ICON = { "Feedback": "💬", "Data collection": "📊", "Training": "🎓", "Poll": "🗳️", "Audit / checklist": "✅", "Other": "📋" };
+  var COLORS = ["#4D5BF9", "#9152E0", "#1E9E61", "#E69A00", "#E0457B", "#0E9AA7", "#1B1F5E"];
+  var STATES = [];
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+
+  function statusChip(s) { return '<span class="chip ' + s + '">' + (s === "live" ? "● Live" : s === "draft" ? "Draft" : "Closed") + "</span>"; }
+  function closesText(s) {
+    if (s.status === "closed") return "Closed" + (s.closesAt ? " " + dOnly(s.closesAt) : "");
+    if (!s.closesAt) return "No deadline";
+    var left = s.closesAt - Date.now(), d = Math.floor(left / 86400000);
+    if (left < 0) return "Closed";
+    if (left < 86400000) return "⏰ Closes today " + dfmt(s.closesAt, { hour: "numeric", minute: "2-digit" });
+    return (d <= 2 ? "⏰ " : "") + "Closes in " + d + " day" + (d > 1 ? "s" : "") + " (" + dOnly(s.closesAt) + ")";
+  }
+  function estMin(n) { return Math.max(1, Math.round(n * 0.4)); }
+
+  // ---------- routing ----------
+  var VIEW = $("view"), LIST = null, TAB = ls("svy-tab") || "pending";
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  function loading(m) { VIEW.innerHTML = '<div class="loading"><div class="spin"></div>' + esc(m || "Loading…") + "</div>"; }
+  function fail(m) { VIEW.innerHTML = '<div class="err">' + esc(m) + '</div><div style="text-align:center;margin-top:14px"><button class="btn sec" id="rt">Try again</button></div>'; $("rt").onclick = route; }
+  function go(h) { if (location.hash === h) route(); else location.hash = h; }
+  var dirty = false;
+  window.__surveyBack = function () { if (/^#(s|r|e|new|tpl)/.test(location.hash)) { if (dirty && !confirm("Leave without saving your changes?")) return true; dirty = false; go("#list"); return true; } return false; };
+  window.addEventListener("beforeunload", function (e) { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+  window.addEventListener("hashchange", route);
+  function route() {
+    window.scrollTo(0, 0);
+    var h = location.hash, m;
+    if (!AUTH || !AUTH.token) { hero("Surveys", ""); fail("Please log in to the BI app or dashboard first."); return; }
+    if ((m = /^#s=(\w+)/.exec(h))) return ADMIN ? showResults(m[1]) : openFill(m[1]);
+    if (ADMIN && (m = /^#r=(\w+)/.exec(h))) return showResults(m[1]);
+    if (ADMIN && (m = /^#e=(\w+)/.exec(h))) return editSurvey(m[1]);
+    if (ADMIN && h === "#tpl") return showTemplates();
+    if (ADMIN && h === "#new") return builder(ls(draftKey()) || blankSurvey());
+    showList();
+  }
+
+  // ---------- LIST ----------
+  function showList() {
+    dirty = false;
+    hero(ADMIN ? "Survey manager" : "Surveys", ADMIN ? "Create surveys, send them to state teams and track answers live." : "Surveys from BI admins. Your answers help shape plans for your state.");
+    if (!LIST) loading("Loading surveys…");
+    api({ action: "survey-list" }).then(function (r) {
+      if (!r.ok) { if (!LIST) fail(r.error); return; }
+      LIST = r.surveys; ADMIN ? renderAdminList() : renderStateList();
+    });
+  }
+  function svCard(s, extra, right) {
+    return '<div class="sv" data-id="' + s.id + '"><div class="strip" style="background:' + esc(s.color || "#4D5BF9") + '"></div><div class="in">' +
+      '<div class="row"><span class="chip">' + (CAT_ICON[s.category] || "📋") + " " + esc(s.category) + "</span>" + (right || "") + "</div>" +
+      '<div class="t">' + esc(s.title) + "</div>" + (s.description ? '<div class="d">' + esc(s.description) + "</div>" : "") +
+      '<div class="meta">' + extra + "</div></div></div>";
+  }
+  function renderStateList() {
+    var pend = LIST.filter(function (s) { return s.status === "live" && !s.responded; });
+    var done = LIST.filter(function (s) { return s.responded; });
+    var missed = LIST.filter(function (s) { return s.status !== "live" && !s.responded; });
+    if (["pending", "done", "missed"].indexOf(TAB) < 0) TAB = "pending";
+    var tabs = [["pending", "To answer", pend.length], ["done", "Answered", done.length], ["missed", "Closed", missed.length]];
+    var list = TAB === "pending" ? pend : TAB === "done" ? done : missed;
+    var html = '<div class="seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + '<span class="n">' + t[2] + "</span></button>"; }).join("") + "</div>";
+    if (!list.length) html += '<div class="card empty"><div class="big">' + (TAB === "pending" ? "🎉" : "📭") + "</div>" + (TAB === "pending" ? "You're all caught up. New surveys from BI admins will appear here." : "Nothing here yet.") + "</div>";
+    list.forEach(function (s) {
+      var right = s.isNew ? '<span class="chip new" style="margin-left:auto">NEW</span>' : s.responded ? '<span class="chip done" style="margin-left:auto">✓ Answered</span>' : "";
+      var meta = "<span>❓ " + s.questions + " questions · ~" + estMin(s.questions) + " min</span><span>" + closesText(s) + "</span>" +
+        (s.responded ? "<span>Sent " + dt(s.updatedRespAt || s.submittedAt) + "</span>" : "") + (s.anonymous ? "<span>🕶️ Anonymous</span>" : "");
+      html += svCard(s, meta, right);
+    });
+    VIEW.innerHTML = html;
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("svy-tab", TAB); renderStateList(); }; });
+    [].forEach.call(VIEW.querySelectorAll(".sv"), function (c) { c.onclick = function () { go("#s=" + c.dataset.id); }; });
+    $("h2").textContent = pend.length ? pend.length + " survey" + (pend.length > 1 ? "s" : "") + " waiting for your answer" : "No pending surveys — thank you!";
+  }
+  function renderAdminList() {
+    var live = LIST.filter(function (s) { return s.status === "live"; }), drafts = LIST.filter(function (s) { return s.status === "draft"; });
+    var closed = LIST.filter(function (s) { return s.status === "closed"; });
+    var totalResp = LIST.reduce(function (a, s) { return a + (s.count || 0); }, 0);
+    var pub = LIST.filter(function (s) { return s.publishedAt && s.targets; });
+    var avgRate = pub.length ? Math.round(pub.reduce(function (a, s) { return a + Math.min(100, pct(s.count, s.targets)); }, 0) / pub.length) : 0;
+    if (["live", "draft", "closed", "all"].indexOf(TAB) < 0) TAB = "live";
+    var html = '<div class="tiles">' + tileS("🟢", "#E6F4EA", live.length, "Live surveys") + tileS("📝", "#EEF0FF", drafts.length, "Drafts") +
+      tileS("📨", "#F4EEFF", fmtN(totalResp), "Responses") + tileS("🎯", "#FFF4E5", avgRate + "%", "Avg response rate") + "</div>";
+    html += '<div class="row" style="margin:12px 0"><button class="btn pri grow" id="new">＋ Create survey</button></div>';
+    var tabs = [["live", "Live", live.length], ["draft", "Drafts", drafts.length], ["closed", "Closed", closed.length], ["all", "All", LIST.length]];
+    html += '<div class="seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + '<span class="n">' + t[2] + "</span></button>"; }).join("") + "</div>";
+    var list = TAB === "all" ? LIST : LIST.filter(function (s) { return s.status === TAB; });
+    if (!list.length) html += '<div class="card empty"><div class="big">📋</div>' + (TAB === "draft" ? "No drafts." : TAB === "live" ? "No live surveys. Create one and publish it to state teams." : "Nothing here yet.") + "</div>";
+    list.forEach(function (s) {
+      var rate = s.targets ? Math.min(100, pct(s.count, s.targets)) : 0;
+      var right = '<span style="margin-left:auto" class="row">' + (s.unseen ? '<span class="chip new">New answers</span>' : "") + statusChip(s.status) + "</span>";
+      var meta = "<span>❓ " + s.questions + " Qs</span><span>👥 " + (s.audience && s.audience.length ? s.audience.length + " state" + (s.audience.length > 1 ? "s" : "") : "All states") + "</span>" +
+        (s.status !== "draft" ? "<span>" + closesText(s) + "</span>" : "<span>Edited " + dt(s.updatedAt) + "</span>") + (s.anonymous ? "<span>🕶️ Anonymous</span>" : "") +
+        (s.status !== "draft" ? '<div style="width:100%"><div class="row" style="justify-content:space-between;font-size:12px"><b style="color:var(--ink)">' + s.count + " / " + s.targets + " responded</b><span>" + rate + '%</span></div><div class="prog"><i style="width:' + rate + '%"></i></div></div>' : "");
+      html += svCard(s, meta, right);
+    });
+    VIEW.innerHTML = html;
+    $("new").onclick = function () { go("#tpl"); };
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("svy-tab", TAB); renderAdminList(); }; });
+    [].forEach.call(VIEW.querySelectorAll(".sv"), function (c) { c.onclick = function () { adminMenu(LIST.find(function (x) { return x.id === c.dataset.id; })); }; });
+    $("h2").textContent = live.length + " live · " + fmtN(totalResp) + " responses so far";
+  }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  function adminMenu(s) {
+    var acts = [];
+    if (s.status !== "draft") acts.push(["📊", "Results & analysis", function () { go("#r=" + s.id); }]);
+    acts.push(["✏️", s.status === "draft" ? "Edit & publish" : "Edit survey", function () { go("#e=" + s.id); }]);
+    acts.push(["📄", "Duplicate", function () { duplicate(s.id); }]);
+    if (s.status === "live") acts.push(["🔔", "Re-announce to pending users", function () { remind(s.id); }]);
+    if (s.status === "live") acts.push(["⏹️", "Close survey now", function () { setStatus(s.id, "closed", "Survey closed. No more answers will be accepted."); }]);
+    if (s.status === "closed") acts.push(["▶️", "Reopen survey", function () { reopen(s); }]);
+    acts.push(["🗑️", "Delete survey", function () { delSurvey(s); }, "red"]);
+    sheet(s.title, (s.status === "draft" ? "Draft" : s.count + " of " + s.targets + " responded") + " · created by " + (s.createdBy || "admin"), acts);
+  }
+  function setStatus(id, st, msg, extra) {
+    api(Object.assign({ action: "survey-status", id: id, status: st }, extra || {})).then(function (r) { if (!r.ok) { toast(r.error); return; } toast(msg); changed(); LIST = null; route(); });
+  }
+  function reopen(s) {
+    if (s.closesAt && s.closesAt < Date.now()) {
+      var ov = sheet("Reopen survey", "The closing date has passed. Pick a new one (or leave empty for no deadline).",
+        [["▶️", "Reopen", function (o) { var v = o.querySelector("input").value; setStatus(s.id, "live", "Survey reopened.", { closesAt: v ? new Date(v).getTime() : 0 }); }]],
+        '<input type="datetime-local" class="tx" style="margin-top:12px">');
+      return ov;
+    }
+    setStatus(s.id, "live", "Survey reopened.");
+  }
+  function remind(id) { api({ action: "survey-remind", id: id }).then(function (r) { toast(r.ok ? "Re-announced. Pending users will get a fresh notification." : r.error); }); }
+  function delSurvey(s) {
+    sheet("Delete \"" + s.title + "\"?", "This removes the survey and all " + (s.count || 0) + " responses permanently. Export the results first if you need them.",
+      [["🗑️", "Yes, delete permanently", function () { setStatus(s.id, "delete", "Survey deleted."); }, "red"]]);
+  }
+  function duplicate(id) {
+    toast("Copying…");
+    api({ action: "survey-get", id: id }).then(function (r) {
+      if (!r.ok) { toast(r.error); return; }
+      var s = editable(r.survey); delete s.id; s.title = ("Copy of " + s.title).slice(0, 120); s.closesAt = 0;
+      ls(draftKey(), s); go("#new");
+    });
+  }
+
+  // ---------- FILL (state users) ----------
+  var FS = null;   // { survey, ans, atts, startedAt, readOnly }
+  function ansKey(id) { return "svy-ans:" + AUTH.username + ":" + id; }
+  function openFill(id) {
+    loading("Opening survey…");
+    api({ action: "survey-get", id: id }).then(function (r) {
+      if (!r.ok) { fail(r.error); return; }
+      changed();
+      var s = r.survey, mine = r.response;
+      var canEdit = s.status === "live" && (!mine || s.allowEdit);
+      var saved = canEdit ? ls(ansKey(id)) : null;
+      FS = { survey: s, ans: saved && saved.ans ? saved.ans : mine ? clone(mine.answers) : {}, startedAt: (saved && saved.startedAt) || Date.now(), readOnly: !canEdit, mine: mine, preview: false };
+      if (mine && canEdit && !saved) FS.editing = false;
+      hero(s.title, (CAT_ICON[s.category] || "📋") + " " + s.category + " · " + closesText(s));
+      if (mine && !FS.editing && !saved) return renderAnswered();
+      renderFill();
+    });
+  }
+  function renderAnswered() {
+    var s = FS.survey, m = FS.mine;
+    var html = '<button class="back" id="bk">‹ All surveys</button><div class="card done"><div class="ck">✓</div><h2 style="margin:0 0 6px">You answered this survey</h2><div class="muted">Sent ' + dt(m.submittedAt) +
+      (m.edits ? " · edited " + dt(m.updatedAt) : "") + "</div>" + (s.status === "live" && s.allowEdit ? '<button class="btn pri" id="ed" style="margin-top:14px">✏️ Edit my answers</button>' : "") +
+      (s.status !== "live" ? '<div class="notice info" style="margin-top:12px">This survey is closed.</div>' : !s.allowEdit ? '<div class="notice info" style="margin-top:12px">Answers to this survey can\'t be changed after sending.</div>' : "") + "</div>";
+    html += readOnlyAnswers(s, m.answers);
+    VIEW.innerHTML = html;
+    $("bk").onclick = function () { go("#list"); };
+    if ($("ed")) $("ed").onclick = function () { FS.editing = true; FS.readOnly = false; renderFill(); };
+  }
+  function readOnlyAnswers(s, answers) {
+    var html = "", n = 0;
+    s.questions.forEach(function (q) {
+      if (q.type === "section") { html += '<div class="sec"><b>' + esc(q.title) + "</b></div>"; return; }
+      n++;
+      var a = answers[q.id], v;
+      if (a == null || a === "" || (Array.isArray(a) && !a.length)) v = '<div class="ro none">No answer</div>';
+      else if (q.type === "file") v = a.map(function (f, i) { return '<button class="filebtn" data-f="' + q.id + ":" + i + '">📎 ' + esc(f.name) + "</button>"; }).join("");
+      else if (q.type === "rating") v = '<div class="ro" style="color:#F5A623;font-size:22px">' + "★★★★★".slice(0, a) + '<span style="color:#D5D8E8">' + "★★★★★".slice(a) + "</span></div>";
+      else v = '<div class="ro">' + esc(Array.isArray(a) ? a.join(", ") : (q.type === "number" && q.unit ? fmtN(a) + " " + q.unit : q.type === "date" ? dOnly(Date.parse(a)) : a)) + "</div>";
+      html += '<div class="q"><div class="qt"><span class="no">' + n + ".</span>" + esc(q.title) + '</div><div class="ans">' + v + "</div></div>";
+    });
+    setTimeout(function () { [].forEach.call(document.querySelectorAll(".filebtn[data-f]"), function (b) { b.onclick = function () { var p = b.dataset.f.split(":"); openAtt(answers[p[0]][+p[1]]); }; }); }, 0);
+    return html;
+  }
+  function visible(s, ans) {
+    var vis = {};
+    s.questions.forEach(function (q) {
+      if (q.showIf) { if (!vis[q.showIf.q]) return; var a = ans[q.showIf.q], vals = Array.isArray(a) ? a : a == null ? [] : [a]; if (!vals.some(function (v) { return q.showIf.any.indexOf(v) >= 0; })) return; }
+      vis[q.id] = true;
+    });
+    return vis;
+  }
+  function isEmpty(v) { return v == null || v === "" || (Array.isArray(v) && !v.length); }
+  function shuffled(arr, seed) { var a = arr.slice(), x = 0; for (var i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) >>> 0; for (var j = a.length - 1; j > 0; j--) { x = (x * 1103515245 + 12345) >>> 0; var k = x % (j + 1); var t = a[j]; a[j] = a[k]; a[k] = t; } return a; }
+
+  function renderFill() {
+    var s = FS.survey, prev = FS.preview;
+    var html = (prev ? '<div class="notice info" style="margin-bottom:10px">👁️ Preview — this is what state users will see. Answers are not saved.</div><button class="back" id="bk">‹ Back to editor</button>' : '<button class="back" id="bk">‹ All surveys</button>') +
+      '<div class="fillhead" style="border-top-color:' + esc(s.color || "#4D5BF9") + '"><span class="chip">' + (CAT_ICON[s.category] || "📋") + " " + esc(s.category) + "</span>" +
+      (s.anonymous ? ' <span class="chip">🕶️ Anonymous — admins see only your state</span>' : "") +
+      "<h2>" + esc(s.title) + "</h2>" + (s.description ? '<div class="d">' + esc(s.description) + "</div>" : "") +
+      '<div class="progtxt"><span id="ptxt"></span><span>' + closesText(s) + '</span></div><div class="prog"><i id="pbar" style="width:0"></i></div></div><div id="qs"></div>' +
+      '<div class="stick"><button class="btn pri block" id="send">' + (prev ? "Close preview" : FS.mine ? "Update my answers" : "Submit answers") + "</button>" +
+      (!prev ? '<div class="muted" style="text-align:center;font-size:12px;margin-top:6px">Your progress is saved on this device until you submit.</div>' : "") + "</div>";
+    VIEW.innerHTML = html;
+    $("bk").onclick = function () { prev ? backToEditor() : go("#list"); };
+    $("send").onclick = prev ? backToEditor : submit;
+    drawQuestions();
+  }
+  function drawQuestions() {
+    var s = FS.survey, vis = visible(s, FS.ans), html = "", n = 0;
+    s.questions.forEach(function (q) {
+      if (!vis[q.id]) return;
+      if (q.type === "section") { html += '<div class="sec"><b>' + esc(q.title || "Section") + "</b>" + (q.help ? "<p>" + esc(q.help) + "</p>" : "") + "</div>"; return; }
+      n++;
+      html += '<div class="q" id="Q-' + q.id + '"><div class="qt"><span class="no">' + n + ".</span>" + esc(q.title) + (q.required ? ' <span class="req">*</span>' : "") + "</div>" +
+        (q.help ? '<div class="qh">' + esc(q.help) + "</div>" : "") + '<div class="ans">' + inputFor(q) + '</div><div class="qe"></div></div>';
+    });
+    $("qs").innerHTML = html;
+    bindInputs();
+    progress();
+  }
+  function inputFor(q) {
+    var a = FS.ans[q.id];
+    switch (q.type) {
+      case "short": case "email": case "phone":
+        return '<input class="tx" data-q="' + q.id + '" maxlength="' + (q.type === "short" ? 500 : 80) + '" ' + (q.type === "email" ? 'type="email" inputmode="email"' : q.type === "phone" ? 'type="tel" inputmode="numeric" maxlength="13"' : "") +
+          ' placeholder="' + esc(q.placeholder || (q.type === "email" ? "name@example.com" : q.type === "phone" ? "10-digit mobile number" : "Your answer")) + '" value="' + esc(a || "") + '">';
+      case "long": return '<textarea class="tx" data-q="' + q.id + '" maxlength="5000" placeholder="' + esc(q.placeholder || "Your answer") + '">' + esc(a || "") + "</textarea>";
+      case "number": return '<div class="unit"><input class="tx" data-q="' + q.id + '" type="number" inputmode="decimal" ' + (q.min != null ? 'min="' + q.min + '" ' : "") + (q.max != null ? 'max="' + q.max + '" ' : "") + (q.integer ? 'step="1" ' : 'step="any" ') + 'placeholder="0" value="' + esc(a == null ? "" : a) + '">' + (q.unit ? "<span>" + esc(q.unit) + "</span>" : "") + "</div>" +
+        (q.min != null || q.max != null ? '<div class="lohi"><span>' + (q.min != null ? "Min " + fmtN(q.min) : "") + "</span><span>" + (q.max != null ? "Max " + fmtN(q.max) : "") + "</span></div>" : "");
+      case "date": return '<input class="tx" data-q="' + q.id + '" type="date" value="' + esc(a || "") + '">';
+      case "dropdown": return '<select class="tx" data-q="' + q.id + '"><option value="">Choose…</option>' + q.options.map(function (o) { return "<option" + (a === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
+      case "yesno": return '<div class="yn">' + ["Yes", "No"].map(function (o) { return '<div class="opt' + (a === o ? " on" : "") + '" data-c="' + q.id + '" data-v="' + o + '">' + (o === "Yes" ? "👍 Yes" : "👎 No") + "</div>"; }).join("") + "</div>";
+      case "single": case "multi": {
+        var multi = q.type === "multi", vals = multi ? (a || []) : (a ? [a] : []);
+        var other = vals.filter(function (v) { return q.options.indexOf(v) < 0; })[0];
+        var opts = q.shuffle ? shuffled(q.options, AUTH.username + q.id) : q.options;
+        var h = opts.map(function (o) { var on = vals.indexOf(o) >= 0; return '<div class="opt' + (multi ? " multi" : "") + (on ? " on" : "") + '" data-c="' + q.id + '" data-v="' + esc(o) + '"><span class="bx">' + (on ? "✓" : "") + "</span>" + esc(o) + "</div>"; }).join("");
+        if (q.other) { var ot = other ? String(other).replace(/^Other:\s*/, "") : ""; h += '<div class="opt' + (multi ? " multi" : "") + (other != null ? " on" : "") + '" data-c="' + q.id + '" data-other="1"><span class="bx">' + (other != null ? "✓" : "") + '</span>Other: <input class="other" data-o="' + q.id + '" maxlength="190" placeholder="type here" value="' + esc(ot) + '"></div>'; }
+        if (multi && (q.minSel || q.maxSel)) h += '<div class="lohi"><span>' + (q.minSel && q.maxSel ? "Choose " + q.minSel + " to " + q.maxSel : q.minSel ? "Choose at least " + q.minSel : "Choose up to " + q.maxSel) + "</span></div>";
+        return h;
+      }
+      case "rating": return '<div class="stars">' + [1, 2, 3, 4, 5].map(function (i) { return '<button type="button" data-r="' + q.id + '" data-v="' + i + '" class="' + (a >= i ? "on" : "") + '" aria-label="' + i + ' stars">★</button>'; }).join("") + '</div><div class="lohi"><span>' + (a ? ["", "Poor", "Fair", "Good", "Very good", "Excellent"][a] : "Tap to rate") + "</span></div>";
+      case "scale": case "nps": {
+        var lo = q.type === "nps" ? 0 : q.min, hi = q.type === "nps" ? 10 : q.max, h2 = '<div class="scale' + (q.type === "nps" ? " nps" : "") + '">';
+        for (var i = lo; i <= hi; i++) h2 += '<button type="button" data-s="' + q.id + '" data-v="' + i + '" class="' + (q.type === "nps" ? (i <= 6 ? "d" : i <= 8 ? "p" : "g") : "") + (a === i ? " on" : "") + '">' + i + "</button>";
+        return h2 + '</div><div class="lohi"><span>' + esc(q.lo || "") + "</span><span>" + esc(q.hi || "") + "</span></div>";
+      }
+      case "file": {
+        var files = a || [];
+        return files.map(function (f, i) { return '<div class="att"><span>📎 ' + esc(f.name) + " · " + Math.max(1, Math.round(f.size / 1024)) + ' KB</span><button data-rm="' + q.id + ":" + i + '" aria-label="Remove">✕</button></div>'; }).join("") +
+          (files.length < (q.maxFiles || 1) ? '<button class="attbtn" data-up="' + q.id + '" style="margin-top:6px">📎 Add file' + ((q.maxFiles || 1) > 1 ? " (up to " + q.maxFiles + ")" : "") + '</button><div class="lohi"><span>Photo, PDF, Excel, Word, PowerPoint, CSV or TXT · max 4 MB</span></div>' : "");
+      }
+    }
+    return "";
+  }
+  var saveT = 0;
+  function persist() { if (FS.preview || FS.readOnly) return; clearTimeout(saveT); saveT = setTimeout(function () { ls(ansKey(FS.survey.id), { ans: FS.ans, startedAt: FS.startedAt }); }, 300); }
+  function setAns(id, v, redraw) {
+    var before = JSON.stringify(visible(FS.survey, FS.ans));
+    if (isEmpty(v)) delete FS.ans[id]; else FS.ans[id] = v;
+    var el = $("Q-" + id); if (el) el.classList.remove("bad");
+    persist();
+    if (redraw || JSON.stringify(visible(FS.survey, FS.ans)) !== before) { var y = window.scrollY; drawQuestions(); window.scrollTo(0, y); } else progress();
+  }
+  function qOf(id) { return FS.survey.questions.find(function (q) { return q.id === id; }); }
+  function bindInputs() {
+    var root = $("qs");
+    [].forEach.call(root.querySelectorAll("[data-q]"), function (inp) {
+      var q = qOf(inp.dataset.q);
+      var h = function () { var v = inp.value; if (q.type === "number") v = v === "" ? "" : Number(v); setAns(q.id, v, false); };
+      inp.oninput = h; if (inp.tagName === "SELECT") inp.onchange = function () { setAns(q.id, inp.value, false); };
+    });
+    [].forEach.call(root.querySelectorAll(".opt[data-c]"), function (o) {
+      o.onclick = function (e) {
+        var q = qOf(o.dataset.c);
+        if (e.target.classList.contains("other") && o.classList.contains("on")) return;
+        var otherInp = o.querySelector("input.other"), otherVal = otherInp ? "Other: " + otherInp.value.trim() : null;
+        if (q.type === "multi") {
+          var cur = (FS.ans[q.id] || []).slice();
+          if (o.dataset.other) { var idx = cur.findIndex(function (v) { return q.options.indexOf(v) < 0; }); if (idx >= 0) cur.splice(idx, 1); else cur.push(otherVal || "Other: "); }
+          else { var k = cur.indexOf(o.dataset.v); if (k >= 0) cur.splice(k, 1); else { if (q.maxSel && cur.length >= q.maxSel) { toast("You can choose up to " + q.maxSel); return; } cur.push(o.dataset.v); } }
+          setAns(q.id, cur, true);
+        } else {
+          var v = o.dataset.other ? (otherVal || "Other: ") : o.dataset.v;
+          setAns(q.id, FS.ans[q.id] === v && !o.dataset.other ? "" : v, true);
+        }
+        if (o.dataset.other) setTimeout(function () { var i = document.querySelector('input.other[data-o="' + q.id + '"]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 30);
+      };
+    });
+    [].forEach.call(root.querySelectorAll("input.other"), function (inp) {
+      inp.oninput = function () {
+        var q = qOf(inp.dataset.o), val = "Other: " + inp.value.trim();
+        if (q.type === "multi") { var cur = (FS.ans[q.id] || []).filter(function (v) { return q.options.indexOf(v) >= 0; }); cur.push(val); FS.ans[q.id] = cur; }
+        else FS.ans[q.id] = val;
+        persist(); progress();
+      };
+      inp.onclick = function (e) { var o = inp.closest(".opt"); if (o.classList.contains("on")) e.stopPropagation(); };
+    });
+    [].forEach.call(root.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { setAns(b.dataset.r, +b.dataset.v, true); }; });
+    [].forEach.call(root.querySelectorAll("[data-s]"), function (b) { b.onclick = function () { var q = qOf(b.dataset.s); setAns(q.id, FS.ans[q.id] === +b.dataset.v ? "" : +b.dataset.v, true); }; });
+    [].forEach.call(root.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { var p = b.dataset.rm.split(":"), cur = (FS.ans[p[0]] || []).slice(); cur.splice(+p[1], 1); setAns(p[0], cur, true); }; });
+    [].forEach.call(root.querySelectorAll("[data-up]"), function (b) { b.onclick = function () { pickFile(b.dataset.up, b); }; });
+  }
+  var OK_EXT = ["pdf", "xls", "xlsx", "csv", "doc", "docx", "ppt", "pptx", "png", "jpg", "jpeg", "webp", "txt"];
+  function shrinkImage(file, cb) {
+    var img = new Image(), url = URL.createObjectURL(file);
+    img.onload = function () {
+      var max = 1600, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h)); var c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      cb(c.toDataURL("image/jpeg", 0.82).split(",")[1], file.name.replace(/\.\w+$/, "") + ".jpg");
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+    img.src = url;
+  }
+  function pickFile(qid, btn) {
+    if (FS.preview) { toast("File upload works when state users answer."); return; }
+    var inp = document.createElement("input"); inp.type = "file";
+    inp.accept = ".pdf,.xls,.xlsx,.csv,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.txt,image/*";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      var ext = (f.name.split(".").pop() || "").toLowerCase();
+      if (OK_EXT.indexOf(ext) < 0 && !/^image\//.test(f.type)) { toast("This file type isn't allowed."); return; }
+      btn.disabled = true; btn.textContent = "Uploading " + f.name + "…";
+      var up = function (b64, name) {
+        if (!b64) { btn.disabled = false; btn.textContent = "📎 Add file"; toast("Couldn't read this file."); return; }
+        if (b64.length * 3 / 4 > 4 * 1024 * 1024) { btn.disabled = false; btn.textContent = "📎 Add file"; toast("File is larger than 4 MB."); return; }
+        api({ action: "support-upload", name: name, data: b64 }).then(function (r) {
+          if (!r.ok) { btn.disabled = false; btn.textContent = "📎 Add file"; toast(r.error); return; }
+          var cur = (FS.ans[qid] || []).slice(); cur.push(r.att); setAns(qid, cur, true);
+        });
+      };
+      if (/^image\/(jpeg|png|webp)$/.test(f.type) && f.size > 700 * 1024) shrinkImage(f, up);
+      else { var fr = new FileReader(); fr.onload = function () { up(String(fr.result).split(",")[1], f.name); }; fr.onerror = function () { up(null); }; fr.readAsDataURL(f); }
+    };
+    inp.click();
+  }
+  function progress() {
+    var s = FS.survey, vis = visible(s, FS.ans), tot = 0, done = 0;
+    s.questions.forEach(function (q) { if (q.type === "section" || !vis[q.id]) return; tot++; if (!isEmpty(FS.ans[q.id]) && FS.ans[q.id] !== "Other: ") done++; });
+    var p = tot ? Math.round(done / tot * 100) : 0;
+    if ($("pbar")) $("pbar").style.width = p + "%";
+    if ($("ptxt")) $("ptxt").textContent = done + " of " + tot + " answered";
+  }
+  function localCheck() {
+    var s = FS.survey, vis = visible(s, FS.ans);
+    for (var i = 0; i < s.questions.length; i++) {
+      var q = s.questions[i], a = FS.ans[q.id];
+      if (q.type === "section" || !vis[q.id]) continue;
+      if (a === "Other: " || (Array.isArray(a) && a.indexOf("Other: ") >= 0)) return [q.id, "Type your \"Other\" answer."];
+      if (isEmpty(a)) { if (q.required) return [q.id, "This question is required."]; continue; }
+      if (q.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a)) return [q.id, "Enter a valid email."];
+      if (q.type === "phone" && !/^(\+?91|0)?[6-9]\d{9}$/.test(String(a).replace(/[\s-]/g, ""))) return [q.id, "Enter a valid 10-digit mobile number."];
+      if (q.type === "number") { if (!isFinite(a)) return [q.id, "Enter a number."]; if (q.integer && !Number.isInteger(a)) return [q.id, "Enter a whole number."]; if (q.min != null && a < q.min) return [q.id, "Must be at least " + q.min + "."]; if (q.max != null && a > q.max) return [q.id, "Must be at most " + q.max + "."]; }
+      if (q.type === "multi" && q.minSel && a.length < q.minSel) return [q.id, "Choose at least " + q.minSel + "."];
+    }
+    return null;
+  }
+  function flag(qid, msg) {
+    var el = $("Q-" + qid); if (!el) { toast(msg); return; }
+    el.classList.add("bad"); el.querySelector(".qe").textContent = msg;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  function submit() {
+    var bad = localCheck(); if (bad) { flag(bad[0], bad[1]); return; }
+    var b = $("send"); b.disabled = true; b.textContent = "Sending…";
+    var vis = visible(FS.survey, FS.ans), answers = {};
+    Object.keys(FS.ans).forEach(function (k) { if (vis[k]) answers[k] = qOf(k) && qOf(k).type === "file" ? FS.ans[k].map(function (f) { return f.id; }) : FS.ans[k]; });
+    api({ action: "survey-respond", id: FS.survey.id, answers: answers, startedAt: FS.startedAt, via: VIA, device: navigator.userAgent.slice(0, 60) }).then(function (r) {
+      b.disabled = false; b.textContent = FS.mine ? "Update my answers" : "Submit answers";
+      if (!r.ok) { if (r.q) flag(r.q, r.error.replace(/^[^:]*:\s*/, "")); else toast(r.error); return; }
+      ls(ansKey(FS.survey.id), null); LIST = null; changed();
+      var s = FS.survey;
+      VIEW.innerHTML = '<div class="card done"><div class="ck">✓</div><h2 style="margin:0 0 6px">' + (FS.mine ? "Answers updated" : "Thank you!") + "</h2><div style=\"font-size:15px;color:var(--ink2);white-space:pre-wrap\">" +
+        esc(r.thankYou || "Your response has been sent to the BI team.") + '</div><button class="btn pri" id="bk2" style="margin-top:16px">Back to surveys</button></div>';
+      $("bk2").onclick = function () { go("#list"); };
+      hero(s.title, "Response sent " + dt(Date.now()));
+    });
+  }
+
+  // ---------- BUILDER (admins) ----------
+  var ED = null, EDQ = null;   // survey being edited; question id that is expanded
+  function draftKey() { return "svy-draft:" + (AUTH ? AUTH.username : ""); }
+  function blankSurvey() { return { title: "", description: "", category: "Feedback", color: COLORS[0], audience: [], closesAt: 0, anonymous: false, allowEdit: true, thankYou: "", questions: [] }; }
+  function editable(s) { var o = {}; ["id", "title", "description", "category", "color", "audience", "closesAt", "anonymous", "allowEdit", "thankYou", "questions", "status", "count"].forEach(function (k) { if (s[k] !== undefined) o[k] = clone(s[k]); }); return o; }
+  function Q(type, title, extra) { return Object.assign({ id: uid(), type: type, title: title, help: "", required: false }, extra || {}); }
+  var TEMPLATES = [
+    { e: "✨", t: "Blank survey", d: "Start from scratch and add your own questions.", make: function () { return blankSurvey(); } },
+    { e: "📱", t: "Retailer App adoption", d: "Usage, features, blockers and proof from each state.", make: function () {
+      return Object.assign(blankSurvey(), { title: "Retailer App adoption check", category: "Feedback", description: "Help us understand how retailers in your state use the vivo Retailer App and what blocks them.", questions: [
+        Q("yesno", "Are most of your retailers using the app every day?", { required: true }),
+        Q("multi", "What stops retailers from using it daily?", { options: ["Network / app speed", "Don't see the benefit", "Login / OTP issues", "Not trained", "Prefer WhatsApp", "Old phone"], other: true, maxSel: 3, required: true, showIf: { q: "", any: ["No"] } }),
+        Q("multi", "Which features do retailers use most?", { options: ["Scheme announcements", "Scheme payout", "Notifications", "v-Notice", "Order / stock"], other: true }),
+        Q("rating", "How do retailers rate the app overall?", { required: true }),
+        Q("number", "Active retailer IDs in your state this month", { min: 0, integer: true, unit: "IDs" }),
+        Q("long", "One change that would improve adoption the most", { placeholder: "Be specific — feature, process or support" }),
+        Q("file", "Attach a field photo or report (optional)", { maxFiles: 3 })] });
+    } },
+    { e: "🎓", t: "Training feedback", d: "Rate a training session, trainer and content.", make: function () {
+      return Object.assign(blankSurvey(), { title: "Training feedback", category: "Training", color: COLORS[2], thankYou: "Thanks! Your feedback helps us plan better sessions.", questions: [
+        Q("date", "Training date", { required: true }), Q("rating", "Overall, how was the training?", { required: true }),
+        Q("scale", "How useful was the content for your daily work?", { min: 1, max: 5, lo: "Not useful", hi: "Very useful", required: true }),
+        Q("yesno", "Was the trainer clear and easy to follow?"), Q("single", "Session length was…", { options: ["Too short", "Just right", "Too long"] }),
+        Q("long", "Topics you want covered next time")] });
+    } },
+    { e: "📊", t: "Market visit / data collection", d: "Collect numbers, observations and photos from the field.", make: function () {
+      return Object.assign(blankSurvey(), { title: "Market visit report", category: "Data collection", color: COLORS[5], allowEdit: true, questions: [
+        Q("date", "Visit date", { required: true }), Q("short", "Town / market name", { required: true }),
+        Q("number", "Retailers visited", { min: 0, integer: true, required: true, unit: "retailers" }),
+        Q("number", "Retailers using the vivo Retailer App", { min: 0, integer: true, unit: "retailers" }),
+        Q("dropdown", "Strongest competitor in this market", { options: ["Samsung", "Xiaomi", "OPPO", "realme", "Apple", "Others"] }),
+        Q("long", "Key observations", { required: true }), Q("file", "Visit photos", { maxFiles: 5 })] });
+    } },
+    { e: "💰", t: "Scheme feedback", d: "Clarity, payout experience and NPS for a scheme.", make: function () {
+      return Object.assign(blankSurvey(), { title: "Scheme feedback", category: "Feedback", color: COLORS[3], questions: [
+        Q("short", "Scheme name", { required: true }), Q("scale", "How clear was the scheme communication?", { min: 1, max: 5, lo: "Confusing", hi: "Very clear", required: true }),
+        Q("yesno", "Was the payout received on time?", { required: true }), Q("nps", "How likely are retailers to recommend this scheme to others?"),
+        Q("long", "Suggestions to improve the next scheme")] });
+    } },
+    { e: "✅", t: "Audit checklist", d: "Yes/No checks with photo proof and remarks.", make: function () {
+      return Object.assign(blankSurvey(), { title: "Store audit checklist", category: "Audit / checklist", color: COLORS[4], questions: [
+        Q("short", "Store / retailer name", { required: true }), Q("section", "Checklist"),
+        Q("yesno", "vivo branding visible at the store?", { required: true }), Q("yesno", "Demo phones working and charged?", { required: true }),
+        Q("yesno", "Retailer App installed and logged in?", { required: true }), Q("yesno", "Current scheme poster displayed?", { required: true }),
+        Q("section", "Proof"), Q("file", "Store photos", { maxFiles: 3, required: true }), Q("long", "Remarks")] });
+    } },
+    { e: "🗳️", t: "Quick poll", d: "One question, answers in seconds.", make: function () {
+      return Object.assign(blankSurvey(), { title: "Quick poll", category: "Poll", color: COLORS[1], questions: [Q("single", "Your question here", { options: ["Option 1", "Option 2", "Option 3"], required: true })] });
+    } },
+    { e: "📣", t: "Team pulse (anonymous)", d: "NPS-style check on how teams feel — names hidden.", make: function () {
+      return Object.assign(blankSurvey(), { title: "BI team pulse", category: "Feedback", color: COLORS[6], anonymous: true, allowEdit: false, questions: [
+        Q("nps", "How likely are you to recommend the BI dashboard to a colleague?", { required: true }),
+        Q("scale", "How manageable is your workload this month?", { min: 1, max: 5, lo: "Too heavy", hi: "Very manageable" }),
+        Q("long", "What should the BI team start, stop or continue doing?")] });
+    } }
+  ];
+  function showTemplates() {
+    hero("Create a survey", "Pick a template to start fast — you can change everything.");
+    var d = ls(draftKey());
+    var html = '<button class="back" id="bk">‹ All surveys</button>' +
+      (d && (d.title || (d.questions && d.questions.length)) ? '<div class="notice" style="margin-bottom:10px">📝 You have an unsaved survey: <b>' + esc(d.title || "Untitled") + '</b> <button class="btn sm sec" id="resume" style="margin-left:6px">Continue it</button></div>' : "") +
+      '<div class="tpl">' + TEMPLATES.map(function (t, i) { return '<button data-i="' + i + '"><span class="e">' + t.e + "</span><span><b>" + esc(t.t) + "</b><small>" + esc(t.d) + "</small></span></button>"; }).join("") + "</div>";
+    VIEW.innerHTML = html;
+    $("bk").onclick = function () { go("#list"); };
+    if ($("resume")) $("resume").onclick = function () { go("#new"); };
+    [].forEach.call(VIEW.querySelectorAll(".tpl button"), function (b) {
+      b.onclick = function () {
+        var s = TEMPLATES[+b.dataset.i].make();
+        s.questions.forEach(function (q, i) { if (q.showIf && !q.showIf.q) q.showIf.q = s.questions[i - 1].id; });
+        ls(draftKey(), s); EDQ = s.questions[0] ? s.questions[0].id : null; go("#new");
+      };
+    });
+  }
+  function editSurvey(id) {
+    loading("Opening survey…");
+    api({ action: "survey-get", id: id }).then(function (r) { if (!r.ok) { fail(r.error); return; } builder(editable(r.survey)); });
+  }
+  function saveLocal() { dirty = true; if (!ED.id) ls(draftKey(), ED); }
+  function builder(s) {
+    ED = s; if (!ED.questions) ED.questions = [];
+    hero(ED.id ? "Edit survey" : "New survey", ED.id ? (ED.status === "live" ? "Live — changes reach users right away" : ED.status === "closed" ? "Closed survey" : "Draft — not visible to state users yet") : "Draft — saved on this device until you save or publish");
+    var html = '<button class="back" id="bk">‹ All surveys</button>' +
+      (ED.status === "live" && ED.count ? '<div class="notice">⚠️ ' + ED.count + " people already answered. Removing questions or options hides those answers in results — prefer adding new ones.</div>" : "") +
+      '<div class="card"><label class="l" style="font-size:12px;color:var(--mut);font-weight:600">Survey title *</label><input class="tx" id="ti" maxlength="120" placeholder="e.g. Retailer App adoption check" value="' + esc(ED.title) + '">' +
+      '<label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 4px">Description / instructions</label><textarea class="tx" id="de" maxlength="1500" placeholder="Why you are asking and how answers will be used" style="min-height:70px">' + esc(ED.description) + "</textarea>" +
+      '<div class="row" style="margin-top:10px"><select class="tx" id="ca" style="flex:1;min-width:150px">' + CATS.map(function (c) { return "<option" + (ED.category === c ? " selected" : "") + ">" + c + "</option>"; }).join("") + "</select>" +
+      '<div class="colors" id="co">' + COLORS.map(function (c) { return '<button style="background:' + c + '" data-c="' + c + '" class="' + (ED.color === c ? "on" : "") + '" aria-label="Colour"></button>'; }).join("") + "</div></div></div>" +
+      '<div id="bqs"></div>' +
+      '<div class="card"><h3>＋ Add a question</h3><div class="sub">Tap a type to add it at the end</div><div class="palette">' + TYPES.map(function (t) { return '<button data-add="' + t[0] + '"><span class="e">' + t[1] + "</span><span>" + t[2] + "<small>" + t[3] + "</small></span></button>"; }).join("") + "</div></div>" +
+      '<div class="card" id="settings"></div>' +
+      '<div class="stick"><div class="row"><button class="btn ghost" id="pv">👁️ Preview</button><button class="btn sec grow" id="sv">' + (ED.status === "live" ? "Save changes" : "Save draft") + "</button>" +
+      (ED.status !== "live" ? '<button class="btn pri grow" id="pb">🚀 Publish</button>' : "") + "</div></div>";
+    VIEW.innerHTML = html;
+    $("bk").onclick = function () { window.__surveyBack(); };
+    $("ti").oninput = function () { ED.title = this.value; saveLocal(); };
+    $("de").oninput = function () { ED.description = this.value; saveLocal(); };
+    $("ca").onchange = function () { ED.category = this.value; saveLocal(); };
+    [].forEach.call($("co").querySelectorAll("button"), function (b) { b.onclick = function () { ED.color = b.dataset.c; saveLocal(); [].forEach.call($("co").children, function (x) { x.classList.toggle("on", x === b); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-add]"), function (b) { b.onclick = function () { addQ(b.dataset.add); }; });
+    $("pv").onclick = preview; $("sv").onclick = function () { save(false); }; if ($("pb")) $("pb").onclick = function () { save(true); };
+    drawBQ(); drawSettings();
+  }
+  function newQ(type) {
+    var q = { id: uid(), type: type, title: "", help: "", required: false };
+    if (type === "single" || type === "multi" || type === "dropdown") q.options = ["Option 1", "Option 2"];
+    if (type === "scale") { q.min = 1; q.max = 5; q.lo = ""; q.hi = ""; }
+    if (type === "nps") { q.lo = "Not likely"; q.hi = "Very likely"; }
+    if (type === "file") q.maxFiles = 1;
+    return q;
+  }
+  function addQ(type) { var q = newQ(type); ED.questions.push(q); EDQ = q.id; saveLocal(); drawBQ(); setTimeout(function () { var el = $("B-" + q.id); if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); var i = el.querySelector("[data-k=title]"); if (i) i.focus(); } }, 50); }
+  function qNum(id) { var n = 0; for (var i = 0; i < ED.questions.length; i++) { if (ED.questions[i].type !== "section") n++; if (ED.questions[i].id === id) return n; } return n; }
+  function drawBQ() {
+    var c = $("bqs"); if (!c) return;
+    if (!ED.questions.length) { c.innerHTML = '<div class="card empty"><div class="big">🧩</div>No questions yet — add one below.</div>'; return; }
+    c.innerHTML = ED.questions.map(function (q, i) { return bqCard(q, i); }).join("");
+    bindBQ();
+  }
+  function bqCard(q, i) {
+    var t = TYPE[q.type], open = EDQ === q.id, sec = q.type === "section";
+    var h = '<div class="bq' + (sec ? " secq" : "") + '" id="B-' + q.id + '"><div class="bh"><span class="num">' + (sec ? "§" : "Q" + qNum(q.id)) + "</span>" +
+      '<select data-k="type">' + TYPES.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === q.type ? " selected" : "") + ">" + x[1] + " " + x[2] + "</option>"; }).join("") + "</select>" +
+      '<span class="tools"><button data-t="up" title="Move up"' + (i === 0 ? " disabled" : "") + '>↑</button><button data-t="down" title="Move down">↓</button><button data-t="dup" title="Duplicate">⧉</button><button data-t="del" title="Delete">🗑</button><button data-t="tog" title="' + (open ? "Collapse" : "Edit") + '">' + (open ? "▴" : "▾") + "</button></span></div>";
+    if (!open) {
+      return h + '<div class="bb" data-t="tog" style="cursor:pointer"><b>' + (esc(q.title) || '<span class="muted">' + (sec ? "Untitled section" : "Untitled question") + "</span>") + "</b>" + (q.required ? ' <span style="color:var(--bad)">*</span>' : "") +
+        (q.options && q.type !== "yesno" ? '<div class="muted" style="font-size:12.5px;margin-top:3px">' + esc(q.options.slice(0, 5).join(" · ")) + (q.options.length > 5 ? " …" : "") + "</div>" : "") +
+        (q.showIf ? '<div class="muted" style="font-size:12px;margin-top:3px">↪ Shown only if Q' + qNum(q.showIf.q) + " = " + esc(q.showIf.any.join(" / ")) + "</div>" : "") + "</div></div>";
+    }
+    h += '<div class="bb"><label class="l">' + (sec ? "Section title" : "Question *") + '</label><input class="tx" data-k="title" maxlength="300" value="' + esc(q.title) + '" placeholder="' + (sec ? "e.g. Store details" : "Type your question") + '">' +
+      '<label class="l">' + (sec ? "Section note" : "Help text (optional)") + '</label><input class="tx" data-k="help" maxlength="400" value="' + esc(q.help || "") + '" placeholder="Extra guidance shown under the ' + (sec ? "title" : "question") + '">';
+    if (q.type === "single" || q.type === "multi" || q.type === "dropdown") {
+      h += '<label class="l">Options</label>' + q.options.map(function (o, k) { return '<div class="oprow"><span class="dot' + (q.type === "multi" ? " sq" : "") + '"></span><input class="tx" data-op="' + k + '" maxlength="120" value="' + esc(o) + '"><button data-rmop="' + k + '" title="Remove">✕</button></div>'; }).join("") +
+        '<div class="row" style="margin-top:8px"><button class="btn sm sec" data-t="addop">＋ Option</button><button class="btn sm ghost" data-t="bulk">Paste a list</button></div>' +
+        '<div class="opts2">' + (q.type !== "dropdown" ? tog("other", "Allow \"Other\" answer", q.other) : "") + tog("shuffle", "Shuffle order", q.shuffle) + "</div>";
+      if (q.type === "multi") h += '<div class="row" style="margin-top:8px"><span class="muted" style="font-size:13px">Pick</span><input class="tx" data-k="minSel" type="number" min="0" style="width:80px" placeholder="min" value="' + (q.minSel || "") + '"><span class="muted" style="font-size:13px">to</span><input class="tx" data-k="maxSel" type="number" min="0" style="width:80px" placeholder="max" value="' + (q.maxSel || "") + '"></div>';
+    }
+    if (q.type === "scale") h += '<div class="row" style="margin-top:10px"><select class="tx" data-k="min" style="width:80px"><option value="0"' + (q.min === 0 ? " selected" : "") + '>0</option><option value="1"' + (q.min !== 0 ? " selected" : "") + '>1</option></select><span class="muted">to</span><select class="tx" data-k="max" style="width:80px">' +
+      [3, 4, 5, 6, 7, 8, 9, 10].map(function (n) { return '<option value="' + n + '"' + (q.max === n ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select></div>";
+    if (q.type === "scale" || q.type === "nps") h += '<div class="row" style="margin-top:8px"><input class="tx grow" data-k="lo" maxlength="40" placeholder="Low label (e.g. Poor)" value="' + esc(q.lo || "") + '"><input class="tx grow" data-k="hi" maxlength="40" placeholder="High label (e.g. Excellent)" value="' + esc(q.hi || "") + '"></div>';
+    if (q.type === "number") h += '<div class="row" style="margin-top:10px"><input class="tx" data-k="min" type="number" style="width:100px" placeholder="Min" value="' + (q.min != null ? q.min : "") + '"><input class="tx" data-k="max" type="number" style="width:100px" placeholder="Max" value="' + (q.max != null ? q.max : "") + '"><input class="tx grow" data-k="unit" maxlength="20" placeholder="Unit (e.g. IDs, Rs, units)" value="' + esc(q.unit || "") + '"></div><div class="opts2">' + tog("integer", "Whole numbers only", q.integer) + "</div>";
+    if (q.type === "short" || q.type === "long") h += '<label class="l">Placeholder</label><input class="tx" data-k="placeholder" maxlength="80" value="' + esc(q.placeholder || "") + '" placeholder="e.g. Type your answer">';
+    if (q.type === "file") h += '<label class="l">Files allowed</label><select class="tx" data-k="maxFiles" style="width:120px">' + [1, 2, 3, 4, 5].map(function (n) { return "<option" + (q.maxFiles === n ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select>";
+    // skip logic
+    var parents = ED.questions.slice(0, i).filter(function (p) { return CHOICE.indexOf(p.type) >= 0; });
+    if (parents.length) {
+      var par = q.showIf ? ED.questions.find(function (p) { return p.id === q.showIf.q; }) : null;
+      h += '<label class="l">↪ Show this ' + (sec ? "section" : "question") + ' only if…</label><select class="tx" data-k="sifq"><option value="">Always show</option>' +
+        parents.map(function (p) { return '<option value="' + p.id + '"' + (par && par.id === p.id ? " selected" : "") + ">Q" + qNum(p.id) + ". " + esc(String(p.title || "Untitled").slice(0, 50)) + "</option>"; }).join("") + "</select>";
+      if (par) { var opts = par.type === "yesno" ? ["Yes", "No"] : par.options; h += '<div class="stchips">' + opts.map(function (o) { var on = q.showIf.any.indexOf(o) >= 0; return '<label class="' + (on ? "on" : "") + '"><input type="checkbox" data-sif="' + esc(o) + '"' + (on ? " checked" : "") + ">" + esc(o) + "</label>"; }).join("") + '</div><div class="muted" style="font-size:12px;margin-top:4px">Shown when the answer is any of the selected options.</div>'; }
+    }
+    if (!sec) h += '<div class="opts2">' + tog("required", "Required", q.required) + "</div>";
+    return h + "</div></div>";
+  }
+  function tog(k, label, on) { return '<label class="tg"><input type="checkbox" data-b="' + k + '"' + (on ? " checked" : "") + "><i></i>" + esc(label) + "</label>"; }
+  function bindBQ() {
+    [].forEach.call($("bqs").querySelectorAll(".bq"), function (card) {
+      var id = card.id.slice(2), q = ED.questions.find(function (x) { return x.id === id; }), idx = ED.questions.indexOf(q);
+      [].forEach.call(card.querySelectorAll("[data-t]"), function (b) {
+        b.onclick = function () {
+          var t = b.dataset.t;
+          if (t === "tog") { EDQ = EDQ === id ? null : id; drawBQ(); return; }
+          if (t === "up" && idx > 0) { ED.questions.splice(idx, 1); ED.questions.splice(idx - 1, 0, q); }
+          if (t === "down" && idx < ED.questions.length - 1) { ED.questions.splice(idx, 1); ED.questions.splice(idx + 1, 0, q); }
+          if (t === "dup") { var c = clone(q); c.id = uid(); ED.questions.splice(idx + 1, 0, c); EDQ = c.id; }
+          if (t === "del") { if (q.title && !confirm("Delete this question?")) return; ED.questions.splice(idx, 1); ED.questions.forEach(function (x) { if (x.showIf && x.showIf.q === id) delete x.showIf; }); }
+          if (t === "addop") { q.options.push("Option " + (q.options.length + 1)); }
+          if (t === "bulk") { var txt = prompt("Paste options — one per line"); if (!txt) return; var lines = txt.split(/\r?\n|;/).map(function (s) { return s.trim(); }).filter(Boolean); if (lines.length) q.options = q.options.filter(function (o) { return !/^Option \d+$/.test(o); }).concat(lines).filter(function (v, k, a) { return a.indexOf(v) === k; }).slice(0, 50); }
+          fixSkip(); saveLocal(); drawBQ();
+        };
+      });
+      [].forEach.call(card.querySelectorAll("[data-k]"), function (inp) {
+        var k = inp.dataset.k;
+        var h = function () {
+          var v = inp.value;
+          if (k === "type") { var nq = newQ(v); nq.id = q.id; nq.title = q.title; nq.help = q.help; nq.required = v !== "section" && q.required; if (q.options && nq.options) nq.options = q.options; if (q.showIf) nq.showIf = q.showIf; ED.questions[idx] = nq; EDQ = q.id; fixSkip(); saveLocal(); drawBQ(); return; }
+          if (k === "sifq") { if (v) q.showIf = { q: v, any: [] }; else delete q.showIf; saveLocal(); drawBQ(); return; }
+          if (["min", "max", "minSel", "maxSel", "maxFiles"].indexOf(k) >= 0) { if (v === "") delete q[k]; else q[k] = Number(v); }
+          else q[k] = v;
+          saveLocal();
+        };
+        if (inp.tagName === "SELECT") inp.onchange = h; else inp.oninput = h;
+      });
+      [].forEach.call(card.querySelectorAll("[data-op]"), function (inp) { inp.oninput = function () { q.options[+inp.dataset.op] = inp.value; saveLocal(); }; inp.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); q.options.splice(+inp.dataset.op + 1, 0, ""); saveLocal(); drawBQ(); var n = $("B-" + id).querySelector('[data-op="' + (+inp.dataset.op + 1) + '"]'); if (n) n.focus(); } }; });
+      [].forEach.call(card.querySelectorAll("[data-rmop]"), function (b) { b.onclick = function () { if (q.options.length <= 2) { toast("Keep at least 2 options."); return; } q.options.splice(+b.dataset.rmop, 1); fixSkip(); saveLocal(); drawBQ(); }; });
+      [].forEach.call(card.querySelectorAll("[data-b]"), function (inp) { inp.onchange = function () { q[inp.dataset.b] = inp.checked; saveLocal(); }; });
+      [].forEach.call(card.querySelectorAll("[data-sif]"), function (inp) { inp.onchange = function () { var v = inp.dataset.sif, a = q.showIf.any, k = a.indexOf(v); if (inp.checked && k < 0) a.push(v); if (!inp.checked && k >= 0) a.splice(k, 1); inp.parentNode.classList.toggle("on", inp.checked); saveLocal(); }; });
+    });
+  }
+  // Keep skip logic valid after reordering / edits.
+  function fixSkip() {
+    ED.questions.forEach(function (q, i) {
+      if (!q.showIf) return;
+      var p = ED.questions.slice(0, i).find(function (x) { return x.id === q.showIf.q && CHOICE.indexOf(x.type) >= 0; });
+      if (!p) { delete q.showIf; return; }
+      var opts = p.type === "yesno" ? ["Yes", "No"] : p.options; q.showIf.any = q.showIf.any.filter(function (v) { return opts.indexOf(v) >= 0; });
+    });
+  }
+  function toLocalInput(t) { if (!t) return ""; var d = new Date(t), z = function (n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + z(d.getMonth() + 1) + "-" + z(d.getDate()) + "T" + z(d.getHours()) + ":" + z(d.getMinutes()); }
+  function drawSettings() {
+    var all = !ED.audience || !ED.audience.length, sts = STATES.length ? STATES : (ED.audience || []);
+    var c = $("settings");
+    c.innerHTML = '<h3>⚙️ Settings</h3><div class="sub">Who gets it, until when, and how answers are handled</div>' +
+      '<label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:6px 2px 4px">Send to</label><div class="seg" style="box-shadow:none;background:#F1F2FA"><button data-a="all" class="' + (all ? "on" : "") + '">All states</button><button data-a="sel" class="' + (!all ? "on" : "") + '">Selected states</button></div>' +
+      (!all || ED._pick ? '<div class="stchips" id="stc">' + sts.map(function (s) { var on = (ED.audience || []).indexOf(s) >= 0; return '<label class="' + (on ? "on" : "") + '"><input type="checkbox" value="' + esc(s) + '"' + (on ? " checked" : "") + ">" + esc(s) + "</label>"; }).join("") + "</div>" : "") +
+      '<label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:14px 2px 4px">Closing date & time (optional)</label><div class="row"><input type="datetime-local" class="tx grow" id="cl" value="' + toLocalInput(ED.closesAt) + '"><button class="btn sm ghost" id="cl0">No deadline</button></div>' +
+      '<div class="row" style="margin-top:6px">' + [["+3 days", 3], ["+1 week", 7], ["+2 weeks", 14], ["Month end", -1]].map(function (x) { return '<button class="btn sm sec" data-dl="' + x[1] + '">' + x[0] + "</button>"; }).join("") + "</div>" +
+      '<div class="opts2" style="flex-direction:column;gap:12px">' + tog("anonymous", "Anonymous — hide names, show only state", ED.anonymous) + tog("allowEdit", "Let users edit answers until the survey closes", ED.allowEdit) + "</div>" +
+      '<label class="l" style="display:block;font-size:12px;color:var(--mut);font-weight:600;margin:14px 2px 4px">Thank-you message</label><input class="tx" id="ty" maxlength="300" placeholder="Shown after submitting (optional)" value="' + esc(ED.thankYou || "") + '">';
+    [].forEach.call(c.querySelectorAll("[data-a]"), function (b) { b.onclick = function () { if (b.dataset.a === "all") { ED.audience = []; ED._pick = false; } else ED._pick = true; saveLocal(); drawSettings(); }; });
+    if ($("stc")) [].forEach.call($("stc").querySelectorAll("input"), function (inp) { inp.onchange = function () { ED.audience = [].filter.call($("stc").querySelectorAll("input"), function (x) { return x.checked; }).map(function (x) { return x.value; }); inp.parentNode.classList.toggle("on", inp.checked); saveLocal(); }; });
+    $("cl").onchange = function () { ED.closesAt = this.value ? new Date(this.value).getTime() : 0; saveLocal(); };
+    $("cl0").onclick = function () { ED.closesAt = 0; $("cl").value = ""; saveLocal(); };
+    [].forEach.call(c.querySelectorAll("[data-dl]"), function (b) { b.onclick = function () { var n = +b.dataset.dl, d = new Date(); if (n < 0) d = new Date(d.getFullYear(), d.getMonth() + 1, 0); else d = new Date(d.getTime() + n * 86400000); d.setHours(18, 0, 0, 0); ED.closesAt = d.getTime(); $("cl").value = toLocalInput(ED.closesAt); saveLocal(); }; });
+    [].forEach.call(c.querySelectorAll("[data-b]"), function (inp) { inp.onchange = function () { ED[inp.dataset.b] = inp.checked; saveLocal(); }; });
+    $("ty").oninput = function () { ED.thankYou = this.value; saveLocal(); };
+  }
+  function checkED() {
+    if ((ED.title || "").trim().length < 3) return "Give the survey a title.";
+    var real = ED.questions.filter(function (q) { return q.type !== "section"; });
+    if (!real.length) return "Add at least one question.";
+    for (var i = 0; i < ED.questions.length; i++) {
+      var q = ED.questions[i];
+      if (q.type !== "section" && !(q.title || "").trim()) { EDQ = q.id; drawBQ(); return "Question " + qNum(q.id) + " needs a question text."; }
+      if (q.options && q.type !== "yesno") { q.options = q.options.map(function (o) { return o.trim(); }).filter(function (o, k, a) { return o && a.indexOf(o) === k; }); if (q.options.length < 2) { EDQ = q.id; drawBQ(); return "Question " + qNum(q.id) + " needs at least 2 options."; } }
+      if (q.showIf && !q.showIf.any.length) { EDQ = q.id; drawBQ(); return "Q" + qNum(q.id) + ": pick which answers show it, or set it to Always show."; }
+    }
+    if (ED._pick && !(ED.audience || []).length) return "Select at least one state, or choose All states.";
+    return null;
+  }
+  function payload() { var s = clone(ED); delete s._pick; delete s.status; delete s.count; return s; }
+  function save(publish) {
+    var bad = checkED(); if (bad) { toast(bad); return; }
+    var go2 = function () {
+      var btn = publish ? $("pb") : $("sv"); btn.disabled = true;
+      api({ action: "survey-save", survey: payload(), publish: publish }).then(function (r) {
+        btn.disabled = false;
+        if (!r.ok) { toast(r.error); return; }
+        dirty = false; ls(draftKey(), null); LIST = null; changed();
+        toast(publish ? "🚀 Published! State users are being notified." : "Saved.");
+        if (publish) { TAB = "live"; go("#list"); } else { ED = editable(r.survey); if (location.hash !== "#e=" + r.survey.id) history.replaceState(null, "", "#e=" + r.survey.id); builder(ED); }
+      });
+    };
+    if (!publish) return go2();
+    var who = ED.audience && ED.audience.length ? ED.audience.length + " state" + (ED.audience.length > 1 ? "s" : "") + " (" + ED.audience.slice(0, 4).join(", ") + (ED.audience.length > 4 ? "…" : "") + ")" : "all states";
+    sheet("Publish this survey?", "It goes live for state users in " + who + ". They get a notification in the apps and on the web." + (ED.closesAt ? " Closes " + dt(ED.closesAt) + "." : " No deadline."),
+      [["🚀", "Publish now", function () { go2(); }]]);
+  }
+  var EDsaved = null;
+  function preview() {
+    var bad = checkED(); if (bad) { toast(bad); return; }
+    EDsaved = clone(ED);
+    FS = { survey: Object.assign(payload(), { status: "live", category: ED.category }), ans: {}, startedAt: Date.now(), preview: true };
+    hero("Preview", ED.title); renderFill();
+  }
+  function backToEditor() { var s = EDsaved || ED; builder(s); }
+
+  // ---------- RESULTS (admins) ----------
+  var RS = null;   // { survey, responses, targets, state }
+  function card(title, sub, body, cls) { return '<div class="card ' + (cls || "") + '"><h3>' + title + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  var PAL = ["#4D5BF9", "#9152E0", "#1E9E61", "#E69A00", "#E0457B", "#0E9AA7", "#2F80ED", "#F2994A", "#7A7F99", "#B3402F"];
+  var STOP = ("a an and are as at be but by for from has have i in is it its of on or our so that the their them they this to was we were will with not no yes very more most can should would could also all any some been being do does did more less there here than then just get got make need app retailers retailer state team " +
+    "hai ka ki ke ko se me mein aur nahi bhi par ye wo kya hain tha").split(" ");
+  function words(texts) {
+    var m = {};
+    texts.forEach(function (t) { String(t).toLowerCase().replace(/[^a-zऀ-ॿ\s]/g, " ").split(/\s+/).forEach(function (w) { if (w.length > 2 && STOP.indexOf(w) < 0) m[w] = (m[w] || 0) + 1; }); });
+    return topN(m, 14).filter(function (x) { return x[1] > 1; });
+  }
+  function median(a) { if (!a.length) return 0; var s = a.slice().sort(function (x, y) { return x - y; }), m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
+  function avg(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
+  function round1(n) { return Math.round(n * 10) / 10; }
+  function answerText(q, a) {
+    if (a == null || a === "") return "";
+    if (q.type === "file") return a.map(function (f) { return f.name; }).join("; ");
+    if (Array.isArray(a)) return a.join("; ");
+    return a;
+  }
+
+  function showResults(id, keepState) {
+    if (!keepState || !RS || RS.survey.id !== id) loading("Loading results…");
+    api({ action: "survey-results", id: id }).then(function (r) {
+      if (!r.ok) { fail(r.error); return; }
+      changed();
+      RS = { survey: r.survey, responses: r.responses, targets: r.targets, state: keepState && RS ? RS.state : "", q: "" };
+      renderResults();
+    });
+  }
+  function filtered() { return RS.state ? RS.responses.filter(function (r) { return r.by.state === RS.state; }) : RS.responses; }
+  function stats(q, resp) {
+    var vals = resp.map(function (r) { return r.answers[q.id]; }).filter(function (v) { return !(v == null || v === "" || (Array.isArray(v) && !v.length)); });
+    var o = { n: vals.length, vals: vals };
+    if (CHOICE.indexOf(q.type) >= 0) {
+      var opts = q.type === "yesno" ? ["Yes", "No"] : q.options, m = {}, other = [];
+      opts.forEach(function (x) { m[x] = 0; });
+      vals.forEach(function (v) { (Array.isArray(v) ? v : [v]).forEach(function (x) { if (m[x] != null) m[x]++; else { m["Other"] = (m["Other"] || 0) + 1; other.push(String(x).replace(/^Other:\s*/, "")); } }); });
+      o.counts = Object.keys(m).map(function (k) { return [k, m[k]]; }); o.other = other;
+      if (q.type !== "multi") o.top = o.counts.slice().sort(function (a, b) { return b[1] - a[1]; })[0];
+    }
+    if (["rating", "scale", "nps", "number"].indexOf(q.type) >= 0) {
+      var nums = vals.map(Number).filter(isFinite);
+      o.avg = avg(nums); o.sum = nums.reduce(function (a, b) { return a + b; }, 0); o.min = nums.length ? Math.min.apply(null, nums) : 0; o.max = nums.length ? Math.max.apply(null, nums) : 0; o.median = median(nums);
+      if (q.type !== "number") { var lo = q.type === "rating" ? 1 : q.type === "nps" ? 0 : q.min, hi = q.type === "rating" ? 5 : q.type === "nps" ? 10 : q.max; o.dist = []; for (var i = lo; i <= hi; i++) o.dist.push([String(i), nums.filter(function (x) { return x === i; }).length]); }
+      if (q.type === "nps") { var p = nums.filter(function (x) { return x >= 9; }).length, d = nums.filter(function (x) { return x <= 6; }).length; o.prom = p; o.det = d; o.pas = nums.length - p - d; o.nps = nums.length ? Math.round((p - d) / nums.length * 100) : 0; }
+    }
+    return o;
+  }
+  function renderResults() {
+    var s = RS.survey, all = RS.responses, resp = filtered(), tg = RS.state ? RS.targets.filter(function (t) { return t.state === RS.state; }) : RS.targets;
+    var answered = tg.filter(function (t) { return t.responded; }).length, rate = tg.length ? Math.min(100, pct(answered, tg.length)) : 0;
+    var states = {}; resp.forEach(function (r) { states[r.by.state || "—"] = 1; });
+    var durs = resp.map(function (r) { return r.dur; }).filter(function (x) { return x > 0; });
+    var last = resp.length ? Math.max.apply(null, resp.map(function (r) { return r.updatedAt; })) : 0;
+    hero(s.title, statusLabel(s) + " · " + all.length + " response" + (all.length === 1 ? "" : "s"));
+    var stOpts = {}; RS.targets.forEach(function (t) { if (t.state) stOpts[t.state] = 1; }); all.forEach(function (r) { if (r.by.state) stOpts[r.by.state] = 1; });
+    var html = '<button class="back" id="bk">‹ All surveys</button>' +
+      '<div class="row" style="margin:4px 0 10px"><select class="tx" id="stf" style="flex:1;min-width:150px;padding:10px"><option value="">All states</option>' + Object.keys(stOpts).sort().map(function (x) { return "<option" + (RS.state === x ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + "</select>" +
+      '<button class="btn sec sm" id="rf" title="Refresh">↻</button><button class="btn pri sm" id="ex">⬇ Export Excel</button><button class="btn ghost sm" id="mn">⋯</button></div>' +
+      '<div class="tiles">' + tileS("📨", "#EEF0FF", resp.length, "Responses", RS.state ? esc(RS.state) : "all states") +
+      tileS("🎯", "#E6F4EA", rate + "%", "Response rate", answered + " of " + tg.length + " users") +
+      tileS("🗺️", "#FFF4E5", Object.keys(states).length, "States responded") + tileS("⏱️", "#F4EEFF", mins(median(durs)), "Median time", last ? "last " + dt(last) : "") + "</div>";
+    if (!all.length) {
+      html += card("📭 No responses yet", "", '<div class="muted" style="font-size:14px">' + (s.status === "live" ? "State users have been notified. Re-announce it from the ⋯ menu to remind people who haven't answered." : "This survey has no responses.") + "</div>");
+    } else {
+      // AI insights
+      html += card("✨ AI insights", "Gemini reads the results and suggests next steps", '<div class="out" id="aiout"></div><button class="btn pri sm" id="aib" style="margin-top:8px">Generate insights</button>', "ai");
+      // responses over time
+      var first = istDay(Math.min.apply(null, resp.map(function (r) { return r.submittedAt; })) || Date.now()), today = istDay(Date.now()), days = [];
+      for (var d = first; d <= today && days.length < 60; d = addDays(d, 1)) days.push(d);
+      if (days.length > 1 || resp.length > 1) {
+        var byDay = count(resp, function (r) { return istDay(r.submittedAt); });
+        html += card("📈 Responses over time", "New responses per day (IST)", colBars(days.map(dayLabel), [{ name: "Responses", color: "#4D5BF9", values: days.map(function (x) { return byDay[x] || 0; }) }], { maxLabels: 8 }));
+      }
+    }
+    // by state
+    var bySt = {}; RS.targets.forEach(function (t) { var k = t.state || "—"; bySt[k] = bySt[k] || [0, 0]; bySt[k][0]++; if (t.responded) bySt[k][1]++; });
+    var stRows = Object.keys(bySt).map(function (k) { return [k, bySt[k][1], bySt[k][0]]; }).sort(function (a, b) { return pct(b[1], b[2]) - pct(a[1], a[2]) || b[2] - a[2]; });
+    if (stRows.length) html += card("🗺️ Response rate by state", "Share of active state users who answered", hBars(stRows.map(function (x) { var p = pct(x[1], x[2]); return [x[0], p, p >= 80 ? "#1E9E61" : p >= 40 ? "#E69A00" : "#E05757", x]; }), "#4D5BF9", { lw: 110, rw: 92, fmt: function (v, it) { return v + "% (" + it[3][1] + "/" + it[3][2] + ")"; } }));
+    // questions
+    var n = 0;
+    s.questions.forEach(function (q) {
+      if (q.type === "section") { html += '<div class="sec" style="margin-top:18px"><b>' + esc(q.title) + "</b></div>"; return; }
+      n++; html += qResult(q, n, resp);
+    });
+    // pending users
+    var pend = tg.filter(function (t) { return !t.responded; });
+    if (RS.targets.length) {
+      html += card("⏳ Not answered yet (" + pend.length + ")", s.anonymous ? "Anonymous survey — only states are shown" : "Active state users who haven't responded",
+        (pend.length ? table(["State", "Name", "Mobile", "Last seen"], pend.slice(0, 300).sort(function (a, b) { return a.state < b.state ? -1 : 1; }).map(function (t) { return [esc(t.state || "—"), esc(t.fullName || "—"), esc(t.phone || ""), t.lastSeen ? dt(t.lastSeen) : "—"]; })) : '<div class="muted">Everyone has answered 🎉</div>') +
+        (pend.length && s.status === "live" ? '<button class="btn sec sm" id="rmd" style="margin-top:10px">🔔 Re-announce to these users</button>' : ""));
+    }
+    // individual responses
+    if (resp.length) {
+      html += card("🧾 Individual responses (" + resp.length + ")", "Tap a row to see every answer", '<input class="searchin" id="rsq" placeholder="Search by name, state or answer…" value="' + esc(RS.q) + '"><div id="rlist"></div>');
+    }
+    html += '<div class="foot">Results update live. Created by ' + esc(s.createdBy || "admin") + " · " + dt(s.createdAt) + "</div>";
+    VIEW.innerHTML = html;
+    $("bk").onclick = function () { go("#list"); };
+    $("stf").onchange = function () { RS.state = this.value; renderResults(); };
+    $("rf").onclick = function () { showResults(s.id, true); };
+    $("ex").onclick = exportResults;
+    $("mn").onclick = function () { adminMenu(Object.assign({}, s, { count: all.length, targets: RS.targets.length })); };
+    if ($("rmd")) $("rmd").onclick = function () { remind(s.id); };
+    if ($("aib")) $("aib").onclick = aiInsights;
+    [].forEach.call(VIEW.querySelectorAll(".filebtn[data-att]"), function (b) { b.onclick = function () { openAtt(JSON.parse(b.dataset.att)); }; });
+    if ($("rlist")) { drawRespList(); $("rsq").oninput = function () { RS.q = this.value; drawRespList(); }; }
+  }
+  function statusLabel(s) { return s.status === "live" ? "● Live" + (s.closesAt ? " · closes " + dt(s.closesAt) : "") : s.status === "closed" ? "Closed" : "Draft"; }
+  function qResult(q, n, resp) {
+    var st = stats(q, resp), skipped = resp.length - st.n, t = TYPE[q.type];
+    var head = '<div class="qlabel">Q' + n + " · " + t[1] + " " + t[2] + "</div>";
+    var sub = st.n + " answered" + (skipped > 0 ? " · " + skipped + " skipped" : "") + (q.showIf ? " · conditional" : "");
+    var body = "";
+    if (!st.n) body = '<div class="muted">No answers yet.</div>';
+    else if (q.type === "yesno") {
+      var y = st.counts[0][1], no = st.counts[1][1];
+      body = donut([["Yes", y, "#1E9E61"], ["No", no, "#E05757"]], pct(y, y + no) + "%", "said yes");
+    } else if (q.type === "single" || q.type === "dropdown" || q.type === "multi") {
+      var items = st.counts.slice().sort(function (a, b) { return b[1] - a[1]; }).map(function (x, i) { return [x[0], x[1], PAL[i % PAL.length]]; });
+      body = hBars(items, "#4D5BF9", { lw: 140, rw: 74, fmt: function (v) { return v + " (" + pct(v, st.n) + "%)"; } });
+      if (q.type === "multi") body += '<div class="muted" style="font-size:12px;margin-top:4px">People could pick more than one, so % add up to more than 100.</div>';
+      if (st.other.length) body += '<div style="margin-top:10px;font-weight:700;font-size:13px">"Other" answers</div>' + st.other.slice(0, 20).map(function (x) { return '<div class="txtans">' + esc(x) + "</div>"; }).join("");
+    } else if (q.type === "rating") {
+      body = '<div class="bigstat"><div><b style="color:#F5A623">' + round1(st.avg) + ' ★</b><span>Average of 5</span></div><div><b>' + pct(st.dist[3][1] + st.dist[4][1], st.n) + "%</b><span>4–5 stars</span></div></div>" +
+        hBars(st.dist.slice().reverse().map(function (x) { return [x[0] + " ★", x[1], +x[0] >= 4 ? "#1E9E61" : +x[0] === 3 ? "#E69A00" : "#E05757"]; }), "#F5A623", { lw: 50, rw: 74, fmt: function (v) { return v + " (" + pct(v, st.n) + "%)"; } });
+    } else if (q.type === "scale") {
+      body = '<div class="bigstat"><div><b>' + round1(st.avg) + "</b><span>Average (" + q.min + "–" + q.max + ")</span></div><div><b>" + st.median + "</b><span>Median</span></div></div>" +
+        colBars(st.dist.map(function (x) { return x[0]; }), [{ name: "Answers", color: "#9152E0", values: st.dist.map(function (x) { return x[1]; }) }], { h: 140 }) +
+        (q.lo || q.hi ? '<div class="lohi"><span>' + esc(q.min + " = " + (q.lo || "")) + "</span><span>" + esc(q.max + " = " + (q.hi || "")) + "</span></div>" : "");
+    } else if (q.type === "nps") {
+      body = donut([["Promoters (9–10)", st.prom, "#1E9E61"], ["Passives (7–8)", st.pas, "#E6A100"], ["Detractors (0–6)", st.det, "#E05757"]], (st.nps > 0 ? "+" : "") + st.nps, "NPS") +
+        '<div class="muted" style="font-size:12px;margin-top:6px">NPS = % promoters − % detractors (range −100 to +100). Average score ' + round1(st.avg) + "/10.</div>";
+    } else if (q.type === "number") {
+      var u = q.unit ? " " + esc(q.unit) : "";
+      body = '<div class="bigstat"><div><b>' + fmtN(st.sum) + "</b><span>Total" + u + "</span></div><div><b>" + fmtN(round1(st.avg)) + "</b><span>Average</span></div><div><b>" + fmtN(st.min) + " – " + fmtN(st.max) + "</b><span>Range</span></div></div>";
+      var bs = {}; resp.forEach(function (r) { var v = Number(r.answers[q.id]); if (r.answers[q.id] == null || !isFinite(v)) return; var k = r.by.state || "—"; bs[k] = (bs[k] || 0) + v; });
+      var bsI = topN(bs, 15);
+      if (bsI.length > 1) body += '<div style="font-weight:700;font-size:13px;margin:4px 0">Total by state</div>' + hBars(bsI.map(function (x) { return [x[0], x[1], "#0E9AA7"]; }), "#0E9AA7", { lw: 110 });
+    } else if (q.type === "file") {
+      var files = []; resp.forEach(function (r) { (r.answers[q.id] || []).forEach(function (f) { files.push([f, r]); }); });
+      body = '<div class="muted" style="font-size:13px">' + files.length + " file" + (files.length === 1 ? "" : "s") + "</div>" +
+        files.slice(0, 60).map(function (x) { return '<button class="filebtn" data-att="' + esc(JSON.stringify(x[0])) + '">📎 ' + esc(x[0].name) + ' <span class="muted" style="margin-left:auto;font-size:12px">' + esc((x[1].by.fullName || "") + " · " + (x[1].by.state || "")) + "</span></button>"; }).join("") +
+        (files.length > 60 ? '<div class="muted" style="font-size:12px;margin-top:6px">Showing 60 — every file name is in the Excel export.</div>' : "");
+    } else if (q.type === "date") {
+      var ds = st.vals.slice().sort(), byD = count(st.vals, function (v) { return v; });
+      body = '<div class="bigstat"><div><b>' + dOnly(Date.parse(ds[0])) + "</b><span>Earliest</span></div><div><b>" + dOnly(Date.parse(ds[ds.length - 1])) + "</b><span>Latest</span></div></div>" +
+        hBars(topN(byD, 8).map(function (x) { return [dOnly(Date.parse(x[0])), x[1]]; }), "#2F80ED", { lw: 100 });
+    } else {
+      var w = q.type === "long" || q.type === "short" ? words(st.vals) : [];
+      var withBy = resp.filter(function (r) { var v = r.answers[q.id]; return v != null && v !== ""; }).slice().reverse();
+      body = (w.length ? '<div class="muted" style="font-size:12px">Most mentioned words</div><div class="words">' + w.map(function (x) { return "<span>" + esc(x[0]) + " · " + x[1] + "</span>"; }).join("") + "</div>" : "") +
+        withBy.slice(0, 8).map(function (r) { return '<div class="txtans">' + esc(r.answers[q.id]) + "<small>" + esc((r.by.fullName || "") + " · " + (r.by.state || "")) + " · " + dt(r.updatedAt) + "</small></div>"; }).join("") +
+        (withBy.length > 8 ? '<div class="muted" style="font-size:12px;margin-top:6px">+ ' + (withBy.length - 8) + " more — see Individual responses or the Excel export.</div>" : "");
+    }
+    return '<div class="card">' + head + '<h3 style="margin-top:4px">' + esc(q.title) + '</h3><div class="sub">' + esc(sub) + "</div>" + body + "</div>";
+  }
+  function drawRespList() {
+    var q = RS.q.trim().toLowerCase(), s = RS.survey, list = filtered().slice().reverse();
+    if (q) list = list.filter(function (r) { return (r.by.fullName + " " + r.by.username + " " + r.by.state + " " + JSON.stringify(r.answers)).toLowerCase().indexOf(q) >= 0; });
+    var first = s.questions.filter(function (x) { return x.type !== "section"; })[0];
+    $("rlist").innerHTML = list.length ? table(["#", "Name", "State", "Sent", first ? String(first.title).slice(0, 28) : ""], list.slice(0, 200).map(function (r) {
+      var i = RS.responses.indexOf(r) + 1;
+      return ['<a href="javascript:void 0" data-ri="' + (i - 1) + '">' + i + "</a>", '<a href="javascript:void 0" data-ri="' + (i - 1) + '">' + esc(r.by.fullName || "—") + "</a>", esc(r.by.state || "—"), dt(r.updatedAt), esc(String(answerText(first, r.answers[first && first.id]) || "—").slice(0, 40))];
+    })) : '<div class="muted">No matching responses.</div>';
+    [].forEach.call($("rlist").querySelectorAll("[data-ri]"), function (a) { a.onclick = function () { showResponse(RS.responses[+a.dataset.ri]); }; });
+  }
+  function showResponse(r) {
+    var s = RS.survey;
+    var body = '<div class="muted" style="font-size:13px;margin-bottom:8px">' + esc([r.by.state, r.by.phone, r.by.designation].filter(Boolean).join(" · ")) + "<br>Sent " + dt(r.submittedAt) + (r.edits ? " · edited " + r.edits + "× (last " + dt(r.updatedAt) + ")" : "") + (r.dur ? " · took " + mins(r.dur) : "") + (r.via ? " · via " + r.via : "") + "</div>" + readOnlyAnswers(s, r.answers);
+    var ov = sheet(r.by.fullName || "Response", "", [], body);
+    ov.querySelector(".sheet").style.maxWidth = "640px";
+  }
+  function aiContext() {
+    var s = RS.survey, resp = filtered(), lines = [];
+    var tg = RS.state ? RS.targets.filter(function (t) { return t.state === RS.state; }) : RS.targets;
+    lines.push("Survey: " + s.title + " (" + s.category + ")" + (RS.state ? " — filtered to " + RS.state : ""));
+    if (s.description) lines.push("Purpose: " + s.description.slice(0, 300));
+    lines.push("Responses: " + resp.length + " of " + tg.length + " targeted users (" + pct(tg.filter(function (t) { return t.responded; }).length, tg.length) + "% response rate)");
+    var bySt = {}; RS.targets.forEach(function (t) { var k = t.state || "—"; bySt[k] = bySt[k] || [0, 0]; bySt[k][0]++; if (t.responded) bySt[k][1]++; });
+    lines.push("Response by state: " + Object.keys(bySt).map(function (k) { return k + " " + bySt[k][1] + "/" + bySt[k][0]; }).join(", "));
+    var n = 0;
+    s.questions.forEach(function (q) {
+      if (q.type === "section" || q.type === "file") return; n++;
+      var st = stats(q, resp), l = "Q" + n + " [" + q.type + "] " + q.title + " — " + st.n + " answers: ";
+      if (st.counts) l += st.counts.map(function (x) { return x[0] + " " + x[1] + " (" + pct(x[1], st.n) + "%)"; }).join(", ") + (st.other && st.other.length ? "; other: " + st.other.slice(0, 8).join(" | ") : "");
+      else if (q.type === "nps") l += "NPS " + st.nps + ", promoters " + st.prom + ", passives " + st.pas + ", detractors " + st.det + ", avg " + round1(st.avg);
+      else if (st.avg != null && q.type !== "number") l += "avg " + round1(st.avg) + ", distribution " + st.dist.map(function (x) { return x[0] + ":" + x[1]; }).join(" ");
+      else if (q.type === "number") l += "total " + st.sum + ", avg " + round1(st.avg) + ", min " + st.min + ", max " + st.max + (q.unit ? " " + q.unit : "");
+      else l += st.vals.slice(-25).map(function (v, i) { var r = resp.filter(function (x) { return x.answers[q.id] === v; })[0]; return "\"" + String(v).slice(0, 220).replace(/\s+/g, " ") + "\"" + (r && r.by.state ? " (" + r.by.state + ")" : ""); }).join(" | ");
+      lines.push(l);
+    });
+    return lines.join("\n");
+  }
+  function aiInsights() {
+    var b = $("aib"), out = $("aiout"); b.disabled = true; b.textContent = "Thinking…"; out.textContent = "";
+    api({ action: "survey-ai", id: RS.survey.id, context: aiContext() }).then(function (r) {
+      b.disabled = false; b.textContent = "Regenerate";
+      out.textContent = r.ok ? r.text : (r.error || "AI is not available right now.");
+    });
+  }
+  function exportResults() {
+    var s = RS.survey, resp = filtered(), qs = s.questions.filter(function (q) { return q.type !== "section"; });
+    var head = ["#", "Submitted (IST)", "Last updated (IST)", "Name", "User name", "Mobile", "State", "Designation", "Time taken (min)", "Edits", "Via"];
+    qs.forEach(function (q, i) { head.push("Q" + (i + 1) + ". " + q.title); });
+    var rows = [head];
+    resp.forEach(function (r, i) {
+      var row = [i + 1, dt(r.submittedAt), dt(r.updatedAt), r.by.fullName || "", r.by.username || "", r.by.phone || "", r.by.state || "", r.by.designation || "", r.dur ? Math.round(r.dur / 6000) / 10 : "", r.edits || 0, r.via || ""];
+      qs.forEach(function (q) { var a = r.answers[q.id]; row.push(q.type === "number" || q.type === "rating" || q.type === "scale" || q.type === "nps" ? (a == null ? "" : Number(a)) : answerText(q, a)); });
+      rows.push(row);
+    });
+    var sum = [["Question", "Type", "Answered", "Result / option", "Count", "% of answered"]];
+    qs.forEach(function (q, i) {
+      var st = stats(q, resp), label = "Q" + (i + 1) + ". " + q.title, typ = TYPE[q.type][2];
+      if (st.counts) st.counts.forEach(function (x, k) { sum.push([k ? "" : label, k ? "" : typ, k ? "" : st.n, x[0], x[1], pct(x[1], st.n)]); });
+      else if (q.type === "nps") { sum.push([label, typ, st.n, "NPS score", st.nps, ""]); sum.push(["", "", "", "Promoters (9–10)", st.prom, pct(st.prom, st.n)]); sum.push(["", "", "", "Passives (7–8)", st.pas, pct(st.pas, st.n)]); sum.push(["", "", "", "Detractors (0–6)", st.det, pct(st.det, st.n)]); }
+      else if (st.dist) { sum.push([label, typ, st.n, "Average", round1(st.avg), ""]); st.dist.forEach(function (x) { sum.push(["", "", "", x[0] + (q.type === "rating" ? " star" : ""), x[1], pct(x[1], st.n)]); }); }
+      else if (q.type === "number") { sum.push([label, typ, st.n, "Total" + (q.unit ? " (" + q.unit + ")" : ""), st.sum, ""]); sum.push(["", "", "", "Average", round1(st.avg), ""]); sum.push(["", "", "", "Minimum", st.min, ""]); sum.push(["", "", "", "Maximum", st.max, ""]); }
+      else sum.push([label, typ, st.n, q.type === "file" ? "Files uploaded" : "Text answers (see Responses sheet)", q.type === "file" ? st.vals.reduce(function (a, v) { return a + v.length; }, 0) : st.n, ""]);
+    });
+    var bySt = {}; RS.targets.forEach(function (t) { var k = t.state || "—"; bySt[k] = bySt[k] || [0, 0]; bySt[k][0]++; if (t.responded) bySt[k][1]++; });
+    var stS = [["State", "Active users", "Responded", "Pending", "Response rate %"]].concat(Object.keys(bySt).sort().map(function (k) { return [k, bySt[k][0], bySt[k][1], bySt[k][0] - bySt[k][1], pct(bySt[k][1], bySt[k][0])]; }));
+    var pend = [["State", "Name", "User name", "Mobile", "Last seen (IST)"]].concat(RS.targets.filter(function (t) { return !t.responded && (!RS.state || t.state === RS.state); }).map(function (t) { return [t.state, t.fullName, t.username, t.phone, t.lastSeen ? dt(t.lastSeen) : ""]; }));
+    var info = [["Survey", s.title], ["Category", s.category], ["Status", s.status], ["Audience", s.audience && s.audience.length ? s.audience.join(", ") : "All states"], ["Closes", s.closesAt ? dt(s.closesAt) : "No deadline"],
+      ["Anonymous", s.anonymous ? "Yes" : "No"], ["Responses", resp.length], ["Filter", RS.state || "All states"], ["Exported", dt(Date.now())], ["Created by", s.createdBy || ""]];
+    var sheets = [{ name: "Summary", rows: sum }, { name: "Responses", rows: rows }, { name: "By state", rows: stS }];
+    if (!s.anonymous) sheets.push({ name: "Not answered", rows: pend });
+    sheets.push({ name: "Survey info", rows: info });
+    download(xlsx(sheets), ("Survey_" + s.title.replace(/[^\w]+/g, "_").slice(0, 40) + (RS.state ? "_" + RS.state.replace(/\W+/g, "") : "") + "_" + istDay(Date.now()) + ".xlsx").replace(/_+/g, "_"));
+    toast("Excel exported");
+  }
+
+
+  route();
+})();
+</script>
+</body>
+</html>
