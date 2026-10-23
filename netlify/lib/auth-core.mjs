@@ -469,12 +469,15 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const bad = await checkEmailOtp("signup", signupEmail, b.emailOtp);
       if (bad) return json(400, { ok: false, error: bad });
       emailVerified = true;
+    } else if (b.via === "web") {
+      // Web sign-up without OTP: the access code (checked above) is the gate.
     } else if (b.phoneVerified !== true) return json(400, { ok: false, error: "Mobile number is not verified." });
     const username = String(b.username).trim().replace(/\s+/g, " ");
     const rec = {
       username, fullName: name, phone, ...hashPassword(b.password),
       createdAt: t, fails: 0, lockUntil: 0, sessions: [], state: userState,
-      email: signupEmail || "", emailVerified, phoneVerified: !emailVerified, signupVia: emailVerified ? "web" : "app",
+      email: signupEmail || "", emailVerified, phoneVerified: b.phoneVerified === true && b.via !== "web",
+      signupVia: emailVerified || b.via === "web" ? "web" : "app",
     };
     const token = newSession(rec, t);
     rec.lastSeen = t;

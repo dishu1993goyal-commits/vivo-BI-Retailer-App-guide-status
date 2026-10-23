@@ -227,60 +227,34 @@
 
   function showSignup(role) {
     role = role || "state";
-    var c = authCard('<h1>Create <em>account</em></h1><p>Your email is verified with a one-time code.</p>' +
+    var c = authCard('<h1>Create <em>account</em></h1><p>Use the access code from your BI admin.</p>' +
       '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
       '<label>Full name</label><input id="s-n" maxlength="40" autocomplete="name">' +
       '<label>Choose a user name (for login)</label><input id="s-u" maxlength="30" autocomplete="username">' +
       '<label>Mobile number</label><div style="display:flex;gap:8px;align-items:center"><span style="font-weight:600">+91</span><input id="s-ph" inputmode="numeric" maxlength="10" placeholder="10-digit mobile"></div>' +
-      '<label>Email</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
+      '<label>Email (optional)</label><input id="s-e" type="email" maxlength="80" autocomplete="email" placeholder="name@example.com">' +
       '<div id="s-stw"><label>Your state</label><select id="s-st"><option value="">Select your state</option>' + STATES.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + "</select></div>" +
       '<label>Create password (min 6 characters)</label><input id="s-p" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Confirm password</label><input id="s-p2" type="password" maxlength="64" autocomplete="new-password">' +
       '<label>Access code (from your BI admin)</label><input id="s-ac" type="password" maxlength="64">' +
-      '<div id="s-otpw" style="display:none"><label>Code sent to your email</label><input id="s-otp" inputmode="numeric" maxlength="6" placeholder="6-digit code" style="letter-spacing:6px;text-align:center;font-size:20px"></div>' +
-      '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Send code to email</button>' +
-      '<a class="biw-link" id="s-rs" style="display:none">Resend code</a><a class="biw-link" id="s-back">Already have an account? Log in</a>');
+      '<div class="biw-msg" id="s-m"></div><button class="biw-btn biw-dark" id="s-go">Create account</button>' +
+      '<a class="biw-link" id="s-back">Already have an account? Log in</a>');
     roleSeg(c, role, function (r) { role = r; c.querySelector("#s-stw").style.display = r === "state" ? "" : "none"; });
-    var sent = false, go = c.querySelector("#s-go");
-    function vals() {
-      return { fullName: c.querySelector("#s-n").value.trim(), username: c.querySelector("#s-u").value.trim(), phone: c.querySelector("#s-ph").value.replace(/\D/g, ""),
+    var go = c.querySelector("#s-go");
+    go.onclick = function () {
+      var v = { fullName: c.querySelector("#s-n").value.trim(), username: c.querySelector("#s-u").value.trim(), phone: c.querySelector("#s-ph").value.replace(/\D/g, ""),
         email: c.querySelector("#s-e").value.trim(), state: role === "state" ? c.querySelector("#s-st").value : "", password: c.querySelector("#s-p").value,
         accessCode: c.querySelector("#s-ac").value.trim() };
-    }
-    function validate(v) {
-      if (v.fullName.length < 2) return "Please enter your full name.";
-      if (v.username.length < 3) return "User name must be at least 3 characters.";
-      if (!/^[6-9]\d{9}$/.test(v.phone)) return "Enter a valid 10-digit mobile number.";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email)) return "Enter a valid email address.";
-      if (role === "state" && !v.state) return "Please select your state.";
-      if (v.password.length < 6) return "Password must be at least 6 characters.";
-      if (v.password !== c.querySelector("#s-p2").value) return "Passwords do not match.";
-      if (!v.accessCode) return "Enter the access code from your BI admin.";
-      return "";
-    }
-    function sendCode() {
-      var v = vals(), err = validate(v);
+      var err = v.fullName.length < 2 ? "Please enter your full name." : v.username.length < 3 ? "User name must be at least 3 characters." :
+        !/^[6-9]\d{9}$/.test(v.phone) ? "Enter a valid 10-digit mobile number." :
+        v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "Enter a valid email address, or leave it empty." :
+        role === "state" && !v.state ? "Please select your state." : v.password.length < 6 ? "Password must be at least 6 characters." :
+        v.password !== c.querySelector("#s-p2").value ? "Passwords do not match." : !v.accessCode ? "Enter the access code from your BI admin." : "";
       if (err) { msg(c, "#s-m", err); return; }
-      go.disabled = true; go.textContent = "Checking…";
-      api(Object.assign({ app: role, action: "signup-check" }, v), false).then(function (res) {
-        if (!res.ok) { go.disabled = false; go.textContent = "Send code to email"; msg(c, "#s-m", res.error); return; }
-        return api({ app: role, action: "email-otp-send", email: v.email, purpose: "signup" }, false).then(function (r2) {
-          go.disabled = false;
-          if (!r2.ok) { go.textContent = "Send code to email"; msg(c, "#s-m", r2.error); return; }
-          sent = true; c.querySelector("#s-otpw").style.display = ""; c.querySelector("#s-rs").style.display = "";
-          go.textContent = "Verify & create account"; msg(c, "#s-m", "Code sent to " + v.email + ". Check inbox and spam.", true);
-          c.querySelector("#s-otp").focus();
-        });
-      });
-    }
-    go.onclick = function () {
-      if (!sent) return sendCode();
-      var v = vals(), err = validate(v), code = c.querySelector("#s-otp").value.replace(/\D/g, "");
-      if (err) { msg(c, "#s-m", err); return; }
-      if (code.length !== 6) { msg(c, "#s-m", "Enter the 6-digit code from your email."); return; }
+      if (!v.email) delete v.email;
       go.disabled = true; go.textContent = "Creating account…";
-      api(Object.assign({ app: role, action: "signup", emailOtp: code }, v), false).then(function (res) {
-        go.disabled = false; go.textContent = "Verify & create account";
+      api(Object.assign({ app: role, action: "signup", via: "web" }, v), false).then(function (res) {
+        go.disabled = false; go.textContent = "Create account";
         if (!res.ok) { msg(c, "#s-m", res.error); return; }
         AUTH = { app: role, username: res.username, token: res.token };
         store("biw-auth", AUTH); store("biw-role", role); store("biw-last-user", res.username); saveProfile(res.profile);
@@ -288,15 +262,22 @@
         startSession(true);
       });
     };
-    c.querySelector("#s-rs").onclick = function () { sent = false; sendCode(); };
     c.querySelector("#s-back").onclick = function () { showLogin(); };
   }
 
-  // ---------- FORGOT PASSWORD (web: email code) ----------
-  function showForgot(role) {
+  // ---------- FORGOT PASSWORD ----------
+  function showForgot() {
+    var c = authCard('<h1>Forgot <em>password?</em></h1>' +
+      '<div class="biw-note" style="font-size:14px">Reset it in the mobile app: open the <a href="' + APP_LINKS.state + '">State app</a> or <a href="' + APP_LINKS.admin + '">Admin app</a> → <b>Forgot password?</b> and verify your mobile with Truecaller. Then log in here with the new password.<br><br>' +
+      "If you can't use the app, raise it with your BI admin.</div>" +
+      '<a class="biw-link" id="f-back">Back to log in</a>');
+    c.querySelector("#f-back").onclick = function () { showLogin(); };
+  }
+
+  // (email-code password reset, kept for later if an email service is added)
+  function showForgotEmail(role) {
     role = role || "state";
-    var c = authCard('<h1>Reset <em>password</em></h1><p>We\'ll email a code to the address on your account.</p>' +
-      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+    var c = authCard('<h1>Reset <em>password</em></h1><p>We\'ll email a code to the address on your account.</p>' +      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
       '<label>Account email</label><input id="f-e" type="email" maxlength="80" autocomplete="email">' +
       '<div id="f-step2" style="display:none"><label>Code sent to your email</label><input id="f-otp" inputmode="numeric" maxlength="6" style="letter-spacing:6px;text-align:center;font-size:20px">' +
       '<label>New password (min 6 characters)</label><input id="f-p" type="password" maxlength="64"><label>Confirm new password</label><input id="f-p2" type="password" maxlength="64"></div>' +
