@@ -455,7 +455,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     api({ action: "aff-catalog" }).then(function (r) {
       if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       CAT = r; render();
-      if (r.refreshing && !r.models.length) { clearTimeout(POLL); POLL = setTimeout(load, 9000); }
+      if (!r.models.length && (r.refreshing || r.retryAt)) { clearTimeout(POLL); POLL = setTimeout(load, r.refreshing ? 8000 : Math.max(15000, r.retryAt - r.now + 3000)); }
     });
   }
   function render() {
@@ -501,9 +501,14 @@ td.n,th.n{text-align:right;white-space:nowrap}
     p.innerHTML = '<div id="cbx" style="margin-top:6px"></div><div id="mstat"></div><div id="md"></div>';
     var c = combo($("cbx"), function (m) { ls("aff-last", m.slug); SEL = { v: 0, partner: "All", stateF: "All" }; openModel(m); });
     if (!CAT.models.length) {
-      $("mstat").innerHTML = CAT.refreshing ? '<div class="wait"><div class="spin"></div>AI is building the vivo model list from vivo.com and Google — about a minute. This page updates by itself.</div>' :
-        '<div class="err">' + esc(CAT.error || CAT.note || "Model list not available yet.") + "</div>" + (ADMIN ? '<button class="btn pri sm" id="rc" style="margin-top:8px">Build model list now</button>' : "");
-      if ($("rc")) $("rc").onclick = function () { api({ action: "aff-refresh", catalog: true }).then(function (r) { toast(r.started ? "Started" : r.reason || r.error || "Already running"); load(); }); };
+      var pg = CAT.progress, secs = pg ? Math.round((CAT.now - pg.since) / 1000) : 0;
+      $("mstat").innerHTML = CAT.refreshing ? '<div class="wait"><div class="spin"></div><div>AI is building the vivo model list from vivo.com and Google — usually 1–3 minutes. This page updates by itself.' +
+          (pg ? '<div style="font-size:12px;opacity:.85;margin-top:3px">Step: ' + esc(pg.stage) + " · " + (secs < 60 ? secs + " s" : Math.floor(secs / 60) + " min " + (secs % 60) + " s") + "</div>" : "") + "</div></div>" +
+          (CAT.error ? '<div class="muted" style="font-size:12px;margin-top:6px">Previous attempt: ' + esc(CAT.error) + "</div>" : "") :
+        '<div class="err">Couldn\'t build the model list: ' + esc(CAT.error || CAT.note || "not available yet.") + "</div>" +
+          (CAT.retryAt ? '<div class="muted" style="font-size:12.5px;margin-top:6px">It will try again automatically at ' + dfmt(CAT.retryAt, { hour: "numeric", minute: "2-digit" }) + ".</div>" : "") +
+          (ADMIN ? '<button class="btn pri sm" id="rc" style="margin-top:8px">⟳ Try again now</button>' : "");
+      if ($("rc")) $("rc").onclick = function () { this.disabled = true; api({ action: "aff-refresh", catalog: true }).then(function (r) { toast(r.started ? "Started — about 1–3 minutes" : r.running ? "Already running" : r.reason || r.error); load(); }); };
       return;
     }
     $("mstat").innerHTML = '<div class="muted" style="font-size:12px;margin:8px 2px 0">' + CAT.models.length + " models · list updated " + ago(CAT.updatedAt) + (CAT.refreshing ? " · refreshing…" : "") + "</div>";
@@ -518,7 +523,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     api({ action: "aff-model", slug: base.slug, name: base.name }).then(function (r) {
       if (!$("md")) return;
       if (!r.ok) { $("md").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
-      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, note: r.note };
+      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, progress: r.progress, note: r.note };
       drawModel();
       if (r.refreshing) POLL = setTimeout(function () { if (TAB === "find" && CUR && CUR.slug === base.slug) openModel(base); }, 8000);
     });
@@ -534,7 +539,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<div class="pr"><b>' + rs(price) + "</b>" + (mrp && price && mrp > price ? "<s>MRP " + rs(mrp) + '</s><span class="off">' + Math.round((mrp - price) / mrp * 100) + "% off</span>" : mrp ? "<s>MRP " + rs(mrp) + "</s>" : "") + "</div>" +
       (v.priceSource ? '<div class="upd">Best price seen at: ' + esc(v.priceSource) + "</div>" : "") +
       '<div class="upd">🕒 Offers updated ' + ago(m && m.updatedAt) + (m && m.url ? ' · <a style="color:#fff" href="' + esc(m.url) + '" target="_blank" rel="noopener">vivo.com page ↗</a>' : "") + (ADMIN ? ' · <a style="color:#fff;cursor:pointer;text-decoration:underline" id="rf">Refresh now</a>' : "") + "</div></div>";
-    if (C.refreshing) html += '<div class="wait"><div class="spin"></div>' + (m ? "Updating with the latest offers…" : "AI is searching vivo.com, Google, Amazon, Flipkart and partner sites for current offers — about a minute.") + "</div>";
+    if (C.refreshing) html += '<div class="wait"><div class="spin"></div><div>' + (m && m.updatedAt ? "Updating with the latest offers…" : "AI is searching vivo.com, Google, Amazon, Flipkart and partner sites for current offers — usually 1–3 minutes.") + (C.progress ? '<div style="font-size:12px;opacity:.85;margin-top:3px">Step: ' + esc(C.progress.stage) + "</div>" : "") + "</div></div>";
     else if (C.note) html += '<div class="notice">' + esc(C.note) + "</div>";
     if (m && m.error && (!m.updatedAt || m.errorAt > m.updatedAt)) html += '<div class="notice">Last update failed: ' + esc(m.error) + (m.updatedAt ? " — showing data from " + ago(m.updatedAt) : "") + "</div>";
     // partner filter (EMI)
