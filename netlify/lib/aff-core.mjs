@@ -15,6 +15,8 @@ import { randomBytes, createHash } from "node:crypto";
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+// Same phone however it's written: "vivo T5x 5G" = "T5x" ; "Y31 5G" = "vivo Y31".
+export const nameKey = (s) => String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\b5g\b/g, "").replace(/[^a-z0-9+]/g, "");
 export const slugify = (s) => String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\+/g, " plus").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 const DAY = 86400000;
 export const MODEL_TTL = DAY, CATALOG_TTL = 3 * DAY, LOCK_MS = 4 * 60000, START_MS = 2 * 60000, RETRY_MS = 15 * 60000;
@@ -89,7 +91,8 @@ export async function researchJSON(env, prompt, fetchImpl = fetch, opts = {}) {
       const cand = (j.candidates || [])[0] || {};
       const text = ((cand.content || {}).parts || []).map((p) => p.text || "").join("");
       const data = parseJSON(text);
-      if (!data) { errs.push(m + ": unreadable answer (" + (cand.finishReason || "no text") + ", " + text.length + " chars)"); continue; }
+      if (!data) { errs.push(m + (tools ? "" : " (no tools)") + ": unreadable answer (" + (cand.finishReason || "no text") + ", " + text.length + " chars)"); continue; }
+      if (opts.validate && !opts.validate(data)) { errs.push(m + (tools ? "" : " (no tools)") + ": answer had no usable items"); continue; }
       const gm = cand.groundingMetadata || {};
       const sources = [];
       (gm.groundingChunks || []).forEach((c) => { const w = c.web || {}; if (w.uri && sources.length < 15 && !sources.some((s) => s.title === w.title)) sources.push({ title: str(w.title, 80) || "source", url: str(w.uri, 600) }); });
@@ -102,7 +105,7 @@ export async function researchJSON(env, prompt, fetchImpl = fetch, opts = {}) {
     if (r.status === 404) badModel[m] = 1;          // model name not available for this key
     else if (r.status === 429 && /day|daily|PerDay/i.test(msg) && tools) { /* grounding quota for this model: try the next */ }
   }
-  return { ok: false, error: "AI research failed. " + errs.slice(-4).join(" | "), tried: errs };
+  return { ok: false, error: ("AI research failed. " + errs.map((e) => e.slice(0, 110)).join(" | ")).slice(0, 900), tried: errs };
 }
 
 // ---------- cleaning AI output ----------
@@ -134,7 +137,7 @@ export function cleanCatalog(d) {
   return (Array.isArray(d && d.models) ? d.models : []).slice(0, 120).map((x) => {
     if (!x || typeof x !== "object") return null;
     const name = str(x.name || x.n, 60); if (!name) return null;
-    const slug = slugify(x.slug || name); if (!slug || seen[slug]) return null; seen[slug] = 1;
+    const slug = slugify(x.slug || name), nk = "k:" + nameKey(name); if (!slug || seen[slug] || seen[nk]) return null; seen[slug] = 1; seen[nk] = 1;
     const variants = cleanVariants((x.variants || x.v || []).map((v) => Array.isArray(v) ? { ram: v[0], storage: v[1], mrp: v[2], price: v[3] } : v));
     if (!x.series && x.s) x.series = x.s;
     if (!x.colours && x.c) x.colours = x.c;
@@ -147,9 +150,17 @@ export function cleanCatalog(d) {
 // ---------- prompts ----------
 function pageText(html, n) { return String(html || "").replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").slice(0, n); }
 async function grab(u, fetchImpl) { try { const r = await fetchImpl(u, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 14) vivoBI/1.0", "accept-language": "en-IN" } }); return r.ok ? await r.text() : ""; } catch (e) { return ""; } }
-export function catalogPrompt(today, storeText) {
+// Starter list (from vivo.com/in and shop.vivo.com/in, Oct 2026) so the page works before/without AI; AI research adds prices and new models.
+export const SEED = [["vivo X Fold6", "X", "x-fold6"], ["vivo X300 Ultra", "X", "x300-ultra"], ["vivo X300 Pro", "X", "x300-pro"], ["vivo X300", "X", "x300"], ["vivo X300 FE", "X", "x300-fe"],
+  ["vivo V80", "V", "v80"], ["vivo V70 Elite", "V", "v70-elite"], ["vivo V70", "V", "v70"], ["vivo S2", "S", "s2"], ["vivo S2 FE", "S", "s2-fe"],
+  ["vivo T5 5G", "T", "t5-5g"], ["vivo T5x 5G", "T", "t5x"], ["vivo T5 Lite 44W 5G", "T", "t5-lite-44w-5g"], ["vivo T5e", "T", "t5e"],
+  ["vivo Y51 Pro 5G", "Y", "y51-pro-5g"], ["vivo Y400 5G", "Y", "y400-5g"], ["vivo Y31t 5G", "Y", "y31t-5g"], ["vivo Y31 5G", "Y", "y31-5g"], ["vivo Y21 5G", "Y", "y21-5g"], ["vivo Y11 5G", "Y", "y11-5g"], ["vivo Y05", "Y", "y05"]];
+export function seedCatalog() { return cleanCatalog({ models: SEED.map((x) => ({ name: x[0], series: x[1], slug: x[2] })) }).map((m) => Object.assign(m, { seed: true })); }
+export const CAT_GROUPS = [["X", "X series (flagships and X Fold)"], ["V", "V series"], ["ST", "S series and T series"], ["Y", "Y series and any other vivo phones"]];
+export function catalogPrompt(today, storeText, group) {
+  const g = group || ["", "all series (X, V, S, T, Y and others)"];
   return `Today is ${today}. You are building a price list for vivo India's sales team.
-Using Google Search, https://www.vivo.com/in/products?choose=all and https://shop.vivo.com/in/products/phone (text copied below), list EVERY vivo smartphone currently on sale in India (X, V, S, T, Y series and any others; skip models no longer sold).
+Using Google Search, https://www.vivo.com/in/products?choose=all and https://shop.vivo.com/in/products/phone (text copied below), list EVERY vivo ${g[1]} smartphone currently on sale in India (skip models no longer sold).
 For each model give all RAM+storage variants with MRP and current best selling price in India (vivo e-store, Amazon.in, Flipkart or retail), and the colours.
 Return ONLY one JSON object, no prose:
 {"models":[{"n":"vivo V70","s":"V","v":[["8GB","256GB",65999,59999],["12GB","256GB",69999,63999]],"c":["Authentic Black","Pearl White"]}]}
@@ -193,19 +204,36 @@ export async function runJob(store, env, jobId, { fetchImpl = fetch, now = () =>
     if (job.kind === "catalog") {
       await beat("Reading vivo e-store");
       const [p1, p2] = await Promise.all([grab("https://shop.vivo.com/in/products/phone", fetchImpl), grab("https://shop.vivo.com/in/products/phone?page=2", fetchImpl)]);
-      let r;
-      try { r = await researchJSON(env, catalogPrompt(today, (pageText(p1, 14000) + " " + pageText(p2, 8000)).trim()), fetchImpl, ropts); } catch (e) { r = { ok: false, error: "AI research " + e.message }; }
+      const storeText = (pageText(p1, 14000) + " " + pageText(p2, 8000)).trim();
+      await beat("Searching Google for vivo models (4 series in parallel)");
+      // Smaller answers per series are faster and far less likely to be cut off.
+      const results = await Promise.all(CAT_GROUPS.map(async (g) => {
+        try {
+          return await researchJSON(env, catalogPrompt(today, storeText, g), fetchImpl, Object.assign({}, ropts, { noToolsLast: storeText.length > 500, timeoutMs: 150000,
+            onStage: async (msg) => { if (now() > deadline) throw new Error("took too long"); await beat(g[0] + ": " + msg); }, validate: (d) => cleanCatalog(d).length >= 1 }));
+        } catch (e) { return { ok: false, error: "AI research " + e.message }; }
+      }));
       const old = (await store.get("affcat")) || {};
-      if (!r.ok) { await store.set("affcat", Object.assign(old, { error: r.error, errorAt: now() })); return r; }
-      const models = cleanCatalog(r.data);
-      if (models.length < 3) { await store.set("affcat", Object.assign(old, { error: "AI returned only " + models.length + " model(s) (" + r.model + ") — will retry.", errorAt: now() })); return { ok: false, error: "too few models" }; }
-      await store.set("affcat", { models, updatedAt: now(), sources: r.sources, model: r.model, by: job.by || "auto" });
+      const byslug = {}, keyToSlug = {};
+      (old.models && old.models.length ? old.models : seedCatalog()).forEach((m) => { byslug[m.slug] = m; keyToSlug[nameKey(m.name)] = m.slug; });
+      let found = 0; const diag = [], srcs = [];
+      results.forEach((r, i) => {
+        const g = CAT_GROUPS[i][0];
+        if (!r.ok) { diag.push(g + ": " + r.error); return; }
+        const ms = cleanCatalog(r.data); found += ms.length;
+        ms.forEach((m) => { const k = nameKey(m.name); if (keyToSlug[k] && keyToSlug[k] !== m.slug) m.slug = keyToSlug[k]; else keyToSlug[k] = m.slug; const o = byslug[m.slug]; byslug[m.slug] = Object.assign({}, o || {}, m, { seed: false, variants: m.variants.length ? m.variants : (o ? o.variants : []), colours: m.colours.length ? m.colours : (o ? o.colours : []) }); });
+        (r.sources || []).forEach((x) => { if (srcs.length < 15) srcs.push(x); });
+        diag.push(g + ": " + ms.length + " models via " + r.model + (r.grounded ? "" : " (no Google)"));
+      });
+      const models = cleanCatalog({ models: Object.values(byslug) }).map((m) => { const o = byslug[m.slug]; return Object.assign(m, { seed: !!(o && o.seed) }); });
+      if (!found) { await store.set("affcat", Object.assign(old, { models, error: "AI research found no models. " + diag.join(" | "), errorAt: now(), diag })); return { ok: false, error: "no models" }; }
+      await store.set("affcat", { models, updatedAt: now(), sources: srcs, by: job.by || "auto", diag, error: results.some((r) => !r.ok) ? "Some series failed: " + diag.filter((d) => !/ models via /.test(d)).join(" | ") : "", errorAt: results.some((r) => !r.ok) ? now() : 0 });
       return { ok: true, n: models.length };
     }
     await beat("Reading vivo.com page");
     const html = await grab(`https://www.vivo.com/in/products/${job.slug}`, fetchImpl);
     let r;
-    try { r = await researchJSON(env, modelPrompt(today, job.name, job.slug, pageText(html, 9000)), fetchImpl, ropts); } catch (e) { r = { ok: false, error: "AI research " + e.message }; }
+    try { r = await researchJSON(env, modelPrompt(today, job.name, job.slug, pageText(html, 9000)), fetchImpl, Object.assign({}, ropts, { noToolsLast: !!html, timeoutMs: 150000, validate: (d) => (Array.isArray(d.variants) && d.variants.length) || KINDS.some((k) => Array.isArray(d[k]) && d[k].length) })); } catch (e) { r = { ok: false, error: "AI research " + e.message }; }
     const old = (await store.get(`affm:${job.slug}`)) || null;
     if (!r.ok) { await store.set(`affm:${job.slug}`, Object.assign(old || { slug: job.slug, name: job.name }, { error: r.error, errorAt: now() })); return r; }
     const m = cleanModel(r.data, { slug: job.slug, name: job.name, series: job.series, url: `https://www.vivo.com/in/products/${job.slug}` });
@@ -262,7 +290,8 @@ export async function affAction(b, ctx) {
 
   if (b.action === "aff-catalog") {
     await reapLock(store, t, "catalog");
-    const cat = (await store.get("affcat")) || { models: [] };
+    let cat = await store.get("affcat");
+    if (!cat || !cat.models || !cat.models.length) { cat = Object.assign(cat || {}, { models: seedCatalog(), seeded: true }); await store.set("affcat", cat); }
     let start = null;
     const backoff = cat.errorAt && t - cat.errorAt < RETRY_MS && (!cat.updatedAt || cat.errorAt > cat.updatedAt);
     if ((!cat.updatedAt || t - cat.updatedAt > CATALOG_TTL) && !backoff && !(await running("catalog"))) start = await startJob(ctx, "catalog", null);

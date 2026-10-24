@@ -119,9 +119,11 @@
     var draw = function (open) {
       var q = inp.value.trim().toLowerCase().replace(/^vivo\s*/, "");
       list = (CAT.models || []).filter(function (m) { return (ser === "All" || m.series === ser) && (!q || m.name.toLowerCase().replace(/^vivo\s*/, "").indexOf(q) >= 0 || m.slug.indexOf(q.replace(/\s+/g, "-")) >= 0); });
+      if (q) { var nk = function (x) { return x.toLowerCase().replace(/^vivo\s*/, "").replace(/\b5g\b/g, "").replace(/[^a-z0-9+]/g, ""); }, qk = nk(q), rank = function (m) { var k = nk(m.name); return k === qk ? 0 : k.indexOf(qk) === 0 ? 1 : 2; };
+        list = list.map(function (m, i) { return [m, i]; }).sort(function (a, b) { return rank(a[0]) - rank(b[0]) || a[1] - b[1]; }).map(function (x) { return x[0]; }); }
       if (!open) { dd.style.display = "none"; return; }
       var html = "", last = "";
-      list.forEach(function (m, i) { if (m.series !== last) { html += '<div class="gh">' + esc(m.series || "Other") + " series</div>"; last = m.series; } html += '<div class="op' + (i === hi ? " on" : "") + '" data-i="' + i + '"><span>' + esc(m.name) + "</span><small>" + (m.startPrice ? "from " + rs(m.startPrice) : "") + "</small></div>"; });
+      list.forEach(function (m, i) { if (!q && m.series !== last) { html += '<div class="gh">' + esc(m.series || "Other") + " series</div>"; last = m.series; } html += '<div class="op' + (i === hi ? " on" : "") + '" data-i="' + i + '"><span>' + esc(m.name) + "</span><small>" + (m.startPrice ? "from " + rs(m.startPrice) : "") + "</small></div>"; });
       dd.innerHTML = html || '<div class="op">No model matches “' + esc(inp.value) + "”</div>";
       dd.style.display = "";
       [].forEach.call(dd.querySelectorAll(".op[data-i]"), function (o) { o.onmousedown = function (e) { e.preventDefault(); pick(list[+o.dataset.i]); }; });
@@ -151,7 +153,13 @@
       if ($("rc")) $("rc").onclick = function () { this.disabled = true; api({ action: "aff-refresh", catalog: true }).then(function (r) { toast(r.started ? "Started — about 1–3 minutes" : r.running ? "Already running" : r.reason || r.error); load(); }); };
       return;
     }
-    $("mstat").innerHTML = '<div class="muted" style="font-size:12px;margin:8px 2px 0">' + CAT.models.length + " models · list updated " + ago(CAT.updatedAt) + (CAT.refreshing ? " · refreshing…" : "") + "</div>";
+    $("mstat").innerHTML = '<div class="muted" style="font-size:12px;margin:8px 2px 0">' + CAT.models.length + " models · " + (CAT.updatedAt ? "prices updated " + ago(CAT.updatedAt) : "starter list from vivo.com") + (CAT.refreshing ? " · AI is adding prices & new models" + (CAT.progress ? " (" + esc(CAT.progress.stage) + ")" : "") + "…" : "") + "</div>" +
+      (ADMIN && CAT.error && !CAT.refreshing ? '<div class="notice" style="font-size:12px">AI model-list research: ' + esc(CAT.error) + ' <a href="javascript:void 0" id="rc2">Try again</a></div>' : "");
+    if ($("rc2")) $("rc2").onclick = function () { api({ action: "aff-refresh", catalog: true }).then(function (r) { toast(r.started ? "Started — 1–3 minutes" : r.running ? "Already running" : r.reason || r.error); load(); }); };
+    if (CAT.refreshing) { clearTimeout(POLL); POLL = setTimeout(function again() {
+      if (TAB !== "find" || CUR) return;
+      api({ action: "aff-catalog" }).then(function (r) { if (!r.ok || TAB !== "find" || CUR) return; CAT = r; var typing = document.activeElement && document.activeElement.closest && document.activeElement.closest("#cbx"); if (typing && r.refreshing) { POLL = setTimeout(again, 15000); return; } if (!typing) showFind(); });
+    }, 15000); }
     var last = CUR ? CUR.slug : ls("aff-last"), m = last && CAT.models.find(function (x) { return x.slug === last; });
     if (m) { c.set(m.name); openModel(m); }
     else $("md").innerHTML = '<div class="card empty"><div class="big">💳</div>Pick a vivo model to see its variants, colours, price and every running offer — EMI by partner (Bajaj, Pine Labs, banks), exchange, upgrade, V-Shield and ABB.</div>';
