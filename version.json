@@ -1,10 +1,11 @@
 {
-  "versionCode": 25,
-  "versionName": "5.2",
+  "versionCode": 26,
+  "versionName": "6.0",
   "notes": [
-    "New: Affordability Corner — every vivo model with variants, colours, market price and running offers",
-    "EMI offers by partner (Bajaj, Pine Labs, banks) with 10/0, 12/0, 24/0 schemes, exchange, upgrade, V-Shield and ABB",
-    "Compare phones, compare offers state-wise, report offers you see in market, EMI calculator"
+    "New look: one All tools hub — tools grouped by category (Field, Reports, Engage, Help, Support, Admin)",
+    "New: Report builder, auto-reports, disputes with TAT timer, market hygiene (IMEIs), quizzes & certificates, polls, best-practice wall, leaderboard",
+    "New: FAQ + Ask AI, process flowcharts, escalation contacts, official schemes & payout calculator",
+    "Admins: import users with email invites, switch modules on/off per state"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
