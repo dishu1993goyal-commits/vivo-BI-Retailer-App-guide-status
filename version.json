@@ -1,11 +1,11 @@
 {
-  "versionCode": 26,
-  "versionName": "6.0",
+  "versionCode": 27,
+  "versionName": "6.1",
   "notes": [
-    "New look: one All tools hub — tools grouped by category (Field, Reports, Engage, Help, Support, Admin)",
-    "New: Report builder, auto-reports, disputes with TAT timer, market hygiene (IMEIs), quizzes & certificates, polls, best-practice wall, leaderboard",
-    "New: FAQ + Ask AI, process flowcharts, escalation contacts, official schemes & payout calculator",
-    "Admins: import users with email invites, switch modules on/off per state"
+    "New: Master admin — log in with the \"Master admin\" switch on the Admin app (same user name and password)",
+    "Masters: ✏️ Customize any screen — rename or hide labels, edit dropdown options, add fields to forms",
+    "Masters: Studio — build new tools (forms, links, info pages, saved reports), test as drafts, then release to roles, states or user IDs",
+    "Masters: turn any tool on/off for admins or specific IDs, by hand or from Excel"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
