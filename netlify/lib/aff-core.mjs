@@ -19,7 +19,7 @@ const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 export const nameKey = (s) => String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\b5g\b/g, "").replace(/[^a-z0-9+]/g, "");
 export const slugify = (s) => String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\+/g, " plus").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 const DAY = 86400000;
-export const MODEL_TTL = DAY, CATALOG_TTL = 3 * DAY, LOCK_MS = 4 * 60000, START_MS = 2 * 60000, RETRY_MS = 15 * 60000;
+export const MODEL_TTL = 3 * DAY, CATALOG_TTL = 7 * DAY, LOCK_MS = 4 * 60000, START_MS = 2 * 60000, RETRY_MS = 15 * 60000;
 // A lock is alive while the worker keeps sending heartbeats, or while we're still waiting for it to pick the job up.
 export const lockAlive = (l, t) => !!l && (l.startedAt ? t - (l.beat || l.startedAt) < LOCK_MS : t - l.at < START_MS);
 // Clears a dead lock and records why (so the page shows a reason instead of spinning).
@@ -72,14 +72,16 @@ export async function researchJSON(env, prompt, fetchImpl = fetch, opts = {}) {
   const models = env.GEMINI_RESEARCH_MODEL ? [env.GEMINI_RESEARCH_MODEL, ...RESEARCH_MODELS] : RESEARCH_MODELS;
   const toolSets = [[{ google_search: {} }, { url_context: {} }], [{ google_search: {} }]];
   const tries = [];
-  models.forEach((m) => toolSets.forEach((tools) => tries.push([m, tools])));
+  if (!opts.plainOnly) models.forEach((m) => toolSets.forEach((tools) => tries.push([m, tools])));
+  else ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"].forEach((m) => tries.push([m, null]));
   if (opts.noToolsLast) ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-3.5-flash-lite"].forEach((m) => tries.push([m, null]));
-  const errs = [], badModel = {};
+  const errs = [], badModel = {}; let quota = 0;
   for (const [m, tools] of tries) {
     if (badModel[m]) continue;
+    if (quota >= 2) return { ok: false, quota: true, error: "Gemini's free quota is used up for today (429).", tried: errs };
     if (opts.onStage) await opts.onStage((tools ? "Searching Google" : "Reading vivo.com text") + " with " + m);
     const gen = { temperature: 0.15, maxOutputTokens: 32000 };
-    const body = JSON.stringify(Object.assign({ contents: [{ role: "user", parts: [{ text: tools ? prompt : prompt + "\n\nYou have no web access now: use ONLY the page text above; leave out anything it doesn't show." }] }], generationConfig: gen }, tools ? { tools } : {}));
+    const body = JSON.stringify(Object.assign({ contents: [{ role: "user", parts: [{ text: tools || opts.plainOnly ? prompt : prompt + "\n\nYou have no web access now: use ONLY the page text above; leave out anything it doesn't show." }] }], generationConfig: gen }, tools ? { tools } : {}));
     let r, j;
     const ac = typeof AbortController !== "undefined" ? new AbortController() : null, tm = ac ? setTimeout(() => ac.abort(), opts.timeoutMs || 110000) : 0;
     try {
@@ -102,10 +104,119 @@ export async function researchJSON(env, prompt, fetchImpl = fetch, opts = {}) {
     const msg = r.status + (j.error && j.error.message ? " " + j.error.message.slice(0, 160) : "");
     errs.push(m + (tools ? "" : " (no tools)") + ": " + msg);
     if (r.status === 401 || (r.status === 403 && /key|permission|API_KEY/i.test(msg))) return { ok: false, error: "The Gemini API key was rejected: " + msg, tried: errs };
+    if (r.status === 429 && /exceeded your current quota|RESOURCE_EXHAUSTED/i.test(msg)) quota++;
     if (r.status === 404) badModel[m] = 1;          // model name not available for this key
     else if (r.status === 429 && /day|daily|PerDay/i.test(msg) && tools) { /* grounding quota for this model: try the next */ }
   }
   return { ok: false, error: ("AI research failed. " + errs.map((e) => e.slice(0, 110)).join(" | ")).slice(0, 900), tried: errs };
+}
+
+// ---------- other free research sources (when Gemini's quota is used up) ----------
+// Tavily: web search API (free plan, no card). Groq: fast LLM API (free plan, no card) that turns search results into JSON.
+export async function tavilySearch(key, query, fetchImpl = fetch, { max = 6, depth = "basic" } = {}) {
+  try {
+    const r = await fetchImpl("https://api.tavily.com/search", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key },
+      body: JSON.stringify({ query, search_depth: depth, max_results: max, include_answer: false, include_raw_content: false, country: "india" }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, status: r.status, error: "Tavily " + r.status + " " + String((j.detail && (j.detail.error || j.detail)) || j.error || j.message || "").slice(0, 120) };
+    return { ok: true, results: (j.results || []).map((x) => ({ title: str(x.title, 120), url: str(x.url, 500), content: str(x.content, 1400) })).filter((x) => x.url) };
+  } catch (e) { return { ok: false, error: "Tavily network " + e.message }; }
+}
+const GROQ_MODELS = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"];
+export async function groqJSON(key, prompt, fetchImpl = fetch, { validate, browse = false } = {}) {
+  const errs = [];
+  for (const m of browse ? ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] : GROQ_MODELS) {
+    const body = { model: m, messages: [{ role: "system", content: "You are a careful research assistant for vivo India's sales team. Reply with ONE JSON object only." }, { role: "user", content: prompt }], temperature: 0.1, max_completion_tokens: 8000 };
+    if (browse) { body.tools = [{ type: "browser_search" }]; body.tool_choice = "required"; body.reasoning_effort = "low"; } else body.response_format = { type: "json_object" };
+    try {
+      const r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { const msg = r.status + " " + String((j.error && j.error.message) || "").slice(0, 120); errs.push("Groq " + m + ": " + msg); if (r.status === 401) break; continue; }
+      const text = (((j.choices || [])[0] || {}).message || {}).content || "";
+      const data = parseJSON(text);
+      if (!data) { errs.push("Groq " + m + ": unreadable answer"); continue; }
+      if (validate && !validate(data)) { errs.push("Groq " + m + ": answer had no usable items"); continue; }
+      const urls = browse ? [...new Set(text.match(/https?:\/\/[^\s)\]"'<>]+/g) || [])].slice(0, 12).map((u) => ({ title: u.replace(/^https?:\/\/(www\.)?/, "").split("/")[0], url: u })) : [];
+      return { ok: true, data, model: "groq/" + m, sources: urls };
+    } catch (e) { errs.push("Groq " + m + ": network " + e.message); }
+  }
+  return { ok: false, error: errs.join(" | ") };
+}
+export async function aiKeys(store, env) {
+  const c = (await store.get("config:aikeys")) || {};
+  return { groq: env.GROQ_API_KEY || c.groq || "", tavily: env.TAVILY_API_KEY || c.tavily || "" };
+}
+// Tries every available source in turn. task: { prompt, queries:[...], pageText, validate }
+export async function research(store, env, task, { fetchImpl = fetch, now = () => Date.now(), onStage = async () => { } } = {}) {
+  const keys = await aiKeys(store, env), day = istDay(now()), errs = [];
+  const qk = `aiq:gemini:${day}`;
+  const geminiOut = async () => !!(await store.get(qk));
+  // 1) Tavily web search → Groq (or Gemini without tools) writes the JSON
+  if (keys.tavily && task.queries && task.queries.length) {
+    const results = [], seen = {};
+    for (const q of task.queries) {
+      await onStage("Searching the web: " + q.slice(0, 60));
+      const r = await tavilySearch(keys.tavily, q, fetchImpl);
+      if (!r.ok) { errs.push(r.error); if ([401, 403, 429, 432, 433].includes(r.status)) break; continue; }
+      r.results.forEach((x) => { if (!seen[x.url] && results.length < 18) { seen[x.url] = 1; results.push(x); } });
+    }
+    if (results.length) {
+      const ctxText = results.map((x, i) => `[${i + 1}] ${x.title} — ${x.url}\n${x.content}`).join("\n\n").slice(0, 22000);
+      const p2 = task.prompt + "\n\nWEB SEARCH RESULTS (use these as your sources; put the matching URL in each item's \"source\"):\n" + ctxText;
+      const sources = results.slice(0, 15).map((x) => ({ title: x.title.slice(0, 80) || x.url, url: x.url }));
+      if (keys.groq) {
+        await onStage("Groq is reading " + results.length + " search results");
+        const g = await groqJSON(keys.groq, p2, fetchImpl, { validate: task.validate });
+        if (g.ok) return { ok: true, data: g.data, sources, model: "Tavily + " + g.model, grounded: true, tried: errs };
+        errs.push(g.error);
+      }
+      if (env.GEMINI_API_KEY && !(await geminiOut())) {
+        const r = await researchJSON(env, p2, fetchImpl, { plainOnly: true, validate: task.validate, onStage });
+        if (r.ok) return Object.assign(r, { sources, model: "Tavily + " + r.model, grounded: true, tried: errs });
+        if (r.quota) await store.set(qk, { at: now() });
+        errs.push(r.error);
+      }
+    } else if (!errs.length) errs.push("Tavily: no results");
+  }
+  // 2) Groq with its own browser search
+  if (keys.groq) {
+    await onStage("Groq web search");
+    const g = await groqJSON(keys.groq, task.prompt, fetchImpl, { validate: task.validate, browse: true });
+    if (g.ok) return { ok: true, data: g.data, sources: g.sources, model: g.model + " (browser search)", grounded: true, tried: errs };
+    errs.push(g.error);
+  }
+  // 3) Gemini with Google Search (skipped for the rest of the day once its quota is used up)
+  if (env.GEMINI_API_KEY && !(await geminiOut())) {
+    const r = await researchJSON(env, task.prompt, fetchImpl, { validate: task.validate, onStage, timeoutMs: task.timeoutMs });
+    if (r.ok) return Object.assign(r, { tried: errs });
+    if (r.quota) await store.set(qk, { at: now() });
+    errs.push(r.error);
+  } else if (env.GEMINI_API_KEY) errs.push("Gemini skipped: its free quota is used up for today");
+  // 4) vivo.com page text only (no web search)
+  if (task.pageText && task.pageText.length > 300 && keys.groq) {
+    await onStage("Reading vivo.com text with Groq");
+    const g = await groqJSON(keys.groq, task.prompt + "\n\nYou have no web access: use ONLY the page text above; leave out anything it doesn't show.", fetchImpl, { validate: task.validate });
+    if (g.ok) return { ok: true, data: g.data, sources: [], model: g.model + " (vivo.com text only)", grounded: false, tried: errs };
+    errs.push(g.error);
+  }
+  if (!keys.tavily && !keys.groq) errs.push("No free research keys saved yet (admin: Data tab → Research sources)");
+  return { ok: false, error: ("Research failed. " + errs.map((e) => String(e).slice(0, 140)).join(" | ")).slice(0, 900), tried: errs };
+}
+
+// ---------- vivo e-store listing read directly (no AI) ----------
+// Listing text looks like: "V70 8GB+256GB Authentic Black ₹59,999 ₹65,999" (one card per model).
+export function parseStoreListing(text) {
+  const out = [], seen = {};
+  const re = /((?:vivo\s+)?(?:[A-Z]\s)?[A-Z][A-Za-z0-9]{0,8}\d[A-Za-z0-9]{0,4}(?:\s(?:Pro\+?|Ultra|Lite|FE|Elite|Plus|Prime|Neo|Max|\d{2,3}W|5G|4G))*)\s+(\d{1,2})\s?GB\s?\+\s?(\d{1,4})\s?(GB|TB)\s+([A-Za-z][A-Za-z ]{2,28}?)\s+(?:₹|Rs\.?|INR)\s?([\d,]{4,9})(?:\s+(?:MRP\s*)?(?:₹|Rs\.?|INR)\s?([\d,]{4,9}))?/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const name = m[1].replace(/^vivo\s+/i, "").trim();
+    const k = nameKey(name), price = num(m[6]), mrp = num(m[7]);
+    const v = { ram: m[2] + "GB", storage: m[3] + m[4], price: price && mrp ? Math.min(price, mrp) : price, mrp: price && mrp ? Math.max(price, mrp) : null, colours: [m[5].trim()], priceSource: "vivo e-store" };
+    if (!seen[k]) { seen[k] = { name: "vivo " + name, variants: [] }; out.push(seen[k]); }
+    if (!seen[k].variants.some((x) => x.ram === v.ram && x.storage === v.storage)) seen[k].variants.push(v);
+  }
+  return out;
 }
 
 // ---------- cleaning AI output ----------
@@ -205,18 +316,28 @@ export async function runJob(store, env, jobId, { fetchImpl = fetch, now = () =>
       await beat("Reading vivo e-store");
       const [p1, p2] = await Promise.all([grab("https://shop.vivo.com/in/products/phone", fetchImpl), grab("https://shop.vivo.com/in/products/phone?page=2", fetchImpl)]);
       const storeText = (pageText(p1, 14000) + " " + pageText(p2, 8000)).trim();
-      await beat("Searching Google for vivo models (4 series in parallel)");
-      // Smaller answers per series are faster and far less likely to be cut off.
-      const results = await Promise.all(CAT_GROUPS.map(async (g) => {
+      const listed = parseStoreListing(storeText);   // no AI needed for the e-store's own list
+      const month = new Date(t + 5.5 * 3600000).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "UTC" });
+      // One series at a time: smaller answers, and a used-up quota is noticed before the next call.
+      const results = [];
+      for (const g of CAT_GROUPS) {
         try {
-          return await researchJSON(env, catalogPrompt(today, storeText, g), fetchImpl, Object.assign({}, ropts, { noToolsLast: storeText.length > 500, timeoutMs: 150000,
-            onStage: async (msg) => { if (now() > deadline) throw new Error("took too long"); await beat(g[0] + ": " + msg); }, validate: (d) => cleanCatalog(d).length >= 1 }));
-        } catch (e) { return { ok: false, error: "AI research " + e.message }; }
-      }));
+          results.push(await research(store, env, { prompt: catalogPrompt(today, storeText, g), queries: [`vivo ${g[1].replace(/ and any other vivo phones/, "")} smartphones price list India ${month}`], pageText: storeText, validate: (d) => cleanCatalog(d).length >= 1 },
+            { fetchImpl, now, onStage: async (msg) => { if (now() > deadline) throw new Error("took too long"); await beat(g[0] + ": " + msg); } }));
+        } catch (e) { results.push({ ok: false, error: "research " + e.message }); }
+      }
       const old = (await store.get("affcat")) || {};
       const byslug = {}, keyToSlug = {};
       (old.models && old.models.length ? old.models : seedCatalog()).forEach((m) => { byslug[m.slug] = m; keyToSlug[nameKey(m.name)] = m.slug; });
       let found = 0; const diag = [], srcs = [];
+      listed.forEach((x) => {
+        const k = nameKey(x.name), slug = keyToSlug[k] || slugify(x.name); keyToSlug[k] = slug;
+        const o = byslug[slug] || { slug, name: x.name, series: (x.name.replace(/^vivo\s+/i, "").match(/^[A-Za-z]+/) || [""])[0].toUpperCase().slice(0, 1), variants: [], colours: [] };
+        const vs = (o.variants || []).slice();
+        x.variants.forEach((v) => { const e = vs.find((y) => y.ram === v.ram && y.storage === v.storage); if (e) { e.price = v.price || e.price; e.mrp = v.mrp || e.mrp; e.priceSource = "vivo e-store"; } else vs.push(v); });
+        byslug[slug] = Object.assign({}, o, { variants: vs, colours: [...new Set((o.colours || []).concat(x.variants.flatMap((v) => v.colours)))], seed: false });
+      });
+      diag.push("vivo e-store page: " + (storeText.length > 300 ? listed.length + " models read" : "could not be read"));
       results.forEach((r, i) => {
         const g = CAT_GROUPS[i][0];
         if (!r.ok) { diag.push(g + ": " + r.error); return; }
@@ -226,19 +347,24 @@ export async function runJob(store, env, jobId, { fetchImpl = fetch, now = () =>
         diag.push(g + ": " + ms.length + " models via " + r.model + (r.grounded ? "" : " (no Google)"));
       });
       const models = cleanCatalog({ models: Object.values(byslug) }).map((m) => { const o = byslug[m.slug]; return Object.assign(m, { seed: !!(o && o.seed) }); });
-      if (!found) { await store.set("affcat", Object.assign(old, { models, error: "AI research found no models. " + diag.join(" | "), errorAt: now(), diag })); return { ok: false, error: "no models" }; }
+      if (!found && !listed.length) { await store.set("affcat", Object.assign(old, { models, error: "Research found no models. " + diag.join(" | "), errorAt: now(), diag })); return { ok: false, error: "no models" }; }
       await store.set("affcat", { models, updatedAt: now(), sources: srcs, by: job.by || "auto", diag, error: results.some((r) => !r.ok) ? "Some series failed: " + diag.filter((d) => !/ models via /.test(d)).join(" | ") : "", errorAt: results.some((r) => !r.ok) ? now() : 0 });
       return { ok: true, n: models.length };
     }
     await beat("Reading vivo.com page");
     const html = await grab(`https://www.vivo.com/in/products/${job.slug}`, fetchImpl);
     let r;
-    try { r = await researchJSON(env, modelPrompt(today, job.name, job.slug, pageText(html, 9000)), fetchImpl, Object.assign({}, ropts, { noToolsLast: !!html, timeoutMs: 150000, validate: (d) => (Array.isArray(d.variants) && d.variants.length) || KINDS.some((k) => Array.isArray(d[k]) && d[k].length) })); } catch (e) { r = { ok: false, error: "AI research " + e.message }; }
+    const nm = job.name.replace(/^vivo\s+/i, "");
+    try {
+      r = await research(store, env, { prompt: modelPrompt(today, job.name, job.slug, pageText(html, 9000)), pageText: pageText(html, 9000), timeoutMs: 150000,
+        queries: [`vivo ${nm} price in India bank offer no cost EMI`, `vivo ${nm} exchange offer upgrade bonus V-Shield`, `vivo ${nm} Bajaj Finserv Pine Labs EMI cashback offer`],
+        validate: (d) => (Array.isArray(d.variants) && d.variants.length) || KINDS.some((k) => Array.isArray(d[k]) && d[k].length) }, { fetchImpl, now, onStage: ropts.onStage });
+    } catch (e) { r = { ok: false, error: "research " + e.message }; }
     const old = (await store.get(`affm:${job.slug}`)) || null;
     if (!r.ok) { await store.set(`affm:${job.slug}`, Object.assign(old || { slug: job.slug, name: job.name }, { error: r.error, errorAt: now() })); return r; }
     const m = cleanModel(r.data, { slug: job.slug, name: job.name, series: job.series, url: `https://www.vivo.com/in/products/${job.slug}` });
     m.updatedAt = now(); m.sources = r.sources; m.queries = r.queries; m.aiModel = r.model; m.grounded = r.grounded; m.by = job.by || "auto";
-    if (!r.grounded) m.notes = ("Google Search was not available, so this is from the vivo.com page only. " + (m.notes || "")).slice(0, 600);
+    if (!r.grounded) m.notes = ("Web search was not available, so this is from the vivo.com page only. " + (m.notes || "")).slice(0, 600);
     await store.set(`affm:${job.slug}`, m);
     // keep the catalog's prices in step with the fresher model research
     const cat = await store.get("affcat");
@@ -315,7 +441,7 @@ export async function affAction(b, ctx) {
     const rks = await store.list(`affr:${slug}:`);
     const reports = (await pool(rks, 30, (k) => store.get(k))).filter(Boolean).sort((x, y) => (y.verified - x.verified) || y.at - x.at);
     const mRef = (start && start.started) || (await running(slug));
-    return json(200, { ok: true, base, model: (await store.get(`affm:${slug}`)) || null, hidden, reports, refreshing: mRef, progress: mRef ? await stageOf(slug) : null, note: start && start.reason ? start.reason : "", now: t });
+    return json(200, { ok: true, base, model: (await store.get(`affm:${slug}`)) || null, ho: (await store.get(`affho:${slug}`)) || null, hidden, reports, refreshing: mRef, progress: mRef ? await stageOf(slug) : null, note: start && start.reason ? start.reason : "", now: t });
   }
 
   if (b.action === "aff-many") {   // compare: cached data only (starts research for stale ones)
@@ -328,7 +454,7 @@ export async function affAction(b, ctx) {
       let refreshing = await running(slug);
       if (!refreshing && (!m || !m.updatedAt || t - m.updatedAt > MODEL_TTL)) { const s = await startJob(ctx, "model", base); refreshing = !!s.started; }
       const rks = await store.list(`affr:${slug}:`);
-      out.push({ slug, base, model: m || null, hidden: (await store.get(`affhide:${slug}`)) || {}, reports: (await pool(rks, 20, (k) => store.get(k))).filter(Boolean), refreshing });
+      out.push({ slug, base, model: m || null, ho: (await store.get(`affho:${slug}`)) || null, hidden: (await store.get(`affhide:${slug}`)) || {}, reports: (await pool(rks, 20, (k) => store.get(k))).filter(Boolean), refreshing });
     }
     return json(200, { ok: true, items: out, now: t });
   }
@@ -390,6 +516,41 @@ export async function affAction(b, ctx) {
     return json(200, { ok: true, ...s });
   }
 
+  if (b.action === "aff-keys") {   // free research sources: Groq + Tavily keys (stored server-side, never sent back)
+    const c = (await store.get("config:aikeys")) || {};
+    if (b.clear === "groq" || b.clear === "tavily") delete c[b.clear];
+    const g = str(b.groq, 120), tv = str(b.tavily, 120);
+    if (g) { if (!/^gsk_[A-Za-z0-9]{20,}$/.test(g)) return json(400, { ok: false, error: "That doesn't look like a Groq key (it starts with gsk_)." }); c.groq = g; }
+    if (tv) { if (!/^tvly-[A-Za-z0-9-_]{10,}$/.test(tv)) return json(400, { ok: false, error: "That doesn't look like a Tavily key (it starts with tvly-)." }); c.tavily = tv; }
+    c.by = rec.fullName; c.at = t;
+    await store.set("config:aikeys", c);
+    return json(200, { ok: true });
+  }
+
+  if (b.action === "aff-keys-test") {
+    const k = await aiKeys(store, ctx.env), f = ctx.aiFetch || fetch, out = {};
+    if (k.tavily) { const r = await tavilySearch(k.tavily, "vivo V70 price in India", f, { max: 2 }); out.tavily = r.ok ? "✓ working (" + r.results.length + " results)" : "✗ " + r.error; } else out.tavily = "not set";
+    if (k.groq) {
+      try {
+        const r = await f("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + k.groq }, body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "user", content: "Reply with the JSON {\"ok\":true}" }], response_format: { type: "json_object" }, max_completion_tokens: 20 }) });
+        const j = await r.json().catch(() => ({})); out.groq = r.ok ? "✓ working" : "✗ " + r.status + " " + String((j.error && j.error.message) || "").slice(0, 120);
+      } catch (e) { out.groq = "✗ network " + e.message; }
+    } else out.groq = "not set";
+    return json(200, { ok: true, result: out });
+  }
+
+  if (b.action === "aff-model-edit") {   // HO sets official prices / variants / colours (shown instead of researched ones)
+    const slug = slugify(b.slug); if (!slug) return json(400, { ok: false, error: "Choose a model." });
+    if (b.clear) { await store.delete(`affho:${slug}`); return json(200, { ok: true, ho: null }); }
+    const variants = cleanVariants(b.variants).map((v) => Object.assign(v, { priceSource: "HO" }));
+    if (!variants.length) return json(400, { ok: false, error: "Add at least one variant with a price." });
+    const ho = { variants, colours: (Array.isArray(b.colours) ? b.colours : []).slice(0, 12).map((c) => str(c, 40)).filter(Boolean), by: rec.fullName, at: t };
+    await store.set(`affho:${slug}`, ho);
+    const cat = await store.get("affcat");
+    if (cat && cat.models) { const c = cat.models.find((x) => x.slug === slug); if (c) { c.variants = variants; c.startPrice = Math.min(...variants.map((v) => v.price).filter(Boolean)) || c.startPrice; if (ho.colours.length) c.colours = ho.colours; await store.set("affcat", cat); } }
+    return json(200, { ok: true, ho });
+  }
+
   if (b.action === "aff-hide") {
     const slug = slugify(b.slug), key = String(b.key || "").replace(/[^a-f0-9]/g, "").slice(0, 12);
     if (!slug || !key) return json(400, { ok: false, error: "Bad request." });
@@ -403,7 +564,9 @@ export async function affAction(b, ctx) {
     const cat = (await store.get("affcat")) || { models: [] };
     const rows = await pool(cat.models, 30, async (c) => { const m = await store.get(`affm:${c.slug}`); return { slug: c.slug, name: c.name, series: c.series, updatedAt: m ? m.updatedAt || 0 : 0, error: m && m.error && (!m.updatedAt || m.errorAt > m.updatedAt) ? m.error : "", offers: m ? KINDS.reduce((a, k) => a + (m[k] || []).length, 0) : 0, refreshing: await running(c.slug) }; });
     const cap = (await store.get(`affcap:${istDay(t)}`)) || { n: 0 };
-    return json(200, { ok: true, catalog: { updatedAt: cat.updatedAt || 0, count: cat.models.length, error: cat.error || "", errorAt: cat.errorAt || 0, refreshing: await running("catalog"), sources: cat.sources || [] }, models: rows, capUsed: cap.n, capMax: Number(ctx.env.AFF_DAILY_CAP || 150) });
+    const kc = (await store.get("config:aikeys")) || {}, k = await aiKeys(store, ctx.env);
+    const providers = { groq: k.groq ? "…" + k.groq.slice(-4) : "", tavily: k.tavily ? "…" + k.tavily.slice(-4) : "", savedBy: kc.by || "", gemini: !ctx.env.GEMINI_API_KEY ? "not set" : (await store.get(`aiq:gemini:${istDay(t)}`)) ? "free quota used up today" : "available" };
+    return json(200, { ok: true, providers, catalog: { updatedAt: cat.updatedAt || 0, count: cat.models.length, error: cat.error || "", errorAt: cat.errorAt || 0, diag: cat.diag || [], refreshing: await running("catalog"), sources: cat.sources || [] }, models: rows, capUsed: cap.n, capMax: Number(ctx.env.AFF_DAILY_CAP || 150) });
   }
 
   if (b.action === "aff-refresh-stale") {   // refresh up to N oldest models
@@ -420,7 +583,7 @@ export async function affAction(b, ctx) {
 }
 
 // Daily refresh (scheduled function): catalog if stale + the oldest models.
-export async function dailyRefresh(store, env, { now = () => Date.now(), jobFetch = fetch, n = 12 } = {}) {
+export async function dailyRefresh(store, env, { now = () => Date.now(), jobFetch = fetch, n = 5 } = {}) {
   const t = now(), ctx = { store, t, rec: { fullName: "auto" }, env, jobFetch };
   const cat = (await store.get("affcat")) || { models: [] };
   const out = { catalog: null, models: 0 };

@@ -20,7 +20,8 @@ export default async (req) => {
   try {
     return await handle(req, { store, env: { GEMINI_API_KEY: Netlify.env.get("GEMINI_API_KEY"), GEMINI_MODEL: Netlify.env.get("GEMINI_MODEL"),
       BREVO_API_KEY: Netlify.env.get("BREVO_API_KEY"), OTP_FROM_EMAIL: Netlify.env.get("OTP_FROM_EMAIL"), OTP_FROM_NAME: Netlify.env.get("OTP_FROM_NAME"),
-      SITE_URL: Netlify.env.get("URL") || new URL(req.url).origin, AFF_DAILY_CAP: Netlify.env.get("AFF_DAILY_CAP") } });
+      SITE_URL: Netlify.env.get("URL") || new URL(req.url).origin, AFF_DAILY_CAP: Netlify.env.get("AFF_DAILY_CAP"),
+      GROQ_API_KEY: Netlify.env.get("GROQ_API_KEY"), TAVILY_API_KEY: Netlify.env.get("TAVILY_API_KEY") } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: "Server error, please try again." }), {
       status: 500,

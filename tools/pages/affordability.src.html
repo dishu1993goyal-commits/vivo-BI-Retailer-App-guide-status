@@ -171,21 +171,22 @@
     api({ action: "aff-model", slug: base.slug, name: base.name }).then(function (r) {
       if (!$("md")) return;
       if (!r.ok) { $("md").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
-      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, progress: r.progress, note: r.note };
+      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, progress: r.progress, note: r.note, ho: r.ho };
       drawModel();
       if (r.refreshing) POLL = setTimeout(function () { if (TAB === "find" && CUR && CUR.slug === base.slug) openModel(base); }, 8000);
     });
   }
   function offersOf(m, kind, hidden) { return ((m && m[kind]) || []).filter(function (o) { return ADMIN || !hidden[o.key]; }); }
   function drawModel() {
-    var C = CUR, m = C.m, b = C.base, vs = (m && m.variants.length ? m.variants : b.variants) || [];
+    var C = CUR, m = C.m, b = C.base, ho = C.ho, vs = (ho && ho.variants.length ? ho.variants : m && m.variants.length ? m.variants : b.variants) || [];
     if (SEL.v >= vs.length) SEL.v = 0;
-    var v = vs[SEL.v] || {}, price = v.price, mrp = v.mrp, cols = (v.colours && v.colours.length ? v.colours : (m && m.colours.length ? m.colours : b.colours)) || [];
+    var v = vs[SEL.v] || {}, price = v.price, mrp = v.mrp, cols = (ho && ho.colours.length ? ho.colours : v.colours && v.colours.length ? v.colours : (m && m.colours.length ? m.colours : b.colours)) || [];
     var html = '<div class="mh"><h2>' + esc((m && m.name) || b.name) + "</h2>" + (m && m.highlights && m.highlights.length ? '<div class="hl">' + m.highlights.map(esc).join(" · ") + "</div>" : "") +
       (vs.length ? '<div class="vch">' + vs.map(function (x, i) { return '<button data-v="' + i + '" class="' + (i === SEL.v ? "on" : "") + '">' + esc(vlabel(x)) + "<small>" + rs(x.price) + "</small></button>"; }).join("") + "</div>" : "") +
       (cols.length ? '<div class="cols">' + cols.map(function (c) { return "<span>● " + esc(c) + "</span>"; }).join("") + "</div>" : "") +
       '<div class="pr"><b>' + rs(price) + "</b>" + (mrp && price && mrp > price ? "<s>MRP " + rs(mrp) + '</s><span class="off">' + Math.round((mrp - price) / mrp * 100) + "% off</span>" : mrp ? "<s>MRP " + rs(mrp) + "</s>" : "") + "</div>" +
-      (v.priceSource ? '<div class="upd">Best price seen at: ' + esc(v.priceSource) + "</div>" : "") +
+      (ho ? '<div class="upd">✅ Official HO price · set by ' + esc(ho.by) + " · " + dOnly(ho.at) + "</div>" : v.priceSource ? '<div class="upd">Best price seen at: ' + esc(v.priceSource) + "</div>" : "") +
+      (ADMIN ? '<div class="upd"><a style="color:#fff;cursor:pointer;text-decoration:underline" id="hoe">✏️ ' + (ho ? "Edit" : "Set") + " official price & variants</a></div>" : "") +
       '<div class="upd">🕒 Offers updated ' + ago(m && m.updatedAt) + (m && m.url ? ' · <a style="color:#fff" href="' + esc(m.url) + '" target="_blank" rel="noopener">vivo.com page ↗</a>' : "") + (ADMIN ? ' · <a style="color:#fff;cursor:pointer;text-decoration:underline" id="rf">Refresh now</a>' : "") + "</div></div>";
     if (C.refreshing) html += '<div class="wait"><div class="spin"></div><div>' + (m && m.updatedAt ? "Updating with the latest offers…" : "AI is searching vivo.com, Google, Amazon, Flipkart and partner sites for current offers — usually 1–3 minutes.") + (C.progress ? '<div style="font-size:12px;opacity:.85;margin-top:3px">Step: ' + esc(C.progress.stage) + "</div>" : "") + "</div></div>";
     else if (C.note) html += '<div class="notice">' + esc(C.note) + "</div>";
@@ -225,6 +226,7 @@
     [].forEach.call($("md").querySelectorAll("[data-ph]"), function (x) { x.onclick = function () { showPhoto(C.slug, x.dataset.ph); }; });
     bindCalc(price);
     $("rep").onclick = function () { reportForm(C, vs); };
+    if ($("hoe")) $("hoe").onclick = function () { hoEdit(C, vs, cols); };
   }
   function offerCard(o, k) {
     var hid = CUR.hidden[o.key];
@@ -245,6 +247,25 @@
     var go = function () { var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="' + PICS[k] + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); };
     if (PICS[k]) return go();
     api({ action: "aff-photo", slug: slug, id: id }).then(function (r) { if (!r.ok) return toast(r.error); PICS[k] = "data:" + r.mime + ";base64," + r.data; go(); });
+  }
+
+  function hoEdit(C, vs, cols) {
+    var rows = (vs.length ? vs : [{}]).map(function (v) { return { ram: v.ram || "", storage: v.storage || "", mrp: v.mrp || "", price: v.price || "" }; });
+    var body = function () { return '<div class="f2" id="hoRows">' + rows.map(function (r, i) { return '<div class="g2s" style="grid-template-columns:1fr 1fr 1fr 1fr auto;align-items:end;margin-top:6px"><div><label>RAM</label><input class="tx" data-i="' + i + '" data-k="ram" value="' + esc(r.ram) + '" placeholder="8GB"></div><div><label>Storage</label><input class="tx" data-i="' + i + '" data-k="storage" value="' + esc(r.storage) + '" placeholder="256GB"></div><div><label>MRP ₹</label><input class="tx" type="number" data-i="' + i + '" data-k="mrp" value="' + esc(r.mrp) + '"></div><div><label>Price ₹</label><input class="tx" type="number" data-i="' + i + '" data-k="price" value="' + esc(r.price) + '"></div><button class="btn ghost sm" data-rm="' + i + '">✕</button></div>'; }).join("") +
+      '<button class="btn sec sm" id="hoAdd" style="margin-top:8px">＋ Variant</button><label>Colours (comma separated)</label><input class="tx" id="hoCols" value="' + esc(cols.join(", ")) + '"></div>'; };
+    var ov = sheet("Official price & variants", (C.m && C.m.name) || C.base.name, [["💾", "Save for all users", function (ov) {
+      var vv = rows.filter(function (r) { return r.price; }).map(function (r) { return { ram: r.ram, storage: r.storage, mrp: +r.mrp || null, price: +r.price }; });
+      if (!vv.length) { toast("Add a price."); return false; }
+      api({ action: "aff-model-edit", slug: C.slug, variants: vv, colours: ov.querySelector("#hoCols").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean) }).then(function (r) { if (!r.ok) return toast(r.error); C.ho = r.ho; toast("Saved — shown to everyone"); drawModel(); });
+    }]].concat(C.ho ? [["↩️", "Remove HO price (use researched data)", function () { api({ action: "aff-model-edit", slug: C.slug, clear: true }).then(function (r) { if (!r.ok) return toast(r.error); C.ho = null; drawModel(); }); }, "red"]] : []), '<div id="hoBody">' + body() + "</div>");
+    ov.querySelector(".sheet").style.maxWidth = "620px";
+    var bind = function () {
+      [].forEach.call(ov.querySelectorAll("#hoRows [data-k]"), function (i) { i.oninput = function () { rows[+i.dataset.i][i.dataset.k] = i.value; }; });
+      [].forEach.call(ov.querySelectorAll("#hoRows [data-rm]"), function (b) { b.onclick = function () { rows.splice(+b.dataset.rm, 1); if (!rows.length) rows.push({}); redraw(); }; });
+      ov.querySelector("#hoAdd").onclick = function () { rows.push({ ram: "", storage: "", mrp: "", price: "" }); redraw(); };
+    };
+    var redraw = function () { var c = ov.querySelector("#hoCols").value; ov.querySelector("#hoBody").innerHTML = body(); ov.querySelector("#hoCols").value = c; bind(); };
+    bind();
   }
 
   // ================= EMI calculator =================
@@ -325,15 +346,16 @@
       if (!$("ct")) return;
       if (!r.ok) { $("ct").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       var it = r.items, any = it.some(function (x) { return x.refreshing; });
-      var best = function (x) { var vs = (x.model && x.model.variants.length ? x.model.variants : x.base.variants) || []; var ps = vs.map(function (v) { return v.price; }).filter(Boolean); return ps.length ? Math.min.apply(null, ps) : null; };
+      var vsOf = function (x) { return (x.ho && x.ho.variants.length ? x.ho.variants : x.model && x.model.variants.length ? x.model.variants : x.base.variants) || []; };
+      var best = function (x) { var vs = vsOf(x); var ps = vs.map(function (v) { return v.price; }).filter(Boolean); return ps.length ? Math.min.apply(null, ps) : null; };
       var bestP = Math.min.apply(null, it.map(best).filter(Boolean));
       var vis = function (x, k) { return ((x.model && x.model[k]) || []).filter(function (o) { return !x.hidden[o.key]; }); };
       var longNoCost = function (x) { var l = vis(x, "emi").filter(function (o) { return o.noCost && o.scheme; }).sort(function (a, b) { return parseInt(b.scheme) - parseInt(a.scheme); }); return l.length ? l[0].scheme + " · " + (l[0].partner || "") : "—"; };
       var txt = function (x, k) { var l = vis(x, k); return l.length ? l.slice(0, 2).map(function (o) { return esc(o.benefit || o.plan || o.details).slice(0, 90); }).join("<br>") : "—"; };
       var rows = [
         ["Starting price", function (x) { var p = best(x); return '<span class="' + (p === bestP ? "best" : "") + '">' + rs(p) + "</span>"; }],
-        ["Variants", function (x) { var vs = (x.model && x.model.variants.length ? x.model.variants : x.base.variants) || []; return vs.map(function (v) { return esc(vlabel(v)) + " · " + rs(v.price); }).join("<br>") || "—"; }],
-        ["Colours", function (x) { var c = (x.model && x.model.colours.length ? x.model.colours : x.base.colours) || []; return c.map(esc).join(", ") || "—"; }],
+        ["Variants", function (x) { var vs = vsOf(x); return vs.map(function (v) { return esc(vlabel(v)) + " · " + rs(v.price); }).join("<br>") || "—"; }],
+        ["Colours", function (x) { var c = (x.ho && x.ho.colours.length ? x.ho.colours : x.model && x.model.colours.length ? x.model.colours : x.base.colours) || []; return c.map(esc).join(", ") || "—"; }],
         ["Longest No Cost EMI", longNoCost],
         ["EMI partners", function (x) { var p = vis(x, "emi").map(function (o) { return o.partner; }).filter(function (q, i, a) { return q && a.indexOf(q) === i; }); return p.map(esc).join(", ") || "—"; }],
         ["Instant discount / cashback", function (x) { var l = vis(x, "emi").concat(vis(x, "cashback")).filter(function (o) { return o.benefit; }); return l.slice(0, 2).map(function (o) { return esc(o.benefit) + (o.partner ? " (" + esc(o.partner) + ")" : ""); }).join("<br>") || "—"; }],
@@ -384,18 +406,25 @@
 
   // ================= DATA (admins) =================
   function showData() {
-    hero("Data & sources", "Automatic AI research — no imports needed");
+    hero("Data & sources", "Automatic research — no imports needed");
     $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
     api({ action: "aff-status" }).then(function (r) {
       if (!$("pane")) return;
       if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
-      var c = r.catalog;
-      $("pane").innerHTML = '<div class="card"><h3>📱 Model list</h3><div class="sub">' + c.count + " models · updated " + ago(c.updatedAt) + (c.refreshing ? " · refreshing now…" : "") + "</div>" + (c.error && c.errorAt > c.updatedAt ? '<div class="notice">' + esc(c.error) + "</div>" : "") +
+      var c = r.catalog, pv = r.providers || {};
+      var srcCard = '<div class="card"><h3>🔌 Research sources</h3><div class="sub">Free services that find prices and offers on the web. Gemini\'s free quota is very small, so add Tavily + Groq (both free, no card).</div>' +
+        '<table style="margin-top:8px"><tbody><tr><td>🔎 Tavily web search</td><td>' + (pv.tavily ? '<span class="chip live">Saved ' + esc(pv.tavily) + "</span>" : '<span class="chip warn">Not set</span>') + "</td></tr><tr><td>⚡ Groq AI</td><td>" + (pv.groq ? '<span class="chip live">Saved ' + esc(pv.groq) + "</span>" : '<span class="chip warn">Not set</span>') + "</td></tr><tr><td>✨ Gemini (backup)</td><td>" + esc(pv.gemini || "") + "</td></tr><tr><td>🛒 vivo e-store (no AI)</td><td>always on</td></tr></tbody></table>" +
+        '<div class="f2"><label>Tavily API key (starts with tvly-)</label><input class="tx" id="kt" autocomplete="off" placeholder="' + (pv.tavily ? "Saved — paste a new key to change" : "tvly-…") + '"><label>Groq API key (starts with gsk_)</label><input class="tx" id="kg" autocomplete="off" placeholder="' + (pv.groq ? "Saved — paste a new key to change" : "gsk_…") + '"></div>' +
+        '<div class="row" style="margin-top:10px"><button class="btn pri sm" id="ks">Save keys</button><button class="btn sec sm" id="kx">Test</button></div><div id="kres" class="muted" style="font-size:12.5px;margin-top:8px"></div>' +
+        '<details style="margin-top:10px;font-size:13px"><summary style="cursor:pointer;font-weight:700">How to get the free keys (2 minutes each)</summary><ol style="padding-left:18px;line-height:1.6"><li><b>Tavily:</b> open app.tavily.com → sign in with Google → copy the API key shown on the home page (free plan: 1,000 searches a month).</li><li><b>Groq:</b> open console.groq.com → sign in with Google → <b>API Keys</b> → <b>Create API Key</b> → copy it (shown only once).</li><li>Paste both here → <b>Save keys</b> → <b>Test</b> → then <b>Refresh model list</b>.</li></ol></details></div>';
+      $("pane").innerHTML = srcCard + '<div class="card"><h3>📱 Model list</h3><div class="sub">' + c.count + " models · updated " + ago(c.updatedAt) + (c.refreshing ? " · refreshing now…" : "") + "</div>" + (c.error && c.errorAt >= c.updatedAt ? '<div class="notice">' + esc(c.error) + "</div>" : "") + (c.diag && c.diag.length ? '<div class="muted" style="font-size:12px;margin-top:6px">Last run: ' + c.diag.map(esc).join(" · ") + "</div>" : "") +
         '<div class="row" style="margin-top:10px"><button class="btn pri sm" id="d1">⟳ Refresh model list</button><button class="btn sec sm" id="d2">⟳ Update 8 oldest models</button></div>' +
-        '<div class="muted" style="font-size:12px;margin-top:8px">AI research used today: ' + r.capUsed + " / " + r.capMax + ". Every day at 6:00 AM the oldest models are refreshed automatically; a model is also refreshed when someone opens it and its data is over 24 hours old.</div></div>" +
+        '<div class="muted" style="font-size:12px;margin-top:8px">Research runs used today: ' + r.capUsed + " / " + r.capMax + ". Every day at 6:00 AM the 5 oldest models are refreshed automatically; a model is also refreshed when someone opens it and its data is over 3 days old.</div></div>" +
         '<div class="card"><h3>🗂️ Models</h3><div class="tscroll"><table><thead><tr><th>Model</th><th>Updated</th><th class="n">Offers</th><th></th></tr></thead><tbody>' +
         r.models.map(function (m) { return "<tr><td><b>" + esc(m.name) + "</b>" + (m.error ? '<div style="color:var(--bad);font-size:11.5px">' + esc(m.error).slice(0, 90) + "</div>" : "") + "</td><td>" + (m.refreshing ? "updating…" : ago(m.updatedAt)) + '</td><td class="n">' + m.offers + '</td><td><button class="btn ghost sm" data-r="' + m.slug + '">⟳</button></td></tr>'; }).join("") + "</tbody></table></div></div>" +
-        '<div class="notice info">How it works: Gemini searches Google and reads vivo.com / shop.vivo.com, Amazon, Flipkart and partner pages, then saves variants, colours, prices and offers with source links. Admins can hide a wrong AI offer (“Mark wrong”) and add official HO offers from the model page. State teams add offers they see in market; admins verify them.</div>';
+        '<div class="notice info">How it works: the vivo e-store list is read directly; Tavily searches the web for each model\'s offers and Groq turns the results into structured offers with source links (Gemini is a backup). Admins can set the official HO price on any model page. Admins can hide a wrong AI offer (“Mark wrong”) and add official HO offers from the model page. State teams add offers they see in market; admins verify them.</div>';
+      $("ks").onclick = function () { var kt = $("kt").value.trim(), kg = $("kg").value.trim(); if (!kt && !kg) return toast("Paste a key first."); api({ action: "aff-keys", tavily: kt, groq: kg }).then(function (x) { if (!x.ok) return toast(x.error); toast("Saved"); showData(); }); };
+      $("kx").onclick = function () { $("kres").textContent = "Testing…"; api({ action: "aff-keys-test" }).then(function (x) { $("kres").innerHTML = x.ok ? "Tavily: " + esc(x.result.tavily) + "<br>Groq: " + esc(x.result.groq) : esc(x.error); }); };
       $("d1").onclick = function () { api({ action: "aff-refresh", catalog: true }).then(function (x) { toast(x.started ? "Model list research started" : x.running ? "Already running" : x.reason || x.error); setTimeout(showData, 1500); }); };
       $("d2").onclick = function () { api({ action: "aff-refresh-stale", n: 8 }).then(function (x) { toast(x.ok ? x.started + " model(s) started" + (x.reason ? " — " + x.reason : "") : x.error); setTimeout(showData, 1500); }); };
       [].forEach.call($("pane").querySelectorAll("[data-r]"), function (bt) { bt.onclick = function () { api({ action: "aff-refresh", slug: bt.dataset.r }).then(function (x) { toast(x.started ? "Started" : x.running ? "Already running" : x.reason || x.error); setTimeout(showData, 1200); }); }; });
