@@ -177,14 +177,46 @@ export function cleanAI(t) {
     !/(IDC|Canalys|Counterpoint|research firms?)[^\n]*(vary|varies|change|differ|estimate)/i.test(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// Groq (free plan, no card, ~1,000 requests/day per model) is tried first; Gemini is the backup.
+export const GROQ_CHAT_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"];
+async function askGroq(key, system, contents, fetchImpl) {
+  const messages = [{ role: "system", content: system }].concat(contents.map((c) => ({ role: c.role === "model" ? "assistant" : "user", content: c.parts[0].text })));
+  let last = "";
+  for (const m of GROQ_CHAT_MODELS) {
+    const body = { model: m, messages, temperature: 0.6, max_completion_tokens: 1800 };
+    if (/gpt-oss|qwen3/.test(m)) body.reasoning_effort = /qwen/.test(m) ? "none" : "low";
+    try {
+      let r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) });
+      if (r.status === 400 && body.reasoning_effort) { delete body.reasoning_effort; r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) }); }
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        let text = String((((j.choices || [])[0] || {}).message || {}).content || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        if (text) text = cleanAI(text);
+        if (text) return { ok: true, text, model: "groq/" + m };
+        last = "empty answer"; continue;
+      }
+      last = r.status + (j.error && j.error.message ? ": " + j.error.message.slice(0, 100) : "");
+      if (r.status === 401) break;
+    } catch (e) { last = "network " + e.message; }
+  }
+  return { ok: false, error: last };
+}
+
 export async function askAI(env, question, context, history, fetchImpl = fetch, opts = {}) {
-  if (!env || !env.GEMINI_API_KEY) return { ok: false, error: "AI is not set up yet.", notConfigured: true };
+  if (!env || (!env.GEMINI_API_KEY && !env.GROQ_API_KEY)) return { ok: false, error: "AI is not set up yet.", notConfigured: true };
   const contents = [];
   (Array.isArray(history) ? history : []).slice(-6).forEach((h) => {
     if (h && h.q) contents.push({ role: "user", parts: [{ text: String(h.q).slice(0, 600) }] });
     if (h && h.a) contents.push({ role: "model", parts: [{ text: String(h.a).slice(0, 1200) }] });
   });
   contents.push({ role: "user", parts: [{ text: (opts.label || "DASHBOARD DATA") + ":\n" + String(context || "").slice(0, 14000) + "\n\nQUESTION: " + String(question).slice(0, 800) }] });
+  let groqErr = "";
+  if (env.GROQ_API_KEY) {
+    const g = await askGroq(env.GROQ_API_KEY, opts.system || AI_SYSTEM, contents, fetchImpl);
+    if (g.ok) return g;
+    groqErr = "Groq " + g.error;
+    if (!env.GEMINI_API_KEY) return { ok: false, error: "AI is busy right now (" + groqErr + "). Showing built-in answers." };
+  }
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: opts.system || AI_SYSTEM }] }, contents,
     generationConfig: { temperature: 0.6, maxOutputTokens: 900 } });
   const models = env.GEMINI_MODEL ? [env.GEMINI_MODEL, ...AI_MODELS] : AI_MODELS;
@@ -202,7 +234,7 @@ export async function askAI(env, question, context, history, fetchImpl = fetch, 
     last = r.status + (j.error && j.error.message ? ": " + j.error.message.slice(0, 120) : "");
     if (r.status === 400 || r.status === 401 || r.status === 403) break;   // bad key: other models won't help
   }
-  return { ok: false, error: "AI is busy right now (" + last + "). Showing built-in answers." };
+  return { ok: false, error: "AI is busy right now (" + [groqErr, last].filter(Boolean).join("; ") + "). Showing built-in answers." };
 }
 
 function publicProfile(rec) {
@@ -390,8 +422,14 @@ async function supportAction(b, { store, t, app, rec, key }) {
 }
 
 // store: { get(key) -> object|null, set(key, object), delete(key) }
+let KEYCACHE = { at: 0, groq: "" };
+export function _resetKeyCache() { KEYCACHE = { at: 0, groq: "" }; }
 export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch, jobFetch = fetch }) {
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
+  if (!env.GROQ_API_KEY) {   // key saved by an admin in Affordability Corner → Data → AI keys
+    if (Date.now() - KEYCACHE.at > 60000) { try { KEYCACHE = { at: Date.now(), groq: ((await store.get("config:aikeys")) || {}).groq || "" }; } catch (e) { } }
+    if (KEYCACHE.groq) env = Object.assign({}, env, { GROQ_API_KEY: KEYCACHE.groq });
+  }
   if (req.headers.get("x-bi-app") !== "1") return json(403, { ok: false, error: "Not allowed" });
 
   let b;
@@ -745,7 +783,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       return json(200, { ok: true, profile: await profOut(rec) });
     }
 
-    if (b.action === "ai-status") return json(200, { ok: true, ai: !!env.GEMINI_API_KEY });
+    if (b.action === "ai-status") return json(200, { ok: true, ai: !!(env.GEMINI_API_KEY || env.GROQ_API_KEY), provider: env.GROQ_API_KEY ? "groq" : "gemini" });
     if (b.action === "ai-ask") {
       const q = String(b.question || "").trim();
       if (!q) return json(400, { ok: false, error: "Ask a question." });

@@ -122,12 +122,12 @@ export async function tavilySearch(key, query, fetchImpl = fetch, { max = 6, dep
     return { ok: true, results: (j.results || []).map((x) => ({ title: str(x.title, 120), url: str(x.url, 500), content: str(x.content, 1400) })).filter((x) => x.url) };
   } catch (e) { return { ok: false, error: "Tavily network " + e.message }; }
 }
-const GROQ_MODELS = ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"];
+const GROQ_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"];
 export async function groqJSON(key, prompt, fetchImpl = fetch, { validate, browse = false } = {}) {
   const errs = [];
   for (const m of browse ? ["openai/gpt-oss-120b", "openai/gpt-oss-20b"] : GROQ_MODELS) {
     const body = { model: m, messages: [{ role: "system", content: "You are a careful research assistant for vivo India's sales team. Reply with ONE JSON object only." }, { role: "user", content: prompt }], temperature: 0.1, max_completion_tokens: 8000 };
-    if (browse) { body.tools = [{ type: "browser_search" }]; body.tool_choice = "required"; body.reasoning_effort = "low"; } else body.response_format = { type: "json_object" };
+    if (browse) { body.tools = [{ type: "browser_search" }]; body.tool_choice = "required"; body.reasoning_effort = "low"; } else { body.response_format = { type: "json_object" }; if (/gpt-oss/.test(m)) body.reasoning_effort = "low"; }
     try {
       const r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
@@ -532,7 +532,7 @@ export async function affAction(b, ctx) {
     if (k.tavily) { const r = await tavilySearch(k.tavily, "vivo V70 price in India", f, { max: 2 }); out.tavily = r.ok ? "✓ working (" + r.results.length + " results)" : "✗ " + r.error; } else out.tavily = "not set";
     if (k.groq) {
       try {
-        const r = await f("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + k.groq }, body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: [{ role: "user", content: "Reply with the JSON {\"ok\":true}" }], response_format: { type: "json_object" }, max_completion_tokens: 20 }) });
+        const r = await f("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + k.groq }, body: JSON.stringify({ model: "openai/gpt-oss-20b", messages: [{ role: "user", content: "Reply with the JSON {\"ok\":true}" }], response_format: { type: "json_object" }, max_completion_tokens: 300 }) });
         const j = await r.json().catch(() => ({})); out.groq = r.ok ? "✓ working" : "✗ " + r.status + " " + String((j.error && j.error.message) || "").slice(0, 120);
       } catch (e) { out.groq = "✗ network " + e.message; }
     } else out.groq = "not set";
