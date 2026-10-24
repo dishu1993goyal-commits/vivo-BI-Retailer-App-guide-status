@@ -10,6 +10,9 @@ import android.os.Build;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.webkit.JavascriptInterface;
+import android.speech.RecognitionListener;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -108,7 +111,7 @@ public class MainActivity extends FragmentActivity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     // Market visits: GPS punch in/out and camera photos inside the shared tool pages.
-    private static final int GEO_REQUEST = 2101, CAM_PERM_REQUEST = 2102;
+    private static final int GEO_REQUEST = 2101, CAM_PERM_REQUEST = 2102, MIC_PERM_REQUEST = 2103;
     private String geoOrigin;
     private android.webkit.GeolocationPermissions.Callback geoCallback;
     private Uri cameraPhotoUri;
@@ -148,6 +151,7 @@ public class MainActivity extends FragmentActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        try { if (speech != null) speech.destroy(); } catch (Throwable ignored) { }
         try { TcSdk.clear(); } catch (Throwable ignored) { }
     }
 
@@ -466,6 +470,11 @@ public class MainActivity extends FragmentActivity {
             geoCallback.invoke(geoOrigin, ok, false);
             geoCallback = null;
             if (!ok) Toast.makeText(this, tr("location_needed"), Toast.LENGTH_LONG).show();
+        }
+        if (requestCode == MIC_PERM_REQUEST && pendingSpeech != null) {
+            String[] ps = pendingSpeech; pendingSpeech = null;
+            boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+            if (ok) startSpeech(ps[0], "1".equals(ps[1])); else { speechJs("error", "not-allowed"); speechJs("end", ""); }
         }
         if (requestCode == CAM_PERM_REQUEST && pendingImageChooser) {
             pendingImageChooser = false;
@@ -2735,7 +2744,14 @@ public class MainActivity extends FragmentActivity {
             case "logs": if (!STATE_APP) showAdminPage("logs"); break;
             case "supportReport": if (!STATE_APP) showAdminPage("support"); break;
             case "calculator": openDashboard(); openAssistant("openCalculator"); break;
-            default: break;
+            default:
+                if (name.startsWith("dash:")) {   // e.g. dash:tool-voice-notes -> dashboard smart tool
+                    String h = name.substring(5).replaceAll("[^A-Za-z0-9_=~\\-]", "");
+                    toolFromHub = false; toolFile = null; inSurveyPage = false;
+                    openDashboard();
+                    ui.postDelayed(() -> { if (webView != null) webView.evaluateJavascript("location.hash=" + JSONObject.quote(h), null); }, 250);
+                }
+                break;
         }
     }
 
@@ -2745,7 +2761,7 @@ public class MainActivity extends FragmentActivity {
         if (u == null || t == null || t.isEmpty()) return "void 0";
         try {
             JSONObject a = new JSONObject().put("app", APP_ID).put("username", u).put("token", t);
-            return "(function(){if(window.CUST||!/^https:/.test(location.protocol))return;window.__BI_AUTH=" + a + ";window.CUST_PAGE='dashboard';var s=document.createElement('script');s.src='/cust.js?v=61';document.head.appendChild(s);})()";
+            return "(function(){if(window.CUST||!/^https:/.test(location.protocol))return;window.__BI_AUTH=" + a + ";window.CUST_PAGE='dashboard';var s=document.createElement('script');s.src='/cust.js?v=64';document.head.appendChild(s);})()";
         } catch (Exception e) { return "void 0"; }
     }
 
@@ -3894,6 +3910,19 @@ public class MainActivity extends FragmentActivity {
 
             @Override
             public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                String cur = view.getUrl() == null ? "" : view.getUrl();
+                if (cur.contains("#tool-") || cur.contains("#smart-tools")) {   // smart tools: photo audit, beat list, reconciliation, Excel insight
+                    if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                    filePathCallback = callback;
+                    boolean image = false;
+                    for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("image")) image = true;
+                    if (image && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                        pendingImageChooser = true;
+                        requestPermissions(new String[]{Manifest.permission.CAMERA}, CAM_PERM_REQUEST);
+                        return true;
+                    }
+                    return launchFileChooser(image);
+                }
                 if (STATE_APP) { // no imports in the state app
                     callback.onReceiveValue(null);
                     Toast.makeText(MainActivity.this, "Import is not available in this app", Toast.LENGTH_SHORT).show();
@@ -3923,6 +3952,7 @@ public class MainActivity extends FragmentActivity {
         // (state app: only the own-state Active retailers Excel export gets through, checked in the page)
         webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
         webView.addJavascriptInterface(new AIBridge(), "BIAI");
+        webView.addJavascriptInterface(new SpeechBridge(), "BISpeech");
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             if (STATE_APP) {
@@ -4107,6 +4137,63 @@ public class MainActivity extends FragmentActivity {
     }
 
     // Lets the assistant in the page ask the free AI through the accounts service (the session stays in the app).
+    // ---------- Voice notes: Android speech recognition for the dashboard (the in-app browser has none of its own).
+    // A small script in the page (added when the dashboard is published) turns this into window.webkitSpeechRecognition.
+    private SpeechRecognizer speech;
+    private String[] pendingSpeech;
+    private void speechJs(String type, String a) {
+        final String js = "window.__bisp&&window.__bisp(" + JSONObject.quote(type) + "," + JSONObject.quote(a == null ? "" : a) + ")";
+        ui.post(() -> { if (webView != null) webView.evaluateJavascript(js, null); });
+    }
+    private void startSpeech(String lang, boolean partial) {
+        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingSpeech = new String[]{lang, partial ? "1" : "0"};
+            requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_PERM_REQUEST);
+            return;
+        }
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) { speechJs("error", "service-not-allowed"); speechJs("end", ""); return; }
+        try {
+            if (speech == null) {
+                speech = SpeechRecognizer.createSpeechRecognizer(this);
+                speech.setRecognitionListener(new RecognitionListener() {
+                    @Override public void onReadyForSpeech(Bundle b) { speechJs("start", ""); }
+                    @Override public void onBeginningOfSpeech() { }
+                    @Override public void onRmsChanged(float v) { }
+                    @Override public void onBufferReceived(byte[] bytes) { }
+                    @Override public void onEndOfSpeech() { }
+                    @Override public void onEvent(int i, Bundle b) { }
+                    @Override public void onPartialResults(Bundle b) {
+                        java.util.ArrayList<String> r = b == null ? null : b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        if (r != null && !r.isEmpty() && r.get(0) != null && !r.get(0).isEmpty()) speechJs("partial", r.get(0));
+                    }
+                    @Override public void onResults(Bundle b) {
+                        java.util.ArrayList<String> r = b == null ? null : b.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                        if (r != null && !r.isEmpty() && r.get(0) != null && !r.get(0).isEmpty()) speechJs("final", r.get(0));
+                        speechJs("end", "");
+                    }
+                    @Override public void onError(int e) {
+                        String code = e == SpeechRecognizer.ERROR_NO_MATCH || e == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ? "no-speech"
+                                : e == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ? "not-allowed"
+                                : e == SpeechRecognizer.ERROR_NETWORK || e == SpeechRecognizer.ERROR_NETWORK_TIMEOUT || e == SpeechRecognizer.ERROR_SERVER ? "network"
+                                : e == SpeechRecognizer.ERROR_AUDIO ? "audio-capture" : e == SpeechRecognizer.ERROR_RECOGNIZER_BUSY ? "aborted" : "aborted";
+                        speechJs("error", code); speechJs("end", "");
+                    }
+                });
+            }
+            Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+            i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang == null || lang.isEmpty() ? "en-IN" : lang);
+            i.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, partial);
+            i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+            speech.startListening(i);
+        } catch (Throwable t) { speechJs("error", "aborted"); speechJs("end", ""); }
+    }
+    private class SpeechBridge {
+        @JavascriptInterface public void start(String lang, boolean partial) { ui.post(() -> startSpeech(lang, partial)); }
+        @JavascriptInterface public void stop() { ui.post(() -> { try { if (speech != null) speech.stopListening(); } catch (Throwable ignored) { } }); }
+        @JavascriptInterface public void abort() { ui.post(() -> { try { if (speech != null) speech.cancel(); } catch (Throwable ignored) { } speechJs("end", ""); }); }
+    }
+
     private class AIBridge {
         private void reply(String id, JSONObject res, boolean ok, String err) {
             try {
