@@ -9,7 +9,7 @@ const json = (status, body) => new Response(JSON.stringify(body), { status, head
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const cid = (v) => String(v || "").replace(/[^a-z0-9]/gi, "").slice(0, 30);
 const num = (v, d = 0) => { const n = Number(String(v == null ? "" : v).replace(/[₹,%\s]/g, "")); return isFinite(n) ? n : d; };
-const RULE_TYPES = ["ach_slab", "unit_slab", "flat_unit", "value_pct", "kicker", "penalty", "multiplier", "gate", "formula"];
+const RULE_TYPES = ["ach_slab", "unit_slab", "flat_unit", "value_pct", "kicker", "model_rate", "penalty", "multiplier", "gate", "formula"];
 const WHEN = ["always", "achieved", "notAchieved"];
 
 // ---- rule cleaning (same shape the page uses) ----
@@ -30,14 +30,16 @@ export function cleanRule(r, isMaster, allowed) {
   if (type === "kicker") { o.rate = num(r.rate); }
   if (type === "penalty") { o.amount = Math.abs(num(r.amount)); o.per = r.per === "shortUnit" ? "shortUnit" : r.per === "vsShortUnit" ? "vsShortUnit" : "fixed"; o.when = ["notAchieved", "vshieldShort", "either", "both"].includes(r.when) ? r.when : "notAchieved"; o.minAch = num(r.minAch, 100); }
   if (type === "multiplier") { o.minAch = num(r.minAch, 100); o.factor = num(r.factor, 1); o.maxAch = r.maxAch == null || r.maxAch === "" ? null : num(r.maxAch, null); }
-  if (type === "gate") { o.active = r.active === true; o.appDays = num(r.appDays); o.features = num(r.features); o.mvisits = num(r.mvisits); o.vsPct = num(r.vsPct); o.effect = r.effect === "reduce" ? "reduce" : "zero"; o.reducePct = num(r.reducePct, 50); }
+  if (type === "model_rate") { o.minAch = num(r.minAch, 100); o.rates = (Array.isArray(r.rates) ? r.rates : []).slice(0, 60).map((x) => ({ model: str(x && x.model, 40), rate: num(x && x.rate), when: ["always", "modelAchieved", "achieved", "notAchieved"].includes(x && x.when) ? x.when : "always" })).filter((x) => x.model); }
+  if (type === "gate") { o.allModels = r.allModels === true; o.active = r.active === true; o.appDays = num(r.appDays); o.features = num(r.features); o.mvisits = num(r.mvisits); o.vsPct = num(r.vsPct); o.effect = r.effect === "reduce" ? "reduce" : "zero"; o.reducePct = num(r.reducePct, 50); }
   if (type === "formula") { o.expr = expr; }
   return o;
 }
 export function cleanScheme(s, isMaster, allowed) {
   s = s || {};
   return { name: str(s.name, 120) || "Untitled scheme", period: /^\d{4}-\d{2}$/.test(String(s.period || "")) ? s.period : "", audience: s.audience === "vba" ? "vba" : "retailer",
-    basis: ["upload", "activation", "both", "either"].includes(s.basis) ? s.basis : "both", targetType: s.targetType === "value" ? "value" : "units",
+    basis: ["upload", "activation", "both", "either"].includes(s.basis) ? s.basis : "both", targetType: ["value", "both", "either"].includes(s.targetType) ? s.targetType : "units",
+    models: (Array.isArray(s.models) ? s.models : []).slice(0, 60).map((m) => ({ name: str(m && m.name, 40), target: Math.max(0, num(m && m.target)) })).filter((m) => m.name),
     excludePartners: (Array.isArray(s.excludePartners) ? s.excludePartners : String(s.excludePartners || "").split(/[,\n]/)).map((x) => str(x, 40)).filter(Boolean).slice(0, 20),
     minAch: Math.max(0, num(s.minAch)), belowMin: s.belowMin === "prorata" ? "prorata" : "zero", cap: Math.max(0, num(s.cap)), extraCols: (Array.isArray(s.extraCols) ? s.extraCols : []).map((x) => str(x, 30)).filter(Boolean).slice(0, 6),
     rules: (Array.isArray(s.rules) ? s.rules : []).slice(0, 25).map((r) => cleanRule(r, isMaster, allowed)).filter(Boolean), notes: (Array.isArray(s.notes) ? s.notes : []).map((x) => str(x, 300)).filter(Boolean).slice(0, 12),
@@ -48,7 +50,9 @@ const PROMPT = `Read this vivo India scheme circular (dealer / retailer / VBA in
 Return ONE JSON object:
 {"name": scheme name, "period": "YYYY-MM" or "", "audience": "retailer" or "vba",
  "basis": which sales count — "upload" (sales uploaded), "activation" (activated), "both" (uploaded AND activated in the same month), "either",
- "targetType": "units" or "value", "excludePartners": [EMI / finance partner names whose IMEIs are NOT counted],
+ "targetType": "units" (volume), "value" (₹ sale value), "both" (must reach both) or "either" (volume or value),
+ "models": [{"name":"model name e.g. V80","target":units target for that model}] when targets or payouts are given per model,
+ "excludePartners": [EMI / finance partner names whose IMEIs are NOT counted],
  "minAch": minimum achievement % to get any payout (0 if none), "belowMin": "zero" or "prorata", "cap": maximum payout per retailer in ₹ (0 if none),
  "rules": [ one or more of:
    {"type":"ach_slab","label":"...","pay":"perUnit" (₹ per unit) or "fixed" (one amount),"slabs":[{"from":achievement % lower bound,"to":upper % or null,"amount":₹}]},
@@ -56,6 +60,7 @@ Return ONE JSON object:
    {"type":"flat_unit","label":"...","rate":₹ per unit,"when":"always"|"achieved"|"notAchieved"},
    {"type":"value_pct","label":"...","pct":% of sale value,"when":"always"|"achieved"|"notAchieved"},
    {"type":"kicker","label":"...","rate":₹ per unit sold above target},
+   {"type":"model_rate","label":"...","rates":[{"model":"V80","rate":₹ per unit,"when":"always"|"modelAchieved" (only if that model's target is met)|"achieved" (only if the overall target is met)}]} — use this when the payout differs by model,
    {"type":"penalty","label":"...","amount":₹,"per":"fixed"|"shortUnit" (per unit short of target)|"vsShortUnit" (per V-Shield plan short),"when":"notAchieved"|"vshieldShort"|"either"|"both","minAch":% that counts as achieved},
    {"type":"multiplier","label":"...","minAch":%,"maxAch":% or null,"factor":e.g. 1.2}
  ] — add "models":["model names"] to a rule only when it applies to specific models,

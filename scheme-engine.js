@@ -15,20 +15,34 @@
     if (!row.fromImei) v -= n(row.excl);           // summary template: units sold through excluded EMI partners are taken out
     return Math.max(0, v);
   }
+  // ---- models: names in the scheme (V80, X300 Pro …), per-retailer model targets (row.mt) and sold units (row.ms or IMEI models)
+  var mkey = function (s) { return lc(s).replace(/[^a-z0-9]/g, ""); };
+  function modelNames(sc, extra) { var a = (sc.models || []).map(function (m) { return m.name; }).concat(extra || []); var seen = {}; return a.filter(function (x) { var k = mkey(x); if (!k || seen[k]) return false; seen[k] = 1; return true; }); }
+  // which scheme model a sold handset belongs to: the longest model name contained in it ("vivo X300 Pro 5G" → X300 Pro, not X300)
+  function bestModel(raw, names) { var rk = mkey(raw), best = null; names.forEach(function (nm) { var k = mkey(nm); if (k && rk.indexOf(k) >= 0 && (!best || k.length > mkey(best).length)) best = nm; }); return best; }
+  function pick(map, name) { if (!map) return null; var k = mkey(name); for (var x in map) if (mkey(x) === k) return n(map[x]); return null; }
+  function modelSold(row, sc, name, names) {
+    var v = pick(row.ms, name); if (v != null) return v;
+    var m = row.models && row.models[sc.basis]; if (!m) return 0;
+    names = names || modelNames(sc, [name]); if (!names.some(function (x) { return mkey(x) === mkey(name); })) names = names.concat([name]);
+    var t = 0; Object.keys(m).forEach(function (raw) { var b = bestModel(raw, names); if (b && mkey(b) === mkey(name)) t += n(m[raw]); }); return t;
+  }
+  function modelTarget(row, sc, name) { var v = pick(row.mt, name); if (v != null) return v; var d = (sc.models || []).find(function (m) { return mkey(m.name) === mkey(name); }); return d ? n(d.target) : 0; }
+  function modelRows(row, sc) { return modelNames(sc).map(function (nm) { var tg = modelTarget(row, sc, nm), sd = modelSold(row, sc, nm); return { name: nm, target: tg, sold: sd, ach: tg > 0 ? sd / tg * 100 : null }; }); }
   function unitsFor(row, sc, rule) {
-    if (rule && rule.models && rule.models.length) {
-      var m = (row.models && row.models[sc.basis]) || null;
-      if (!m) return 0;
-      var t = 0; Object.keys(m).forEach(function (k) { if (rule.models.some(function (x) { return lc(k).indexOf(lc(x)) >= 0; })) t += n(m[k]); });
-      return t;
-    }
+    if (rule && rule.models && rule.models.length) { var names = modelNames(sc, rule.models); return rule.models.reduce(function (a, nm) { return a + modelSold(row, sc, nm, names); }, 0); }
     return baseUnits(row, sc.basis);
   }
-  function achOf(row, sc) {
-    var tg = n(row.target); if (tg <= 0) return null;
-    var got = sc.targetType === "value" ? n(row.value) : baseUnits(row, sc.basis);
-    return got / tg * 100;
+  // targets: volume (units), value (₹), both (must reach both → the lower %), either (the higher %)
+  function unitTarget(row, sc) { var t = n(row.target); if (t > 0) return t; return modelNames(sc).reduce(function (a, nm) { return a + modelTarget(row, sc, nm); }, 0); }
+  function valueTarget(row, sc) { var t = n(row.targetValue); if (t > 0) return t; return sc.targetType === "value" ? n(row.target) : 0; }
+  function achParts(row, sc) {
+    var tu = sc.targetType === "value" ? 0 : unitTarget(row, sc), tv = sc.targetType === "units" || !sc.targetType ? 0 : valueTarget(row, sc);
+    var ua = tu > 0 ? baseUnits(row, sc.basis) / tu * 100 : null, va = tv > 0 ? n(row.value) / tv * 100 : null;
+    var ach = sc.targetType === "value" ? va : sc.targetType === "both" ? (ua != null && va != null ? Math.min(ua, va) : ua != null ? ua : va) : sc.targetType === "either" ? (ua != null && va != null ? Math.max(ua, va) : ua != null ? ua : va) : ua;
+    return { ach: ach, ua: ua, va: va, tu: tu, tv: tv };
   }
+  function achOf(row, sc) { return achParts(row, sc).ach; }
   function slabFor(slabs, x) { var s = null; (slabs || []).forEach(function (z) { if (x != null && x >= n(z.from)) s = z; }); return s; }
   function whenOk(w, achieved) { return w === "achieved" ? achieved : w === "notAchieved" ? !achieved : true; }
   function evalFormula(expr, vars) {
@@ -44,7 +58,7 @@
   // ---- one row ----
   function computeRow(sc, row) {
     var rules = (sc.rules || []).filter(function (r) { return !r.off; });
-    var units = baseUnits(row, sc.basis), tg = n(row.target), ach = achOf(row, sc);
+    var AP = achParts(row, sc), units = baseUnits(row, sc.basis), tg = AP.tu, ach = AP.ach, MR = modelRows(row, sc);
     var minA = n(sc.minAch), achieved = ach != null && ach >= (minA || 100);
     var d = row.dash || {}, parts = [], reasons = [], pos = 0, neg = 0, mainSlab = null, factor = 1, gateMode = null, reduce = 0;
     // eligibility rules (dashboard data)
@@ -55,6 +69,7 @@
       if (n(g.features) && n(d.features) < n(g.features)) fails.push(n(d.features) + " of " + n(g.features) + " app features used");
       if (n(g.mvisits) && n(d.mvisits) < n(g.mvisits)) fails.push(n(d.mvisits) + " of " + n(g.mvisits) + " market visits");
       if (n(g.vsPct) && (n(row.vsTarget) > 0 ? n(row.vsSold) / n(row.vsTarget) * 100 : 0) < n(g.vsPct)) fails.push("V-Shield below " + n(g.vsPct) + "% of target");
+      if (g.allModels) { var miss = MR.filter(function (m) { return m.target > 0 && m.sold < m.target; }); if (miss.length) fails.push("model target missed: " + miss.map(function (m) { return m.name + " " + m.sold + "/" + m.target; }).join(", ")); }
       if (fails.length) { reasons.push((g.label || "Eligibility") + ": " + fails.join(", ")); if (g.effect === "reduce") reduce = Math.max(reduce, n(g.reducePct)); else gateMode = "zero"; }
     });
     var vars = { units: units, target: tg, ach: ach || 0, value: n(row.value), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget), upload: n(row.upload), activation: n(row.activation), both: row.both != null ? n(row.both) : Math.min(n(row.upload), n(row.activation)), appDays: n(d.appDays), features: n(d.features), appVisits: n(d.appVisits), mvisits: n(d.mvisits), active: d.active ? 1 : 0, payout: 0 };
@@ -75,6 +90,20 @@
       } else if (r.type === "flat_unit") { if (whenOk(r.when, achieved)) amt = n(r.rate) * u; }
       else if (r.type === "value_pct") { if (whenOk(r.when, achieved)) amt = n(r.pct) / 100 * n(row.value); }
       else if (r.type === "kicker") { if (tg > 0 && sc.targetType !== "value") amt = Math.max(0, u - tg) * n(r.rate); }
+      else if (r.type === "model_rate") {   // ₹ per unit by model (e.g. V80 ₹1,099, X300 Pro ₹2,000)
+        var names = modelNames(sc, (r.rates || []).map(function (x) { return x.model; })), any = false;
+        (r.rates || []).forEach(function (x) {
+          if (!x.model) return;
+          var sold = modelSold(row, sc, x.model, names), mt = modelTarget(row, sc, x.model), pct = n(r.minAch || 100);
+          var ok = x.when === "modelAchieved" ? mt > 0 && sold >= mt * pct / 100 : x.when === "achieved" ? achieved : x.when === "notAchieved" ? !achieved : true;
+          if (!sold) return;
+          var a = ok ? sold * n(x.rate) : 0; any = true;
+          parts.push({ id: r.id, label: (r.label ? r.label + " · " : "") + x.model + " × " + sold + (ok ? " @ ₹" + n(x.rate).toLocaleString("en-IN") : " (model target " + sold + "/" + mt + " not met)"), type: r.type, amount: a, slab: "" });
+          pos += a;
+        });
+        if (!any) parts.push({ id: r.id, label: (r.label || "Model rates") + ": none of these models sold", type: r.type, amount: 0 });
+        return;
+      }
       else if (r.type === "formula") { vars.payout = pos; try { amt = evalFormula(r.expr, vars); } catch (e) { reasons.push((r.label || "Formula") + ": " + e.message); amt = 0; } }
       else if (r.type === "penalty") {
         var ok = ach != null && ach >= n(r.minAch || 100), vsShort = n(row.vsTarget) > 0 && n(row.vsSold) < n(row.vsTarget);
@@ -97,14 +126,15 @@
     else if (reduce && pos) { var rc = pos * reduce / 100; parts.push({ label: "Eligibility cut " + reduce + "%", type: "gate", amount: -rc }); pos -= rc; }
     if (n(sc.cap) > 0 && pos > n(sc.cap)) { parts.push({ label: "Capped at maximum", type: "cap", amount: n(sc.cap) - pos }); pos = n(sc.cap); }
     var total = Math.round((pos - neg) * 100) / 100;
-    return { rid: row.rid, name: row.name || "", state: row.state || "", target: tg, units: units, value: n(row.value), ach: ach, achieved: achieved, upload: n(row.upload), activation: n(row.activation), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget),
+    return { rid: row.rid, name: row.name || "", state: row.state || "", target: tg, targetValue: AP.tv, unitAch: AP.ua, valueAch: AP.va, models: MR, units: units, value: n(row.value), ach: ach, achieved: achieved, upload: n(row.upload), activation: n(row.activation), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget),
       parts: parts, positive: Math.round(pos * 100) / 100, penalty: Math.round(neg * 100) / 100, total: total, eligible: pos > 0, slab: mainSlab || "", reasons: reasons, dash: d, extra: row.extra || {} };
   }
-  function bump(row, k) {
+  function bump(row, k, model) {
     var r = JSON.parse(JSON.stringify(row));
     ["upload", "activation", "both", "either"].forEach(function (f) { if (r[f] != null) r[f] = n(r[f]) + k; });
     var u0 = Math.max(n(row.upload), n(row.activation), 1); if (n(r.value) > 0) r.value = n(r.value) + k * n(r.value) / u0;
-    if (r.models) Object.keys(r.models).forEach(function (b) { var ks = Object.keys(r.models[b]); if (ks.length) r.models[b][ks[0]] = n(r.models[b][ks[0]]) + k; });
+    if (r.ms) { var mk = model ? Object.keys(r.ms).find(function (x) { return mkey(x) === mkey(model); }) : Object.keys(r.ms)[0]; if (mk) r.ms[mk] = n(r.ms[mk]) + k; else if (model) r.ms[model] = k; }
+    if (r.models) Object.keys(r.models).forEach(function (b) { var ks = Object.keys(r.models[b]); var key = model ? ks.find(function (x) { return mkey(x).indexOf(mkey(model)) >= 0; }) || model : ks[0]; if (key) r.models[b][key] = n(r.models[b][key]) + k; });
     return r;
   }
   // who is closest to the next slab: "Sell 3 more → +₹1,200"
@@ -117,10 +147,17 @@
       if ((r.type === "multiplier" || (r.type === "penalty" && r.when !== "vshieldShort")) && tg > 0 && sc.targetType !== "value") { var nd = Math.ceil(n(r.minAch || 100) / 100 * tg - u - 1e-9); if (nd > 0) cands.push(nd); }
       if (r.type === "flat_unit" && r.when === "achieved" && tg > 0) { var nd2 = Math.ceil(tg - u - 1e-9); if (nd2 > 0) cands.push(nd2); }
     });
-    cands = cands.filter(function (x) { return x > 0 && x <= Math.max(50, tg * 2); }).sort(function (a, b) { return a - b; });
-    for (var i = 0; i < cands.length; i++) {
-      var r2 = computeRow(sc, bump(row, cands[i])), gain = Math.round((r2.total - res.total) * 100) / 100;
-      if (gain > 0) return { need: cands[i], gain: gain, newTotal: r2.total, slab: r2.slab };
+    // model targets: "Sell 2 more V80"
+    var mc = [];
+    rules.forEach(function (r) {
+      if (r.type === "model_rate") (r.rates || []).forEach(function (x) { if (x.when !== "modelAchieved") return; var mt = modelTarget(row, sc, x.model), sd = modelSold(row, sc, x.model); var need = Math.ceil(mt * n(r.minAch || 100) / 100 - sd - 1e-9); if (mt > 0 && need > 0) mc.push([need, x.model]); });
+      if (r.type === "gate" && r.allModels) (res.models || []).forEach(function (m) { if (m.target > 0 && m.sold < m.target) mc.push([m.target - m.sold, m.name]); });
+    });
+    var all = cands.filter(function (x) { return x > 0 && x <= Math.max(50, tg * 2); }).map(function (x) { return [x, null]; }).concat(mc.filter(function (x) { return x[0] <= 200; }));
+    all.sort(function (a, b) { return a[0] - b[0]; });
+    for (var i = 0; i < all.length; i++) {
+      var r2 = computeRow(sc, bump(row, all[i][0], all[i][1])), gain = Math.round((r2.total - res.total) * 100) / 100;
+      if (gain > 0) return { need: all[i][0], model: all[i][1] || "", gain: gain, newTotal: r2.total, slab: r2.slab };
     }
     return null;
   }
@@ -160,6 +197,6 @@
   }
   function finishImei(sc, o) { o.value = o.val[sc.basis] || 0; o.vsSold = o.vs[sc.basis] || 0; return o; }
 
-  var api = { compute: compute, computeRow: computeRow, fromImei: fromImei, finishImei: finishImei, parseDate: parseDate, baseUnits: baseUnits, evalFormula: evalFormula, VARS: VARS };
+  var api = { modelNames: modelNames, bestModel: bestModel, compute: compute, computeRow: computeRow, fromImei: fromImei, finishImei: finishImei, parseDate: parseDate, baseUnits: baseUnits, evalFormula: evalFormula, VARS: VARS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.SCENG = api;
 })(typeof window !== "undefined" ? window : globalThis);
