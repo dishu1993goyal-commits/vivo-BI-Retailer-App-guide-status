@@ -186,8 +186,12 @@ export async function startJob(ctx, kind, model, { force = false } = {}) {
   try {
     const kick = ctx.jobFetch || fetch;
     const base = env.SITE_URL || "";
-    const r = await kick(base + "/.netlify/functions/aff-refresh-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: id }) });
-    if (r && r.status && r.status >= 400) throw new Error("status " + r.status);
+    const ac = typeof AbortController !== "undefined" ? new AbortController() : null, tm = ac ? setTimeout(() => ac.abort(), 5000) : 0;
+    try {
+      const r = await kick(base + "/.netlify/functions/aff-refresh-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: id }), signal: ac ? ac.signal : undefined });
+      if (r && r.status && r.status >= 400) throw new Error("status " + r.status);
+    } catch (e) { if (!(e && e.name === "AbortError")) throw e; }   // slow ack: the job is still queued
+    finally { clearTimeout(tm); }
   } catch (e) {
     await store.delete(lockK); await store.delete(`affjob:${id}`);
     return { started: false, reason: "Couldn't start the AI research (" + e.message + ")." };
