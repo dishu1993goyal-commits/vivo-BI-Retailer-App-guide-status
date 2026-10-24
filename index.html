@@ -814,7 +814,131 @@
 .rp[data-layout=hub] .herorow .foldlnk{display:none}.rp[data-layout=hub] .tile small{padding-right:22px}
 
 @media (min-width:1001px){.rp[data-layout=hub] .tgrid{grid-template-columns:repeat(3,1fr)}}
-</style><script id="biw-gate">(function(){var u=navigator.userAgent;if(/; wv\)/.test(u)||window.AndroidDL||window.BIAI)return;document.documentElement.classList.add("biw-web","biw-locked");})();</script><style id="biw-gate-css">html.biw-locked body>*:not(#biw-root){visibility:hidden!important}html.biw-locked body{background:#0b0b0c}</style></head><body><div id="dash-root"><div class="rp" id="rp" data-layout="hub">
+
+/* ---------- Smart tools (voice, photo audit, beat planner, share card, reconciliation, insight, idea box, KPI builder) */
+.rp .tl-back{display:inline-flex;align-items:center;gap:6px;margin:22px 0 0;font-size:13px;font-weight:600;color:var(--goldd);text-decoration:none;border:1px solid var(--line);background:#fffdf7;border-radius:99px;padding:6px 14px}
+.rp .tl-back:hover{background:#fff4d6}
+.rp .tl-ico{display:inline-flex;width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#111,#2a2210);color:#e6cf86;align-items:center;justify-content:center;flex:none;box-shadow:0 6px 14px -8px rgba(0,0,0,.6)}
+.rp .tl-ico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rp .tl-ico.sm{width:34px;height:34px;border-radius:10px}.rp .tl-ico.sm svg{width:17px;height:17px}
+.rp .tl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:14px}
+.rp .tl-tile{display:flex;flex-direction:column;gap:8px;text-align:left;font:inherit;color:inherit;text-decoration:none;background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;cursor:pointer;position:relative;transition:transform .18s,box-shadow .18s,border-color .18s;box-shadow:0 1px 0 rgba(201,162,39,.12),0 8px 24px -18px rgba(0,0,0,.3)}
+.rp .tl-tile:hover{transform:translateY(-3px);border-color:var(--gold);box-shadow:0 14px 28px -16px rgba(138,106,31,.55)}
+.rp .tl-tile b{font-size:15.5px;color:#111}.rp .tl-tile small{color:var(--mut);font-size:13px;line-height:1.45}
+.rp .tl-tile .tl-open{margin-top:auto;font-size:12.5px;font-weight:700;color:var(--goldd)}
+.rp .tl-tile .tl-cnt{position:absolute;top:14px;right:14px;font-size:11px;font-weight:700;letter-spacing:.04em;background:#111;color:var(--gold2);border-radius:99px;padding:3px 9px}
+.rp .tl-tile.dark{background:linear-gradient(160deg,#0b0b0c,#1d180b);border-color:#3a3320}.rp .tl-tile.dark b{color:#fff}.rp .tl-tile.dark small{color:#cdbf92}
+.rp .tl-ov{background:linear-gradient(160deg,#0b0b0c,#1f1a0c);border-radius:20px;padding:26px 24px;margin-top:6px;color:#fff;border:1px solid #3a3320}
+.rp .tl-ov h2{color:#fff}.rp .tl-ov .kick{color:var(--gold)}.rp .tl-ov .lead{color:#cdbf92;margin-bottom:16px}
+.rp .tl-ov .tl-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,12.5rem),1fr));gap:10px}
+.rp .tl-ov .tl-tile{background:rgba(255,255,255,.04);border-color:#3a3320;padding:14px;box-shadow:none}.rp .tl-ov .tl-tile b{color:#fff;font-size:14px}.rp .tl-ov .tl-tile small{color:#bfb38a;font-size:12px}
+.rp .tl-ov .tl-tile:hover{background:rgba(201,162,39,.12)}
+.rp .tl-seg{display:inline-flex;flex-wrap:wrap;gap:4px;background:#f6f0de;border:1px solid var(--line);border-radius:99px;padding:4px}
+.rp .tl-seg button{font:inherit;font-size:13px;font-weight:600;border:0;background:none;color:#5b5646;border-radius:99px;padding:7px 14px;cursor:pointer}
+.rp .tl-seg button.on{background:#111;color:var(--gold2)}
+.rp .tl-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,13rem),1fr));gap:12px;margin:12px 0}
+.rp .tl-form label,.rp .tl-lbl{display:flex;flex-direction:column;gap:5px;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--goldd)}
+.rp .tl-in{font:inherit;font-size:14px;letter-spacing:0;text-transform:none;color:#111;background:#fffdf7;border:1px solid #e3d6b2;border-radius:12px;padding:10px 12px;width:100%;min-width:0}
+.rp select.tl-in{border-radius:12px;min-width:0;padding:9px 12px}
+.rp .tl-in:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,162,39,.18)}
+.rp textarea.tl-in{min-height:120px;resize:vertical;line-height:1.5}
+.rp .tl-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.rp .tl-acts .note{margin-left:4px}
+.rp .xlbtn.red{border-color:#e2b3a9;color:#b3402f;background:#fff}
+.rp .xlbtn.ghost{background:#fff}
+.rp .tl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:12px;margin:4px 0 14px}
+.rp .tl-stats .sdc{cursor:default}.rp .tl-stats .sdc.click{cursor:pointer}.rp .tl-stats .sdc.click:hover{background:#fff8e1}.rp .tl-stats .sdc.on{background:#111;border-color:#111}.rp .tl-stats .sdc.on b,.rp .tl-stats .sdc.on span{color:var(--gold2)}
+.rp .tl-stats .sdc.bad{border-top-color:#b3402f}.rp .tl-stats .sdc.ok{border-top-color:#2e7d5b}.rp .tl-stats .sdc.warn{border-top-color:#d39b12}
+.rp .tl-chips{display:flex;flex-wrap:wrap;gap:6px}
+.rp .tl-chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;border-radius:99px;padding:4px 11px;background:#f6f0de;color:#5b5646;border:1px solid #eadfc4;white-space:nowrap}
+.rp button.tl-chip{cursor:pointer;font-family:inherit}.rp button.tl-chip:hover{border-color:var(--gold)}
+.rp .tl-chip.gold{background:#fff4d6;border-color:#e6cf86;color:#8a6a1f}.rp .tl-chip.dark{background:#111;color:var(--gold2);border-color:#111}
+.rp .tl-chip.red{background:#fbe9e5;border-color:#f1c4bc;color:#b3402f}.rp .tl-chip.green{background:#e6f3ec;border-color:#cfe8d8;color:#2e7d5b}.rp .tl-chip.amber{background:#fff1cc;border-color:#f6e4a8;color:#9a6b00}
+.rp .tl-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.rp .tl-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;padding:3px 8px}
+.rp .tl-badge.hi{background:#b3402f;color:#fff}.rp .tl-badge.md{background:#f6e4a8;color:#6b4c00}.rp .tl-badge.lo{background:#cfe8d8;color:#1f5a40}
+.rp .tl-kv{display:grid;grid-template-columns:minmax(7rem,10rem) 1fr;gap:10px 14px;align-items:start;font-size:14px}
+.rp .tl-kv>dt{color:var(--mut);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding-top:5px}.rp .tl-kv>dd{margin:0}
+.rp .tl-kv ul{margin:0;padding-left:18px}.rp .tl-kv li{margin:3px 0}
+/* voice */
+.rp .tl-micwrap{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:16px 0 8px}
+.rp .tl-mic{width:84px;height:84px;border-radius:50%;border:0;cursor:pointer;background:radial-gradient(circle at 30% 30%,#2a2210,#000);color:var(--gold2);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #fff4d6,0 0 0 5px var(--gold),0 14px 28px -10px rgba(0,0,0,.6);flex:none;transition:transform .15s}
+.rp .tl-mic svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rp .tl-mic:hover{transform:scale(1.04)}
+.rp .tl-mic.on{background:radial-gradient(circle at 30% 30%,#d64a35,#8f2414);color:#fff;animation:tlpulse 1.4s infinite}
+.rp .tl-mic.sm{width:44px;height:44px;box-shadow:0 0 0 3px #fff4d6,0 0 0 4px var(--gold)}.rp .tl-mic.sm svg{width:20px;height:20px}
+@keyframes tlpulse{0%{box-shadow:0 0 0 4px #fbe2dc,0 0 0 5px #d64a35,0 0 0 0 rgba(214,74,53,.45)}70%{box-shadow:0 0 0 4px #fbe2dc,0 0 0 5px #d64a35,0 0 0 22px rgba(214,74,53,0)}100%{box-shadow:0 0 0 4px #fbe2dc,0 0 0 5px #d64a35,0 0 0 0 rgba(214,74,53,0)}}
+@media (prefers-reduced-motion:reduce){.rp .tl-mic.on{animation:none}}
+.rp .tl-mstat b{display:block;font-size:16px}.rp .tl-mstat small{color:var(--mut);font-size:13px}
+.rp .tl-interim{min-height:20px;font-style:italic;color:var(--goldd);font-size:14px;margin:4px 0}
+.rp .tl-q{border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;background:#fffdf7}
+.rp .tl-q .tl-qh{display:flex;gap:12px;align-items:center}.rp .tl-q .tl-qh b{flex:1;font-size:14.5px}
+.rp .tl-q .tl-qn{width:26px;height:26px;border-radius:50%;background:#111;color:var(--gold2);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none}
+.rp .tl-q textarea.tl-in{min-height:60px;margin-top:8px}
+/* photo audit */
+.rp .tl-up{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;border:2px dashed #e3d6b2;border-radius:18px;padding:30px 16px;background:#fffdf7}
+.rp .tl-up b{font-size:16px}.rp .tl-up.drag{border-color:var(--gold);background:#fff4d6}
+.rp .tl-photo{position:relative;border-radius:14px;overflow:hidden;background:#111;line-height:0;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.rp .tl-photo img{width:100%;height:auto;display:block}
+.rp .tl-mk{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.55);font:700 10px/20px var(--font-anthropic-sans);color:#fff;text-align:center;pointer-events:none}
+.rp .tl-brands{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.rp .tl-brands button{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #e3d6b2;background:#fff;border-radius:99px;padding:6px 12px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.rp .tl-brands button i{width:10px;height:10px;border-radius:50%}
+.rp .tl-brands button.on{background:#111;color:#fff;border-color:#111}
+.rp .tl-brands button em{font-style:normal;font-weight:800;color:var(--goldd)}.rp .tl-brands button.on em{color:var(--gold2)}
+.rp .tl-chk{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:8px}
+.rp .tl-chk label{display:flex;gap:10px;align-items:center;font-size:14px;border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:#fffdf7;cursor:pointer}
+.rp .tl-chk label.yes{background:#e6f3ec;border-color:#cfe8d8}
+.rp .tl-chk input{width:18px;height:18px;accent-color:#2e7d5b;flex:none}
+.rp .tl-score{display:flex;align-items:center;gap:18px}
+.rp .tl-score .tl-ring{flex:none}
+.rp .tl-score b.big{font-family:var(--font-anthropic-serif);font-weight:400;font-size:2.6rem;line-height:1}
+.rp .tl-thumb{width:64px;height:48px;object-fit:cover;border-radius:8px;display:block}
+/* lists */
+.rp .tl-list{display:flex;flex-direction:column;gap:10px}
+.rp .tl-item{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#fff}
+.rp .tl-item .tl-main{flex:1;min-width:0}.rp .tl-item .tl-main b{font-size:14.5px}
+.rp .tl-item .tl-main p{margin:4px 0 6px;font-size:13.5px;color:#3d3a31;line-height:1.45}
+.rp .tl-item .tl-meta{font-size:12px;color:var(--mut)}
+.rp .tl-item .tl-side{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.rp .tl-rank{width:30px;height:30px;border-radius:50%;background:#111;color:var(--gold2);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+.rp .tl-bar{height:8px;border-radius:99px;background:#efe8d6;overflow:hidden;margin-top:6px;max-width:16rem}.rp .tl-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#c9a227,#b3402f)}
+.rp .tl-empty{text-align:center;color:var(--mut);padding:26px 10px;font-size:14px}
+/* ideas */
+.rp .tl-vote{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:58px;border:1px solid #e3d6b2;border-radius:12px;background:#fffdf7;cursor:pointer;padding:8px 6px;font:inherit;color:#111}
+.rp .tl-vote b{font-size:18px;line-height:1.1}.rp .tl-vote small{font-size:10.5px;color:var(--mut);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.rp .tl-vote span{font-size:14px;color:var(--goldd)}
+.rp .tl-vote.on{background:#111;border-color:#111;color:var(--gold2)}.rp .tl-vote.on small,.rp .tl-vote.on span{color:var(--gold2)}
+.rp .tl-top3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:12px}
+.rp .tl-top3 .card{border-top:3px solid var(--gold)}
+.rp .tl-medal{font-family:var(--font-anthropic-serif);font-size:2rem;color:var(--gold);line-height:1}
+.rp .tl-st{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:6px;padding:3px 8px;background:#f6f0de;color:#5b5646}
+.rp .tl-st.s1{background:#fff1cc;color:#8a6a1f}.rp .tl-st.s2{background:#e3eefb;color:#2b5aa0}.rp .tl-st.s3{background:#cfe8d8;color:#1f5a40}.rp .tl-st.s4{background:#eee;color:#6b6657}
+.rp .tl-pre{background:#0b0b0c;color:#e6cf86;border-radius:12px;padding:14px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow:auto;max-height:320px;white-space:pre}
+.rp details.tl-det{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:#fffdf7;margin-top:12px}
+.rp details.tl-det summary{cursor:pointer;font-weight:700;font-size:14px}
+.rp ol.tl-ol{margin:10px 0;padding-left:20px;font-size:14px;line-height:1.6}
+/* charts */
+.rp .tl-svg{width:100%;height:auto;display:block;overflow:visible}
+.rp .tl-svg text{font-family:var(--font-anthropic-sans);font-size:11px;fill:#6b6657}
+.rp .tl-svg .lbl{fill:#111;font-weight:600}
+.rp .tl-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--mut);margin-top:8px}.rp .tl-leg span{display:inline-flex;align-items:center;gap:6px}.rp .tl-leg i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.rp .tl-cv{width:100%;max-width:440px;height:auto;display:block;margin:0 auto;border-radius:14px;box-shadow:0 18px 40px -18px rgba(0,0,0,.6);background:#111}
+.rp .tl-fx{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.rp .tl-fx button{font:12px/1 ui-monospace,Menlo,Consolas,monospace;border:1px solid #e3d6b2;background:#fff;border-radius:8px;padding:6px 8px;cursor:pointer;color:#5b5646}
+.rp .tl-fx button:hover{border-color:var(--gold);background:#fff4d6}
+.rp .tl-fx button.op{background:#111;color:var(--gold2);border-color:#111;min-width:30px}
+.rp .tl-err{color:#b3402f;font-size:13px;font-weight:600;margin-top:6px}
+.rp .tl-ok{color:#2e7d5b;font-size:13px;font-weight:600;margin-top:6px}
+.rp .tl-ck{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),1fr));gap:14px}
+.rp .tl-ck .card{cursor:pointer;transition:transform .18s}.rp .tl-ck .card:hover{transform:translateY(-3px)}
+.rp .tl-ck b.v{display:block;font-family:var(--font-anthropic-serif);font-weight:400;font-size:2.1rem;margin:6px 0 2px}
+.rp .tl-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,20rem),1fr));gap:14px}
+.rp .tl-stepn{display:inline-flex;width:26px;height:26px;border-radius:50%;background:#111;color:var(--gold2);align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-right:8px}
+.rp .tl-scroll{max-height:520px;overflow:auto;border-radius:12px}
+.rp .tl-note{background:#fff8e1;border:1px solid #f0dfa6;border-radius:12px;padding:10px 14px;font-size:13px;color:#5b4a14;margin-top:12px;line-height:1.5}
+@media (max-width:760px){.rp .tl-kv{grid-template-columns:1fr}.rp .tl-kv>dt{padding-top:0}.rp .tl-item{flex-wrap:wrap}.rp .tl-item .tl-side{flex-direction:row;align-items:center;width:100%}.rp .tl-mic{width:72px;height:72px}.rp .tl-ov{padding:20px 16px;border-radius:16px}}
+</style><script id="biw-gate">(function(){var u=navigator.userAgent;if(/; wv\)/.test(u)||window.AndroidDL||window.BIAI)return;document.documentElement.classList.add("biw-web","biw-locked");})();</script><style id="biw-gate-css">html.biw-locked body>*:not(#biw-root){visibility:hidden!important}html.biw-locked body{background:#0b0b0c}</style><script id="biw-speech">(function(){if(!window.BISpeech)return;var cur=null;function SR(){this.lang="en-IN";this.continuous=false;this.interimResults=false;this.maxAlternatives=1;this.onresult=null;this.onerror=null;this.onend=null;this.onstart=null;this._res=[]}SR.prototype.start=function(){cur=this;this._res=[];window.BISpeech.start(String(this.lang||"en-IN"),!!this.interimResults)};SR.prototype.stop=function(){if(cur===this)window.BISpeech.stop()};SR.prototype.abort=function(){if(cur===this)window.BISpeech.abort()};window.__bisp=function(t,a){var r=cur;if(!r)return;if(t==="start"){r.onstart&&r.onstart({})}else if(t==="partial"||t==="final"){var it=[{transcript:a,confidence:1}];it.isFinal=t==="final";var res=r._res.slice();res.push(it);if(t==="final")r._res.push(it);r.onresult&&r.onresult({resultIndex:res.length-1,results:res})}else if(t==="error"){r.onerror&&r.onerror({error:a})}else if(t==="end"){cur=null;r.onend&&r.onend({})}};window.webkitSpeechRecognition=window.SpeechRecognition=SR})();</script></head><body><div id="dash-root"><div class="rp" id="rp" data-layout="hub">
   <div class="top"><div class="wrap">
     <img class="logo" alt="vivo Business Innovation">
     <nav class="tabs" id="tabs" role="tablist"></nav>
@@ -1470,6 +1594,1135 @@ var KE = (function () {
   return {MONS: MONS, TYPES: TYPES, SCH: SCH, encode: encode, rows: rows, span: span, sliceRaw: sliceRaw, mergeRaw: mergeRaw, ridSet: ridSet, filterRaw: filterRaw, tally: tally, scorePeriod: scorePeriod, cfgFor: cfgFor, cfgW: cfgW, dataMonths: dataMonths, qKey: qKey, qLabel: qLabel, qMonths: qMonths, KPIS: KPIS, DEFNAME: DEFNAME, PTS: PTS, RKS: RKS, titleFor: titleFor, monthLabel: monthLabel, nrm: nrm, PCAN: PCAN, resolver: resolver, W0: W0};
 })();
 if (typeof module !== 'undefined') module.exports = KE;
+</script><script id="s-tools">// Smart tools: voice notes, photo audit, beat planner, share card, reconciliation, Excel to insight, idea box, custom KPI builder.
+// Loaded before s-app. s-app calls BITOOLS.init / render / after with its helper API.
+window.BITOOLS = (function () {
+  'use strict';
+  let A = null;
+  const LIST = [
+    {t: 'tlv', hash: 'tool-voice-notes', ic: 'mic', grp: 'field', n: 'Voice notes', s: 'Speak visit notes or survey answers in Hindi or a regional language. The app writes and structures them.', kick: 'Smart tools · Voice', title: 'Voice notes and survey answers'},
+    {t: 'tlp', hash: 'tool-photo-audit', ic: 'camera', grp: 'field', n: 'Photo audit', s: 'Snap the counter. Get share of shelf for vivo vs competition, branding and missing POS items.', kick: 'Smart tools · Photo AI', title: 'Display and shelf photo audit'},
+    {t: 'tlb', hash: 'tool-beat-planner', ic: 'route', grp: 'field', n: 'Smart beat planner', s: 'Who to visit today, ranked by low retailer app usage and days since the last visit.', kick: 'Smart tools · Beat planner', title: 'Who to visit today'},
+    {t: 'tlr', hash: 'tool-reconciliation', ic: 'merge', grp: 'bi', n: 'Auto-reconciliation', s: 'vWork data vs retailer app usage logs. Mismatches highlighted, no VLOOKUP.', kick: 'Smart tools · Reconciliation', title: 'vWork vs retailer app logs'},
+    {t: 'tli', hash: 'tool-excel-insight', ic: 'sheet', grp: 'bi', n: 'Excel to insight', s: 'Upload any raw Excel. Columns are detected and you get a summary with charts.', kick: 'Smart tools · Insight', title: 'Any Excel, instant insight'},
+    {t: 'tlk', hash: 'tool-kpi-builder', ic: 'fx', grp: 'bi', n: 'Custom KPI builder', s: 'Define new metrics as formulas from existing fields, with charts and trends.', kick: 'Smart tools · KPI builder', title: 'Build your own KPI'},
+    {t: 'tls', hash: 'tool-share-card', ic: 'share', grp: 'collab', n: 'Share a KPI card', s: 'One tap image card of a KPI to forward on vChat or WhatsApp. No screenshots.', kick: 'Smart tools · Share', title: 'One-tap KPI card'},
+    {t: 'tld', hash: 'tool-idea-box', ic: 'bulb', grp: 'collab', n: 'Idea box', s: 'State BI admins submit process ideas, others upvote, top ideas get reviewed.', kick: 'Smart tools · Idea box', title: 'Ideas from the states'}
+  ];
+  const TK = {}; LIST.forEach(x => { TK[x.t] = x; });
+  TK.tl = {t: 'tl', hash: 'smart-tools', n: 'Smart tools', kick: 'Smart tools', title: 'Tools that save time in the field and at HO'};
+
+  // ---------- small helpers
+  const IC = {
+    tool: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20M10 13v2h4v-2"/>',
+    mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/>',
+    camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>',
+    route: '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+    share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+    merge: '<path d="M8 6h10M8 12h10M8 18h10"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2"/><path d="m3 17 3 3M6 17l-3 3"/>',
+    sheet: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/><path d="m13 17 2-3 2 2 2-4"/>',
+    bulb: '<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V18h6v-1.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2Z"/>',
+    fx: '<path d="M4 20h16"/><path d="M8 16V9M12 16V5M16 16v-4"/><path d="M14 3h6v6"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>'
+  };
+  const svgI = n => '<svg viewBox="0 0 24 24" aria-hidden="true">' + IC[n] + '</svg>';
+  const E = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+  const ico = (n, cls) => { const s = E('span', 'tl-ico' + (cls ? ' ' + cls : '')); s.innerHTML = svgI(n); return s; };
+  const btn = (txt, cls, fn) => { const b = E('button', 'xlbtn' + (cls ? ' ' + cls : ''), txt); b.type = 'button'; if (fn) b.addEventListener('click', fn); return b; };
+  const LS = {
+    get(k, d) { try { const v = localStorage.getItem('bi_tl_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('bi_tl_' + k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+    del(k) { try { localStorage.removeItem('bi_tl_' + k); } catch (e) {} }
+  };
+  const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const pad2 = n => String(n).padStart(2, '0');
+  const isoOf = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  const today = () => isoOf(new Date());
+  const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return isoOf(d); };
+  const dayDiff = (a, b) => Math.round((Date.parse(a + 'T00:00:00') - Date.parse(b + 'T00:00:00')) / 864e5);
+  const dlabel = iso => { if (!iso) return '—'; const d = new Date(String(iso).length > 10 ? iso : iso + 'T00:00:00'); if (isNaN(d)) return String(iso); return d.getDate() + ' ' + MON3[d.getMonth()] + ' ' + d.getFullYear(); };
+  const tlabel = iso => { const d = new Date(iso); return isNaN(d) ? '' : dlabel(iso) + ', ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const fin = v => v != null && typeof v === 'number' && isFinite(v);
+  const fmtN = v => fin(v) ? Math.round(v).toLocaleString('en-IN') : '—';
+  const fmtD = (v, d) => fin(v) ? v.toLocaleString('en-IN', {maximumFractionDigits: d == null ? 2 : d, minimumFractionDigits: 0}) : '—';
+  const fmtP = (v, d) => fin(v) ? (v * 100).toFixed(d == null ? 1 : d) + '%' : '—';
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const nk = v => v == null ? '' : String(v).trim().toUpperCase().replace(/\s+/g, '');
+  const cmpS = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const dlBlob = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); };
+  const stateList = () => { if (A.gated) return A.lock() ? [A.lock()] : []; return (A.SETUP.states || []).map(s => s.state); };
+  const codeMap = () => { const m = {}; (A.SETUP.states || []).forEach(s => { m[String(s.code).toUpperCase()] = s.state; }); return m; };
+  const stOfId = (id, cm) => cm[String(id).slice(0, -7).toUpperCase()];
+  function stNorm(v) {
+    const s = String(v == null ? '' : v).trim(); if (!s) return ''; const cm = codeMap(); if (cm[s.toUpperCase()]) return cm[s.toUpperCase()];
+    const vm = A.SETUP.vmap || {}; for (const k in vm) if (cmpS(k) === cmpS(s)) return vm[k];
+    const hit = (A.SETUP.states || []).find(x => cmpS(x.state) === cmpS(s)); return hit ? hit.state : s;
+  }
+  function selOpts(sel, opts, val) { sel.replaceChildren(); opts.forEach(o => { const op = E('option', null, Array.isArray(o) ? o[1] : o); op.value = Array.isArray(o) ? o[0] : o; sel.appendChild(op); }); if (val != null) sel.value = val; return sel; }
+  function field(label, node) { const l = E('label'); l.appendChild(document.createTextNode(label)); l.appendChild(node); return l; }
+  function inp(type, val, ph) { const i = E(type === 'textarea' ? 'textarea' : type === 'select' ? 'select' : 'input', 'tl-in'); if (type !== 'textarea' && type !== 'select') i.type = type; if (val != null) i.value = val; if (ph) i.placeholder = ph; return i; }
+  function segCtl(opts, val, cb) { const s = E('div', 'tl-seg'); opts.forEach(o => { const b = E('button', o[0] === val ? 'on' : null, o[1]); b.type = 'button'; b.addEventListener('click', () => { s.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); cb(o[0]); }); s.appendChild(b); }); return s; }
+  function fileBtn(txt, accept, cb, o) {
+    o = o || {}; const w = E('span'); const i = E('input'); i.type = 'file'; i.accept = accept; i.hidden = true; if (o.capture) i.setAttribute('capture', o.capture);
+    const b = btn(txt, o.cls || 'big', () => i.click()); i.addEventListener('change', () => { const f = i.files && i.files[0]; i.value = ''; if (f) cb(f); }); w.appendChild(b); w.appendChild(i); return w;
+  }
+  function stat(v, l, cls, onClick) { const d = E('div', 'sdc' + (cls ? ' ' + cls : '') + (onClick ? ' click' : '')); d.appendChild(E('b', null, v)); d.appendChild(E('span', null, l)); if (onClick) d.addEventListener('click', onClick); return d; }
+  function emptyBox(t) { return E('div', 'tl-empty', t); }
+  function page(t) {
+    stopRec();
+    const body = document.getElementById('d-body'); body.replaceChildren(); const root = E('div'); root.dataset.tlroot = t; body.appendChild(root);
+    if (t !== 'tl') { const b = E('a', 'tl-back', '← All smart tools'); b.href = '#smart-tools'; b.addEventListener('click', ev => { ev.preventDefault(); A.go('tl'); }); root.appendChild(b); }
+    return root;
+  }
+  const mounted = t => { const r = document.querySelector('#d-body > [data-tlroot]'); return r && r.dataset.tlroot === t ? r : null; };
+  function hero(t, chips, tag) { const x = TK[t]; A.heroBlock(x.kick, x.title, chips, 'Back to overview'); if (tag) A.htag(tag); }
+  async function shareText(text) {
+    if (navigator.share) { try { await navigator.share({text}); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  }
+  async function copyText(text) { try { await navigator.clipboard.writeText(text); A.say('Copied. Paste it in vChat or WhatsApp.', 3500); } catch (e) { A.say('Could not copy on this device.', 3000); } }
+  async function shareCanvas(cv, fname, text) {
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    if (!blob) { A.say('Could not create the image.', 3000); return; }
+    let file = null; try { file = new File([blob], fname, {type: 'image/png'}); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({files: [file]})) { try { await navigator.share({files: [file], text, title: fname.replace(/\.png$/, '')}); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+    dlBlob(blob, fname); A.say('Card saved as an image. Attach it in vChat or WhatsApp.', 5000);
+  }
+
+  // ---------- tables from Excel / CSV
+  async function readTable(file) {
+    const n = file.name.toLowerCase();
+    if (/\.(csv|txt|tsv)$/.test(n)) return {[file.name.replace(/\.[^.]+$/, '').slice(0, 28) || 'Sheet1']: A.readCsv(await file.text())};
+    if (/\.(xlsx|xlsm)$/.test(n)) return await A.readXlsx(await file.arrayBuffer());
+    if (/\.xls$/.test(n)) throw new Error('Old .xls files cannot be read. Open it in Excel and save as .xlsx, then upload again.');
+    throw new Error('Please choose an Excel (.xlsx) or CSV file.');
+  }
+  function toTable(rows) {
+    rows = (rows || []).map(r => r || []); let best = 0, bs = -1;
+    for (let i = 0; i < Math.min(15, rows.length); i++) { const r = rows[i]; const ne = r.filter(v => v != null && String(v).trim() !== ''); const str = ne.filter(v => typeof v === 'string' && isNaN(+String(v).replace(/,/g, ''))).length; if (ne.length >= 2 && str > bs) { bs = str; best = i; } }
+    const raw = rows[best] || [], w = Math.max(raw.length, ...rows.slice(best + 1, best + 200).map(r => r.length), 0), used = {};
+    const hdr = []; for (let c = 0; c < w; c++) { let h = raw[c] == null || String(raw[c]).trim() === '' ? 'Column ' + (c + 1) : String(raw[c]).replace(/\s+/g, ' ').trim(); let k = h, n = 2; while (used[k.toLowerCase()]) k = h + ' (' + n++ + ')'; used[k.toLowerCase()] = 1; hdr.push(k); }
+    const body = rows.slice(best + 1).filter(r => r.some(v => v != null && String(v).trim() !== ''));
+    return {hdr, rows: body, hdrRow: best + 1};
+  }
+  const pick = (hdr, re, not) => hdr.findIndex(h => re.test(String(h).toLowerCase()) && !(not && not.test(String(h).toLowerCase())));
+  const RX = {
+    id: /retailer\s*(id|code)|store\s*(id|code)|dealer\s*(id|code)|outlet\s*(id|code)|user\s*id|^(retailer|id|code|rid)$|customer\s*code|shop\s*code/,
+    name: /retailer\s*name|store\s*name|shop\s*name|outlet\s*name|dealer\s*name|firm|^name$|party/,
+    st: /^state|state\s*name|^region$/,
+    town: /town|beat|route|area|city|cluster|market|district|taluk/,
+    last: /last.*visit|visit.*date|visited|^date$|visit\s*on/,
+    lat: /^lat|latitude/, lng: /^lon|^lng|longitude/, ph: /mobile|phone|contact/,
+    status: /status|active|inactive|state of account|activation/
+  };
+  function sheetPick(sheets, re) { let best = null, bn = -1; Object.keys(sheets).forEach(k => { const T = toTable(sheets[k]); const ok = pick(T.hdr, re) >= 0; const sc = (ok ? 1e9 : 0) + T.rows.length; if (sc > bn) { bn = sc; best = k; } }); return best; }
+
+  // ---------- small SVG charts
+  const NS = 'http://www.w3.org/2000/svg';
+  function svgEl(p, t, a) { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); if (p) p.appendChild(n); return n; }
+  function lineChart(labels, series, o) {
+    o = o || {}; const W = 640, H = o.h || 240, L = 54, R = 16, T = 16, B = 34, f = o.fmt || (v => fmtD(v, 1));
+    const vals = []; series.forEach(s => s.vals.forEach(v => { if (fin(v)) vals.push(v); })); if (fin(o.target)) vals.push(o.target);
+    const wrap = E('div'); if (!vals.length || !labels.length) { wrap.appendChild(emptyBox('No values to chart for this period.')); return wrap; }
+    let mn = Math.min(0, ...vals), mx = Math.max(...vals); if (mx === mn) mx = mn + 1; mx += (mx - mn) * 0.08;
+    const x = i => L + (labels.length < 2 ? (W - L - R) / 2 : i * (W - L - R) / (labels.length - 1)), y = v => T + (H - T - B) * (1 - (v - mn) / (mx - mn));
+    const s = svgEl(null, 'svg', {viewBox: '0 0 ' + W + ' ' + H, class: 'tl-svg', role: 'img'});
+    for (let i = 0; i <= 4; i++) { const v = mn + (mx - mn) * i / 4, yy = y(v); svgEl(s, 'line', {x1: L, x2: W - R, y1: yy, y2: yy, stroke: '#efe8d6'}); const t = svgEl(s, 'text', {x: L - 8, y: yy + 4, 'text-anchor': 'end'}); t.textContent = f(v); }
+    const step = Math.ceil(labels.length / 10); labels.forEach((l, i) => { if (i % step && i !== labels.length - 1) return; const t = svgEl(s, 'text', {x: x(i), y: H - 10, 'text-anchor': 'middle'}); t.textContent = l; });
+    if (fin(o.target)) { svgEl(s, 'line', {x1: L, x2: W - R, y1: y(o.target), y2: y(o.target), stroke: '#b3402f', 'stroke-dasharray': '5 4', 'stroke-width': 1.5}); const t = svgEl(s, 'text', {x: W - R, y: y(o.target) - 5, 'text-anchor': 'end', fill: '#b3402f'}); t.textContent = 'Target ' + f(o.target); }
+    series.forEach(se => {
+      let d = ''; se.vals.forEach((v, i) => { if (!fin(v)) return; d += (d ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); });
+      if (d) svgEl(s, 'path', {d, fill: 'none', stroke: se.col, 'stroke-width': se.w || 2.6, 'stroke-dasharray': se.dash || '', 'stroke-linejoin': 'round'});
+      se.vals.forEach((v, i) => { if (!fin(v)) return; const c = svgEl(s, 'circle', {cx: x(i), cy: y(v), r: 4, fill: '#fff', stroke: se.col, 'stroke-width': 2}); const ti = svgEl(c, 'title', {}); ti.textContent = se.name + ' · ' + labels[i] + ': ' + f(v); });
+    });
+    wrap.appendChild(s);
+    if (series.length > 1 || o.legend) { const lg = E('div', 'tl-leg'); series.forEach(se => { const sp = E('span'); const i = E('i'); i.style.background = se.col; if (se.dash) i.style.opacity = '.6'; sp.appendChild(i); sp.appendChild(document.createTextNode(se.name)); lg.appendChild(sp); }); wrap.appendChild(lg); }
+    return wrap;
+  }
+  function colChart(items, o) {
+    o = o || {}; const W = 640, H = o.h || 220, L = 46, R = 10, T = 14, B = 46, f = o.fmt || fmtN; const wrap = E('div');
+    if (!items.length) { wrap.appendChild(emptyBox('No values to chart.')); return wrap; }
+    const mx = Math.max(...items.map(i => i.v), 1e-9), bw = (W - L - R) / items.length;
+    const s = svgEl(null, 'svg', {viewBox: '0 0 ' + W + ' ' + H, class: 'tl-svg', role: 'img'}), y = v => T + (H - T - B) * (1 - v / mx);
+    for (let i = 0; i <= 3; i++) { const v = mx * i / 3; svgEl(s, 'line', {x1: L, x2: W - R, y1: y(v), y2: y(v), stroke: '#efe8d6'}); const t = svgEl(s, 'text', {x: L - 6, y: y(v) + 4, 'text-anchor': 'end'}); t.textContent = f(v); }
+    items.forEach((it, i) => {
+      const h = Math.max(1, (H - T - B) * it.v / mx), r = svgEl(s, 'rect', {x: L + i * bw + bw * 0.14, y: H - B - h, width: bw * 0.72, height: h, rx: 4, fill: it.col || o.col || '#c9a227'});
+      const ti = svgEl(r, 'title', {}); ti.textContent = it.label + ': ' + f(it.v);
+      if (items.length <= 14 || i % Math.ceil(items.length / 10) === 0) { const t = svgEl(s, 'text', {x: L + i * bw + bw / 2, y: H - B + 15, 'text-anchor': 'middle'}); t.textContent = String(it.label).length > 11 ? String(it.label).slice(0, 10) + '…' : it.label; }
+    });
+    wrap.appendChild(s); return wrap;
+  }
+  function donut(items, size, center) {
+    const S = size || 150, r = S / 2 - 12, c = S / 2, tot = items.reduce((a, i) => a + i.v, 0), s = svgEl(null, 'svg', {viewBox: '0 0 ' + S + ' ' + S, width: S, height: S, class: 'tl-ring'});
+    svgEl(s, 'circle', {cx: c, cy: c, r, fill: 'none', stroke: '#efe8d6', 'stroke-width': 18});
+    let a0 = -Math.PI / 2; if (tot > 0) items.forEach(it => { if (!it.v) return; const a1 = a0 + 2 * Math.PI * it.v / tot, big = a1 - a0 > Math.PI ? 1 : 0; if (it.v === tot) { svgEl(s, 'circle', {cx: c, cy: c, r, fill: 'none', stroke: it.col, 'stroke-width': 18}); } else { svgEl(s, 'path', {d: 'M' + (c + r * Math.cos(a0)) + ' ' + (c + r * Math.sin(a0)) + 'A' + r + ' ' + r + ' 0 ' + big + ' 1 ' + (c + r * Math.cos(a1)) + ' ' + (c + r * Math.sin(a1)), fill: 'none', stroke: it.col, 'stroke-width': 18}); } a0 = a1; });
+    if (center) { const t = svgEl(s, 'text', {x: c, y: c + 2, 'text-anchor': 'middle', 'font-size': S / 6, 'font-family': 'Georgia,serif', fill: '#111'}); t.textContent = center[0]; const t2 = svgEl(s, 'text', {x: c, y: c + S / 7, 'text-anchor': 'middle', 'font-size': 10, fill: '#6b6657'}); t2.textContent = center[1]; }
+    return s;
+  }
+  function ring(v, size) { const col = v >= 75 ? '#2e7d5b' : v >= 50 ? '#c9a227' : '#b3402f'; return donut([{v: v, col}, {v: 100 - v, col: 'transparent'}], size || 120, [String(v), 'out of 100']); }
+  function spark(vals, col) {
+    const W = 120, H = 34, s = svgEl(null, 'svg', {viewBox: '0 0 ' + W + ' ' + H, width: W, height: H}); const v = vals.filter(fin); if (v.length < 2) return s;
+    const mn = Math.min(...v), mx = Math.max(...v) === mn ? mn + 1 : Math.max(...v); let d = ''; vals.forEach((x, i) => { if (!fin(x)) return; d += (d ? 'L' : 'M') + (4 + i * (W - 8) / (vals.length - 1)).toFixed(1) + ' ' + (H - 4 - (H - 8) * (x - mn) / (mx - mn)).toFixed(1); });
+    svgEl(s, 'path', {d, fill: 'none', stroke: col || '#c9a227', 'stroke-width': 2.2}); return s;
+  }
+
+  // ---------- counts for tiles
+  function counts() {
+    const n = LS.get('notes', []).length, au = LS.get('audits', []).length, bm = LS.get('beat', null), id = ideasAll().length, k = kpisAll().length;
+    return {tlv: n ? n + ' saved' : '', tlp: au ? au + ' audits' : '', tlb: bm ? bm.n + ' in list' : '', tld: id ? id + ' ideas' : '', tlk: k ? k + ' KPIs' : ''};
+  }
+  function tile(x, cnt) { const a = E('a', 'tl-tile'); a.href = '#' + x.hash; a.appendChild(ico(x.ic)); a.appendChild(E('b', null, x.n)); a.appendChild(E('small', null, x.s)); if (cnt) a.appendChild(E('span', 'tl-cnt', cnt)); a.appendChild(E('span', 'tl-open', 'Open →')); a.addEventListener('click', ev => { ev.preventDefault(); A.go(x.t); }); return a; }
+
+  // =====================================================================================
+  // HUB
+  function rHub() {
+    hero('tl', [['8', 'tools in one place'], ['11', 'languages for voice notes'], ['On device', 'your entries stay here until you share'], ['Excel', 'export from every tool']], 'Field and HO tools that cut manual work. They run inside this dashboard and the app, with nothing to install.');
+    const root = page('tl'), ct = counts();
+    [['field', 'For field teams', 'Capture the market faster', 'Speak, snap and plan the day.'], ['bi', 'For BI teams', 'Replace manual Excel work', 'Reconcile, analyse and build your own KPIs.'], ['collab', 'Share and collaborate', 'Spread results and ideas', 'Share KPI cards on vChat or WhatsApp, and vote on the best ideas.']].forEach(g => {
+      const s = A.sec(g[1], g[2], g[3]), gr = E('div', 'tl-grid'); LIST.filter(x => x.grp === g[0]).forEach(x => gr.appendChild(tile(x, ct[x.t]))); s.appendChild(gr); root.appendChild(s);
+    });
+    const s4 = A.sec('Good to know', 'Where your entries are kept', null);
+    s4.appendChild(A.card(A.bullets(['Voice notes, photo audits, the beat list and uploaded files stay on this phone or computer. Nothing is sent anywhere until you tap Share or Export.', 'Every tool has an Excel export, so HO can collect the results in one place.', 'Custom KPIs and ideas added by the HO admin are saved inside the dashboard file, so every state sees them in the next shared file.', 'The idea box can also connect to a shared Google Sheet so votes from all states count together. Setup steps are on the idea box page.'])));
+    root.appendChild(s4);
+  }
+
+  // =====================================================================================
+  // 1. VOICE NOTES
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const LANGS = [['hi-IN', 'Hindi · हिन्दी'], ['en-IN', 'English (India)'], ['mr-IN', 'Marathi · मराठी'], ['bn-IN', 'Bengali · বাংলা'], ['ta-IN', 'Tamil · தமிழ்'], ['te-IN', 'Telugu · తెలుగు'], ['gu-IN', 'Gujarati · ગુજરાતી'], ['kn-IN', 'Kannada · ಕನ್ನಡ'], ['ml-IN', 'Malayalam · മലയാളം'], ['pa-IN', 'Punjabi · ਪੰਜਾਬੀ'], ['or-IN', 'Odia · ଓଡ଼ିଆ']];
+  const langName = c => (LANGS.find(l => l[0] === c) || [c, c])[1];
+  const QDEF = ['How happy is the retailer with the vivo Retailer App? Give 1 to 5.', 'Which app feature do they use the most?', 'Any problem with payout, scheme or stock?', 'What is the competition doing in this market?', 'Any suggestion for vivo?'];
+  const V = {mode: 'visit', lang: LS.get('vlang', 'hi-IN'), text: '', rid: '', store: '', ans: {}};
+  const TOPICS = [
+    ['Stock', ['stock', 'inventory', 'supply', 'shortage', 'out of stock', 'no stock', 'maal', 'माल', 'स्टॉक', 'स्टोक', 'सप्लाई', 'इन्वेंटरी', 'স্টক', 'ஸ்டாக்', 'స్టాక్', 'સ્ટોક', 'ಸ್ಟಾಕ್', 'സ്റ്റോക്ക്', 'ਸਟਾਕ']],
+    ['Payout / incentive', ['payout', 'incentive', 'payment', 'commission', 'paisa', 'paise', 'पेमेंट', 'भुगतान', 'इंसेंटिव', 'इन्सेंटिव', 'पैसा', 'पैसे', 'कमीशन', 'পেমেন্ট', 'பேமெண்ட்', 'పేమెంట్', 'પેમેન્ટ', 'ಪೇಮೆಂಟ್', 'ਪੇਮੈਂਟ']],
+    ['Scheme', ['scheme', 'offer', 'slab', 'स्कीम', 'योजना', 'ऑफर', 'स्लैब', 'স্কিম', 'ஸ்கீம்', 'స్కీమ్', 'સ્કીમ', 'ಸ್ಕೀಮ್', 'ਸਕੀਮ']],
+    ['Retailer app / login', ['app', 'login', 'otp', 'password', 'vchat', 'application', 'ऐप', 'एप', 'एप्प', 'लॉगिन', 'ओटीपी', 'অ্যাপ', 'ஆப்', 'యాప్', 'એપ', 'ಆಪ್', 'ਐਪ']],
+    ['Display / branding', ['display', 'branding', 'glow sign', 'standee', 'dangler', 'poster', 'banner', 'signboard', 'board', 'डिस्प्ले', 'ब्रांडिंग', 'बोर्ड', 'पोस्टर', 'बैनर']],
+    ['Pricing / margin', ['price', 'pricing', 'rate', 'margin', 'mrp', 'discount', 'दाम', 'कीमत', 'रेट', 'मार्जिन', 'डिस्काउंट']],
+    ['Finance / EMI', ['emi', 'finance', 'loan', 'bajaj', 'hdb', 'tvs credit', 'zero down', 'फाइनेंस', 'ईएमआई', 'किस्त', 'लोन']],
+    ['Demo device', ['demo', 'dummy', 'डेमो', 'डमी']],
+    ['Service / repair', ['service', 'repair', 'warranty', 'सर्विस', 'रिपेयर', 'वारंटी', 'खराब']],
+    ['Training', ['training', 'trained', 'ट्रेनिंग', 'प्रशिक्षण']],
+    ['IMEI / activation', ['imei', 'activation', 'activate', 'pre-activ', 'एक्टिवेशन', 'आईएमईआई']],
+    ['Sales / target', ['sale', 'sales', 'target', 'sell', 'बिक्री', 'सेल', 'टारगेट', 'लक्ष्य']]
+  ];
+  const COMPS = [['Samsung', ['samsung', 'सैमसंग', 'স্যামসাং', 'சாம்சங்', 'సామ్‌సంగ్', 'સેમસંગ']], ['OPPO', ['oppo', 'ओप्पो', 'ऑप्पो', 'ओपो']], ['Xiaomi / Redmi', ['xiaomi', 'redmi', '\\bmi\\b', 'शाओमी', 'श्याओमी', 'रेडमी']], ['realme', ['realme', 'real me', 'रियलमी']], ['OnePlus', ['oneplus', 'one plus', 'वनप्लस']], ['Apple', ['apple', 'iphone', 'आईफोन', 'एप्पल']], ['Motorola', ['motorola', '\\bmoto\\b', 'मोटोरोला']], ['POCO', ['poco', 'पोको']], ['Infinix / Tecno / itel', ['infinix', 'tecno', 'itel']], ['Lava', ['\\blava\\b', 'लावा']], ['Nothing', ['nothing phone']]];
+  const NEG = ['problem', 'issue', 'complaint', 'not working', 'pending', 'delay', 'late', 'angry', 'unhappy', 'not happy', 'bad', 'poor', 'nahi', 'nahin', 'नहीं', 'नही', 'समस्या', 'दिक्कत', 'परेशानी', 'शिकायत', 'नाराज', 'खराब', 'बंद', 'देरी', 'पेंडिंग', 'कम'];
+  const POS = ['good', 'happy', 'satisfied', 'great', 'excellent', 'increase', 'growth', 'improved', 'अच्छा', 'अच्छी', 'खुश', 'बढ़िया', 'बढिया', 'संतुष्ट', 'बढ़', 'ठीक'];
+  const ACTW = ['will ', 'need', 'should', 'follow up', 'follow-up', 'request', 'asked', 'want', 'next', 'tomorrow', 'pending', 'कल', 'चाहिए', 'करना', 'करेंगे', 'भेजना', 'भेजो', 'मांग', 'दिलाना'];
+  const hasW = (t, w) => /^\\b|\\b$/.test(w) ? new RegExp(w, 'i').test(t) : /^[a-z0-9 .\-]+$/i.test(w) ? new RegExp('(^|[^a-z])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(t) : t.indexOf(w) >= 0;
+  const NUMW = {one: 1, two: 2, three: 3, four: 4, five: 5, 'एक': 1, 'दो': 2, 'तीन': 3, 'चार': 4, 'पांच': 5, 'पाँच': 5};
+  function findRid(text) {
+    const toks = String(text).toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean), cm = codeMap();
+    for (let i = 0; i < toks.length; i++) for (let j = i; j < Math.min(toks.length, i + 5); j++) { const c = toks.slice(i, j + 1).join(''); if (/^[A-Z]{2,4}[A-Z0-9]{5,9}$/.test(c) && (c.match(/\d/g) || []).length >= 4) { if (cm[c.slice(0, -7)] || /^[A-Z]{2,3}[A-Z]?\d{5,8}$/.test(c)) return c; } }
+    return '';
+  }
+  function parseNote(text) {
+    const t = String(text || ''), lo = t.toLowerCase();
+    const topics = TOPICS.filter(x => x[1].some(w => hasW(lo, w))).map(x => x[0]);
+    const comps = COMPS.filter(x => x[1].some(w => hasW(lo, w))).map(x => x[0]); if (comps.length && topics.indexOf('Competition') < 0) topics.push('Competition');
+    const nums = []; let m; const re1 = /(\d+(?:\.\d+)?)\s*(%|percent|प्रतिशत|परसेंट|पर्सेंट)/gi; while ((m = re1.exec(t))) nums.push(m[1] + '%');
+    const re2 = /(?:₹|rs\.?|rupees?|रुपये|रुपए|रूपये)\s*([\d,]+)|([\d,]{2,})\s*(?:rs|rupees?|रुपये|रुपए|रूपये|₹)/gi; while ((m = re2.exec(t))) nums.push('₹' + (m[1] || m[2]));
+    const re3 = /(\d+)\s*(pcs|pieces|units|phones|handsets|sets|पीस|फोन|मोबाइल|सेट)/gi; while ((m = re3.exec(t))) nums.push(m[1] + ' ' + m[2]);
+    const re4 = /(\d+)\s*(days|day|दिन)/gi; while ((m = re4.exec(t))) nums.push(m[1] + ' days');
+    const neg = NEG.filter(w => hasW(lo, w)).length, pos = POS.filter(w => hasW(lo, w)).length;
+    const sentiment = neg > pos ? 'Needs attention' : pos > neg ? 'Positive' : 'Neutral';
+    const sents = t.split(/[.!?।\n]+/).map(s => s.trim()).filter(s => s.length > 3);
+    const actions = sents.filter(s => ACTW.some(w => s.toLowerCase().indexOf(w) >= 0)).slice(0, 6);
+    const urgent = topics.some(x => /Payout|Stock|app/.test(x));
+    const priority = neg >= 2 || (neg >= 1 && urgent) ? 'High' : neg >= 1 || actions.length ? 'Medium' : 'Low';
+    let rating = null; const rm = /\b([1-5])\b/.exec(t); if (rm) rating = +rm[1]; else { for (const k in NUMW) if (hasW(lo, k)) { rating = NUMW[k]; break; } }
+    const summary = sents.length ? (sents[0].length > 150 ? sents[0].slice(0, 147) + '…' : sents[0]) : '';
+    return {rid: findRid(t), topics, comps, nums: Array.from(new Set(nums)), sentiment, priority, actions, rating, summary};
+  }
+  let REC = null, RECON = false, RECBTN = null, RECCB = null;
+  function setInterim(t) { const n = document.getElementById('tl-interim'); if (n) n.textContent = t ? '… ' + t : ''; }
+  function markMic() {
+    document.querySelectorAll('.tl-mic').forEach(b => { const on = RECON && b === RECBTN; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.innerHTML = svgI(on ? 'stop' : 'mic'); });
+    const st = document.getElementById('tl-mst'); if (st) st.innerHTML = RECON ? '<b>Listening…</b><small>Speak now in ' + langName(V.lang) + '. Tap the red button to stop.</small>' : '<b>Tap the mic and speak</b><small>' + langName(V.lang) + (SR ? '' : ' · voice typing not available here, use the keyboard mic') + '</small>';
+  }
+  function startRec(b, cb) {
+    if (RECON && RECBTN === b) { stopRec(); return; }
+    stopRec(); if (!SR) { A.say('Voice typing is not available in this browser. Tap the text box and use the mic on your keyboard.', 6000); return; }
+    const r = new SR(); r.lang = V.lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = e => { let f = '', it = ''; for (let i = e.resultIndex; i < e.results.length; i++) { const x = e.results[i]; if (x.isFinal) f += x[0].transcript; else it += x[0].transcript; } if (f && RECCB) RECCB(f.trim()); setInterim(it); };
+    r.onerror = e => { const er = e && e.error; if (er === 'no-speech' || er === 'aborted') return; RECON = false; A.say(er === 'not-allowed' || er === 'service-not-allowed' ? 'Microphone is blocked. Allow the mic for this site in the browser or app settings.' : er === 'network' ? 'Voice typing needs internet. Check the connection.' : er === 'language-not-supported' ? 'This language is not available for voice on this phone. Try Hindi or English.' : 'Voice typing stopped: ' + er, 6000); };
+    r.onend = () => { if (RECON && REC === r) { try { r.start(); return; } catch (x) {} } if (REC === r) { REC = null; RECON = false; markMic(); setInterim(''); } };
+    REC = r; RECON = true; RECBTN = b; RECCB = cb; try { r.start(); } catch (x) { RECON = false; REC = null; } markMic();
+  }
+  function stopRec() { RECON = false; const r = REC; REC = null; if (r) { try { r.stop(); } catch (x) {} } markMic(); setInterim(''); }
+  const vQs = () => LS.get('vq', QDEF);
+  function vText() { return V.mode === 'visit' ? V.text : vQs().map((q, i) => V.ans[i] ? q + ' — ' + V.ans[i] : '').filter(Boolean).join('. '); }
+  function rVoice() {
+    const notes = LS.get('notes', []);
+    hero('tlv', [[String(notes.length), 'notes saved on this device'], ['11', 'Indian languages'], ['Auto', 'topics, competitors, follow-ups'], ['Excel', 'export for HO']], 'Speak naturally. The app writes it down and picks out the retailer ID, topics, competitors, numbers and follow-up actions.');
+    if (mounted('tlv')) { markMic(); return; }
+    const root = page('tlv');
+    const s1 = A.sec('Step 1', 'Speak your note', 'Pick the language, tap the mic and speak. Tap again to stop. You can correct the text before saving.');
+    const c1 = E('div', 'card'); const top = E('div', 'tl-acts'); top.style.marginTop = '0';
+    top.appendChild(segCtl([['visit', 'Visit note'], ['survey', 'Survey answers']], V.mode, v => { V.mode = v; stopRec(); paint(); }));
+    c1.appendChild(top);
+    const fm = E('div', 'tl-form'), ls = selOpts(inp('select'), LANGS, V.lang), ri = inp('text', V.rid, 'e.g. BRE010294'), sn = inp('text', V.store, 'Store or retailer name');
+    ls.addEventListener('change', () => { V.lang = ls.value; LS.set('vlang', V.lang); if (RECON) stopRec(); markMic(); });
+    ri.addEventListener('input', () => { V.rid = ri.value.trim().toUpperCase(); }); sn.addEventListener('input', () => { V.store = sn.value; });
+    fm.appendChild(field('Language', ls)); fm.appendChild(field('Retailer ID (spoken IDs fill in)', ri)); fm.appendChild(field('Store name', sn)); c1.appendChild(fm);
+    const mb = E('div'); c1.appendChild(mb); s1.appendChild(c1); root.appendChild(s1);
+    const s2 = A.sec('Step 2', 'Structured note', 'Picked out automatically from what you said. It updates as you speak or type.');
+    const c2 = E('div', 'card'); s2.appendChild(c2); root.appendChild(s2);
+    const s3 = A.sec('Saved', 'Notes on this device', 'Saving a note with a retailer ID also marks that retailer as visited today in the beat planner.');
+    const c3 = E('div'); s3.appendChild(c3); root.appendChild(s3);
+    let tmr = null; const upd = () => { clearTimeout(tmr); tmr = setTimeout(() => paintStruct(c2, ri), 250); };
+    function paint() {
+      mb.replaceChildren(); const mw = E('div', 'tl-micwrap');
+      if (V.mode === 'visit') {
+        const mic = E('button', 'tl-mic'); mic.type = 'button'; mic.setAttribute('aria-label', 'Start or stop voice typing'); mw.appendChild(mic); const ms = E('div', 'tl-mstat'); ms.id = 'tl-mst'; mw.appendChild(ms); mb.appendChild(mw);
+        const iv = E('div', 'tl-interim'); iv.id = 'tl-interim'; mb.appendChild(iv);
+        const ta = inp('textarea', V.text, 'Your words appear here. Example: Retailer BRE010294, stock of Y-series is low, payout for September pending, Samsung giving 500 extra margin. Need to follow up on payout tomorrow.'); ta.rows = 6;
+        ta.addEventListener('input', () => { V.text = ta.value; upd(); });
+        mic.addEventListener('click', () => startRec(mic, f => { V.text = (V.text ? V.text.replace(/\s+$/, '') + (/[.!?।]$/.test(V.text.trim()) ? ' ' : '. ') : '') + f; ta.value = V.text; ta.scrollTop = ta.scrollHeight; upd(); }));
+        mb.appendChild(ta);
+      } else {
+        const ms = E('div', 'tl-mstat'); ms.id = 'tl-mst'; mw.appendChild(ms); mb.appendChild(mw); const iv = E('div', 'tl-interim'); iv.id = 'tl-interim'; mb.appendChild(iv);
+        vQs().forEach((q, i) => {
+          const w = E('div', 'tl-q'), hd = E('div', 'tl-qh'); hd.appendChild(E('span', 'tl-qn', String(i + 1))); hd.appendChild(E('b', null, q)); const mic = E('button', 'tl-mic sm'); mic.type = 'button'; mic.setAttribute('aria-label', 'Answer question ' + (i + 1) + ' by voice'); hd.appendChild(mic); w.appendChild(hd);
+          const ta = inp('textarea', V.ans[i] || '', 'Speak or type the answer'); ta.rows = 2; ta.addEventListener('input', () => { V.ans[i] = ta.value; upd(); });
+          mic.addEventListener('click', () => startRec(mic, f => { V.ans[i] = ((V.ans[i] || '') + ' ' + f).trim(); ta.value = V.ans[i]; upd(); }));
+          w.appendChild(ta); mb.appendChild(w);
+        });
+        const det = E('details', 'tl-det'); det.appendChild(E('summary', null, 'Edit the survey questions')); const qa = inp('textarea', vQs().join('\n')); qa.rows = 6; det.appendChild(E('p', 'note', 'One question per line. Saved on this device.')); det.appendChild(qa);
+        const qa2 = E('div', 'tl-acts'); qa2.appendChild(btn('Save questions', 'big', () => { const qs = qa.value.split('\n').map(s => s.trim()).filter(Boolean); if (!qs.length) return; LS.set('vq', qs); V.ans = {}; paint(); A.say('Questions saved.', 2500); })); qa2.appendChild(btn('Reset to default', 'ghost', () => { LS.del('vq'); V.ans = {}; paint(); })); det.appendChild(qa2); mb.appendChild(det);
+      }
+      const ac = E('div', 'tl-acts'); ac.appendChild(btn('✓ Save note', 'big', save)); ac.appendChild(btn('Clear', 'ghost', () => { stopRec(); V.text = ''; V.ans = {}; V.rid = ''; V.store = ''; ri.value = ''; sn.value = ''; paint(); }));
+      if (!SR) ac.appendChild(E('span', 'note', 'Voice typing is not available here. Use the mic on your phone keyboard.'));
+      mb.appendChild(ac); markMic(); paintStruct(c2, ri);
+    }
+    function save() {
+      stopRec(); const txt = vText().trim(); if (!txt) { A.say('Speak or type the note first.', 3000); return; }
+      const p = parseNote(txt), rid = (V.rid || p.rid || '').toUpperCase();
+      const n = {id: uid(), at: new Date().toISOString(), mode: V.mode, lang: V.lang, rid, store: V.store, text: txt, ans: V.mode === 'survey' ? vQs().map((q, i) => ({q, a: V.ans[i] || '', r: V.ans[i] ? parseNote(V.ans[i]).rating : null})) : null, topics: p.topics, comps: p.comps, nums: p.nums, sentiment: p.sentiment, priority: p.priority, actions: p.actions, summary: p.summary};
+      const all = LS.get('notes', []); all.unshift(n); if (!LS.set('notes', all.slice(0, 400))) { A.say('Phone storage is full. Export and clear old notes.', 5000); return; }
+      if (rid) markVisited(rid);
+      V.text = ''; V.ans = {}; V.rid = ''; V.store = ''; ri.value = ''; sn.value = ''; paint(); paintSaved(c3); hero('tlv', [[String(all.length), 'notes saved on this device'], ['11', 'Indian languages'], ['Auto', 'topics, competitors, follow-ups'], ['Excel', 'export for HO']], null);
+      A.say('Note saved' + (rid ? ' and ' + rid + ' marked as visited.' : '.'), 3500);
+    }
+    paint(); paintSaved(c3);
+  }
+  function paintStruct(c2, ri) {
+    c2.replaceChildren(); const txt = vText(); if (!txt.trim()) { c2.appendChild(emptyBox('Start speaking. The retailer, topics, competitors and actions will show here.')); return; }
+    const p = parseNote(txt); if (p.rid && !V.rid) { V.rid = p.rid; if (ri) ri.value = p.rid; }
+    const dl = E('dl', 'tl-kv'), row = (k, node) => { dl.appendChild(E('dt', null, k)); const dd = E('dd'); dd.appendChild(node); dl.appendChild(dd); };
+    const chips = (arr, cls, none) => { const w = E('div', 'tl-chips'); if (!arr.length) w.appendChild(E('span', 'note', none || 'None found')); arr.forEach(x => w.appendChild(E('span', 'tl-chip ' + (cls || ''), x))); return w; };
+    row('Retailer', E('span', null, (V.rid || p.rid || 'Not found, type it above') + (V.store ? ' · ' + V.store : '')));
+    const pr = E('span'); const bd = E('span', 'tl-badge ' + (p.priority === 'High' ? 'hi' : p.priority === 'Medium' ? 'md' : 'lo'), p.priority); pr.appendChild(bd); pr.appendChild(document.createTextNode('  ' + p.sentiment)); row('Priority', pr);
+    row('Topics', chips(p.topics, 'gold')); row('Competitors', chips(p.comps, 'red', 'No competitor named'));
+    if (p.nums.length) row('Numbers', chips(p.nums, 'dark'));
+    if (V.mode === 'survey') { const ul = E('ul'); vQs().forEach((q, i) => { if (!V.ans[i]) return; const r = parseNote(V.ans[i]).rating; const li = E('li'); li.appendChild(E('b', null, 'Q' + (i + 1) + ': ')); li.appendChild(document.createTextNode(V.ans[i] + (i === 0 && r ? '  (rating ' + r + '/5)' : ''))); ul.appendChild(li); }); row('Answers', ul); }
+    const ul = E('ul'); if (!p.actions.length) ul.appendChild(E('li', 'note', 'No follow-up found')); p.actions.forEach(a => ul.appendChild(E('li', null, a))); row('Follow-ups', ul);
+    if (p.summary) row('Summary', E('span', null, p.summary));
+    c2.appendChild(dl);
+  }
+  function noteText(n) {
+    return '*' + (n.mode === 'survey' ? 'Survey answers' : 'Visit note') + '* · ' + tlabel(n.at) + '\n' + (n.rid ? 'Retailer: ' + n.rid + (n.store ? ' (' + n.store + ')' : '') + '\n' : '') + 'Priority: ' + n.priority + ' · ' + n.sentiment + '\n' + (n.topics.length ? 'Topics: ' + n.topics.join(', ') + '\n' : '') + (n.comps.length ? 'Competitors: ' + n.comps.join(', ') + '\n' : '') + (n.actions.length ? 'Follow-ups:\n' + n.actions.map(a => '• ' + a).join('\n') + '\n' : '') + '\n' + (n.ans ? n.ans.filter(x => x.a).map((x, i) => 'Q' + (i + 1) + '. ' + x.q + '\n→ ' + x.a).join('\n') : n.text);
+  }
+  function paintSaved(c3) {
+    c3.replaceChildren(); const all = LS.get('notes', []);
+    const tb = E('div', 'tl-acts'); tb.style.margin = '0 0 12px';
+    tb.appendChild(btn('⬇ Export all to Excel', 'big', () => { if (!all.length) { A.say('No notes yet.', 2500); return; } const rows = [['Date', 'Type', 'Language', 'Retailer ID', 'Store', 'Priority', 'Sentiment', 'Topics', 'Competitors', 'Numbers', 'Follow-ups', 'Rating (Q1)', 'Note']]; all.forEach(n => rows.push([tlabel(n.at), n.mode === 'survey' ? 'Survey' : 'Visit note', langName(n.lang), n.rid, n.store || '', n.priority, n.sentiment, n.topics.join(', '), n.comps.join(', '), n.nums.join(', '), n.actions.join(' | '), n.ans && n.ans[0] && n.ans[0].r ? n.ans[0].r : '', n.ans ? n.ans.filter(x => x.a).map(x => x.q + ' → ' + x.a).join(' | ') : n.text])); A.saveXlsx([{name: 'Voice notes', rows}], 'Voice_Notes_' + today() + '.xlsx'); }));
+    if (all.length) tb.appendChild(btn('Delete all', 'red', () => { if (!confirmIt('Delete all ' + all.length + ' notes from this device?')) return; LS.set('notes', []); paintSaved(c3); }));
+    c3.appendChild(tb);
+    if (!all.length) { c3.appendChild(A.card(emptyBox('No notes yet. Your saved notes appear here.'))); return; }
+    const l = E('div', 'tl-list');
+    all.slice(0, 60).forEach(n => {
+      const it = E('div', 'tl-item'), mn = E('div', 'tl-main'); const hd = E('div'); hd.appendChild(E('span', 'tl-badge ' + (n.priority === 'High' ? 'hi' : n.priority === 'Medium' ? 'md' : 'lo'), n.priority)); hd.appendChild(document.createTextNode('  ')); hd.appendChild(E('b', null, (n.rid || 'No retailer ID') + (n.store ? ' · ' + n.store : '')));
+      mn.appendChild(hd); mn.appendChild(E('p', null, n.summary || n.text.slice(0, 160)));
+      const ch = E('div', 'tl-chips'); n.topics.concat(n.comps).slice(0, 6).forEach(x => ch.appendChild(E('span', 'tl-chip', x))); mn.appendChild(ch);
+      mn.appendChild(E('div', 'tl-meta', (n.mode === 'survey' ? 'Survey' : 'Visit note') + ' · ' + langName(n.lang) + ' · ' + tlabel(n.at))); it.appendChild(mn);
+      const sd = E('div', 'tl-side'); sd.appendChild(btn('Share', null, () => shareText(noteText(n)))); sd.appendChild(btn('Delete', 'red', () => { LS.set('notes', LS.get('notes', []).filter(x => x.id !== n.id)); paintSaved(c3); })); it.appendChild(sd); l.appendChild(it);
+    });
+    c3.appendChild(l); if (all.length > 60) c3.appendChild(E('p', 'note', 'Showing the latest 60 of ' + all.length + '. Export to Excel for all.'));
+  }
+  // window.confirm is avoided inside the app wrapper; a second tap within 4 seconds confirms instead
+  let CONF = {t: '', at: 0};
+  function confirmIt(msg) { const now = Date.now(); if (CONF.t === msg && now - CONF.at < 4000) { CONF = {t: '', at: 0}; return true; } CONF = {t: msg, at: now}; A.say(msg + ' Tap again to confirm.', 4000); return false; }
+
+  // =====================================================================================
+  // 2. PHOTO AUDIT
+  const BRANDS = [['vivo', '#415fff'], ['Samsung', '#1428a0'], ['OPPO', '#1ba784'], ['Xiaomi', '#ff6900'], ['realme', '#e0b400'], ['OnePlus', '#eb0028'], ['Apple', '#8e8e93'], ['Other', '#6b6657']];
+  const BC = {}; BRANDS.forEach(b => { BC[b[0]] = b[1]; });
+  const POSI = [['glow', 'vivo glow sign or fascia board'], ['wall', 'Brand wall or backdrop'], ['standee', 'Standee'], ['dangler', 'Danglers or ceiling hangers'], ['table', 'Demo table or fixture'], ['live', 'Live demo units switched on'], ['price', 'Price cards on every device'], ['scheme', 'Scheme or offer poster'], ['emi', 'Affordability / EMI poster']];
+  const P = {src: null, tags: [], brand: 'vivo', pos: {}, rid: '', store: '', note: '', auto: null, target: LS.get('sostgt', 30)};
+  function loadImg(file) {
+    return new Promise((res, rej) => { const fr = new FileReader(); fr.onerror = () => rej(new Error('Could not read the photo.')); fr.onload = () => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('This file is not a photo the browser can open.')); im.src = fr.result; }; fr.readAsDataURL(file); });
+  }
+  function scaled(im, max, q) { const s = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement('canvas'); c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); return q ? c.toDataURL('image/jpeg', q) : c; }
+  function analyse(im) {
+    const c = scaled(im, 220), g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data, n = c.width * c.height;
+    const cnt = {vivo: 0, Samsung: 0, OPPO: 0, Xiaomi: 0, realme: 0, OnePlus: 0}; let lum = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i] / 255, gg = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), l = (mx + mn) / 2, dd = mx - mn; lum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      if (dd < 0.12) continue; const s = dd / (1 - Math.abs(2 * l - 1) || 1); let h = mx === r ? 60 * (((gg - b) / dd) % 6) : mx === gg ? 60 * ((b - r) / dd + 2) : 60 * ((r - gg) / dd + 4); if (h < 0) h += 360;
+      if (h >= 212 && h <= 240 && s > 0.5 && l >= 0.36 && l <= 0.78) cnt.vivo++;
+      else if (h >= 218 && h <= 248 && s > 0.45 && l >= 0.12 && l < 0.36) cnt.Samsung++;
+      else if (h >= 135 && h <= 172 && s > 0.38 && l >= 0.22 && l <= 0.66) cnt.OPPO++;
+      else if (h >= 14 && h <= 32 && s > 0.6 && l >= 0.38 && l <= 0.72) cnt.Xiaomi++;
+      else if (h >= 44 && h <= 58 && s > 0.6 && l >= 0.42 && l <= 0.78) cnt.realme++;
+      else if ((h >= 348 || h <= 8) && s > 0.6 && l >= 0.32 && l <= 0.64) cnt.OnePlus++;
+    }
+    // sharpness: variance of a Laplacian on a 320px grey copy
+    const c2 = scaled(im, 320), g2 = c2.getContext('2d'), w = c2.width, hh = c2.height, p = g2.getImageData(0, 0, w, hh).data, gr = new Float32Array(w * hh);
+    for (let i = 0; i < w * hh; i++) gr[i] = 0.299 * p[i * 4] + 0.587 * p[i * 4 + 1] + 0.114 * p[i * 4 + 2];
+    let sm = 0, sq = 0, k = 0; for (let y = 1; y < hh - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, v = 4 * gr[i] - gr[i - 1] - gr[i + 1] - gr[i - w] - gr[i + w]; sm += v; sq += v * v; k++; }
+    const sharp = k ? sq / k - (sm / k) * (sm / k) : 0, bright = lum / n;
+    const col = {}; Object.keys(cnt).forEach(x => { col[x] = cnt[x] / n; });
+    const warn = []; if (bright < 70) warn.push('Photo is dark. Turn on the flash or move closer to the light.'); if (bright > 225) warn.push('Photo is overexposed.'); if (sharp < 60) warn.push('Photo may be blurry. Hold steady and retake.'); if (Math.max(im.naturalWidth, im.naturalHeight) < 800) warn.push('Low resolution photo.');
+    return {col, bright, sharp, w: im.naturalWidth, h: im.naturalHeight, warn, qual: warn.length === 0 ? 1 : warn.length === 1 ? 0.6 : 0.25};
+  }
+  function pScore() {
+    const n = P.tags.length, vv = P.tags.filter(t => t.b === 'vivo').length, sos = n ? vv / n : null, posY = POSI.filter(p => P.pos[p[0]]).length;
+    const q = P.auto ? P.auto.qual : 1, sp = sos == null ? 0 : Math.min(1, sos / Math.max(0.01, P.target / 100));
+    return {n, vv, sos, posY, posN: POSI.length, score: Math.round(100 * (0.4 * sp + 0.45 * posY / POSI.length + 0.15 * q)), missing: POSI.filter(p => !P.pos[p[0]]).map(p => p[1]), by: BRANDS.map(b => [b[0], P.tags.filter(t => t.b === b[0]).length]).filter(x => x[1] > 0)};
+  }
+  function rPhoto() {
+    const au = LS.get('audits', []), avg = au.length ? Math.round(au.reduce((a, x) => a + x.score, 0) / au.length) : null;
+    hero('tlp', [[String(au.length), 'audits saved'], [avg == null ? '—' : String(avg), 'average audit score'], [P.target + '%', 'vivo share of shelf target'], [String(POSI.length), 'POS items checked']], 'Snap the counter. The app checks the photo, estimates brand colour presence and builds share of shelf as you tap each phone on the photo.');
+    if (mounted('tlp')) return;
+    const root = page('tlp');
+    const s1 = A.sec('Step 1', 'Take or choose a photo', 'Stand back so the whole counter or shelf is in the frame.');
+    const c1 = E('div'); s1.appendChild(c1); root.appendChild(s1);
+    const sx = E('div'); root.appendChild(sx);
+    const s6 = A.sec('Saved', 'Audits on this device', 'Saving an audit with a retailer ID also marks that retailer as visited today in the beat planner.'); const c6 = E('div'); s6.appendChild(c6); root.appendChild(s6);
+    const onFile = async f => { try { A.say('Reading the photo…'); const im = await loadImg(f); P.src = scaled(im, 1600, 0.86); P.thumb = scaled(im, 420, 0.72); P.auto = analyse(im); P.tags = []; P.pos = {}; if (P.auto.col.vivo > 0.01) P.pos.glow = false; paintPhoto(); A.say('Photo ready. Tap each phone on the photo to tag its brand.', 4500); } catch (e) { A.say(e.message || String(e), 5000); } };
+    function paintPhoto() {
+      c1.replaceChildren();
+      if (!P.src) {
+        const up = E('div', 'tl-up'); up.appendChild(ico('camera')); up.appendChild(E('b', null, 'Photo of the display or shelf')); up.appendChild(E('small', 'note', 'JPG or PNG. On a phone, Take photo opens the camera.'));
+        const ac = E('div', 'tl-acts'); ac.style.justifyContent = 'center'; ac.appendChild(fileBtn('📷 Take photo', 'image/*', onFile, {capture: 'environment'})); ac.appendChild(fileBtn('Choose from gallery', 'image/*', onFile, {cls: 'ghost'})); up.appendChild(ac);
+        up.addEventListener('dragover', ev => { ev.preventDefault(); up.classList.add('drag'); }); up.addEventListener('dragleave', () => up.classList.remove('drag')); up.addEventListener('drop', ev => { ev.preventDefault(); up.classList.remove('drag'); const f = ev.dataTransfer.files[0]; if (f) onFile(f); });
+        c1.appendChild(up); sx.replaceChildren(); return;
+      }
+      const g = E('div', 'g2'), lc = E('div', 'card'), rc = E('div', 'card');
+      lc.appendChild(E('div', 'note', 'Pick a brand, then tap each phone on the photo. Tap a marker again to remove it.'));
+      const br = E('div', 'tl-brands'); lc.appendChild(br);
+      const ph = E('div', 'tl-photo'), img = E('img'); img.src = P.src; img.alt = 'Store display photo'; img.draggable = false; ph.appendChild(img); lc.appendChild(ph);
+      const ac = E('div', 'tl-acts'); ac.appendChild(btn('↶ Undo', 'ghost', () => { P.tags.pop(); paintTags(); paintStats(); })); ac.appendChild(btn('Clear tags', 'ghost', () => { P.tags = []; paintTags(); paintStats(); })); ac.appendChild(fileBtn('New photo', 'image/*', onFile, {cls: 'ghost'})); ac.appendChild(btn('Remove photo', 'red', () => { P.src = null; P.tags = []; P.pos = {}; P.auto = null; paintPhoto(); })); lc.appendChild(ac);
+      function paintBrands() { br.replaceChildren(); BRANDS.forEach(b => { const n = P.tags.filter(t => t.b === b[0]).length, x = E('button', b[0] === P.brand ? 'on' : null); x.type = 'button'; const i = E('i'); i.style.background = b[1]; x.appendChild(i); x.appendChild(document.createTextNode(b[0])); if (n) x.appendChild(E('em', null, String(n))); x.addEventListener('click', () => { P.brand = b[0]; paintBrands(); }); br.appendChild(x); }); }
+      function paintTags() { ph.querySelectorAll('.tl-mk').forEach(m => m.remove()); P.tags.forEach((t, i) => { const m = E('span', 'tl-mk', String(i + 1)); m.style.left = t.x + '%'; m.style.top = t.y + '%'; m.style.background = BC[t.b]; m.title = t.b; ph.appendChild(m); }); paintBrands(); }
+      ph.addEventListener('click', ev => { const r = img.getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * 100, y = (ev.clientY - r.top) / r.height * 100; if (x < 0 || y < 0 || x > 100 || y > 100) return; const near = P.tags.findIndex(t => Math.hypot((t.x - x) * r.width / 100, (t.y - y) * r.height / 100) < 16); if (near >= 0) P.tags.splice(near, 1); else P.tags.push({x: +x.toFixed(2), y: +y.toFixed(2), b: P.brand}); paintTags(); paintStats(); });
+      // auto check
+      rc.appendChild(E('div', 'eyebrow', 'Auto-check')); rc.lastChild.style.color = 'var(--goldd)'; rc.appendChild(E('h3', null, 'Photo quality and brand colours')); rc.lastChild.style.cssText = 'font-family:var(--font-anthropic-serif);font-weight:400;font-size:1.4rem;margin:6px 0 10px';
+      const au = P.auto; const ql = E('div', 'tl-chips'); if (!au.warn.length) ql.appendChild(E('span', 'tl-chip green', '✓ Clear, well-lit photo')); au.warn.forEach(w => ql.appendChild(E('span', 'tl-chip amber', w))); ql.appendChild(E('span', 'tl-chip', au.w + ' × ' + au.h + ' px')); rc.appendChild(ql);
+      const tot = Object.keys(au.col).reduce((a, k) => a + au.col[k], 0); const items = Object.keys(au.col).map(k => ({label: k, v: tot ? au.col[k] / tot : 0, col: BC[k], txt: fmtP(au.col[k], 1) + ' of photo'})).sort((a, b) => b.v - a.v);
+      rc.appendChild(E('div', 'note', 'Share of brand-coloured area (estimate from colours, not a phone count):')); rc.lastChild.style.marginTop = '12px';
+      rc.appendChild(tot > 0.002 ? A.hbars(items, {mx: 1}) : emptyBox('No strong brand colours found in this photo.'));
+      const vb = au.col.vivo; rc.appendChild(E('div', 'tl-note', vb >= 0.04 ? 'vivo blue is clearly visible (' + fmtP(vb, 1) + ' of the photo). Branding looks present.' : vb >= 0.01 ? 'Some vivo blue is visible (' + fmtP(vb, 1) + '). Check that the glow sign and brand wall are in the frame.' : 'Very little vivo blue is visible. Branding may be missing or out of frame.'));
+      g.appendChild(lc); g.appendChild(rc); c1.appendChild(g); paintTags(); paintStats();
+    }
+    function paintStats() {
+      sx.replaceChildren(); if (!P.src) return; const sc = pScore();
+      const s2 = A.sec('Step 2', 'Share of shelf and POS check', null), g = E('div', 'g2');
+      const c2 = E('div', 'card'); c2.appendChild(E('div', 'note', 'Share of shelf from your tags'));
+      const row = E('div', 'tl-score'); row.style.marginTop = '10px'; row.appendChild(donut(sc.by.map(b => ({v: b[1], col: BC[b[0]]})), 150, [sc.sos == null ? '—' : fmtP(sc.sos, 0), 'vivo share']));
+      const rb = E('div'); rb.style.flex = '1'; if (!sc.n) rb.appendChild(E('p', 'note', 'Tap each phone on the photo to count it.')); else rb.appendChild(A.hbars(sc.by.map(b => ({label: b[0], v: b[1] / sc.n, col: BC[b[0]], txt: b[1] + ' · ' + fmtP(b[1] / sc.n, 0)})), {mx: 1}));
+      row.appendChild(rb); c2.appendChild(row);
+      const tg = inp('number', P.target); tg.min = 1; tg.max = 100; tg.style.maxWidth = '7rem'; tg.addEventListener('change', () => { P.target = Math.max(1, Math.min(100, +tg.value || 30)); LS.set('sostgt', P.target); paintStats(); });
+      const tr = E('div', 'tl-acts'); tr.appendChild(E('span', 'note', 'vivo target %')); tr.appendChild(tg); if (sc.sos != null) tr.appendChild(E('span', 'tl-chip ' + (sc.sos * 100 >= P.target ? 'green' : 'red'), sc.sos * 100 >= P.target ? '✓ On target' : 'Below target by ' + Math.round(P.target - sc.sos * 100) + ' pts')); c2.appendChild(tr);
+      const c3 = E('div', 'card'); c3.appendChild(E('div', 'note', 'Tick what is present in the store')); const ck = E('div', 'tl-chk'); ck.style.marginTop = '10px';
+      POSI.forEach(p => { const l = E('label', P.pos[p[0]] ? 'yes' : null), i = E('input'); i.type = 'checkbox'; i.checked = !!P.pos[p[0]]; i.addEventListener('change', () => { P.pos[p[0]] = i.checked; paintStats(); }); l.appendChild(i); l.appendChild(document.createTextNode(p[1])); ck.appendChild(l); }); c3.appendChild(ck);
+      g.appendChild(c2); g.appendChild(c3); s2.appendChild(g); sx.appendChild(s2);
+      const s3 = A.sec('Step 3', 'Audit score and save', 'Score = 40% share of shelf vs target + 45% POS items present + 15% photo quality.');
+      const c4 = E('div', 'card'), sr = E('div', 'tl-score'); sr.appendChild(ring(sc.score, 130)); const sd = E('div');
+      sd.appendChild(E('b', null, sc.score >= 75 ? 'Good display' : sc.score >= 50 ? 'Needs some fixes' : 'Display needs attention')); sd.lastChild.style.fontSize = '18px';
+      const ml = E('div', 'tl-chips'); ml.style.marginTop = '8px'; if (!sc.missing.length) ml.appendChild(E('span', 'tl-chip green', '✓ All POS items present')); sc.missing.forEach(m => ml.appendChild(E('span', 'tl-chip red', 'Missing: ' + m))); sd.appendChild(ml); sr.appendChild(sd); c4.appendChild(sr);
+      const fm = E('div', 'tl-form'), ri = inp('text', P.rid, 'Retailer ID'), sn = inp('text', P.store, 'Store name'), nt = inp('text', P.note, 'Optional note');
+      ri.addEventListener('input', () => { P.rid = ri.value.trim().toUpperCase(); }); sn.addEventListener('input', () => { P.store = sn.value; }); nt.addEventListener('input', () => { P.note = nt.value; });
+      fm.appendChild(field('Retailer ID', ri)); fm.appendChild(field('Store name', sn)); fm.appendChild(field('Note', nt)); c4.appendChild(fm);
+      const ac = E('div', 'tl-acts'); ac.appendChild(btn('✓ Save audit', 'big', () => {
+        const s = pScore(), au = {id: uid(), at: new Date().toISOString(), rid: P.rid, store: P.store, note: P.note, thumb: P.thumb, by: s.by, n: s.n, sos: s.sos, target: P.target, posY: s.posY, posN: s.posN, missing: s.missing, score: s.score, col: P.auto ? +(P.auto.col.vivo * 100).toFixed(1) : null, warn: P.auto ? P.auto.warn : []};
+        const all = LS.get('audits', []); all.unshift(au); let ok = LS.set('audits', all.slice(0, 80)); if (!ok) { all.forEach((x, i) => { if (i > 15) delete x.thumb; }); ok = LS.set('audits', all.slice(0, 80)); }
+        if (!ok) { A.say('Phone storage is full. Export and delete old audits.', 5000); return; }
+        if (P.rid) markVisited(P.rid); paintSaved6(); A.say('Audit saved' + (P.rid ? ' and ' + P.rid + ' marked as visited.' : '.'), 3500);
+      }));
+      ac.appendChild(btn('📤 Share audit card', null, () => auditCard({rid: P.rid, store: P.store, at: new Date().toISOString(), thumb: P.src, sos: sc.sos, target: P.target, by: sc.by, n: sc.n, posY: sc.posY, posN: sc.posN, missing: sc.missing, score: sc.score})));
+      c4.appendChild(ac); s3.appendChild(c4); sx.appendChild(s3);
+    }
+    function paintSaved6() {
+      c6.replaceChildren(); const all = LS.get('audits', []);
+      const tb = E('div', 'tl-acts'); tb.style.margin = '0 0 12px'; tb.appendChild(btn('⬇ Export audits to Excel', 'big', () => { if (!all.length) { A.say('No audits yet.', 2500); return; } const rows = [['Date', 'Retailer ID', 'Store', 'Audit score', 'vivo share of shelf', 'Target', 'Phones tagged', 'Phones by brand', 'POS present', 'POS missing', 'vivo blue in photo %', 'Photo checks', 'Note']]; all.forEach(a => rows.push([tlabel(a.at), a.rid, a.store, a.score, a.sos == null ? '' : {p: a.sos}, a.target / 100, a.n, a.by.map(b => b[0] + ' ' + b[1]).join(', '), a.posY + ' of ' + a.posN, a.missing.join(', '), a.col == null ? '' : a.col, (a.warn || []).join(' '), a.note])); A.saveXlsx([{name: 'Photo audits', rows}], 'Photo_Audits_' + today() + '.xlsx'); }));
+      if (all.length) tb.appendChild(btn('Delete all', 'red', () => { if (!confirmIt('Delete all ' + all.length + ' audits from this device?')) return; LS.set('audits', []); paintSaved6(); }));
+      c6.appendChild(tb); if (!all.length) { c6.appendChild(A.card(emptyBox('No audits yet.'))); return; }
+      const l = E('div', 'tl-list'); all.slice(0, 40).forEach(a => {
+        const it = E('div', 'tl-item'); if (a.thumb) { const im = E('img', 'tl-thumb'); im.src = a.thumb; im.alt = ''; it.appendChild(im); }
+        const mn = E('div', 'tl-main'); mn.appendChild(E('b', null, (a.rid || 'No retailer ID') + (a.store ? ' · ' + a.store : ''))); mn.appendChild(E('p', null, 'Score ' + a.score + ' · vivo share ' + (a.sos == null ? '—' : fmtP(a.sos, 0)) + ' · POS ' + a.posY + '/' + a.posN + (a.missing.length ? ' · missing ' + a.missing.slice(0, 3).join(', ') + (a.missing.length > 3 ? '…' : '') : ''))); mn.appendChild(E('div', 'tl-meta', tlabel(a.at))); it.appendChild(mn);
+        const sd = E('div', 'tl-side'); sd.appendChild(btn('Share', null, () => auditCard(a))); sd.appendChild(btn('Delete', 'red', () => { LS.set('audits', LS.get('audits', []).filter(x => x.id !== a.id)); paintSaved6(); })); it.appendChild(sd); l.appendChild(it);
+      });
+      c6.appendChild(l);
+    }
+    paintPhoto(); paintSaved6();
+  }
+  function auditCard(a) {
+    const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+    const go = im => {
+      g.fillStyle = '#fbf9f3'; g.fillRect(0, 0, W, H); const PH = 700;
+      if (im) { const s = Math.max(W / im.naturalWidth, PH / im.naturalHeight), w = im.naturalWidth * s, h = im.naturalHeight * s; g.save(); g.beginPath(); g.rect(0, 0, W, PH); g.clip(); g.drawImage(im, (W - w) / 2, (PH - h) / 2, w, h); g.restore(); } else { g.fillStyle = '#111'; g.fillRect(0, 0, W, PH); }
+      const gr = g.createLinearGradient(0, PH - 260, 0, PH); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,.85)'); g.fillStyle = gr; g.fillRect(0, PH - 260, W, 260);
+      logoPill(g, 48, 44); g.fillStyle = '#e6cf86'; g.font = '700 26px ' + SANS; sp(g, 'STORE DISPLAY AUDIT', 56, PH - 120, 4); g.fillStyle = '#fff'; g.font = '64px ' + SERIF; g.fillText(fit(g, (a.store || a.rid || 'Store') + '', W - 112, 64, SERIF), 56, PH - 50);
+      g.fillStyle = '#c9a227'; g.fillRect(0, PH, W, 6);
+      const col = a.score >= 75 ? '#2e7d5b' : a.score >= 50 ? '#c9a227' : '#b3402f';
+      g.fillStyle = '#111'; g.font = '150px ' + SERIF; g.fillText(String(a.score), 56, PH + 190); const sw = g.measureText(String(a.score)).width; g.fillStyle = '#6b6657'; g.font = '40px ' + SERIF; g.fillText('/100 audit score', 56 + sw + 14, PH + 190);
+      g.fillStyle = col; rr(g, 56, PH + 220, 968, 14, 7); g.fill();
+      const lines = [['vivo share of shelf', a.sos == null ? '—' : fmtP(a.sos, 0) + ' (target ' + a.target + '%)'], ['Phones tagged', String(a.n) + (a.by && a.by.length ? ' · ' + a.by.map(b => b[0] + ' ' + b[1]).join(', ') : '')], ['POS items present', a.posY + ' of ' + a.posN], ['Missing', a.missing.length ? a.missing.slice(0, 3).join(', ') + (a.missing.length > 3 ? ' +' + (a.missing.length - 3) : '') : 'Nothing missing']];
+      lines.forEach((l, i) => { const y = PH + 300 + i * 66; g.fillStyle = '#6b6657'; g.font = '600 26px ' + SANS; g.fillText(l[0].toUpperCase(), 56, y); g.fillStyle = '#111'; g.font = '600 32px ' + SANS; g.fillText(fit(g, l[1], 600, 32, SANS, '600 '), 420, y); });
+      footer(g, W, H, (a.rid ? a.rid + ' · ' : '') + tlabel(a.at || new Date().toISOString()));
+      shareCanvas(cv, 'Store_Audit_' + (a.rid || 'store') + '.png', 'Store audit ' + (a.rid || '') + ': score ' + a.score + '/100, vivo share ' + (a.sos == null ? '—' : fmtP(a.sos, 0)) + (a.missing.length ? ', missing ' + a.missing.join(', ') : ''));
+    };
+    if (a.thumb) { const im = new Image(); im.onload = () => go(im); im.onerror = () => go(null); im.src = a.thumb; } else go(null);
+  }
+
+  // =====================================================================================
+  // 3. SMART BEAT PLANNER
+  const B = {st: null, n: 15, w: LS.get('beatw', 60), town: 'all', mem: null};
+  let APPC = null;
+  function appUse() {
+    const RAW = A.RAW, T = RAW && RAW.t && RAW.t.app, key = (RAW && RAW.days ? RAW.days.length : 0) + '|' + (T ? T.r.length : 0) + '|' + today();
+    if (APPC && APPC.key === key) return APPC;
+    const D = RAW && RAW.days ? RAW.days : [], td = today(); let ref = D.length ? D[D.length - 1] : td; if (ref > td) ref = td; const f30 = addDays(ref, -29), m = new Map();
+    if (T) { const r = T.r, ids = T.d[0]; for (let i = 0; i < r.length; i += 4) { const d = D[r[i + 2]]; if (!d || d > ref) continue; const id = ids[r[i]]; let a = m.get(id); if (!a) { a = {last: d, v30: 0, d30: new Set(), tot: 0}; m.set(id, a); } if (d > a.last) a.last = d; a.tot += r[i + 3]; if (d >= f30) { a.v30 += r[i + 3]; a.d30.add(d); } } }
+    APPC = {key, ref, m}; return APPC;
+  }
+  const master = () => B.mem || LS.get('beat', null);
+  function markVisited(rid) { const v = LS.get('beatv', {}); v[nk(rid)] = today(); LS.set('beatv', v); }
+  function beatRows(st) {
+    const U = appUse(), cm = codeMap(), mp = A.gated && A.lock() ? (A.maps()[A.lock()] || {}) : null, M = master(), vis = LS.get('beatv', {}), td = today(), out = [], seen = new Set(), w = B.w / 100;
+    const ids = new Set(); U.m.forEach((a, id) => ids.add(id)); if (!A.gated && !A.META.shareable && A.SETUP.rids) A.SETUP.rids.split(',').forEach(x => { x = x.trim(); if (x) ids.add(x); });
+    const add = (rid, s, a) => {
+      const k = nk(rid); if (seen.has(k)) return; seen.add(k); const mr = M && M.rows[k] || null;
+      let lv = mr && mr.last || null; if (vis[k] && (!lv || vis[k] > lv)) lv = vis[k];
+      const dApp = a ? dayDiff(U.ref, a.last) : null, dVis = lv ? Math.max(0, dayDiff(td, lv)) : null;
+      const appGap = a ? 0.6 * clamp01(dApp / 30) + 0.4 * (1 - clamp01(a.v30 / 20)) : 1, visGap = dVis == null ? 0.75 : clamp01(dVis / 30);
+      const score = Math.round(100 * (w * appGap + (1 - w) * visGap)), why = [];
+      if (!a) why.push(['Never used the app', 'red']); else if (dApp >= 7) why.push(['No app use for ' + dApp + ' days', 'red']); else if (a.v30 < 5) why.push(['Only ' + a.v30 + ' app visits in 30 days', 'amber']);
+      if (dVis == null) why.push([M ? 'No visit on record' : 'Visit date not uploaded', 'amber']); else if (dVis >= 21) why.push(['Not visited for ' + dVis + ' days', 'red']); else if (dVis === 0) why.push(['Visited today', 'green']);
+      out.push({rid, st: s, name: mr ? mr.n : '', town: mr ? mr.town : '', ph: mr ? mr.ph : '', lat: mr ? mr.lat : null, lng: mr ? mr.lng : null, dApp, v30: a ? a.v30 : 0, d30: a ? a.d30.size : 0, last: a ? a.last : null, lv, dVis, score, why});
+    };
+    ids.forEach(id => { const s = stOfId(id, cm); if (!s || (st !== 'PAN India' && s !== st)) return; add(mp ? (mp[id] || id) : id, s, U.m.get(id)); });
+    if (M) Object.keys(M.rows).forEach(k => { const mr = M.rows[k], s = mr.st || stOfId(k, cm) || ''; if (st !== 'PAN India' && s !== st) return; add(mr.id || k, s || '—', null); });
+    return out.sort((a, b) => b.score - a.score || (b.dVis || 0) - (a.dVis || 0));
+  }
+  function planOrder(list) {
+    const geo = list.filter(r => fin(r.lat) && fin(r.lng));
+    if (geo.length >= list.length * 0.6 && geo.length > 2) { const rest = list.filter(r => !(fin(r.lat) && fin(r.lng))), out = [geo.shift()]; while (geo.length) { const c = out[out.length - 1]; let bi = 0, bd = Infinity; geo.forEach((g, i) => { const d = Math.hypot(g.lat - c.lat, (g.lng - c.lng) * Math.cos(c.lat * Math.PI / 180)); if (d < bd) { bd = d; bi = i; } }); out.push(geo.splice(bi, 1)[0]); } return {list: out.concat(rest), how: 'Ordered as a route: each next stop is the nearest one.'}; }
+    if (list.some(r => r.town)) { const tb = {}; list.forEach(r => { const t = r.town || 'Other'; tb[t] = Math.max(tb[t] || 0, r.score); }); return {list: list.slice().sort((a, b) => tb[b.town || 'Other'] - tb[a.town || 'Other'] || String(a.town).localeCompare(String(b.town)) || b.score - a.score), how: 'Grouped by town or beat, highest priority town first.'}; }
+    return {list, how: 'Highest priority first.'};
+  }
+  async function loadMaster(f) {
+    const sh = await readTable(f), nm = sheetPick(sh, RX.id), T = toTable(sh[nm]), h = T.hdr, ci = pick(h, RX.id);
+    if (ci < 0) throw new Error('No Retailer ID column found. Name a column "Retailer ID".');
+    const cN = pick(h, RX.name), cT = pick(h, RX.town), cL = pick(h, RX.last), cLa = pick(h, RX.lat), cLn = pick(h, RX.lng), cP = pick(h, RX.ph), cS = pick(h, RX.st, /code|id/), rows = {}; let n = 0;
+    T.rows.forEach(r => { const id = r[ci]; const k = nk(id); if (!k) return; let o = rows[k]; if (!o) { o = rows[k] = {id: String(id).trim()}; n++; } if (cN >= 0 && r[cN] != null) o.n = String(r[cN]); if (cT >= 0 && r[cT] != null) o.town = String(r[cT]); if (cP >= 0 && r[cP] != null) o.ph = String(r[cP]).replace(/\.0$/, ''); if (cS >= 0 && r[cS] != null) o.st = stNorm(r[cS]); if (cLa >= 0 && fin(+r[cLa])) o.lat = +r[cLa]; if (cLn >= 0 && fin(+r[cLn])) o.lng = +r[cLn]; if (cL >= 0 && r[cL] != null) { const d = A.parseDate(r[cL]); if (d && (!o.last || d > o.last)) o.last = d; } });
+    const M = {name: f.name, at: today(), n, rows, cols: {name: cN >= 0, town: cT >= 0, last: cL >= 0, geo: cLa >= 0 && cLn >= 0, ph: cP >= 0}};
+    B.mem = null; if (!LS.set('beat', M)) { B.mem = M; A.say('List is large, kept for this session only.', 5000); } return M;
+  }
+  function rBeat() {
+    const states = stateList(); if (!B.st) B.st = A.scope !== 'PAN India' && states.indexOf(A.scope) >= 0 ? A.scope : A.gated ? (states[0] || '') : 'PAN India';
+    const M = master();
+    if (A.gated && !A.lock()) {
+      hero('tlb', [['Locked', 'unlock your state to plan'], ['App', 'usage from the logs'], ['Visits', 'from your visit list'], ['Today', 'ranked list']], 'Ranks retailers by low app usage and days since the last visit, so the field team knows where to go first.');
+      const root = page('tlb'), s = A.sec('Locked', 'Unlock your state first', 'The beat planner needs your own retailer IDs.'); const c = A.card(E('p', null, 'Use Unlock my state with the access code from your BI admin. Then open this page again.')); c.appendChild(btn('🔒 Unlock my state', 'big', () => A.unlock())); s.appendChild(c); root.appendChild(s); return;
+    }
+    const rows = beatRows(B.st), U = appUse(), never = rows.filter(r => r.last == null).length, idle = rows.filter(r => r.dApp != null && r.dApp >= 15).length, nv = rows.filter(r => r.dVis != null && r.dVis >= 30).length;
+    hero('tlb', [[fmtN(rows.length), 'retailers in ' + B.st], [fmtN(never), 'never used the app'], [fmtN(idle), 'no app use for 15+ days'], [M ? fmtN(nv) : '—', 'not visited for 30+ days']], 'Ranks retailers by low retailer app usage and days since the last visit, so the field team knows where to go first. App use is read from the logs up to ' + dlabel(U.ref) + '.');
+    const root = page('tlb');
+    // controls
+    const s1 = A.sec('Plan', 'Set up today\'s plan', null), c1 = E('div', 'card'), fm = E('div', 'tl-form');
+    const ss = selOpts(inp('select'), (A.gated ? [] : ['PAN India']).concat(states), B.st); ss.addEventListener('change', () => { B.st = ss.value; B.town = 'all'; rBeat(); });
+    const ns = selOpts(inp('select'), [['10', '10 visits'], ['15', '15 visits'], ['20', '20 visits'], ['30', '30 visits']], String(B.n)); ns.addEventListener('change', () => { B.n = +ns.value; rBeat(); });
+    const towns = Array.from(new Set(rows.map(r => r.town).filter(Boolean))).sort(); const ts = selOpts(inp('select'), [['all', 'All towns / beats']].concat(towns), B.town); ts.disabled = !towns.length; ts.addEventListener('change', () => { B.town = ts.value; rBeat(); });
+    const ws = inp('range', B.w); ws.min = 0; ws.max = 100; ws.step = 10; const wl = E('span', 'note', 'App usage ' + B.w + '% · last visit ' + (100 - B.w) + '%'); ws.addEventListener('input', () => { wl.textContent = 'App usage ' + ws.value + '% · last visit ' + (100 - ws.value) + '%'; }); ws.addEventListener('change', () => { B.w = +ws.value; LS.set('beatw', B.w); rBeat(); });
+    fm.appendChild(field('State', ss)); fm.appendChild(field('Visits today', ns)); fm.appendChild(field('Town / beat', ts)); const wf = field('What matters more', ws); wf.appendChild(wl); fm.appendChild(wf); c1.appendChild(fm);
+    const mrow = E('div', 'tl-acts');
+    mrow.appendChild(fileBtn(M ? '⬆ Replace retailer / visit list' : '⬆ Upload retailer / visit list', '.xlsx,.csv', async f => { try { A.say('Reading the list…'); const m = await loadMaster(f); A.say('Loaded ' + fmtN(m.n) + ' retailers from ' + f.name + '.', 4000); rBeat(); } catch (e) { A.say(e.message || String(e), 6000); } }, {cls: M ? 'ghost' : 'big'}));
+    mrow.appendChild(btn('⬇ Template', 'ghost', () => A.saveXlsx([{name: 'Retailer visits', rows: [['Retailer ID', 'Retailer name', 'State', 'Town / beat', 'Last visit date', 'Latitude', 'Longitude', 'Mobile'], ['BRE0102940', 'Sample Mobile Store', 'Bihar', 'Patna Beat 1', '2026-10-02', 25.6093, 85.1376, '9800000000']]}], 'Beat_Planner_Template.xlsx')));
+    if (M) { mrow.appendChild(E('span', 'tl-chip gold', M.name + ' · ' + fmtN(M.n) + ' retailers · ' + dlabel(M.at))); mrow.appendChild(btn('Remove list', 'red', () => { LS.del('beat'); B.mem = null; rBeat(); })); }
+    c1.appendChild(mrow);
+    c1.appendChild(E('div', 'tl-note', M ? 'Visit dates come from your list' + (M.cols.last ? '' : ' (no visit date column found)') + ' and from notes or audits saved in this app. ' + (M.cols.geo ? 'Latitude and longitude found, so the plan is ordered as a route.' : M.cols.town ? 'Towns found, so the plan is grouped by town.' : '') : 'Upload your retailer list with the last visit date (vWork or visit report export) to add visit gaps, names and towns. Without it the plan uses retailer app usage only.'));
+    s1.appendChild(c1); root.appendChild(s1);
+    // plan
+    const pool = rows.filter(r => B.town === 'all' || r.town === B.town), top = pool.filter(r => r.dVis !== 0).slice(0, B.n), po = planOrder(top);
+    const s2 = A.sec('Today', 'Visit these ' + po.list.length + ' retailers today', po.how + ' Tap ✓ Visited after each visit.');
+    const sa = E('div', 'tl-acts'); sa.style.margin = '0 0 12px';
+    sa.appendChild(btn('📤 Share plan on vChat / WhatsApp', 'big', () => shareText('*Beat plan · ' + dlabel(today()) + '* · ' + B.st + (B.town !== 'all' ? ' · ' + B.town : '') + '\n' + po.list.map((r, i) => (i + 1) + '. ' + r.rid + (r.name ? ' ' + r.name : '') + (r.town ? ' (' + r.town + ')' : '') + ' — ' + r.why.map(w => w[0]).join(', ')).join('\n'))));
+    sa.appendChild(btn('⬇ Plan to Excel', null, () => A.saveXlsx([{name: 'Today plan', rows: beatXl(po.list)}], 'Beat_Plan_' + safeSt(B.st) + '_' + today() + '.xlsx')));
+    s2.appendChild(sa);
+    if (!po.list.length) s2.appendChild(A.card(emptyBox(rows.length ? 'Everyone in this view was visited today.' : 'No retailers found for ' + B.st + '. Import the retailer app logs or upload your retailer list.')));
+    else {
+      const l = E('div', 'tl-list'); let lastTown = null;
+      po.list.forEach((r, i) => {
+        if (r.town && r.town !== lastTown && /town/.test(po.how)) { const th = E('div', 'kick', r.town); th.style.margin = '8px 0 0'; l.appendChild(th); lastTown = r.town; }
+        const it = E('div', 'tl-item'); it.appendChild(E('span', 'tl-rank', String(i + 1)));
+        const mn = E('div', 'tl-main'); mn.appendChild(E('b', null, r.rid + (r.name ? ' · ' + r.name : ''))); const ch = E('div', 'tl-chips'); ch.style.marginTop = '6px'; r.why.forEach(w => ch.appendChild(E('span', 'tl-chip ' + w[1], w[0]))); mn.appendChild(ch);
+        const bar = E('div', 'tl-bar'), bi = E('i'); bi.style.width = r.score + '%'; bar.appendChild(bi); mn.appendChild(bar);
+        mn.appendChild(E('div', 'tl-meta', 'Priority ' + r.score + '/100' + (r.town ? ' · ' + r.town : '') + ' · last app use ' + (r.last ? dlabel(r.last) : 'never') + ' · last visit ' + (r.lv ? dlabel(r.lv) : 'unknown'))); it.appendChild(mn);
+        const sd = E('div', 'tl-side'); sd.appendChild(btn('✓ Visited', 'big', () => { markVisited(r.rid); A.say(r.rid + ' marked as visited today.', 2500); rBeat(); }));
+        if (r.ph) { const a = E('a', 'xlbtn', '📞 Call'); a.href = 'tel:' + r.ph; sd.appendChild(a); }
+        if (fin(r.lat) && fin(r.lng)) { const a = E('a', 'xlbtn', '🗺 Map'); a.href = 'https://www.google.com/maps/search/?api=1&query=' + r.lat + ',' + r.lng; a.target = '_blank'; a.rel = 'noopener'; sd.appendChild(a); }
+        it.appendChild(sd); l.appendChild(it);
+      });
+      s2.appendChild(l);
+    }
+    root.appendChild(s2);
+    // full table
+    const s3 = A.sec('All retailers', 'Priority list for ' + B.st, 'Top 300 by priority. Export gives every retailer.');
+    const ex = E('div', 'tl-acts'); ex.style.margin = '0 0 12px'; ex.appendChild(btn('⬇ Full list to Excel', 'big', () => A.saveXlsx([{name: 'Priority list', rows: beatXl(pool)}], 'Beat_Priority_' + safeSt(B.st) + '_' + today() + '.xlsx'))); s3.appendChild(ex);
+    s3.appendChild(A.card(A.mkTable([{h: '#', r: 1}, {h: 'Retailer ID'}, {h: 'Name'}, {h: 'Town / beat'}, {h: 'Days since app use', r: 1}, {h: 'App visits, 30 days', r: 1}, {h: 'Days since visit', r: 1}, {h: 'Priority', r: 1}, {h: 'Why'}], pool.slice(0, 300).map((r, i) => [i + 1, r.rid, r.name || '', r.town || '', r.dApp == null ? 'Never' : r.dApp, r.v30, r.dVis == null ? '—' : r.dVis, r.score, r.why.map(w => w[0]).join(', ')]))));
+    root.appendChild(s3);
+  }
+  const safeSt = s => String(s).replace(/[^A-Za-z0-9]+/g, '_');
+  const beatXl = list => [['#', 'Retailer ID', 'Name', 'State', 'Town / beat', 'Mobile', 'Last app use', 'Days since app use', 'App visits (30 days)', 'Active days (30 days)', 'Last visit', 'Days since visit', 'Priority score', 'Why']].concat(list.map((r, i) => [i + 1, r.rid, r.name || '', r.st, r.town || '', r.ph || '', r.last || 'Never', r.dApp == null ? '' : r.dApp, r.v30, r.d30, r.lv || '', r.dVis == null ? '' : r.dVis, r.score, r.why.map(w => w[0]).join(', ')]));
+
+  // =====================================================================================
+  // 4. SHARE CARD
+  const SERIF = 'Georgia, "Times New Roman", serif', SANS = '"Segoe UI", Roboto, system-ui, -apple-system, Arial, sans-serif';
+  let LOGO = null;
+  const S = {type: 'score', st: null, kpi: null, size: 'p', ck: null};
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function sp(g, t, x, y, ls) { if ('letterSpacing' in g) { g.letterSpacing = ls + 'px'; g.fillText(t, x, y); g.letterSpacing = '0px'; } else g.fillText(t.split('').join(' '), x, y); }
+  function fit(g, t, maxW, size, fam, wt) { t = String(t); let s = size; g.font = (wt || '') + s + 'px ' + (fam || SERIF); while (g.measureText(t).width > maxW && s > 18) { s -= 2; g.font = (wt || '') + s + 'px ' + (fam || SERIF); } if (g.measureText(t).width > maxW) { while (t.length > 3 && g.measureText(t + '…').width > maxW) t = t.slice(0, -1); t += '…'; } return t; }
+  function logoPill(g, x, y) { rr(g, x, y, 250, 82, 18); g.fillStyle = '#fff'; g.fill(); if (LOGO && LOGO.complete && LOGO.naturalWidth) { const s = Math.min(214 / LOGO.naturalWidth, 60 / LOGO.naturalHeight), w = LOGO.naturalWidth * s, h = LOGO.naturalHeight * s; g.drawImage(LOGO, x + (250 - w) / 2, y + (82 - h) / 2, w, h); } else { g.fillStyle = '#111'; g.font = '700 30px ' + SANS; g.fillText('vivo BI', x + 30, y + 52); } }
+  function footer(g, W, H, right) { g.fillStyle = '#0b0b0c'; g.fillRect(0, H - 84, W, 84); g.fillStyle = '#c9a227'; g.fillRect(0, H - 84, W, 4); g.fillStyle = '#e6cf86'; g.font = '600 24px ' + SANS; g.textAlign = 'left'; g.fillText('vivo Business Innovation · BI KPI Dashboard', 48, H - 32); if (right) { g.textAlign = 'right'; g.fillStyle = '#cdbf92'; g.font = '22px ' + SANS; g.fillText(fit(g, right, 380, 22, SANS), W - 48, H - 32); g.textAlign = 'left'; } }
+  function headBg(g, W, HH) { const gr = g.createLinearGradient(0, 0, W * 0.4, HH); gr.addColorStop(0, '#000'); gr.addColorStop(0.7, '#141109'); gr.addColorStop(1, '#1f1a0c'); g.fillStyle = gr; g.fillRect(0, 0, W, HH); const rg = g.createRadialGradient(W * 0.88, -40, 10, W * 0.88, -40, 620); rg.addColorStop(0, 'rgba(201,162,39,.45)'); rg.addColorStop(1, 'rgba(201,162,39,0)'); g.fillStyle = rg; g.fillRect(0, 0, W, HH); g.fillStyle = '#c9a227'; g.fillRect(0, HH - 6, W, 6); }
+  const bandC = v => v >= 0.9 ? '#2e7d5b' : v >= 0.5 ? '#c9a227' : '#b3402f';
+  function cardData() {
+    const ks = A.kpiState(), K = A.K(), ranked = ks.filter(r => r.rank != null).sort((a, b) => a.rank - b.rank), pan = ks.find(r => r.state === 'PAN India');
+    return {ks, K, ranked, pan, row: ks.find(r => r.state === S.st) || pan, n: ranked.length};
+  }
+  function drawCard() {
+    const W = 1080, H = S.size === 'p' ? 1350 : 1080, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d'), D = cardData(), LB = A.LB;
+    g.fillStyle = '#fbf9f3'; g.fillRect(0, 0, W, H); g.textBaseline = 'alphabetic';
+    let text = '';
+    if (S.type === 'score') {
+      const HH = Math.round(H * (S.size === 'p' ? 0.43 : 0.47)), r = D.row; headBg(g, W, HH); logoPill(g, 48, 44);
+      g.textAlign = 'right'; g.fillStyle = '#e6cf86'; g.font = '600 26px ' + SANS; g.fillText(dlabel(today()), W - 48, 96); g.textAlign = 'left';
+      g.fillStyle = '#c9a227'; g.font = '700 24px ' + SANS; sp(g, 'BI KPI SCORECARD', 52, 196, 5);
+      g.fillStyle = '#fff'; g.font = '74px ' + SERIF; g.fillText(fit(g, r.state, W - 104, 74), 52, 274);
+      g.fillStyle = '#cdbf92'; g.font = '28px ' + SANS; g.fillText(fit(g, LB.title + ' · ' + LB.rng, W - 104, 28, SANS), 52, 318);
+      const sy = HH - 48; g.fillStyle = '#e6cf86'; g.font = (S.size === 'p' ? 178 : 150) + 'px ' + SERIF; const sc = (Math.round(r.score * 10) / 10).toFixed(1); g.fillText(sc, 48, sy); const sw = g.measureText(sc).width; g.fillStyle = '#fff'; g.font = '46px ' + SERIF; g.fillText('/100', 60 + sw, sy); g.fillStyle = '#cdbf92'; g.font = '24px ' + SANS; g.fillText('final score', 62 + sw, sy - 58);
+      if (r.rank != null) { const px = W - 330, py = sy - 150; rr(g, px, py, 282, 150, 22); g.fillStyle = 'rgba(255,255,255,.06)'; g.fill(); g.strokeStyle = '#8a6a1f'; g.lineWidth = 2; g.stroke(); g.fillStyle = '#fff'; g.font = '72px ' + SERIF; g.fillText('#' + r.rank, px + 26, py + 82); g.fillStyle = '#cdbf92'; g.font = '24px ' + SANS; g.fillText('of ' + D.n + ' states', px + 26, py + 120); if (r.change) { g.fillStyle = r.change > 0 ? '#7fd1a6' : '#f19a8a'; g.font = '700 26px ' + SANS; g.textAlign = 'right'; g.fillText((r.change > 0 ? '▲ ' : '▼ ') + Math.abs(r.change), px + 258, py + 82); g.textAlign = 'left'; } }
+      else { g.fillStyle = '#cdbf92'; g.font = '26px ' + SANS; g.textAlign = 'right'; g.fillText('Average of all states', W - 52, sy - 20); g.textAlign = 'left'; }
+      const top = HH + 40, bot = H - 84 - 30, n = D.K.length, rh = Math.min(150, (bot - top) / Math.max(1, n));
+      D.K.forEach((p, i) => { const y = top + i * rh, v = r[p.k] || 0, pts = r[p.pts] || 0; g.fillStyle = '#111'; g.font = '700 ' + (rh > 120 ? 32 : 28) + 'px ' + SANS; g.fillText(fit(g, p.name, 640, rh > 120 ? 32 : 28, SANS, '700 '), 52, y + 36); g.textAlign = 'right'; g.font = '600 ' + (rh > 120 ? 32 : 28) + 'px ' + SANS; g.fillStyle = bandC(v); g.fillText(fmtP(v, 1), W - 52, y + 36); g.textAlign = 'left';
+        rr(g, 52, y + 54, W - 104, 18, 9); g.fillStyle = '#efe8d6'; g.fill(); rr(g, 52, y + 54, Math.max(18, (W - 104) * Math.min(1, v)), 18, 9); g.fillStyle = bandC(v); g.fill();
+        g.fillStyle = '#6b6657'; g.font = '22px ' + SANS; g.fillText((Math.round(pts * 10) / 10) + ' of ' + (Math.round(p.w * 10) / 10) + ' points', 52, y + 102); });
+      text = '*' + r.state + ' · ' + LB.title + '*\nFinal score ' + sc + '/100' + (r.rank != null ? ' · Rank #' + r.rank + ' of ' + D.n + (r.change ? ' (' + (r.change > 0 ? '▲' : '▼') + Math.abs(r.change) + ')' : '') : '') + '\n' + D.K.map(p => p.name + ': ' + fmtP(r[p.k] || 0, 1)).join('\n');
+    } else {
+      const HH = 330; headBg(g, W, HH); logoPill(g, 48, 44); g.textAlign = 'right'; g.fillStyle = '#e6cf86'; g.font = '600 26px ' + SANS; g.fillText(dlabel(today()), W - 48, 96); g.textAlign = 'left';
+      let items = [], title = '', eyebrow = '', fmt = v => fmtP(v, 1), sub = LB.title + ' · ' + LB.rng, panV = null, mx = 1;
+      if (S.type === 'top5') { eyebrow = 'OUR TOP 5 CHAMPIONS'; title = 'Top 5 states'; items = D.ranked.slice(0, 5).map(r => ({st: r.state, v: r.score, sub: adminOf(r.state)})); fmt = v => (Math.round(v * 10) / 10).toFixed(1); mx = 100; }
+      else if (S.type === 'kpi') { const p = D.K.find(x => x.k === S.kpi) || D.K[0]; eyebrow = 'KPI RANKING'; title = p ? p.name : 'KPI'; const all = D.ranked.map(r => ({st: r.state, v: r[p.k] || 0})).sort((a, b) => b.v - a.v); all.forEach((x, i) => { x.rk = i + 1; }); items = all; panV = D.pan ? D.pan[p.k] : null; mx = Math.max(1, ...all.map(x => x.v)); }
+      else { const k = kpisAll().find(x => x.id === S.ck) || kpisAll()[0]; eyebrow = 'CUSTOM KPI'; title = k ? k.n : 'Custom KPI'; if (k) { const R = kpiEval(k); fmt = v => kFmt(k, v); items = R.states.filter(x => fin(x.v)).sort((a, b) => k.dir === 'down' ? a.v - b.v : b.v - a.v).map((x, i) => ({st: x.st, v: x.v, rk: i + 1})); panV = R.pan; mx = Math.max(1e-9, ...items.map(x => Math.abs(x.v))); } }
+      g.fillStyle = '#c9a227'; g.font = '700 24px ' + SANS; sp(g, eyebrow, 52, 186, 5); g.fillStyle = '#fff'; g.font = '66px ' + SERIF; g.fillText(fit(g, title, W - 104, 66), 52, 258); g.fillStyle = '#cdbf92'; g.font = '26px ' + SANS; g.fillText(fit(g, sub + (panV != null ? ' · PAN India ' + fmt(panV) : ''), W - 104, 26, SANS), 52, 300);
+      const show = S.type === 'top5' ? items : items.slice(0, S.size === 'p' ? 10 : 8), mine = items.find(x => x.st === S.st), top = HH + 34, bot = H - 84 - 24 - (mine && show.indexOf(mine) < 0 ? 80 : 0), rh = Math.min(S.type === 'top5' ? 170 : 92, (bot - top) / Math.max(1, show.length));
+      const rowDraw = (x, i, y, hl) => {
+        if (hl) { rr(g, 36, y - 6, W - 72, rh - 6, 16); g.fillStyle = '#fff4d6'; g.fill(); }
+        const big = S.type === 'top5'; g.fillStyle = big && i < 3 ? '#c9a227' : '#111'; g.beginPath(); g.arc(80, y + rh / 2 - 6, big ? 32 : 24, 0, Math.PI * 2); g.fill(); g.fillStyle = big && i < 3 ? '#111' : '#e6cf86'; g.font = '700 ' + (big ? 30 : 22) + 'px ' + SANS; g.textAlign = 'center'; g.fillText(String(x.rk || i + 1), 80, y + rh / 2 + (big ? 4 : 2)); g.textAlign = 'left';
+        const nx = 132, bw = W - nx - 230; g.fillStyle = '#111'; g.font = (big ? '600 38px ' : '600 30px ') + SANS; g.fillText(fit(g, x.st, bw, big ? 38 : 30, SANS, '600 '), nx, y + (big ? rh / 2 - 16 : rh / 2 - 12));
+        if (big && x.sub) { g.fillStyle = '#6b6657'; g.font = '24px ' + SANS; g.fillText('BI Admin: ' + x.sub, nx, y + rh / 2 + 16); }
+        const by = y + (big ? rh / 2 + 32 : rh / 2 + 4); rr(g, nx, by, bw, 12, 6); g.fillStyle = '#efe8d6'; g.fill(); rr(g, nx, by, Math.max(12, bw * Math.min(1, Math.abs(x.v) / mx)), 12, 6); g.fillStyle = S.type === 'kpi' ? bandC(x.v) : '#c9a227'; g.fill();
+        g.textAlign = 'right'; g.fillStyle = '#111'; g.font = (big ? '56px ' : '40px ') + SERIF; g.fillText(fmt(x.v), W - 52, y + rh / 2 + (big ? 14 : 8)); g.textAlign = 'left';
+      };
+      show.forEach((x, i) => rowDraw(x, i, top + i * rh, x.st === S.st));
+      if (mine && show.indexOf(mine) < 0) { g.fillStyle = '#6b6657'; g.font = '26px ' + SANS; g.fillText('…', 70, bot + 8); rowDraw(mine, mine.rk - 1, bot + 14, true); }
+      if (!show.length) { g.fillStyle = '#6b6657'; g.font = '30px ' + SANS; g.fillText('No values for this period.', 52, top + 60); }
+      text = '*' + title + ' · ' + LB.title + '*\n' + show.map((x, i) => (x.rk || i + 1) + '. ' + x.st + ' — ' + fmt(x.v)).join('\n') + (panV != null ? '\nPAN India: ' + fmt(panV) : '');
+    }
+    footer(g, W, H, 'Shared ' + dlabel(today()));
+    cv._text = text; return cv;
+  }
+  function adminOf(st) { const m = A.META.people && A.META.people[st]; if (m && m.n) return m.n; const s = (A.SETUP.states || []).find(x => x.state === st); return s && s.admin && s.admin !== '-' ? s.admin : ''; }
+  function rShare() {
+    const D = cardData(), sts = D.ranked.map(r => r.state);
+    if (!S.st || (S.st !== 'PAN India' && sts.indexOf(S.st) < 0)) S.st = A.scope && (A.scope === 'PAN India' || sts.indexOf(A.scope) >= 0) ? A.scope : 'PAN India';
+    if (!S.kpi || !D.K.find(x => x.k === S.kpi)) S.kpi = D.K.length ? D.K[0].k : null;
+    hero('tls', [['1 tap', 'image card, no screenshot'], ['4', 'card types'], ['PNG', 'for vChat and WhatsApp'], [A.LB.title, 'period on the card']], 'Pick a card, check the preview and tap Share. On a phone the share sheet opens with vChat and WhatsApp. On a computer the image downloads.');
+    const root = page('tls');
+    if (A.NODATA || !D.ks.length) { const s = A.sec('No data', 'No KPI data for this period', null); s.appendChild(A.card(E('p', null, 'Choose a period with data in Filters & tools.'))); root.appendChild(s); return; }
+    const s1 = A.sec('Card', 'Build your card', 'The card follows the period chosen in Filters & tools.'), g = E('div', 'g2'), c1 = E('div', 'card'), c2 = E('div', 'card');
+    const types = [['score', 'Scorecard'], ['top5', 'Top 5 states'], ['kpi', 'KPI ranking']].concat(kpisAll().length ? [['custom', 'Custom KPI']] : []);
+    c1.appendChild(segCtl(types, S.type, v => { S.type = v; rShare(); }));
+    const fm = E('div', 'tl-form');
+    const ss = selOpts(inp('select'), ['PAN India'].concat(sts), S.st); ss.addEventListener('change', () => { S.st = ss.value; paint(); }); fm.appendChild(field(S.type === 'score' ? 'State' : 'Highlight state', ss));
+    if (S.type === 'kpi') { const ks = selOpts(inp('select'), D.K.map(p => [p.k, p.name]), S.kpi); ks.addEventListener('change', () => { S.kpi = ks.value; paint(); }); fm.appendChild(field('KPI', ks)); }
+    if (S.type === 'custom') { const cs = selOpts(inp('select'), kpisAll().map(k => [k.id, k.n]), S.ck || kpisAll()[0].id); S.ck = cs.value; cs.addEventListener('change', () => { S.ck = cs.value; paint(); }); fm.appendChild(field('Custom KPI', cs)); }
+    const zs = selOpts(inp('select'), [['p', 'Portrait 4:5 (best for chats)'], ['s', 'Square 1:1']], S.size); zs.addEventListener('change', () => { S.size = zs.value; paint(); }); fm.appendChild(field('Size', zs));
+    c1.appendChild(fm);
+    const ac = E('div', 'tl-acts'); let cur = null;
+    ac.appendChild(btn('📤 Share image', 'big', () => cur && shareCanvas(cur, cardName(), cur._text)));
+    ac.appendChild(btn('⬇ Download PNG', null, () => cur && cur.toBlob(b => { dlBlob(b, cardName()); A.say('Saved ' + cardName(), 3000); }, 'image/png')));
+    ac.appendChild(btn('WhatsApp text', null, () => cur && window.open('https://wa.me/?text=' + encodeURIComponent(cur._text), '_blank', 'noopener')));
+    ac.appendChild(btn('Copy text', 'ghost', () => cur && copyText(cur._text)));
+    c1.appendChild(ac); c1.appendChild(E('div', 'tl-note', 'vChat: tap Share image and pick vChat in the share sheet. If vChat is not listed, download the PNG and attach it in the chat.'));
+    const pv = E('div'); c2.appendChild(E('div', 'note', 'Preview')); c2.appendChild(pv); c2.lastChild.style.marginTop = '10px';
+    g.appendChild(c1); g.appendChild(c2); s1.appendChild(g); root.appendChild(s1);
+    function paint() { cur = drawCard(); const im = E('img', 'tl-cv'); im.alt = 'KPI card preview'; im.src = cur.toDataURL('image/png'); pv.replaceChildren(im); }
+    paint(); if (LOGO && !LOGO.complete) LOGO.onload = () => { if (mounted('tls')) paint(); };
+  }
+  const cardName = () => 'BI_' + ({score: 'Scorecard', top5: 'Top5', kpi: 'KPI_ranking', custom: 'Custom_KPI'}[S.type]) + '_' + safeSt(S.type === 'top5' ? A.LB.title : S.st + '_' + A.LB.title) + '.png';
+
+  // =====================================================================================
+  // 5. AUTO-RECONCILIATION
+  const R = {a: null, bm: 'logs', b: null, bval: 'none', tol: 0, res: null, f: 'all'};
+  function tblPicker(o, cols, onChange) {
+    // o = {file, sheets, sheet, T, c:{}}
+    const w = E('div'); const top = E('div', 'tl-acts'); top.style.marginTop = '0'; top.appendChild(E('span', 'tl-chip gold', o.file + ' · ' + fmtN(o.T.rows.length) + ' rows'));
+    const names = Object.keys(o.sheets); if (names.length > 1) { const sh = selOpts(inp('select'), names, o.sheet); sh.style.maxWidth = '16rem'; sh.addEventListener('change', () => { o.sheet = sh.value; o.T = toTable(o.sheets[o.sheet]); autoCols(o, cols); onChange(); }); top.appendChild(sh); }
+    w.appendChild(top);
+    const fm = E('div', 'tl-form'); cols.forEach(c => { const s = selOpts(inp('select'), [['-1', c[2] ? '— none —' : 'Choose…']].concat(o.T.hdr.map((h, i) => [String(i), h])), String(o.c[c[0]])); s.addEventListener('change', () => { o.c[c[0]] = +s.value; onChange(true); }); fm.appendChild(field(c[1], s)); }); w.appendChild(fm);
+    return w;
+  }
+  function autoCols(o, cols) { o.c = {}; cols.forEach(c => { o.c[c[0]] = c[3] ? pick(o.T.hdr, c[3], c[4]) : -1; }); }
+  const ACOLS = [['key', 'Retailer ID *', 0, RX.id], ['st', 'State', 1, RX.st, /code|id/], ['name', 'Retailer name', 1, RX.name], ['status', 'Status (active / inactive)', 1, RX.status, /date/], ['val', 'Number to compare (optional)', 1, null]];
+  const BCOLS = [['key', 'Retailer ID *', 0, RX.id], ['st', 'State', 1, RX.st, /code|id/], ['val', 'Number to compare (optional)', 1, null]];
+  async function loadSide(f, cols) { const sh = await readTable(f), nm = sheetPick(sh, RX.id), o = {file: f.name, sheets: sh, sheet: nm, T: toTable(sh[nm])}; autoCols(o, cols); return o; }
+  function logsSide() {
+    const RAW = A.RAW, T = RAW && RAW.t && RAW.t.app, rng = A.RNG, cm = codeMap(), mp = A.gated && A.lock() ? (A.maps()[A.lock()] || {}) : null, m = new Map(); if (!T || !rng) return m;
+    const D = RAW.days, r = T.r, ids = T.d[0];
+    for (let i = 0; i < r.length; i += 4) { const d = D[r[i + 2]]; if (d < rng.f || d > rng.t) continue; const id = ids[r[i]], st = stOfId(id, cm); if (!st) continue; if (A.gated && A.lock() && st !== A.lock()) continue; const rid = mp ? (mp[id] || id) : id, k = nk(rid); let a = m.get(k); if (!a) { a = {id: rid, st, visits: 0, days: new Set(), last: d}; m.set(k, a); } a.visits += r[i + 3]; a.days.add(d); if (d > a.last) a.last = d; }
+    return m;
+  }
+  const num = v => { if (typeof v === 'number') return v; const s = String(v == null ? '' : v).replace(/[,₹\s%]/g, ''); return s !== '' && isFinite(+s) ? +s : null; };
+  function runRecon() {
+    const a = R.a, ca = a.c, mA = new Map(), dupA = [];
+    a.T.rows.forEach(r => { const k = nk(r[ca.key]); if (!k) return; if (mA.has(k)) { dupA.push(r); return; } mA.set(k, r); });
+    let mB = new Map(), dupB = [];
+    if (R.bm === 'logs') { logsSide().forEach((v, k) => mB.set(k, {id: v.id, st: v.st, val: R.bval === 'visits' ? v.visits : R.bval === 'days' ? v.days.size : null, info: v.visits + ' visits · ' + v.days.size + ' days · last ' + dlabel(v.last)})); }
+    else { const cb = R.b.c; R.b.T.rows.forEach(r => { const k = nk(r[cb.key]); if (!k) return; if (mB.has(k)) { dupB.push(r); return; } mB.set(k, {id: String(r[cb.key]).trim(), st: cb.st >= 0 ? stNorm(r[cb.st]) : '', val: cb.val >= 0 ? num(r[cb.val]) : null, info: ''}); }); }
+    const cm = codeMap(), out = [], cnt = {match: 0, onlyA: 0, onlyB: 0, status: 0, state: 0, val: 0, dup: dupA.length + dupB.length}, useVal = ca.val >= 0 && (R.bm === 'logs' ? R.bval !== 'none' : R.b.c.val >= 0), tol = +R.tol || 0;
+    const INACT = /inactive|in-active|closed|block|deactiv|suspend|terminat|disabled|left|^no$|^n$|^0$|dormant/i;
+    mA.forEach((r, k) => {
+      const b = mB.get(k), stA = ca.st >= 0 ? stNorm(r[ca.st]) : '', stB = b ? (b.st || stOfId(k, cm) || '') : '', status = ca.status >= 0 && r[ca.status] != null ? String(r[ca.status]) : '', vA = ca.val >= 0 ? num(r[ca.val]) : null, vB = b ? b.val : null;
+      const issues = [];
+      if (!b) { issues.push('onlyA'); }
+      else {
+        if (status && INACT.test(status.trim())) issues.push('status');
+        if (stA && stB && cmpS(stA) !== cmpS(stB)) issues.push('state');
+        if (useVal && (fin(vA) || fin(vB)) && Math.abs((vA || 0) - (vB || 0)) > tol) issues.push('val');
+        if (!issues.length) issues.push('match');
+      }
+      issues.forEach(x => cnt[x]++);
+      out.push({k, id: String(r[ca.key]).trim(), name: ca.name >= 0 && r[ca.name] != null ? String(r[ca.name]) : '', stA, stB, status, vA, vB, info: b ? b.info : '', issues});
+    });
+    mB.forEach((b, k) => { if (mA.has(k)) return; cnt.onlyB++; out.push({k, id: b.id, name: '', stA: '', stB: b.st || stOfId(k, cm) || '', status: '', vA: null, vB: b.val, info: b.info, issues: ['onlyB']}); });
+    dupA.forEach(r => out.push({k: nk(r[ca.key]), id: String(r[ca.key]).trim(), name: ca.name >= 0 && r[ca.name] != null ? String(r[ca.name]) : '', stA: ca.st >= 0 ? stNorm(r[ca.st]) : '', stB: '', status: '', vA: null, vB: null, info: 'Repeated in ' + R.a.file, issues: ['dup']}));
+    dupB.forEach(r => { const cb = R.b.c; out.push({k: nk(r[cb.key]), id: String(r[cb.key]).trim(), name: '', stA: '', stB: '', status: '', vA: null, vB: null, info: 'Repeated in ' + R.b.file, issues: ['dup']}); });
+    R.res = {out, cnt, nA: mA.size, nB: mB.size, useVal, at: new Date().toISOString(), bLabel: R.bm === 'logs' ? 'Retailer app logs' : R.b.file}; R.f = 'all';
+  }
+  const RLAB = () => ({match: ['Matched', 'In both, no issue', 'ok'], onlyA: [R.bm === 'logs' ? 'In vWork, no app usage' : 'Only in vWork', R.bm === 'logs' ? 'No app log in ' + A.LB.title : 'Missing from file 2', 'bad'], onlyB: [R.bm === 'logs' ? 'Using app, not in vWork' : 'Only in file 2', 'Missing from vWork', 'bad'], status: ['Inactive in vWork but used', 'Status mismatch', 'warn'], state: ['State mismatch', 'Different state in the two sources', 'warn'], val: ['Number mismatch', 'Difference above tolerance', 'warn'], dup: ['Duplicate IDs', 'Repeated rows', 'warn']});
+  function rRecon() {
+    const L = RLAB(), res = R.res;
+    hero('tlr', [[res ? fmtN(res.nA) : '—', 'IDs in vWork file'], [res ? fmtN(res.nB) : '—', 'IDs in ' + (R.bm === 'logs' ? 'app logs' : 'file 2')], [res ? fmtN(res.cnt.match) : '—', 'matched'], [res ? fmtN(res.out.length - res.cnt.match) : '—', 'need a look']], 'Upload the vWork export. It is matched by Retailer ID with the retailer app usage logs (or a second file). Every mismatch is listed and ready for Excel, with no VLOOKUP.');
+    const root = page('tlr');
+    if (A.gated && !A.lock()) { const s = A.sec('Locked', 'Unlock your state first', 'Matching needs your real retailer IDs. Unlock with your access code, or upload a second file to compare two files.'); const c = A.card(btn('🔒 Unlock my state', 'big', () => A.unlock())); s.appendChild(c); root.appendChild(s); }
+    const s1 = A.sec('Step 1', 'vWork data', 'Retailer master or any vWork export with a Retailer ID column.'), c1 = E('div', 'card');
+    c1.appendChild(fileBtn(R.a ? '⬆ Replace vWork file' : '⬆ Upload vWork file (.xlsx / .csv)', '.xlsx,.xlsm,.csv', async f => { try { A.say('Reading ' + f.name + '…'); R.a = await loadSide(f, ACOLS); R.res = null; A.say('Columns detected. Check them and tap Compare.', 4000); rRecon(); } catch (e) { A.say(e.message || String(e), 6000); } }, {cls: R.a ? 'ghost' : 'big'}));
+    if (R.a) { c1.appendChild(E('div', 'note', 'Columns detected automatically. Change any that are wrong.')); c1.lastChild.style.marginTop = '12px'; c1.appendChild(tblPicker(R.a, ACOLS, () => { R.res = null; })); }
+    s1.appendChild(c1); root.appendChild(s1);
+    const s2 = A.sec('Step 2', 'Compare with', null), c2 = E('div', 'card');
+    c2.appendChild(segCtl([['logs', 'Retailer app logs in this dashboard'], ['file', 'Another file']], R.bm, v => { R.bm = v; R.res = null; rRecon(); }));
+    if (R.bm === 'logs') {
+      const lg = logsSide(); c2.appendChild(E('p', 'note', 'Retailer App logs for ' + A.LB.title + ' (' + A.LB.rng + '): ' + fmtN(lg.size) + ' retailer IDs with app use' + (A.gated ? ' in ' + (A.lock() || 'your state') : '') + '. Change the period in Filters & tools.'));
+      if (A.META.shareable) c2.appendChild(E('div', 'tl-note', 'This is a shareable copy with anonymised IDs, so app logs will not match real vWork IDs. Use the master file or compare two files.'));
+      const fm = E('div', 'tl-form'), bv = selOpts(inp('select'), [['none', '— no number check —'], ['visits', 'App visits (count)'], ['days', 'Active days']], R.bval); bv.addEventListener('change', () => { R.bval = bv.value; R.res = null; }); fm.appendChild(field('Number from the logs', bv)); c2.appendChild(fm);
+    } else {
+      c2.appendChild(E('div')); c2.lastChild.style.marginTop = '12px';
+      c2.lastChild.appendChild(fileBtn(R.b ? '⬆ Replace file 2' : '⬆ Upload file 2', '.xlsx,.xlsm,.csv', async f => { try { R.b = await loadSide(f, BCOLS); R.res = null; rRecon(); } catch (e) { A.say(e.message || String(e), 6000); } }, {cls: R.b ? 'ghost' : 'big'}));
+      if (R.b) { const w = E('div'); w.style.marginTop = '12px'; w.appendChild(tblPicker(R.b, BCOLS, () => { R.res = null; })); c2.appendChild(w); }
+    }
+    const tf = E('div', 'tl-form'), ti = inp('number', R.tol); ti.min = 0; ti.addEventListener('change', () => { R.tol = +ti.value || 0; }); tf.appendChild(field('Allowed difference for numbers', ti)); c2.appendChild(tf);
+    const go = E('div', 'tl-acts'); go.appendChild(btn('⚡ Compare now', 'big', () => {
+      if (!R.a) { A.say('Upload the vWork file first.', 3000); return; } if (R.a.c.key < 0) { A.say('Choose the Retailer ID column of the vWork file.', 3500); return; }
+      if (R.bm === 'file' && (!R.b || R.b.c.key < 0)) { A.say('Upload file 2 and choose its Retailer ID column.', 3500); return; }
+      runRecon(); rRecon(); setTimeout(() => { const n = document.getElementById('tl-rres'); if (n) n.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 60);
+    })); c2.appendChild(go);
+    s2.appendChild(c2); root.appendChild(s2);
+    if (!res) return;
+    const s3 = A.sec('Result', 'What matches and what does not', 'Tap a box to filter the list. Compared on ' + tlabel(res.at) + '.'); s3.id = 'tl-rres';
+    const st = E('div', 'tl-stats'); st.appendChild(stat(fmtN(res.out.length), 'All rows', 'click' + (R.f === 'all' ? ' on' : ''), () => { R.f = 'all'; rRecon(); }));
+    Object.keys(L).forEach(k => { if (k === 'val' && !res.useVal) return; if (k === 'dup' && !res.cnt.dup) return; st.appendChild(stat(fmtN(res.cnt[k]), L[k][0], L[k][2] + (R.f === k ? ' on' : ''), () => { R.f = k; rRecon(); })); });
+    s3.appendChild(st);
+    const bad = res.out.filter(r => r.issues[0] !== 'match'), bySt = {}; bad.forEach(r => { const s = r.stA || r.stB || 'Unknown'; bySt[s] = (bySt[s] || 0) + 1; });
+    const g = E('div', 'g2'), cA = E('div', 'card'); cA.appendChild(E('div', 'note', 'Rows needing a look, by state')); const bi = Object.keys(bySt).map(s => ({label: s, v: bySt[s], txt: fmtN(bySt[s])})).sort((a, b) => b.v - a.v).slice(0, 12); cA.appendChild(bi.length ? A.hbars(bi, {col: '#b3402f'}) : emptyBox('No mismatches. Everything matches.'));
+    const cB = E('div', 'card'); cB.appendChild(E('div', 'note', 'Match rate')); const mr = res.nA ? res.cnt.match / res.nA : 0; const rw = E('div', 'tl-score'); rw.style.marginTop = '10px'; rw.appendChild(donut([{v: res.cnt.match, col: '#2e7d5b'}, {v: res.cnt.onlyA, col: '#b3402f'}, {v: res.cnt.status + res.cnt.state + res.cnt.val, col: '#c9a227'}], 150, [fmtP(mr, 0), 'of vWork IDs'])); const lg = E('div'); lg.appendChild(A.bullets([fmtN(res.cnt.match) + ' vWork IDs match with no issue.', fmtN(res.cnt.onlyA) + ' vWork IDs have no ' + (R.bm === 'logs' ? 'app usage in this period' : 'row in file 2') + '.', fmtN(res.cnt.onlyB) + ' IDs ' + (R.bm === 'logs' ? 'used the app' : 'are in file 2') + ' but are missing in vWork.'])); rw.appendChild(lg); cB.appendChild(rw);
+    g.appendChild(cA); g.appendChild(cB); s3.appendChild(g);
+    const list = R.f === 'all' ? res.out : res.out.filter(r => r.issues.indexOf(R.f) >= 0);
+    const ex = E('div', 'tl-acts'); ex.style.margin = '14px 0 12px';
+    ex.appendChild(btn('⬇ Export all results to Excel', 'big', () => {
+      const H = ['Retailer ID', 'Retailer name', 'State (vWork)', 'State (' + res.bLabel + ')', 'Status (vWork)', 'Number (vWork)', 'Number (' + res.bLabel + ')', 'Difference', 'Issue', 'Details'];
+      const rowX = r => [r.id, r.name, r.stA, r.stB, r.status, fin(r.vA) ? r.vA : '', fin(r.vB) ? r.vB : '', fin(r.vA) || fin(r.vB) ? (r.vA || 0) - (r.vB || 0) : '', r.issues.map(x => L[x][0]).join(', '), r.info];
+      const sheets = [{name: 'Summary', rows: [['Item', 'Value'], ['vWork file', R.a.file], ['Compared with', res.bLabel + (R.bm === 'logs' ? ' (' + A.LB.title + ', ' + A.LB.rng + ')' : '')], ['Compared on', tlabel(res.at)], ['IDs in vWork', res.nA], ['IDs in ' + res.bLabel, res.nB]].concat(Object.keys(L).map(k => [L[k][0], res.cnt[k]]))}, {name: 'All rows', rows: [H].concat(res.out.map(rowX))}];
+      Object.keys(L).forEach(k => { if (k === 'match') return; const rs = res.out.filter(r => r.issues.indexOf(k) >= 0); if (rs.length) sheets.push({name: L[k][0], rows: [H].concat(rs.map(rowX))}); });
+      A.saveXlsx(sheets, 'Reconciliation_' + today() + '.xlsx');
+    }));
+    ex.appendChild(E('span', 'note', 'Showing ' + fmtN(Math.min(300, list.length)) + ' of ' + fmtN(list.length) + ' rows on screen. Excel has every row, one sheet per issue.')); s3.appendChild(ex);
+    s3.appendChild(A.card(A.mkTable([{h: 'Retailer ID'}, {h: 'Name'}, {h: 'State (vWork)'}, {h: 'State (' + (R.bm === 'logs' ? 'logs' : 'file 2') + ')'}, {h: 'Status'}].concat(res.useVal ? [{h: 'vWork', r: 1}, {h: R.bm === 'logs' ? 'Logs' : 'File 2', r: 1}] : []).concat([{h: 'Issue'}, {h: 'Details'}]), list.slice(0, 300).map(r => { const iss = E('span'); r.issues.forEach(x => { const c = E('span', 'tl-chip ' + (x === 'match' ? 'green' : L[x][2] === 'bad' ? 'red' : 'amber'), L[x][0]); c.style.marginRight = '4px'; iss.appendChild(c); }); return [r.id, r.name, r.stA, r.stB, r.status].concat(res.useVal ? [fin(r.vA) ? fmtD(r.vA) : '', fin(r.vB) ? fmtD(r.vB) : ''] : []).concat([iss, r.info]); }))));
+    root.appendChild(s3);
+  }
+
+  // =====================================================================================
+  // 6. EXCEL TO INSIGHT
+  const I = {o: null, prof: null, gb: -1, ms: -1, agg: 'sum'};
+  const DIM = /state|zone|region|district|city|town|area|dealer|retailer\s*name|store\s*name|model|product|brand|category|type|status|channel|segment|month|scheme|feature|partner|bank|series|asm|tsm|vbm|vba/;
+  const MEAS = /sale|qty|quantity|amount|value|revenue|payout|target|achiev|count|volume|units|visits|activation|incentive|price|margin|stock|score/;
+  function toNum(v) { if (typeof v === 'number') return isFinite(v) ? v : null; if (v == null) return null; let s = String(v).trim().replace(/[,₹\s]/g, ''); if (/%$/.test(s)) s = s.slice(0, -1); return /^-?\d+(\.\d+)?$/.test(s) ? +s : null; }
+  function profile(T) {
+    const n = T.rows.length;
+    return T.hdr.map((h, ci) => {
+      const hl = h.toLowerCase(), vals = T.rows.map(r => r[ci]), ne = vals.filter(v => v != null && String(v).trim() !== ''), f = ne.length, uniqM = new Map(); ne.forEach(v => { const k = String(v).trim(); uniqM.set(k, (uniqM.get(k) || 0) + 1); });
+      const nums = ne.map(toNum).filter(v => v != null), hint = /date|day|month|time|period|dt$|created|visit on/.test(hl);
+      let dates = []; if (hint || nums.length < f * 0.8) dates = ne.map(v => (typeof v === 'number' ? (hint && v > 20000 && v < 80000 ? A.parseDate(v) : null) : A.parseDate(v))).filter(Boolean);
+      const idLike = /(^|\s)(id|code|imei|mobile|phone|no\.?|number|pin|pincode|serial)($|\s)|_id$|code$/.test(hl) && uniqM.size > f * 0.5;
+      let type = 'text'; if (f === 0) type = 'empty'; else if (dates.length >= f * 0.8) type = 'date'; else if (idLike) type = 'id'; else if (nums.length >= f * 0.8) type = 'number'; else if (uniqM.size <= Math.max(60, f * 0.05) || uniqM.size < f * 0.3) type = 'category'; else if (uniqM.size > f * 0.9) type = 'id';
+      const p = {h, ci, type, f, blank: n - f, uniq: uniqM.size, top: Array.from(uniqM.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)};
+      if (type === 'number') { const s = nums.reduce((a, b) => a + b, 0), mean = s / nums.length, sd = Math.sqrt(nums.reduce((a, b) => a + (b - mean) * (b - mean), 0) / nums.length); p.sum = s; p.mean = mean; p.sd = sd; p.min = Math.min(...nums); p.max = Math.max(...nums); p.neg = nums.filter(v => v < 0).length; p.out = nums.filter(v => sd > 0 && v > mean + 3 * sd).length; }
+      if (type === 'date') { const ds = dates.slice().sort(); p.dmin = ds[0]; p.dmax = ds[ds.length - 1]; }
+      return p;
+    });
+  }
+  function pickMeas(P) { const nu = P.filter(p => p.type === 'number'); return nu.find(p => MEAS.test(p.h.toLowerCase())) || nu[0] || null; }
+  function pickDim(P, not) { const c = P.filter(p => p.type === 'category' && p !== not && p.uniq > 1); return c.find(p => DIM.test(p.h.toLowerCase())) || c[0] || null; }
+  function groupBy(T, gi, mi, agg, isDate) {
+    const m = new Map(); T.rows.forEach(r => { let k = r[gi]; if (k == null || String(k).trim() === '') k = '(blank)'; else if (isDate) { const d = typeof k === 'number' ? A.parseDate(k) : A.parseDate(k); k = d ? d.slice(0, 7) : '(no date)'; } else k = String(k).trim(); let a = m.get(k); if (!a) { a = {n: 0, s: 0, c: 0, mn: Infinity, mx: -Infinity}; m.set(k, a); } a.n++; if (mi >= 0) { const v = toNum(r[mi]); if (v != null) { a.s += v; a.c++; if (v < a.mn) a.mn = v; if (v > a.mx) a.mx = v; } } });
+    return Array.from(m.entries()).map(([k, a]) => ({label: k, v: mi < 0 || agg === 'count' ? a.n : agg === 'avg' ? (a.c ? a.s / a.c : 0) : agg === 'min' ? (a.c ? a.mn : 0) : agg === 'max' ? (a.c ? a.mx : 0) : a.s}));
+  }
+  function rInsight() {
+    const o = I.o, P = I.prof;
+    hero('tli', [[o ? fmtN(o.T.rows.length) : '—', 'rows read'], [o ? String(o.T.hdr.length) : '—', 'columns detected'], [P ? String(P.filter(p => p.type === 'number').length) : '—', 'number columns'], [P ? String(P.filter(p => p.type === 'category').length) : '—', 'category columns']], 'Upload any raw Excel or CSV. The app finds the header row, detects each column type and builds a summary with charts. Nothing leaves this device.');
+    const root = page('tli');
+    const s1 = A.sec('Upload', o ? o.file : 'Choose a file', null), c1 = E('div', 'card');
+    c1.appendChild(fileBtn(o ? '⬆ Another file' : '⬆ Upload Excel or CSV', '.xlsx,.xlsm,.csv,.txt', async f => { try { A.say('Reading ' + f.name + '…'); const sh = await readTable(f), names = Object.keys(sh); let best = names[0], bn = -1; names.forEach(k => { const n = (sh[k] || []).length; if (n > bn) { bn = n; best = k; } }); I.o = {file: f.name, sheets: sh, sheet: best, T: toTable(sh[best])}; I.prof = profile(I.o.T); I.gb = -1; I.ms = -1; A.say('Done. ' + fmtN(I.o.T.rows.length) + ' rows analysed.', 3500); rInsight(); } catch (e) { A.say(e.message || String(e), 6000); } }, {cls: o ? 'ghost' : 'big'}));
+    if (o) { const names = Object.keys(o.sheets); if (names.length > 1) { const sh = selOpts(inp('select'), names, o.sheet); sh.style.maxWidth = '18rem'; sh.addEventListener('change', () => { o.sheet = sh.value; o.T = toTable(o.sheets[o.sheet]); I.prof = profile(o.T); I.gb = -1; I.ms = -1; rInsight(); }); const w = E('div', 'tl-acts'); w.appendChild(E('span', 'note', 'Sheet')); w.appendChild(sh); w.appendChild(E('span', 'note', 'Header found in row ' + o.T.hdrRow)); c1.appendChild(w); } else c1.appendChild(E('p', 'note', 'Header found in row ' + o.T.hdrRow + '.')); }
+    else c1.appendChild(E('p', 'note', 'Works with any export: vWork reports, app logs, sales, payout or visit sheets.'));
+    s1.appendChild(c1); root.appendChild(s1);
+    if (!o) return;
+    if (!o.T.rows.length) { root.appendChild(A.card(emptyBox('This sheet has no data rows.'))); return; }
+    const T = o.T, meas = pickMeas(P), dim = pickDim(P), dim2 = pickDim(P, dim), dt = P.find(p => p.type === 'date'), ids = P.filter(p => p.type === 'id');
+    // insights
+    const ins = [];
+    ins.push(fmtN(T.rows.length) + ' rows and ' + T.hdr.length + ' columns: ' + ['number', 'category', 'date', 'id', 'text'].map(t => { const n = P.filter(p => p.type === t).length; return n ? n + ' ' + t + (n > 1 ? (t === 'category' ? ' columns' : t === 'id' ? ' ID columns' : ' columns') : (t === 'id' ? ' ID column' : ' column')) : null; }).filter(Boolean).join(', ') + '.');
+    if (meas) ins.push('Total ' + meas.h + ' is ' + fmtD(meas.sum, 0) + ', average ' + fmtD(meas.mean, 1) + ' per row (from ' + fmtD(meas.min, 1) + ' to ' + fmtD(meas.max, 1) + ').');
+    if (meas && dim) { const gb = groupBy(T, dim.ci, meas.ci, 'sum').sort((a, b) => b.v - a.v), tot = gb.reduce((a, b) => a + b.v, 0); if (gb.length && tot) { ins.push('Top ' + dim.h + ' by ' + meas.h + ' is ' + gb[0].label + ' with ' + fmtD(gb[0].v, 0) + ' (' + fmtP(gb[0].v / tot, 0) + ' of total).'); if (gb.length > 3) ins.push('The top 3 ' + dim.h + ' values make ' + fmtP((gb[0].v + gb[1].v + gb[2].v) / tot, 0) + ' of ' + meas.h + '. The lowest is ' + gb[gb.length - 1].label + ' (' + fmtD(gb[gb.length - 1].v, 0) + ').'); } }
+    if (dt) { const gm = groupBy(T, dt.ci, meas ? meas.ci : -1, meas ? 'sum' : 'count', true).filter(x => /^\d{4}-\d{2}$/.test(x.label)).sort((a, b) => a.label < b.label ? -1 : 1); ins.push(dt.h + ' runs from ' + dlabel(dt.dmin) + ' to ' + dlabel(dt.dmax) + '.'); if (gm.length >= 2 && gm[0].v) { const ch = gm[gm.length - 1].v / gm[0].v - 1; ins.push((meas ? meas.h : 'Rows') + ' ' + (ch >= 0 ? 'grew ' : 'fell ') + fmtP(Math.abs(ch), 0) + ' from ' + gm[0].label + ' to ' + gm[gm.length - 1].label + '.'); } }
+    P.filter(p => p.blank > T.rows.length * 0.2 && p.type !== 'empty').slice(0, 3).forEach(p => ins.push(p.h + ' is blank in ' + fmtP(p.blank / T.rows.length, 0) + ' of rows.'));
+    ids.slice(0, 2).forEach(p => { if (p.uniq < p.f) ins.push(p.h + ' has ' + fmtN(p.f - p.uniq) + ' repeated values.'); });
+    P.filter(p => p.type === 'number' && p.out).slice(0, 2).forEach(p => ins.push(p.h + ' has ' + p.out + ' unusually high values (more than 3 standard deviations above average).'));
+    P.filter(p => p.type === 'number' && p.neg).slice(0, 2).forEach(p => ins.push(p.h + ' has ' + p.neg + ' negative values.'));
+    const s2 = A.sec('Summary', 'What this file says', null), st = E('div', 'tl-stats');
+    st.appendChild(stat(fmtN(T.rows.length), 'rows')); st.appendChild(stat(String(T.hdr.length), 'columns')); if (meas) st.appendChild(stat(fmtD(meas.sum, 0), 'total ' + meas.h)); if (dim) st.appendChild(stat(fmtN(dim.uniq), 'unique ' + dim.h)); const bl = P.reduce((a, p) => a + p.blank, 0); st.appendChild(stat(fmtP(bl / Math.max(1, T.rows.length * T.hdr.length), 1), 'blank cells', bl ? 'warn' : 'ok'));
+    s2.appendChild(st); const ic = E('div', 'card focus'); ic.appendChild(E('div', 'eyebrow', 'Auto insights')); ic.appendChild(A.bullets(ins)); s2.appendChild(ic); root.appendChild(s2);
+    // charts
+    const s3 = A.sec('Charts', 'Built automatically', null), g = E('div', 'g2'); let nC = 0;
+    const cc = (t, node) => { const c = E('div', 'card'); c.appendChild(E('div', 'note', t)); c.lastChild.style.marginBottom = '8px'; c.appendChild(node); g.appendChild(c); nC++; };
+    if (dim) { const gb = groupBy(T, dim.ci, meas ? meas.ci : -1, meas ? 'sum' : 'count').sort((a, b) => b.v - a.v).slice(0, 12); cc((meas ? meas.h + ' by ' : 'Rows by ') + dim.h + ' (top 12)', A.hbars(gb.map(x => ({label: x.label, v: x.v, txt: fmtD(x.v, 0)})), {col: '#c9a227'})); }
+    if (dt) { const gm = groupBy(T, dt.ci, meas ? meas.ci : -1, meas ? 'sum' : 'count', true).filter(x => /^\d{4}-\d{2}$/.test(x.label)).sort((a, b) => a.label < b.label ? -1 : 1); cc((meas ? meas.h : 'Rows') + ' by month', lineChart(gm.map(x => MON3[+x.label.slice(5) - 1] + '-' + x.label.slice(2, 4)), [{name: meas ? meas.h : 'Rows', vals: gm.map(x => x.v), col: '#c9a227'}], {fmt: v => fmtD(v, 0)})); }
+    if (dim2) { const gb = groupBy(T, dim2.ci, -1, 'count').sort((a, b) => b.v - a.v).slice(0, 10); cc('Rows by ' + dim2.h + ' (top 10)', A.hbars(gb.map(x => ({label: x.label, v: x.v, txt: fmtN(x.v)})), {col: '#111'})); }
+    if (meas && meas.max > meas.min) { const nb = 10, w = (meas.max - meas.min) / nb, bins = Array.from({length: nb}, (_, i) => ({label: fmtD(meas.min + i * w, 0), v: 0})); T.rows.forEach(r => { const v = toNum(r[meas.ci]); if (v == null) return; bins[Math.min(nb - 1, Math.floor((v - meas.min) / w))].v++; }); cc('Spread of ' + meas.h + ' (rows per range)', colChart(bins, {col: '#8a6a1f'})); }
+    if (nC) { s3.appendChild(g); root.appendChild(s3); }
+    // pivot
+    const gcols = P.filter(p => ['category', 'date', 'id', 'text'].indexOf(p.type) >= 0), mcols = P.filter(p => p.type === 'number');
+    if (I.gb < 0 || !P[I.gb]) I.gb = dim ? dim.ci : gcols.length ? gcols[0].ci : 0; if (I.ms === -1) I.ms = meas ? meas.ci : -2;
+    const s4 = A.sec('Explore', 'Your own summary table', 'Pick what to group by and what to add up.'), c4 = E('div', 'card'), fm = E('div', 'tl-form');
+    const gs = selOpts(inp('select'), gcols.map(p => [String(p.ci), p.h + (p.type === 'date' ? ' (by month)' : '')]), String(I.gb)); gs.addEventListener('change', () => { I.gb = +gs.value; rInsight(); });
+    const ms = selOpts(inp('select'), [['-2', 'Number of rows']].concat(mcols.map(p => [String(p.ci), p.h])), String(I.ms)); ms.addEventListener('change', () => { I.ms = +ms.value; rInsight(); });
+    const ag = selOpts(inp('select'), [['sum', 'Sum'], ['avg', 'Average'], ['min', 'Minimum'], ['max', 'Maximum'], ['count', 'Count']], I.agg); ag.addEventListener('change', () => { I.agg = ag.value; rInsight(); });
+    fm.appendChild(field('Group by', gs)); fm.appendChild(field('Value', ms)); if (I.ms >= 0) fm.appendChild(field('How', ag)); c4.appendChild(fm);
+    const gp = P[I.gb], pv = groupBy(T, I.gb, I.ms >= 0 ? I.ms : -1, I.ms >= 0 ? I.agg : 'count', gp && gp.type === 'date').sort((a, b) => gp && gp.type === 'date' ? (a.label < b.label ? -1 : 1) : b.v - a.v), tot = pv.reduce((a, b) => a + b.v, 0);
+    const vname = I.ms >= 0 ? ({sum: 'Sum of ', avg: 'Average of ', min: 'Minimum of ', max: 'Maximum of ', count: 'Count of '}[I.agg]) + P[I.ms].h : 'Rows';
+    const g2 = E('div', 'g2'); g2.style.marginTop = '8px'; const pc = E('div'); pc.appendChild(A.hbars(pv.slice(0, 15).map(x => ({label: x.label, v: Math.max(0, x.v), txt: fmtD(x.v, 1)})), {col: '#c9a227'})); g2.appendChild(pc);
+    const tw = E('div', 'tl-scroll'); tw.appendChild(A.mkTable([{h: gp ? gp.h : 'Group'}, {h: vname, r: 1}, {h: 'Share', r: 1}], pv.slice(0, 200).map(x => [x.label, fmtD(x.v, 2), I.agg === 'sum' || I.ms < 0 ? fmtP(tot ? x.v / tot : 0, 1) : '—']))); g2.appendChild(tw); c4.appendChild(g2);
+    const ex = E('div', 'tl-acts'); ex.appendChild(btn('⬇ Summary and profile to Excel', 'big', () => A.saveXlsx([{name: 'Summary table', rows: [[gp ? gp.h : 'Group', vname]].concat(pv.map(x => [x.label, x.v]))}, {name: 'Column profile', rows: [['Column', 'Type', 'Filled', 'Blank', 'Unique', 'Sum', 'Average', 'Min', 'Max', 'Most common']].concat(P.map(p => [p.h, p.type, p.f, p.blank, p.uniq, p.sum == null ? '' : p.sum, p.mean == null ? '' : p.mean, p.min == null ? (p.dmin || '') : p.min, p.max == null ? (p.dmax || '') : p.max, p.top.map(t => t[0] + ' (' + t[1] + ')').join(', ')]))}, {name: 'Insights', rows: [['Insight']].concat(ins.map(x => [x]))}], 'Insight_' + safeSt(o.file.replace(/\.[^.]+$/, '')) + '.xlsx'))); c4.appendChild(ex);
+    s4.appendChild(c4); root.appendChild(s4);
+    // profile
+    const s5 = A.sec('Columns', 'Column profile', 'How each column was read.');
+    s5.appendChild(A.card(A.mkTable([{h: 'Column'}, {h: 'Type'}, {h: 'Filled', r: 1}, {h: 'Unique', r: 1}, {h: 'Range or top values'}], P.map(p => { const ty = E('span', 'tl-chip ' + ({number: 'gold', date: 'green', id: 'dark', category: '', text: '', empty: 'red'}[p.type] || ''), p.type); return [p.h, ty, fmtP(T.rows.length ? p.f / T.rows.length : 0, 0), fmtN(p.uniq), p.type === 'number' ? fmtD(p.min, 1) + ' to ' + fmtD(p.max, 1) : p.type === 'date' ? dlabel(p.dmin) + ' to ' + dlabel(p.dmax) : p.top.slice(0, 3).map(t => String(t[0]).slice(0, 24)).join(', ')]; }))));
+    root.appendChild(s5);
+  }
+
+  // =====================================================================================
+  // 7. IDEA BOX
+  const ICATS = ['Process', 'Reports & data', 'Retailer app', 'Incentive & payout', 'Market hygiene', 'Affordability', 'Training', 'Other'];
+  const ISTAT = ['New', 'Under review', 'Approved', 'Implemented', 'Not now'];
+  const IDR = {list: null, at: 0, err: '', busy: false};
+  const devId = () => { let d = LS.get('dev', null); if (!d) { d = uid(); LS.set('dev', d); } return d; };
+  const ideaUrl = () => LS.get('ideaurl', '') || (A.META.tools && A.META.tools.ideaUrl) || '';
+  function ideasAll() {
+    const m = new Map(); ((A.META.tools && A.META.tools.ideas) || []).forEach(x => m.set(x.id, Object.assign({}, x, {src: 'file'}))); LS.get('ideas', []).forEach(x => m.set(x.id, Object.assign({}, m.get(x.id) || {}, x, {src: m.has(x.id) ? 'file' : 'local'})));
+    if (IDR.list) IDR.list.forEach(x => m.set(x.id, Object.assign({}, x, {src: 'remote'})));
+    const mv = LS.get('myvotes', {}); return Array.from(m.values()).map(x => Object.assign(x, {mine: !!mv[x.id], votes: x.src === 'remote' ? (+x.v || 0) : (+x.v || 0) + (mv[x.id] === true ? 1 : 0)}));
+  }
+  async function ideaFetch(force) {
+    const url = ideaUrl(); if (!url) { IDR.list = null; return; } if (IDR.busy || (!force && IDR.list && Date.now() - IDR.at < 60000)) return;
+    IDR.busy = true; IDR.err = '';
+    try { const r = await fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + 't=' + Date.now()); const j = await r.json(); IDR.list = (j.ideas || []).map(x => ({id: String(x.id), t: x.title, c: x.category, p: x.problem, s: x.idea, b: x.benefit, st: x.state, by: x.by, at: x.at instanceof Date ? x.at.toISOString() : String(x.at || ''), status: x.status || 'New', v: +x.votes || 0})); IDR.at = Date.now(); }
+    catch (e) { IDR.err = 'Could not reach the shared board. Showing ideas on this device.'; }
+    IDR.busy = false; if (mounted('tld')) rIdeas();
+  }
+  async function ideaPost(body) { const url = ideaUrl(); const r = await fetch(url, {method: 'POST', body: JSON.stringify(body)}); try { const j = await r.json(); if (j && j.ideas) { IDR.list = null; IDR.at = 0; } } catch (e) {} await ideaFetch(true); }
+  const ideaTxt = x => '*Idea: ' + x.t + '*\nCategory: ' + x.c + (x.st ? ' · ' + x.st : '') + (x.by ? ' · by ' + x.by : '') + '\n' + (x.p ? 'Problem today: ' + x.p + '\n' : '') + 'Idea: ' + x.s + (x.b ? '\nBenefit: ' + x.b : '') + '\nVotes: ' + x.votes + ' · Status: ' + (x.status || 'New');
+  const IF = {sort: 'top', cat: 'all', status: 'all', open: false};
+  function rIdeas() {
+    const all = ideasAll(), url = ideaUrl(), admin = A.isAdmin();
+    if (url && !IDR.list && !IDR.busy && !IDR.err) ideaFetch();
+    hero('tld', [[String(all.length), 'ideas'], [fmtN(all.reduce((a, x) => a + x.votes, 0)), 'votes'], [String(all.filter(x => x.status === 'Under review' || x.status === 'Approved').length), 'under review or approved'], [String(all.filter(x => x.status === 'Implemented').length), 'implemented']], 'State BI admins share ideas that save time or fix a process. Everyone upvotes, and the top ideas go to HO for review.');
+    const root = page('tld');
+    const mode = E('div', 'tl-note', url ? (IDR.list ? '● Live: connected to the shared board. Votes from all states count together.' : IDR.busy ? 'Connecting to the shared board…' : IDR.err || 'Connecting…') : 'Ideas and votes are kept on this device. The HO admin can add them to the shared dashboard file, or connect a shared Google Sheet so votes from all states count together (setup below).');
+    // top 3
+    const open = all.filter(x => ['New', 'Under review', 'Approved'].indexOf(x.status || 'New') >= 0).sort((a, b) => b.votes - a.votes || (b.at > a.at ? 1 : -1)).slice(0, 3);
+    if (open.length) {
+      const s0 = A.sec('Review queue', 'Top ideas for HO review', 'The most voted open ideas.'), g = E('div', 'tl-top3');
+      open.forEach((x, i) => { const c = E('div', 'card'); const hd = E('div', 'tl-acts'); hd.style.marginTop = '0'; hd.appendChild(E('span', 'tl-medal', '#' + (i + 1))); hd.appendChild(E('span', 'tl-chip dark', '▲ ' + x.votes + ' votes')); hd.appendChild(E('span', 'tl-st s' + ISTAT.indexOf(x.status || 'New'), x.status || 'New')); c.appendChild(hd); c.appendChild(E('b', null, x.t)); c.lastChild.style.cssText = 'display:block;margin:10px 0 4px;font-size:16px'; c.appendChild(E('p', 'note', x.s.length > 140 ? x.s.slice(0, 137) + '…' : x.s)); c.appendChild(E('div', 'tl-meta', x.c + (x.st ? ' · ' + x.st : '') + (x.by ? ' · ' + x.by : ''))); c.lastChild.style.cssText = 'font-size:12px;color:var(--mut)'; g.appendChild(c); });
+      s0.appendChild(g); root.appendChild(s0);
+    }
+    // form
+    const me = LS.get('me', {name: '', st: A.gated && A.lock() ? A.lock() : ''});
+    const s1 = A.sec('Share', 'Share an idea', 'Short and specific works best: what is slow or manual today, and what would fix it.'), c1 = E('div', 'card'), fm = E('div', 'tl-form');
+    const t = inp('text', '', 'e.g. Auto-send payout PDF on vChat'), cat = selOpts(inp('select'), ICATS, 'Process'), st = selOpts(inp('select'), [''].concat(['HO'], stateList().length ? stateList() : (A.SETUP.states || []).map(s => s.state)), me.st || ''), nm = inp('text', me.name, 'Your name');
+    fm.appendChild(field('Idea title *', t)); fm.appendChild(field('Category', cat)); fm.appendChild(field('State', st)); fm.appendChild(field('Your name', nm)); c1.appendChild(fm);
+    const fm2 = E('div', 'tl-form'); const pb = inp('textarea', '', 'What is slow, manual or wrong today?'), sl = inp('textarea', '', 'Your idea: what should change? *'), bf = inp('textarea', '', 'Benefit: time saved, errors avoided, more sales…'); [pb, sl, bf].forEach(x => { x.rows = 3; x.style.minHeight = '84px'; });
+    fm2.appendChild(field('Problem today', pb)); fm2.appendChild(field('Your idea *', sl)); fm2.appendChild(field('Expected benefit', bf)); c1.appendChild(fm2);
+    const ac = E('div', 'tl-acts'); ac.appendChild(btn('💡 Submit idea', 'big', async () => {
+      if (!t.value.trim() || !sl.value.trim()) { A.say('Add a title and your idea.', 3000); return; }
+      const x = {id: uid(), t: t.value.trim(), c: cat.value, st: st.value, by: nm.value.trim(), p: pb.value.trim(), s: sl.value.trim(), b: bf.value.trim(), at: new Date().toISOString(), status: 'New', v: 0};
+      LS.set('me', {name: x.by, st: x.st});
+      if (url) { try { A.say('Sending…'); await ideaPost({action: 'add', idea: x}); A.say('Idea shared with all states.', 3500); } catch (e) { A.say('Could not reach the shared board. Saved on this device.', 4500); const l = LS.get('ideas', []); l.unshift(x); LS.set('ideas', l); } }
+      else { const l = LS.get('ideas', []); l.unshift(x); LS.set('ideas', l); if (admin) A.say('Idea added. Use Add ideas to the file to share it with states.', 4500); else A.say('Idea saved. Tap Share on it to send it to HO on vChat or WhatsApp.', 5000); }
+      rIdeas();
+    })); c1.appendChild(ac); s1.appendChild(c1); root.appendChild(s1);
+    // list
+    const s2 = A.sec('All ideas', 'Vote for the ideas you want', null); s2.appendChild(mode);
+    const fl = E('div', 'tl-acts'); fl.appendChild(segCtl([['top', 'Top voted'], ['new', 'Newest']], IF.sort, v => { IF.sort = v; rIdeas(); }));
+    const cf = selOpts(inp('select'), [['all', 'All categories']].concat(ICATS), IF.cat); cf.style.maxWidth = '13rem'; cf.addEventListener('change', () => { IF.cat = cf.value; rIdeas(); }); fl.appendChild(cf);
+    const sf = selOpts(inp('select'), [['all', 'Any status']].concat(ISTAT), IF.status); sf.style.maxWidth = '11rem'; sf.addEventListener('change', () => { IF.status = sf.value; rIdeas(); }); fl.appendChild(sf);
+    fl.appendChild(btn('⬇ Excel', 'ghost', () => A.saveXlsx([{name: 'Ideas', rows: [['Title', 'Category', 'State', 'By', 'Problem today', 'Idea', 'Benefit', 'Votes', 'Status', 'Date']].concat(all.sort((a, b) => b.votes - a.votes).map(x => [x.t, x.c, x.st || '', x.by || '', x.p || '', x.s, x.b || '', x.votes, x.status || 'New', dlabel(x.at)]))}], 'Idea_Box_' + today() + '.xlsx')));
+    if (url) fl.appendChild(btn('↻ Refresh', 'ghost', () => ideaFetch(true)));
+    s2.appendChild(fl);
+    let list = all.filter(x => (IF.cat === 'all' || x.c === IF.cat) && (IF.status === 'all' || (x.status || 'New') === IF.status));
+    list.sort((a, b) => IF.sort === 'top' ? b.votes - a.votes || (b.at > a.at ? 1 : -1) : (b.at > a.at ? 1 : -1));
+    const l = E('div', 'tl-list'); l.style.marginTop = '12px';
+    if (!list.length) l.appendChild(A.card(emptyBox(all.length ? 'No ideas match this filter.' : 'No ideas yet. Be the first to share one.')));
+    list.forEach(x => {
+      const it = E('div', 'tl-item'), vb = E('button', 'tl-vote' + (x.mine ? ' on' : '')); vb.type = 'button'; vb.innerHTML = '<span>▲</span><b>' + x.votes + '</b><small>' + (x.mine ? 'Voted' : 'Vote') + '</small>'; vb.title = x.mine ? 'Remove your vote' : 'Upvote this idea';
+      vb.addEventListener('click', async () => { const mv = LS.get('myvotes', {}); if (mv[x.id] === 'in') { A.say('Your vote is already counted in the file.', 3000); return; } const up = !mv[x.id]; if (up) mv[x.id] = true; else delete mv[x.id]; LS.set('myvotes', mv); if (x.src === 'remote') { try { await ideaPost({action: 'vote', id: x.id, voter: devId(), up}); } catch (e) { A.say('Could not reach the shared board.', 3000); } } rIdeas(); });
+      it.appendChild(vb);
+      const mn = E('div', 'tl-main'), hd = E('div'); hd.appendChild(E('b', null, x.t)); hd.appendChild(document.createTextNode('  ')); hd.appendChild(E('span', 'tl-st s' + ISTAT.indexOf(x.status || 'New'), x.status || 'New')); mn.appendChild(hd);
+      if (x.p) { const p = E('p'); p.appendChild(E('b', null, 'Today: ')); p.appendChild(document.createTextNode(x.p)); mn.appendChild(p); }
+      const p2 = E('p'); p2.appendChild(E('b', null, 'Idea: ')); p2.appendChild(document.createTextNode(x.s)); mn.appendChild(p2);
+      if (x.b) { const p = E('p'); p.appendChild(E('b', null, 'Benefit: ')); p.appendChild(document.createTextNode(x.b)); mn.appendChild(p); }
+      mn.appendChild(E('div', 'tl-meta', x.c + (x.st ? ' · ' + x.st : '') + (x.by ? ' · ' + x.by : '') + ' · ' + dlabel(x.at) + (x.src === 'file' ? ' · in the shared file' : x.src === 'local' ? ' · on this device' : '')));
+      it.appendChild(mn);
+      const sd = E('div', 'tl-side'); sd.appendChild(btn('Share', null, () => shareText(ideaTxt(x))));
+      if (admin || (url && LS.get('ideakey', ''))) { const ss = selOpts(inp('select'), ISTAT, x.status || 'New'); ss.style.cssText = 'max-width:9.5rem;padding:6px 10px;font-size:13px'; ss.addEventListener('change', async () => { if (x.src === 'remote') { try { await ideaPost({action: 'status', id: x.id, status: ss.value, key: LS.get('ideakey', '')}); A.say('Status updated.', 2500); } catch (e) { A.say('Could not update the shared board.', 3000); } } else { const l2 = LS.get('ideas', []), i = l2.findIndex(y => y.id === x.id); const nx = Object.assign({}, x, {status: ss.value}); delete nx.src; delete nx.mine; delete nx.votes; if (i >= 0) l2[i] = nx; else l2.push(nx); LS.set('ideas', l2); rIdeas(); } }); sd.appendChild(ss); }
+      if (x.src !== 'remote' && (admin || x.src === 'local')) sd.appendChild(btn('Delete', 'red', () => { if (!confirmIt('Delete this idea?')) return; LS.set('ideas', LS.get('ideas', []).filter(y => y.id !== x.id)); if (x.src === 'file' && admin) { A.META.tools.ideas = A.META.tools.ideas.filter(y => y.id !== x.id); A.markDirty(); } rIdeas(); }));
+      it.appendChild(sd); l.appendChild(it);
+    });
+    s2.appendChild(l); root.appendChild(s2);
+    // admin
+    if (admin) {
+      const s3 = A.sec('HO admin', 'Share ideas with every state', null), c3 = E('div', 'card');
+      c3.appendChild(E('p', null, 'Add the ideas and your votes into this dashboard file. They appear for all states in the next common file you export.'));
+      const a3 = E('div', 'tl-acts'); a3.appendChild(btn('📥 Add ideas to the file', 'big', () => { const mv = LS.get('myvotes', {}); const loc = LS.get('ideas', []); const T = A.META.tools = A.META.tools || {}; const m = new Map(); (T.ideas || []).forEach(x => m.set(x.id, x)); loc.forEach(x => m.set(x.id, Object.assign({}, m.get(x.id) || {}, x))); m.forEach((x, id) => { if (mv[id] === true) { x.v = (+x.v || 0) + 1; mv[id] = 'in'; } }); T.ideas = Array.from(m.values()).map(x => { const y = Object.assign({}, x); delete y.src; delete y.mine; delete y.votes; return y; }); LS.set('myvotes', mv); LS.set('ideas', []); A.markDirty(); A.say('Added ' + T.ideas.length + ' ideas. Now use Export & share → Save updated file.', 6000); rIdeas(); })); c3.appendChild(a3);
+      const det = E('details', 'tl-det'); det.appendChild(E('summary', null, 'Optional: connect a shared Google Sheet for live votes from all states'));
+      det.appendChild(E('ol', 'tl-ol')); [['Create a Google Sheet. Open Extensions → Apps Script.'], ['Delete the sample code, paste the script below and save.'], ['Project Settings → Script properties: add ADMIN_KEY with a secret word. Only people with this word can change an idea\'s status.'], ['Deploy → New deployment → Web app. Execute as: Me. Who has access: Anyone. Copy the web app URL.'], ['Paste the URL below and tap Save. Then Save updated file so every state connects to the same board.']].forEach(x => det.lastChild.appendChild(E('li', null, x[0])));
+      const pre = E('pre', 'tl-pre', APPS_SCRIPT); det.appendChild(pre); const cp = E('div', 'tl-acts'); cp.appendChild(btn('Copy script', 'ghost', () => copyText(APPS_SCRIPT))); det.appendChild(cp);
+      const fm3 = E('div', 'tl-form'), ui = inp('url', (A.META.tools && A.META.tools.ideaUrl) || '', 'https://script.google.com/macros/s/…/exec'), ki = inp('password', LS.get('ideakey', ''), 'ADMIN_KEY word'); fm3.appendChild(field('Web app URL', ui)); fm3.appendChild(field('Admin key (kept on this device only)', ki)); det.appendChild(fm3);
+      const sv = E('div', 'tl-acts'); sv.appendChild(btn('Save connection', 'big', () => { const u = ui.value.trim(); if (u && !/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) { A.say('Paste the Apps Script web app URL (script.google.com).', 4500); return; } const T = A.META.tools = A.META.tools || {}; T.ideaUrl = u; LS.set('ideaurl', u); LS.set('ideakey', ki.value.trim()); IDR.list = null; IDR.err = ''; A.markDirty(); A.say(u ? 'Connected. Save updated file so states use the same board.' : 'Disconnected.', 5000); rIdeas(); })); det.appendChild(sv);
+      c3.appendChild(det); s3.appendChild(c3); root.appendChild(s3);
+    }
+  }
+  const APPS_SCRIPT = [
+    '// vivo BI Idea box: shared board on a Google Sheet',
+    'function sh_(){var ss=SpreadsheetApp.getActive(),s=ss.getSheetByName("Ideas");',
+    '  if(!s){s=ss.insertSheet("Ideas");s.appendRow(["id","title","category","problem","idea","benefit","state","by","at","status","votes","voters"]);}return s;}',
+    'function out_(o){return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);}',
+    'function doGet(){var v=sh_().getDataRange().getValues(),h=v.shift();',
+    '  return out_({ideas:v.map(function(r){var o={};h.forEach(function(k,i){if(k!=="voters")o[k]=r[i];});return o;})});}',
+    'function doPost(e){var b=JSON.parse(e.postData.contents),s=sh_(),L=LockService.getScriptLock();L.waitLock(10000);',
+    '  try{var v=s.getDataRange().getValues();',
+    '    if(b.action==="add"){var i=b.idea;s.appendRow([i.id,i.t,i.c,i.p,i.s,i.b,i.st,i.by,i.at,"New",0,""]);}',
+    '    else for(var r=1;r<v.length;r++){if(String(v[r][0])!==String(b.id))continue;',
+    '      if(b.action==="vote"){var vs=String(v[r][11]||"").split(",").filter(String),k=vs.indexOf(b.voter);',
+    '        if(b.up&&k<0)vs.push(b.voter);if(!b.up&&k>=0)vs.splice(k,1);s.getRange(r+1,11,1,2).setValues([[vs.length,vs.join(",")]]);}',
+    '      if(b.action==="status"&&b.key&&b.key===PropertiesService.getScriptProperties().getProperty("ADMIN_KEY"))s.getRange(r+1,10).setValue(b.status);',
+    '      break;}',
+    '  }finally{L.releaseLock();}return doGet();}'
+  ].join('\n');
+
+  // =====================================================================================
+  // 8. CUSTOM KPI BUILDER
+  const FIELDS = [
+    ['app', 'Retailer app usage', 'rate'], ['sa', 'Scheme announcement usage', 'rate'], ['sp', 'Scheme payout usage', 'rate'], ['an', 'Announcements usage', 'rate'], ['av', 'App visits usage', 'rate'], ['sales', 'Sales target achievement', 'rate'], ['visit', 'Customer visit efficiency', 'rate'], ['comp', 'Competition / support desk', 'rate'], ['vnotice', 'v-Notice utilization', 'rate'], ['new', 'New implementation', 'rate'],
+    ['elig', 'Eligible retailers', 'count'], ['sa_n', 'Retailers using Scheme announcement', 'count'], ['sp_n', 'Retailers using Scheme payout', 'count'], ['an_n', 'Retailers using Announcements', 'count'], ['av_n', 'Retailers with App visits', 'count'], ['stores', 'Eligible stores', 'count'], ['v_planned', 'Planned visits', 'count'], ['v_actual', 'Actual visits', 'count'], ['v_valid', 'Valid visits', 'count'], ['v_unv', 'Unverified visits', 'count'], ['v_abn', 'Abnormal visits', 'count'], ['vstores', 'Stores visited', 'count'], ['comp_n', 'Competition uploads', 'count'], ['sd_raised', 'Support queries raised', 'count'], ['sd_closed', 'Support queries closed', 'count'], ['within_tat', 'Closed within TAT', 'count'], ['escalated', 'Escalated queries', 'count'], ['open', 'Open queries', 'count'],
+    ['avg_rating', 'Average support rating (1 to 5)', 'avg']
+  ];
+  const FK = {}; FIELDS.forEach(f => { FK[f[0]] = f; });
+  const FUNCS = {min: Math.min, max: Math.max, abs: Math.abs, round: (x, d) => { const p = Math.pow(10, d || 0); return Math.round(x * p) / p; }, avg: (...a) => a.reduce((s, x) => s + x, 0) / a.length, sqrt: Math.sqrt};
+  const PRESETS = [
+    ['App adoption per eligible retailer', 'av_n / elig', 'pct', 50, 'up'],
+    ['Scheme engagement', '(sa_n + sp_n) / (2 * elig)', 'pct', 40, 'up'],
+    ['Valid visit rate', 'v_valid / v_actual', 'pct', 85, 'up'],
+    ['Unverified visit share', 'v_unv / v_actual', 'pct', 20, 'down'],
+    ['Support closure rate', 'sd_closed / sd_raised', 'pct', 90, 'up'],
+    ['Store visit coverage', 'vstores / stores', 'pct', 80, 'up'],
+    ['Visits per eligible store', 'v_actual / stores', 'dec', 1, 'up'],
+    ['App and sales combined', '(app + sales) / 2', 'pct', 60, 'up']
+  ];
+  function compile(src) {
+    const s = String(src || ''), toks = []; let i = 0;
+    while (i < s.length) { const c = s[i]; if (/\s/.test(c)) { i++; continue; } let m; if ((m = /^\d+(\.\d+)?|^\.\d+/.exec(s.slice(i)))) { toks.push({t: 'n', v: +m[0]}); i += m[0].length; continue; } if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(s.slice(i)))) { toks.push({t: 'id', v: m[0]}); i += m[0].length; continue; } if ('+-*/(),'.indexOf(c) >= 0) { toks.push({t: c}); i++; continue; } throw new Error('Unexpected "' + c + '" in the formula.'); }
+    let p = 0; const used = new Set(); const peek = () => toks[p] || {t: 'end'}, eat = t => { if (peek().t !== t) throw new Error(t === ')' ? 'A bracket is not closed.' : 'Something is missing near the end.'); p++; };
+    function expr() { let a = term(); while (peek().t === '+' || peek().t === '-') { const o = toks[p++].t, b = term(), x = a; a = o === '+' ? r => x(r) + b(r) : r => x(r) - b(r); } return a; }
+    function term() { let a = fac(); while (peek().t === '*' || peek().t === '/') { const o = toks[p++].t, b = fac(), x = a; a = o === '*' ? r => x(r) * b(r) : r => { const d = b(r); return d === 0 ? NaN : x(r) / d; }; } return a; }
+    function fac() {
+      const k = peek(); if (k.t === '-') { p++; const f = fac(); return r => -f(r); } if (k.t === '+') { p++; return fac(); }
+      if (k.t === 'n') { p++; return () => k.v; }
+      if (k.t === '(') { p++; const e = expr(); eat(')'); return e; }
+      if (k.t === 'id') { p++; const nm = k.v.toLowerCase();
+        if (peek().t === '(') { if (!FUNCS[nm]) throw new Error('Unknown function "' + k.v + '". Use min, max, avg, abs, round or sqrt.'); p++; const args = []; if (peek().t !== ')') { args.push(expr()); while (peek().t === ',') { p++; args.push(expr()); } } eat(')'); const fn = FUNCS[nm]; return r => fn(...args.map(a => a(r))); }
+        if (!FK[nm]) throw new Error('Unknown field "' + k.v + '". Tap a field below to insert it.'); used.add(nm); return r => { const v = r[nm]; return v == null ? NaN : +v; }; }
+      throw new Error(k.t === 'end' ? 'The formula is incomplete.' : 'Unexpected "' + k.t + '".');
+    }
+    if (!toks.length) throw new Error('Type a formula.');
+    const fn = expr(); if (p < toks.length) throw new Error('Unexpected "' + (toks[p].v || toks[p].t) + '".'); return {fn, used: Array.from(used)};
+  }
+  function kpisAll() { const f = ((A && A.META.tools && A.META.tools.kpis) || []).map(k => Object.assign({}, k, {scope: 'file'})); const me = LS.get('kpis', []).map(k => Object.assign({}, k, {scope: 'me'})); return f.concat(me.filter(k => !f.find(x => x.id === k.id))); }
+  function kData() {
+    const km = A.kpiMonth(), kc = A.kpiCounts(), sp = A.support(), M = new Map(), mk = {};
+    const add = (r, keys) => { const key = r.state + '|' + r.month; let o = M.get(key); if (!o) { o = {state: r.state, month: r.month}; M.set(key, o); } keys.forEach(k => { if (r[k] != null && o[k] == null) o[k] = r[k]; }); };
+    km.forEach(r => { if (r.mkey) mk[r.month] = r.mkey; add(r, FIELDS.filter(f => f[2] === 'rate').map(f => f[0])); }); kc.forEach(r => add(r, FIELDS.filter(f => f[2] === 'count').map(f => f[0]))); sp.forEach(r => add(r, ['within_tat', 'escalated', 'open', 'avg_rating']));
+    const months = Array.from(new Set(Array.from(M.values()).map(r => r.month))).sort((a, b) => (mk[a] || a) < (mk[b] || b) ? -1 : 1);
+    const states = A.kpiState().filter(r => r.state !== 'PAN India' && r.rank != null).sort((a, b) => a.rank - b.rank).map(r => r.state);
+    const pan = {}; months.forEach(m => { const rs = states.map(s => M.get(s + '|' + m)).filter(Boolean), pr = M.get('PAN India|' + m) || {}, o = {state: 'PAN India', month: m}; FIELDS.forEach(f => { const vs = rs.map(r => r[f[0]]).filter(v => v != null); if (f[2] === 'count') o[f[0]] = vs.length ? vs.reduce((a, b) => a + b, 0) : null; else o[f[0]] = pr[f[0]] != null ? pr[f[0]] : vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null; }); pan[m] = o; });
+    const get = (s, m) => s === 'PAN India' ? pan[m] : M.get(s + '|' + m);
+    const agg = s => { const rs = months.map(m => get(s, m)).filter(Boolean), o = {state: s}; FIELDS.forEach(f => { const vs = rs.map(r => r[f[0]]).filter(v => v != null); o[f[0]] = !vs.length ? null : f[2] === 'count' ? vs.reduce((a, b) => a + b, 0) : vs.reduce((a, b) => a + b, 0) / vs.length; }); return o; };
+    return {months, states, get, agg};
+  }
+  let KDC = null;
+  function kD() { const k = A.LB.title + '|' + A.LB.rng + '|' + A.kpiMonth().length + '|' + A.kpiState().length; if (!KDC || KDC.k !== k) KDC = {k, d: kData()}; return KDC.d; }
+  function kpiEval(k) { let c; try { c = compile(k.f); } catch (e) { return {err: e.message, states: [], pan: null, months: [], ser: {}}; } const D = kD(), ev = r => { if (!r) return null; const v = c.fn(r); return fin(v) ? v : null; }; const states = D.states.map(s => ({st: s, v: ev(D.agg(s))})), ser = {}; ['PAN India'].concat(D.states).forEach(s => { ser[s] = D.months.map(m => ev(D.get(s, m))); }); return {states, pan: ev(D.agg('PAN India')), months: D.months, ser}; }
+  const kFmt = (k, v) => !fin(v) ? '—' : k.fmt === 'pct' ? (v * 100).toFixed(1) + '%' : k.fmt === 'num' ? fmtN(v) : fmtD(v, 2);
+  const kTgt = k => k.tgt == null || k.tgt === '' || !fin(+k.tgt) ? null : k.fmt === 'pct' ? +k.tgt / 100 : +k.tgt;
+  const kOk = (k, v) => { const t = kTgt(k); if (t == null || !fin(v)) return null; return k.dir === 'down' ? v <= t : v >= t; };
+  const KB = {edit: null, act: null, err: ''};
+  function saveKpi(k, toFile) {
+    const clean = {id: k.id, n: k.n, f: k.f, fmt: k.fmt, tgt: k.tgt, dir: k.dir, pin: k.pin !== false};
+    if (toFile) { const T = A.META.tools = A.META.tools || {}; T.kpis = (T.kpis || []).filter(x => x.id !== k.id).concat([clean]); LS.set('kpis', LS.get('kpis', []).filter(x => x.id !== k.id)); A.markDirty(); }
+    else { LS.set('kpis', LS.get('kpis', []).filter(x => x.id !== k.id).concat([clean])); if (A.META.tools && A.META.tools.kpis && A.META.tools.kpis.find(x => x.id === k.id) && A.isAdmin()) { A.META.tools.kpis = A.META.tools.kpis.filter(x => x.id !== k.id); A.markDirty(); } }
+  }
+  function delKpi(k) { LS.set('kpis', LS.get('kpis', []).filter(x => x.id !== k.id)); if (k.scope === 'file' && A.isAdmin()) { A.META.tools.kpis = A.META.tools.kpis.filter(x => x.id !== k.id); A.markDirty(); } }
+  function rKpi() {
+    const ks = kpisAll(), admin = A.isAdmin(); if (KB.act && !ks.find(k => k.id === KB.act)) KB.act = null; if (!KB.act && ks.length) KB.act = ks[0].id;
+    hero('tlk', [[String(ks.length), 'custom KPIs'], [String(ks.filter(k => k.pin !== false).length), 'pinned to the overview'], [String(FIELDS.length), 'fields to build from'], [A.LB.title, 'period, follows the filter']], 'Combine existing fields into a new metric with a simple formula, like av_n / elig. Values, ranking and the monthly trend update with the period and state filters.');
+    const root = page('tlk');
+    if (A.NODATA) { const s = A.sec('No data', 'No KPI data for this period', null); s.appendChild(A.card(E('p', null, 'Choose a period with data in Filters & tools.'))); root.appendChild(s); }
+    // list
+    const s1 = A.sec('Your KPIs', ks.length ? 'Custom KPIs' : 'No custom KPIs yet', ks.length ? 'Tap a card to see its ranking and trend. Pinned KPIs also show on the overview.' : 'Start from a ready template or build your own below.');
+    if (ks.length) {
+      const g = E('div', 'tl-ck'); ks.forEach(k => { const R = kpiEval(k), ok = kOk(k, R.pan), c = E('div', 'card' + (k.id === KB.act ? ' focus' : '')); c.appendChild(E('div', 'eyebrow', k.scope === 'file' ? 'Shared in file' : 'My KPI')); c.lastChild.style.color = 'var(--goldd)'; c.appendChild(E('b', null, k.n)); c.lastChild.style.fontSize = '15px';
+        c.appendChild(E('b', 'v', R.err ? '⚠' : kFmt(k, R.pan))); c.appendChild(E('div', 'note', R.err ? R.err : 'PAN India · ' + k.f)); const ch = E('div', 'tl-chips'); ch.style.marginTop = '8px'; if (ok != null) ch.appendChild(E('span', 'tl-chip ' + (ok ? 'green' : 'red'), (ok ? '✓ meets ' : '✗ target ') + kFmt(k, kTgt(k)))); if (k.pin !== false) ch.appendChild(E('span', 'tl-chip gold', '📌 Overview')); c.appendChild(ch);
+        c.addEventListener('click', () => { KB.act = k.id; rKpi(); setTimeout(() => { const n = document.getElementById('tl-kres'); if (n) n.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 50); }); g.appendChild(c); });
+      s1.appendChild(g);
+    }
+    root.appendChild(s1);
+    // builder
+    const ed = KB.edit || {id: null, n: '', f: '', fmt: 'pct', tgt: '', dir: 'up', pin: true, toFile: admin};
+    const s2 = A.sec('Builder', ed.id ? 'Edit KPI' : 'Build a KPI', 'Tap fields and operators to write the formula. Rates are 0 to 1 (0.45 = 45%), counts are numbers.'), c2 = E('div', 'card');
+    const pr = E('div', 'tl-chips'); pr.appendChild(E('span', 'note', 'Templates:')); PRESETS.forEach(x => { const b = E('button', 'tl-chip gold', x[0]); b.type = 'button'; b.addEventListener('click', () => { KB.edit = {id: null, n: x[0], f: x[1], fmt: x[2], tgt: x[3], dir: x[4], pin: true, toFile: admin}; rKpi(); setTimeout(() => { const n = document.getElementById('tl-kf'); if (n) n.focus(); }, 30); }); pr.appendChild(b); }); c2.appendChild(pr);
+    const fm = E('div', 'tl-form'), nI = inp('text', ed.n, 'e.g. App adoption per eligible retailer'), fI = inp('text', ed.f, 'e.g. av_n / elig'); fI.id = 'tl-kf'; fI.autocomplete = 'off'; fI.spellcheck = false; fI.style.fontFamily = 'ui-monospace,Menlo,Consolas,monospace';
+    const fmS = selOpts(inp('select'), [['pct', 'Percent (0.45 → 45%)'], ['num', 'Whole number'], ['dec', 'Decimal']], ed.fmt), tI = inp('number', ed.tgt, ed.fmt === 'pct' ? 'e.g. 60 for 60%' : 'optional'), dS = selOpts(inp('select'), [['up', 'Higher is better'], ['down', 'Lower is better']], ed.dir);
+    fm.appendChild(field('KPI name *', nI)); const ff = field('Formula *', fI); ff.style.gridColumn = '1 / -1'; fm.appendChild(ff); fm.appendChild(field('Show as', fmS)); fm.appendChild(field('Target (optional)', tI)); fm.appendChild(field('Direction', dS)); c2.appendChild(fm);
+    const ins = t => { const s0 = fI.selectionStart != null ? fI.selectionStart : fI.value.length, e0 = fI.selectionEnd != null ? fI.selectionEnd : fI.value.length, pre = fI.value.slice(0, s0), sp2 = /[\w)]$/.test(pre) && /^\w/.test(t) ? ' ' : ''; fI.value = pre + sp2 + t + fI.value.slice(e0); const np = s0 + sp2.length + t.length; fI.focus(); try { fI.setSelectionRange(np, np); } catch (e) {} prev(); };
+    const ops = E('div', 'tl-fx'); ['+', '-', '*', '/', '(', ')', 'min(', 'max(', 'avg(', ','].forEach(o => { const b = E('button', 'op', o); b.type = 'button'; b.addEventListener('click', () => ins(o.length === 1 && o !== '(' && o !== ')' && o !== ',' ? ' ' + o + ' ' : o)); ops.appendChild(b); }); c2.appendChild(ops);
+    [['Rates (0 to 1)', 'rate'], ['Counts', 'count'], ['Support', 'avg']].forEach(gp => { const w = E('div'); w.appendChild(E('div', 'note', gp[0])); const fx = E('div', 'tl-fx'); FIELDS.filter(f => f[2] === gp[1]).forEach(f => { const b = E('button', null, f[0]); b.type = 'button'; b.title = f[1]; b.addEventListener('click', () => ins(f[0])); fx.appendChild(b); }); w.appendChild(fx); c2.appendChild(w); });
+    const det = E('details', 'tl-det'); det.appendChild(E('summary', null, 'What each field means')); det.appendChild(A.mkTable([{h: 'Field'}, {h: 'Meaning'}, {h: 'Type'}], FIELDS.map(f => [f[0], f[1], f[2] === 'rate' ? 'Rate 0 to 1, averaged over months' : f[2] === 'count' ? 'Count, added over months' : 'Average']))); c2.appendChild(det);
+    const pv = E('div'); c2.appendChild(pv);
+    function prev() { pv.replaceChildren(); if (!fI.value.trim()) return; try { compile(fI.value); const R = kpiEval({f: fI.value}); const k = {fmt: fmS.value}; pv.appendChild(E('div', 'tl-ok', '✓ Formula works. PAN India = ' + kFmt(k, R.pan) + (R.states.length ? ' · best state ' + (R.states.filter(x => fin(x.v)).sort((a, b) => dS.value === 'down' ? a.v - b.v : b.v - a.v)[0] || {st: '—'}).st : ''))); } catch (e) { pv.appendChild(E('div', 'tl-err', '⚠ ' + e.message)); } }
+    fI.addEventListener('input', prev); fmS.addEventListener('change', () => { tI.placeholder = fmS.value === 'pct' ? 'e.g. 60 for 60%' : 'optional'; prev(); }); dS.addEventListener('change', prev); prev();
+    const ac = E('div', 'tl-acts'); let pinC = null, fileC = null;
+    { const l = E('label', 'tl-chip'); pinC = E('input'); pinC.type = 'checkbox'; pinC.checked = ed.pin !== false; l.appendChild(pinC); l.appendChild(document.createTextNode(' Pin to overview')); ac.appendChild(l); }
+    if (admin) { const l = E('label', 'tl-chip gold'); fileC = E('input'); fileC.type = 'checkbox'; fileC.checked = ed.toFile !== false; l.appendChild(fileC); l.appendChild(document.createTextNode(' Share with all states (saved in the file)')); ac.appendChild(l); }
+    c2.appendChild(ac);
+    const ac2 = E('div', 'tl-acts'); ac2.appendChild(btn(ed.id ? '✓ Save changes' : '✓ Save KPI', 'big', () => {
+      const n = nI.value.trim(), f = fI.value.trim(); if (!n) { A.say('Give the KPI a name.', 3000); return; } try { compile(f); } catch (e) { A.say(e.message, 4000); return; }
+      const k = {id: ed.id || uid(), n, f, fmt: fmS.value, tgt: tI.value === '' ? '' : +tI.value, dir: dS.value, pin: pinC.checked}; saveKpi(k, !!(fileC && fileC.checked)); KB.edit = null; KB.act = k.id;
+      A.say(fileC && fileC.checked ? 'KPI saved in the file. Use Export & share → Save updated file to keep it.' : 'KPI saved on this device.', 5000); rKpi();
+    }));
+    if (KB.edit) ac2.appendChild(btn('Cancel', 'ghost', () => { KB.edit = null; rKpi(); }));
+    c2.appendChild(ac2); s2.appendChild(c2); root.appendChild(s2);
+    // results
+    const k = ks.find(x => x.id === KB.act); if (!k) return; const Rz = kpiEval(k);
+    const s3 = A.sec('Results', k.n, k.f + ' · ' + A.LB.title + ' (' + A.LB.rng + ')'); s3.id = 'tl-kres';
+    const ac3 = E('div', 'tl-acts'); ac3.style.margin = '0 0 12px'; ac3.appendChild(btn('✎ Edit', null, () => { KB.edit = Object.assign({}, k, {toFile: k.scope === 'file'}); rKpi(); setTimeout(() => { const n = document.getElementById('tl-kf'); if (n) n.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 40); }));
+    ac3.appendChild(btn(k.pin !== false ? 'Unpin from overview' : '📌 Pin to overview', 'ghost', () => { saveKpi(Object.assign({}, k, {pin: k.pin === false}), k.scope === 'file' && admin); rKpi(); }));
+    ac3.appendChild(btn('📤 Share card', 'ghost', () => { S.type = 'custom'; S.ck = k.id; A.go('tls'); }));
+    if (k.scope === 'me' || admin) ac3.appendChild(btn('Delete', 'red', () => { if (!confirmIt('Delete ' + k.n + '?')) return; delKpi(k); KB.act = null; rKpi(); }));
+    s3.appendChild(ac3);
+    if (Rz.err) { s3.appendChild(A.card(E('p', 'tl-err', Rz.err))); root.appendChild(s3); return; }
+    const sorted = Rz.states.filter(x => fin(x.v)).sort((a, b) => k.dir === 'down' ? a.v - b.v : b.v - a.v), sc = A.scope, mine = sorted.findIndex(x => x.st === sc), tg = kTgt(k);
+    const st = E('div', 'tl-stats'); st.appendChild(stat(kFmt(k, Rz.pan), 'PAN India'));
+    if (sc !== 'PAN India' && mine >= 0) st.appendChild(stat(kFmt(k, sorted[mine].v), sc + ' · rank ' + (mine + 1) + ' of ' + sorted.length, kOk(k, sorted[mine].v) === false ? 'bad' : kOk(k, sorted[mine].v) ? 'ok' : ''));
+    if (sorted.length) { st.appendChild(stat(kFmt(k, sorted[0].v), 'best: ' + sorted[0].st, 'ok')); st.appendChild(stat(kFmt(k, sorted[sorted.length - 1].v), 'lowest: ' + sorted[sorted.length - 1].st, 'bad')); }
+    if (tg != null) st.appendChild(stat(sorted.filter(x => kOk(k, x.v)).length + ' of ' + sorted.length, 'states meet ' + kFmt(k, tg)));
+    s3.appendChild(st);
+    const g = E('div', 'g2'), c4 = E('div', 'card'); c4.appendChild(E('div', 'note', 'By state' + (tg != null ? ' · black line is the target' : '')));
+    const mx = Math.max(1e-9, ...sorted.map(x => Math.abs(x.v)), tg || 0); c4.appendChild(A.hbars(sorted.map(x => ({link: A.mkLink('lk', x.st, 'state', x.st), label: x.st, v: Math.max(0, x.v), txt: kFmt(k, x.v), col: kOk(k, x.v) == null ? (x.st === sc ? '#111' : '#c9a227') : kOk(k, x.v) ? '#2e7d5b' : '#b3402f'})), {mx, mark: tg != null ? tg : null}));
+    const c5 = E('div', 'card'); c5.appendChild(E('div', 'note', 'Monthly trend' + (Rz.months.length < 2 ? '. Pick a quarter or the year to see a trend.' : '')));
+    const ser = [{name: 'PAN India', vals: Rz.ser['PAN India'] || [], col: '#7d7d7d', dash: '6 5', w: 2}]; if (sorted.length) ser.push({name: sorted[0].st + ' (best)', vals: Rz.ser[sorted[0].st], col: '#2e7d5b'}); if (sc !== 'PAN India' && Rz.ser[sc] && (!sorted.length || sorted[0].st !== sc)) ser.push({name: sc, vals: Rz.ser[sc], col: '#c9a227', w: 3});
+    c5.appendChild(lineChart(Rz.months, ser, {fmt: v => kFmt(k, v), target: tg})); g.appendChild(c4); g.appendChild(c5); s3.appendChild(g);
+    const t = E('div', 'card'); t.style.marginTop = '14px'; t.appendChild(A.mkTable([{h: '#', r: 1}, {h: 'State'}].concat(Rz.months.map(m => ({h: m, r: 1}))).concat([{h: A.LB.title, r: 1}, {h: 'Target', r: 0}]), [['', 'PAN India'].concat(Rz.months.map((m, i) => kFmt(k, (Rz.ser['PAN India'] || [])[i]))).concat([kFmt(k, Rz.pan), ''])].concat(sorted.map((x, i) => [i + 1, x.st].concat(Rz.months.map((m, j) => kFmt(k, Rz.ser[x.st][j]))).concat([kFmt(k, x.v), kOk(k, x.v) == null ? '' : kOk(k, x.v) ? '✓' : '✗'])))));
+    s3.appendChild(t); root.appendChild(s3);
+  }
+
+  // =====================================================================================
+  // overview additions: pinned custom KPIs and the smart tools strip
+  function ovKpis() {
+    const old = document.getElementById('tl-ck-sec'); const ks = kpisAll().filter(k => k.pin !== false);
+    const kg = document.getElementById('kpi-grid'), anchor = kg && kg.closest('section'); if (!anchor) return;
+    if (!ks.length || A.NODATA || !A.kpiState().length || !tabOn()) { if (old) old.remove(); return; }
+    const s = E('section'); s.id = 'tl-ck-sec'; s.appendChild(E('div', 'kick', 'Custom KPIs')); s.appendChild(E('h2', null, 'Your own KPIs')); s.appendChild(E('p', 'lead', 'Built in the KPI builder. Values follow the period and state filters. Tap a card for the ranking and trend.'));
+    const g = E('div', 'tl-ck'), sc = A.scope;
+    ks.forEach(k => { const R = kpiEval(k); if (R.err) return; const v = sc === 'PAN India' ? R.pan : (R.states.find(x => x.st === sc) || {}).v, srt = R.states.filter(x => fin(x.v)).sort((a, b) => k.dir === 'down' ? a.v - b.v : b.v - a.v), rk = srt.findIndex(x => x.st === sc), ok = kOk(k, v);
+      const c = E('div', 'card'); c.appendChild(E('div', 'note', k.n)); c.lastChild.style.cssText = 'font-weight:700;color:#111;font-size:14px'; c.appendChild(E('b', 'v', kFmt(k, v)));
+      const ln = E('div', 'note', sc === 'PAN India' ? 'PAN India' + (srt.length ? ' · best ' + srt[0].st + ' ' + kFmt(k, srt[0].v) : '') : sc + (rk >= 0 ? ' · rank ' + (rk + 1) + ' of ' + srt.length : '') + ' · PAN India ' + kFmt(k, R.pan)); c.appendChild(ln);
+      const ft = E('div', 'tl-acts'); ft.style.cssText = 'margin-top:8px;justify-content:space-between'; ft.appendChild(spark(R.ser[sc] || R.ser['PAN India'] || [], ok === false ? '#b3402f' : '#c9a227')); if (ok != null) ft.appendChild(E('span', 'tl-chip ' + (ok ? 'green' : 'red'), ok ? '✓ on target' : 'target ' + kFmt(k, kTgt(k)))); c.appendChild(ft);
+      c.addEventListener('click', () => { KB.act = k.id; A.go('tlk'); }); g.appendChild(c); });
+    s.appendChild(g); if (old) old.replaceWith(s); else anchor.after(s);
+  }
+  const tabOn = () => { const t = document.getElementById('tabs'); return !!(t && t.querySelector('[data-t=tl]')); };
+  function ovTools() {
+    const wrap = document.querySelector('#pane-overview > .wrap'); if (!wrap) return; let s = document.getElementById('tl-ov-sec');
+    if (!tabOn()) { if (s) s.remove(); return; }
+    const ct = counts(), n = E('section'); n.id = 'tl-ov-sec'; const box = E('div', 'tl-ov'); box.appendChild(E('div', 'kick', 'Smart tools')); box.appendChild(E('h2', null, 'Save time in the field and at HO')); box.appendChild(E('p', 'lead', 'Voice notes, photo audit, beat planner, reconciliation, Excel insight, KPI builder, share cards and the idea box.'));
+    const g = E('div', 'tl-grid'); LIST.forEach(x => { const t = tile(x, ct[x.t]); t.querySelector('.tl-open').remove(); g.appendChild(t); }); box.appendChild(g); n.appendChild(box);
+    if (s) s.replaceWith(n); else { const hc = wrap.querySelector('.hubcats'); if (hc) hc.after(n); else wrap.appendChild(n); }
+  }
+
+  // =====================================================================================
+  function init(api) {
+    A = api; A.META.tools = A.META.tools || {};
+    if (A.media && A.media.logo) { LOGO = new Image(); LOGO.src = A.media.logo; }
+    const sb = document.querySelector('#rp .snapbar'); if (sb && !document.getElementById('tl-shb') && tabOn()) { const b = E('button', 'alt', '📤 Share card'); b.id = 'tl-shb'; b.title = 'Make an image card of a KPI to share on vChat or WhatsApp'; b.addEventListener('click', () => { const v = A.view(); if (!v && A.scope) S.st = A.scope; A.go('tls'); }); sb.insertBefore(b, sb.firstChild); }
+  }
+  function render(t, api) {
+    A = api;
+    try {
+      if (t === 'tl') rHub(); else if (t === 'tlv') rVoice(); else if (t === 'tlp') rPhoto(); else if (t === 'tlb') rBeat(); else if (t === 'tls') rShare(); else if (t === 'tlr') rRecon(); else if (t === 'tli') rInsight(); else if (t === 'tld') rIdeas(); else if (t === 'tlk') rKpi(); else rHub();
+    } catch (e) { const b = document.getElementById('d-body'); b.replaceChildren(); b.appendChild(A.card(E('p', 'tl-err', 'This tool hit a problem: ' + (e && e.message || e)))); if (window.console) console.error(e); }
+  }
+  function after(api) {
+    A = api; const v = A.view(); if (!(v && v.t === 'tlv')) { if (RECON) stopRec(); }
+    if (!v) { try { ovTools(); } catch (e) {} try { ovKpis(); } catch (e) {} }
+  }
+  return {list: LIST, hub: TK.tl, init, render, after, title: t => (TK[t] || TK.tl).n};
+})();
 </script><script id="s-app">(function(){
   const root = document.getElementById('rp');
   const int = d3.format(','), pct = (v, d) => d3.format('.' + d + '%')(v);
@@ -1598,14 +2851,17 @@ if (typeof module !== 'undefined') module.exports = KE;
     const a = el('a', null, x[1]); a.dataset.t = x[0]; a.setAttribute('aria-current', x[0] === tab ? 'true' : 'false'); a.addEventListener('click', () => act(x[0])); mlist.appendChild(a);
   });
   const PG = {how: 'how-to-use', kq4: 'kpi-framework', onb: 'onboarded-retailers', grw: 'monthly-growth', cmp: 'compare-states', rm: 'roadmap-2027', rma: 'rm-retailer-app', rmc: 'rm-schemes-calculator', rms: 'rm-sd-cd-discount', rmh: 'rm-affordability-hub', rmm: 'rm-material-management', rmv: 'rm-survey-tools', q3: 'q3-ranking', dl: 'download'};
+  if (window.BITOOLS) { PG.tl = BITOOLS.hub.hash; BITOOLS.list.forEach(x => { PG[x.t] = x.hash; }); }
   const MORE = [['rm', 'Roadmap 2027', 'BI upcoming plans and projects', '🗺️'], ['how', 'How to use this dashboard', 'Steps, filters and downloads', '📘'], ['kq4', 'KPI framework by quarter', 'Weights and logic of every quarter', '🎯'], ['grw', 'Monthly growth', 'Rank growth or degrowth by month', '📈'], ['cmp', 'Compare states', 'Two states, rank and features', '⚖️'], ['onb', 'Onboarded retailers', 'State-wise base and rollout month of 2025', '🏪'], ['q3', 'Q3 BI state KPI rankings', 'Previous quarter for comparison', '🏆'], ['dl', 'How to download the app', 'Install guide for retailers', '📲']];
+  if (window.BITOOLS) MORE.push(['tl', 'Smart tools', 'Voice notes, photo audit, beat planner and more', '🧰']);
   const GL = {rm: 'Roadmap 2027', how: 'How to use', kq4: 'KPI framework', onb: 'Onboarded', grw: 'Growth', cmp: 'Compare', q3: 'Q3 rankings', dl: 'Get the app'};
+  GL.tl = 'Smart tools';
   const mm = document.getElementById('mmenu'), mb = document.getElementById('more-b');
   const mh = el('div', 'mmh', 'Guides & reference'); mm.appendChild(mh);
   function mkLinkLater(x, rich) { const a = el('a', null); if (rich) { a.innerHTML = '<span class="mic">' + x[3] + '</span><span class="mtx"><b>' + x[1] + '</b><small>' + x[2] + '</small></span>'; } else a.textContent = x[1]; a.href = '#' + PG[x[0]]; a.addEventListener('click', ev => { ev.preventDefault(); mm.classList.remove('open'); menu.classList.remove('open'); go(x[0], ''); }); return a; }
   MORE.forEach((x, i) => { const gb = el('button', i === 0 ? 'gsep' : null, GL[x[0]]); gb.dataset.t = x[0]; gb.setAttribute('role', 'tab'); gb.setAttribute('aria-selected', 'false'); gb.title = x[1] + ' · ' + x[2]; gb.addEventListener('click', () => { menu.classList.remove('open'); go(x[0], ''); }); tabsEl.appendChild(gb); mm.appendChild(mkLinkLater(x, true)); const m = mkLinkLater(x, false); m.dataset.t = x[0]; mlist.appendChild(m); });
   const ALLK = TABS.map(x => x[0]).concat(MORE.map(x => x[0]));
-  const tabOk = t => { const k = t === 'ret' ? 'retv' : /^rm/.test(t) ? 'rm' : t; return !META.tabs || ALLK.indexOf(k) < 0 || k === 'overview' || META.tabs.indexOf(k) >= 0; };
+  const tabOk = t => { const k = t === 'ret' ? 'retv' : /^rm/.test(t) ? 'rm' : /^tl/.test(t) ? 'tl' : t; return !META.tabs || ALLK.indexOf(k) < 0 || k === 'overview' || META.tabs.indexOf(k) >= 0; };
   if (META.tabs) { const hid = k => META.tabs.indexOf(k) < 0 && k !== 'overview'; ALLK.forEach(k => { if (hid(k)) { tabsEl.querySelectorAll('[data-t=' + k + ']').forEach(n => n.remove()); mlist.querySelectorAll('[data-t=' + k + ']').forEach(n => n.remove()); } }); Array.from(mm.querySelectorAll('a')).forEach((a, i) => { if (hid(MORE[i][0])) a.remove(); }); if (!mm.querySelector('a')) mb.parentElement.hidden = true; }
   const ftog = document.getElementById('ftog'), flt = document.getElementById('filters'), ftsum = document.getElementById('ftsum'), ctxEl = document.getElementById('ctx');
   ftog.addEventListener('click', () => { const o = flt.classList.toggle('fopen'); ftog.setAttribute('aria-expanded', o); });
@@ -1895,14 +3151,14 @@ if (typeof module !== 'undefined') module.exports = KE;
     }
     sel.value = scope; ksel.value = kpiSel;
     const dv = !!view; root.classList.toggle('dv', dv);
-    tabsEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', ((dv ? (view.t === 'ret' ? 'retv' : /^rm/.test(view.t) ? 'rm' : PG[view.t] ? view.t : null) : tab) === b.dataset.t) ? 'true' : 'false'));
-    mlist.querySelectorAll('a').forEach(a => a.setAttribute('aria-current', (dv ? (view.t === 'ret' ? 'retv' : /^rm/.test(view.t) ? 'rm' : view.t) : tab) === a.dataset.t ? 'true' : 'false'));
+    tabsEl.querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', ((dv ? (view.t === 'ret' ? 'retv' : /^rm/.test(view.t) ? 'rm' : /^tl/.test(view.t) ? 'tl' : PG[view.t] ? view.t : null) : tab) === b.dataset.t) ? 'true' : 'false'));
+    mlist.querySelectorAll('a').forEach(a => a.setAttribute('aria-current', (dv ? (view.t === 'ret' ? 'retv' : /^rm/.test(view.t) ? 'rm' : /^tl/.test(view.t) ? 'tl' : view.t) : tab) === a.dataset.t ? 'true' : 'false'));
     // footer
     document.getElementById('foot').textContent = 'Figures are calculated from the data in this file for ' + LB.title + ' (' + LB.rng + '). ' + 'Each KPI is measured month by month with the framework of its quarter (' + (LB.qs || []).map(q => q.label).join(', ') + ') and the period value combines the months (' + LB.mlabs.join(', ') + '). Points = achievement capped at 100% times the weight. Weights: ' + K.map(p => p.name.toLowerCase() + ' ' + (Math.round(p.w * 10) / 10)).join(', ') + '. Competition applies to some states and Support Desk to others when the quarter says so in KPI Setup. MHA, MHN, MHM and MHP are the Aurangabad, Nagpur, Mumbai and Pune regions of Maharashtra.';
     if (dv) {
       const TT = {ret: 'Active retailers', app: 'vivo Retailer Workplace app', how: 'How to use this dashboard', kq4: "BI KPI framework Q4'2026", q3: 'Q3 BI state KPI rankings', dl: 'How to download the app', onb: 'Onboarded retailers', grw: 'Monthly growth', cmp: 'Compare states', rm: 'Roadmap 2027', rma: 'Retailer App new version', rmc: 'Schemes calculator', rms: 'Student & Corporate Discount', rmh: 'Affordability Hub', rmm: 'Material management', rmv: 'Survey management tools'};
-      document.title = (TT[view.t] || (view.t === 'state' ? view.k : view.t === 'appf' ? ((AFK[view.k] || {}).name || 'App feature') : view.t === 'kpi' ? ((KEY[view.k] || {}).name || 'KPI') : view.t === 'feat' ? ((FK[view.k] || {}).name || 'Feature') : 'Detail')) + ' · ' + LB.title + ' BI KPI Dashboard';
-      if (view.t === 'state') renderState(view.k); else if (view.t === 'ret') renderRetailers(view.k); else if (view.t === 'app') renderApp(); else if (view.t === 'appf') renderAppFeature(view.k); else if (view.t === 'kpi') renderKpiPage(view.k); else if (view.t === 'feat') renderKpiPage(view.k); else if (view.t === 'how') renderHow(); else if (view.t === 'dl') renderDownload(); else if (view.t === 'kq4') renderKpiQ4(); else if (view.t === 'q3') renderQ3(); else if (view.t === 'onb') renderOnb(); else if (view.t === 'grw') renderGrowth(); else if (view.t === 'cmp') renderCompare(); else if (view.t === 'rm') renderRoadmap(); else if (RMSUB[view.t]) renderRmSub(view.t);
+      document.title = (TT[view.t] || (/^tl/.test(view.t) && window.BITOOLS ? BITOOLS.title(view.t) : null) || (view.t === 'state' ? view.k : view.t === 'appf' ? ((AFK[view.k] || {}).name || 'App feature') : view.t === 'kpi' ? ((KEY[view.k] || {}).name || 'KPI') : view.t === 'feat' ? ((FK[view.k] || {}).name || 'Feature') : 'Detail')) + ' · ' + LB.title + ' BI KPI Dashboard';
+      if (view.t === 'state') renderState(view.k); else if (view.t === 'ret') renderRetailers(view.k); else if (view.t === 'app') renderApp(); else if (view.t === 'appf') renderAppFeature(view.k); else if (view.t === 'kpi') renderKpiPage(view.k); else if (view.t === 'feat') renderKpiPage(view.k); else if (view.t === 'how') renderHow(); else if (view.t === 'dl') renderDownload(); else if (view.t === 'kq4') renderKpiQ4(); else if (view.t === 'q3') renderQ3(); else if (view.t === 'onb') renderOnb(); else if (view.t === 'grw') renderGrowth(); else if (view.t === 'cmp') renderCompare(); else if (view.t === 'rm') renderRoadmap(); else if (RMSUB[view.t]) renderRmSub(view.t); else if (/^tl/.test(view.t) && window.BITOOLS) BITOOLS.render(view.t, TLAPI);
       document.getElementById('ctx').textContent = LB.title + ' · ' + LB.rng; return;
     }
     renderChrome(row, S);
@@ -3415,7 +4671,7 @@ if (typeof module !== 'undefined') module.exports = KE;
   function composeHtml(title, rawObj, metaObj, pre, setupObj) {
     const SU = setupObj || SETUP, Dd = {kpi_state: [], kpi_month: [], support: [], kpi_counts: [], rawlog: [rawObj], setup: [(metaObj && (metaObj.gated || metaObj.shareable)) ? Object.assign({}, SU, {rids: ''}) : SU], meta: [metaObj], media: D0.media || []};
     return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + title + '</title><style>' + document.querySelector('style').textContent + '</style></head><body><div id="dash-root">' + document.getElementById('bodytpl').innerHTML + '</div><template id="bodytpl">' + document.getElementById('bodytpl').innerHTML + '</template>' +
-      '<script type="application/json" id="dd">' + escJ(JSON.stringify(Dd)) + '</scr' + 'ipt>' + (pre || '') + '<script id="s-d3">' + gT('s-d3') + '</scr' + 'ipt><script id="s-shim">' + gT('s-shim') + '</scr' + 'ipt><script id="s-h2i">' + gT('s-h2i') + '</scr' + 'ipt><script id="s-eng">' + gT('s-eng') + '</scr' + 'ipt><script id="s-app">' + gT('s-app') + '</scr' + 'ipt>' + (document.getElementById('s-layout') ? '<script id="s-layout">' + gT('s-layout') + '</scr' + 'ipt>' : '') + '</body></html>';
+      '<script type="application/json" id="dd">' + escJ(JSON.stringify(Dd)) + '</scr' + 'ipt>' + (pre || '') + '<script id="s-d3">' + gT('s-d3') + '</scr' + 'ipt><script id="s-shim">' + gT('s-shim') + '</scr' + 'ipt><script id="s-h2i">' + gT('s-h2i') + '</scr' + 'ipt><script id="s-eng">' + gT('s-eng') + '</scr' + 'ipt>' + (document.getElementById('s-tools') ? '<script id="s-tools">' + gT('s-tools') + '</scr' + 'ipt>' : '') + '<script id="s-app">' + gT('s-app') + '</scr' + 'ipt>' + (document.getElementById('s-layout') ? '<script id="s-layout">' + gT('s-layout') + '</scr' + 'ipt>' : '') + '</body></html>';
   }
   const dlText = (html, fn) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([html], {type: 'text/html'})); a.download = fn; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2500); };
   const fullTitle = () => { if (META.scope) return META.scope.label + ' BI KPI Dashboard';  const ms = dataMs(); return (ms.length > 3 && ms[0].slice(0, 4) === ms[ms.length - 1].slice(0, 4) ? 'Year ' + ms[0].slice(0, 4) : KE.titleFor(ms).title) + ' BI KPI Dashboard'; };
@@ -3598,7 +4854,12 @@ if (typeof module !== 'undefined') module.exports = KE;
   if (META.shareable) shareB.hidden = true;
 
   // ---------- start
-  const main2 = () => { main(); try { decorate(); } catch (e) {} };
+  const TLAPI = {el, sec, card, note, mkTable, bullets, hbars, heroBlock, htag, mkLink, say, saveXlsx, readXlsx, readCsv, parseDate, KE,
+    go: (t, k) => go(t, k || ''), get META() { return META; }, get SETUP() { return SETUP; }, get RAW() { return RAW; }, get LB() { return LB; }, get scope() { return scope; }, get RNG() { return RNG; }, get NODATA() { return NODATA; },
+    K: () => K.slice(), kpiState: () => dsets('kpi_state'), kpiMonth: () => dsets('kpi_month'), kpiCounts: () => dsets('kpi_counts'), support: () => dsets('support'),
+    isAdmin: () => CANIMPORT && !GATED && !META.shareable, gated: GATED, lock: () => LOCK, maps: () => MAPS, media: MEDIA, view: () => view,
+    markDirty: () => { saveAdm.hidden = false; }, unlock: () => { const b = document.getElementById('unlock-b'); if (b && !b.hidden) b.click(); }};
+  const main2 = () => { main(); try { decorate(); } catch (e) {} try { if (window.BITOOLS) BITOOLS.after(TLAPI); } catch (e) {} };
   draw = main2;
   document.querySelectorAll('#rp .logo').forEach(i => { if (MEDIA.logo) i.src = MEDIA.logo; });
   if (MEDIA.hero) { const fi = document.getElementById('fold-img'); fi.src = MEDIA.hero; fi.hidden = false }
@@ -3617,6 +4878,7 @@ if (typeof module !== 'undefined') module.exports = KE;
   })();
   syncW(); syncCats();
   if (dataMs().length) { initPeriods(); recompute(); } else NODATA = true;
+  if (window.BITOOLS) { try { BITOOLS.init(TLAPI); } catch (e) {} }
   READY = true; main2();
 })();
 </script><script id="s-layout">(function(){
@@ -3644,9 +4906,10 @@ bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9
 star:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
 map:'<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><path d="M9 3v15M15 6v15"/>',
 gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>'};
+P.tool='<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M2 13h20M10 13v2h4v-2"/>';
 function ic(n,c){return '<svg class="ico '+(c||'')+'" viewBox="0 0 24 24" aria-hidden="true">'+P[n]+'</svg>';}
 function pre(el,n){if(!el||el.querySelector(':scope>svg.ico'))return;el.insertAdjacentHTML('afterbegin',ic(n));}
-var TI={overview:'grid',rank:'trophy',trend:'trend',app:'phone',retv:'store',sd:'headset',plan:'target',how:'book',kq4:'sliders',onb:'store',grw:'trend',cmp:'bars',rm:'map',q3:'clock',dl:'down'};
+var TI={overview:'grid',rank:'trophy',trend:'trend',app:'phone',retv:'store',sd:'headset',plan:'target',how:'book',kq4:'sliders',onb:'store',grw:'trend',cmp:'bars',rm:'map',q3:'clock',dl:'down',tl:'tool'};
 var tabs=document.getElementById('tabs');
 function decorTabs(){tabs.querySelectorAll('button').forEach(function(b){var t=b.dataset.t;if(!b.querySelector('svg.ico')){var tx=b.textContent;b.innerHTML=ic(TI[t]||'grid')+'<span class="tl">'+tx+'</span>';}});}
 decorTabs();
@@ -3664,7 +4927,7 @@ function decorChips(){document.querySelectorAll('#pane-overview .chip').forEach(
 decorChips();var chipsEl=document.querySelector('#pane-overview .chips');if(chipsEl)new MutationObserver(function(){decorChips();}).observe(chipsEl,{subtree:true,childList:true,characterData:true});
 // sidebar group labels
 if(L==='side'){function lab(before,txt){var b=tabs.querySelector('[data-t='+before+']');if(b&&!tabs.querySelector('.tgl[data-for='+before+']')){var d=document.createElement('div');d.className='tgl';d.dataset.for=before;d.textContent=txt;tabs.insertBefore(d,b);}}
-lab('overview','Analysis');lab('app','Deep dive');lab('how','Guides');
+lab('overview','Analysis');lab('app','Deep dive');lab('how','Guides');lab('tl','Smart tools');
 var ph=document.createElement('div');ph.className='sbfoot';ph.innerHTML='vivo Business Innovation<br><small>Innovate · Collaborate · Grow</small>';root.querySelector('.top .wrap').appendChild(ph);}
 // executive quick period chips
 if(L==='exec'){var ps=document.getElementById('per-sel');var host=ps.closest('.fgroup');var qc=document.createElement('div');qc.className='qchips';qc.id='qchips';var lbl=ps.closest('label');host.insertBefore(qc,lbl);
@@ -3676,7 +4939,7 @@ lbl.childNodes.forEach(function(n){if(n.nodeType===3&&n.nodeValue.trim())n.nodeV
 if(L==='hub'){
 tabs.querySelectorAll('button').forEach(function(b){if(!b.title)b.title=b.textContent.trim();});
 function grp(before,txt){var b=tabs.querySelector('[data-t='+before+']');if(b&&!tabs.querySelector('.tgl2[data-for='+before+']')){var d=document.createElement('div');d.className='tgl2';d.dataset.for=before;d.textContent=txt;tabs.insertBefore(d,b);}}
-grp('overview','Analysis');grp('rm','Plans & reference');
+grp('overview','Analysis');grp('rm','Plans & reference');grp('tl','Smart tools');
 var tb=document.createElement('button');tb.type='button';tb.className='sbtog';tb.id='sbtog';tb.title='Minimize or expand the menu';tb.setAttribute('aria-label','Minimize or expand the menu');tb.innerHTML='<svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/><line x1="20" y1="4" x2="20" y2="20"/></svg><span class="sbl">Minimize menu</span>';
 var tw=root.querySelector('.top .wrap');tw.appendChild(tb);
 var ft2=document.createElement('div');ft2.className='sbfoot2';ft2.innerHTML='vivo Business Innovation';tw.appendChild(ft2);

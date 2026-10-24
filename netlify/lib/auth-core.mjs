@@ -12,6 +12,7 @@ import { hygieneAction } from "./hygiene-core.mjs";
 import { engageAction } from "./engage-core.mjs";
 import { autorepAction } from "./autorep-core.mjs";
 import { inviteAdminAction, INVITE_DAYS } from "./invite-core.mjs";
+import { toolsAction } from "./tools-core.mjs";
 import { masterAction, MASTER_SETUP_SHA256, roleOf } from "./master-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
@@ -432,6 +433,17 @@ async function supportAction(b, { store, t, app, rec, key }) {
 let KEYCACHE = { at: 0, groq: "" };
 export function _resetKeyCache() { KEYCACHE = { at: 0, groq: "" }; }
 export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch, jobFetch = fetch }) {
+  // The dashboard's Idea box talks to a "shared board" URL with plain GET / POST (no headers). tools-sync.js points it
+  // here as /api/auth?tl=ideas&a=<app>&u=<user>&k=<token>; turn that into a normal session request.
+  try {
+    const u = new URL(req.url);
+    if (u.searchParams.get("tl") === "ideas") {
+      let body = {};
+      if (req.method === "POST") { try { body = JSON.parse(await req.text()) || {}; } catch (e) { body = {}; } }
+      req = new Request(u.origin + u.pathname, { method: "POST", headers: { "x-bi-app": "1", "content-type": "application/json" },
+        body: JSON.stringify({ app: u.searchParams.get("a"), username: u.searchParams.get("u"), token: u.searchParams.get("k"), action: "tl-ideas", op: body.action || "list", idea: body.idea, id: body.id, up: body.up, status: body.status }) });
+    }
+  } catch (e) { }
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
   if (!env.GROQ_API_KEY) {   // key saved by an admin in Affordability Corner → Data → AI keys
     if (Date.now() - KEYCACHE.at > 60000) { try { KEYCACHE = { at: Date.now(), groq: ((await store.get("config:aikeys")) || {}).groq || "" }; } catch (e) { } }
@@ -822,7 +834,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -923,6 +935,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^(quiz|poll|wall|recog|people|engage)-/.test(b.action)) return engageAction(b, surveyCtx());
     if (b.action.startsWith("autorep-")) return autorepAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^(cust|ct|cxx|master)-/.test(b.action)) return masterAction(b, surveyCtx());
+    if (b.action.startsWith("tl-")) return toolsAction(b, surveyCtx());
     if (b.action.startsWith("inv-")) return inviteAdminAction(b, Object.assign(surveyCtx(), { normalizePhone, normEmail, vKey, mailFetch }));
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Team notes & audits</title>
+<style>
+/*@@CSS@@*/
+.nt{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 1px 8px rgba(20,24,51,.06);font-size:13.5px}
+.nt .top3{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.nt .tx2{margin-top:6px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.chs{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.chs span{background:#F1F2F8;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:600}
+.chs .hi{background:#FDECEC;color:#B3402F}.chs .md{background:#FFF4E5;color:#B26A00}.chs .lo{background:#E6F4EA;color:#0F7B4F}.chs .cmp{background:#EEF0FF;color:#2B33A6}
+.sc{min-width:46px;height:46px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;flex:none}
+.qa{margin-top:6px;border-left:3px solid #E1E3EE;padding-left:8px}.qa div{margin:3px 0}
+.flt2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.flt2 .tx{flex:1;min-width:130px}
+.lnk2{color:#4D5BF9;cursor:pointer;font-weight:600;font-size:12.5px}
+.ph-ov img{max-width:94vw;max-height:88vh;border-radius:12px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🗂️</span></div>
+  <h1>Team notes & audits</h1><p id="h2">Voice notes and photo audits from the field</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = ls("fn-tab") || "notes", DATA = { notes: null, audits: null }, F = { state: "", q: "", days: "30" }, STATES = [];
+  fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
+  function from() { if (F.days === "all") return ""; var d = new Date(Date.now() - (+F.days) * 864e5); return d.toISOString().slice(0, 10); }
+  function load() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "tl-team", ns: TAB, state: F.state, from: from() }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      DATA[TAB] = r.rows; draw();
+    });
+  }
+  function arr(v) { return Array.isArray(v) ? v.filter(function (x) { return x != null && x !== ""; }).map(function (x) { return typeof x === "object" ? (x.label || x.v || JSON.stringify(x)) : String(x); }) : []; }
+  function match(r) {
+    if (!F.q) return true;
+    var it = r.item, s = [r.by.fullName, r.state, it.rid, it.store, it.text, it.note, arr(it.topics).join(" "), arr(it.comps).join(" ")].join(" ").toLowerCase();
+    return s.indexOf(F.q.toLowerCase()) >= 0;
+  }
+  function draw() {
+    $("h2").textContent = ADMIN ? "Voice notes and photo audits from every state" : "Your state team's voice notes and photo audits";
+    var rows = (DATA[TAB] || []).filter(match);
+    var rids = {}; rows.forEach(function (r) { if (r.item.rid) rids[r.item.rid] = 1; });
+    var tiles = TAB === "notes"
+      ? tileS("🎙️", "#EEF0FF", rows.length, "Notes") + tileS("🏪", "#E6F4EA", Object.keys(rids).length, "Retailers") + tileS("🔥", "#FDECEC", rows.filter(function (r) { return r.item.priority === "High"; }).length, "High priority") + tileS("👥", "#F4EEFF", Object.keys(rows.reduce(function (a, r) { a[r.by.username + r.by.app] = 1; return a; }, {})).length, "People")
+      : tileS("📸", "#EEF0FF", rows.length, "Audits") + tileS("🏪", "#E6F4EA", Object.keys(rids).length, "Retailers") + tileS("⭐", "#FFF4E5", rows.length ? Math.round(rows.reduce(function (a, r) { return a + (+r.item.score || 0); }, 0) / rows.length) : "—", "Avg score") + tileS("⚠️", "#FDECEC", rows.filter(function (r) { return (+r.item.score || 0) < 50; }).length, "Below 50");
+    VIEW.innerHTML = '<div class="seg"><button data-t="notes" class="' + (TAB === "notes" ? "on" : "") + '">🎙️ Voice notes</button><button data-t="audits" class="' + (TAB === "audits" ? "on" : "") + '">📸 Photo audits</button></div>' +
+      '<div class="flt2">' + (ADMIN ? '<select class="tx" id="fs"><option value="">All states</option>' + STATES.map(function (s) { return "<option" + (F.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") +
+      '<select class="tx" id="fd">' + [["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"], ["all", "All time"]].map(function (o) { return '<option value="' + o[0] + '"' + (F.days === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><input class="tx" id="fq" placeholder="Search retailer, name, topic…" value="' + esc(F.q) + '"></div>' +
+      '<div class="tiles" style="margin-top:10px">' + tiles + "</div>" +
+      '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="muted">' + rows.length + " shown · saved from Smart tools on any device</span>" + (rows.length ? '<button class="btn sec sm" id="fx">⬇ Excel</button>' : "") + "</div>" +
+      (rows.length ? rows.slice(0, 400).map(TAB === "notes" ? noteCard : auditCard).join("") : '<div class="card empty"><div class="big">' + (TAB === "notes" ? "🎙️" : "📸") + "</div>Nothing yet. Notes and audits saved in Smart tools appear here for the team.</div>");
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("fn-tab", TAB); DATA[TAB] ? draw() : load(); }; });
+    if ($("fs")) $("fs").onchange = function () { F.state = this.value; DATA = { notes: null, audits: null }; load(); };
+    $("fd").onchange = function () { F.days = this.value; DATA = { notes: null, audits: null }; load(); };
+    $("fq").oninput = function () { F.q = this.value; var p = this.selectionStart; draw(); var n = $("fq"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
+    if ($("fx")) $("fx").onclick = function () { exportX(rows); };
+    [].forEach.call(VIEW.querySelectorAll("[data-ph]"), function (a) { a.onclick = function () { api({ action: "tl-thumb", id: a.dataset.ph }).then(function (x) { if (!x.ok || !x.thumb) return toast(x.error || "No photo saved with this audit."); var w = document.createElement("div"); w.className = "ov ph-ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="' + esc(x.thumb) + '">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-more]"), function (a) { a.onclick = function () { var el = a.parentNode.querySelector(".tx2"); el.style.webkitLineClamp = "unset"; el.style.display = "block"; a.remove(); }; });
+  }
+  function who(r) { return "<b>" + esc(r.by.fullName) + '</b><span class="muted">' + esc(r.state || "") + " · " + esc(dt(Date.parse(r.item.at))) + "</span>"; }
+  function noteCard(r) {
+    var it = r.item, pr = it.priority || "";
+    return '<div class="nt"><div class="top3">' + who(r) + '</div><div class="chs">' + (it.rid ? "<span>🏪 " + esc(it.rid) + (it.store ? " · " + esc(it.store) : "") + "</span>" : it.store ? "<span>🏪 " + esc(it.store) + "</span>" : "") +
+      (pr ? '<span class="' + (pr === "High" ? "hi" : pr === "Medium" ? "md" : "lo") + '">' + esc(pr) + " priority</span>" : "") + (it.sentiment ? "<span>" + esc(it.sentiment) + "</span>" : "") + (it.mode === "survey" ? "<span>📋 Survey</span>" : "") +
+      arr(it.topics).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + arr(it.comps).map(function (x) { return '<span class="cmp">vs ' + esc(x) + "</span>"; }).join("") + arr(it.nums).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" +
+      (it.ans && it.ans.length ? '<div class="qa">' + it.ans.filter(function (x) { return x.a; }).map(function (x) { return "<div><b>" + esc(x.q) + "</b><br>" + esc(x.a) + "</div>"; }).join("") + "</div>" : '<div class="tx2" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + esc(it.text || "") + "</div>" + (String(it.text || "").length > 260 ? '<a class="lnk2" data-more="1">Show all</a>' : "")) +
+      (arr(it.actions).length ? '<div class="qa"><b>Follow-ups</b>' + arr(it.actions).map(function (x) { return "<div>• " + esc(x) + "</div>"; }).join("") + "</div>" : "") + "</div>";
+  }
+  function auditCard(r) {
+    var it = r.item, sc = +it.score || 0, col = sc >= 75 ? "#E6F4EA;color:#0F7B4F" : sc >= 50 ? "#FFF4E5;color:#B26A00" : "#FDECEC;color:#B3402F";
+    return '<div class="nt"><div class="top3"><span class="sc" style="background:' + col + '">' + sc + "</span><div>" + who(r) + "<div>" + esc(it.rid || "") + (it.store ? " · " + esc(it.store) : "") + "</div></div></div>" +
+      '<div class="chs">' + (it.sos != null ? "<span>vivo share of shelf " + esc(String(Math.round(it.sos * (it.sos <= 1 ? 100 : 1)))) + "%</span>" : "") + (it.n ? "<span>" + esc(String(it.n)) + " phones tapped</span>" : "") + (it.col != null ? "<span>vivo colour ≈ " + esc(String(it.col)) + "%</span>" : "") +
+      (arr(it.missing).length ? arr(it.missing).map(function (m) { return '<span class="hi">Missing: ' + esc(m) + "</span>"; }).join("") : '<span class="lo">✓ All POS items</span>') + "</div>" +
+      (it.note ? '<div class="tx2">' + esc(it.note) + "</div>" : "") + '<a class="lnk2" data-ph="' + esc(it.id) + '">📷 View photo</a></div>';
+  }
+  function exportX(rows) {
+    if (TAB === "notes") download(xlsx([{ name: "Voice notes", rows: [["Date", "Name", "State", "Retailer ID", "Store", "Mode", "Priority", "Sentiment", "Topics", "Competitors", "Numbers", "Follow-ups", "Note"]].concat(rows.map(function (r) { var it = r.item; return [dt(Date.parse(it.at)), r.by.fullName, r.state, it.rid || "", it.store || "", it.mode || "", it.priority || "", it.sentiment || "", arr(it.topics).join(", "), arr(it.comps).join(", "), arr(it.nums).join(", "), arr(it.actions).join(" | "), it.ans && it.ans.length ? it.ans.map(function (x) { return x.q + ": " + x.a; }).join(" | ") : it.text || ""]; })) }]), "Team_voice_notes.xlsx");
+    else download(xlsx([{ name: "Photo audits", rows: [["Date", "Name", "State", "Retailer ID", "Store", "Score", "vivo share of shelf %", "Phones tapped", "Missing POS", "Note"]].concat(rows.map(function (r) { var it = r.item; return [dt(Date.parse(it.at)), r.by.fullName, r.state, it.rid || "", it.store || "", it.score, it.sos != null ? Math.round(it.sos * (it.sos <= 1 ? 100 : 1)) : "", it.n || "", arr(it.missing).join(", "), it.note || ""]; })) }]), "Team_photo_audits.xlsx");
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else load();
+})();
+</script>
+</body>
+</html>

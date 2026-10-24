@@ -18,15 +18,26 @@ HEAD = ('<script id="biw-gate">(function(){var u=navigator.userAgent;if(/; wv\\)
         '<style id="biw-gate-css">html.biw-locked body>*:not(#biw-root){visibility:hidden!important}'
         'html.biw-locked body{background:#0b0b0c}</style>')
 TAIL = '<script id="biw-loader" src="/web.js" defer></script>'
+# Voice notes in the Android apps: the in-app browser has no speech recognition, so the apps provide window.BISpeech
+# and this turns it into the standard window.webkitSpeechRecognition before the smart tools load.
+SPEECH = ('<script id="biw-speech">(function(){if(!window.BISpeech)return;var cur=null;'
+          'function SR(){this.lang="en-IN";this.continuous=false;this.interimResults=false;this.maxAlternatives=1;this.onresult=null;this.onerror=null;this.onend=null;this.onstart=null;this._res=[]}'
+          'SR.prototype.start=function(){cur=this;this._res=[];window.BISpeech.start(String(this.lang||"en-IN"),!!this.interimResults)};'
+          'SR.prototype.stop=function(){if(cur===this)window.BISpeech.stop()};SR.prototype.abort=function(){if(cur===this)window.BISpeech.abort()};'
+          'window.__bisp=function(t,a){var r=cur;if(!r)return;if(t==="start"){r.onstart&&r.onstart({})}'
+          'else if(t==="partial"||t==="final"){var it=[{transcript:a,confidence:1}];it.isFinal=t==="final";var res=r._res.slice();res.push(it);if(t==="final")r._res.push(it);'
+          'r.onresult&&r.onresult({resultIndex:res.length-1,results:res})}else if(t==="error"){r.onerror&&r.onerror({error:a})}else if(t==="end"){cur=null;r.onend&&r.onend({})}};'
+          'window.webkitSpeechRecognition=window.SpeechRecognition=SR})();</script>')
 
 def add_web_layer(html):
     html = re.sub(r'<script id="biw-gate">.*?</script><style id="biw-gate-css">.*?</style>', "", html, flags=re.S)
+    html = re.sub(r'<script id="biw-speech">.*?</script>', "", html, flags=re.S)
     html = html.replace(TAIL, "")
     i = html.find("</head>")   # first </head> is the real one (scripts later contain the text)
     j = html.rfind("</body>")  # last </body> is the real one
     if i < 0 or j < 0 or i > j:
         sys.exit("Couldn't find </head> / </body> in index.html")
-    html = html[:i] + HEAD + html[i:]
+    html = html[:i] + HEAD + SPEECH + html[i:]
     j = html.rfind("</body>")
     return html[:j] + TAIL + html[j:]
 seen = {}

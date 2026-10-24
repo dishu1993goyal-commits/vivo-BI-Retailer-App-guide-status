@@ -23,6 +23,11 @@
     Cache-Control = "no-cache"
 
 [[headers]]
+  for = "/tools-sync.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
   for = "/cust.js"
   [headers.values]
     Cache-Control = "no-cache"

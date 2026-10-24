@@ -614,7 +614,7 @@
   function custLoad() {
     if (window.CUST && window.CUST.reauth) { window.CUST.reauth(); return; }
     window.CUST_PAGE = "dashboard";
-    var s = el("script"); s.src = "/cust.js?v=63"; document.head.appendChild(s);
+    var s = el("script"); s.src = "/cust.js?v=64"; document.head.appendChild(s);
   }
 
   // ---------- SESSION START ----------
@@ -773,7 +773,7 @@
   var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"], visits: ["visits.html", "Market visits", "Market visits"], knowledge: ["knowledge.html", "Knowledge", "Knowledge"], affordability: ["affordability.html", "Affordability Corner", "Affordability Corner"],
     hub: ["hub.html", "All tools", "All tools"], reports: ["reports.html", "Reports", "Reports"], help: ["help.html", "Help centre", "Help centre"], disputes: ["disputes.html", "Disputes", "Disputes"],
     hygiene: ["hygiene.html", "Market hygiene", "Market hygiene"], engage: ["engage.html", "Engage", "Engage"], schemes: ["schemes.html", "Schemes & payout", "Schemes & payout"], admintools: ["admin-tools.html", "Admin tools", "Admin tools"],
-    tool: ["tool.html", "Tool", "Tool"], studio: ["studio.html", "Studio", "Studio · Master admin"] };
+    tool: ["tool.html", "Tool", "Tool"], fieldnotes: ["fieldnotes.html", "Team notes & audits", "Team notes & audits"], studio: ["studio.html", "Studio", "Studio · Master admin"] };
   function toolByFile(file) { for (var k in TOOLS) if (TOOLS[k][0] === file) return k; return null; }
   function openSurveys(hash) { openTool("survey", hash); }
   function openTool(name, hash, title) {
@@ -796,6 +796,7 @@
     if (e.data.biOpen) { var o = e.data.biOpen, k = toolByFile(String(o.file || "")); if (k) openTool(k, String(o.hash || "#list"), k === "tool" && o.title ? String(o.title).slice(0, 60) : ""); }
     if (e.data.biNative) {   // hub tiles for screens that live in the dashboard itself
       var n = e.data.biNative; if (svFrame) { svFrame.remove(); svFrame = null; }
+      if (/^dash:[A-Za-z0-9_=~-]+$/.test(n)) { location.hash = n.slice(5); window.scrollTo(0, 0); return; }
       if (n === "support") openSupport(); else if (n === "users") showUsers("state"); else if (n === "logs") openInsights("logs"); else if (n === "supportReport") openInsights("support");
       else if (n === "calculator") assistant("openCalculator");
     }

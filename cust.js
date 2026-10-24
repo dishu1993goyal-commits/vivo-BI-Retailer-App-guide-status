@@ -120,7 +120,7 @@
     extraColumns: function (formKey) { return CUST.fields(formKey).map(function (f) { return [f.key, f.label]; }); },
     refresh: refresh, edit: function (on) { if (on && !document.querySelector(".cx-fab")) masterUi(); setEdit(on); },
     // the web dashboard logs in / out without reloading the page
-    reauth: function () { var was = AUTH && AUTH.token; readAuth(); if (!AUTH) { if (EDIT) setEdit(false); var f = document.querySelector(".cx-fab"); if (f) f.remove(); apply(); return Promise.resolve(); } if (!DATA.master) { var f2 = document.querySelector(".cx-fab"); if (f2) f2.remove(); } apply(); return refresh().then(function () { if (DATA.master) masterUi(); }); }
+    reauth: function () { var was = AUTH && AUTH.token; readAuth(); try { toolsSync(); } catch (e) { } if (!AUTH) { if (EDIT) setEdit(false); var f = document.querySelector(".cx-fab"); if (f) f.remove(); apply(); return Promise.resolve(); } if (!DATA.master) { var f2 = document.querySelector(".cx-fab"); if (f2) f2.remove(); } apply(); return refresh().then(function () { if (DATA.master) masterUi(); }); }
   };
   function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; t.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1F2340;color:#fff;padding:10px 16px;border-radius:12px;z-index:2147483600;font:600 13px Segoe UI,Arial;max-width:90vw"; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3000); }
   function pickPhoto(cb) {
@@ -418,5 +418,11 @@
   }
 
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { start(); refresh(); }); else { start(); refresh(); }
+  // dashboard smart tools: keep their on-device data in sync with the server (see tools-sync.js)
+  function toolsSync() {
+    if (PAGE !== "dashboard") return;
+    if (window.TLSYNC) { window.TLSYNC.start(); return; }
+    var s = document.createElement("script"); s.src = "/tools-sync.js?v=64"; (document.head || document.documentElement).appendChild(s);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { start(); refresh(); toolsSync(); }); else { start(); refresh(); toolsSync(); }
 })();
