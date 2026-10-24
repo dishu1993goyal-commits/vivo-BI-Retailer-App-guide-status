@@ -72,22 +72,32 @@
       if (g.allModels) { var miss = MR.filter(function (m) { return m.target > 0 && m.sold < m.target; }); if (miss.length) fails.push("model target missed: " + miss.map(function (m) { return m.name + " " + m.sold + "/" + m.target; }).join(", ")); }
       if (fails.length) { reasons.push((g.label || "Eligibility") + ": " + fails.join(", ")); if (g.effect === "reduce") reduce = Math.max(reduce, n(g.reducePct)); else gateMode = "zero"; }
     });
+    // gifts / product rewards (e.g. 10 units → 1 vivo V80). When "consume" is on, the units used for the gift are not paid in cash.
+    var consumed = 0, gifts = [];
+    rules.filter(function (r) { return r.type === "reward"; }).forEach(function (r) { var z = slabFor(r.slabs, unitsFor(row, sc, r)); if (z) { gifts.push({ item: z.item || "Gift", qty: n(z.qty) || 1, value: n(z.value), rule: r.label || "" }); if (r.consume) consumed = Math.max(consumed, n(z.from)); } });
+    var bandAmt = function (sl, u) { var a = 0; sl.forEach(function (s, i) { var lo = n(s.from), hi = s.to != null ? n(s.to) : (sl[i + 1] ? n(sl[i + 1].from) - 1 : Infinity); a += Math.max(0, Math.min(u, hi) - lo + 1) * n(s.rate); }); return a; };
     var vars = { units: units, target: tg, ach: ach || 0, value: n(row.value), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget), upload: n(row.upload), activation: n(row.activation), both: row.both != null ? n(row.both) : Math.min(n(row.upload), n(row.activation)), appDays: n(d.appDays), features: n(d.features), appVisits: n(d.appVisits), mvisits: n(d.mvisits), active: d.active ? 1 : 0, payout: 0 };
     rules.forEach(function (r) {
-      var amt = 0, slabTxt = "", u = unitsFor(row, sc, r);
+      var amt = 0, slabTxt = "", u = unitsFor(row, sc, r), pu = Math.max(0, u - consumed);
       if (r.type === "ach_slab") {
         var z = ach == null ? null : slabFor(r.slabs, ach);
         if (ach == null) reasons.push((r.label || "Achievement slab") + ": no target given");
-        if (z) amt = r.pay === "fixed" ? n(z.amount) : n(z.amount) * u;
+        if (z) amt = r.pay === "fixed" ? n(z.amount) : n(z.amount) * pu;
         slabTxt = fmtSlab(z, "%"); if (!mainSlab) mainSlab = slabTxt;
       } else if (r.type === "unit_slab") {
         var sl = r.slabs || [];
         if (r.mode === "incremental") {
-          sl.forEach(function (s, i) { var lo = n(s.from), hi = s.to != null ? n(s.to) : (sl[i + 1] ? n(sl[i + 1].from) - 1 : Infinity); var inBand = Math.max(0, Math.min(u, hi) - lo + 1); amt += inBand * n(s.rate); });
+          amt = bandAmt(sl, u) - bandAmt(sl, Math.min(u, consumed));
           var zz = slabFor(sl, u); slabTxt = fmtSlab(zz, " units");
-        } else { var z2 = slabFor(sl, u); if (z2) amt = u * n(z2.rate); slabTxt = fmtSlab(z2, " units"); }
+        } else { var z2 = slabFor(sl, u); if (z2) amt = pu * n(z2.rate); slabTxt = fmtSlab(z2, " units"); }
+        if (consumed && amt >= 0) slabTxt += " · cash on " + pu + " unit" + (pu === 1 ? "" : "s");
         if (!mainSlab) mainSlab = slabTxt;
-      } else if (r.type === "flat_unit") { if (whenOk(r.when, achieved)) amt = n(r.rate) * u; }
+      } else if (r.type === "flat_unit") { if (whenOk(r.when, achieved)) amt = n(r.rate) * pu; }
+      else if (r.type === "reward") {
+        var gz = slabFor(r.slabs, u);
+        if (gz) { var gq = n(gz.qty) || 1; amt = gq * n(gz.value); slabTxt = "≥ " + gz.from + " units"; parts.push({ id: r.id, label: "🎁 " + gq + " × " + (gz.item || "Gift") + (r.consume ? " (" + gz.from + " units)" : ""), type: r.type, amount: amt, slab: slabTxt, gift: true }); pos += amt; }
+        return;
+      }
       else if (r.type === "value_pct") { if (whenOk(r.when, achieved)) amt = n(r.pct) / 100 * n(row.value); }
       else if (r.type === "kicker") { if (tg > 0 && sc.targetType !== "value") amt = Math.max(0, u - tg) * n(r.rate); }
       else if (r.type === "model_rate") {   // ₹ per unit by model (e.g. V80 ₹1,099, X300 Pro ₹2,000)
@@ -126,7 +136,7 @@
     else if (reduce && pos) { var rc = pos * reduce / 100; parts.push({ label: "Eligibility cut " + reduce + "%", type: "gate", amount: -rc }); pos -= rc; }
     if (n(sc.cap) > 0 && pos > n(sc.cap)) { parts.push({ label: "Capped at maximum", type: "cap", amount: n(sc.cap) - pos }); pos = n(sc.cap); }
     var total = Math.round((pos - neg) * 100) / 100;
-    return { rid: row.rid, name: row.name || "", state: row.state || "", target: tg, targetValue: AP.tv, unitAch: AP.ua, valueAch: AP.va, models: MR, units: units, value: n(row.value), ach: ach, achieved: achieved, upload: n(row.upload), activation: n(row.activation), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget),
+    return { gifts: gifts, rid: row.rid, name: row.name || "", state: row.state || "", target: tg, targetValue: AP.tv, unitAch: AP.ua, valueAch: AP.va, models: MR, units: units, value: n(row.value), ach: ach, achieved: achieved, upload: n(row.upload), activation: n(row.activation), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget),
       parts: parts, positive: Math.round(pos * 100) / 100, penalty: Math.round(neg * 100) / 100, total: total, eligible: pos > 0, slab: mainSlab || "", reasons: reasons, dash: d, extra: row.extra || {} };
   }
   function bump(row, k, model) {
@@ -143,7 +153,7 @@
     if (n(sc.minAch) && tg > 0 && res.ach != null && res.ach < n(sc.minAch)) cands.push(Math.ceil(n(sc.minAch) / 100 * tg - u - 1e-9));
     rules.forEach(function (r) {
       if (r.type === "ach_slab" && tg > 0 && sc.targetType !== "value") (r.slabs || []).forEach(function (z) { var need = Math.ceil(n(z.from) / 100 * tg - u - 1e-9); if (need > 0) cands.push(need); });
-      if (r.type === "unit_slab") (r.slabs || []).forEach(function (z) { var need = n(z.from) - unitsFor(row, sc, r); if (need > 0) cands.push(need); });
+      if (r.type === "unit_slab" || r.type === "reward") (r.slabs || []).forEach(function (z) { var need = n(z.from) - unitsFor(row, sc, r); if (need > 0) cands.push(need); });
       if ((r.type === "multiplier" || (r.type === "penalty" && r.when !== "vshieldShort")) && tg > 0 && sc.targetType !== "value") { var nd = Math.ceil(n(r.minAch || 100) / 100 * tg - u - 1e-9); if (nd > 0) cands.push(nd); }
       if (r.type === "flat_unit" && r.when === "achieved" && tg > 0) { var nd2 = Math.ceil(tg - u - 1e-9); if (nd2 > 0) cands.push(nd2); }
     });
@@ -166,8 +176,9 @@
     var tot = out.reduce(function (a, r) { return a + r.total; }, 0), el = out.filter(function (r) { return r.eligible; });
     var achs = out.filter(function (r) { return r.ach != null; });
     var buckets = [["Below 50%", 0, 50], ["50–80%", 50, 80], ["80–100%", 80, 100], ["100–120%", 100, 120], ["120%+", 120, Infinity]].map(function (b) { return [b[0], achs.filter(function (r) { return r.ach >= b[1] && r.ach < b[2]; }).length]; });
+    var gifts = {}; out.forEach(function (r) { (r.gifts || []).forEach(function (g) { gifts[g.item] = (gifts[g.item] || 0) + g.qty; }); });
     var bySlab = {}; out.forEach(function (r) { var k = r.slab || "—"; bySlab[k] = bySlab[k] || { count: 0, payout: 0 }; bySlab[k].count++; bySlab[k].payout += r.total; });
-    return { rows: out, summary: { total: Math.round(tot * 100) / 100, count: out.length, eligible: el.length, units: out.reduce(function (a, r) { return a + r.units; }, 0), avgAch: achs.length ? achs.reduce(function (a, r) { return a + r.ach; }, 0) / achs.length : null, penalties: out.reduce(function (a, r) { return a + r.penalty; }, 0), buckets: buckets, bySlab: bySlab } };
+    return { rows: out, summary: { total: Math.round(tot * 100) / 100, count: out.length, eligible: el.length, units: out.reduce(function (a, r) { return a + r.units; }, 0), avgAch: achs.length ? achs.reduce(function (a, r) { return a + r.ach; }, 0) / achs.length : null, penalties: out.reduce(function (a, r) { return a + r.penalty; }, 0), buckets: buckets, bySlab: bySlab, gifts: gifts } };
   }
 
   // ---- IMEI-level sales → per-retailer units (basis, same-month rule, EMI partner exclusion, models, value, V-Shield) ----
@@ -182,7 +193,8 @@
   }
   function fromImei(sc, list) {
     var by = {}, period = sc.period || "", ex = (sc.excludePartners || []).map(lc).filter(Boolean), seen = {};
-    var inP = function (d) { return d && (!period || d.slice(0, 7) === period); };
+    var df = sc.dateFrom || "", dto = sc.dateTo || "";
+    var inP = function (d) { return d && (df || dto ? (!df || d >= df) && (!dto || d <= dto) : (!period || d.slice(0, 7) === period)); };
     list.forEach(function (x) {
       var rid = String(x.rid || "").trim().toUpperCase(); if (!rid) return;
       var imei = String(x.imei || "").trim(); if (imei) { if (seen[imei]) return; seen[imei] = 1; }
