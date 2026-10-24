@@ -19,6 +19,8 @@ const ISTAT = ["New", "Under review", "Approved", "Implemented", "Not now"];
 const ICATS = ["Process", "Reports & data", "Retailer app", "Incentive & payout", "Market hygiene", "Affordability", "Training", "Other"];
 const istDay = (t) => new Date(t + 19800000).toISOString().slice(0, 10);
 const ymOf = (t) => new Date(t + 19800000).toISOString().slice(0, 7).replace("-", "");
+export const TOOL_IDS = ["tl", "tlv", "tlp", "tlb", "tlr", "tli", "tlk", "tls", "tld"];
+//   tluse:<yyyymmdd>:<ownerKey>  { by, state, app, tools: { tlv: { opens, acts, saves, last } } }   usage per user per day
 
 export async function toolsAction(b, ctx) {
   const { store, t, app, rec, key, pool } = ctx;
@@ -27,6 +29,14 @@ export async function toolsAction(b, ctx) {
   const by = { fullName: rec.fullName || rec.username, username: rec.username || "", app };
   const myState = rec.state || "";
   const scope = isAdmin ? "ALL" : myState || "NONE";
+  // usage counter (one small record per user per day)
+  async function logUse(tool, kind, n) {
+    if (!TOOL_IDS.includes(tool)) return;
+    const k = `tluse:${istDay(t).replace(/-/g, "")}:${owner}`, u = (await store.get(k)) || { by, state: myState || (isAdmin ? "HO" : ""), app, tools: {} };
+    const x = u.tools[tool] || (u.tools[tool] = { opens: 0, acts: 0, saves: 0, last: 0 });
+    x[kind] = (x[kind] || 0) + (n || 1); x.last = t; u.by = by; u.state = myState || (isAdmin ? "HO" : "");
+    await store.set(k, u);
+  }
   const listNs = async (ns, prefix) => (await pool(await store.list(`tl:${ns}:${prefix || ""}`), 40, (k) => store.get(k))).filter(Boolean);
 
   // Market visits (punch-ins) mark retailers as visited for the beat planner
@@ -72,6 +82,7 @@ export async function toolsAction(b, ctx) {
         await store.set(k, { id, ns, owner, by, state: myState || (isAdmin ? "HO" : ""), item: it, updatedAt: t, createdAt: old ? old.createdAt : t, shared: ns === "kpis" && isAdmin });
         saved++;
       }
+      if (saved) await logUse({ notes: "tlv", audits: "tlp", kpis: "tlk" }[ns], "saves", saved);
       for (const id0 of (Array.isArray(b.deletes) ? b.deletes : []).slice(0, 500)) { const id = cid(id0); if (id) await store.delete(`tl:${ns}:${owner}:${id}`); }
       // keep the newest N per user
       const mine = (await store.list(`tl:${ns}:${owner}:`));
@@ -90,7 +101,8 @@ export async function toolsAction(b, ctx) {
     if (ns === "beat") {
       if (b.value == null) { await store.delete(`tlbeat:${scope}`); return json(200, { ok: true }); }
       const raw = JSON.stringify(b.value); if (raw.length > 4500000) return json(413, { ok: false, error: "The list is too large to share." });
-      await store.set(`tlbeat:${scope}`, { value: b.value, by: by.fullName, at: t });
+      await store.set(`tlbeat:${scope}`, { value: b.value, by: by.fullName, byUser: by, at: t });
+      await logUse("tlb", "saves");
       return json(200, { ok: true });
     }
     if (ns === "prefs") {
@@ -100,6 +112,49 @@ export async function toolsAction(b, ctx) {
       return json(200, { ok: true });
     }
     return json(400, { ok: false, error: "Unknown data." });
+  }
+
+  // opened a tool / used it (upload, export, share) — sent by tools-sync.js
+  if (b.action === "tl-use") { await logUse(String(b.tool || ""), b.kind === "acts" ? "acts" : "opens"); return json(200, { ok: true }); }
+
+  // ---- HO / master: who uses the smart tools, every state's KPIs and beat plans ----
+  if (b.action === "tl-activity") {
+    if (!isAdmin) return json(403, { ok: false, error: "Admins only." });
+    const days = Math.max(1, Math.min(120, Number(b.days) || 30)), rows = [];
+    for (let i = 0; i < days; i++) {
+      const d = istDay(t - i * 864e5).replace(/-/g, "");
+      const recs = (await pool(await store.list(`tluse:${d}:`), 40, (k) => store.get(k))).filter(Boolean);
+      recs.forEach((u) => Object.entries(u.tools || {}).forEach(([tool, x]) => rows.push({ day: d, by: u.by, state: u.state, app: u.app, tool, opens: x.opens || 0, acts: x.acts || 0, saves: x.saves || 0, last: x.last || 0 })));
+    }
+    return json(200, { ok: true, rows, days });
+  }
+  if (b.action === "tl-kpis-all") {
+    if (!isAdmin) return json(403, { ok: false, error: "Admins only." });
+    const rows = (await listNs("kpis")).map((r) => ({ by: r.by, state: r.state, shared: !!r.shared, updatedAt: r.updatedAt, item: r.item })).sort((x, y) => y.updatedAt - x.updatedAt);
+    return json(200, { ok: true, rows });
+  }
+  if (b.action === "tl-beats") {   // one row per state that uploaded a list or has visited marks
+    if (!isAdmin) return json(403, { ok: false, error: "Admins only." });
+    const scopes = new Set();
+    (await store.list("tlbeat:")).forEach((k) => scopes.add(k.slice(7)));
+    (await store.list("tlmap:beatv:")).forEach((k) => scopes.add(k.slice(12)));
+    const d7 = istDay(t - 7 * 864e5), d30 = istDay(t - 30 * 864e5), out = [];
+    for (const sc of scopes) {
+      const bt = await store.get(`tlbeat:${sc}`), bv = Object.assign({}, ((await store.get(`tlmap:beatv:${sc}`)) || {}).map || {});
+      const vd = await visitDays(sc); for (const k in vd) if (!bv[k] || bv[k] < vd[k]) bv[k] = vd[k];
+      const ids = bt && bt.value && bt.value.rows ? Object.keys(bt.value.rows) : [];
+      const inList = (k) => !ids.length || ids.includes(k);
+      const vals = Object.entries(bv).filter(([k]) => inList(k)).map(([, v]) => v);
+      out.push({ scope: sc, list: bt ? { name: bt.value.name || "", n: bt.value.n || ids.length, at: bt.at, by: bt.by, towns: ids.length ? new Set(ids.map((k) => bt.value.rows[k].town || "")).size : 0, geo: !!(bt.value.cols && bt.value.cols.geo) } : null,
+        visited: vals.length, v7: vals.filter((v) => v >= d7).length, v30: vals.filter((v) => v >= d30).length });
+    }
+    return json(200, { ok: true, rows: out.sort((x, y) => String(x.scope).localeCompare(String(y.scope))) });
+  }
+  if (b.action === "tl-beat-get") {
+    if (!isAdmin) return json(403, { ok: false, error: "Admins only." });
+    const sc = str(b.scope, 60), bt = await store.get(`tlbeat:${sc}`), bv = Object.assign({}, ((await store.get(`tlmap:beatv:${sc}`)) || {}).map || {});
+    const vd = await visitDays(sc); for (const k in vd) if (!bv[k] || bv[k] < vd[k]) bv[k] = vd[k];
+    return json(200, { ok: true, list: bt ? bt.value : null, by: bt ? bt.by : "", at: bt ? bt.at : 0, visited: bv });
   }
 
   // Team view: HO sees every state; a state user sees their own state's team
@@ -130,6 +185,7 @@ export async function toolsAction(b, ctx) {
       if (!title || !idea) return json(400, { ok: false, error: "Add a title and your idea." });
       const id = cid(x.id) || t.toString(36) + randomBytes(3).toString("hex");
       if (await store.get(`idea:${id}`)) return json(200, out(await all()));
+      await logUse("tld", "saves");
       await store.set(`idea:${id}`, { id, title, idea, category: ICATS.includes(x.c || x.category) ? x.c || x.category : "Other", problem: str(x.p || x.problem, 2000), benefit: str(x.b || x.benefit, 1000),
         state: isAdmin ? str(x.st || x.state, 40) || "HO" : myState, by: str(x.by, 60) || by.fullName, byUser: owner, at: new Date(t).toISOString(), status: "New", voters: [], base: 0 });
       return json(200, out(await all()));
@@ -138,6 +194,7 @@ export async function toolsAction(b, ctx) {
       const k = `idea:${cid(b.id)}`, x = await store.get(k);
       if (!x) return json(404, { ok: false, error: "Idea not found." });
       x.voters = (x.voters || []).filter((v) => v !== owner); if (b.up !== false) x.voters.push(owner);
+      await logUse("tld", "acts");
       await store.set(k, x);
       return json(200, out(await all()));
     }

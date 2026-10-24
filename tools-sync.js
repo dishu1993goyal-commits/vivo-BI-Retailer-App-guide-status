@@ -121,6 +121,20 @@
   var wrapTries = 0, wrapT = setInterval(function () { allowToolExports(); if (++wrapTries > 30) clearInterval(wrapT); }, 1000);
   window.addEventListener("hashchange", allowToolExports);
 
+  // usage: which smart tool was opened / used (upload, export, share, save) — shown to HO in Smart tools activity
+  var TOOLS = { "smart-tools": "tl", "tool-voice-notes": "tlv", "tool-photo-audit": "tlp", "tool-beat-planner": "tlb", "tool-reconciliation": "tlr", "tool-excel-insight": "tli", "tool-kpi-builder": "tlk", "tool-share-card": "tls", "tool-idea-box": "tld" };
+  function curTool() { var h = String(location.hash || "").replace(/^#/, "").split(/[?&~]/)[0]; return TOOLS[h] || null; }
+  var sent = {};
+  function use(kind) {
+    var tl = curTool(); if (!tl || !AUTH) return;
+    var k = tl + ":" + kind, gap = kind === "opens" ? 600000 : 60000;
+    if (sent[k] && Date.now() - sent[k] < gap) return; sent[k] = Date.now();
+    api({ action: "tl-use", tool: tl, kind: kind });
+  }
+  window.addEventListener("hashchange", function () { setTimeout(function () { use("opens"); }, 300); });
+  document.addEventListener("click", function (e) { var b = e.target && e.target.closest && e.target.closest("[data-tlroot] button, [data-tlroot] .xlbtn"); if (b) use("acts"); }, true);
+  document.addEventListener("change", function (e) { if (e.target && e.target.type === "file" && curTool()) use("acts"); }, true);
+
   function start() {
     var a = readAuth();
     if (!a) { AUTH = null; return; }
@@ -132,6 +146,7 @@
     try { SNAP = JSON.parse(ls.getItem(SK()) || "{}") || {}; } catch (e) { SNAP = {}; }
     allowToolExports();
     pull();
+    setTimeout(function () { use("opens"); }, 500);
   }
   function stop() { AUTH = null; }
   window.TLSYNC = { start: start, stop: stop, pull: pull };

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Smart tools activity</title>
+<style>
+/*@@CSS@@*/
+.tb{width:100%;border-collapse:collapse;font-size:13px;background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 1px 8px rgba(20,24,51,.06)}
+.tb th{background:#F3F4FA;text-align:left;padding:8px 10px;font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.3px}
+.tb td{padding:8px 10px;border-top:1px solid #EEF0F6;vertical-align:top}.tb td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbw{overflow-x:auto;margin-top:8px;border-radius:14px}
+.ur{background:var(--card);border-radius:14px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);font-size:13px}
+.chs{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}.chs span{background:#F1F2F8;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:600}
+.chs .sh{background:#E6F4EA;color:#0F7B4F}
+.flt2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.flt2 .tx{flex:1;min-width:130px}
+.bar2{height:8px;border-radius:99px;background:#E6E8F2;overflow:hidden;margin-top:6px}.bar2 i{display:block;height:100%;background:#1E9E61}
+.sec2{font-weight:800;margin:16px 2px 2px;font-size:14px}
+.fx{font-family:ui-monospace,Menlo,Consolas,monospace;background:#F7F8FC;border-radius:8px;padding:4px 8px;font-size:12.5px;display:inline-block;margin-top:4px;word-break:break-all}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📊</span></div>
+  <h1>Smart tools activity</h1><p>Who uses which tool · every state's KPIs and beat plans</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = ls("ta-tab") || "use", DAYS = "30", ST = "", Q = "", CACHE = {};
+  var TN = { tl: ["✨", "Smart tools home"], tlv: ["🎙️", "Voice notes"], tlp: ["📸", "Photo audit"], tlb: ["🧭", "Beat planner"], tlr: ["🔀", "Reconciliation"], tli: ["📈", "Excel to insight"], tlk: ["🧮", "KPI builder"], tls: ["📤", "Share card"], tld: ["💡", "Idea box"] };
+  var ORDER = ["tlv", "tlp", "tlb", "tls", "tlr", "tli", "tld", "tlk", "tl"];
+  function tabs() {
+    return '<div class="seg">' + [["use", "📊 Activity"], ["kpi", "🧮 KPIs"], ["beat", "🧭 Beat plans"]].map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + "</div>";
+  }
+  function bindTabs() { [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("ta-tab", TAB); go(); }; }); }
+  function go() {
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">Only HO admins and master admins can see Smart tools activity.</div>'; return; }
+    VIEW.innerHTML = tabs() + '<div class="loading"><div class="spin"></div></div>'; bindTabs();
+    var key = TAB + ":" + (TAB === "use" ? DAYS : "");
+    if (CACHE[key]) return ({ use: showUse, kpi: showKpi, beat: showBeat })[TAB](CACHE[key]);
+    var req = TAB === "use" ? { action: "tl-activity", days: DAYS } : TAB === "kpi" ? { action: "tl-kpis-all" } : { action: "tl-beats" };
+    api(req).then(function (r) { if (!r.ok) { VIEW.innerHTML = tabs() + '<div class="err">' + esc(r.error) + "</div>"; bindTabs(); return; } CACHE[key] = r; ({ use: showUse, kpi: showKpi, beat: showBeat })[TAB](r); });
+  }
+  function stateSel(list) { return '<select class="tx" id="fs"><option value="">All states</option>' + list.map(function (s) { return "<option" + (ST === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>"; }
+  function bindFilters(redraw) {
+    if ($("fs")) $("fs").onchange = function () { ST = this.value; redraw(); };
+    if ($("fq")) $("fq").oninput = function () { Q = this.value; var p = this.selectionStart; redraw(); var n = $("fq"); if (n) { n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } } };
+  }
+  function uid(r) { return r.app + ":" + (r.by.username || r.by.fullName); }
+
+  // ---------- usage ----------
+  function showUse(r) {
+    var states = Object.keys(r.rows.reduce(function (a, x) { a[x.state || "—"] = 1; return a; }, {})).sort();
+    var rows = r.rows.filter(function (x) { return (!ST || x.state === ST) && (!Q || (x.by.fullName + " " + x.state).toLowerCase().indexOf(Q.toLowerCase()) >= 0); });
+    var users = {}, byTool = {}, byState = {};
+    rows.forEach(function (x) {
+      var u = users[uid(x)] || (users[uid(x)] = { by: x.by, state: x.state, app: x.app, tools: {}, last: 0, days: {} });
+      var tt = u.tools[x.tool] || (u.tools[x.tool] = { opens: 0, acts: 0, saves: 0 }); tt.opens += x.opens; tt.acts += x.acts; tt.saves += x.saves; u.last = Math.max(u.last, x.last); u.days[x.day] = 1;
+      var bt = byTool[x.tool] || (byTool[x.tool] = { users: {}, opens: 0, acts: 0, saves: 0 }); bt.users[uid(x)] = 1; bt.opens += x.opens; bt.acts += x.acts; bt.saves += x.saves;
+      var bs = byState[x.state || "—"] || (byState[x.state || "—"] = { users: {}, opens: 0, acts: 0, saves: 0, tools: {} }); bs.users[uid(x)] = 1; bs.opens += x.opens; bs.acts += x.acts; bs.saves += x.saves; bs.tools[x.tool] = (bs.tools[x.tool] || 0) + x.opens + x.acts + x.saves;
+    });
+    var U = Object.keys(users).map(function (k) { return users[k]; }).sort(function (a, b) { return b.last - a.last; });
+    var tot = function (k) { return rows.reduce(function (a, x) { return a + x[k]; }, 0); };
+    var top = ORDER.filter(function (k) { return byTool[k]; }).sort(function (a, b) { return Object.keys(byTool[b].users).length - Object.keys(byTool[a].users).length; })[0];
+    var maxU = Math.max.apply(null, [1].concat(ORDER.map(function (k) { return byTool[k] ? Object.keys(byTool[k].users).length : 0; })));
+    VIEW.innerHTML = tabs() + '<div class="flt2"><select class="tx" id="fd">' + [["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]].map(function (o) { return '<option value="' + o[0] + '"' + (DAYS === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" + stateSel(states) + '<input class="tx" id="fq" placeholder="Search name or state" value="' + esc(Q) + '"></div>' +
+      '<div class="tiles" style="margin-top:10px">' + tileS("👥", "#EEF0FF", U.length, "Active users") + tileS("🗺️", "#E6F4EA", Object.keys(byState).length, "States") + tileS("👆", "#FFF4E5", tot("opens") + tot("acts"), "Opens & actions") + tileS("💾", "#F4EEFF", tot("saves"), "Saved items") + "</div>" +
+      (top ? '<div class="notice info" style="margin-top:8px">Most used: <b>' + TN[top][0] + " " + TN[top][1] + "</b> · " + Object.keys(byTool[top].users).length + " users</div>" : "") +
+      '<div class="row" style="justify-content:space-between;margin-top:10px"><div class="sec2" style="margin:0">By tool</div>' + (rows.length ? '<button class="btn sec sm" id="ux">⬇ Excel</button>' : "") + "</div>" +
+      '<div class="tbw"><table class="tb"><tr><th>Tool</th><th>Users</th><th>Opens</th><th>Actions</th><th>Saved</th></tr>' + ORDER.map(function (k) { var b = byTool[k] || { users: {}, opens: 0, acts: 0, saves: 0 }, n = Object.keys(b.users).length; return "<tr><td>" + TN[k][0] + " " + TN[k][1] + '<div class="bar2"><i style="width:' + Math.round(n / maxU * 100) + '%"></i></div></td><td class="n">' + n + '</td><td class="n">' + b.opens + '</td><td class="n">' + b.acts + '</td><td class="n">' + b.saves + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="sec2">By state</div><div class="tbw"><table class="tb"><tr><th>State</th><th>Users</th><th>Opens</th><th>Actions</th><th>Saved</th><th>Top tool</th></tr>' + Object.keys(byState).sort(function (a, b) { return Object.keys(byState[b].users).length - Object.keys(byState[a].users).length; }).map(function (s) { var b = byState[s], tt = Object.keys(b.tools).sort(function (x, y) { return b.tools[y] - b.tools[x]; })[0]; return "<tr><td>" + esc(s) + '</td><td class="n">' + Object.keys(b.users).length + '</td><td class="n">' + b.opens + '</td><td class="n">' + b.acts + '</td><td class="n">' + b.saves + "</td><td>" + (tt ? TN[tt][0] + " " + TN[tt][1] : "") + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="sec2">By user</div>' + (U.length ? U.slice(0, 300).map(function (u) { return '<div class="ur"><b>' + esc(u.by.fullName) + '</b> <span class="muted">' + esc(u.state || "") + " · " + (u.app === "admin" ? "admin" : "state user") + " · last used " + dt(u.last) + " · active " + Object.keys(u.days).length + " day" + (Object.keys(u.days).length === 1 ? "" : "s") + '</span><div class="chs">' + ORDER.filter(function (k) { return u.tools[k]; }).map(function (k) { var x = u.tools[k]; var parts = []; if (x.opens + x.acts) parts.push((x.opens + x.acts) + " use" + (x.opens + x.acts === 1 ? "" : "s")); if (x.saves) parts.push(x.saves + " saved"); return "<span>" + TN[k][0] + " " + TN[k][1] + " · " + parts.join(" · ") + "</span>"; }).join("") + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">📊</div>No smart tool use in this period yet.</div>');
+    bindTabs(); bindFilters(function () { showUse(r); });
+    $("fd").onchange = function () { DAYS = this.value; go(); };
+    if ($("ux")) $("ux").onclick = function () {
+      download(xlsx([
+        { name: "By user", rows: [["Name", "State", "Role", "Last used", "Active days"].concat(ORDER.map(function (k) { return TN[k][1]; }))].concat(U.map(function (u) { return [u.by.fullName, u.state, u.app === "admin" ? "Admin" : "State user", dt(u.last), Object.keys(u.days).length].concat(ORDER.map(function (k) { var x = u.tools[k]; return x ? x.opens + x.acts + x.saves : 0; })); })) },
+        { name: "By state", rows: [["State", "Users", "Opens", "Actions", "Saved"]].concat(Object.keys(byState).map(function (s) { var b = byState[s]; return [s, Object.keys(b.users).length, b.opens, b.acts, b.saves]; })) },
+        { name: "Daily log", rows: [["Date", "Name", "State", "Tool", "Opens", "Actions", "Saved"]].concat(rows.map(function (x) { return [x.day.replace(/(\d{4})(\d\d)(\d\d)/, "$3-$2-$1"), x.by.fullName, x.state, TN[x.tool] ? TN[x.tool][1] : x.tool, x.opens, x.acts, x.saves]; })) }
+      ]), "Smart_tools_activity_" + DAYS + "d.xlsx");
+    };
+  }
+  // ---------- custom KPIs from every user ----------
+  function showKpi(r) {
+    var states = Object.keys(r.rows.reduce(function (a, x) { a[x.state || "—"] = 1; return a; }, {})).sort();
+    var rows = r.rows.filter(function (x) { return (!ST || x.state === ST) && (!Q || (x.item.n + " " + x.item.f + " " + x.by.fullName).toLowerCase().indexOf(Q.toLowerCase()) >= 0); });
+    var fmt = function (it) { return { pct: "%", num: "number", inr: "₹", ratio: "ratio" }[it.fmt] || it.fmt || ""; };
+    VIEW.innerHTML = tabs() + '<div class="flt2">' + stateSel(states) + '<input class="tx" id="fq" placeholder="Search KPI, formula or name" value="' + esc(Q) + '"></div>' +
+      '<div class="tiles" style="margin-top:10px">' + tileS("🧮", "#EEF0FF", rows.length, "Custom KPIs") + tileS("🌐", "#E6F4EA", rows.filter(function (x) { return x.shared; }).length, "Shared by HO") + tileS("👤", "#FFF4E5", rows.filter(function (x) { return !x.shared; }).length, "Made by users") + tileS("🗺️", "#F4EEFF", Object.keys(rows.reduce(function (a, x) { a[x.state] = 1; return a; }, {})).length, "States") + "</div>" +
+      '<div class="row" style="justify-content:flex-end;margin-top:8px">' + (rows.length ? '<button class="btn sec sm" id="kx">⬇ Excel</button>' : "") + "</div>" +
+      (rows.length ? rows.map(function (x) { var it = x.item; return '<div class="ur"><b>' + esc(it.n || "Untitled KPI") + "</b> " + (x.shared ? '<span class="chip live">Shared with everyone</span>' : '<span class="chip">Private to the user</span>') + '<div><span class="fx">' + esc(it.f || "") + '</span></div><div class="chs">' + (fmt(it) ? "<span>Format: " + esc(fmt(it)) + "</span>" : "") + (it.tgt != null && it.tgt !== "" ? "<span>Target " + esc(String(it.tgt)) + (it.dir ? " · " + esc(it.dir === "down" ? "lower is better" : "higher is better") : "") + "</span>" : "") + (it.pin !== false ? "<span>📌 Pinned on overview</span>" : "") + '</div><div class="muted" style="font-size:12px;margin-top:4px">By ' + esc(x.by.fullName) + " · " + esc(x.state || "") + " · updated " + dt(x.updatedAt) + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">🧮</div>No custom KPIs yet.</div>');
+    bindTabs(); bindFilters(function () { showKpi(r); });
+    if ($("kx")) $("kx").onclick = function () { download(xlsx([{ name: "Custom KPIs", rows: [["KPI", "Formula", "Format", "Target", "Direction", "Pinned", "Shared", "By", "State", "Updated"]].concat(rows.map(function (x) { var it = x.item; return [it.n || "", it.f || "", fmt(it), it.tgt == null ? "" : it.tgt, it.dir || "", it.pin !== false ? "Yes" : "No", x.shared ? "Everyone" : "Private", x.by.fullName, x.state, dt(x.updatedAt)]; })) }]), "Custom_KPIs_all_states.xlsx"); };
+  }
+  // ---------- beat plans per state ----------
+  function showBeat(r) {
+    var rows = r.rows.filter(function (x) { return (!ST || x.scope === ST) && (!Q || x.scope.toLowerCase().indexOf(Q.toLowerCase()) >= 0); });
+    VIEW.innerHTML = tabs() + '<div class="flt2">' + stateSel(r.rows.map(function (x) { return x.scope; })) + '<input class="tx" id="fq" placeholder="Search state" value="' + esc(Q) + '"></div>' +
+      '<div class="tiles" style="margin-top:10px">' + tileS("📋", "#EEF0FF", rows.filter(function (x) { return x.list; }).length, "States with a list") + tileS("🏪", "#E6F4EA", rows.reduce(function (a, x) { return a + (x.list ? x.list.n : 0); }, 0), "Retailers in lists") + tileS("✅", "#FFF4E5", rows.reduce(function (a, x) { return a + x.v7; }, 0), "Visited · 7 days") + tileS("📅", "#F4EEFF", rows.reduce(function (a, x) { return a + x.v30; }, 0), "Visited · 30 days") + "</div>" +
+      '<div class="muted" style="font-size:12px;margin-top:8px">Visited = a voice note, photo audit or Market visits punch-in for that retailer. “ALL” is the HO admins\' own list.</div>' +
+      (rows.length ? rows.map(function (x) { var L = x.list, pct = L && L.n ? Math.round(x.v30 / L.n * 100) : 0; return '<div class="ur"><div class="row" style="justify-content:space-between"><b>' + esc(x.scope === "ALL" ? "HO (all states)" : x.scope) + '</b><button class="btn sec sm" data-bx="' + esc(x.scope) + '">⬇ Excel</button></div>' +
+        (L ? '<div class="muted" style="font-size:12.5px">' + esc(L.name) + " · " + L.n + " retailers" + (L.towns ? " · " + L.towns + " towns" : "") + (L.geo ? " · 📍 with map points" : "") + " · uploaded by " + esc(L.by) + " " + dt(L.at) + "</div>" : '<div class="muted" style="font-size:12.5px">No list uploaded — visited marks only</div>') +
+        '<div class="chs"><span>Visited ever ' + x.visited + "</span><span>Last 7 days " + x.v7 + '</span><span class="sh">Last 30 days ' + x.v30 + (L && L.n ? " (" + pct + "%)" : "") + "</span></div>" + (L && L.n ? '<div class="bar2"><i style="width:' + Math.min(100, pct) + '%"></i></div>' : "") + "</div>"; }).join("") : '<div class="card empty"><div class="big">🧭</div>No beat plans yet. A state\'s list appears here once someone uploads it in Smart beat planner.</div>');
+    bindTabs(); bindFilters(function () { showBeat(r); });
+    [].forEach.call(VIEW.querySelectorAll("[data-bx]"), function (b) { b.onclick = function () {
+      api({ action: "tl-beat-get", scope: b.dataset.bx }).then(function (x) {
+        if (!x.ok) return toast(x.error);
+        var L = x.list, vis = x.visited || {}, out = [["Retailer ID", "Name", "Town / beat", "Phone", "State", "Last visit (list)", "Visited (app)"]];
+        if (L && L.rows) Object.keys(L.rows).forEach(function (k) { var o = L.rows[k]; out.push([o.id, o.n || "", o.town || "", o.ph || "", o.st || "", o.last || "", vis[k] || ""]); });
+        else Object.keys(vis).forEach(function (k) { out.push([k, "", "", "", "", "", vis[k]]); });
+        download(xlsx([{ name: "Beat plan", rows: out }]), "Beat_plan_" + b.dataset.bx.replace(/[^A-Za-z0-9]+/g, "_") + ".xlsx");
+      });
+    }; });
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else go();
+})();
+</script>
+</body>
+</html>

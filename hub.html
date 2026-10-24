@@ -423,7 +423,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     { id: "smart", icon: "✨", name: "Smart tools", sub: "Less manual work", col: "#FFF1E6", items: [
       ["tlv", "🎙️", "Voice notes", null, "n:dash:tool-voice-notes"], ["tlp", "📸", "Photo audit", null, "n:dash:tool-photo-audit"], ["tlb", "🧭", "Smart beat planner", null, "n:dash:tool-beat-planner"],
       ["tls", "📤", "Share a KPI card", null, "n:dash:tool-share-card"], ["tlr", "🔀", "Auto-reconciliation", null, "n:dash:tool-reconciliation"], ["tli", "📈", "Excel to insight", null, "n:dash:tool-excel-insight"],
-      ["tld", "💡", "Idea box", null, "n:dash:tool-idea-box"], ["tlk", "🧮", "Custom KPI builder", null, "n:dash:tool-kpi-builder"], ["fnotes", "🗂️", "Team notes & audits", null, "t:fieldnotes.html"]] },
+      ["tld", "💡", "Idea box", null, "n:dash:tool-idea-box"], ["tlk", "🧮", "Custom KPI builder", null, "n:dash:tool-kpi-builder"], ["fnotes", "🗂️", "Team notes & audits", null, "t:fieldnotes.html"], ["tact", "📊", "Smart tools activity", null, "t:toolactivity.html", null, "admin"]] },
     { id: "more", icon: "🧰", name: "More tools", sub: "Custom", col: "#F1F2F6", items: [] }
   ];
   // custom tools made by master admins (shown in the category they chose)
@@ -453,6 +453,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   function visible(it, cat) {
     if (it[6] === "app" && !IN_APP) return false;
     if (it[6] === "master" && !(window.CUST && CUST.master)) return false;
+    if (it[6] === "admin" && !ADMIN) return false;
     if (cat.admin && !ADMIN) return false;
     if (it[3] && MODS && MODS[it[3]] === false) return false;
     return true;

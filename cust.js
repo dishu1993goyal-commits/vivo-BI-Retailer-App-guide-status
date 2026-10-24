@@ -422,7 +422,7 @@
   function toolsSync() {
     if (PAGE !== "dashboard") return;
     if (window.TLSYNC) { window.TLSYNC.start(); return; }
-    var s = document.createElement("script"); s.src = "/tools-sync.js?v=64"; (document.head || document.documentElement).appendChild(s);
+    var s = document.createElement("script"); s.src = "/tools-sync.js?v=65"; (document.head || document.documentElement).appendChild(s);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { start(); refresh(); toolsSync(); }); else { start(); refresh(); toolsSync(); }
 })();
