@@ -15,6 +15,11 @@
 .flt2{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.flt2 .tx{flex:1;min-width:130px}
 .lnk2{color:#4D5BF9;cursor:pointer;font-weight:600;font-size:12.5px}
 .ph-ov img{max-width:94vw;max-height:88vh;border-radius:12px}
+.en{margin-top:8px;background:#F4F7FF;border-left:3px solid #4D5BF9;border-radius:8px;padding:7px 9px;line-height:1.5}
+.en small,.og small{display:block;font-size:10.5px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.ais{min-width:40px;height:26px;border-radius:99px;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:12.5px;padding:0 8px}
+.need{margin-top:6px;font-size:13px}.need b{color:#2B33A6}
+.ins h4{margin:14px 0 4px;font-size:14px}.ins .it{background:#F7F8FC;border-radius:10px;padding:7px 9px;margin-top:5px;font-size:13px}
 </style>
 </head>
 <body>
@@ -27,7 +32,7 @@
 (function () {
   "use strict";
   /*@@CORE@@*/
-  var VIEW = $("view"), TAB = ls("fn-tab") || "notes", DATA = { notes: null, audits: null }, F = { state: "", q: "", days: "30" }, STATES = [];
+  var VIEW = $("view"), TAB = ls("fn-tab") || "notes", DATA = { notes: null, audits: null }, F = { state: "", q: "", days: "30", sort: "new", comp: false }, STATES = [], AIBUSY = false, AIERR = "";
   fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
   function from() { if (F.days === "all") return ""; var d = new Date(Date.now() - (+F.days) * 864e5); return d.toISOString().slice(0, 10); }
   function load() {
@@ -35,29 +40,76 @@
     api({ action: "tl-team", ns: TAB, state: F.state, from: from() }).then(function (r) {
       if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       DATA[TAB] = r.rows; draw();
+      if (TAB === "notes") aiFill();
+    });
+  }
+  // translate + score notes that don't have it yet (a few at a time)
+  function aiFill() {
+    var miss = (DATA.notes || []).filter(function (r) { return !r.ai && (r.item.text || (r.item.ans || []).length); }).length;
+    if (!miss || AIBUSY || AIERR || window.__aiTried) return;
+    window.__aiTried = true; AIBUSY = true; draw();
+    var step = function () {
+      api({ action: "tl-ai", limit: 6 }).then(function (x) {
+        if (!x.ok) { AIBUSY = false; AIERR = x.error; draw(); return; }
+        if (x.remaining > 0 && x.done > 0) { $("aist") && ($("aist").textContent = "🌐 Translating to English and scoring… " + x.remaining + " left"); step(); return; }
+        AIBUSY = false; DATA.notes = null; load();
+      });
+    };
+    step();
+  }
+  var scCol = function (v) { return v >= 80 ? "#FDECEC;color:#B3402F" : v >= 50 ? "#FFF4E5;color:#B26A00" : "#EEF0F6;color:#3A3F5C"; };
+  function insights() {
+    var ov = sheet("🤖 AI insights", "Ranked from the scored notes" + (F.state ? " · " + F.state : "") + " · " + { "7": "last 7 days", "30": "last 30 days", "90": "last 90 days", all: "all time" }[F.days], [], '<div id="insb" class="ins"><div class="loading"><div class="spin"></div>Reading the notes…</div></div>');
+    ov.querySelector(".sheet").style.maxWidth = "640px";
+    api({ action: "tl-ai-summary", state: F.state, from: from() }).then(function (x) {
+      var box = ov.querySelector("#insb");
+      if (!x.ok) { box.innerHTML = '<div class="err">' + esc(x.error) + "</div>"; return; }
+      if (!x.summary) { box.innerHTML = '<div class="muted">No scored notes in this period yet.</div>'; return; }
+      var S = x.summary, byId = {}; (DATA.notes || []).forEach(function (r) { byId[r.item.id] = r; });
+      var li = function (a, f) { return (a || []).map(function (y, i) { return '<div class="it"><b>' + (i + 1) + ". " + f(y) + "</div>"; }).join(""); };
+      box.innerHTML = '<div class="notice info" style="margin-top:8px">' + esc(S.headline || "") + " <span class=\"muted\">(" + x.count + " notes)</span></div>" +
+        "<h4>📌 Top needs</h4>" + li(S.needs, function (y) { return esc(y.title) + "</b> · " + (y.count || 1) + " note" + ((y.count || 1) > 1 ? "s" : "") + ((y.states || []).length ? " · " + esc(y.states.join(", ")) : "") + '<div class="muted" style="font-size:12px">' + esc(y.why || "") + "</div>"; }) +
+        "<h4>💡 Retailer-app ideas</h4>" + (li(S.appIdeas, function (y) { return esc(y.title) + "</b>" + '<div class="muted" style="font-size:12px">' + esc(y.why || "") + "</div>"; }) || '<div class="muted">None yet</div>') +
+        "<h4>⚔️ What competitor apps offer</h4>" + (li(S.competitors, function (y) { return esc(y.brand) + "</b>: " + esc(y.feature) + (y.count ? ' <span class="muted">(' + y.count + ")</span>" : ""); }) || '<div class="muted">No competitor mentions</div>') +
+        "<h4>🏆 Best feedback</h4>" + li(S.best, function (y) { var r = byId[y.id]; return (r ? esc(r.by.fullName) + " · " + esc(r.state) : esc(y.id)) + "</b>" + '<div class="muted" style="font-size:12px">' + esc(y.why || "") + "</div>" + (r && r.ai ? '<div style="font-size:12.5px;margin-top:3px">' + esc(r.ai.en.slice(0, 220)) + "</div>" : ""); }) +
+        '<button class="btn sec block" id="insx" style="margin-top:12px">⬇ Insights to Excel</button>';
+      box.querySelector("#insx").onclick = function () {
+        download(xlsx([{ name: "AI insights", rows: [["Section", "Item", "Detail", "Count / who"]].concat([["Summary", S.headline || "", "", x.count + " notes"]])
+          .concat((S.needs || []).map(function (y) { return ["Top need", y.title, y.why || "", (y.count || "") + " " + (y.states || []).join(", ")]; }))
+          .concat((S.appIdeas || []).map(function (y) { return ["App idea", y.title, y.why || "", y.count || ""]; }))
+          .concat((S.competitors || []).map(function (y) { return ["Competitor app", y.brand, y.feature, y.count || ""]; }))
+          .concat((S.best || []).map(function (y) { var r = byId[y.id]; return ["Best feedback", r ? r.by.fullName + " · " + r.state : y.id, y.why || "", r && r.ai ? r.ai.en : ""]; })) }]), "Voice_notes_AI_insights.xlsx");
+      };
     });
   }
   function arr(v) { return Array.isArray(v) ? v.filter(function (x) { return x != null && x !== ""; }).map(function (x) { return typeof x === "object" ? (x.label || x.v || JSON.stringify(x)) : String(x); }) : []; }
   function match(r) {
     if (!F.q) return true;
-    var it = r.item, s = [r.by.fullName, r.state, it.rid, it.store, it.text, it.note, arr(it.topics).join(" "), arr(it.comps).join(" ")].join(" ").toLowerCase();
+    if (F.comp && !(r.ai && r.ai.competitor && r.ai.competitor.length) && !arr(r.item.comps).length) return false;
+    var it = r.item, s = [r.by.fullName, r.state, it.rid, it.store, it.text, it.note, arr(it.topics).join(" "), arr(it.comps).join(" "), r.ai ? r.ai.en + " " + r.ai.requirement + " " + r.ai.category : ""].join(" ").toLowerCase();
     return s.indexOf(F.q.toLowerCase()) >= 0;
   }
   function draw() {
     $("h2").textContent = ADMIN ? "Voice notes and photo audits from every state" : "Your state team's voice notes and photo audits";
     var rows = (DATA[TAB] || []).filter(match);
+    if (TAB === "notes" && F.sort === "score") rows = rows.slice().sort(function (a, b) { return ((b.ai && b.ai.score) || -1) - ((a.ai && a.ai.score) || -1); });
     var rids = {}; rows.forEach(function (r) { if (r.item.rid) rids[r.item.rid] = 1; });
     var tiles = TAB === "notes"
       ? tileS("🎙️", "#EEF0FF", rows.length, "Notes") + tileS("🏪", "#E6F4EA", Object.keys(rids).length, "Retailers") + tileS("🔥", "#FDECEC", rows.filter(function (r) { return r.item.priority === "High"; }).length, "High priority") + tileS("👥", "#F4EEFF", Object.keys(rows.reduce(function (a, r) { a[r.by.username + r.by.app] = 1; return a; }, {})).length, "People")
       : tileS("📸", "#EEF0FF", rows.length, "Audits") + tileS("🏪", "#E6F4EA", Object.keys(rids).length, "Retailers") + tileS("⭐", "#FFF4E5", rows.length ? Math.round(rows.reduce(function (a, r) { return a + (+r.item.score || 0); }, 0) / rows.length) : "—", "Avg score") + tileS("⚠️", "#FDECEC", rows.filter(function (r) { return (+r.item.score || 0) < 50; }).length, "Below 50");
     VIEW.innerHTML = '<div class="seg"><button data-t="notes" class="' + (TAB === "notes" ? "on" : "") + '">🎙️ Voice notes</button><button data-t="audits" class="' + (TAB === "audits" ? "on" : "") + '">📸 Photo audits</button></div>' +
-      '<div class="flt2">' + (ADMIN ? '<select class="tx" id="fs"><option value="">All states</option>' + STATES.map(function (s) { return "<option" + (F.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") +
+      '<div class="flt2">' + (ADMIN ? '<select class="tx" id="fs"><option value="">All states</option>' + STATES.map(function (s) { return "<option" + (F.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") + (TAB === "notes" ? '<select class="tx" id="fo"><option value="new"' + (F.sort === "new" ? " selected" : "") + '>Newest first</option><option value="score"' + (F.sort === "score" ? " selected" : "") + ">Highest AI score</option></select>" : "") +
       '<select class="tx" id="fd">' + [["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"], ["all", "All time"]].map(function (o) { return '<option value="' + o[0] + '"' + (F.days === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><input class="tx" id="fq" placeholder="Search retailer, name, topic…" value="' + esc(F.q) + '"></div>' +
+      (TAB === "notes" ? '<div class="row" style="margin-top:8px;flex-wrap:wrap"><label class="muted" style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="fc"' + (F.comp ? " checked" : "") + '> Mentions competitor apps</label><span class="grow"></span><button class="btn pri sm" id="ins">🤖 AI insights</button></div>' +
+        (AIBUSY ? '<div class="notice info" id="aist" style="margin-top:8px">🌐 Translating to English and scoring…</div>' : AIERR ? '<div class="notice" style="margin-top:8px">' + esc(AIERR) + "</div>" : "") : "") +
       '<div class="tiles" style="margin-top:10px">' + tiles + "</div>" +
       '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="muted">' + rows.length + " shown · saved from Smart tools on any device</span>" + (rows.length ? '<button class="btn sec sm" id="fx">⬇ Excel</button>' : "") + "</div>" +
       (rows.length ? rows.slice(0, 400).map(TAB === "notes" ? noteCard : auditCard).join("") : '<div class="card empty"><div class="big">' + (TAB === "notes" ? "🎙️" : "📸") + "</div>Nothing yet. Notes and audits saved in Smart tools appear here for the team.</div>");
     [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("fn-tab", TAB); DATA[TAB] ? draw() : load(); }; });
     if ($("fs")) $("fs").onchange = function () { F.state = this.value; DATA = { notes: null, audits: null }; load(); };
+    if ($("fo")) $("fo").onchange = function () { F.sort = this.value; draw(); };
+    if ($("fc")) $("fc").onchange = function () { F.comp = this.checked; draw(); };
+    if ($("ins")) $("ins").onclick = insights;
     $("fd").onchange = function () { F.days = this.value; DATA = { notes: null, audits: null }; load(); };
     $("fq").oninput = function () { F.q = this.value; var p = this.selectionStart; draw(); var n = $("fq"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
     if ($("fx")) $("fx").onclick = function () { exportX(rows); };
@@ -66,11 +118,15 @@
   }
   function who(r) { return "<b>" + esc(r.by.fullName) + '</b><span class="muted">' + esc(r.state || "") + " · " + esc(dt(Date.parse(r.item.at))) + "</span>"; }
   function noteCard(r) {
-    var it = r.item, pr = it.priority || "";
-    return '<div class="nt"><div class="top3">' + who(r) + '</div><div class="chs">' + (it.rid ? "<span>🏪 " + esc(it.rid) + (it.store ? " · " + esc(it.store) : "") + "</span>" : it.store ? "<span>🏪 " + esc(it.store) + "</span>" : "") +
+    var it = r.item, pr = it.priority || "", ai = r.ai;
+    var isEn = ai && /^english$/i.test(ai.lang || "");
+    return '<div class="nt"><div class="top3">' + who(r) + (ai ? '<span class="grow" style="flex:1"></span><span class="ais" style="background:' + scCol(ai.score) + '" title="AI score: how valuable this feedback is">AI ' + ai.score + "</span>" : "") + '</div><div class="chs">' + (ai ? "<span>" + esc(ai.category) + "</span>" + (ai.lang ? "<span>🗣️ " + esc(ai.lang) + "</span>" : "") : "") + (it.rid ? "<span>🏪 " + esc(it.rid) + (it.store ? " · " + esc(it.store) : "") + "</span>" : it.store ? "<span>🏪 " + esc(it.store) + "</span>" : "") +
       (pr ? '<span class="' + (pr === "High" ? "hi" : pr === "Medium" ? "md" : "lo") + '">' + esc(pr) + " priority</span>" : "") + (it.sentiment ? "<span>" + esc(it.sentiment) + "</span>" : "") + (it.mode === "survey" ? "<span>📋 Survey</span>" : "") +
       arr(it.topics).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + arr(it.comps).map(function (x) { return '<span class="cmp">vs ' + esc(x) + "</span>"; }).join("") + arr(it.nums).map(function (x) { return "<span>" + esc(x) + "</span>"; }).join("") + "</div>" +
       (it.ans && it.ans.length ? '<div class="qa">' + it.ans.filter(function (x) { return x.a; }).map(function (x) { return "<div><b>" + esc(x.q) + "</b><br>" + esc(x.a) + "</div>"; }).join("") + "</div>" : '<div class="tx2" style="display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">' + esc(it.text || "") + "</div>" + (String(it.text || "").length > 260 ? '<a class="lnk2" data-more="1">Show all</a>' : "")) +
+      (ai && ai.en && !isEn ? '<div class="en"><small>🌐 English</small>' + esc(ai.en) + "</div>" : "") +
+      (ai && ai.requirement ? '<div class="need"><b>Need:</b> ' + esc(ai.requirement) + "</div>" : "") + (ai && ai.appIdea ? '<div class="need"><b>App idea:</b> ' + esc(ai.appIdea) + "</div>" : "") +
+      (ai && ai.competitor && ai.competitor.length ? '<div class="chs">' + ai.competitor.map(function (c) { return '<span class="cmp">' + esc(c.brand) + (c.feature ? ": " + esc(c.feature) : "") + "</span>"; }).join("") + "</div>" : "") +
       (arr(it.actions).length ? '<div class="qa"><b>Follow-ups</b>' + arr(it.actions).map(function (x) { return "<div>• " + esc(x) + "</div>"; }).join("") + "</div>" : "") + "</div>";
   }
   function auditCard(r) {
@@ -81,7 +137,7 @@
       (it.note ? '<div class="tx2">' + esc(it.note) + "</div>" : "") + '<a class="lnk2" data-ph="' + esc(it.id) + '">📷 View photo</a></div>';
   }
   function exportX(rows) {
-    if (TAB === "notes") download(xlsx([{ name: "Voice notes", rows: [["Date", "Name", "State", "Retailer ID", "Store", "Mode", "Priority", "Sentiment", "Topics", "Competitors", "Numbers", "Follow-ups", "Note"]].concat(rows.map(function (r) { var it = r.item; return [dt(Date.parse(it.at)), r.by.fullName, r.state, it.rid || "", it.store || "", it.mode || "", it.priority || "", it.sentiment || "", arr(it.topics).join(", "), arr(it.comps).join(", "), arr(it.nums).join(", "), arr(it.actions).join(" | "), it.ans && it.ans.length ? it.ans.map(function (x) { return x.q + ": " + x.a; }).join(" | ") : it.text || ""]; })) }]), "Team_voice_notes.xlsx");
+    if (TAB === "notes") download(xlsx([{ name: "Voice notes", rows: [["Date", "Name", "State", "Retailer ID", "Store", "Mode", "Language", "Note (original)", "Note (English)", "AI score", "Category", "Need", "App idea", "Competitor app features", "Priority", "Sentiment", "Topics", "Competitors", "Numbers", "Follow-ups"]].concat(rows.map(function (r) { var it = r.item, ai = r.ai || {}; return [dt(Date.parse(it.at)), r.by.fullName, r.state, it.rid || "", it.store || "", it.mode || "", ai.lang || "", it.ans && it.ans.length ? it.ans.map(function (x) { return x.q + ": " + x.a; }).join(" | ") : it.text || "", ai.en || "", ai.score == null ? "" : ai.score, ai.category || "", ai.requirement || "", ai.appIdea || "", (ai.competitor || []).map(function (c) { return c.brand + ": " + c.feature; }).join(" | "), it.priority || "", it.sentiment || "", arr(it.topics).join(", "), arr(it.comps).join(", "), arr(it.nums).join(", "), arr(it.actions).join(" | ")]; })) }]), "Team_voice_notes.xlsx");
     else download(xlsx([{ name: "Photo audits", rows: [["Date", "Name", "State", "Retailer ID", "Store", "Score", "vivo share of shelf %", "Phones tapped", "Missing POS", "Note"]].concat(rows.map(function (r) { var it = r.item; return [dt(Date.parse(it.at)), r.by.fullName, r.state, it.rid || "", it.store || "", it.score, it.sos != null ? Math.round(it.sos * (it.sos <= 1 ? 100 : 1)) : "", it.n || "", arr(it.missing).join(", "), it.note || ""]; })) }]), "Team_photo_audits.xlsx");
   }
   window.__pageBack = function () { return false; };

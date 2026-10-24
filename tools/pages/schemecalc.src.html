@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Scheme payout calculator</title>
+<script src="scheme-engine.js?v=1"></script>
+<script src="kpi-data.js?v=3"></script>
+<style>
+/*@@CSS@@*/
+.stp{display:flex;gap:6px;overflow-x:auto;margin-top:6px;padding-bottom:2px}.stp button{flex:1;min-width:92px;border:0;background:var(--card);border-radius:12px;padding:9px 6px;font:700 12.5px inherit;cursor:pointer;box-shadow:0 1px 6px rgba(20,24,51,.06);color:var(--mut)}
+.stp button b{display:inline-flex;width:20px;height:20px;border-radius:50%;background:#E6E8F2;color:#3A3F5C;align-items:center;justify-content:center;font-size:11px;margin-right:4px}
+.stp button.on{background:#1F2340;color:#fff}.stp button.on b{background:#F5A623;color:#1F2340}.stp button.ok b{background:#1E9E61;color:#fff}
+.bar3{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:var(--card);border-radius:14px;padding:8px 10px;margin-top:8px;box-shadow:0 1px 6px rgba(20,24,51,.05)}
+.bar3 select{flex:1;min-width:150px}
+.f9 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+.g2b{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3b{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:520px){.g3b{grid-template-columns:1fr 1fr}}
+.rl{background:var(--card);border-radius:14px;padding:10px 12px;margin-top:8px;box-shadow:0 1px 8px rgba(20,24,51,.06);border-left:4px solid #4D5BF9}
+.rl.neg{border-left-color:#E05757}.rl.gate{border-left-color:#F5A623}.rl.mult{border-left-color:#7B4DDB}.rl.fx{border-left-color:#0E8FB3}.rl.off{opacity:.55}
+.rl .hd{display:flex;gap:6px;align-items:center}.rl .hd .ty{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--mut);flex:1}
+.ib{border:0;background:#F3F4FA;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:13px;flex:none}
+.sl{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px}.sl th{font-size:11px;color:var(--mut);text-align:left;padding:3px}.sl td{padding:3px}.sl input{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid #E1E3EE;border-radius:8px;font:inherit}
+.cbx{display:flex!important;gap:8px;align-items:center;margin:8px 2px 0!important;font-size:13px!important;color:var(--ink)!important;font-weight:500!important;cursor:pointer}.cbx input{width:18px;height:18px;margin:0}
+.rad{display:flex;gap:6px;flex-wrap:wrap}.rad label{display:inline-flex!important;gap:6px;align-items:center;border:1px solid #E1E3EE;border-radius:99px;padding:6px 11px;font-size:12.5px!important;cursor:pointer;background:#fff;margin:0!important;color:var(--ink)!important;font-weight:600!important}
+.rad label.on{background:#EEF0FF;border-color:#9AA1F5;color:#2B33A6!important}.rad input{display:none}
+.txtread{width:100%;box-sizing:border-box;min-height:180px;font:12.5px ui-monospace,Menlo,Consolas,monospace;border:1px solid #E1E3EE;border-radius:12px;padding:10px;background:#FAFAFE}
+.found{background:#F6FBF8;border:1px solid #CDEBD9;border-radius:14px;padding:10px 12px;margin-top:8px;font-size:13px}.found li{margin:3px 0}
+.tbw{overflow-x:auto;margin-top:8px;border-radius:12px;background:var(--card);box-shadow:0 1px 8px rgba(20,24,51,.06)}
+.dt{border-collapse:collapse;font-size:12.5px;min-width:100%}.dt th{background:#F3F4FA;text-align:left;padding:7px 8px;font-size:11px;color:var(--mut);white-space:nowrap;position:sticky;top:0}
+.dt td{padding:5px 8px;border-top:1px solid #EEF0F6;white-space:nowrap}.dt td.n{text-align:right;font-variant-numeric:tabular-nums}.dt input{width:86px;padding:6px;border:1px solid #E1E3EE;border-radius:7px;font:inherit}.dt input.id{width:118px}
+.dt tr.clk{cursor:pointer}.dt tr.clk:hover td{background:#FAFAFE}
+.ok2{color:#0F7B4F;font-weight:700}.no2{color:#B3402F;font-weight:700}
+.push{background:var(--card);border-radius:12px;padding:9px 12px;margin-top:6px;display:flex;gap:10px;align-items:center;box-shadow:0 1px 6px rgba(20,24,51,.05);font-size:13px}.push .bd{background:#FFF4E5;color:#B26A00;border-radius:10px;padding:6px 9px;font-weight:800;white-space:nowrap}
+.chips9{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}.chips9 code,.chips9 span{background:#F1F2F8;border-radius:99px;padding:2px 9px;font-size:11.5px;cursor:pointer}
+.big2{font-size:26px;font-weight:800}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧮</span></div>
+  <h1>Scheme payout calculator</h1><p id="h2">Read the circular · set the rules · import retailers · get tentative payouts</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var MYSTATE = "";
+  var VIEW = $("view"), STEP = 1, LIST = [], CUR = null, SC = null, ROWS = [], RES = null, PARSED = null, DASH = null, DSTATE = "", MASTER = false, STATES = [], DONE = {};
+  var NOW = new Date(Date.now() + 19800000).toISOString().slice(0, 7);
+  var rs = function (v) { return "₹" + Math.round(Number(v) || 0).toLocaleString("en-IN"); };
+  var pc = function (v) { return v == null ? "—" : (Math.round(v * 10) / 10) + "%"; };
+  var uid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); };
+  function blank() { return { name: "New scheme", period: NOW, audience: "retailer", basis: "both", targetType: "units", excludePartners: [], minAch: 0, belowMin: "zero", cap: 0, extraCols: [], rules: [], notes: [] }; }
+  var TYPES = {
+    ach_slab: ["📶", "Slab on achievement %", "Reach a % of target → ₹ per unit or a fixed amount"],
+    unit_slab: ["📦", "Slab on units sold", "Units bands → ₹ per unit (all units at the band rate, or each band at its own rate)"],
+    flat_unit: ["➕", "Flat ₹ per unit", "Always, only if the target is achieved, or only if not achieved"],
+    value_pct: ["💰", "% of sale value", "A percentage of the sale value"],
+    kicker: ["🚀", "Kicker above target", "₹ per unit sold above the target"],
+    penalty: ["➖", "Negative incentive", "Deduction if the target or the V-Shield target is not met"],
+    multiplier: ["✖️", "Multiplier", "Multiply the payout when achievement reaches a level"],
+    gate: ["✅", "Eligibility (dashboard data)", "Active retailer, retailer app use, app features, market visits, V-Shield %"],
+    formula: ["🧪", "Custom formula (master)", "Any formula using units, target, ach, value, app use, visits…"]
+  };
+  var TEMPLATES = [
+    ["📶 Achievement slabs (₹/unit)", function () { return { rules: [{ type: "ach_slab", label: "Achievement slab", pay: "perUnit", slabs: [{ from: 80, to: 100, amount: 50 }, { from: 100, to: 120, amount: 100 }, { from: 120, to: null, amount: 150 }] }], minAch: 80 }; }],
+    ["📦 Unit bands, each band own rate", function () { return { rules: [{ type: "unit_slab", label: "Unit bands", mode: "incremental", slabs: [{ from: 1, to: 20, rate: 50 }, { from: 21, to: 50, rate: 80 }, { from: 51, to: null, rate: 120 }] }] }; }],
+    ["➕ Flat ₹/unit if target achieved", function () { return { rules: [{ type: "flat_unit", label: "Per unit on target", rate: 100, when: "achieved" }, { type: "kicker", label: "Kicker above target", rate: 50 }], minAch: 100 }; }],
+    ["💰 % of sale value", function () { return { rules: [{ type: "value_pct", label: "1% of sale value", pct: 1, when: "always" }] }; }],
+    ["➖ Target + V-Shield with negative", function () { return { rules: [{ type: "ach_slab", label: "Achievement slab", pay: "perUnit", slabs: [{ from: 100, to: null, amount: 120 }] }, { type: "penalty", label: "V-Shield not sold", amount: 200, per: "vsShortUnit", when: "vshieldShort", minAch: 100 }] }; }]
+  ];
+  fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
+  try { var dr = JSON.parse(localStorage.getItem("sc-rows") || "null"); if (dr && dr.rows) ROWS = dr.rows; } catch (e) { }
+  function saveRows() { try { localStorage.setItem("sc-rows", JSON.stringify({ rows: ROWS.slice(0, 3000) })); } catch (e) { } }
+
+  // ================= shell =================
+  function load(then) {
+    if (!MYSTATE && !ADMIN) api({ action: "me" }).then(function (m) { MYSTATE = (m && m.profile && m.profile.state) || ""; });
+    api({ action: "sc-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      LIST = r.rows; MASTER = !!r.master || !!(window.CUST && CUST.master);
+      if (!SC) { var off = LIST.find(function (x) { return x.official; }); if (off) pick(off); else { SC = blank(); CUR = null; } }
+      (then || render)();
+    });
+  }
+  function pick(x) { CUR = { id: x.id, mine: x.mine, official: x.official, status: x.status, audience: x.audience }; SC = JSON.parse(JSON.stringify(x.scheme)); SC.rules = (SC.rules || []).map(function (r) { if (!r.id) r.id = uid(); return r; }); RES = null; }
+  function render() {
+    var opts = LIST.map(function (x) { return '<option value="' + x.id + '"' + (CUR && CUR.id === x.id ? " selected" : "") + ">" + (x.official ? "★ " : "") + esc(x.scheme.name) + (x.scheme.period ? " · " + x.scheme.period : "") + (x.official ? (x.status === "released" ? " (official)" : " (official draft)") : x.mine ? "" : " · " + esc(x.by.fullName)) + "</option>"; }).join("");
+    VIEW.innerHTML = '<div class="bar3"><select class="tx" id="pk"><option value="">＋ New scheme</option>' + opts + '</select><button class="btn pri sm" id="sv">💾 Save</button>' + (CUR && (CUR.official && !MASTER || !CUR.mine && !MASTER) ? "" : "") +
+      (CUR ? '<button class="btn sec sm" id="cp">⧉ Copy</button>' : "") + (MASTER ? '<button class="btn ok sm" id="rel">★ Official…</button>' : "") + (CUR && (CUR.mine || MASTER) ? '<button class="btn ghost sm" id="dl">🗑️</button>' : "") + "</div>" +
+      (CUR && CUR.official && !MASTER ? '<div class="notice info" style="margin-top:8px">Official scheme set up by HO. You can change the rules here to test; saving makes your own copy.</div>' : "") +
+      '<div class="stp">' + [[1, "Read scheme"], [2, "Rules"], [3, "Retailers"], [4, "Results"]].map(function (s) { return '<button data-s="' + s[0] + '" class="' + (STEP === s[0] ? "on" : DONE[s[0]] ? "ok" : "") + '"><b>' + s[0] + "</b>" + s[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    $("pk").onchange = function () { var x = LIST.find(function (y) { return y.id === $("pk").value; }); if (x) pick(x); else { CUR = null; SC = blank(); RES = null; STEP = 1; } render(); };
+    $("sv").onclick = function () { save(false); };
+    if ($("cp")) $("cp").onclick = function () { save(true); };
+    if ($("rel")) $("rel").onclick = officialDialog;
+    if ($("dl")) $("dl").onclick = function () { sheet("Delete this scheme?", SC.name, [["🗑️", "Delete", function () { api({ action: "sc-delete", id: CUR.id }).then(function (r) { if (!r.ok) return toast(r.error); toast("Deleted"); CUR = null; SC = null; load(); }); }, "red"]]); };
+    [].forEach.call(VIEW.querySelectorAll(".stp button"), function (b) { b.onclick = function () { go(+b.dataset.s); }; });
+    ({ 1: step1, 2: step2, 3: step3, 4: step4 })[STEP]();
+  }
+  function go(n) { if (STEP === 2) collectBasics(); STEP = n; render(); window.scrollTo(0, 0); }
+  function save(copy) {
+    if (STEP === 2) collectBasics();
+    var sameOwner = CUR && (CUR.mine || (CUR.official && MASTER));
+    var id = copy || !sameOwner ? undefined : CUR.id;
+    var sc = JSON.parse(JSON.stringify(SC)); if (copy) sc.name = sc.name + " (copy)";
+    api({ action: "sc-save", id: id, scheme: sc, official: MASTER && CUR && CUR.official && !copy }).then(function (r) {
+      if (!r.ok) return toast(r.error);
+      toast(id ? "Saved" : "Saved as your scheme");
+      load(function () { var x = LIST.find(function (y) { return y.id === r.id; }); if (x) { var keep = SC; pick(x); if (!copy) SC = Object.assign(SC, { rules: SC.rules }); } render(); });
+    });
+  }
+  function officialDialog() {
+    if (!CUR) return toast("Save the scheme first.");
+    var a = (CUR.audience || { roles: [], states: [], users: [] }); a = { roles: (a.roles || []).slice(), states: (a.states || []).slice(), users: (a.users || []).slice() };
+    var ov = sheet("Official scheme", "Released schemes appear for the chosen users with these rules (they can't change the official copy)", [["🚀", "Release as official", function (ov) {
+      a.users = ov.querySelector("#au").value.split(/[\s,;]+/).filter(Boolean);
+      api({ action: "sc-save", id: CUR.id, scheme: SC, official: true }).then(function (r) { if (!r.ok) return toast(r.error); return api({ action: "sc-release", id: r.id, status: "released", audience: a }); }).then(function (r) { if (r && r.ok) { toast("Released"); load(); } else if (r) toast(r.error); });
+    }], ["↩", "Keep as official draft (only masters see it)", function () { api({ action: "sc-save", id: CUR.id, scheme: SC, official: true }).then(function (r) { if (!r.ok) return toast(r.error); return api({ action: "sc-release", id: r.id, status: "draft", audience: a }); }).then(function () { toast("Official draft saved"); load(); }); }]],
+      '<div class="f9"><label>Roles (empty = everyone)</label><div class="rad" id="ar">' + [["state", "State users"], ["admin", "Admins"]].map(function (r) { return '<label class="' + (a.roles.indexOf(r[0]) >= 0 ? "on" : "") + '" data-r="' + r[0] + '">' + r[1] + "</label>"; }).join("") + '</div><label>States</label><div class="rad" id="as">' + STATES.map(function (s) { return '<label class="' + (a.states.indexOf(s) >= 0 ? "on" : "") + '" data-st="' + esc(s) + '">' + esc(s) + "</label>"; }).join("") + '</div><label>User IDs</label><textarea class="tx" id="au" rows="2">' + esc(a.users.join(", ")) + "</textarea></div>");
+    ov.querySelector(".sheet").style.maxWidth = "600px";
+    [].forEach.call(ov.querySelectorAll("[data-r]"), function (l) { l.onclick = function () { var k = a.roles.indexOf(l.dataset.r); if (k >= 0) a.roles.splice(k, 1); else a.roles.push(l.dataset.r); l.classList.toggle("on", k < 0); }; });
+    [].forEach.call(ov.querySelectorAll("[data-st]"), function (l) { l.onclick = function () { var k = a.states.indexOf(l.dataset.st); if (k >= 0) a.states.splice(k, 1); else a.states.push(l.dataset.st); l.classList.toggle("on", k < 0); }; });
+  }
+
+  // ================= STEP 1: read the circular =================
+  var LIBS = { pdf: "/vendor/pdf.js", zip: "/vendor/jszip.min.js", xlsx: "/vendor/xlsx.full.min.js" };   // file readers hosted with the site
+  var loaded = {};
+  function lib(k) { if (loaded[k]) return loaded[k]; loaded[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIBS[k]; s.onload = res; s.onerror = function () { loaded[k] = null; rej(new Error("Couldn't load the file reader — check the internet connection.")); }; document.head.appendChild(s); }); return loaded[k]; }
+  function readPdf(buf) {
+    return lib("pdf").then(function () {
+      var pdfjs = window.pdfjsLib; pdfjs.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.js";
+      return pdfjs.getDocument({ data: buf }).promise;
+    }).then(function (doc) {
+      var pages = [], n = Math.min(doc.numPages, 25), chain = Promise.resolve();
+      for (var i = 1; i <= n; i++) (function (i) { chain = chain.then(function () { return doc.getPage(i).then(function (pg) { return pg.getTextContent().then(function (tc) {
+        var lines = {}, out = [];
+        tc.items.forEach(function (it) { var y = Math.round(it.transform[5] / 3) * 3; (lines[y] = lines[y] || []).push([it.transform[4], it.str]); });
+        Object.keys(lines).map(Number).sort(function (a, b) { return b - a; }).forEach(function (y) { out.push(lines[y].sort(function (a, b) { return a[0] - b[0]; }).map(function (x) { return x[1]; }).join("  ").replace(/\s{3,}/g, " | ")); });
+        pages.push(out.join("\n"));
+      }); }); }); })(i);
+      return chain.then(function () {
+        var text = pages.join("\n\n").trim();
+        if (text.replace(/\s/g, "").length > 60) return { text: text };
+        // scanned PDF → page images for the AI to read
+        var imgs = [], c2 = Promise.resolve();
+        for (var j = 1; j <= Math.min(doc.numPages, 4); j++) (function (j) { c2 = c2.then(function () { return doc.getPage(j).then(function (pg) { var vp0 = pg.getViewport({ scale: 1 }), sc = Math.min(2, 1400 / vp0.width), vp = pg.getViewport({ scale: sc }), cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height; return pg.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise.then(function () { imgs.push(cv.toDataURL("image/jpeg", 0.72)); }); }); }); })(j);
+        return c2.then(function () { return { text: "", images: imgs, scanned: true }; });
+      });
+    });
+  }
+  function readDocx(buf) {
+    return lib("zip").then(function () { return window.JSZip.loadAsync(buf); }).then(function (z) { var f = z.file("word/document.xml"); if (!f) throw new Error("This doesn't look like a Word (.docx) file."); return f.async("string"); }).then(function (xml) {
+      var d = new DOMParser().parseFromString(xml, "application/xml"), W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main", out = [];
+      var body = d.getElementsByTagNameNS(W, "body")[0];
+      var txt = function (el) { return [].map.call(el.getElementsByTagNameNS(W, "t"), function (t) { return t.textContent; }).join(""); };
+      [].forEach.call(body.childNodes, function (el) {
+        if (el.localName === "p") { var t = txt(el); if (t.trim()) out.push(t); }
+        else if (el.localName === "tbl") [].forEach.call(el.getElementsByTagNameNS(W, "tr"), function (tr) { out.push([].map.call(tr.getElementsByTagNameNS(W, "tc"), function (tc) { return txt(tc).trim(); }).join(" | ")); });
+      });
+      return { text: out.join("\n") };
+    });
+  }
+  function readXls(buf) { return lib("xlsx").then(function () { var wb = window.XLSX.read(buf, { type: "array" }); return { text: wb.SheetNames.map(function (n) { return "## " + n + "\n" + window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }).map(function (r) { return r.join(" | "); }).join("\n"); }).join("\n\n") }; }); }
+  function readImage(file) { return new Promise(function (res) { var im = new Image(), u = URL.createObjectURL(file); im.onload = function () { var k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = im.width * k; c.height = im.height * k; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res({ text: "", images: [c.toDataURL("image/jpeg", 0.75)], scanned: true }); }; im.src = u; }); }
+  function step1() {
+    var p = PARSED;
+    $("pane").innerHTML = '<div class="card"><h3 style="margin:0 0 4px">📄 Read the scheme circular</h3><div class="muted" style="font-size:13px">PDF, Word (.docx), Excel or a photo of the circular. The AI picks out slabs, minimum %, rates, kicker, maximum payout, period, sales basis, excluded EMI partners and negative incentives.</div>' +
+      '<div class="row" style="margin-top:10px"><button class="btn pri" id="up">📤 Upload circular</button><button class="btn sec" id="sk">Skip — set rules by hand →</button></div>' +
+      '<div class="muted" style="font-size:12px;margin-top:8px">Scanned PDFs and photos are read by AI. Old .doc files: open in Word and “Save as” .docx.</div></div>' +
+      (p ? '<div class="card"><b>Text read from ' + esc(p.file) + "</b>" + (p.ocr ? ' <span class="chip warn">read by AI from the scanned pages</span>' : "") + '<div class="muted" style="font-size:12px;margin:4px 0 6px">You can correct the text, then read the rules again.</div><textarea class="txtread" id="tx">' + esc(p.text || "") + '</textarea><div class="row" style="margin-top:8px"><button class="btn sec sm" id="ag">🤖 Read rules again</button></div>' +
+        (p.scheme ? '<div class="found"><b>Rules found</b><ul>' + describe(p.scheme).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" + ((p.scheme.notes || []).length ? '<div class="muted" style="font-size:12px"><b>Notes from the AI:</b> ' + p.scheme.notes.map(esc).join(" · ") + "</div>" : "") + '<button class="btn ok block" id="use" style="margin-top:10px;padding:12px">✓ Use these rules</button><div class="muted" style="font-size:12px;margin-top:6px;text-align:center">Always check the rules on the next step — AI can misread a circular.</div></div>' : p.error ? '<div class="err" style="margin-top:8px">' + esc(p.error) + "</div>" : "") + "</div>" : "") +
+      '<div class="card"><b>Or start from a template</b><div class="chips9" style="margin-top:6px">' + TEMPLATES.map(function (t, i) { return '<span data-tp="' + i + '">' + esc(t[0]) + "</span>"; }).join("") + "</div></div>";
+    $("up").onclick = function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".pdf,.docx,.xlsx,.xls,.csv,.txt,image/*";
+      inp.onchange = function () {
+        var f = inp.files[0]; if (!f) return; var nm = f.name.toLowerCase();
+        if (/\.doc$/.test(nm)) return toast("Old .doc files can't be read. Open it in Word and save as .docx.");
+        $("up").disabled = true; $("up").textContent = "Reading…";
+        var reader = /^image\//.test(f.type) ? readImage(f) : f.arrayBuffer().then(function (buf) { return /\.pdf$/.test(nm) ? readPdf(buf) : /\.docx$/.test(nm) ? readDocx(buf) : /\.(xlsx|xls|csv)$/.test(nm) ? readXls(buf) : f.text().then(function (t) { return { text: t }; }); });
+        reader.then(function (x) { PARSED = { file: f.name, text: x.text || "" }; return parse(x.text, x.images, f.name); }).catch(function (e) { toast(e.message || "Couldn't read the file."); $("up").disabled = false; $("up").textContent = "📤 Upload circular"; });
+      };
+      inp.click();
+    };
+    $("sk").onclick = function () { DONE[1] = 1; go(2); };
+    if ($("ag")) $("ag").onclick = function () { PARSED.text = $("tx").value; parse(PARSED.text, null, PARSED.file); };
+    if ($("use")) $("use").onclick = function () { var keep = { name: SC && SC.name !== "New scheme" ? SC.name : null }; SC = Object.assign(blank(), PARSED.scheme); if (!SC.period) SC.period = NOW; SC.rules.forEach(function (r) { r.id = r.id || uid(); }); CUR = CUR && CUR.mine ? CUR : null; DONE[1] = 1; toast("Rules loaded — check each one"); go(2); };
+    [].forEach.call($("pane").querySelectorAll("[data-tp]"), function (s) { s.onclick = function () { var t = TEMPLATES[+s.dataset.tp][1](); SC = Object.assign(blank(), { name: TEMPLATES[+s.dataset.tp][0].replace(/^\S+\s/, "") }, t); SC.rules.forEach(function (r) { r.id = uid(); }); CUR = null; DONE[1] = 1; go(2); }; });
+  }
+  function parse(text, images, file) {
+    $("pane").insertAdjacentHTML("afterbegin", '<div class="loading" id="pl"><div class="spin"></div>AI is reading the circular…</div>');
+    if ($("use")) $("use").disabled = true;
+    api({ action: "sc-parse", text: text || "", images: text ? undefined : images, fileName: file }).then(function (r) {
+      PARSED = { file: file, text: r.text || text || "", ocr: r.ocr, scheme: r.ok ? r.scheme : null, error: r.ok ? "" : r.error };
+      if (STEP === 1) step1(); else toast(r.ok ? "Circular read — open step 1 to use its rules" : r.error);
+    });
+  }
+  function describe(sc) {
+    var o = [];
+    o.push((sc.name || "Scheme") + (sc.period ? " · " + sc.period : "") + " · for " + (sc.audience === "vba" ? "VBAs" : "retailers"));
+    o.push("Sales counted: " + { upload: "sales uploaded", activation: "activations", both: "uploaded AND activated in the same month", either: "uploaded OR activated" }[sc.basis] + (sc.targetType === "value" ? " · target in ₹ value" : ""));
+    if ((sc.excludePartners || []).length) o.push("Not counted: IMEIs sold through " + sc.excludePartners.join(", "));
+    if (sc.minAch) o.push("Minimum achievement " + sc.minAch + "% (below it: " + (sc.belowMin === "prorata" ? "pro-rata" : "no payout") + ")");
+    if (sc.cap) o.push("Maximum payout " + rs(sc.cap));
+    (sc.rules || []).forEach(function (r) { o.push(ruleText(r)); });
+    return o;
+  }
+  function ruleText(r) {
+    var m = r.models && r.models.length ? " (models: " + r.models.join(", ") + ")" : "", w = { always: "", achieved: " if target achieved", notAchieved: " if target NOT achieved" };
+    if (r.type === "ach_slab") return (r.label || "Achievement slab") + ": " + (r.slabs || []).map(function (z) { return "≥" + z.from + "% → " + rs(z.amount) + (r.pay === "fixed" ? "" : "/unit"); }).join(", ") + m;
+    if (r.type === "unit_slab") return (r.label || "Unit slab") + " (" + (r.mode === "incremental" ? "each band own rate" : "all units at band rate") + "): " + (r.slabs || []).map(function (z) { return z.from + (z.to != null ? "–" + z.to : "+") + " units → " + rs(z.rate) + "/unit"; }).join(", ") + m;
+    if (r.type === "flat_unit") return (r.label || "Flat") + ": " + rs(r.rate) + "/unit" + (w[r.when] || "") + m;
+    if (r.type === "value_pct") return (r.label || "% of value") + ": " + r.pct + "% of sale value" + (w[r.when] || "");
+    if (r.type === "kicker") return (r.label || "Kicker") + ": " + rs(r.rate) + " per unit above target" + m;
+    if (r.type === "penalty") return (r.label || "Negative incentive") + ": −" + rs(r.amount) + { fixed: "", shortUnit: " per unit short", vsShortUnit: " per V-Shield plan short" }[r.per] + " when " + { notAchieved: "target (" + r.minAch + "%) not achieved", vshieldShort: "V-Shield target not met", either: "target or V-Shield missed", both: "target and V-Shield both missed" }[r.when];
+    if (r.type === "multiplier") return (r.label || "Multiplier") + ": ×" + r.factor + " when achievement ≥" + r.minAch + "%" + (r.maxAch != null ? " and <" + r.maxAch + "%" : "");
+    if (r.type === "gate") { var g = []; if (r.active) g.push("active retailer"); if (r.appDays) g.push("app used ≥" + r.appDays + " days"); if (r.features) g.push("≥" + r.features + " app features"); if (r.mvisits) g.push("≥" + r.mvisits + " market visits"); if (r.vsPct) g.push("V-Shield ≥" + r.vsPct + "%"); return (r.label || "Eligibility") + ": " + (g.join(", ") || "—") + (r.effect === "reduce" ? " (else cut " + r.reducePct + "%)" : " (else no payout)"); }
+    if (r.type === "formula") return (r.label || "Formula") + ": " + r.expr;
+    return r.type;
+  }
+
+  // ================= STEP 2: rules =================
+  function radio(name, val, opts) { return '<div class="rad" data-rad="' + name + '">' + opts.map(function (o) { return '<label class="' + (val === o[0] ? "on" : "") + '" data-v="' + o[0] + '">' + o[1] + "</label>"; }).join("") + "</div>"; }
+  function step2() {
+    var s = SC;
+    $("pane").innerHTML = '<div class="card f9"><h3 style="margin:0">⚙️ Scheme</h3>' +
+      '<div class="g2b"><div><label>Scheme name</label><input class="tx" id="b_name" value="' + esc(s.name) + '"></div><div><label>Month</label><input class="tx" id="b_period" type="month" value="' + esc(s.period || "") + '"></div></div>' +
+      "<label>Payout for</label>" + radio("audience", s.audience, [["retailer", "🏪 Retailers"], ["vba", "🧑‍💼 VBAs"]]) +
+      "<label>Which sales count</label>" + radio("basis", s.basis, [["upload", "Sales uploaded"], ["activation", "Activated"], ["both", "Uploaded + activated (same month)"], ["either", "Uploaded or activated"]]) +
+      "<label>Target in</label>" + radio("targetType", s.targetType, [["units", "Units"], ["value", "₹ sale value"]]) +
+      '<label>Don\'t count IMEIs sold through these EMI partners (comma separated)</label><input class="tx" id="b_ex" value="' + esc((s.excludePartners || []).join(", ")) + '" placeholder="e.g. Bajaj Finserv, HDB">' +
+      '<div class="g3b"><div><label>Minimum achievement %</label><input class="tx" id="b_min" type="number" value="' + (s.minAch || "") + '" placeholder="0 = none"></div><div><label>Below minimum</label><select class="tx" id="b_below"><option value="zero"' + (s.belowMin !== "prorata" ? " selected" : "") + '>No payout</option><option value="prorata"' + (s.belowMin === "prorata" ? " selected" : "") + '>Pro-rata</option></select></div><div><label>Maximum payout ₹ (per retailer)</label><input class="tx" id="b_cap" type="number" value="' + (s.cap || "") + '" placeholder="0 = no cap"></div></div>' +
+      '<label>Extra columns in the template (e.g. Model, Beat)</label><input class="tx" id="b_cols" value="' + esc((s.extraCols || []).join(", ")) + '"></div>' +
+      '<div class="row" style="justify-content:space-between;margin-top:12px"><b>Payout rules</b><span class="muted" style="font-size:12px">Applied in order · negatives after the cap</span></div><div id="rls"></div>' +
+      '<button class="btn pri block" id="ar" style="margin-top:10px;padding:12px">＋ Add rule</button>' +
+      '<div class="row" style="margin-top:12px"><button class="btn ok" id="nx" style="flex:1;padding:12px">Next: retailers →</button></div>';
+    [].forEach.call($("pane").querySelectorAll("[data-rad]"), function (g) { [].forEach.call(g.children, function (l) { l.onclick = function () { [].forEach.call(g.children, function (x) { x.classList.toggle("on", x === l); }); SC[g.dataset.rad] = l.dataset.v; RES = null; }; }); });
+    drawRules();
+    $("ar").onclick = addRule;
+    $("nx").onclick = function () { collectBasics(); DONE[2] = 1; go(3); };
+  }
+  function collectBasics() {
+    if (!$("b_name")) return;
+    SC.name = $("b_name").value.trim() || "Scheme"; SC.period = $("b_period").value; SC.excludePartners = $("b_ex").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+    SC.minAch = +$("b_min").value || 0; SC.belowMin = $("b_below").value; SC.cap = +$("b_cap").value || 0; SC.extraCols = $("b_cols").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 6); RES = null;
+  }
+  function slabTable(r, cols) {
+    return '<table class="sl"><tr>' + cols.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "<th></th></tr>" + (r.slabs || []).map(function (z, i) { return "<tr>" + cols.map(function (c) { return '<td><input type="number" data-sl="' + i + '" data-k="' + c[0] + '" value="' + (z[c[0]] == null ? "" : z[c[0]]) + '" placeholder="' + (c[0] === "to" ? "no limit" : "") + '"></td>'; }).join("") + '<td><button class="ib" data-slx="' + i + '">✕</button></td></tr>'; }).join("") + '</table><button class="btn ghost sm" data-sladd="1" style="margin-top:4px">＋ Band</button>';
+  }
+  function whenSel(r) { return '<select class="tx" data-f="when"><option value="always"' + (r.when === "always" ? " selected" : "") + '>Always</option><option value="achieved"' + (r.when === "achieved" ? " selected" : "") + '>Only if target achieved</option><option value="notAchieved"' + (r.when === "notAchieved" ? " selected" : "") + ">Only if target NOT achieved</option></select>"; }
+  function inp(f, v, ph, ty) { return '<input class="tx" data-f="' + f + '" type="' + (ty || "number") + '" value="' + (v == null ? "" : esc(String(v))) + '" placeholder="' + (ph || "") + '">'; }
+  function ruleBody(r) {
+    var lock = r.type === "formula" && !MASTER;
+    if (r.type === "ach_slab") return '<label>Pay</label><select class="tx" data-f="pay"><option value="perUnit"' + (r.pay !== "fixed" ? " selected" : "") + '>₹ per unit</option><option value="fixed"' + (r.pay === "fixed" ? " selected" : "") + ">Fixed amount</option></select>" + slabTable(r, [["from", "From %"], ["to", "To %"], ["amount", r.pay === "fixed" ? "Amount ₹" : "₹ / unit"]]);
+    if (r.type === "unit_slab") return '<label>How bands pay</label><select class="tx" data-f="mode"><option value="retro"' + (r.mode !== "incremental" ? " selected" : "") + '>All units at the reached band\'s rate</option><option value="incremental"' + (r.mode === "incremental" ? " selected" : "") + ">Each band at its own rate</option></select>" + slabTable(r, [["from", "From unit"], ["to", "To unit"], ["rate", "₹ / unit"]]);
+    if (r.type === "flat_unit") return '<div class="g2b"><div><label>₹ per unit</label>' + inp("rate", r.rate) + "</div><div><label>When</label>" + whenSel(r) + "</div></div>";
+    if (r.type === "value_pct") return '<div class="g2b"><div><label>% of sale value</label>' + inp("pct", r.pct) + "</div><div><label>When</label>" + whenSel(r) + "</div></div>";
+    if (r.type === "kicker") return "<label>₹ per unit above target</label>" + inp("rate", r.rate);
+    if (r.type === "penalty") return '<div class="g2b"><div><label>Deduct ₹</label>' + inp("amount", r.amount) + '</div><div><label>Per</label><select class="tx" data-f="per"><option value="fixed"' + (r.per === "fixed" ? " selected" : "") + '>One amount</option><option value="shortUnit"' + (r.per === "shortUnit" ? " selected" : "") + '>Unit short of target</option><option value="vsShortUnit"' + (r.per === "vsShortUnit" ? " selected" : "") + '>V-Shield plan short</option></select></div></div><div class="g2b"><div><label>When</label><select class="tx" data-f="when"><option value="notAchieved"' + (r.when === "notAchieved" ? " selected" : "") + '>Target not achieved</option><option value="vshieldShort"' + (r.when === "vshieldShort" ? " selected" : "") + '>V-Shield target not met</option><option value="either"' + (r.when === "either" ? " selected" : "") + '>Either is missed</option><option value="both"' + (r.when === "both" ? " selected" : "") + '>Both are missed</option></select></div><div><label>Target counts as achieved at %</label>' + inp("minAch", r.minAch == null ? 100 : r.minAch) + "</div></div>";
+    if (r.type === "multiplier") return '<div class="g3b"><div><label>From achievement %</label>' + inp("minAch", r.minAch) + "</div><div><label>Below % (optional)</label>" + inp("maxAch", r.maxAch, "no limit") + "</div><div><label>Multiply by</label>" + inp("factor", r.factor, "e.g. 1.2") + "</div></div>";
+    if (r.type === "gate") return '<label class="cbx"><input type="checkbox" data-f="active"' + (r.active ? " checked" : "") + '> Must be an active retailer on the dashboard</label><div class="g2b"><div><label>Retailer app used on at least (days)</label>' + inp("appDays", r.appDays || "") + "</div><div><label>App features used (at least)</label>" + inp("features", r.features || "") + '</div></div><div class="g2b"><div><label>Market visits in the month (at least)</label>' + inp("mvisits", r.mvisits || "") + "</div><div><label>V-Shield sold, % of V-Shield target</label>" + inp("vsPct", r.vsPct || "") + '</div></div><div class="g2b"><div><label>If not met</label><select class="tx" data-f="effect"><option value="zero"' + (r.effect !== "reduce" ? " selected" : "") + '>No payout</option><option value="reduce"' + (r.effect === "reduce" ? " selected" : "") + ">Cut the payout by %</option></select></div><div><label>Cut %</label>" + inp("reducePct", r.reducePct == null ? 50 : r.reducePct) + "</div></div>";
+    if (r.type === "formula") return "<label>Formula (₹)</label>" + '<input class="tx" data-f="expr" type="text" value="' + esc(r.expr || "") + '"' + (lock ? " readonly" : "") + ' placeholder="e.g. ach>=110 ? units*25 : 0" style="font-family:ui-monospace,monospace">' + (lock ? '<div class="muted" style="font-size:12px">Set by a master admin.</div>' : '<div class="chips9">' + SCENG.VARS.concat(["min(", "max(", "round("]).map(function (v) { return '<code data-ins="' + v + '">' + v + "</code>"; }).join("") + '</div><div class="muted" style="font-size:11.5px;margin-top:4px">units, target, ach (%), value (₹), vsSold, vsTarget, upload, activation, both, appDays, features, appVisits, mvisits, active (1/0), payout (total of rules above). Use ? : for conditions.</div>');
+    return "";
+  }
+  function drawRules() {
+    var box = $("rls");
+    box.innerHTML = SC.rules.length ? SC.rules.map(function (r, i) {
+      var T = TYPES[r.type] || ["", r.type, ""], cls = r.type === "penalty" ? " neg" : r.type === "gate" ? " gate" : r.type === "multiplier" ? " mult" : r.type === "formula" ? " fx" : "";
+      return '<div class="rl f9' + cls + (r.off ? " off" : "") + '" data-i="' + i + '"><div class="hd"><span class="ty">' + T[0] + " " + T[1] + '</span><button class="ib" data-mv="-1">↑</button><button class="ib" data-mv="1">↓</button><button class="ib" data-tg="1" title="Turn on / off">' + (r.off ? "▶" : "⏸") + '</button><button class="ib" data-rm="1">✕</button></div>' +
+        '<input class="tx" data-f="label" type="text" value="' + esc(r.label || "") + '" placeholder="Name shown in the results" style="margin-top:6px;font-weight:600">' + ruleBody(r) +
+        (["ach_slab", "unit_slab", "flat_unit", "kicker"].indexOf(r.type) >= 0 ? '<label>Only these models (optional, needs the IMEI sheet)</label><input class="tx" data-f="models" type="text" value="' + esc((r.models || []).join(", ")) + '" placeholder="e.g. Y29, V40">' : "") + "</div>";
+    }).join("") : '<div class="card empty"><div class="big">🧮</div>No rules yet. Upload the circular in step 1, pick a template, or add rules.</div>';
+    [].forEach.call(box.querySelectorAll(".rl"), function (card) {
+      var r = SC.rules[+card.dataset.i];
+      [].forEach.call(card.querySelectorAll("[data-f]"), function (e) { e.oninput = e.onchange = function () { var f = e.dataset.f; RES = null;
+        if (e.type === "checkbox") r[f] = e.checked; else if (f === "models") r.models = e.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        else if (e.type === "number") r[f] = e.value === "" ? (f === "maxAch" ? null : 0) : +e.value; else r[f] = e.value;
+        if (f === "pay") drawRules(); }; });
+      [].forEach.call(card.querySelectorAll("[data-sl]"), function (e) { e.oninput = function () { var z = r.slabs[+e.dataset.sl]; z[e.dataset.k] = e.value === "" ? null : +e.value; RES = null; }; });
+      [].forEach.call(card.querySelectorAll("[data-slx]"), function (b) { b.onclick = function () { r.slabs.splice(+b.dataset.slx, 1); drawRules(); }; });
+      var add = card.querySelector("[data-sladd]"); if (add) add.onclick = function () { var l = r.slabs[r.slabs.length - 1]; r.slabs.push(r.type === "ach_slab" ? { from: l ? (l.to || l.from + 20) : 80, to: null, amount: l ? l.amount : 0 } : { from: l ? (l.to ? l.to + 1 : l.from + 10) : 1, to: null, rate: l ? l.rate : 0 }); if (l && l.to == null) l.to = r.slabs[r.slabs.length - 1].from - (r.type === "ach_slab" ? 0 : 1); drawRules(); };
+      [].forEach.call(card.querySelectorAll("[data-ins]"), function (c) { c.onclick = function () { var e = card.querySelector('[data-f="expr"]'); e.value += (e.value && !/[ (]$/.test(e.value) ? " " : "") + c.dataset.ins; r.expr = e.value; e.focus(); }; });
+      var i = +card.dataset.i;
+      card.querySelector("[data-rm]").onclick = function () { if (r.type === "formula" && !MASTER) return toast("Only a master admin can remove a custom formula."); SC.rules.splice(i, 1); RES = null; drawRules(); };
+      card.querySelector("[data-tg]").onclick = function () { r.off = !r.off; RES = null; drawRules(); };
+      [].forEach.call(card.querySelectorAll("[data-mv]"), function (b) { b.onclick = function () { var j = i + (+b.dataset.mv); if (j < 0 || j >= SC.rules.length) return; SC.rules.splice(j, 0, SC.rules.splice(i, 1)[0]); drawRules(); }; });
+    });
+  }
+  function addRule() {
+    var ks = Object.keys(TYPES).filter(function (k) { return k !== "formula" || MASTER; });
+    var ov = sheet("Add a rule", "Combine as many as the scheme needs", [], '<div style="display:grid;gap:6px;margin-top:10px">' + ks.map(function (k) { return '<button class="act" data-ty="' + k + '" style="text-align:left;display:block"><b>' + TYPES[k][0] + " " + TYPES[k][1] + '</b><div class="muted" style="font-size:12px;font-weight:500">' + TYPES[k][2] + "</div></button>"; }).join("") + "</div>");
+    [].forEach.call(ov.querySelectorAll("[data-ty]"), function (b) { b.onclick = function () {
+      var k = b.dataset.ty, r = { id: uid(), type: k, label: TYPES[k][1] };
+      if (k === "ach_slab") Object.assign(r, { pay: "perUnit", slabs: [{ from: 100, to: null, amount: 100 }] });
+      if (k === "unit_slab") Object.assign(r, { mode: "retro", slabs: [{ from: 1, to: null, rate: 50 }] });
+      if (k === "flat_unit") Object.assign(r, { rate: 50, when: "achieved" });
+      if (k === "value_pct") Object.assign(r, { pct: 1, when: "always" });
+      if (k === "kicker") Object.assign(r, { rate: 50 });
+      if (k === "penalty") Object.assign(r, { amount: 500, per: "fixed", when: "notAchieved", minAch: 100 });
+      if (k === "multiplier") Object.assign(r, { minAch: 120, maxAch: null, factor: 1.2 });
+      if (k === "gate") Object.assign(r, { active: true, appDays: 0, features: 0, mvisits: 0, vsPct: 0, effect: "zero", reducePct: 50 });
+      if (k === "formula") Object.assign(r, { expr: "ach >= 100 ? units * 10 : 0" });
+      SC.rules.push(r); RES = null; ov.remove(); drawRules(); var l = $("rls").lastElementChild; if (l && l.scrollIntoView) l.scrollIntoView({ block: "center" });
+    }; });
+  }
+
+  // ================= STEP 3: retailers =================
+  var COLS = [["rid", "Retailer ID", /retailer|^id$|rid|code|vba/], ["name", "Name", /name|firm|store/], ["target", "Target", /^target|target (units|qty|value)|^tgt/], ["upload", "Sales uploaded", /upload|sell.?out|sales? (qty|units)|^sales$/], ["activation", "Activated", /activat/],
+    ["both", "Uploaded + activated (same month)", /both|same month|upload.*activ/], ["value", "Sale value ₹", /value|amount|revenue/], ["vsTarget", "V-Shield target", /v.?shield.*target|vs target/], ["vsSold", "V-Shield sold", /v.?shield(?!.*target)|vs sold/], ["excl", "Units via excluded EMI partners", /exclud|emi/]];
+  var ICOLS = [["imei", /imei/], ["rid", /retailer|rid|code|vba/], ["model", /model/], ["upload", /upload|sale date|sell.?out date|^sales? date/], ["activation", /activat/], ["price", /price|value|amount|mop/], ["partner", /partner|finance|emi|financier/], ["vshield", /v.?shield/]];
+  function dashLoad() {
+    var st = ADMIN ? DSTATE : "", month = SC.period || NOW;
+    return Promise.all([KPIDATA.load().catch(function () { return null; }), api({ action: "sc-visits", month: month, state: st })]).then(function (rs2) {
+      var D = rs2[0], V = (rs2[1] && rs2[1].visits) || {}, m = {}, active = {}, info = { month: month, note: "" };
+      if (D) {
+        String(D.SETUP.rids || "").split(",").forEach(function (x) { x = x.trim().toUpperCase(); if (x) active[x] = 1; });
+        var fm = {}; (D.SETUP.fmap || []).forEach(function (x) { fm[x[0]] = D.KE.PCAN ? D.KE.PCAN[D.KE.nrm(x[1])] || "" : ""; });
+        var rows = D.KE.rows(D.RAW, "app"), inMonth = rows.some(function (r) { return String(r[2]).slice(0, 7) === month; });
+        if (!inMonth) info.note = "The dashboard has no app data for " + month + " — app use shown is for all months in the dashboard.";
+        rows.forEach(function (r) {
+          if (inMonth && String(r[2]).slice(0, 7) !== month) return;
+          var id = String(r[0]).toUpperCase(), o = m[id] || (m[id] = { days: {}, feats: {}, appVisits: 0 });
+          o.days[r[2]] = 1; o.feats[r[1]] = 1; if (fm[r[1]] === "av") o.appVisits += r[3] || 1;
+        });
+        info.stateOf = D.stateOfRid; info.activeIds = Object.keys(active);
+      }
+      DASH = { info: info, get: function (rid) { var id = String(rid || "").toUpperCase(), o = m[id]; return { active: !!active[id], appDays: o ? Object.keys(o.days).length : 0, features: o ? Object.keys(o.feats).length : 0, appVisits: o ? o.appVisits : 0, mvisits: V[id] || 0 }; } };
+      return DASH;
+    });
+  }
+  function step3() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div>Loading dashboard data…</div>';
+    dashLoad().then(function () { draw3(); });
+  }
+  function draw3() {
+    var D = DASH.info, ex = SC.extraCols || [];
+    $("pane").innerHTML = (ADMIN ? '<div class="bar3"><span class="muted" style="font-size:12.5px">State</span><select class="tx" id="dst"><option value="">All states</option>' + STATES.map(function (s) { return "<option" + (DSTATE === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" : "") +
+      (D.note ? '<div class="notice" style="margin-top:8px">' + esc(D.note) + "</div>" : "") +
+      '<div class="card"><b>📥 Many retailers — Excel</b><div class="muted" style="font-size:13px;margin-top:2px">Download the template, fill target and achievement (sales uploaded and activated), upload it back. For EMI-partner exclusion, same-month upload + activation and model rules, also fill the <b>IMEI sales</b> sheet — it then counts every IMEI exactly.</div>' +
+      '<label class="cbx"><input type="checkbox" id="pf" checked> Pre-fill ' + (ADMIN ? (DSTATE ? DSTATE + "'s" : "all") : "my state's") + " active retailer IDs from the dashboard (" + activeFor().length + ")</label>" +
+      '<div class="row" style="margin-top:8px"><button class="btn sec" id="tp">⬇ Template</button><button class="btn pri" id="im">📤 Import filled file</button></div></div>' +
+      '<div class="card"><div class="row" style="justify-content:space-between"><b>✍️ Few retailers — type them in</b><button class="btn ghost sm" id="clr">Clear all</button></div><div class="muted" style="font-size:12.5px">Dashboard columns (active, app use, features, market visits) fill in from the Retailer ID.</div>' +
+      '<datalist id="rids">' + activeFor().slice(0, 3000).map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</datalist>" +
+      '<div class="tbw"><table class="dt"><tr>' + COLS.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + ex.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "<th>Active</th><th>App days</th><th>Features</th><th>Market visits</th><th></th></tr>" +
+      ROWS.slice(0, 200).map(function (r, i) { var d = DASH.get(r.rid); return '<tr data-i="' + i + '">' + COLS.map(function (c) { return '<td><input' + (c[0] === "rid" ? ' class="id" list="rids"' : "") + ' data-c="' + c[0] + '" type="' + (c[0] === "rid" || c[0] === "name" ? "text" : "number") + '" value="' + (r[c[0]] == null ? "" : esc(String(r[c[0]]))) + '"' + (r.fromImei && /upload|activation|both|value|vsSold|excl/.test(c[0]) ? " readonly title=\"From the IMEI sheet\"" : "") + "></td>"; }).join("") + ex.map(function (c) { return '<td><input type="text" data-x="' + esc(c) + '" value="' + esc((r.extra || {})[c] || "") + '"></td>'; }).join("") +
+        '<td class="' + (d.active ? "ok2" : "no2") + '">' + (d.active ? "✓" : "✗") + '</td><td class="n">' + d.appDays + '</td><td class="n">' + d.features + '</td><td class="n">' + d.mvisits + '</td><td><button class="ib" data-rx="' + i + '">✕</button></td></tr>'; }).join("") + "</table></div>" +
+      (ROWS.length > 200 ? '<div class="muted" style="font-size:12px;margin-top:4px">Showing 200 of ' + ROWS.length + " imported rows — all are calculated.</div>" : "") +
+      '<button class="btn sec sm" id="addr" style="margin-top:8px">＋ Retailer</button></div>' +
+      '<button class="btn ok block" id="calc" style="margin-top:10px;padding:13px">Calculate payout →</button>';
+    if ($("dst")) $("dst").onchange = function () { DSTATE = this.value; step3(); };
+    $("tp").onclick = template; $("im").onclick = importFile;
+    $("clr").onclick = function () { ROWS = []; saveRows(); RES = null; draw3(); };
+    $("addr").onclick = function () { ROWS.push({ rid: "", target: "", upload: "", activation: "" }); draw3(); var t = $("pane").querySelectorAll(".dt tr"); var l = t[t.length - 1]; if (l) l.querySelector("input").focus(); };
+    [].forEach.call($("pane").querySelectorAll(".dt tr[data-i]"), function (tr) {
+      var r = ROWS[+tr.dataset.i];
+      [].forEach.call(tr.querySelectorAll("[data-c]"), function (e) { e.onchange = function () { var c = e.dataset.c; r[c] = c === "rid" ? e.value.trim().toUpperCase() : c === "name" ? e.value : e.value === "" ? "" : +e.value; RES = null; saveRows(); if (c === "rid") draw3(); }; });
+      [].forEach.call(tr.querySelectorAll("[data-x]"), function (e) { e.onchange = function () { r.extra = r.extra || {}; r.extra[e.dataset.x] = e.value; saveRows(); }; });
+    });
+    [].forEach.call($("pane").querySelectorAll("[data-rx]"), function (b) { b.onclick = function () { ROWS.splice(+b.dataset.rx, 1); saveRows(); RES = null; draw3(); }; });
+    $("calc").onclick = function () { var ok = ROWS.filter(function (r) { return r.rid; }); if (!ok.length) return toast("Add at least one retailer."); calc(); DONE[3] = 1; go(4); };
+  }
+  function activeFor() {
+    var D = DASH && DASH.info; if (!D || !D.activeIds) return [];
+    var st = ADMIN ? DSTATE : null;
+    return D.activeIds.filter(function (x) { return !D.stateOf || (ADMIN ? (!st || D.stateOf(x) === st) : (!!MYSTATE && D.stateOf(x) === MYSTATE)); });
+  }
+  function template() {
+    var ex = SC.extraCols || [], pre = $("pf").checked ? activeFor() : [];
+    var head = COLS.map(function (c) { return c[1]; }).concat(ex);
+    var rows = [head].concat(pre.length ? pre.map(function (id) { return [id].concat(COLS.slice(1).map(function () { return ""; })).concat(ex.map(function () { return ""; })); }) : [["BRE010294", "Shree Mobiles", 50, 48, 45, 44, 720000, 10, 7, 2].concat(ex.map(function () { return ""; }))]);
+    download(xlsx([{ name: "Retailers", rows: rows },
+      { name: "IMEI sales", rows: [["IMEI", "Retailer ID", "Model", "Sale upload date", "Activation date", "Sale value", "EMI partner", "V-Shield (Y/N)"], ["861234567890123", "BRE010294", "Y29", "2026-10-03", "2026-10-05", 15999, "Bajaj Finserv", "Y"]] },
+      { name: "How to fill", rows: [["Scheme", SC.name + (SC.period ? " · " + SC.period : "")], ["Retailers sheet", "One row per retailer / VBA. Target in " + (SC.targetType === "value" ? "₹ sale value" : "units") + "."], ["Sales uploaded / Activated", "Units in the month. 'Uploaded + activated (same month)' is used when the scheme counts only units with both."], ["Units via excluded EMI partners", "Units sold through EMI partners the scheme does not count — they are taken out."],
+        ["IMEI sales sheet (optional)", "One row per IMEI. If filled, units, sale value, V-Shield and model counts come from here (dates decide upload / activation in the scheme month, excluded EMI partners are skipped). Keep targets in the Retailers sheet."], ["Sales counted by this scheme", { upload: "Sales uploaded", activation: "Activated", both: "Uploaded and activated in the same month", either: "Uploaded or activated" }[SC.basis]]] }]),
+      "Scheme_template_" + (SC.period || NOW) + ".xlsx");
+  }
+  function hdrMap(hdr, defs) { var m = {}; defs.forEach(function (d) { var re = d[2] || d[1]; var i = hdr.findIndex(function (h, k) { return re.test(String(h).toLowerCase()) && Object.values(m).indexOf(k) < 0; }); if (i >= 0) m[d[0]] = i; }); return m; }
+  function findHeader(rows, re) { for (var i = 0; i < Math.min(15, rows.length); i++) if (rows[i].some(function (v) { return re.test(String(v).toLowerCase()); })) return i; return -1; }
+  function importFile() {
+    var inp2 = document.createElement("input"); inp2.type = "file"; inp2.accept = ".xlsx,.xls,.csv";
+    inp2.onchange = function () {
+      var f = inp2.files[0]; if (!f) return;
+      lib("xlsx").then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = window.XLSX.read(buf, { type: "array", cellDates: false }), out = [], imei = [];
+        wb.SheetNames.forEach(function (sn) {
+          var rows = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "", raw: true });
+          if (/how to/i.test(sn)) return;
+          var hi = findHeader(rows, /imei/);
+          if (hi >= 0 && rows[hi].some(function (v) { return /^imei/i.test(String(v)); })) {
+            var hm = hdrMap(rows[hi].map(String), ICOLS.map(function (c) { return [c[0], "", c[1]]; }));
+            rows.slice(hi + 1).forEach(function (r) { var o = {}; Object.keys(hm).forEach(function (k) { o[k] = r[hm[k]]; }); if (o.rid && (o.imei || o.upload || o.activation)) imei.push(o); });
+            return;
+          }
+          var h2 = findHeader(rows, /retailer|vba|^id$/); if (h2 < 0) return;
+          var cm = hdrMap(rows[h2].map(String), COLS), extraIdx = {};
+          (SC.extraCols || []).forEach(function (c) { var i = rows[h2].findIndex(function (h) { return String(h).trim().toLowerCase() === c.toLowerCase(); }); if (i >= 0) extraIdx[c] = i; });
+          rows.slice(h2 + 1).forEach(function (r) { var o = { extra: {} }; Object.keys(cm).forEach(function (k) { var v = r[cm[k]]; o[k] = k === "rid" ? String(v).trim().toUpperCase() : k === "name" ? String(v) : v === "" ? "" : Number(String(v).replace(/[₹,\s]/g, "")) || 0; }); Object.keys(extraIdx).forEach(function (c) { o.extra[c] = String(r[extraIdx[c]] || ""); }); if (o.rid) out.push(o); });
+        });
+        if (imei.length) {
+          var agg = SCENG.fromImei(SC, imei), map = {}; out.forEach(function (o) { map[o.rid] = o; });
+          Object.keys(agg).forEach(function (rid) { var a = SCENG.finishImei(SC, agg[rid]), o = map[rid] || (map[rid] = { rid: rid, extra: {} }); ["upload", "activation", "both", "either", "value", "vsSold", "excl", "models", "val", "vs"].forEach(function (k) { o[k] = a[k]; }); o.fromImei = true; if (out.indexOf(o) < 0) out.push(o); });
+        }
+        if (!out.length) return toast("No retailer rows found. Use the template's Retailers sheet (a 'Retailer ID' column).");
+        ROWS = out; saveRows(); RES = null; toast(out.length + " retailers imported" + (imei.length ? " · " + imei.length + " IMEIs counted" : "")); draw3();
+      }).catch(function (e) { toast(e.message || "Couldn't read the file."); });
+    };
+    inp2.click();
+  }
+
+  // ================= STEP 4: results =================
+  function calc() {
+    var rows = ROWS.filter(function (r) { return r.rid; }).map(function (r) { var x = JSON.parse(JSON.stringify(r)); if (x.fromImei) SCENG.finishImei(SC, x); ["target", "upload", "activation", "value", "vsTarget", "vsSold", "excl"].forEach(function (k) { x[k] = Number(x[k]) || 0; }); if (x.both === "" || x.both == null) delete x.both; else x.both = Number(x.both) || 0; x.dash = DASH ? DASH.get(x.rid) : {}; return x; });
+    RES = SCENG.compute(SC, rows);
+  }
+  function step4() {
+    if (!RES) { if (!ROWS.filter(function (r) { return r.rid; }).length) { $("pane").innerHTML = '<div class="card empty"><div class="big">📥</div>Add retailers in step 3 first.</div>'; return; } if (!DASH) return dashLoad().then(function () { calc(); step4(); }); calc(); }
+    var S = RES.summary, rows = RES.rows.slice().sort(function (a, b) { return b.total - a.total; });
+    var push = RES.rows.filter(function (r) { return r.next; }).sort(function (a, b) { return a.next.need - b.next.need || b.next.gain - a.next.gain; }).slice(0, 15);
+    var slabs = Object.keys(S.bySlab).map(function (k) { return [k, Math.round(S.bySlab[k].payout)]; }).sort(function (a, b) { return b[1] - a[1]; });
+    $("pane").innerHTML = '<div class="card" style="text-align:center"><div class="muted">Total tentative payout · ' + esc(SC.name) + (SC.period ? " · " + SC.period : "") + '</div><div class="big2">' + rs(S.total) + "</div>" + (S.penalties ? '<div class="muted" style="font-size:12.5px">after ' + rs(S.penalties) + " negative incentive</div>" : "") + "</div>" +
+      '<div class="tiles">' + tileS("✅", "#E6F4EA", S.eligible + " / " + S.count, "Eligible") + tileS("📦", "#EEF0FF", S.units.toLocaleString("en-IN"), "Units counted") + tileS("🎯", "#FFF4E5", pc(S.avgAch), "Avg achievement") + tileS("📈", "#F4EEFF", push.length, "Close to next slab") + "</div>" +
+      '<div class="card"><b>Achievement</b>' + hBars(S.buckets, "#4D5BF9", { lw: 90 }) + "</div>" +
+      '<div class="card"><b>Payout by slab</b>' + hBars(slabs.map(function (x) { return [x[0], x[1]]; }), "#1E9E61", { lw: 150, rw: 80 }) + "</div>" +
+      (push.length ? '<div class="sec2" style="font-weight:800;margin:14px 2px 4px">🚀 Push list — closest to the next slab</div>' + push.map(function (r) { return '<div class="push"><span class="bd">Sell ' + r.next.need + " more</span><div style=\"flex:1\"><b>" + esc(r.rid) + "</b>" + (r.name ? " · " + esc(r.name) : "") + '<div class="muted" style="font-size:12px">' + pc(r.ach) + " now · +" + rs(r.next.gain) + " → " + rs(r.next.newTotal) + (r.next.slab ? " (" + esc(r.next.slab) + ")" : "") + "</div></div></div>"; }).join("") : "") +
+      '<div class="row" style="margin-top:14px"><button class="btn sec" id="xx">⬇ Excel</button><button class="btn sec" id="xp">⬇ PDF</button><button class="btn ghost" id="rb">← Change rules</button></div>' +
+      '<div class="tbw"><table class="dt"><tr><th>Retailer</th><th>Target</th><th>Units</th><th>Ach</th><th>Slab</th><th>Payout</th><th>Negative</th><th>Total</th><th>Status</th></tr>' + rows.map(function (r) { return '<tr class="clk" data-r="' + esc(r.rid) + '"><td><b>' + esc(r.rid) + "</b>" + (r.name ? '<div class="muted" style="font-size:11px">' + esc(r.name) + "</div>" : "") + '</td><td class="n">' + r.target + '</td><td class="n">' + r.units + '</td><td class="n">' + pc(r.ach) + "</td><td>" + esc(r.slab) + '</td><td class="n">' + rs(r.positive) + '</td><td class="n">' + (r.penalty ? "−" + rs(r.penalty) : "") + '</td><td class="n"><b>' + rs(r.total) + "</b></td><td>" + (r.eligible ? '<span class="ok2">✓</span>' : '<span class="no2">' + esc((r.reasons[0] || "Not eligible").slice(0, 40)) + "</span>") + "</td></tr>"; }).join("") + "</table></div>";
+    [].forEach.call($("pane").querySelectorAll("tr[data-r]"), function (tr) { tr.onclick = function () { detail(RES.rows.find(function (x) { return x.rid === tr.dataset.r; })); }; });
+    $("xx").onclick = exportXlsx; $("xp").onclick = exportPdf; $("rb").onclick = function () { go(2); };
+    DONE[4] = 1;
+  }
+  function detail(r) {
+    sheet(r.rid + (r.name ? " · " + r.name : ""), "Target " + r.target + " · units " + r.units + " · achievement " + pc(r.ach), [],
+      '<div style="margin-top:10px;font-size:13.5px">' + r.parts.map(function (p) { return '<div class="row" style="justify-content:space-between;border-bottom:1px solid #EEF0F6;padding:5px 0"><span>' + esc(p.label) + (p.slab ? ' <span class="muted">' + esc(p.slab) + "</span>" : "") + "</span><b class=\"" + (p.amount < 0 ? "no2" : "") + '">' + (p.amount < 0 ? "−" : "") + rs(Math.abs(p.amount)) + "</b></div>"; }).join("") +
+      '<div class="row" style="justify-content:space-between;padding:8px 0;font-size:15px"><b>Total</b><b>' + rs(r.total) + "</b></div>" + (r.reasons.length ? '<div class="notice">' + r.reasons.map(esc).join("<br>") + "</div>" : "") +
+      '<div class="muted" style="font-size:12px;margin-top:8px">Uploaded ' + r.upload + " · activated " + r.activation + (r.vsTarget ? " · V-Shield " + r.vsSold + "/" + r.vsTarget : "") + " · " + (r.dash.active ? "active retailer" : "not active on dashboard") + " · app used " + (r.dash.appDays || 0) + " days, " + (r.dash.features || 0) + " features · " + (r.dash.mvisits || 0) + " market visits</div>" + (r.next ? '<div class="notice info" style="margin-top:8px">Sell ' + r.next.need + " more → +" + rs(r.next.gain) + "</div>" : "") + "</div>");
+  }
+  function exportXlsx() {
+    var rows = RES.rows, ex = SC.extraCols || [];
+    download(xlsx([
+      { name: "Payout", rows: [["Retailer ID", "Name", "Target", "Units counted", "Uploaded", "Activated", "Sale value", "Achievement %", "Slab", "Payout", "Negative", "Total", "Eligible", "Reason", "Active retailer", "App days", "App features", "Market visits"].concat(ex)].concat(rows.map(function (r) { return [r.rid, r.name, r.target, r.units, r.upload, r.activation, Math.round(r.value), r.ach == null ? "" : Math.round(r.ach * 10) / 10, r.slab, r.positive, -r.penalty, r.total, r.eligible ? "Yes" : "No", r.reasons.join("; "), r.dash.active ? "Yes" : "No", r.dash.appDays || 0, r.dash.features || 0, r.dash.mvisits || 0].concat(ex.map(function (c) { return r.extra[c] || ""; })); })) },
+      { name: "Breakdown", rows: [["Retailer ID", "Rule", "Slab", "Amount"]].concat([].concat.apply([], rows.map(function (r) { return r.parts.map(function (p) { return [r.rid, p.label, p.slab || "", Math.round(p.amount * 100) / 100]; }); }))) },
+      { name: "Push list", rows: [["Retailer ID", "Name", "Achievement %", "Sell more", "Extra payout", "New total"]].concat(rows.filter(function (r) { return r.next; }).sort(function (a, b) { return a.next.need - b.next.need; }).map(function (r) { return [r.rid, r.name, r.ach == null ? "" : Math.round(r.ach * 10) / 10, r.next.need, r.next.gain, r.next.newTotal]; })) },
+      { name: "Rules", rows: [["Scheme rules"]].concat(describe(SC).map(function (x) { return [x]; })) }
+    ]), "Payout_" + SC.name.replace(/[^A-Za-z0-9]+/g, "_") + "_" + (SC.period || NOW) + ".xlsx");
+  }
+  // PDF built here in the page (no internet needed)
+  function pdfDoc(pages) {
+    var esc2 = function (s) { return String(s).replace(/₹/g, "Rs ").replace(/[–—]/g, "-").replace(/[≥]/g, ">=").replace(/[^\x20-\x7E]/g, "").replace(/([\\()])/g, "\\$1"); };
+    var objs = [], add = function (s) { objs.push(s); return objs.length; };
+    var font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"), bold = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    var pagesId = objs.length + 1 + pages.length * 2 + 0; var kids = [];
+    var pageObjs = pages.map(function (ops) {
+      var s = ops.map(function (o) { return o.rect ? "0.94 0.95 0.98 rg " + o.rect.join(" ") + " re f 0 0 0 rg" : "BT /" + (o.b ? "F2" : "F1") + " " + (o.size || 9) + " Tf " + (o.c || "0 0 0") + " rg " + o.x + " " + o.y + " Td (" + esc2(o.t) + ") Tj ET"; }).join("\n");
+      var cs = add("<< /Length " + s.length + " >>\nstream\n" + s + "\nendstream");
+      var pg = add("<< /Type /Page /Parent PAGES 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " + font + " 0 R /F2 " + bold + " 0 R >> >> /Contents " + cs + " 0 R >>"); kids.push(pg); return pg;
+    });
+    var pid = add("<< /Type /Pages /Kids [" + kids.map(function (k) { return k + " 0 R"; }).join(" ") + "] /Count " + kids.length + " >>");
+    objs = objs.map(function (o) { return o.replace("PAGES 0 R", pid + " 0 R"); });
+    var cat = add("<< /Type /Catalog /Pages " + pid + " 0 R >>");
+    var out = "%PDF-1.4\n", offs = [];
+    objs.forEach(function (o, i) { offs.push(out.length); out += (i + 1) + " 0 obj\n" + o + "\nendobj\n"; });
+    var xr = out.length; out += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n" + offs.map(function (o) { return ("0000000000" + o).slice(-10) + " 00000 n \n"; }).join("") + "trailer\n<< /Size " + (objs.length + 1) + " /Root " + cat + " 0 R >>\nstartxref\n" + xr + "\n%%EOF";
+    var bytes = new Uint8Array(out.length); for (var i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+  function exportPdf() {
+    var S = RES.summary, pages = [], ops = [], y = 800;
+    var line = function (t, o) { o = o || {}; if (y < 50) { pages.push(ops); ops = []; y = 800; } ops.push({ x: o.x || 40, y: y, t: t, b: o.b, size: o.size, c: o.c }); if (!o.keep) y -= (o.gap || ((o.size || 9) + 5)); };
+    line("vivo Business Innovation - Scheme payout (tentative)", { b: true, size: 15, gap: 22 });
+    line(SC.name + (SC.period ? "  |  " + SC.period : "") + "  |  " + new Date().toLocaleString("en-IN"), { size: 10, c: "0.35 0.37 0.5", gap: 18 });
+    line("Total tentative payout: " + rs(S.total) + "    Eligible: " + S.eligible + " / " + S.count + "    Units: " + S.units + "    Avg achievement: " + pc(S.avgAch), { b: true, size: 11, gap: 20 });
+    line("Rules", { b: true, size: 11 }); describe(SC).forEach(function (t) { var s = String(t); while (s.length) { line("- " + s.slice(0, 110), { size: 8.5 }); s = s.slice(110); } }); y -= 8;
+    var cols = [[40, "Retailer"], [130, "Name"], [250, "Target"], [295, "Units"], [338, "Ach %"], [385, "Payout"], [445, "Negative"], [505, "Total"]];
+    var head = function () { ops.push({ rect: [36, y - 4, 523, 14] }); cols.forEach(function (c) { ops.push({ x: c[0], y: y, t: c[1], b: true, size: 8.5 }); }); y -= 16; };
+    head();
+    RES.rows.slice().sort(function (a, b) { return b.total - a.total; }).forEach(function (r) {
+      if (y < 50) { pages.push(ops); ops = []; y = 800; head(); }
+      [r.rid, (r.name || "").slice(0, 22), r.target, r.units, r.ach == null ? "-" : (Math.round(r.ach * 10) / 10) + "", rs(r.positive), r.penalty ? "-" + rs(r.penalty) : "", rs(r.total)].forEach(function (v, i) { ops.push({ x: cols[i][0], y: y, t: String(v), size: 8.5, b: i === 7 }); });
+      y -= 13;
+    });
+    var pu = RES.rows.filter(function (r) { return r.next; }).sort(function (a, b) { return a.next.need - b.next.need; }).slice(0, 20);
+    if (pu.length) { y -= 10; line("Push list - closest to the next slab", { b: true, size: 11 }); pu.forEach(function (r) { line(r.rid + (r.name ? " (" + r.name.slice(0, 25) + ")" : "") + ": sell " + r.next.need + " more -> +" + rs(r.next.gain), { size: 9 }); }); }
+    y -= 10; line("Tentative figures from the rules and data entered. Final payout as per HO.", { size: 8, c: "0.45 0.47 0.6" });
+    pages.push(ops);
+    download(pdfDoc(pages), "Payout_" + SC.name.replace(/[^A-Za-z0-9]+/g, "_") + "_" + (SC.period || NOW) + ".pdf");
+  }
+
+  window.__pageBack = function () { if (STEP > 1) { go(STEP - 1); return true; } return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else load();
+})();
+</script>
+</body>
+</html>

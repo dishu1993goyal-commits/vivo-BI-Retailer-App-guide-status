@@ -222,7 +222,7 @@
       if (/\.csv$/i.test(file.name)) { file.text().then(function (t) { cb(t.split(/\r?\n/).filter(Boolean).map(function (l) { return l.split(",").map(function (x) { return x.replace(/^"|"$/g, "").trim(); }); })); }); return; }
       var go = function () { file.arrayBuffer().then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); cb(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false })); }); };
       if (window.XLSX) return go();
-      var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = go; s.onerror = function () { toast("Couldn't load the Excel reader — save as CSV and try again."); }; document.head.appendChild(s);
+      var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = go; s.onerror = function () { toast("Couldn't load the Excel reader — save as CSV and try again."); }; document.head.appendChild(s);
     };
     inp.click();
   }

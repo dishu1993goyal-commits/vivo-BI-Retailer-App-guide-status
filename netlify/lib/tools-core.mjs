@@ -8,7 +8,8 @@
 //   tlbeat:<scope>            { value, by, at }                         uploaded vWork / visit list for the beat planner
 //   tlpref:<ownerKey>         { prefs: { key: value } }
 //   idea:<id>                 { id, title, category, problem, idea, benefit, state, by, at, status, voters:[], base }
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
+import { groqJSON, aiKeys } from "./aff-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const cid = (v) => String(v || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 40);
@@ -17,6 +18,10 @@ const LISTS = { notes: { max: 400, size: 60000 }, audits: { max: 80, size: 26000
 const PREF_KEYS = ["vlang", "beatw", "sostgt", "vq", "me"];
 const ISTAT = ["New", "Under review", "Approved", "Implemented", "Not now"];
 const ICATS = ["Process", "Reports & data", "Retailer app", "Incentive & payout", "Market hygiene", "Affordability", "Training", "Other"];
+// voice-note text the AI reads (free speech + survey answers)
+const noteText = (it) => [it.text || "", ...(Array.isArray(it.ans) ? it.ans.filter((x) => x && x.a).map((x) => "Q: " + x.q + "\nA: " + x.a) : [])].join("\n").trim().slice(0, 3000);
+const hashOf = (s) => createHash("sha1").update(String(s)).digest("hex").slice(0, 12);
+const CATS_AI = ["App feature request", "App issue", "Scheme & payout", "Stock & supply", "Pricing & margin", "Competition", "Training", "Other"];
 const istDay = (t) => new Date(t + 19800000).toISOString().slice(0, 10);
 const ymOf = (t) => new Date(t + 19800000).toISOString().slice(0, 7).replace("-", "");
 export const TOOL_IDS = ["tl", "tlv", "tlp", "tlb", "tlr", "tli", "tlk", "tls", "tld"];
@@ -79,7 +84,8 @@ export async function toolsAction(b, ctx) {
         const raw = JSON.stringify(it); if (raw.length > L.size) { refused.push(id); continue; }
         const k = `tl:${ns}:${owner}:${id}`;
         const old = await store.get(k);
-        await store.set(k, { id, ns, owner, by, state: myState || (isAdmin ? "HO" : ""), item: it, updatedAt: t, createdAt: old ? old.createdAt : t, shared: ns === "kpis" && isAdmin });
+        const keepAi = ns === "notes" && old && old.ai && old.ai.h === hashOf(noteText(it)) ? old.ai : undefined;   // translation/score stays while the text is the same
+        await store.set(k, { id, ns, owner, by, state: myState || (isAdmin ? "HO" : ""), item: it, ai: keepAi, updatedAt: t, createdAt: old ? old.createdAt : t, shared: ns === "kpis" && isAdmin });
         saved++;
       }
       if (saved) await logUse({ notes: "tlv", audits: "tlp", kpis: "tlk" }[ns], "saves", saved);
@@ -165,9 +171,54 @@ export async function toolsAction(b, ctx) {
     else if (b.state) rows = rows.filter((r) => r.state === str(b.state, 40));
     if (b.from) rows = rows.filter((r) => String(r.item.at || "") >= str(b.from, 10));
     rows.sort((x, y) => (y.item.at > x.item.at ? 1 : -1));
-    const out = rows.slice(0, 2000).map((r) => { const it = Object.assign({}, r.item); if (ns === "audits" && !b.thumbs) delete it.thumb; return { by: r.by, state: r.state, item: it, mine: r.owner === owner }; });
+    const out = rows.slice(0, 2000).map((r) => { const it = Object.assign({}, r.item); if (ns === "audits" && !b.thumbs) delete it.thumb; return { by: r.by, state: r.state, item: it, mine: r.owner === owner, ai: r.ai && r.ai.h === hashOf(noteText(r.item)) ? r.ai : null }; });
     return json(200, { ok: true, rows: out, total: rows.length });
   }
+  // ---- voice notes → English translation + AI score (importance, category, need, competitor app features) ----
+  if (b.action === "tl-ai") {
+    const keys = await aiKeys(store, ctx.env || {});
+    if (!keys.groq) return json(400, { ok: false, error: "AI isn't set up yet. An admin can add the free Groq key in Affordability Corner → Data → AI keys." });
+    let rows = await listNs("notes");
+    if (!isAdmin) rows = rows.filter((r) => r.state && r.state === myState);
+    const todo = rows.filter((r) => noteText(r.item) && !(r.ai && r.ai.h === hashOf(noteText(r.item)))).sort((x, y) => (y.item.at > x.item.at ? 1 : -1));
+    const batch = todo.slice(0, Math.max(1, Math.min(8, Number(b.limit) || 6)));
+    if (!batch.length) return json(200, { ok: true, done: 0, remaining: 0 });
+    const prompt = `You help vivo India's Business Innovation team read field notes from retailers and sales teams. Notes may be in Hindi, any Indian language, or mixed Hindi-English.
+For EACH note return one item. Reply with ONE JSON object: {"notes":[{"id":"...","lang":"language of the note, e.g. Hindi, Tamil, English, Hinglish","en":"faithful, complete English translation (copy the text if it is already English)","score":0-100,"category":one of ${JSON.stringify(CATS_AI)},"requirement":"one short English line: what the retailer needs or reports (empty if nothing)","appIdea":"a new vivo retailer-app feature this suggests (empty if none)","competitor":[{"brand":"Samsung / Oppo / Xiaomi / Realme / OnePlus / Apple / other","feature":"what the competitor's app, scheme or support offers"}]}]}
+Score = how valuable the feedback is for improving vivo's retailer app and business: 80-100 specific and urgent, or a feature competitors' apps already have; 50-79 useful and actionable; 20-49 general; 0-19 no real content.
+NOTES:
+` + batch.map((r) => JSON.stringify({ id: r.id, state: r.state, retailer: r.item.rid || "", text: noteText(r.item) })).join("\n");
+    const g = await groqJSON(keys.groq, prompt, ctx.aiFetch, { validate: (d) => d && Array.isArray(d.notes) });
+    if (!g.ok) return json(502, { ok: false, error: "AI is busy right now — try again in a minute. (" + String(g.error).slice(0, 160) + ")" });
+    let done = 0;
+    for (const r of batch) {
+      const a = (g.data.notes || []).find((x) => String(x.id) === r.id); if (!a) continue;
+      r.ai = { h: hashOf(noteText(r.item)), lang: str(a.lang, 30), en: str(a.en, 4000), score: Math.max(0, Math.min(100, Math.round(Number(a.score) || 0))), category: CATS_AI.includes(a.category) ? a.category : "Other",
+        requirement: str(a.requirement, 300), appIdea: str(a.appIdea, 300), competitor: (Array.isArray(a.competitor) ? a.competitor : []).slice(0, 5).map((c) => ({ brand: str(c && c.brand, 30), feature: str(c && c.feature, 200) })).filter((c) => c.brand || c.feature), at: t };
+      await store.set(`tl:notes:${r.owner}:${r.id}`, r); done++;
+    }
+    return json(200, { ok: true, done, remaining: Math.max(0, todo.length - done) });
+  }
+  // ranked summary of all scored notes: top needs, app ideas, competitor app features, best feedback
+  if (b.action === "tl-ai-summary") {
+    const keys = await aiKeys(store, ctx.env || {});
+    if (!keys.groq) return json(400, { ok: false, error: "AI isn't set up yet." });
+    let rows = (await listNs("notes")).filter((r) => r.ai && r.ai.h === hashOf(noteText(r.item)));
+    if (!isAdmin) rows = rows.filter((r) => r.state === myState); else if (b.state) rows = rows.filter((r) => r.state === str(b.state, 40));
+    if (b.from) rows = rows.filter((r) => String(r.item.at || "") >= str(b.from, 10));
+    if (!rows.length) return json(200, { ok: true, summary: null, count: 0 });
+    rows.sort((x, y) => y.ai.score - x.ai.score);
+    const lines = rows.slice(0, 150).map((r) => JSON.stringify({ id: r.id, state: r.state, score: r.ai.score, cat: r.ai.category, need: r.ai.requirement, idea: r.ai.appIdea, comp: r.ai.competitor, en: r.ai.en.slice(0, 400) }));
+    const g = await groqJSON(keys.groq, `These are scored field notes (already translated to English) from vivo India's state teams and retailers. Write a ranked summary for HO.
+Reply with ONE JSON object: {"headline":"one sentence","needs":[{"title":"short","why":"one line","count":number of notes,"states":["..."],"ids":["note ids"]}] (top 8, most important first),
+"appIdeas":[{"title":"new retailer-app feature","why":"one line","count":n}] (top 6),"competitors":[{"brand":"...","feature":"what their app/scheme offers that vivo's does not","count":n}] (top 6),
+"best":[{"id":"note id","why":"why this is the most useful feedback"}] (top 5)}
+NOTES:
+` + lines.join("\n"), ctx.aiFetch, { validate: (d) => d && Array.isArray(d.needs) });
+    if (!g.ok) return json(502, { ok: false, error: "AI is busy right now — try again in a minute." });
+    return json(200, { ok: true, summary: g.data, count: rows.length });
+  }
+
   if (b.action === "tl-thumb") {
     const r = (await listNs("audits")).find((x) => x.id === cid(b.id));
     if (!r || (!isAdmin && r.state !== myState && r.owner !== owner)) return json(404, { ok: false, error: "Not found." });

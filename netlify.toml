@@ -23,6 +23,11 @@
     Cache-Control = "no-cache"
 
 [[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+
+[[headers]]
   for = "/tools-sync.js"
   [headers.values]
     Cache-Control = "no-cache"
