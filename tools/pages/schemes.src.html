@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Schemes & payout calculator</title>
+<style>
+/*@@CSS@@*/
+.sc2{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.sl{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-top:6px;align-items:end}
+.sl label{font-size:11.5px;color:var(--mut);font-weight:600}
+.res2{background:linear-gradient(135deg,#1F2340,#4D5BF9);color:#fff;border-radius:18px;padding:16px;margin-top:12px}
+.res2 .big4{font-size:32px;font-weight:800}
+.res2 .ln{font-size:13px;opacity:.9;margin-top:4px}
+.slabtab td,.slabtab th{padding:7px 9px}.slabtab tr.on td{background:#E6F4EA;font-weight:700}
+.f6 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+.seg2{display:flex;gap:6px}.seg2 button{flex:1;border:1px solid #D8DAE5;background:#fff;border-radius:10px;padding:9px;font:600 13px inherit;cursor:pointer}
+.seg2 button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧾</span></div>
+  <h1 id="h1">Schemes & payout</h1><p id="h2">Official slabs from HO — calculate a tentative payout</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), S = [], MY = "", CUR = null, TAB = "calc", ST = ls("sch-calc") || {};
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  var fmt = function (n) { return Math.round(n).toLocaleString("en-IN"); };
+  // same rules as the dashboard's calculator
+  function compute(o) {
+    var T = +o.target, A = +o.achieved, ach = T > 0 ? A / T * 100 : 0, slabs = o.slabs.slice().sort(function (a, b) { return a.from - b.from; }), idx = -1;
+    slabs.forEach(function (sl, i) { if (sl.from <= ach + 1e-9) idx = i; });
+    var unit = function (q, r) { return o.kind === "value" ? q * r / 100 : q * r; };
+    var res = { ach: ach, idx: idx, slabs: slabs, payout: 0, lines: [] };
+    if (idx >= 0) {
+      var sl = slabs[idx];
+      if (o.method === "retro") { res.payout = unit(A, sl.rate) + (sl.bonus || 0); res.lines.push((o.kind === "value" ? "₹" + fmt(A) + " × " + sl.rate + "%" : fmt(A) + " units × ₹" + sl.rate) + " = ₹" + fmt(unit(A, sl.rate)) + (sl.bonus ? " + bonus ₹" + fmt(sl.bonus) : "")); }
+      else {
+        for (var i = 0; i <= idx; i++) { var lo = slabs[i].from * T / 100, hi = i + 1 < slabs.length ? slabs[i + 1].from * T / 100 : Infinity, q = Math.max(0, Math.min(A, hi) - lo); if (q > 0) { var amt = unit(q, slabs[i].rate); res.payout += amt; res.lines.push("Band " + slabs[i].from + "%+: " + (o.kind === "value" ? "₹" + fmt(q) + " × " + slabs[i].rate + "%" : fmt(q) + " units × ₹" + slabs[i].rate) + " = ₹" + fmt(amt)); } }
+        if (sl.bonus) { res.payout += sl.bonus; res.lines.push("Bonus ₹" + fmt(sl.bonus)); }
+      }
+    }
+    var next = slabs[idx + 1]; if (next && T > 0) res.next = { from: next.from, need: Math.max(0, Math.ceil(next.from * T / 100) - A) };
+    return res;
+  }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "scheme-list" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } S = r.schemes; MY = r.myState; render(); });
+  }
+  function render() {
+    VIEW.innerHTML = (ADMIN ? '<div class="seg"><button data-t="calc" class="' + (TAB === "calc" ? "on" : "") + '">🧮 Calculator</button><button data-t="manage" class="' + (TAB === "manage" ? "on" : "") + '">⚙️ Manage schemes</button></div>' : "") + '<div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    (TAB === "calc" ? showCalc : showManage)();
+  }
+  function showCalc() {
+    hero("Payout calculator", S.length ? "Pick an official scheme or enter your own slabs" : "Enter the scheme slabs to calculate");
+    var s = S.find(function (x) { return x.id === ST.scheme; }) || null;
+    var slabs = s ? s.slabs : (ST.slabs || [{ from: 80, rate: 100, bonus: 0 }, { from: 90, rate: 150, bonus: 0 }, { from: 100, rate: 200, bonus: 0 }, { from: 110, rate: 250, bonus: 1000 }]);
+    var kind = s ? s.kind : ST.kind || "units", method = s ? s.method : ST.method || "retro";
+    var tgt = ST.target || (s && s.targets && s.targets[MY]) || "";
+    var html = '<div class="sc2"><div class="f6"><label>Scheme</label><select class="tx" id="cs"><option value="">✏️ My own slabs</option>' + S.map(function (x) { return '<option value="' + x.id + '"' + (s && s.id === x.id ? " selected" : "") + ">" + esc(x.name) + (x.month ? " · " + x.month : "") + "</option>"; }).join("") + "</select>" +
+      (s && s.notes ? '<div class="notice info">' + esc(s.notes) + "</div>" : "") +
+      (s ? '<div class="muted" style="font-size:12.5px;margin-top:8px">' + (kind === "value" ? "Value scheme (% of ₹)" : "Units scheme (₹ per unit)") + " · " + (method === "retro" ? "Retro" : "Incremental") + " · set by HO</div>" :
+        '<label>Scheme type</label><div class="seg2" id="ck"><button data-v="units" class="' + (kind === "units" ? "on" : "") + '">Units (₹/unit)</button><button data-v="value" class="' + (kind === "value" ? "on" : "") + '">Value (% of ₹)</button></div><label>Method</label><div class="seg2" id="cm"><button data-v="retro" class="' + (method === "retro" ? "on" : "") + '">Retro</button><button data-v="incremental" class="' + (method === "incremental" ? "on" : "") + '">Incremental</button></div>') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>Target (' + (kind === "value" ? "₹" : "units") + ')</label><input class="tx" id="ct" type="number" inputmode="decimal" value="' + esc(tgt) + '"></div><div><label>Achieved (' + (kind === "value" ? "₹" : "units") + ')</label><input class="tx" id="ca" type="number" inputmode="decimal" value="' + esc(ST.achieved || "") + '"></div></div>' +
+      (s && s.targets && s.targets[MY] ? '<div class="muted" style="font-size:12px;margin-top:4px">Your state target from HO: ' + fmt(s.targets[MY]) + "</div>" : "") +
+      '<label>Slabs</label><table class="slabtab" id="stab"><thead><tr><th>From %</th><th>Rate ' + (kind === "value" ? "(%)" : "(₹/unit)") + "</th><th>Bonus ₹</th>" + (s ? "" : "<th></th>") + "</tr></thead><tbody>" +
+      slabs.map(function (sl, i) { return s ? "<tr data-i=\"" + i + "\"><td>" + sl.from + "%</td><td>" + sl.rate + "</td><td>" + (sl.bonus ? fmt(sl.bonus) : "—") + "</td></tr>" : '<tr data-i="' + i + '"><td><input class="tx" data-k="from" data-i="' + i + '" type="number" value="' + sl.from + '"></td><td><input class="tx" data-k="rate" data-i="' + i + '" type="number" value="' + sl.rate + '"></td><td><input class="tx" data-k="bonus" data-i="' + i + '" type="number" value="' + (sl.bonus || 0) + '"></td><td><button class="btn ghost sm" data-r="' + i + '">✕</button></td></tr>'; }).join("") + "</tbody></table>" +
+      (s ? "" : '<button class="btn sec sm" id="cadd" style="margin-top:6px">＋ Slab</button>') + '</div></div><div id="cres"></div>';
+    $("pane").innerHTML = html;
+    var calc = function () {
+      ST.target = $("ct").value; ST.achieved = $("ca").value; ST.kind = kind; ST.method = method; if (!s) ST.slabs = slabs; ls("sch-calc", ST);
+      if (!+ST.target || ST.achieved === "") { $("cres").innerHTML = '<div class="muted" style="margin-top:10px">Enter target and achieved to see the payout.</div>'; return; }
+      var r = compute({ target: ST.target, achieved: ST.achieved, slabs: slabs, kind: kind, method: method });
+      [].forEach.call(document.querySelectorAll("#stab tbody tr"), function (tr) { tr.classList.toggle("on", +tr.dataset.i === r.idx); });
+      $("cres").innerHTML = '<div class="res2"><div style="font-size:12px;opacity:.85">Tentative payout</div><div class="big4">₹' + fmt(r.payout) + '</div><div class="ln">Achievement ' + (Math.round(r.ach * 10) / 10) + "% · " + (r.idx >= 0 ? "slab from " + r.slabs[r.idx].from + "%" : "below the first slab — no payout") + "</div>" + r.lines.map(function (l) { return '<div class="ln">• ' + esc(l) + "</div>"; }).join("") +
+        (r.next ? '<div class="ln" style="margin-top:8px;background:rgba(255,255,255,.14);border-radius:10px;padding:8px">🎯 ' + fmt(r.next.need) + (kind === "value" ? " ₹" : " units") + " more to reach the " + r.next.from + "% slab</div>" : "") + "</div>" +
+        '<div class="muted" style="font-size:12px;margin-top:8px">Tentative — the final payout follows the official settlement.</div>';
+    };
+    $("cs").onchange = function () { ST.scheme = this.value; var x = S.find(function (y) { return y.id === ST.scheme; }); ST.target = x && x.targets && x.targets[MY] ? x.targets[MY] : ST.target; ls("sch-calc", ST); showCalc(); };
+    $("ct").oninput = $("ca").oninput = calc;
+    if (!s) {
+      [].forEach.call($("pane").querySelectorAll("#ck button"), function (b) { b.onclick = function () { kind = ST.kind = b.dataset.v; ls("sch-calc", ST); showCalc(); }; });
+      [].forEach.call($("pane").querySelectorAll("#cm button"), function (b) { b.onclick = function () { method = ST.method = b.dataset.v; ls("sch-calc", ST); showCalc(); }; });
+      [].forEach.call($("pane").querySelectorAll("[data-k]"), function (e) { e.oninput = function () { slabs[+e.dataset.i][e.dataset.k] = +e.value; calc(); }; });
+      [].forEach.call($("pane").querySelectorAll("[data-r]"), function (b) { b.onclick = function () { slabs.splice(+b.dataset.r, 1); ST.slabs = slabs; ls("sch-calc", ST); showCalc(); }; });
+      $("cadd").onclick = function () { var l = slabs[slabs.length - 1] || { from: 70, rate: 100 }; slabs.push({ from: l.from + 10, rate: l.rate + 50, bonus: 0 }); ST.slabs = slabs; ls("sch-calc", ST); showCalc(); };
+    }
+    calc();
+  }
+  function showManage() {
+    hero("Manage schemes", "Update slabs and targets here — no file changes needed");
+    $("pane").innerHTML = '<button class="btn pri sm" id="ns" style="margin-top:8px">＋ New scheme</button>' + (S.length ? S.map(function (x) { return '<div class="sc2" data-id="' + x.id + '" style="cursor:pointer"><div class="row" style="justify-content:space-between"><b>' + esc(x.name) + '</b><span class="chip ' + (x.active !== false ? "live" : "closed") + '">' + (x.active !== false ? "Active" : "Hidden") + '</span></div><div class="muted" style="font-size:12.5px;margin-top:4px">' + (x.month || "No month") + " · " + (x.kind === "value" ? "Value" : "Units") + " · " + (x.method === "retro" ? "Retro" : "Incremental") + " · " + x.slabs.length + " slabs · " + Object.keys(x.targets || {}).length + " state targets</div></div>"; }).join("") : '<div class="card empty"><div class="big">🧾</div>No official schemes yet. Add one so every state calculates with the same slabs.</div>');
+    $("ns").onclick = function () { edit({ kind: "units", method: "retro", active: true, slabs: [{ from: 80, rate: 100, bonus: 0 }, { from: 100, rate: 200, bonus: 0 }], targets: {} }); };
+    [].forEach.call($("pane").querySelectorAll("[data-id]"), function (c) { c.onclick = function () { edit(JSON.parse(JSON.stringify(S.find(function (x) { return x.id === c.dataset.id; })))); }; });
+  }
+  function edit(x) {
+    var states = []; fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { states = j.states || []; redraw(); }).catch(function () { });
+    var body = function () { return '<div class="f6"><label>Name</label><input class="tx" id="sn" value="' + esc(x.name || "") + '" placeholder="e.g. Diwali Y-series sell-out"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label>Month</label><input class="tx" type="month" id="sm" value="' + esc(x.month || "") + '"></div><div><label>Type</label><select class="tx" id="sk"><option value="units"' + (x.kind !== "value" ? " selected" : "") + '>Units</option><option value="value"' + (x.kind === "value" ? " selected" : "") + '>Value</option></select></div><div><label>Method</label><select class="tx" id="smt"><option value="retro"' + (x.method !== "incremental" ? " selected" : "") + '>Retro</option><option value="incremental"' + (x.method === "incremental" ? " selected" : "") + '>Incremental</option></select></div></div>' +
+      '<label>Slabs (From % · rate · bonus ₹)</label>' + x.slabs.map(function (sl, i) { return '<div class="sl"><input class="tx" data-s="' + i + '" data-k="from" type="number" value="' + sl.from + '"><input class="tx" data-s="' + i + '" data-k="rate" type="number" value="' + sl.rate + '"><input class="tx" data-s="' + i + '" data-k="bonus" type="number" value="' + (sl.bonus || 0) + '"><button class="btn ghost sm" data-rs="' + i + '">✕</button></div>'; }).join("") + '<button class="btn sec sm" id="sa" style="margin-top:6px">＋ Slab</button>' +
+      '<label>State targets (optional)</label><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">' + states.map(function (st) { return '<div><div style="font-size:11.5px;color:var(--mut)">' + esc(st) + '</div><input class="tx" type="number" data-t="' + esc(st) + '" value="' + esc((x.targets || {})[st] || "") + '"></div>'; }).join("") + "</div>" +
+      '<label>Notes for teams</label><textarea class="tx" id="sno">' + esc(x.notes || "") + '</textarea><label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="sac"' + (x.active !== false ? " checked" : "") + "> Visible to state teams</label></div>"; };
+    var ov = sheet(x.id ? "Edit scheme" : "New scheme", "", [["💾", "Save", function (ov) { collect(ov); api({ action: "scheme-save", scheme: x }).then(function (r) { toast(r.ok ? "Saved" : r.error); if (r.ok) load(); }); }]].concat(x.id ? [["🗑️", "Delete scheme", function () { api({ action: "scheme-delete", id: x.id }).then(function (r) { toast(r.ok ? "Deleted" : r.error); load(); }); }, "red"]] : []), '<div id="sb">' + body() + "</div>");
+    ov.querySelector(".sheet").style.maxWidth = "680px";
+    var collect = function (ov) { x.name = ov.querySelector("#sn").value; x.month = ov.querySelector("#sm").value; x.kind = ov.querySelector("#sk").value; x.method = ov.querySelector("#smt").value; x.notes = ov.querySelector("#sno").value; x.active = ov.querySelector("#sac").checked; x.targets = x.targets || {}; [].forEach.call(ov.querySelectorAll("[data-t]"), function (e) { if (e.value) x.targets[e.dataset.t] = +e.value; else delete x.targets[e.dataset.t]; }); };
+    var bind = function () { [].forEach.call(ov.querySelectorAll("[data-s]"), function (e) { e.oninput = function () { x.slabs[+e.dataset.s][e.dataset.k] = +e.value; }; }); [].forEach.call(ov.querySelectorAll("[data-rs]"), function (b) { b.onclick = function () { x.slabs.splice(+b.dataset.rs, 1); redraw(); }; }); ov.querySelector("#sa").onclick = function () { x.slabs.push({ from: 0, rate: 0, bonus: 0 }); redraw(); }; };
+    var redraw = function () { if (ov.querySelector("#sn")) collect(ov); ov.querySelector("#sb").innerHTML = body(); bind(); };
+    bind();
+  }
+  window.__pageBack = function () { return false; };
+  load();
+})();
+</script>
+</body>
+</html>

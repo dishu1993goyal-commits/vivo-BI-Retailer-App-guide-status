@@ -66,6 +66,7 @@
     ".biw-bar{position:fixed;top:12px;right:12px;z-index:2147482000;display:flex;align-items:center;gap:4px;background:#0b0b0c;border:1px solid #c9a227;border-radius:99px;padding:4px;box-shadow:0 6px 18px rgba(0,0,0,.25)}" +
     ".biw-bar button{position:relative;border:0;background:transparent;color:#e6cf86;width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}" +
     ".biw-bar button:hover{background:#1f1f22}" +
+    ".biw-bar .biw-apps{background:#c9a227;color:#0b0b0c;font-size:21px;font-weight:800}.biw-bar .biw-apps:hover{background:#e6cf86}" +
     ".biw-av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#c9a227,#8a6a1f);color:#111;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;overflow:hidden}" +
     ".biw-av img{width:100%;height:100%;object-fit:cover}" +
     ".biw-badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;border-radius:99px;background:#e53935;color:#fff;font-size:10px;font-weight:700;display:none;align-items:center;justify-content:center;padding:0 4px}" +
@@ -666,19 +667,14 @@
     if (barEl) barEl.remove();
     barEl = el("div", "biw-bar");
     barEl.innerHTML = '<button title="Search" aria-label="Search">🔍</button><button title="BI Assistant" aria-label="BI Assistant">💬</button>' +
-      '<button title="Messages" aria-label="Messages">✉️<span class="biw-badge" id="biw-cb"></span></button>' +
-      '<button title="Surveys" aria-label="Surveys">📋<span class="biw-badge" id="biw-sb"></span></button>' +
-      '<button title="Market visits" aria-label="Market visits">📍</button>' +
-      '<button title="Support desk" aria-label="Support desk">🎧<span class="biw-badge"></span></button><button title="Profile" aria-label="Profile & settings"><span class="biw-av"></span></button>';
+      '<button title="All tools" aria-label="All tools" class="biw-apps">⊞<span class="biw-badge" id="biw-tb"></span></button>' +
+      '<button title="Profile" aria-label="Profile & settings"><span class="biw-av"></span></button>';
     var b = barEl.querySelectorAll("button");
     b[0].onclick = function () { assistant("openSearch"); };
     b[1].onclick = function () { assistant("openChat"); };
-    b[2].onclick = function () { openTool("chat"); };
-    b[3].onclick = function () { openSurveys(); };
-    b[4].onclick = function () { openTool("visits"); };
-    b[5].onclick = function () { openSupport(); };
-    b[6].onclick = function () { openDrawer(); };
-    badgeEl = barEl.querySelectorAll(".biw-badge")[2]; svBadgeEl = barEl.querySelector("#biw-sb"); chBadgeEl = barEl.querySelector("#biw-cb");
+    b[2].onclick = function () { openTool("hub"); };
+    b[3].onclick = function () { openDrawer(); };
+    badgeEl = null; svBadgeEl = null; chBadgeEl = barEl.querySelector("#biw-tb");
     ROOT.appendChild(barEl);
     paintAvatar(barEl.querySelector(".biw-av"));
   }
@@ -698,10 +694,10 @@
     if (!AUTH) return;
     api({ action: "notify" }).then(function (res) {
       if (!res.ok) { sessionLost(res); return; }
-      setBadge(badgeEl, res.supportUnread || 0);
-      var sv = res.surveys || {};
-      setBadge(svBadgeEl, isAdmin() ? (sv.newResponses || 0) : (sv.pending || 0));
-      setBadge(chBadgeEl, (res.chat && res.chat.unread) || 0);
+      var sv = res.surveys || {}, dp = res.disputes || {};
+      var total = (res.supportUnread || 0) + (isAdmin() ? (sv.newResponses || 0) : (sv.pending || 0)) + ((res.chat && res.chat.unread) || 0) + (dp.unread || 0) + (dp.assigned || 0) +
+        (res.hygiene || 0 ? 1 : 0) + (res.quizNew || 0) + (res.pollNew || 0) + (res.autorep || 0) + (res.matrix && res.matrix.pending ? 1 : 0);
+      setBadge(chBadgeEl, total);
       if (isAdmin()) {
         var pr = res.pwreq || 0;
         if (pr > PWREQ && !document.querySelector(".biw-frame,.biw-ov")) toast("🛡️ " + pr + " password reset request" + (pr > 1 ? "s" : "") + " waiting — Profile → Account security");
@@ -741,22 +737,35 @@
   }
   // ---------- SURVEYS, MESSAGES, FEATURE MATRIX (shared pages, also used by the apps) ----------
   var svFrame = null;
-  var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"], visits: ["visits.html", "Market visits", "Market visits"], knowledge: ["knowledge.html", "Knowledge", "Knowledge"], affordability: ["affordability.html", "Affordability Corner", "Affordability Corner"] };
+  var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"], visits: ["visits.html", "Market visits", "Market visits"], knowledge: ["knowledge.html", "Knowledge", "Knowledge"], affordability: ["affordability.html", "Affordability Corner", "Affordability Corner"],
+    hub: ["hub.html", "All tools", "All tools"], reports: ["reports.html", "Reports", "Reports"], help: ["help.html", "Help centre", "Help centre"], disputes: ["disputes.html", "Disputes", "Disputes"],
+    hygiene: ["hygiene.html", "Market hygiene", "Market hygiene"], engage: ["engage.html", "Engage", "Engage"], schemes: ["schemes.html", "Schemes & payout", "Schemes & payout"], admintools: ["admin-tools.html", "Admin tools", "Admin tools"] };
+  function toolByFile(file) { for (var k in TOOLS) if (TOOLS[k][0] === file) return k; return null; }
   function openSurveys(hash) { openTool("survey", hash); }
   function openTool(name, hash) {
     closeDrawer();
     if (svFrame) svFrame.remove();
-    var tl = TOOLS[name], f = el("div", "biw-frame"); svFrame = f;
-    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? tl[2] : tl[1]) + '</b></div><iframe allow="geolocation; camera" title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
+    var fromHub = !!(svFrame && svFrame.dataset.tool === "hub" && name !== "hub");
+    var tl = TOOLS[name] || [name, name, name], f = el("div", "biw-frame"); svFrame = f; f.dataset.tool = name;
+    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? tl[2] : tl[1]) + '</b></div><iframe allow="geolocation; camera; clipboard-write" title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
     ROOT.appendChild(f);
     var ifr = f.querySelector("iframe");
     f.querySelector(".biw-back").onclick = function () {
       var w = ifr.contentWindow, handled = false;
       try { var fn = w && (w.__pageBack || w.__surveyBack); handled = fn && fn(); } catch (e) { }
-      if (!handled) { f.remove(); svFrame = null; refreshBadge(); }
+      if (!handled) { f.remove(); svFrame = null; refreshBadge(); if (fromHub) openTool("hub"); }
     };
   }
-  window.addEventListener("message", function (e) { if (e.origin === location.origin && e.data && e.data.biSurvey) refreshBadge(); });
+  window.addEventListener("message", function (e) {
+    if (e.origin !== location.origin || !e.data) return;
+    if (e.data.biSurvey) refreshBadge();
+    if (e.data.biOpen) { var o = e.data.biOpen, k = toolByFile(String(o.file || "")); if (k) openTool(k, String(o.hash || "#list")); }
+    if (e.data.biNative) {   // hub tiles for screens that live in the dashboard itself
+      var n = e.data.biNative; if (svFrame) { svFrame.remove(); svFrame = null; }
+      if (n === "support") openSupport(); else if (n === "users") showUsers("state"); else if (n === "logs") openInsights("logs"); else if (n === "supportReport") openInsights("support");
+      else if (n === "calculator") assistant("openCalculator");
+    }
+  });
   setInterval(function () { if (AUTH && document.visibilityState === "visible") refreshBadge(); }, 120000);
 
   // ---------- BI ASSISTANT (search, chat, AI, payout calculator) ----------
@@ -816,6 +825,7 @@
     var ph = store("biw-photo");
     var adminItems = [["🪪", "vChat directory", "", function () { openTool("directory"); }], ["🛡️", "Account security", PWREQ ? PWREQ + " reset request" + (PWREQ > 1 ? "s" : "") : "", function () { openTool("security"); }], ["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
     var helpItems = [["📍", "Market visits", admin ? "Team tracker & scorecard" : "Punch in / out at stores", function () { openTool("visits"); }], ["💳", "Affordability Corner", "Prices, EMI, exchange, V-Shield, ABB", function () { openTool("affordability"); }], ["📚", "Knowledge", "BI, AI, dashboards, Power BI", function () { openTool("knowledge"); }], ["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
+    var toolItems = [["⊞", "All tools", admin ? "Field, reports, engage, help, admin" : "Field, reports, engage, help", function () { openTool("hub"); }]];
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
     var supItems = [["📲", "Get the State app", "APK", function () { location.href = APP_LINKS.state; }], admin ? ["📲", "Get the Admin app", "APK", function () { location.href = APP_LINKS.admin; }] : null,
@@ -826,15 +836,13 @@
     var d = drawer("Profile", null,
       '<div class="biw-prof"><div class="biw-av" id="biw-pav">' + (ph && ph.data ? '<img alt="" src="data:image/jpeg;base64,' + ph.data + '">' : esc(initials(p.fullName || AUTH.username))) + "</div>" +
       '<a class="biw-link" id="biw-chph" style="color:#e6cf86;margin:0 0 6px">📷 Change photo</a><b>' + esc(p.fullName || AUTH.username) + "</b><small>@" + esc(AUTH.username) + (p.phone ? " · " + esc(p.phone) : "") + '</small><br><span class="biw-pill">' + esc(sub) + "</span></div>" +
-      (admin ? '<div class="biw-sec">Admin tools</div><div id="biw-r0">' + rows(adminItems) + "</div>" : "") +
-      '<div class="biw-sec">Help & tools</div><div id="biw-r1">' + rows(helpItems) + "</div>" +
+      '<div class="biw-sec">Tools</div><div id="biw-r1">' + rows(toolItems) + "</div>" +
       '<div class="biw-sec">Account</div><div id="biw-r2">' + rows(accItems) + "</div>" +
       '<div class="biw-sec">Settings</div><div id="biw-r3">' + rows(setItems) + "</div>" +
       '<div class="biw-sec">Apps & support</div><div id="biw-r4">' + rows(supItems) + "</div>" +
       '<div class="biw-sec">About</div><div id="biw-r5">' + rows(about) + "</div>" +
       '<button class="biw-btn biw-danger" id="biw-lo">Log out</button><a class="biw-link" id="biw-del" style="color:#999;font-size:13px">Delete my account</a>');
-    if (admin) bindRows(d, "#biw-r0", adminItems);
-    bindRows(d, "#biw-r1", helpItems); bindRows(d, "#biw-r2", accItems); bindRows(d, "#biw-r3", setItems); bindRows(d, "#biw-r4", supItems);
+    bindRows(d, "#biw-r1", toolItems); bindRows(d, "#biw-r2", accItems); bindRows(d, "#biw-r3", setItems); bindRows(d, "#biw-r4", supItems);
     d.querySelector("#biw-pav").onclick = d.querySelector("#biw-chph").onclick = photoMenu;
     d.querySelector("#biw-lo").onclick = function () {
       if (!confirm("Log out? You'll need your user name and password to log in again.")) return;

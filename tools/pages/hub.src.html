@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>All tools</title>
+<style>
+/*@@CSS@@*/
+.hsearch{position:relative;margin-top:2px}
+.hsearch input{padding-left:40px;font-size:15px}
+.hsearch:before{content:"🔍";position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.quick button{border:0;border-radius:16px;padding:12px 6px 10px;background:var(--card);box-shadow:0 2px 10px rgba(20,24,51,.06);cursor:pointer;font:600 12px inherit;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+.quick button i{font-style:normal;width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:21px;color:#fff}
+.cat{background:var(--card);border-radius:20px;padding:14px 12px 10px;margin-top:12px;box-shadow:0 2px 12px rgba(20,24,51,.05)}
+.cat h3{margin:0 4px 10px;font-size:15px;display:flex;align-items:center;gap:8px}
+.cat h3 small{color:var(--mut);font-weight:500;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 6px}
+@media(min-width:620px){.grid{grid-template-columns:repeat(6,1fr)}.quick{grid-template-columns:repeat(4,1fr)}}
+.it{border:0;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border-radius:14px;position:relative;font:inherit;color:var(--ink)}
+.it:hover,.it:focus-visible{background:#F3F4FD;outline:0}
+.it .ic3{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:25px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+.it span{font-size:11.8px;font-weight:600;text-align:center;line-height:1.2;max-width:84px}
+.bd{position:absolute;top:2px;right:calc(50% - 34px);min-width:18px;height:18px;border-radius:99px;background:#E53935;color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid #fff}
+.quick .bd{right:12px}
+.empty2{text-align:center;color:var(--mut);padding:24px 8px;font-size:14px}
+.pill{display:inline-flex;gap:6px;align-items:center;background:rgba(255,255,255,.16);border-radius:99px;padding:4px 10px;font-size:12px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">⊞</span></div>
+  <h1 id="h1">All tools</h1><p id="h2">Everything in one place</p><div id="pl"></div>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), MODS = null, N = {}, Q = "";
+  var IN_APP = !!(window.BIApp && window.BIApp.getAuth);
+  // id, icon, label, module, target, badge(n)  — target "t:file#hash" opens a shared page; "n:name" a native screen (app) / web panel
+  var CATS = [
+    { id: "field", icon: "📍", name: "Field & market", sub: "In the market", col: "#E6F4EA", items: [
+      ["visits", "📍", "Market visits", "visits", "t:visits.html"], ["affordability", "💳", "Affordability", "affordability", "t:affordability.html"], ["hygiene", "🧼", "Market hygiene", "hygiene", "t:hygiene.html", function () { return N.hygiene; }]] },
+    { id: "reports", icon: "📊", name: "Reports & insights", sub: "Numbers", col: "#EEF0FF", items: [
+      ["reports", "📑", "Report builder", "reports", "t:reports.html#build"], ["autoreports", "🗓️", "Auto-reports", "autoreports", "t:reports.html#auto", function () { return N.autorep; }],
+      ["leaderboard", "🏆", "Leaderboard", "leaderboard", "t:engage.html#board"], ["matrix", "🧩", "Feature usability", "matrix", "t:matrix.html", function () { return N.matrix; }]] },
+    { id: "engage", icon: "💬", name: "Engage", sub: "Team", col: "#F4EEFF", items: [
+      ["quiz", "🎓", "Quizzes", "quiz", "t:engage.html#quiz", function () { return N.quizNew; }], ["polls", "🗳️", "Polls", "polls", "t:engage.html#polls", function () { return N.pollNew; }],
+      ["wall", "💡", "Best practices", "wall", "t:engage.html#wall"], ["surveys", "📋", "Surveys", "surveys", "t:survey.html", function () { return N.surveys; }], ["chat", "✉️", "Messages", "chat", "t:chat.html", function () { return N.chat; }]] },
+    { id: "learn", icon: "📚", name: "Learn & help", sub: "Answers", col: "#FFF4E5", items: [
+      ["help", "❓", "FAQ & Ask AI", "help", "t:help.html#faq"], ["flows", "🔀", "Processes", "flows", "t:help.html#flows"], ["contacts", "☎️", "Escalation contacts", "contacts", "t:help.html#contacts"],
+      ["knowledge", "📖", "Knowledge", "knowledge", "t:knowledge.html"], ["schemes", "🧾", "Schemes & calculator", "schemes", "t:schemes.html"]] },
+    { id: "support", icon: "🎧", name: "Support", sub: "Get help", col: "#FDECEC", items: [
+      ["disputes", "⚖️", "Disputes", "disputes", "t:disputes.html", function () { return (N.disputes || {}).unread + (N.disputes || {}).assigned; }], ["support", "🎧", "Support desk", "support", "n:support", function () { return N.supportUnread; }],
+      ["qr", "🔳", "Web login (QR)", null, "n:scanqr", null, "app"]] },
+    { id: "admin", icon: "🛡️", name: "Admin", sub: "HO only", col: "#E8F6FB", admin: true, items: [
+      ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
+      ["directory", "🪪", "vChat directory", null, "t:directory.html"], ["security", "🛡️", "Account security", null, "t:security.html", function () { return N.pwreq; }], ["insights", "📈", "Access insights", null, "n:logs"],
+      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"]] }
+  ];
+  var QUICK = ADMIN ? [["📍", "Team visits", "#1E9E61", "t:visits.html#team"], ["⚖️", "Disputes", "#E05757", "t:disputes.html", function () { return (N.disputes || {}).assigned; }], ["🗓️", "Auto-reports", "#4D5BF9", "t:reports.html#auto"], ["📥", "Import users", "#8E5CF6", "t:admin-tools.html#import"]]
+    : [["📍", "Punch in", "#1E9E61", "t:visits.html"], ["💳", "Offers", "#4D5BF9", "t:affordability.html"], ["❓", "Ask AI", "#E69A00", "t:help.html#faq"], ["⚖️", "Raise dispute", "#E05757", "t:disputes.html#new"]];
+
+  function open(target, label) {
+    var kind = target.slice(0, 2), rest = target.slice(2), file = rest.split("#")[0], hash = rest.indexOf("#") >= 0 ? "#" + rest.split("#")[1] : "#list";
+    try {
+      if (IN_APP) {
+        if (kind === "n:" && window.BIApp.nativeAction) return window.BIApp.nativeAction(rest);
+        if (kind === "t:" && window.BIApp.openTool) return window.BIApp.openTool(file, label, hash);
+      } else if (parent !== window) {
+        parent.postMessage(kind === "n:" ? { biNative: rest } : { biOpen: { file: file, title: label, hash: hash } }, location.origin);
+        return;
+      }
+    } catch (e) { }
+    if (kind === "t:") location.href = file + "?v=" + Date.now() + hash;
+    else toast("Open this from the app menu.");
+  }
+  function bd(fn) { var n = fn ? +fn() || 0 : 0; return n > 0 ? '<b class="bd">' + (n > 99 ? "99+" : n) + "</b>" : ""; }
+  function visible(it, cat) {
+    if (it[6] === "app" && !IN_APP) return false;
+    if (cat.admin && !ADMIN) return false;
+    if (it[3] && MODS && MODS[it[3]] === false) return false;
+    return true;
+  }
+  function draw() {
+    var q = Q.trim().toLowerCase();
+    var html = '<div class="hsearch"><input class="tx" id="q" placeholder="Find a tool — e.g. visits, quiz, dispute" value="' + esc(Q) + '" autocomplete="off"></div>';
+    if (!q) html += '<div class="quick">' + QUICK.map(function (x, i) { return '<button data-q="' + i + '"><i style="background:' + x[2] + '">' + x[0] + "</i>" + esc(x[1]) + bd(x[4]) + "</button>"; }).join("") + "</div>";
+    var any = false;
+    CATS.forEach(function (c) {
+      var items = c.items.filter(function (it) { return visible(it, c) && (!q || (it[2] + " " + c.name).toLowerCase().indexOf(q) >= 0); });
+      if (!items.length) return; any = true;
+      html += '<div class="cat"><h3><span>' + c.icon + "</span>" + esc(c.name) + "</h3><div class=\"grid\">" + items.map(function (it) {
+        return '<button class="it" data-t="' + esc(it[4]) + '" data-l="' + esc(it[2]) + '"><div class="ic3" style="background:' + c.col + '">' + it[1] + "</div><span>" + esc(it[2]) + "</span>" + bd(it[5]) + "</button>";
+      }).join("") + "</div></div>";
+    });
+    if (!any) html += '<div class="empty2">No tool matches “' + esc(Q) + "”.</div>";
+    VIEW.innerHTML = html;
+    var qi = $("q"); qi.oninput = function () { Q = qi.value; var p = qi.selectionStart; draw(); var n = $("q"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
+    [].forEach.call(VIEW.querySelectorAll(".it"), function (b) { b.onclick = function () { open(b.dataset.t, b.dataset.l); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var x = QUICK[+b.dataset.q]; open(x[3], x[1]); }; });
+  }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "notify" }).then(function (r) {
+      if (r.ok) {
+        MODS = r.modules || null;
+        N = { hygiene: r.hygiene, autorep: r.autorep, quizNew: r.quizNew, pollNew: r.pollNew, disputes: r.disputes || {}, supportUnread: r.supportUnread, pwreq: r.pwreq,
+          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0 };
+      }
+      api({ action: "me" }).then(function (m) {
+        var p = (m && m.profile) || {};
+        $("h1").textContent = "Hi " + String(p.fullName || AUTH.username).split(" ")[0] + " 👋";
+        $("h2").textContent = ADMIN ? "HO admin · all tools" : "State BI · " + (p.state || "");
+      });
+      draw();
+    });
+  }
+  window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
+  window.addEventListener("focus", function () { if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; if (!Q) draw(); } }); });
+  load();
+})();
+</script>
+</body>
+</html>

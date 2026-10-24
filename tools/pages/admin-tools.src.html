@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Admin tools</title>
+<style>
+/*@@CSS@@*/
+.mr{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.mr .t3{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.mr .opts{display:flex;gap:4px;background:#F1F2F8;border-radius:10px;padding:3px}
+.mr .opts button{border:0;background:none;border-radius:8px;padding:6px 10px;font:600 12px inherit;cursor:pointer;color:var(--ink2)}
+.mr .opts button.on{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08);color:var(--brand)}
+.stl{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.stl label{font-size:12px;border:1px solid #E1E3EE;border-radius:99px;padding:4px 9px;cursor:pointer;background:#fff}
+.stl label.on{background:#EEF0FF;border-color:#9AA1F5;color:#2B33A6;font-weight:700}
+.stl input{display:none}
+.iv{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:12px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05)}
+.iv .mid{flex:1;min-width:0}.iv .m{font-size:12px;color:var(--mut)}
+.stepbox{display:flex;gap:10px;margin-top:10px}.stepbox div{flex:1;background:#F5F6FF;border-radius:12px;padding:10px;font-size:12.5px;text-align:center}
+.stepbox b{display:block;font-size:18px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🛡️</span></div>
+  <h1 id="h1">Admin tools</h1><p id="h2">Import users · modules per state</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = (location.hash || "").indexOf("modules") >= 0 ? "modules" : "import", STATES = [], PREV = null;
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
+  function render() {
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">Only BI admins can use these tools.</div>'; return; }
+    VIEW.innerHTML = '<div class="seg"><button data-t="import" class="' + (TAB === "import" ? "on" : "") + '">📥 Import users</button><button data-t="modules" class="' + (TAB === "modules" ? "on" : "") + '">🎛️ Modules per state</button></div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    (TAB === "import" ? showImport : showModules)();
+  }
+
+  // ================= IMPORT USERS (#15) =================
+  function showImport() {
+    hero("Import users", "Create state & admin IDs from a template — each person gets an email to finish registration");
+    $("pane").innerHTML = '<div class="card"><h3>📥 Import from Excel</h3><div class="sub">Columns: <b>Role</b> (State / Admin), <b>Name</b>, <b>vChat ID</b>, <b>State</b>, <b>Mobile</b>, <b>Email</b>. State users need vChat ID, state, mobile and email; admins need name and email.</div>' +
+      '<div class="stepbox"><div><b>1</b>Download the template and fill it</div><div><b>2</b>Upload and check the preview</div><div><b>3</b>Send — each person gets an email with the registration link and app download</div></div>' +
+      '<div class="row" style="margin-top:12px"><button class="btn ghost sm" id="tpl">⬇ Template</button><button class="btn pri" id="up">📁 Upload file</button></div><div id="pv"></div></div><div class="card"><h3>✉️ Invitations</h3><div id="il"><div class="loading"><div class="spin"></div></div></div></div>';
+    $("tpl").onclick = function () { download(xlsx([{ name: "Users", rows: [["Role", "Name", "vChat ID", "State", "Mobile", "Email"], ["State", "Ravi Kumar", "VC1001", "Bihar", "9876543210", "ravi.kumar@vivo.com"], ["Admin", "Neha Sharma", "", "", "9999988888", "neha.sharma@vivo.com"]] }]), "User_import_template.xlsx"); };
+    $("up").onclick = function () { pick(function (rows) {
+      var hk = function (h) { h = String(h).toLowerCase(); return /role|type/.test(h) ? "role" : /vchat/.test(h) ? "vchatId" : /state/.test(h) ? "state" : /mobile|phone/.test(h) ? "mobile" : /mail/.test(h) ? "email" : /name/.test(h) ? "name" : ""; };
+      var head = rows[0].map(hk);
+      PREV = rows.slice(1).map(function (r) { var o = {}; head.forEach(function (k, i) { if (k) o[k] = String(r[i] == null ? "" : r[i]).trim(); }); return o; }).filter(function (o) { return o.name || o.email; });
+      var problems = PREV.map(function (o) { var st = !/admin|ho/i.test(o.role || ""); if (!o.name || !/@/.test(o.email || "")) return "name/email"; if (st && (!o.vchatId || !o.state || String(o.mobile).replace(/\D/g, "").length < 10)) return "vChat ID / state / mobile"; if (st && STATES.length && STATES.indexOf(o.state) < 0) return "unknown state"; return ""; });
+      var ok = problems.filter(function (p) { return !p; }).length;
+      $("pv").innerHTML = '<div class="notice info" style="margin-top:12px">' + PREV.length + " rows · " + ok + " ready" + (PREV.length - ok ? " · " + (PREV.length - ok) + " need fixing (skipped)" : "") + '</div><div class="tscroll" style="max-height:300px;overflow:auto;margin-top:8px"><table><thead><tr><th>Role</th><th>Name</th><th>vChat ID</th><th>State</th><th>Mobile</th><th>Email</th><th></th></tr></thead><tbody>' +
+        PREV.map(function (o, i) { return "<tr><td>" + esc(/admin|ho/i.test(o.role || "") ? "Admin" : "State") + "</td><td>" + esc(o.name) + "</td><td>" + esc(o.vchatId || "") + "</td><td>" + esc(o.state || "") + "</td><td>" + esc(o.mobile || "") + "</td><td>" + esc(o.email || "") + "</td><td>" + (problems[i] ? '<span class="chip warn">' + problems[i] + "</span>" : '<span class="chip live">✓</span>') + "</td></tr>"; }).join("") + "</tbody></table></div>" +
+        '<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="snd" checked> Email each person their registration link now</label><button class="btn ok" id="go" style="margin-top:10px"' + (ok ? "" : " disabled") + ">Create " + ok + " invitation" + (ok === 1 ? "" : "s") + "</button>";
+      $("go").onclick = function () { var b = this; b.disabled = true; b.textContent = "Creating…"; api({ action: "inv-import", rows: PREV.filter(function (o, i) { return !problems[i]; }), send: $("snd").checked }).then(function (r) {
+        b.disabled = false; b.textContent = "Done";
+        if (!r.ok) return toast(r.error);
+        $("pv").innerHTML = '<div class="notice ' + (r.errors.length ? "" : "info") + '" style="margin-top:12px">✓ ' + r.created + " invitation(s) created · " + r.emailed + " emailed" + (r.skipped.length ? "<br>Skipped: " + r.skipped.map(esc).join("<br>") : "") + (r.errors.length ? "<br>Email problems: " + r.errors.map(esc).join("<br>") : "") + "</div>";
+        loadInv();
+      }); };
+    }); };
+    loadInv();
+  }
+  function loadInv() {
+    api({ action: "inv-list" }).then(function (r) {
+      if (!r.ok) { $("il").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var st = { sent: ["✉️ Sent", "warn"], opened: ["👀 Opened", ""], done: ["✓ Registered", "done"], cancelled: ["Cancelled", "closed"] };
+      $("il").innerHTML = (!r.emailReady ? '<div class="notice">Email sending isn\'t set up — add the Brevo key in Account security → Email code, then use Resend.</div>' : "") +
+        (r.invites.length ? '<div class="tiles" style="margin-bottom:6px">' + tileS("✉️", "#FFF4E5", r.invites.filter(function (x) { return x.status === "sent"; }).length, "Waiting") + tileS("👀", "#EEF0FF", r.invites.filter(function (x) { return x.status === "opened"; }).length, "Opened") + tileS("✓", "#E6F4EA", r.invites.filter(function (x) { return x.status === "done"; }).length, "Registered") + tileS("⌛", "#FDECEC", r.invites.filter(function (x) { return x.expired; }).length, "Expired") + "</div>" +
+          r.invites.map(function (x) { var s = x.expired ? ["⌛ Expired", "closed"] : st[x.status] || [x.status, ""]; return '<div class="iv"><div class="mid"><b>' + esc(x.name) + '</b> <span class="muted" style="font-size:12px">' + (x.role === "admin" ? "Admin" : esc(x.state) + " · " + esc(x.vchatId)) + '</span><div class="m">' + esc(x.email) + " · invited " + dOnly(x.createdAt) + (x.sends > 1 ? " · sent " + x.sends + "×" : "") + (x.doneAt ? " · registered " + dOnly(x.doneAt) + " as " + esc(x.username) : "") + (x.mailError ? ' · <span style="color:var(--bad)">' + esc(x.mailError) + "</span>" : "") + '</div></div><span class="chip ' + s[1] + '">' + s[0] + "</span>" + (x.status !== "done" && x.status !== "cancelled" ? '<button class="btn ghost sm" data-rs="' + x.id + '" title="Resend">↻</button><button class="btn ghost sm" data-cx="' + x.id + '" title="Cancel">✕</button>' : "") + "</div>"; }).join("") : '<div class="empty">No invitations yet.</div>');
+      [].forEach.call($("il").querySelectorAll("[data-rs]"), function (b) { b.onclick = function () { b.disabled = true; api({ action: "inv-resend", id: b.dataset.rs }).then(function (x) { toast(x.ok ? "Email sent again" : x.error); loadInv(); }); }; });
+      [].forEach.call($("il").querySelectorAll("[data-cx]"), function (b) { b.onclick = function () { api({ action: "inv-cancel", id: b.dataset.cx }).then(function (x) { toast(x.ok ? "Cancelled" : x.error); loadInv(); }); }; });
+    });
+  }
+  function pick(cb) {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var file = inp.files[0]; if (!file) return;
+      if (/\.csv$/i.test(file.name)) { file.text().then(function (t) { cb(t.split(/\r?\n/).filter(Boolean).map(function (l) { return l.split(",").map(function (x) { return x.replace(/^"|"$/g, "").trim(); }); })); }); return; }
+      var go = function () { file.arrayBuffer().then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); cb(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false })); }); };
+      if (window.XLSX) return go();
+      var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = go; s.onerror = function () { toast("Couldn't load the Excel reader — save as CSV and try again."); }; document.head.appendChild(s);
+    };
+    inp.click();
+  }
+
+  // ================= MODULES PER STATE (#12) =================
+  function showModules() {
+    hero("Modules per state", "Pilot a tool in a few states before a PAN India rollout");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "mod-get" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var M = r.modules;
+      var draw = function () {
+        $("pane").innerHTML = '<div class="notice info" style="margin-top:6px">HO admins always see every tool. For state users: <b>All states</b> = on everywhere · <b>Pilot</b> = only the states you tick · <b>Off</b> = hidden.</div>' +
+          M.map(function (m, i) { return '<div class="mr"><div class="t3"><b>' + esc(m.name) + '</b><div class="opts">' + [["all", "All states"], ["states", "Pilot"], ["off", "Off"]].map(function (o) { return '<button data-i="' + i + '" data-m="' + o[0] + '" class="' + (m.mode === o[0] ? "on" : "") + '">' + o[1] + "</button>"; }).join("") + "</div></div>" +
+            (m.mode === "states" ? '<div class="stl">' + STATES.map(function (s) { return '<label class="' + (m.states.indexOf(s) >= 0 ? "on" : "") + '"><input type="checkbox" data-si="' + i + '" data-s="' + esc(s) + '">' + esc(s) + "</label>"; }).join("") + "</div>" + (m.states.length ? "" : '<div class="muted" style="font-size:12px;margin-top:4px">Tick the pilot states.</div>') : "") + "</div>"; }).join("") +
+          '<div style="position:sticky;bottom:10px;margin-top:14px"><button class="btn pri block" id="ms" style="padding:13px">Save module settings</button></div>' + (r.updatedAt ? '<div class="muted" style="font-size:12px;margin-top:6px;text-align:center">Last changed by ' + esc(r.updatedBy) + " · " + dt(r.updatedAt) + "</div>" : "");
+        [].forEach.call($("pane").querySelectorAll("[data-m]"), function (b) { b.onclick = function () { M[+b.dataset.i].mode = b.dataset.m; draw(); }; });
+        [].forEach.call($("pane").querySelectorAll("[data-si]"), function (c) { c.parentNode.onclick = function (e) { e.preventDefault(); var m = M[+c.dataset.si], k = m.states.indexOf(c.dataset.s); if (k >= 0) m.states.splice(k, 1); else m.states.push(c.dataset.s); draw(); }; });
+        $("ms").onclick = function () { api({ action: "mod-set", modules: M }).then(function (x) { toast(x.ok ? "Saved — state users see the change on their next open" : x.error); }); };
+      };
+      draw();
+    });
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else render();
+})();
+</script>
+</body>
+</html>

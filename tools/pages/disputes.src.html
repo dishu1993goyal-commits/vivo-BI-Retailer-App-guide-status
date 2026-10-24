@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Disputes</title>
+<style>
+/*@@CSS@@*/
+.dc{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer;border-left:4px solid #C9CDF7}
+.dc.p1{border-left-color:#E05757}.dc.p2{border-left-color:#E69A00}.dc.p3{border-left-color:#4D5BF9}.dc.done{border-left-color:#1E9E61;opacity:.85}
+.dc .t1{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.dc b{font-size:14.5px}.dc .m{font-size:12px;color:var(--mut);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.tmr{font-weight:800;font-size:12px;border-radius:8px;padding:3px 8px;white-space:nowrap}
+.tmr.ok{background:#E6F4EA;color:#0F7B4F}.tmr.warn{background:#FFF4E5;color:#B26A00}.tmr.bad{background:#FDECEC;color:#B3402F}
+.flt{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px}
+.flt button{flex:none;border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 12px;font:600 12.5px inherit;cursor:pointer;color:var(--ink2)}
+.flt button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.dh{background:linear-gradient(135deg,#1F2340,#3A3F8F);color:#fff;border-radius:18px;padding:14px 16px;margin-top:8px}
+.dh .big3{font-size:26px;font-weight:800;margin-top:6px}
+.lg{margin-top:12px}.lg .e{display:flex;gap:10px;margin-bottom:10px}
+.lg .e .dot{width:10px;height:10px;border-radius:50%;background:#C9CDF7;margin-top:6px;flex:none}
+.lg .e.comment .dot{background:var(--brand)}.lg .e.status .dot{background:#1E9E61}
+.lg .bub2{background:var(--card);border-radius:12px;padding:9px 11px;box-shadow:0 1px 6px rgba(20,24,51,.05);flex:1;font-size:13.5px;white-space:pre-wrap}
+.lg .who{font-size:11.5px;color:var(--mut);margin-bottom:2px}
+.f3 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+.chips4{display:flex;flex-wrap:wrap;gap:6px}.chips4 button{border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:7px 12px;font:600 13px inherit;cursor:pointer}
+.chips4 button.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">⚖️</span></div>
+  <h1 id="h1">Disputes</h1><p id="h2">Raise → assign → resolve, with a turnaround timer</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), CFG = null, LIST = [], F = ls("disp-f") || "open", CUR = null, TICK = 0, SKEW = 0;
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  var H = 3600000;
+  function left(ms) { var a = Math.abs(ms), h = Math.floor(a / H), m = Math.floor(a % H / 60000); return (h >= 24 ? Math.floor(h / 24) + "d " + (h % 24) + "h" : h + "h " + m + "m"); }
+  function timer(d) {
+    if (["Resolved", "Closed"].includes(d.status)) return '<span class="tmr ' + (d.tat.met ? "ok" : "bad") + '">' + (d.tat.met ? "✓ within TAT" : "TAT missed") + "</span>";
+    var ms = d.dueAt - (Date.now() + SKEW), tot = d.dueAt - d.createdAt;
+    return '<span class="tmr ' + (ms < 0 ? "bad" : ms < tot * 0.25 ? "warn" : "ok") + '" data-due="' + d.dueAt + '">' + (ms < 0 ? "⏰ " + left(ms) + " over" : "⏱ " + left(ms) + " left") + "</span>";
+  }
+  function tick() { [].forEach.call(document.querySelectorAll("[data-due]"), function (e) { var due = +e.dataset.due, ms = due - (Date.now() + SKEW); e.textContent = ms < 0 ? "⏰ " + left(ms) + " over" : "⏱ " + left(ms) + " left"; if (ms < 0) e.className = "tmr bad"; }); }
+  function load(then) {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    Promise.all([CFG ? Promise.resolve({ ok: true, cached: true }) : api({ action: "disp-config" }), api({ action: "disp-list" })]).then(function (rs) {
+      if (!rs[0].cached) CFG = rs[0];
+      if (!rs[1].ok) { VIEW.innerHTML = '<div class="err">' + esc(rs[1].error) + "</div>"; return; }
+      LIST = rs[1].disputes; SKEW = rs[1].now - Date.now();
+      (then || showList)();
+    });
+  }
+  function showList() {
+    CUR = null; hero("Disputes", ADMIN ? "Assign, track turnaround time and resolve" : "Raise a data or report dispute and follow it");
+    var open = LIST.filter(function (d) { return !["Resolved", "Closed"].includes(d.status); });
+    var fl = [["open", "Open (" + open.length + ")"], ["mine", ADMIN ? "Assigned to me" : "Raised by me"], ["breach", "⏰ Over TAT"], ["done", "Resolved"], ["all", "All"]];
+    var meU = AUTH.username.toLowerCase();
+    var list = LIST.filter(function (d) {
+      if (F === "open") return !["Resolved", "Closed"].includes(d.status);
+      if (F === "mine") return ADMIN ? d.assignee && d.assignee.username.toLowerCase() === meU : d.by.username.toLowerCase() === meU;
+      if (F === "breach") return !["Resolved", "Closed"].includes(d.status) && d.dueAt < Date.now() + SKEW;
+      if (F === "done") return ["Resolved", "Closed"].includes(d.status);
+      return true;
+    });
+    var met = LIST.filter(function (d) { return d.tat.done; }), metOk = met.filter(function (d) { return d.tat.met; }).length;
+    VIEW.innerHTML = '<div class="tiles" style="margin-top:6px">' + tileS("📂", "#EEF0FF", open.length, "Open") + tileS("⏰", "#FDECEC", LIST.filter(function (d) { return !["Resolved", "Closed"].includes(d.status) && d.dueAt < Date.now() + SKEW; }).length, "Over TAT") +
+      tileS("✅", "#E6F4EA", met.length ? Math.round(metOk / met.length * 100) + "%" : "—", "Resolved in TAT") + tileS("⏱", "#FFF4E5", "P1 " + CFG.tat.P1 + "h", "P2 " + CFG.tat.P2 + "h · P3 " + CFG.tat.P3 + "h") + "</div>" +
+      '<div class="flt">' + fl.map(function (x) { return '<button data-f="' + x[0] + '" class="' + (F === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>" +
+      (list.length ? list.map(card).join("") : '<div class="card empty"><div class="big">⚖️</div>No disputes here.</div>') +
+      '<div class="fbtn" style="position:sticky;bottom:10px;margin-top:16px;display:flex;gap:8px"><button class="btn pri block" id="nw" style="padding:13px;font-size:15px">＋ Raise a dispute</button>' + (ADMIN ? '<button class="btn sec" id="ex">⬇</button><button class="btn sec" id="tc">⚙️</button>' : "") + "</div>";
+    [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (b) { b.onclick = function () { F = b.dataset.f; ls("disp-f", F); showList(); }; });
+    [].forEach.call(VIEW.querySelectorAll(".dc"), function (c) { c.onclick = function () { openD(c.dataset.id); }; });
+    $("nw").onclick = newD;
+    if ($("ex")) $("ex").onclick = exportD;
+    if ($("tc")) $("tc").onclick = tatCfg;
+    clearInterval(TICK); TICK = setInterval(tick, 30000);
+  }
+  function card(d) {
+    var done = ["Resolved", "Closed"].includes(d.status);
+    return '<div class="dc ' + (done ? "done" : d.priority.toLowerCase()) + '" data-id="' + d.id + '"><div class="t1"><b>#' + d.no + " · " + esc(d.title) + "</b>" + timer(d) + '</div><div class="m"><span class="chip ' + (done ? "done" : d.status === "Open" ? "warn" : "") + '">' + esc(d.status) + "</span><span>" + d.priority + "</span><span>" + esc(d.category) + "</span><span>" + esc(d.state) + "</span><span>" + (d.assignee ? "👤 " + esc(d.assignee.fullName) : "Unassigned") + "</span><span>" + dt(d.updatedAt) + "</span>" + (d.unread ? '<span class="chip new">New</span>' : "") + "</div></div>";
+  }
+  function newD() {
+    var pre = (location.hash || "").indexOf("new") >= 0;
+    var cat = CFG.categories[0], pr = "P2", atts = [];
+    var ov = sheet("Raise a dispute", "HO is notified and the turnaround timer starts", [["📤", "Submit", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
+      api({ action: "disp-create", title: g("dt1"), detail: g("dd"), category: cat, priority: pr, page: g("dp"), shown: g("ds"), expected: g("de"), period: g("dper"), state: ADMIN ? g("dst") : "", atts: atts }).then(function (r) { if (!r.ok) return toast(r.error); toast("Dispute #" + r.dispute.no + " raised"); load(function () { openD(r.dispute.id); }); });
+      return true;
+    }]], '<div class="f3"><label>Category</label><div class="chips4" id="dcat">' + CFG.categories.map(function (c, i) { return '<button type="button" data-c="' + esc(c) + '" class="' + (i ? "" : "on") + '">' + esc(c) + "</button>"; }).join("") + "</div>" +
+      '<label>Short title</label><input class="tx" id="dt1" maxlength="120" placeholder="e.g. Active retailers count wrong for October">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 8px"><div><label>Page / report</label><input class="tx" id="dp" placeholder="e.g. Active retailers"></div><div><label>Period</label><input class="tx" id="dper" placeholder="e.g. Oct-26"></div><div><label>Number shown</label><input class="tx" id="ds"></div><div><label>Number expected</label><input class="tx" id="de"></div></div>' +
+      (ADMIN ? '<label>State</label><input class="tx" id="dst" placeholder="HO or state name">' : "") +
+      '<label>Details</label><textarea class="tx" id="dd" style="min-height:90px" placeholder="What you see, what you expected, and how you checked"></textarea>' +
+      '<label>Priority</label><div class="chips4" id="dpr">' + [["P1", "P1 · urgent (" + CFG.tat.P1 + "h)"], ["P2", "P2 · normal (" + CFG.tat.P2 + "h)"], ["P3", "P3 · low (" + CFG.tat.P3 + "h)"]].map(function (p) { return '<button type="button" data-p="' + p[0] + '" class="' + (p[0] === "P2" ? "on" : "") + '">' + p[1] + "</button>"; }).join("") + "</div>" +
+      '<label>Screenshot / file (optional)</label><div class="row"><button class="btn sec sm" type="button" id="dat">📎 Attach</button><span class="muted" id="datn" style="font-size:12px"></span></div></div>');
+    ov.querySelector(".sheet").style.maxWidth = "580px";
+    [].forEach.call(ov.querySelectorAll("#dcat button"), function (b) { b.onclick = function () { cat = b.dataset.c; [].forEach.call(ov.querySelectorAll("#dcat button"), function (x) { x.classList.toggle("on", x === b); }); }; });
+    [].forEach.call(ov.querySelectorAll("#dpr button"), function (b) { b.onclick = function () { pr = b.dataset.p; [].forEach.call(ov.querySelectorAll("#dpr button"), function (x) { x.classList.toggle("on", x === b); }); }; });
+    ov.querySelector("#dat").onclick = function () { pickFile(function (a) { atts.push(a.id); ov.querySelector("#datn").textContent = atts.length + " file(s) attached"; }); };
+    if (pre) history.replaceState(null, "", location.pathname + location.search + "#list");
+  }
+  function pickFile(cb) {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*,.pdf,.xlsx,.xls,.csv,.html,.txt";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; if (f.size > 4 * 1024 * 1024) return toast("File is larger than 4 MB.");
+      var send = function (name, data) { api({ action: "support-upload", name: name, data: data }).then(function (r) { if (!r.ok) return toast(r.error); cb(r.att); }); };
+      if (/^image\//.test(f.type)) {
+        var img = new Image(), u = URL.createObjectURL(f);
+        img.onload = function () { var k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); send(f.name.replace(/\.\w+$/, "") + ".jpg", c.toDataURL("image/jpeg", 0.8).split(",")[1]); };
+        img.src = u; return;
+      }
+      var fr = new FileReader(); fr.onload = function () { send(f.name.replace(/\.html?$/i, ".txt"), String(fr.result).split(",")[1]); }; fr.readAsDataURL(f);
+    };
+    inp.click();
+  }
+  function openD(id) {
+    api({ action: "disp-get", id: id }).then(function (r) {
+      if (!r.ok) return toast(r.error);
+      var d = CUR = r.dispute; changed(); window.scrollTo(0, 0);
+      var done = ["Resolved", "Closed"].includes(d.status), mine = d.by.username.toLowerCase() === AUTH.username.toLowerCase() && d.by.app === AUTH.app;
+      hero("Dispute #" + d.no, d.category + " · " + d.state);
+      var adm = ADMIN ? '<div class="card"><h3>⚙️ Manage</h3><div class="row"><select class="tx" id="das" style="flex:2;min-width:150px"><option value="">Unassigned</option>' + CFG.admins.map(function (a) { return '<option value="' + esc(a.username) + '"' + (d.assignee && d.assignee.username === a.username ? " selected" : "") + ">👤 " + esc(a.fullName) + "</option>"; }).join("") + '</select><select class="tx" id="dpp" style="flex:1;min-width:80px">' + ["P1", "P2", "P3"].map(function (p) { return "<option" + (p === d.priority ? " selected" : "") + ">" + p + "</option>"; }).join("") + '</select><select class="tx" id="dss" style="flex:2;min-width:150px">' + CFG.statuses.map(function (s) { return "<option" + (s === d.status ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select></div></div>" : "";
+      VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← All disputes</button><div class="dh"><div class="row" style="justify-content:space-between"><span class="chip" style="background:rgba(255,255,255,.18);color:#fff">' + esc(d.status) + " · " + d.priority + "</span>" + timer(d) + '</div><div style="font-size:18px;font-weight:800;margin-top:8px">' + esc(d.title) + '</div><div style="font-size:12.5px;opacity:.85;margin-top:4px">Raised by ' + esc(d.by.fullName) + " · " + dt(d.createdAt) + " · due " + dt(d.dueAt) + (d.assignee ? " · 👤 " + esc(d.assignee.fullName) : "") + "</div>" +
+        (d.shown || d.expected ? '<div class="row" style="margin-top:10px;gap:10px"><div style="flex:1;background:rgba(255,255,255,.12);border-radius:10px;padding:8px"><div style="font-size:11px;opacity:.8">Shown' + (d.page ? " · " + esc(d.page) : "") + '</div><div class="big3" style="font-size:20px">' + esc(d.shown || "—") + '</div></div><div style="flex:1;background:rgba(255,255,255,.12);border-radius:10px;padding:8px"><div style="font-size:11px;opacity:.8">Expected' + (d.period ? " · " + esc(d.period) : "") + '</div><div class="big3" style="font-size:20px">' + esc(d.expected || "—") + "</div></div></div>" : "") + "</div>" +
+        '<div class="card" style="white-space:pre-wrap;font-size:14px">' + esc(d.detail) + attList(d.atts, d.id) + "</div>" + adm +
+        '<div class="lg">' + d.log.map(function (e) { return '<div class="e ' + e.kind + '"><div class="dot"></div><div class="bub2"><div class="who">' + esc(e.by.fullName) + (e.by.app === "admin" ? " (HO)" : "") + " · " + dt(e.t) + "</div>" + esc(e.text || "") + attList(e.atts, d.id) + "</div></div>"; }).join("") + "</div>" +
+        '<div class="card"><textarea class="tx" id="dmsg" placeholder="' + (ADMIN ? "Reply or add a resolution note…" : "Add information…") + '" style="min-height:70px"></textarea><div class="row" style="margin-top:8px"><button class="btn pri sm" id="dsend">Send</button><button class="btn ghost sm" id="datt">📎</button>' +
+        (ADMIN && !done ? '<button class="btn ok sm" id="dres">✓ Resolve with this note</button>' : "") + (!ADMIN && d.status === "Resolved" && mine ? '<button class="btn ok sm" id="dcl">✓ Close (satisfied)</button><button class="btn danger sm" id="dro">↺ Reopen</button>' : "") + "</div><span class=\"muted\" id=\"dattn\" style=\"font-size:12px\"></span></div>" +
+        (mine && done && !d.rating ? '<div class="card"><b>How was the resolution?</b><div class="stars" id="drt">' + [1, 2, 3, 4, 5].map(function (i) { return '<button data-v="' + i + '">★</button>'; }).join("") + "</div></div>" : "");
+      $("bk").onclick = function () { window.__pageBack(); };
+      var natts = [];
+      var upd = function (o) { o.action = "disp-update"; o.id = d.id; return api(o).then(function (x) { if (!x.ok) { toast(x.error); return; } toast("Updated"); load(function () { openD(d.id); }); }); };
+      $("dsend").onclick = function () { var t = $("dmsg").value.trim(); if (!t && !natts.length) return toast("Write a message."); upd({ text: t, atts: natts }); };
+      $("datt").onclick = function () { pickFile(function (a) { natts.push(a.id); $("dattn").textContent = natts.length + " file(s)"; }); };
+      if ($("dres")) $("dres").onclick = function () { var t = $("dmsg").value.trim(); if (!t) return toast("Write the resolution note first."); upd({ text: t, status: "Resolved" }); };
+      if ($("dcl")) $("dcl").onclick = function () { upd({ status: "Closed" }); };
+      if ($("dro")) $("dro").onclick = function () { var t = $("dmsg").value.trim(); if (!t) return toast("Say why you're reopening."); upd({ text: t, status: "In progress" }); };
+      if ($("das")) { $("das").onchange = function () { upd({ assignee: this.value }); }; $("dpp").onchange = function () { upd({ priority: this.value }); }; $("dss").onchange = function () { upd({ status: this.value, text: $("dmsg").value.trim() }); }; }
+      if ($("drt")) [].forEach.call($("drt").children, function (b) { b.onclick = function () { upd({ rating: +b.dataset.v }); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-att]"), function (a) { a.onclick = function () { api({ action: "disp-att", dispute: d.id, id: a.dataset.att }).then(function (x) { if (!x.ok) return toast(x.error); download(b64ToBlob(x.data, x.mime), x.name); }); }; });
+      clearInterval(TICK); TICK = setInterval(tick, 30000);
+    });
+  }
+  function attList(atts, id) { return (atts || []).length ? '<div class="row" style="margin-top:6px">' + atts.map(function (a) { return '<a href="javascript:void 0" class="chip" data-att="' + a.id + '">📎 ' + esc(a.name) + "</a>"; }).join("") + "</div>" : ""; }
+  function exportD() {
+    var rows = [["#", "Title", "Category", "State", "Priority", "Status", "Raised by", "Assignee", "Raised", "Due", "Resolved", "Within TAT", "Shown", "Expected", "Page", "Period", "Rating"]].concat(LIST.map(function (d) { return [d.no, d.title, d.category, d.state, d.priority, d.status, d.by.fullName, d.assignee ? d.assignee.fullName : "", dt(d.createdAt), dt(d.dueAt), d.resolvedAt ? dt(d.resolvedAt) : "", d.tat.done ? (d.tat.met ? "Yes" : "No") : (d.dueAt < Date.now() ? "Overdue" : "Open"), d.shown, d.expected, d.page, d.period, d.rating || ""]; }));
+    download(xlsx([{ name: "Disputes", rows: rows }]), "Disputes_" + istDay(Date.now()) + ".xlsx");
+  }
+  function tatCfg() {
+    sheet("Turnaround time (hours)", "Applies to new disputes", [["💾", "Save", function (ov) { api({ action: "disp-config", set: { tat: { P1: ov.querySelector("#t1").value, P2: ov.querySelector("#t2").value, P3: ov.querySelector("#t3").value } } }).then(function (x) { if (!x.ok) return toast(x.error); CFG.tat = x.tat; toast("Saved"); showList(); }); }]],
+      '<div class="f3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label>P1 urgent</label><input class="tx" id="t1" type="number" value="' + CFG.tat.P1 + '"></div><div><label>P2 normal</label><input class="tx" id="t2" type="number" value="' + CFG.tat.P2 + '"></div><div><label>P3 low</label><input class="tx" id="t3" type="number" value="' + CFG.tat.P3 + '"></div></div>');
+  }
+  window.__pageBack = function () { if (CUR) { load(); return true; } return false; };
+  load(function () { showList(); if ((location.hash || "").indexOf("new") >= 0) newD(); });
+})();
+</script>
+</body>
+</html>

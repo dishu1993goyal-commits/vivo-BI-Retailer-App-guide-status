@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Market hygiene</title>
+<style>
+/*@@CSS@@*/
+.ir{background:var(--card);border-radius:12px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);display:flex;gap:10px;align-items:center}
+.ir input[type=checkbox]{width:20px;height:20px;flex:none}
+.ir .mid{flex:1;min-width:0}.ir b{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;letter-spacing:.3px}
+.ir .m{font-size:12px;color:var(--mut);margin-top:2px}
+.st{font-size:11px;font-weight:700;border-radius:99px;padding:3px 9px;white-space:nowrap}
+.s0{background:#FFF4E5;color:#B26A00}.s1{background:#EEF0FF;color:#2B33A6}.s2{background:#E6F4EA;color:#0F7B4F}.s3,.s4,.s5{background:#FDECEC;color:#B3402F}
+.gr{display:inline-flex;width:30px;height:30px;border-radius:9px;align-items:center;justify-content:center;font-weight:800;color:#fff}
+.gA{background:#1E9E61}.gB{background:#7BBF3A}.gC{background:#E69A00}.gD{background:#E05757}
+.bar2{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 35%);padding:14px 0 10px;display:flex;gap:8px;z-index:4}
+.f4 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧼</span></div>
+  <h1 id="h1">Market hygiene</h1><p id="h2">Suspicious pre-activated IMEIs — check, act, track</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "list", D = null, SELR = {}, FS = "Pending", Q = "", STF = "";
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  var SC = function (s) { return "s" + Math.max(0, D.statuses.indexOf(s)); };
+  function render() {
+    var tabs = [["list", "📋 IMEIs"], ["scores", "🏅 Hygiene scores"]]; if (ADMIN) tabs.push(["upload", "📤 Upload"]);
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    ({ list: showList, scores: showScores, upload: showUpload })[TAB]();
+  }
+  function showList(batch) {
+    hero("Market hygiene", ADMIN ? "Every state's actions on suspicious IMEIs" : "IMEIs assigned to your state — record the action taken");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "hyg-list", batch: batch || (D && D.batch) || "", state: ADMIN ? STF : "" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      D = r; SELR = {}; changed(); draw();
+    });
+  }
+  function draw() {
+    var r = D, q = Q.toLowerCase();
+    if (!r.batches.length) { $("pane").innerHTML = '<div class="card empty"><div class="big">🧼</div>' + (ADMIN ? "No IMEI list yet. Use <b>Upload</b> to send suspicious IMEIs to state teams." : "No suspicious IMEIs assigned to your state. 👍") + "</div>"; return; }
+    var b = r.batches.find(function (x) { return x.id === r.batch; }) || r.batches[0];
+    var cnt = {}; r.rows.forEach(function (x) { cnt[x.status] = (cnt[x.status] || 0) + 1; });
+    var rows = r.rows.filter(function (x) { return (FS === "All" || x.status === FS) && (!q || (x.imei + " " + x.dealer + " " + x.dealerCode + " " + x.model + " " + x.city).toLowerCase().indexOf(q) >= 0); });
+    var states = ADMIN ? Object.keys(b.states) : [];
+    $("pane").innerHTML = '<div class="row" style="margin-top:6px"><select class="tx" id="hb" style="flex:2;min-width:180px">' + r.batches.map(function (x) { return '<option value="' + x.id + '"' + (x.id === b.id ? " selected" : "") + ">" + esc(x.name) + " · " + (ADMIN ? x.total : x.states[r.myState] || 0) + " IMEIs</option>"; }).join("") + "</select>" +
+      (ADMIN ? '<select class="tx" id="hs" style="flex:1;min-width:120px"><option value="">All states</option>' + states.map(function (s) { return "<option" + (s === STF ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") + "</div>" +
+      '<div class="muted" style="font-size:12px;margin-top:4px">Uploaded ' + dt(b.createdAt) + " by " + esc(b.by) + " · action due within " + (b.dueDays || 7) + " days</div>" +
+      '<div class="tiles" style="margin-top:8px">' + tileS("⏳", "#FFF4E5", cnt.Pending || 0, "Pending") + tileS("🔎", "#EEF0FF", cnt["Under review"] || 0, "Under review") + tileS("✅", "#E6F4EA", cnt[D.statuses[2]] || 0, "Cleared") + tileS("⚠️", "#FDECEC", (cnt[D.statuses[3]] || 0) + (cnt[D.statuses[4]] || 0) + (cnt[D.statuses[5]] || 0), "Action on dealer") + "</div>" +
+      '<div class="row" style="margin-top:8px"><select class="tx" id="hf" style="flex:1">' + ["All"].concat(D.statuses).map(function (s) { return "<option" + (s === FS ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><input class="tx" id="hq" placeholder="Search IMEI, dealer, model" value="' + esc(Q) + '" style="flex:2"></div>' +
+      (rows.length ? '<label class="muted" style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:8px"><input type="checkbox" id="hall"> Select all shown (' + rows.length + ")</label>" : "") +
+      rows.slice(0, 400).map(function (x) { return '<div class="ir"><input type="checkbox" data-k="' + x.state + "|" + x.i + '"' + (SELR[x.state + "|" + x.i] ? " checked" : "") + '><div class="mid"><b>' + esc(x.imei) + "</b> <span class=\"muted\" style=\"font-size:12px\">" + esc(x.model || "") + '</span><div class="m">' + esc(x.dealer || x.dealerCode || "") + (x.dealerCode && x.dealer ? " (" + esc(x.dealerCode) + ")" : "") + (x.city ? " · " + esc(x.city) : "") + (ADMIN ? " · " + esc(x.state) : "") + (x.activatedOn ? " · activated " + esc(x.activatedOn) : "") + (x.reason ? " · " + esc(x.reason) : "") + "</div>" + (x.remark ? '<div class="m">💬 ' + esc(x.remark) + (x.by ? " — " + esc(x.by.fullName) + ", " + dOnly(x.at) : "") + (x.photo ? ' · <a href="javascript:void 0" data-ph="' + x.state + "|" + x.i + '">📷 photo</a>' : "") + "</div>" : "") + '</div><span class="st ' + SC(x.status) + '">' + esc(x.status) + "</span></div>"; }).join("") +
+      (rows.length > 400 ? '<div class="muted" style="font-size:12px;margin-top:6px">Showing 400 — search or filter to find others.</div>' : "") +
+      (!rows.length ? '<div class="card empty">Nothing in this filter.</div>' : "") +
+      '<div class="bar2"><button class="btn pri grow" id="hact" style="padding:13px">✍️ Record action (<span id="hn">0</span>)</button>' + (ADMIN ? '<button class="btn sec" id="hx">⬇</button><button class="btn danger" id="hdel">🗑️</button>' : "") + "</div>";
+    var upd = function () { $("hn").textContent = Object.keys(SELR).filter(function (k) { return SELR[k]; }).length; };
+    $("hb").onchange = function () { showList(this.value); };
+    if ($("hs")) $("hs").onchange = function () { STF = this.value; showList(b.id); };
+    $("hf").onchange = function () { FS = this.value; draw(); };
+    $("hq").oninput = function () { Q = this.value; var p = this.selectionStart; draw(); var n = $("hq"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
+    [].forEach.call($("pane").querySelectorAll("[data-k]"), function (c) { c.onchange = function () { SELR[c.dataset.k] = c.checked; upd(); }; });
+    if ($("hall")) $("hall").onchange = function () { var on = this.checked; rows.slice(0, 400).forEach(function (x) { SELR[x.state + "|" + x.i] = on; }); [].forEach.call($("pane").querySelectorAll("[data-k]"), function (c) { c.checked = on; }); upd(); };
+    [].forEach.call($("pane").querySelectorAll("[data-ph]"), function (a) { a.onclick = function () { var p = a.dataset.ph.split("|"); api({ action: "hyg-photo", batch: b.id, state: p[0], row: +p[1] }).then(function (x) { if (!x.ok) return toast(x.error); var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="data:' + x.mime + ";base64," + x.data + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }); }; });
+    $("hact").onclick = function () { act(b); };
+    if ($("hx")) $("hx").onclick = function () { download(xlsx([{ name: "IMEIs", rows: [["IMEI", "Model", "Dealer code", "Dealer", "City", "State", "Activated on", "Reason", "Status", "Remark", "Action by", "Action date"]].concat(D.rows.map(function (x) { return [x.imei, x.model, x.dealerCode, x.dealer, x.city, x.state, x.activatedOn, x.reason, x.status, x.remark, x.by ? x.by.fullName : "", x.at ? dt(x.at) : ""]; })) }]), "Hygiene_" + b.name.replace(/[^A-Za-z0-9]+/g, "_") + ".xlsx"); };
+    if ($("hdel")) $("hdel").onclick = function () { sheet("Delete this IMEI list?", b.name + " · all state actions are removed", [["🗑️", "Delete", function () { api({ action: "hyg-delete", batch: b.id }).then(function (x) { toast(x.ok ? "Deleted" : x.error); D.batch = ""; showList(); }); }, "red"]]); };
+  }
+  function act(b) {
+    var keys = Object.keys(SELR).filter(function (k) { return SELR[k]; });
+    if (!keys.length) return toast("Select one or more IMEIs first.");
+    var byState = {}; keys.forEach(function (k) { var p = k.split("|"); (byState[p[0]] = byState[p[0]] || []).push(+p[1]); });
+    var photo = "", status = "";
+    var ov = sheet("Action for " + keys.length + " IMEI" + (keys.length > 1 ? "s" : ""), "Choose what was found / done", [["💾", "Save action", function (ov) {
+      if (!status) { toast("Choose the action."); return false; }
+      var remark = ov.querySelector("#hr").value.trim();
+      Promise.all(Object.keys(byState).map(function (st) { return api({ action: "hyg-act", batch: b.id, state: st, rows: byState[st], status: status, remark: remark, photo: photo }); })).then(function (rs) {
+        var bad = rs.find(function (x) { return !x.ok; }); if (bad) return toast(bad.error);
+        toast("Saved for " + keys.length + " IMEI(s)"); showList(b.id);
+      });
+    }]], '<div class="f4"><label>Action / finding</label><div class="chips4" style="display:flex;flex-wrap:wrap;gap:6px">' + D.statuses.slice(1).map(function (s) { return '<button type="button" class="btn ghost sm" data-s="' + esc(s) + '">' + esc(s) + "</button>"; }).join("") + '</div><label>Remark</label><textarea class="tx" id="hr" placeholder="e.g. Invoice verified — genuine customer sale / Dealer admitted pre-activation, warned"></textarea><label>Evidence photo (optional)</label><div class="row"><button class="btn sec sm" type="button" id="hph">📷 Add photo</button><span class="muted" id="hpt" style="font-size:12px"></span></div></div>');
+    [].forEach.call(ov.querySelectorAll("[data-s]"), function (x) { x.onclick = function () { status = x.dataset.s; [].forEach.call(ov.querySelectorAll("[data-s]"), function (y) { y.className = "btn sm " + (y === x ? "pri" : "ghost"); }); }; });
+    ov.querySelector("#hph").onclick = function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "environment");
+      inp.onchange = function () { var f = inp.files[0]; if (!f) return; var img = new Image(), u = URL.createObjectURL(f); img.onload = function () { var k = Math.min(1, 1280 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ov.querySelector("#hpt").textContent = "Uploading…"; api({ action: "support-upload", name: "imei-" + Date.now() + ".jpg", data: c.toDataURL("image/jpeg", 0.75).split(",")[1] }).then(function (r) { if (!r.ok) { ov.querySelector("#hpt").textContent = r.error; return; } photo = r.att.id; ov.querySelector("#hpt").textContent = "✓ Photo added"; }); }; img.src = u; };
+      inp.click();
+    };
+  }
+  function showScores() {
+    hero("Hygiene scores", "Per dealer and per state, from the actions recorded");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "hyg-scores" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var html = "";
+      if (ADMIN && r.states.length) html += '<div class="card"><h3>🗺️ States — action taken</h3><div class="sub">% of IMEIs actioned, and actioned within 7 days</div>' + hBars(r.states.map(function (s) { return [s.state, s.actionPct, s.actionPct >= 80 ? "#1E9E61" : s.actionPct >= 50 ? "#E69A00" : "#E05757"]; }), "#4D5BF9", { lw: 120, rw: 40 }) +
+        '<div class="tscroll"><table><thead><tr><th>State</th><th class="n">IMEIs</th><th class="n">Actioned</th><th class="n">On time</th><th class="n">Misuse</th><th class="n">Cleared</th><th class="n">Pending</th></tr></thead><tbody>' + r.states.map(function (s) { return "<tr><td><b>" + esc(s.state) + '</b></td><td class="n">' + s.total + '</td><td class="n">' + s.actionPct + '%</td><td class="n">' + s.onTimePct + '%</td><td class="n">' + s.misuse + '</td><td class="n">' + s.cleared + '</td><td class="n">' + s.pending + "</td></tr>"; }).join("") + "</tbody></table></div></div>";
+      html += '<div class="card"><h3>🏪 Dealer hygiene score</h3><div class="sub">Starts at 100 · −10 per confirmed misuse · −5 per IMEI pending over 7 days · −2 per IMEI under review. A ≥ 90 · B ≥ 75 · C ≥ 50 · D below 50</div>' +
+        (r.dealers.length ? '<div class="tscroll"><table><thead><tr><th>Grade</th><th>Dealer</th>' + (ADMIN ? "<th>State</th>" : "") + '<th class="n">Score</th><th class="n">IMEIs</th><th class="n">Misuse</th><th class="n">Pending</th></tr></thead><tbody>' + r.dealers.slice(0, 300).map(function (d) { return '<tr><td><span class="gr g' + d.grade + '">' + d.grade + "</span></td><td><b>" + esc(d.dealer) + "</b>" + (d.dealerCode ? '<div class="muted" style="font-size:11.5px">' + esc(d.dealerCode) + (d.city ? " · " + esc(d.city) : "") + "</div>" : "") + "</td>" + (ADMIN ? "<td>" + esc(d.state) + "</td>" : "") + '<td class="n"><b>' + d.score + '</b></td><td class="n">' + d.imeis + '</td><td class="n">' + d.misuse + '</td><td class="n">' + d.pending + "</td></tr>"; }).join("") + "</tbody></table></div>" : '<div class="empty">No dealers yet.</div>') + "</div>" +
+        (r.dealers.length ? '<button class="btn sec sm" id="sx">⬇ Export dealer scores</button>' : "");
+      $("pane").innerHTML = html;
+      if ($("sx")) $("sx").onclick = function () { download(xlsx([{ name: "Dealer hygiene", rows: [["Grade", "Score", "Dealer", "Dealer code", "City", "State", "IMEIs", "Misuse", "Pending", "Cleared"]].concat(r.dealers.map(function (d) { return [d.grade, d.score, d.dealer, d.dealerCode, d.city, d.state, d.imeis, d.misuse, d.pending, d.cleared]; })) }]), "Dealer_hygiene_" + istDay(Date.now()) + ".xlsx"); };
+    });
+  }
+  function showUpload() {
+    hero("Upload suspicious IMEIs", "Each row goes to its state's team automatically");
+    $("pane").innerHTML = '<div class="card"><h3>📤 Upload an IMEI list</h3><div class="sub">Excel or CSV with columns: IMEI, Model, Dealer code, Dealer name, City, State, Activation date, Reason. IMEI and State are required.</div>' +
+      '<div class="f4"><label>List name</label><input class="tx" id="un" placeholder="e.g. Pre-activation check — Oct week 3"><label>Action due within (days)</label><input class="tx" id="ud" type="number" value="7"></div>' +
+      '<div class="row" style="margin-top:12px"><button class="btn pri" id="up">📁 Choose file</button><button class="btn ghost sm" id="ut">⬇ Template</button></div><div id="upr"></div></div>';
+    $("ut").onclick = function () { download(xlsx([{ name: "IMEIs", rows: [["IMEI", "Model", "Dealer code", "Dealer name", "City", "State", "Activation date", "Reason"], ["351234567890123", "Y29", "BR-D001", "Shree Mobiles", "Patna", "Bihar", "2026-10-12", "Activated 3 days before invoice"]] }]), "Hygiene_IMEI_template.xlsx"); };
+    $("up").onclick = function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+      inp.onchange = function () { readSheet(inp.files[0], function (rows) {
+        var hk = function (h) { h = String(h).toLowerCase(); return /imei/.test(h) ? "imei" : /model/.test(h) ? "model" : /dealer.*code|code/.test(h) ? "dealerCode" : /dealer|retailer|name/.test(h) ? "dealer" : /city|town/.test(h) ? "city" : /state/.test(h) ? "state" : /activ|date/.test(h) ? "activatedOn" : /reason|remark|flag/.test(h) ? "reason" : ""; };
+        var head = rows[0].map(hk), data = rows.slice(1).map(function (r) { var o = {}; head.forEach(function (k, i) { if (!k) return; var v = r[i]; if (k === "activatedOn" && typeof v === "number" && v > 30000 && v < 80000) v = new Date(Math.round((v - 25569) * 86400000)).toISOString().slice(0, 10); o[k] = String(v == null ? "" : v).trim(); }); return o; }).filter(function (o) { return o.imei; });
+        var by = {}; data.forEach(function (o) { by[o.state || "(no state)"] = (by[o.state || "(no state)"] || 0) + 1; });
+        $("upr").innerHTML = '<div class="notice info" style="margin-top:12px">' + data.length + " IMEIs found: " + Object.keys(by).map(function (s) { return esc(s) + " " + by[s]; }).join(" · ") + '</div><button class="btn ok" id="ugo" style="margin-top:10px">Send to state teams</button>';
+        $("ugo").onclick = function () { this.disabled = true; api({ action: "hyg-upload", name: $("un").value, dueDays: $("ud").value, rows: data }).then(function (x) { if (!x.ok) return toast(x.error); toast("Sent: " + Object.keys(x.states).length + " states" + (x.skippedCount ? " · " + x.skippedCount + " rows skipped" : "")); TAB = "list"; D = null; render(); }); };
+      }); };
+      inp.click();
+    };
+  }
+  function readSheet(file, cb) {
+    if (!file) return;
+    if (/\.csv$/i.test(file.name)) { file.text().then(function (t) { cb(t.split(/\r?\n/).filter(Boolean).map(function (l) { return l.split(",").map(function (x) { return x.replace(/^"|"$/g, "").trim(); }); })); }); return; }
+    var go = function () { file.arrayBuffer().then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); cb(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true })); }); };
+    if (window.XLSX) return go();
+    var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = go; s.onerror = function () { toast("Couldn't load the Excel reader — save as CSV and try again."); }; document.head.appendChild(s);
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else render();
+})();
+</script>
+</body>
+</html>

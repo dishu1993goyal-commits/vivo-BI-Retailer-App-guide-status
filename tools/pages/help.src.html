@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Help centre</title>
+<style>
+/*@@CSS@@*/
+.ask{background:linear-gradient(135deg,#1F2340,#4D5BF9);border-radius:18px;padding:14px;color:#fff;margin-top:6px}
+.ask .row{gap:8px}.ask input{flex:1;border:0}
+.ans{background:#fff;color:var(--ink);border-radius:14px;padding:12px;margin-top:10px;white-space:pre-wrap;font-size:14px;line-height:1.5}
+.ans .src{font-size:11.5px;color:var(--mut);margin-top:8px;white-space:normal}
+.qa{background:var(--card);border-radius:14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);overflow:hidden}
+.qa summary{list-style:none;padding:13px 14px;font-weight:700;font-size:14.5px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+.qa summary::-webkit-details-marker{display:none}
+.qa summary:after{content:"＋";color:var(--brand);font-weight:800}.qa[open] summary:after{content:"－"}
+.qa .a{padding:0 14px 13px;font-size:14px;line-height:1.55;color:var(--ink2);white-space:pre-wrap}
+.cats3{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px}
+.cats3 button{flex:none;border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 12px;font:600 12.5px inherit;cursor:pointer;color:var(--ink2)}
+.cats3 button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.flowc{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;display:flex;gap:12px;align-items:center}
+.flowc .fi{width:46px;height:46px;border-radius:14px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.fch{position:relative;margin:14px 0 0 6px;padding-left:26px}
+.fch:before{content:"";position:absolute;left:11px;top:6px;bottom:6px;width:3px;background:#DCDFF8;border-radius:3px}
+.fs2{position:relative;background:var(--card);border-radius:14px;padding:11px 13px;margin-bottom:12px;box-shadow:0 2px 8px rgba(20,24,51,.06)}
+.fs2:before{content:attr(data-n);position:absolute;left:-26px;top:10px;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--bg)}
+.fs2.dec{border:1.5px dashed #E69A00;background:#FFFBF2}.fs2.dec:before{content:"?";background:#E69A00;border-radius:6px;transform:rotate(45deg)}
+.fs2 b{font-size:14.5px}.fs2 .d{font-size:13px;color:var(--ink2);margin-top:3px}
+.fs2 .m{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.yn{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.yn div{border-radius:10px;padding:7px 9px;font-size:12.5px}.yn .y{background:#E6F4EA;color:#14532d}.yn .n2{background:#FDECEC;color:#8c2f22}
+.ct{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);display:flex;gap:12px;align-items:center}
+.ct .lv{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none}
+.ct .acts2{display:flex;gap:6px;flex:none}
+.ct .acts2 a,.ct .acts2 button{width:40px;height:40px;border-radius:12px;border:0;display:flex;align-items:center;justify-content:center;font-size:18px;text-decoration:none;cursor:pointer}
+.ed2 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">❓</span></div>
+  <h1 id="h1">Help centre</h1><p id="h2">Answers, processes and who to contact</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), H = location.hash || "", TAB = H.indexOf("flows") >= 0 ? "flows" : H.indexOf("contacts") >= 0 ? "contacts" : "faq", CAT = "All", FLOWS = null, CUR = null, ESC = null, VLINK = "";
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  function render() {
+    CUR = null;
+    VIEW.innerHTML = '<div class="seg"><button data-t="faq" class="' + (TAB === "faq" ? "on" : "") + '">❓ FAQ & Ask</button><button data-t="flows" class="' + (TAB === "flows" ? "on" : "") + '">🔀 Processes</button><button data-t="contacts" class="' + (TAB === "contacts" ? "on" : "") + '">☎️ Contacts</button></div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    ({ faq: showFaq, flows: showFlows, contacts: showContacts })[TAB]();
+  }
+
+  // ================= FAQ + Ask =================
+  function showFaq() {
+    hero("FAQ & Ask AI", "Ask in your own words — answers come from our guides");
+    $("pane").innerHTML = '<div class="ask"><b>✨ Ask our guides</b><div style="font-size:12.5px;opacity:.85;margin:2px 0 8px">e.g. “How is retailer app usage calculated?” · “TAT kya hota hai?”</div><div class="row"><input class="tx" id="aq" placeholder="Type your question…"><button class="btn sec" id="ab" style="background:#fff">Ask</button></div><div id="aa"></div></div><div id="fq"><div class="loading"><div class="spin"></div></div></div>';
+    var ask = function () {
+      var q = $("aq").value.trim(); if (q.length < 4) return toast("Type your question.");
+      $("aa").innerHTML = '<div class="ans"><div class="spin" style="width:18px;height:18px;margin:0"></div></div>';
+      api({ action: "faq-ask", question: q }).then(function (r) {
+        if (!r.ok) { $("aa").innerHTML = '<div class="ans">' + esc(r.error) + "</div>"; return; }
+        if (r.noMatch) { $("aa").innerHTML = '<div class="ans">I couldn\'t find this in our guides. Try other words, or raise a Dispute / ask HO.</div>'; return; }
+        var body = r.answer ? esc(r.answer) : (r.fallback || []).map(function (f) { return "<b>" + esc(f.title) + "</b>\n" + esc(f.text); }).join("\n\n");
+        $("aa").innerHTML = '<div class="ans">' + body + '<div class="src">From: ' + r.sources.map(esc).join(" · ") + (r.aiError ? " · AI busy, showing the closest guide" : "") + "</div></div>";
+      });
+    };
+    $("ab").onclick = ask; $("aq").onkeydown = function (e) { if (e.key === "Enter") ask(); };
+    api({ action: "faq-list" }).then(function (r) {
+      if (!r.ok) { $("fq").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      VLINK = r.vchatLink || "";
+      var cats = ["All"].concat(r.faq.map(function (f) { return f.category; }).filter(function (c, i, a) { return a.indexOf(c) === i; }));
+      var draw = function () {
+        var list = r.faq.filter(function (f) { return CAT === "All" || f.category === CAT; });
+        $("fq").innerHTML = '<div class="cats3">' + cats.map(function (c) { return '<button data-c="' + esc(c) + '" class="' + (c === CAT ? "on" : "") + '">' + esc(c) + "</button>"; }).join("") + "</div>" +
+          (ADMIN ? '<button class="btn sec sm" id="fn" style="margin-top:8px">＋ Add FAQ</button>' : "") +
+          list.map(function (f) { return '<details class="qa"><summary>' + esc(f.q) + '</summary><div class="a">' + esc(f.a) + (ADMIN ? '<div class="row" style="margin-top:8px"><button class="btn ghost sm" data-e="' + f.id + '">✏️ Edit</button><button class="btn danger sm" data-d="' + f.id + '">Delete</button></div>' : "") + "</div></details>"; }).join("");
+        [].forEach.call($("fq").querySelectorAll("[data-c]"), function (b) { b.onclick = function () { CAT = b.dataset.c; draw(); }; });
+        if ($("fn")) $("fn").onclick = function () { faqEdit({}); };
+        [].forEach.call($("fq").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { faqEdit(r.faq.find(function (f) { return f.id === b.dataset.e; })); }; });
+        [].forEach.call($("fq").querySelectorAll("[data-d]"), function (b) { b.onclick = function () { api({ action: "faq-delete", id: b.dataset.d }).then(function (x) { toast(x.ok ? "Deleted" : x.error); showFaq(); }); }; });
+      };
+      draw();
+    });
+  }
+  function faqEdit(f) {
+    sheet(f.id ? "Edit FAQ" : "New FAQ", "Used by Ask AI too", [["💾", "Save", function (ov) {
+      api({ action: "faq-save", id: f.id && !String(f.id).match(/^d\d+$/) ? f.id : f.id, q: ov.querySelector("#fq1").value, a: ov.querySelector("#fq2").value, category: ov.querySelector("#fq3").value }).then(function (x) { toast(x.ok ? "Saved" : x.error); if (x.ok) showFaq(); });
+    }]], '<div class="ed2"><label>Category</label><input class="tx" id="fq3" value="' + esc(f.category || "General") + '"><label>Question</label><input class="tx" id="fq1" value="' + esc(f.q || "") + '"><label>Answer</label><textarea class="tx" id="fq2" style="min-height:120px">' + esc(f.a || "") + "</textarea></div>");
+  }
+
+  // ================= Process flowcharts =================
+  function showFlows() {
+    hero("Processes", "Step-by-step flows for common situations");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "flow-list" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      FLOWS = r.flows;
+      $("pane").innerHTML = (ADMIN ? '<button class="btn sec sm" id="nf" style="margin-top:8px">＋ New process</button>' : "") +
+        FLOWS.map(function (f, i) { return '<div class="flowc" data-i="' + i + '"><div class="fi">' + esc(f.icon || "🔀") + '</div><div style="flex:1"><b>' + esc(f.title) + '</b><div class="muted" style="font-size:12.5px">' + esc(f.summary || "") + " · " + f.steps.length + " steps</div></div><span class=\"muted\">›</span></div>"; }).join("") +
+        (FLOWS.some(function (f) { return f.builtIn; }) ? '<div class="notice" style="margin-top:12px">Starter templates — ' + (ADMIN ? "edit them to match your exact SOPs." : "your HO may update them to match the latest SOP.") + "</div>" : "");
+      [].forEach.call($("pane").querySelectorAll(".flowc"), function (c) { c.onclick = function () { openFlow(FLOWS[+c.dataset.i]); }; });
+      if ($("nf")) $("nf").onclick = function () { flowEdit({ steps: [{ type: "step", title: "" }] }); };
+    });
+  }
+  function openFlow(f) {
+    CUR = f; window.scrollTo(0, 0);
+    hero(f.title, f.summary || "Process");
+    var n = 0;
+    $("pane").innerHTML = '<button class="btn ghost sm" id="bk">← All processes</button><div class="fch">' + f.steps.map(function (s) {
+      if (s.type === "decision") return '<div class="fs2 dec" data-n="?"><b>' + esc(s.title) + '</b><div class="yn"><div class="y">✓ Yes → ' + esc(s.yes || "continue") + '</div><div class="n2">✗ No → ' + esc(s.no || "continue") + "</div></div></div>";
+      n++; return '<div class="fs2" data-n="' + n + '"><b>' + esc(s.title) + "</b>" + (s.detail ? '<div class="d">' + esc(s.detail) + "</div>" : "") + '<div class="m">' + (s.owner ? '<span class="chip">👤 ' + esc(s.owner) + "</span>" : "") + (s.tat ? '<span class="chip warn">⏱ ' + esc(s.tat) + "</span>" : "") + "</div></div>";
+    }).join("") + '</div><div class="fs2" data-n="✓" style="background:#E6F4EA;margin-left:26px"><b>Done</b></div>' +
+      (ADMIN ? '<div class="row" style="margin-top:12px"><button class="btn sec sm" id="ef">✏️ Edit</button><button class="btn danger sm" id="df">Delete</button></div>' : "");
+    $("bk").onclick = function () { window.__pageBack(); };
+    if ($("ef")) $("ef").onclick = function () { flowEdit(JSON.parse(JSON.stringify(f))); };
+    if ($("df")) $("df").onclick = function () { sheet("Delete this process?", f.title, [["🗑️", "Delete", function () { api({ action: "flow-delete", id: f.id }).then(function (x) { toast(x.ok ? "Deleted" : x.error); showFlows(); }); }, "red"]]); };
+  }
+  function flowEdit(f) {
+    var steps = f.steps || [];
+    var body = function () { return '<div class="ed2"><div class="g2s" style="display:grid;grid-template-columns:70px 1fr;gap:8px"><div><label>Icon</label><input class="tx" id="fi" value="' + esc(f.icon || "🔀") + '"></div><div><label>Title</label><input class="tx" id="ft" value="' + esc(f.title || "") + '"></div></div><label>Summary</label><input class="tx" id="fsu" value="' + esc(f.summary || "") + '">' +
+      steps.map(function (s, i) { return '<div style="border:1px solid #E6E8F2;border-radius:12px;padding:8px 10px;margin-top:10px"><div class="row"><select class="tx" data-i="' + i + '" data-k="type" style="flex:1"><option value="step"' + (s.type !== "decision" ? " selected" : "") + '>Step</option><option value="decision"' + (s.type === "decision" ? " selected" : "") + '>Decision (yes / no)</option></select><button class="btn ghost sm" data-up="' + i + '">↑</button><button class="btn ghost sm" data-rm="' + i + '">✕</button></div>' +
+        '<input class="tx" data-i="' + i + '" data-k="title" placeholder="' + (s.type === "decision" ? "Question" : "Step title") + '" value="' + esc(s.title || "") + '" style="margin-top:6px">' +
+        (s.type === "decision" ? '<div class="row" style="margin-top:6px"><input class="tx" data-i="' + i + '" data-k="yes" placeholder="If yes…" value="' + esc(s.yes || "") + '" style="flex:1"><input class="tx" data-i="' + i + '" data-k="no" placeholder="If no…" value="' + esc(s.no || "") + '" style="flex:1"></div>' :
+          '<input class="tx" data-i="' + i + '" data-k="detail" placeholder="Details (optional)" value="' + esc(s.detail || "") + '" style="margin-top:6px"><div class="row" style="margin-top:6px"><input class="tx" data-i="' + i + '" data-k="owner" placeholder="Owner" value="' + esc(s.owner || "") + '" style="flex:1"><input class="tx" data-i="' + i + '" data-k="tat" placeholder="TAT e.g. 2 days" value="' + esc(s.tat || "") + '" style="flex:1"></div>') + "</div>"; }).join("") +
+      '<button class="btn sec sm" id="as" style="margin-top:10px">＋ Add step</button></div>'; };
+    var ov = sheet(f.id ? "Edit process" : "New process", "", [["💾", "Save", function (ov) {
+      f.icon = ov.querySelector("#fi").value; f.title = ov.querySelector("#ft").value; f.summary = ov.querySelector("#fsu").value; f.steps = steps;
+      api({ action: "flow-save", flow: f }).then(function (x) { toast(x.ok ? "Saved" : x.error); if (x.ok) showFlows(); });
+    }]], '<div id="fb">' + body() + "</div>");
+    ov.querySelector(".sheet").style.maxWidth = "620px";
+    var bind = function () {
+      [].forEach.call(ov.querySelectorAll("[data-k]"), function (el) { el.oninput = el.onchange = function () { steps[+el.dataset.i][el.dataset.k] = el.value; if (el.dataset.k === "type") redraw(); }; });
+      [].forEach.call(ov.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { steps.splice(+b.dataset.rm, 1); redraw(); }; });
+      [].forEach.call(ov.querySelectorAll("[data-up]"), function (b) { b.onclick = function () { var i = +b.dataset.up; if (i > 0) { var x = steps[i]; steps[i] = steps[i - 1]; steps[i - 1] = x; redraw(); } }; });
+      ov.querySelector("#as").onclick = function () { steps.push({ type: "step", title: "" }); redraw(); };
+    };
+    var redraw = function () { f.icon = ov.querySelector("#fi").value; f.title = ov.querySelector("#ft").value; f.summary = ov.querySelector("#fsu").value; ov.querySelector("#fb").innerHTML = body(); bind(); };
+    bind();
+  }
+
+  // ================= Escalation contacts =================
+  function showContacts() {
+    hero("Escalation contacts", "Who to contact for which issue — tap to call or message");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "esc-list" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      ESC = r; VLINK = r.vchatLink || "";
+      var states = ["All"].concat(r.rows.map(function (x) { return x.state; }).filter(function (s, i, a) { return a.indexOf(s) === i; }));
+      var issues = ["All issues"].concat(r.rows.map(function (x) { return x.issue; }).filter(function (s, i, a) { return a.indexOf(s) === i; }));
+      var st = ls("esc-st") || (r.myState && states.indexOf(r.myState) >= 0 ? r.myState : "All"), is = "All issues";
+      var draw = function () {
+        var list = r.rows.filter(function (x) { return (st === "All" || x.state === st || x.state === "All India") && (is === "All issues" || x.issue === is); });
+        $("pane").innerHTML = '<div class="row" style="margin-top:6px"><select class="tx" id="es" style="flex:1">' + states.map(function (s) { return "<option" + (s === st ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><select class="tx" id="ei" style="flex:1">' + issues.map(function (s) { return "<option" + (s === is ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" +
+          (ADMIN ? '<div class="row" style="margin-top:8px"><button class="btn sec sm" id="eadd">＋ Add contact</button><button class="btn sec sm" id="eimp">📥 Import Excel</button><button class="btn ghost sm" id="etpl">Template</button><button class="btn ghost sm" id="evc">vChat link</button></div>' : "") +
+          (list.length ? list.map(contactCard).join("") : '<div class="card empty"><div class="big">☎️</div>' + (r.rows.length ? "No contact for this filter." : ADMIN ? "No contacts yet — import the escalation matrix (Excel) or add contacts." : "Your HO hasn't added the escalation matrix yet.") + "</div>");
+        $("es").onchange = function () { st = this.value; ls("esc-st", st); draw(); }; $("ei").onchange = function () { is = this.value; draw(); };
+        [].forEach.call($("pane").querySelectorAll("[data-vc]"), function (b) { b.onclick = function () { vchat(b.dataset.vc); }; });
+        [].forEach.call($("pane").querySelectorAll("[data-ce]"), function (b) { b.onclick = function () { escEdit(r.rows.find(function (x) { return x.id === b.dataset.ce; })); }; });
+        if (ADMIN) {
+          $("eadd").onclick = function () { escEdit({}); };
+          $("etpl").onclick = function () { download(xlsx([{ name: "Escalation", rows: [["State", "Issue", "Level", "Name", "Role", "Mobile", "vChat ID", "Email", "Hours"], ["Bihar", "Payout", 1, "Amit Kumar", "State BI lead", "9876511111", "VC1001", "amit@vivo.com", "10am–7pm"], ["All India", "Dashboard data", 2, "HO BI desk", "HO BI", "9999990000", "", "bi@vivo.com", ""]] }]), "Escalation_matrix_template.xlsx"); };
+          $("eimp").onclick = importEsc;
+          $("evc").onclick = function () { sheet("vChat message link", "If vChat supports links, enter the format with {id} for the vChat ID", [["💾", "Save", function (ov) { api({ action: "help-config", vchatLink: ov.querySelector("#vl").value }).then(function (x) { toast(x.ok ? "Saved" : x.error); VLINK = ov.querySelector("#vl").value; }); }]], '<input class="tx" id="vl" style="margin-top:10px" placeholder="e.g. vchat://chat?id={id}" value="' + esc(VLINK) + '"><div class="muted" style="font-size:12px;margin-top:6px">Leave empty to copy the vChat ID instead.</div>'); };
+        }
+      };
+      draw();
+    });
+  }
+  var LV = ["#E6F4EA;color:#14532d", "#FFF4E5;color:#7a4b00", "#FDECEC;color:#8c2f22", "#EEF0FF;color:#2B33A6", "#F4EEFF;color:#5B3FBF"];
+  function contactCard(c) {
+    return '<div class="ct"><div class="lv" style="background:' + LV[(c.level - 1) % 5] + '">L' + c.level + '</div><div style="flex:1;min-width:0"><b>' + esc(c.name) + '</b><div class="muted" style="font-size:12.5px">' + esc([c.role, c.issue, c.state].filter(Boolean).join(" · ")) + (c.hours ? " · " + esc(c.hours) : "") + "</div></div>" +
+      '<div class="acts2">' + (c.phone ? '<a href="tel:' + esc(c.phone) + '" style="background:#E6F4EA" title="Call">📞</a>' : "") + (c.vchatId ? '<button data-vc="' + esc(c.vchatId) + '" style="background:#EEF0FF" title="Message on vChat">💬</button>' : "") + (c.email ? '<a href="mailto:' + esc(c.email) + '" style="background:#FFF4E5" title="Email">✉️</a>' : "") + (ADMIN ? '<button data-ce="' + c.id + '" style="background:#F3F4FA" title="Edit">✏️</button>' : "") + "</div></div>";
+  }
+  function vchat(id) {
+    if (VLINK) { location.href = VLINK.replace("{id}", encodeURIComponent(id)); return; }
+    var done = function () { toast("vChat ID " + id + " copied — paste it in vChat search"); };
+    try { navigator.clipboard.writeText(id).then(done, function () { prompt("vChat ID", id); }); } catch (e) { done(); }
+  }
+  function escEdit(c) {
+    var f = function (k, l, ph) { return '<div><label>' + l + '</label><input class="tx" id="e_' + k + '" value="' + esc(c[k] == null ? "" : c[k]) + '" placeholder="' + (ph || "") + '"></div>'; };
+    var acts = [["💾", "Save", function (ov) { var row = { id: c.id }; ["state", "issue", "level", "name", "role", "phone", "vchatId", "email", "hours"].forEach(function (k) { row[k] = ov.querySelector("#e_" + k).value; }); api({ action: "esc-save", row: row }).then(function (x) { toast(x.ok ? "Saved" : x.error); if (x.ok) showContacts(); }); }]];
+    if (c.id) acts.push(["🗑️", "Delete", function () { api({ action: "esc-delete", id: c.id }).then(function (x) { toast(x.ok ? "Deleted" : x.error); showContacts(); }); }, "red"]);
+    sheet(c.id ? "Edit contact" : "New contact", "", acts, '<div class="ed2" style="display:grid;grid-template-columns:1fr 1fr;gap:0 8px">' + f("state", "State", "Bihar or All India") + f("issue", "Issue", "Payout") + f("level", "Level (1–5)", "1") + f("name", "Name") + f("role", "Role") + f("phone", "Mobile") + f("vchatId", "vChat ID") + f("email", "Email") + f("hours", "Hours", "10am–7pm") + "</div>");
+  }
+  function importEsc() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () { readSheet(inp.files[0], function (rows) {
+      var hk = function (h) { h = String(h).toLowerCase(); return /state/.test(h) ? "state" : /issue|category/.test(h) ? "issue" : /level/.test(h) ? "level" : /role|desig/.test(h) ? "role" : /mobile|phone/.test(h) ? "phone" : /vchat/.test(h) ? "vchatId" : /mail/.test(h) ? "email" : /hour|time/.test(h) ? "hours" : /name/.test(h) ? "name" : ""; };
+      var head = rows[0].map(hk), data = rows.slice(1).map(function (r) { var o = {}; head.forEach(function (k, i) { if (k) o[k] = r[i]; }); return o; }).filter(function (o) { return o.name; });
+      sheet("Import " + data.length + " contacts?", "Replace the current list, or add to it", [["♻️", "Replace all", function () { api({ action: "esc-import", rows: data, replace: true }).then(function (x) { toast(x.ok ? x.imported + " imported" : x.error); showContacts(); }); }], ["＋", "Add to list", function () { api({ action: "esc-import", rows: data }).then(function (x) { toast(x.ok ? x.imported + " imported" : x.error); showContacts(); }); }]]);
+    }); };
+    inp.click();
+  }
+  // minimal reader: CSV, or .xlsx via SheetJS from cdnjs
+  function readSheet(file, cb) {
+    if (!file) return;
+    if (/\.csv$/i.test(file.name)) { file.text().then(function (t) { cb(t.split(/\r?\n/).filter(Boolean).map(function (l) { return l.split(",").map(function (x) { return x.replace(/^"|"$/g, "").trim(); }); })); }); return; }
+    var go = function () { file.arrayBuffer().then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); cb(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false })); }); };
+    if (window.XLSX) return go();
+    var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = go; s.onerror = function () { toast("Couldn't load the Excel reader — save as CSV and try again."); }; document.head.appendChild(s);
+  }
+  window.__pageBack = function () { if (CUR) { showFlows(); CUR = null; return true; } return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else render();
+})();
+</script>
+</body>
+</html>

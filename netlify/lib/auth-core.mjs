@@ -6,6 +6,12 @@ import { chatAction } from "./chat-core.mjs";
 import { visitAction } from "./visit-core.mjs";
 import { kbAction } from "./kb-core.mjs";
 import { affAction } from "./aff-core.mjs";
+import { opsAction, modulesFor, moduleOn } from "./ops-core.mjs";
+import { disputeAction } from "./dispute-core.mjs";
+import { hygieneAction } from "./hygiene-core.mjs";
+import { engageAction } from "./engage-core.mjs";
+import { autorepAction } from "./autorep-core.mjs";
+import { inviteAdminAction, INVITE_DAYS } from "./invite-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
 
@@ -518,6 +524,57 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     return json(200, { ok: true });
   }
 
+  // ---------- Invited users (#15): open the email link → verify email code → choose password ----------
+  if (b.action === "invite-get" || b.action === "invite-otp" || b.action === "invite-accept") {
+    const ik = `invite:${String(b.token || "").replace(/[^a-f0-9]/g, "")}`, inv = await store.get(ik);
+    if (!inv || inv.status === "cancelled") return json(404, { ok: false, error: "This invitation link is not valid. Ask your BI admin to send a new one." });
+    if (inv.status === "done") return json(410, { ok: false, done: true, error: "You have already finished registration. Log in with your " + (inv.role === "state" ? "vChat ID" : "user name") + ".", username: inv.username || "", role: inv.role });
+    if (t > inv.exp) return json(410, { ok: false, error: "This invitation has expired. Ask your BI admin to resend it." });
+    if (b.action === "invite-get") {
+      if (inv.status === "sent") { inv.status = "opened"; inv.openedAt = t; await store.set(ik, inv); }
+      return json(200, { ok: true, invite: { role: inv.role, name: inv.name, email: inv.email, state: inv.state, vchatId: inv.vchatId, mobile: inv.mobile ? "••••••" + inv.mobile.slice(-4) : "", exp: inv.exp } });
+    }
+    if (inv.role !== app) return json(400, { ok: false, error: "Wrong app for this invitation." });
+    const okey = `eotp:invite:${app}:${inv.email}`;
+    if (b.action === "invite-otp") {
+      const rl = (await store.get(`eotprl:${inv.email}`)) || { s: [] };
+      const day = rl.s.filter((x) => t - x < 86400000), recent = day.filter((x) => t - x < 15 * 60000);
+      if (recent.length >= 3 || day.length >= 8) return json(429, { ok: false, error: "Too many codes requested. Please try again later." });
+      const code = String(Math.floor(100000 + (parseInt(randomBytes(4).toString("hex"), 16) % 900000)));
+      const sent = await sendEmailOtp(env, inv.email, code, "signup", mailFetch);
+      if (!sent.ok) return json(502, { ok: false, error: sent.error });
+      await store.set(okey, { hash: sha256(inv.email + ":" + code), exp: t + EOTP_TTL, tries: 0 });
+      day.push(t); await store.set(`eotprl:${inv.email}`, { s: day });
+      return json(200, { ok: true });
+    }
+    // accept
+    const username = String(b.username || (inv.role === "state" ? inv.vchatId : "")).trim().replace(/\s+/g, " ");
+    const ukey = userKey(username);
+    if (!ukey) return json(400, { ok: false, error: "User name must be 3–30 letters/numbers (spaces, . _ - allowed).", field: "username" });
+    const pwErr = passwordProblem(b.password);
+    if (pwErr) return json(400, { ok: false, error: pwErr, field: "password" });
+    const o = await store.get(okey);
+    if (!o || t > o.exp) return json(400, { ok: false, error: "Code expired. Tap Send code again.", field: "otp" });
+    if (o.hash !== sha256(inv.email + ":" + String(b.otp || "").replace(/\D/g, ""))) { o.tries += 1; if (o.tries >= EOTP_TRIES) await store.delete(okey); else await store.set(okey, o); return json(400, { ok: false, error: "Incorrect code.", field: "otp" }); }
+    if (await store.get(uKeyOf(ukey))) return json(409, { ok: false, error: "This user name is taken. Please choose another.", field: "username" });
+    if (await store.get(eKeyOf(inv.email))) return json(409, { ok: false, error: "This email already has an account. Log in or use Forgot password." });
+    const phone = inv.mobile ? normalizePhone(inv.mobile) : null;
+    if (phone && (await store.get(pKeyOf(phone)))) return json(409, { ok: false, error: "This mobile number already has an account. Ask your BI admin." });
+    if (inv.role === "state" && (await store.get(`vchat:${vKey(inv.vchatId)}`))) return json(409, { ok: false, error: "This vChat ID is already registered. Ask your BI admin." });
+    await store.delete(okey);
+    const nrec = { username, fullName: inv.name, phone: phone || "", ...hashPassword(b.password), createdAt: t, fails: 0, lockUntil: 0, sessions: [], state: inv.state || "",
+      email: inv.email, emailVerified: true, phoneVerified: false, signupVia: "invite", invitedBy: inv.by };
+    if (inv.role === "state") Object.assign(nrec, { vchatId: inv.vchatId, vchatVerified: true });
+    const token = newSession(nrec, t); nrec.lastSeen = t;
+    await store.set(uKeyOf(ukey), nrec);
+    if (phone) await store.set(pKeyOf(phone), { key: ukey });
+    await store.set(eKeyOf(inv.email), { key: ukey });
+    if (inv.role === "state") await store.set(`vchat:${vKey(inv.vchatId)}`, { key: ukey });
+    Object.assign(inv, { status: "done", doneAt: t, username }); await store.set(ik, inv);
+    await logEvent(store, t, app, nrec, "signup", { via: "invite", device: "invite", ver: "" });
+    return json(200, { ok: true, username, fullName: nrec.fullName, token, profile: publicProfile(nrec) });
+  }
+
   // Web: forgot password with an email code.
   if (b.action === "reset-email") {
     const email = normEmail(b.email);
@@ -738,7 +795,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  if (SESSION_ACTIONS.includes(b.action)) {
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv)-/;
+  if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
     const th = sha256(String(b.token || ""));
@@ -817,8 +875,27 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         const ks = await store.list("pwreq:");
         pwreq = (await pool(ks, 40, (k) => store.get(k))).filter((q) => q && q.status === "pending" && !(q.app === app && q.key === key)).length;
       }
-      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq });
+      const jr = async (p) => { try { return await (await p).json(); } catch (e) { return {}; } };
+      const mods = await modulesFor(store, app, rec);
+      const dp = mods.disputes ? await jr(disputeAction({ action: "disp-notify" }, ctx)) : {};
+      const hy = mods.hygiene ? await jr(hygieneAction({ action: "hyg-notify" }, ctx)) : {};
+      const en = await jr(engageAction({ action: "engage-notify" }, ctx));
+      const ar = mods.autoreports ? await jr(autorepAction({ action: "autorep-notify" }, ctx)) : {};
+      return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
+        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0 });
     }
+    if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, state: rec.state || "", name: rec.fullName });
+    {
+      const MODMAP = [[/^disp-/, "disputes"], [/^hyg-/, "hygiene"], [/^quiz-/, "quiz"], [/^poll-/, "polls"], [/^wall-/, "wall"], [/^(recog|people)-/, "leaderboard"], [/^autorep-/, "autoreports"]];
+      const mm = MODMAP.find((x) => x[0].test(b.action));
+      if (mm && !(await moduleOn(store, mm[1], app, rec)) && !/-notify$/.test(b.action)) return json(403, { ok: false, error: "This tool isn't switched on for your state yet.", moduleOff: true });
+    }
+    if (/^(mod|faq|help|esc|flow|scheme)-/.test(b.action)) return opsAction(b, surveyCtx());
+    if (b.action.startsWith("disp-")) return disputeAction(b, surveyCtx());
+    if (b.action.startsWith("hyg-")) return hygieneAction(b, surveyCtx());
+    if (/^(quiz|poll|wall|recog|people|engage)-/.test(b.action)) return engageAction(b, surveyCtx());
+    if (b.action.startsWith("autorep-")) return autorepAction(b, Object.assign(surveyCtx(), { jobFetch }));
+    if (b.action.startsWith("inv-")) return inviteAdminAction(b, Object.assign(surveyCtx(), { normalizePhone, normEmail, vKey, mailFetch }));
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());
     if (b.action.startsWith("matrix-")) return matrixAction(b, surveyCtx());

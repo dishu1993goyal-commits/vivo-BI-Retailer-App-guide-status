@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Reports</title>
+<style>
+/*@@CSS@@*/
+.step{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.step h4{margin:0 0 8px;font-size:14.5px;display:flex;gap:8px;align-items:center}
+.step h4 b{background:var(--brand);color:#fff;border-radius:99px;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.dsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.ds{border:1.5px solid #E1E3EE;border-radius:12px;padding:10px;cursor:pointer;background:#fff;text-align:left;font:inherit;color:var(--ink)}
+.ds.on{border-color:var(--brand);background:#F3F4FF}
+.ds b{display:block;font-size:13.5px}.ds small{color:var(--mut);font-size:11.5px;line-height:1.3;display:block;margin-top:2px}
+.flds{display:flex;flex-wrap:wrap;gap:6px}
+.flds label{display:inline-flex;align-items:center;gap:5px;border:1px solid #E1E3EE;border-radius:99px;padding:5px 10px;font-size:12.5px;cursor:pointer;background:#fff}
+.flds label.on{background:#EEF0FF;border-color:#9AA1F5;color:#2B33A6;font-weight:600}
+.flds input{display:none}
+.prev{max-height:420px;overflow:auto;border-radius:12px;border:1px solid #E6E8F2;margin-top:10px}
+.prev table{font-size:12.5px}
+.prev th{position:sticky;top:0;background:#F5F6FF;z-index:1}
+.rcard{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.rhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.big2{font-size:28px;font-weight:800}
+.kbars div{display:grid;grid-template-columns:150px 1fr 54px;gap:8px;align-items:center;font-size:12.5px;margin-top:6px}
+.kbars i{display:block;height:9px;border-radius:9px;background:#EEF0F6;overflow:hidden}.kbars i s{display:block;height:100%;border-radius:9px}
+@media(max-width:420px){.kbars div{grid-template-columns:110px 1fr 46px}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📑</span></div>
+  <h1 id="h1">Reports</h1><p id="h2">Build your own report or read the auto-reports</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="kpi-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = (location.hash || "").indexOf("auto") >= 0 ? "auto" : "build", DATA = null, MY = "", SEL = ls("rb-sel") || { ds: "state", fields: null, period: "", from: "", to: "", states: [] };
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  var P = function (v) { return v == null || v === "" ? "" : Math.round(v * 1000) / 10; };
+  var R1 = function (v) { return v == null ? "" : Math.round(v * 10) / 10; };
+  // dataset definitions: fields [key, label, default-on, formatter]
+  var DS = {
+    state: { name: "State KPI summary", sub: "Rank, score and every KPI per state", fields: [["state", "State", 1], ["code", "Code", 0], ["admin", "Admin", 0], ["rank", "Rank", 1], ["score", "Score", 1, R1], ["app", "Retailer App %", 1, P], ["sa", "Scheme announcement %", 0, P], ["sp", "Scheme payout %", 0, P], ["an", "Announcements %", 0, P], ["av", "App visits %", 0, P], ["sales", "Sales %", 1, P], ["visit", "Visit efficiency %", 1, P], ["comp", "Competition / SD %", 1, P], ["vnotice", "v-Notice %", 1, P], ["new", "New implementation %", 0, P], ["pts_app", "App points", 0, R1], ["pts_sales", "Sales points", 0, R1], ["pts_visit", "Visit points", 0, R1], ["pts_comp", "Competition points", 0, R1], ["pts_vn", "v-Notice points", 0, R1], ["rank_app", "App rank", 0], ["rank_sales", "Sales rank", 0], ["rank_visit", "Visit rank", 0], ["rank_comp", "Competition rank", 0], ["onb", "Onboarded retailers", 0]] },
+    month: { name: "State × month KPIs", sub: "Each KPI by month, for trends", fields: [["state", "State", 1], ["month", "Month", 1], ["app", "Retailer App %", 1, P], ["sa", "Scheme announcement %", 0, P], ["sp", "Scheme payout %", 0, P], ["an", "Announcements %", 0, P], ["av", "App visits %", 0, P], ["sales", "Sales %", 1, P], ["visit", "Visit efficiency %", 1, P], ["comp", "Competition / SD %", 1, P], ["vnotice", "v-Notice %", 1, P], ["eligible", "Eligible retailers", 1], ["visits", "Customer visits", 0]] },
+    counts: { name: "Activity counts", sub: "Raw counts behind the KPIs", fields: [["state", "State", 1], ["month", "Month", 1], ["elig", "Eligible retailers", 1], ["sa_n", "Scheme announcement users", 1], ["sp_n", "Scheme payout users", 1], ["an_n", "Announcement users", 0], ["av_n", "App visit users", 1], ["stores", "Stores", 0], ["visits", "Visits", 1], ["v_planned", "Visits planned", 0], ["v_actual", "Visits actual", 0], ["v_valid", "Valid visits", 0], ["comp_n", "Competition entries", 0], ["sd_raised", "Support raised", 1], ["sd_closed", "Support closed", 1]] },
+    support: { name: "Support desk", sub: "Raised, closed, TAT, ratings", fields: [["state", "State", 1], ["month", "Month", 1], ["raised", "Raised", 1], ["closed", "Closed", 1], ["open", "Open", 1], ["within_tat", "Within TAT", 0], ["tat_pct", "TAT %", 1, P], ["closure_pct", "Closure %", 1, P], ["esc_pct", "Escalation %", 0, P], ["avg_rating", "Avg rating", 1, R1], ["nps", "NPS", 0, R1]] },
+    retailer: { name: "Retailer app usage", sub: "Retailer-level activity on the app", fields: [["rid", "Retailer ID", 1], ["state", "State", 1], ["actions", "Total actions", 1], ["days", "Active days", 1], ["first", "First active", 0], ["last", "Last active", 1], ["f_sp", "Scheme payout", 1], ["f_sa", "Scheme announcement", 1], ["f_an", "Announcements", 0], ["f_av", "App visits", 1]] },
+    visits: { name: "Market visits", sub: "Field visits from the visits tool", server: true, fields: [["date", "Date", 1], ["state", "State", 1], ["visitor", "Visitor", 1], ["store", "Store", 1], ["city", "City", 1], ["minutes", "Minutes", 1], ["valid", "Valid", 1], ["quality", "Quality", 0], ["sales", "Monthly sales units", 0], ["vba", "VBA promoters", 0], ["stock", "Stock issue", 0], ["emi", "EMI issue", 0], ["appRating", "App rating", 0], ["appFeedback", "App feedback", 1]] }
+  };
+
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "me" }).then(function (m) { MY = (m.profile && m.profile.state) || ""; render(); });
+  }
+  function render() {
+    VIEW.innerHTML = '<div class="seg"><button data-t="build" class="' + (TAB === "build" ? "on" : "") + '">📑 Report builder</button><button data-t="auto" class="' + (TAB === "auto" ? "on" : "") + '">🗓️ Auto-reports</button></div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    (TAB === "build" ? showBuild : showAuto)();
+  }
+
+  // ================= BUILDER =================
+  function showBuild() {
+    hero("Report builder", "Pick the data, period, states and columns — download in Excel");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div>Loading dashboard data…</div>';
+    KPIDATA.load().then(function (d) { DATA = d; drawBuild(); }).catch(function (e) { $("pane").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+  }
+  function periodOptions() {
+    var ms = DATA.months(), out = [];
+    var qs = {}; ms.forEach(function (m) { var q = m.slice(0, 4) + "-Q" + (Math.floor((+m.slice(5, 7) - 1) / 3) + 1); (qs[q] = qs[q] || []).push(m); });
+    Object.keys(qs).sort().reverse().forEach(function (q) { var l = qs[q]; out.push([l[0] + "-01", lastDay(l[l.length - 1]), q.replace("-", " ") + " (" + l.length + " month" + (l.length > 1 ? "s" : "") + ")"]); });
+    ms.slice().reverse().forEach(function (m) { out.push([m + "-01", lastDay(m), DATA.KE.monthLabel ? safeLabel(m) : m]); });
+    return out;
+  }
+  function safeLabel(m) { try { return DATA.KE.monthLabel(m); } catch (e) { return m; } }
+  function lastDay(m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0"); }
+  function drawBuild() {
+    var ds = DS[SEL.ds] || DS.state;
+    if (!SEL.fields || !SEL.fields.length || !SEL.fields.every(function (f) { return ds.fields.some(function (x) { return x[0] === f; }); })) SEL.fields = ds.fields.filter(function (f) { return f[2]; }).map(function (f) { return f[0]; });
+    var pos = periodOptions(); if (!SEL.from) { SEL.from = pos[0][0]; SEL.to = pos[0][1]; }
+    var states = DATA.states;
+    var html = '<div class="step"><h4><b>1</b>What data?</h4><div class="dsg">' + Object.keys(DS).map(function (k) { return '<button class="ds ' + (SEL.ds === k ? "on" : "") + '" data-ds="' + k + '"><b>' + DS[k].name + "</b><small>" + DS[k].sub + "</small></button>"; }).join("") + "</div></div>" +
+      '<div class="step"><h4><b>2</b>Period</h4><div class="row"><select class="tx" id="pp" style="flex:2;min-width:180px"><option value="">Custom dates…</option>' + pos.map(function (p) { return '<option value="' + p[0] + "|" + p[1] + '"' + (SEL.from === p[0] && SEL.to === p[1] ? " selected" : "") + ">" + esc(p[2]) + "</option>"; }).join("") + '</select><input class="tx" type="date" id="pf" value="' + SEL.from + '" style="flex:1;min-width:130px"><input class="tx" type="date" id="pt" value="' + SEL.to + '" style="flex:1;min-width:130px"></div><div class="muted" style="font-size:12px;margin-top:6px">Data available: ' + DATA.span.f + " to " + DATA.span.t + "</div></div>" +
+      '<div class="step"><h4><b>3</b>States</h4>' + (ADMIN ? '<div class="flds" id="sts"><label class="' + (!SEL.states.length ? "on" : "") + '"><input type="checkbox" data-s="">All states</label>' + states.map(function (s) { return '<label class="' + (SEL.states.indexOf(s) >= 0 ? "on" : "") + '"><input type="checkbox" data-s="' + esc(s) + '">' + esc(s) + "</label>"; }).join("") + "</div>" : '<div class="muted">Your state: <b>' + esc(MY) + "</b>" + (SEL.ds === "state" ? " (PAN India total row included for comparison)" : "") + "</div>") + "</div>" +
+      '<div class="step"><h4><b>4</b>Columns</h4><div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="fa">Select all</button><button class="btn ghost sm" id="fd">Defaults</button></div><div class="flds" id="fl">' + ds.fields.map(function (f) { return '<label class="' + (SEL.fields.indexOf(f[0]) >= 0 ? "on" : "") + '"><input type="checkbox" data-f="' + f[0] + '">' + esc(f[1]) + "</label>"; }).join("") + "</div></div>" +
+      '<div class="row" style="margin-top:12px"><button class="btn pri grow" id="go">👁️ Preview</button><button class="btn ok grow" id="dl">⬇ Download Excel</button><button class="btn sec" id="csv">CSV</button></div><div id="out"></div>';
+    $("pane").innerHTML = html;
+    [].forEach.call($("pane").querySelectorAll("[data-ds]"), function (b) { b.onclick = function () { SEL.ds = b.dataset.ds; SEL.fields = null; save(); drawBuild(); }; });
+    $("pp").onchange = function () { if (!this.value) return; var v = this.value.split("|"); SEL.from = v[0]; SEL.to = v[1]; $("pf").value = v[0]; $("pt").value = v[1]; save(); };
+    $("pf").onchange = $("pt").onchange = function () { SEL.from = $("pf").value; SEL.to = $("pt").value; $("pp").value = ""; save(); };
+    if ($("sts")) [].forEach.call($("sts").querySelectorAll("input"), function (i) { i.parentNode.onclick = function (e) { e.preventDefault(); var s = i.dataset.s; if (!s) SEL.states = []; else { var k = SEL.states.indexOf(s); if (k >= 0) SEL.states.splice(k, 1); else SEL.states.push(s); } save(); drawBuild(); }; });
+    [].forEach.call($("fl").querySelectorAll("input"), function (i) { i.parentNode.onclick = function (e) { e.preventDefault(); var f = i.dataset.f, k = SEL.fields.indexOf(f); if (k >= 0) SEL.fields.splice(k, 1); else SEL.fields.push(f); i.parentNode.classList.toggle("on", k < 0); save(); }; });
+    $("fa").onclick = function () { SEL.fields = ds.fields.map(function (f) { return f[0]; }); save(); drawBuild(); };
+    $("fd").onclick = function () { SEL.fields = null; save(); drawBuild(); };
+    $("go").onclick = function () { build(function (t) { preview(t); }); };
+    $("dl").onclick = function () { build(function (t) { download(xlsx([{ name: ds.name.slice(0, 30), rows: [t.head].concat(t.rows) }]), fname("xlsx")); toast("Downloaded " + t.rows.length + " rows"); }); };
+    $("csv").onclick = function () { build(function (t) { var c = [t.head].concat(t.rows).map(function (r) { return r.map(function (v) { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\n"); download(new Blob(["﻿" + c], { type: "text/csv" }), fname("csv")); }); };
+  }
+  function save() { ls("rb-sel", SEL); }
+  function fname(ext) { return (DS[SEL.ds].name.replace(/[^A-Za-z0-9]+/g, "_")) + "_" + SEL.from + "_to_" + SEL.to + "." + ext; }
+  function inStates(s) { if (!ADMIN) return s === MY; return !SEL.states.length || SEL.states.indexOf(s) >= 0; }
+  function build(cb) {
+    if (!SEL.from || !SEL.to || SEL.from > SEL.to) return toast("Choose a valid period.");
+    if (!SEL.fields.length) return toast("Choose at least one column.");
+    var ds = DS[SEL.ds], fl = ds.fields.filter(function (f) { return SEL.fields.indexOf(f[0]) >= 0; });
+    var finish = function (objs) {
+      cb({ head: fl.map(function (f) { return f[1]; }), rows: objs.map(function (o) { return fl.map(function (f) { var v = o[f[0]]; return f[3] ? f[3](v) : v == null ? "" : v; }); }) });
+    };
+    $("out").innerHTML = '<div class="loading"><div class="spin"></div>Building…</div>';
+    setTimeout(function () {
+      try {
+        if (ds.server) {
+          api({ action: "visit-list", from: SEL.from, to: SEL.to }).then(function (r) {
+            if (!r.ok) { $("out").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+            finish(r.visits.filter(function (v) { return v.status === "closed" && inStates(v.state); }).map(function (v) { var f = v.form || {}; return { date: dt(v.in.t), state: v.state, visitor: v.by.fullName, store: v.store.name, city: v.store.city, minutes: v.minutes, valid: v.valid ? "Yes" : "No", quality: v.quality, sales: f.salesUnits, vba: f.vbaCount, stock: f.stockIssue, emi: f.emiIssue, appRating: f.appRating, appFeedback: f.appFeedback }; }));
+            $("out").innerHTML = "";
+          });
+          return;
+        }
+        var res;
+        if (SEL.ds === "retailer") res = retailerRows();
+        else {
+          var sp = DATA.KE.scorePeriod(DATA.RAW, DATA.SETUP, SEL.from, SEL.to, "Total");
+          var src = SEL.ds === "state" ? sp.kpi_state : SEL.ds === "month" ? sp.kpi_month : SEL.ds === "counts" ? sp.kpi_counts : sp.support;
+          res = src.filter(function (r) { return r.code === "PAN" || r.state === "Total" ? SEL.ds === "state" : inStates(r.state); });
+        }
+        $("out").innerHTML = "";
+        finish(res);
+      } catch (e) { $("out").innerHTML = '<div class="err">Couldn\'t build this report: ' + esc(e.message) + "</div>"; }
+    }, 30);
+  }
+  function retailerRows() {
+    var fm = {}; (DATA.SETUP.fmap || []).forEach(function (x) { fm[x[0]] = DATA.KE.PCAN[DATA.KE.nrm(x[1])] || ""; });
+    var by = {}, rows = DATA.KE.rows(DATA.RAW, "app");
+    rows.forEach(function (r) {
+      if (r[2] < SEL.from || r[2] > SEL.to) return;
+      var st = DATA.stateOfRid(r[0]); if (!inStates(st)) return;
+      var o = by[r[0]] = by[r[0]] || { rid: r[0], state: st, actions: 0, dset: {}, first: r[2], last: r[2], f_sp: 0, f_sa: 0, f_an: 0, f_av: 0 };
+      o.actions += r[3] || 1; o.dset[r[2]] = 1; if (r[2] < o.first) o.first = r[2]; if (r[2] > o.last) o.last = r[2];
+      var f = fm[r[1]]; if (f) o["f_" + f] += r[3] || 1;
+    });
+    return Object.keys(by).map(function (k) { var o = by[k]; o.days = Object.keys(o.dset).length; delete o.dset; return o; }).sort(function (a, b) { return b.actions - a.actions; });
+  }
+  function preview(t) {
+    $("out").innerHTML = '<div class="muted" style="margin-top:12px;font-size:13px">' + t.rows.length + " rows" + (t.rows.length > 200 ? " — showing the first 200; download for all" : "") + '</div><div class="prev"><table><thead><tr>' + t.head.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      t.rows.slice(0, 200).map(function (r) { return "<tr>" + r.map(function (v) { return "<td>" + esc(v) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+
+  // ================= AUTO-REPORTS =================
+  var KCOL = function (a) { return a >= 0.8 ? "#1E9E61" : a >= 0.5 ? "#E69A00" : "#E05757"; };
+  function showAuto() {
+    hero("Auto-reports", ADMIN ? "Daily or weekly summaries pushed to every state" : "Your state's summary, delivered automatically");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    Promise.all([api({ action: "autorep-list" }), ADMIN ? api({ action: "autorep-config" }) : Promise.resolve(null)]).then(function (rs) {
+      var r = rs[0], c = rs[1];
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      changed();
+      var html = "";
+      if (ADMIN && c && c.ok) {
+        var cf = c.config, days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        html += '<div class="card"><h3>⚙️ Schedule</h3><div class="sub">Built from the published dashboard data. Each state sees its own report in the app; users with an email also get it by email.</div>' +
+          '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-weight:600"><input type="checkbox" id="ae"' + (cf.enabled ? " checked" : "") + "> Send auto-reports</label>" +
+          '<div class="row" style="margin-top:8px"><select class="tx" id="af" style="flex:1"><option value="daily"' + (cf.freq === "daily" ? " selected" : "") + '>Every day</option><option value="weekly"' + (cf.freq === "weekly" ? " selected" : "") + '>Every week</option></select><select class="tx" id="aw" style="flex:1">' + days.map(function (d, i) { return '<option value="' + i + '"' + (+cf.weekday === i ? " selected" : "") + ">" + d + "</option>"; }).join("") + '</select><select class="tx" id="ah" style="flex:1">' + Array.from({ length: 24 }, function (_, h) { return '<option value="' + h + '"' + (+cf.hour === h ? " selected" : "") + ">" + (h % 12 || 12) + ":00 " + (h < 12 ? "AM" : "PM") + " IST</option>"; }).join("") + "</select></div>" +
+          '<label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="am"' + (cf.email !== false ? " checked" : "") + "> Also email each state user</label>" +
+          '<div class="row" style="margin-top:10px"><button class="btn pri sm" id="asv">Save schedule</button><button class="btn sec sm" id="arn">📤 Send now</button></div>' +
+          (cf.lastRunAt ? '<div class="muted" style="font-size:12px;margin-top:8px">Last run ' + dt(cf.lastRunAt) + (cf.lastEmailed != null ? " · " + cf.lastEmailed + " emails" : "") + (cf.lastError ? ' · <span style="color:var(--bad)">' + esc(cf.lastError) + "</span>" : "") + "</div>" : "") + "</div>";
+      }
+      if (!r.runs.length) html += '<div class="card empty"><div class="big">🗓️</div>No auto-report yet.' + (ADMIN ? " Switch on the schedule or tap <b>Send now</b>." : " Your first one will appear here.") + "</div>";
+      r.runs.forEach(function (run, i) {
+        var keys = Object.keys(run.states).sort(function (a, b) { return run.states[a].rank - run.states[b].rank; });
+        html += '<div class="rcard"><div class="rhead"><div><b>' + esc(run.period.label) + "</b> · data to " + esc(run.period.t) + '<div class="muted" style="font-size:12px">Sent ' + dt(run.at) + (run.at > r.lastRead ? ' <span class="chip new">New</span>' : "") + "</div></div>" + (ADMIN ? '<span class="chip">PAN score ' + run.pan.score + "</span>" : "") + "</div>";
+        if (!ADMIN) { var s = run.states[MY]; html += s ? stateCard(s, run) : '<div class="muted" style="margin-top:8px">No data for your state in this run.</div>'; }
+        else if (i === 0) html += '<div class="tscroll" style="margin-top:8px"><table><thead><tr><th>Rank</th><th>State</th><th class="n">Score</th><th class="n">Change</th><th>Weakest KPI</th><th class="n">Visits (7d)</th><th class="n">Open disputes</th></tr></thead><tbody>' +
+          keys.map(function (k) { var s = run.states[k]; return '<tr data-st="' + esc(k) + '" data-run="' + i + '" style="cursor:pointer"><td>#' + s.rank + "</td><td><b>" + esc(k) + '</b></td><td class="n">' + s.score + '</td><td class="n">' + (s.change == null ? "—" : s.change > 0 ? '<span style="color:#1E9E61">▲' + s.change + "</span>" : s.change < 0 ? '<span style="color:#E05757">▼' + (-s.change) + "</span>" : "=") + "</td><td>" + (s.weakest ? esc(s.weakest.name) + " " + P(s.weakest.ach) + "%" : "") + '</td><td class="n">' + (s.field ? s.field.visits : 0) + '</td><td class="n">' + (s.field ? s.field.disputesOpen : 0) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+        else html += '<div class="muted" style="font-size:12px;margin-top:6px">' + keys.length + ' states · <a href="javascript:void 0" data-open="' + i + '">view</a></div>';
+        html += "</div>";
+      });
+      $("pane").innerHTML = html;
+      [].forEach.call($("pane").querySelectorAll("[data-st]"), function (tr) { tr.onclick = function () { var run = r.runs[+tr.dataset.run], s = run.states[tr.dataset.st]; sheet(tr.dataset.st, run.period.label, [], stateCard(s, run)); }; });
+      [].forEach.call($("pane").querySelectorAll("[data-open]"), function (a) { a.onclick = function () { var run = r.runs[+a.dataset.open]; sheet(run.period.label, "Sent " + dt(run.at), [], Object.keys(run.states).sort(function (x, y) { return run.states[x].rank - run.states[y].rank; }).map(function (k) { return "<div>#" + run.states[k].rank + " " + esc(k) + " · " + run.states[k].score + "</div>"; }).join("")); }; });
+      if ($("asv")) $("asv").onclick = function () { api({ action: "autorep-config", set: { enabled: $("ae").checked, freq: $("af").value, weekday: $("aw").value, hour: $("ah").value, email: $("am").checked } }).then(function (x) { toast(x.ok ? "Schedule saved" : x.error); }); };
+      if ($("arn")) $("arn").onclick = function () { var b = this; b.disabled = true; api({ action: "autorep-run" }).then(function (x) { toast(x.ok ? "Building and sending — refresh in a minute" : x.error); setTimeout(function () { b.disabled = false; showAuto(); }, 45000); }); };
+    });
+  }
+  function stateCard(s, run) {
+    return '<div class="row" style="margin-top:10px;gap:10px"><div style="flex:1;background:#F5F6FF;border-radius:12px;padding:10px"><div class="muted" style="font-size:12px">State rank</div><div class="big2">#' + s.rank + '<span class="muted" style="font-size:13px;font-weight:600"> of ' + s.of + "</span></div>" +
+      (s.change != null ? '<div style="font-size:12.5px;color:' + (s.change > 0 ? "#1E9E61" : s.change < 0 ? "#E05757" : "var(--mut)") + '">' + (s.change > 0 ? "▲ up " + s.change : s.change < 0 ? "▼ down " + (-s.change) : "no change") + " vs last month</div>" : "") + '</div><div style="flex:1;background:#F5F6FF;border-radius:12px;padding:10px"><div class="muted" style="font-size:12px">BI KPI score</div><div class="big2">' + s.score + "</div></div></div>" +
+      (s.weakest ? '<div class="notice" style="margin-top:10px">🎯 Focus: <b>' + esc(s.weakest.name) + "</b> is at " + P(s.weakest.ach) + "% — your lowest KPI.</div>" : "") +
+      '<div class="kbars" style="margin-top:8px">' + s.kpis.map(function (k) { var a = Math.min(1, k.ach || 0); return "<div><span>" + esc(k.name) + '</span><i><s style="width:' + Math.round(a * 100) + "%;background:" + KCOL(a) + '"></s></i><b style="text-align:right">' + P(k.ach) + "%</b></div>"; }).join("") + "</div>" +
+      (s.field ? '<div class="muted" style="font-size:12.5px;margin-top:10px">Last 7 days: ' + s.field.visits + " market visits (" + s.field.valid + " valid) · " + s.field.disputesOpen + " open disputes · " + s.field.hygienePending + " IMEIs pending</div>" : "") +
+      '<div class="muted" style="font-size:12px;margin-top:6px">Top states: ' + run.pan.top.map(function (x) { return "#" + x.rank + " " + esc(x.state); }).join(" · ") + "</div>";
+  }
+  window.__pageBack = function () { return false; };
+  load();
+})();
+</script>
+</body>
+</html>
