@@ -1,11 +1,11 @@
 {
-  "versionCode": 27,
-  "versionName": "6.1",
+  "versionCode": 28,
+  "versionName": "6.2",
   "notes": [
-    "New: Master admin — log in with the \"Master admin\" switch on the Admin app (same user name and password)",
-    "Masters: ✏️ Customize any screen — rename or hide labels, edit dropdown options, add fields to forms",
-    "Masters: Studio — build new tools (forms, links, info pages, saved reports), test as drafts, then release to roles, states or user IDs",
-    "Masters: turn any tool on/off for admins or specific IDs, by hand or from Excel"
+    "New: Smart tools — voice notes in 11 Indian languages, photo audit, smart beat planner, share cards, auto-reconciliation, Excel to insight, idea box, custom KPI builder",
+    "Voice notes now use your phone's microphone inside the app",
+    "Your notes, audits, KPIs and beat list sync across your devices; ideas and votes are live for all states",
+    "New: Team notes & audits — HO sees every state, states see their own team"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
