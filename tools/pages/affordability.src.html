@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Affordability Corner</title>
+<style>
+/*@@CSS@@*/
+.cb{position:relative}
+.cb .tx{padding-left:38px}
+.cb:before{content:"🔍";position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;z-index:1}
+.dd{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 34px rgba(20,24,51,.16);max-height:360px;overflow:auto;z-index:20}
+.dd .gh{font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;padding:10px 12px 4px;background:#FAFBFE;position:sticky;top:0}
+.dd .op{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;cursor:pointer;font-size:14px;border-top:1px solid #F2F3F8}
+.dd .op:hover,.dd .op.on{background:#F1F2FF}
+.dd .op small{color:var(--mut);white-space:nowrap}
+.sers{display:flex;gap:6px;overflow-x:auto;padding:8px 0 0;scrollbar-width:none}.sers::-webkit-scrollbar{display:none}
+.sers button,.pch button{flex:none;border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 12px;font:600 12.5px inherit;color:var(--ink2);cursor:pointer}
+.sers button.on,.pch button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.pch{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
+.mh{background:linear-gradient(135deg,#1F2340,#3A3F8F);color:#fff;border-radius:18px;padding:16px;margin-top:12px;box-shadow:0 10px 26px rgba(31,35,64,.25)}
+.mh h2{margin:0;font-size:22px}.mh .hl{font-size:12.5px;opacity:.85;margin-top:4px}
+.vch{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.vch button{border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;border-radius:12px;padding:8px 11px;font:600 13px inherit;cursor:pointer;text-align:left}
+.vch button small{display:block;font-weight:500;opacity:.8;font-size:11.5px}
+.vch button.on{background:#fff;color:#1F2340;border-color:#fff}
+.cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.cols span{font-size:12px;border-radius:99px;padding:4px 10px;background:rgba(255,255,255,.14)}
+.pr{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:14px}
+.pr b{font-size:30px;line-height:1}.pr s{opacity:.7;font-size:14px}.pr .off{background:#27C281;color:#fff;border-radius:8px;padding:3px 8px;font-size:12.5px;font-weight:800}
+.upd{display:flex;align-items:center;gap:8px;font-size:12px;opacity:.9;margin-top:10px;flex-wrap:wrap}
+.sh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:20px 2px 6px}
+.sh h3{margin:0;font-size:16px}.sh small{color:var(--mut);font-size:12px}
+.of{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);border-left:4px solid var(--brand);position:relative}
+.of.hid{opacity:.5;border-left-color:#999}
+.of .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.of .pn{font-weight:800;font-size:14.5px}
+.of .sc{background:#1F2340;color:#fff;border-radius:7px;padding:2px 8px;font-weight:800;font-size:12.5px;letter-spacing:.3px}
+.of .bn{color:#0F7B4F;font-weight:700;font-size:13.5px;margin-top:4px}
+.of .d{font-size:13px;color:var(--ink2);margin-top:3px;line-height:1.4}
+.of .m{font-size:11.5px;color:var(--mut);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.of .m a{color:var(--brand);text-decoration:none}
+.of .hx{position:absolute;top:8px;right:8px;border:0;background:#F3F4FA;border-radius:8px;font-size:11px;padding:4px 7px;cursor:pointer;color:var(--mut)}
+.of.k-exchange,.of.k-upgrade{border-left-color:#E69A00}.of.k-vshield{border-left-color:#1E9E61}.of.k-abb{border-left-color:#8E5CF6}.of.k-cashback,.of.k-other{border-left-color:#E05757}
+.of.fr{border-left-color:#0E9AA7}
+.calc{background:var(--card);border-radius:16px;padding:14px;margin-top:8px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.calc .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:460px){.calc .g3{grid-template-columns:1fr 1fr}}
+.calc label{display:block;font-size:11.5px;color:var(--mut);font-weight:600;margin:0 2px 3px}
+.calc .res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.calc .res div{background:#F5F6FF;border-radius:12px;padding:10px;text-align:center}
+.calc .res b{display:block;font-size:18px;color:#1F2340}.calc .res span{font-size:11.5px;color:var(--mut)}
+.wait{display:flex;align-items:center;gap:10px;background:#EEF0FF;color:#2B33A6;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}
+.wait .spin{width:18px;height:18px;margin:0;border-width:2.5px}
+.ctab{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:12px;overflow:hidden}
+.ctab th,.ctab td{padding:9px 10px;border-bottom:1px solid #EEF0F6;text-align:left;vertical-align:top}
+.ctab th{background:#F5F6FF;font-size:12px;color:var(--ink2)}
+.ctab td:first-child{color:var(--mut);font-weight:600;font-size:12px;white-space:nowrap;background:#FBFBFE}
+.ctab .best{color:#0F7B4F;font-weight:800}
+.src{font-size:12px;line-height:1.7}.src a{color:var(--brand);text-decoration:none;margin-right:10px;white-space:nowrap}
+.fbtn{position:sticky;bottom:10px;margin-top:16px;z-index:6}
+.stc{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.stc h4{margin:0 0 6px;display:flex;justify-content:space-between;font-size:14.5px}
+.stc li{font-size:13px;margin:4px 0;line-height:1.4}
+.g2s{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.g2s{grid-template-columns:1fr}}
+.f2 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">💳</span></div>
+  <h1 id="h1">Affordability Corner</h1><p id="h2">Price, EMI, exchange, V-Shield & ABB offers for every vivo model</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), CAT = null, TAB = ls("aff-tab") || "find", CUR = null, SEL = { v: 0, partner: "All", stateF: "All" }, POLL = 0, STATES = [], CMP = ls("aff-cmp") || [], PICS = {};
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  var KIND_LABEL = { emi: "EMI & finance", exchange: "Exchange", upgrade: "Upgrade", vshield: "V-Shield", abb: "ABB (assured buy-back)", cashback: "Cashback & discounts", other: "Other offers" };
+  var KIND_ICON = { emi: "💳", exchange: "🔁", upgrade: "⬆️", vshield: "🛡️", abb: "♻️", cashback: "💸", other: "🎁" };
+  var SCHEMES = ["6/0", "8/0", "9/0", "10/0", "12/0", "15/0", "18/0", "24/0", "8/2", "10/2", "12/3"];
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  function rs(n) { return n == null || n === "" ? "—" : "₹" + Number(n).toLocaleString("en-IN"); }
+  function ago(t) { if (!t) return "never"; var m = Math.round((Date.now() - t) / 60000); return m < 2 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " days ago"; }
+  function vlabel(v) { return [v.ram, v.storage].filter(Boolean).join(" + ") || "Variant"; }
+  function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return "source"; } }
+  window.__pageBack = window.__surveyBack = function () { return false; };
+
+  // ================= load =================
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in to the BI app or dashboard first.</div>'; return; }
+    api({ action: "aff-catalog" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      CAT = r; render();
+      if (r.refreshing && !r.models.length) { clearTimeout(POLL); POLL = setTimeout(load, 9000); }
+    });
+  }
+  function render() {
+    clearTimeout(POLL);
+    var tabs = [["find", "💳 Find offers"], ["cmp", "⚖️ Compare"], ["state", "🗺️ State-wise"]];
+    if (ADMIN) tabs.push(["data", "⚙️ Data"]);
+    if (!tabs.some(function (t) { return t[0] === TAB; })) TAB = "find";
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("aff-tab", TAB); render(); }; });
+    ({ find: showFind, cmp: showCmp, state: showState, data: showData })[TAB]();
+  }
+
+  // ================= model combobox =================
+  function combo(holder, onPick, ph) {
+    holder.innerHTML = '<div class="cb"><input class="tx" placeholder="' + esc(ph || "Search vivo model — e.g. V70, Y31, X300") + '" autocomplete="off"><div class="dd" style="display:none"></div></div><div class="sers"></div>';
+    var inp = holder.querySelector("input"), dd = holder.querySelector(".dd"), sers = holder.querySelector(".sers"), ser = "All", hi = -1;
+    var series = ["All"].concat((CAT.models || []).map(function (m) { return m.series; }).filter(function (s, i, a) { return s && a.indexOf(s) === i; }));
+    sers.innerHTML = series.map(function (s) { return '<button data-s="' + esc(s) + '" class="' + (s === ser ? "on" : "") + '">' + (s === "All" ? "All series" : esc(s) + " series") + "</button>"; }).join("");
+    [].forEach.call(sers.children, function (b) { b.onclick = function () { ser = b.dataset.s; [].forEach.call(sers.children, function (x) { x.classList.toggle("on", x === b); }); draw(true); inp.focus(); }; });
+    var list = [];
+    var draw = function (open) {
+      var q = inp.value.trim().toLowerCase().replace(/^vivo\s*/, "");
+      list = (CAT.models || []).filter(function (m) { return (ser === "All" || m.series === ser) && (!q || m.name.toLowerCase().replace(/^vivo\s*/, "").indexOf(q) >= 0 || m.slug.indexOf(q.replace(/\s+/g, "-")) >= 0); });
+      if (!open) { dd.style.display = "none"; return; }
+      var html = "", last = "";
+      list.forEach(function (m, i) { if (m.series !== last) { html += '<div class="gh">' + esc(m.series || "Other") + " series</div>"; last = m.series; } html += '<div class="op' + (i === hi ? " on" : "") + '" data-i="' + i + '"><span>' + esc(m.name) + "</span><small>" + (m.startPrice ? "from " + rs(m.startPrice) : "") + "</small></div>"; });
+      dd.innerHTML = html || '<div class="op">No model matches “' + esc(inp.value) + "”</div>";
+      dd.style.display = "";
+      [].forEach.call(dd.querySelectorAll(".op[data-i]"), function (o) { o.onmousedown = function (e) { e.preventDefault(); pick(list[+o.dataset.i]); }; });
+    };
+    var pick = function (m) { if (!m) return; inp.value = m.name; dd.style.display = "none"; onPick(m); };
+    inp.onfocus = function () { inp.select(); hi = -1; draw(true); };
+    inp.oninput = function () { hi = 0; draw(true); };
+    inp.onblur = function () { setTimeout(function () { dd.style.display = "none"; }, 150); };
+    inp.onkeydown = function (e) { if (e.key === "ArrowDown") { hi = Math.min(list.length - 1, hi + 1); draw(true); e.preventDefault(); } else if (e.key === "ArrowUp") { hi = Math.max(0, hi - 1); draw(true); e.preventDefault(); } else if (e.key === "Enter") { pick(list[Math.max(0, hi)]); } };
+    return { set: function (name) { inp.value = name || ""; } };
+  }
+
+  // ================= FIND =================
+  function showFind() {
+    hero("Affordability Corner", "Price, EMI, exchange, V-Shield & ABB offers for every vivo model");
+    var p = $("pane");
+    p.innerHTML = '<div id="cbx" style="margin-top:6px"></div><div id="mstat"></div><div id="md"></div>';
+    var c = combo($("cbx"), function (m) { ls("aff-last", m.slug); SEL = { v: 0, partner: "All", stateF: "All" }; openModel(m); });
+    if (!CAT.models.length) {
+      $("mstat").innerHTML = CAT.refreshing ? '<div class="wait"><div class="spin"></div>AI is building the vivo model list from vivo.com and Google — about a minute. This page updates by itself.</div>' :
+        '<div class="err">' + esc(CAT.error || CAT.note || "Model list not available yet.") + "</div>" + (ADMIN ? '<button class="btn pri sm" id="rc" style="margin-top:8px">Build model list now</button>' : "");
+      if ($("rc")) $("rc").onclick = function () { api({ action: "aff-refresh", catalog: true }).then(function (r) { toast(r.started ? "Started" : r.reason || r.error || "Already running"); load(); }); };
+      return;
+    }
+    $("mstat").innerHTML = '<div class="muted" style="font-size:12px;margin:8px 2px 0">' + CAT.models.length + " models · list updated " + ago(CAT.updatedAt) + (CAT.refreshing ? " · refreshing…" : "") + "</div>";
+    var last = CUR ? CUR.slug : ls("aff-last"), m = last && CAT.models.find(function (x) { return x.slug === last; });
+    if (m) { c.set(m.name); openModel(m); }
+    else $("md").innerHTML = '<div class="card empty"><div class="big">💳</div>Pick a vivo model to see its variants, colours, price and every running offer — EMI by partner (Bajaj, Pine Labs, banks), exchange, upgrade, V-Shield and ABB.</div>';
+  }
+  function openModel(base) {
+    clearTimeout(POLL);
+    if (!$("md")) return;
+    if (!CUR || CUR.slug !== base.slug) $("md").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "aff-model", slug: base.slug, name: base.name }).then(function (r) {
+      if (!$("md")) return;
+      if (!r.ok) { $("md").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, note: r.note };
+      drawModel();
+      if (r.refreshing) POLL = setTimeout(function () { if (TAB === "find" && CUR && CUR.slug === base.slug) openModel(base); }, 8000);
+    });
+  }
+  function offersOf(m, kind, hidden) { return ((m && m[kind]) || []).filter(function (o) { return ADMIN || !hidden[o.key]; }); }
+  function drawModel() {
+    var C = CUR, m = C.m, b = C.base, vs = (m && m.variants.length ? m.variants : b.variants) || [];
+    if (SEL.v >= vs.length) SEL.v = 0;
+    var v = vs[SEL.v] || {}, price = v.price, mrp = v.mrp, cols = (v.colours && v.colours.length ? v.colours : (m && m.colours.length ? m.colours : b.colours)) || [];
+    var html = '<div class="mh"><h2>' + esc((m && m.name) || b.name) + "</h2>" + (m && m.highlights && m.highlights.length ? '<div class="hl">' + m.highlights.map(esc).join(" · ") + "</div>" : "") +
+      (vs.length ? '<div class="vch">' + vs.map(function (x, i) { return '<button data-v="' + i + '" class="' + (i === SEL.v ? "on" : "") + '">' + esc(vlabel(x)) + "<small>" + rs(x.price) + "</small></button>"; }).join("") + "</div>" : "") +
+      (cols.length ? '<div class="cols">' + cols.map(function (c) { return "<span>● " + esc(c) + "</span>"; }).join("") + "</div>" : "") +
+      '<div class="pr"><b>' + rs(price) + "</b>" + (mrp && price && mrp > price ? "<s>MRP " + rs(mrp) + '</s><span class="off">' + Math.round((mrp - price) / mrp * 100) + "% off</span>" : mrp ? "<s>MRP " + rs(mrp) + "</s>" : "") + "</div>" +
+      (v.priceSource ? '<div class="upd">Best price seen at: ' + esc(v.priceSource) + "</div>" : "") +
+      '<div class="upd">🕒 Offers updated ' + ago(m && m.updatedAt) + (m && m.url ? ' · <a style="color:#fff" href="' + esc(m.url) + '" target="_blank" rel="noopener">vivo.com page ↗</a>' : "") + (ADMIN ? ' · <a style="color:#fff;cursor:pointer;text-decoration:underline" id="rf">Refresh now</a>' : "") + "</div></div>";
+    if (C.refreshing) html += '<div class="wait"><div class="spin"></div>' + (m ? "Updating with the latest offers…" : "AI is searching vivo.com, Google, Amazon, Flipkart and partner sites for current offers — about a minute.") + "</div>";
+    else if (C.note) html += '<div class="notice">' + esc(C.note) + "</div>";
+    if (m && m.error && (!m.updatedAt || m.errorAt > m.updatedAt)) html += '<div class="notice">Last update failed: ' + esc(m.error) + (m.updatedAt ? " — showing data from " + ago(m.updatedAt) : "") + "</div>";
+    // partner filter (EMI)
+    var emi = offersOf(m, "emi", C.hidden), fr = C.reports;
+    var partners = ["All"].concat(emi.concat(fr.filter(function (r) { return r.kind === "emi"; })).map(function (o) { return o.partner; }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }));
+    if (partners.indexOf(SEL.partner) < 0) SEL.partner = "All";
+    html += '<div class="sh"><h3>💳 EMI & finance offers</h3><small>' + emi.length + " found online</small></div>";
+    if (partners.length > 2) html += '<div class="pch" id="pch">' + partners.map(function (p) { return '<button data-p="' + esc(p) + '" class="' + (p === SEL.partner ? "on" : "") + '">' + esc(p) + "</button>"; }).join("") + "</div>";
+    var emiShown = emi.filter(function (o) { return SEL.partner === "All" || o.partner === SEL.partner; });
+    html += emiShown.length ? emiShown.map(function (o) { return offerCard(o, "emi"); }).join("") : '<div class="muted" style="font-size:13px;padding:6px 4px">' + (m ? "No public EMI offer found for this model" + (SEL.partner !== "All" ? " from " + esc(SEL.partner) : "") + ". Check field reports below or add one." : "Waiting for data…") + "</div>";
+    html += calcHtml(price, emi);
+    ["exchange", "upgrade", "vshield", "abb", "cashback", "other"].forEach(function (k) {
+      var list = offersOf(m, k, C.hidden);
+      if (!list.length && (k === "cashback" || k === "other" || k === "upgrade")) return;
+      html += '<div class="sh"><h3>' + KIND_ICON[k] + " " + KIND_LABEL[k] + "</h3></div>" + (list.length ? list.map(function (o) { return offerCard(o, k); }).join("") : '<div class="muted" style="font-size:13px;padding:2px 4px">' + (m ? "Nothing found online — add it below if you see one in market." : "Waiting for data…") + "</div>");
+    });
+    // field reports
+    var sts = ["All"].concat(fr.map(function (r) { return r.state; }).filter(function (x, i, a) { return a.indexOf(x) === i; }));
+    if (sts.indexOf(SEL.stateF) < 0) SEL.stateF = "All";
+    var frs = fr.filter(function (r) { return SEL.stateF === "All" || r.state === SEL.stateF; });
+    html += '<div class="sh"><h3>📍 Offers reported from the market</h3><small>' + fr.length + " report" + (fr.length === 1 ? "" : "s") + "</small></div>" +
+      (sts.length > 2 ? '<div class="pch" id="sch">' + sts.map(function (s) { return '<button data-s="' + esc(s) + '" class="' + (s === SEL.stateF ? "on" : "") + '">' + esc(s) + "</button>"; }).join("") + "</div>" : "") +
+      (frs.length ? frs.map(reportCard).join("") : '<div class="muted" style="font-size:13px;padding:2px 4px">No state has reported an offer for this model yet.</div>');
+    if (m && (m.notes || (m.sources || []).length)) html += '<div class="card" style="margin-top:16px"><h3 style="font-size:14px">🔎 Where this came from</h3>' + (m.notes ? '<div class="muted" style="font-size:12.5px;margin-bottom:6px">' + esc(m.notes) + "</div>" : "") + '<div class="src">' + (m.sources || []).map(function (s) { return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">↗ ' + esc(s.title) + "</a>"; }).join("") + "</div></div>";
+    html += '<div class="notice info">Prices and online offers are gathered automatically by AI from vivo.com, Google and partner sites, and refreshed daily. Offers change often — confirm with the partner or the latest circular before quoting to a customer.</div>';
+    html += '<div class="fbtn"><button class="btn pri block" id="rep" style="font-size:15px;padding:13px">＋ Report an offer you saw in market</button></div>';
+    $("md").innerHTML = html;
+    [].forEach.call($("md").querySelectorAll(".vch button"), function (x) { x.onclick = function () { SEL.v = +x.dataset.v; drawModel(); }; });
+    if ($("pch")) [].forEach.call($("pch").children, function (x) { x.onclick = function () { SEL.partner = x.dataset.p; drawModel(); }; });
+    if ($("sch")) [].forEach.call($("sch").children, function (x) { x.onclick = function () { SEL.stateF = x.dataset.s; drawModel(); }; });
+    if ($("rf")) $("rf").onclick = function () { api({ action: "aff-refresh", slug: C.slug, name: C.base.name }).then(function (r) { toast(r.started ? "AI research started — about a minute" : r.running ? "Already updating" : r.reason || r.error); openModel(C.base); }); };
+    [].forEach.call($("md").querySelectorAll("[data-hide]"), function (x) { x.onclick = function () { var k = x.dataset.hide, h = !C.hidden[k]; api({ action: "aff-hide", slug: C.slug, key: k, hidden: h }).then(function (r) { if (!r.ok) return toast(r.error); C.hidden = r.hidden; toast(h ? "Hidden from all users" : "Shown again"); drawModel(); }); }; });
+    [].forEach.call($("md").querySelectorAll("[data-ver]"), function (x) { x.onclick = function () { var r0 = C.reports.find(function (r) { return r.id === x.dataset.ver; }); api({ action: "aff-report-verify", slug: C.slug, id: r0.id, verified: !r0.verified }).then(function (r) { if (!r.ok) return toast(r.error); Object.assign(r0, r.report); drawModel(); }); }; });
+    [].forEach.call($("md").querySelectorAll("[data-del]"), function (x) { x.onclick = function () { sheet("Delete this report?", "", [["🗑️", "Delete", function () { api({ action: "aff-report-delete", slug: C.slug, id: x.dataset.del }).then(function (r) { if (!r.ok) return toast(r.error); C.reports = C.reports.filter(function (q) { return q.id !== x.dataset.del; }); drawModel(); }); }, "red"]]); }; });
+    [].forEach.call($("md").querySelectorAll("[data-ph]"), function (x) { x.onclick = function () { showPhoto(C.slug, x.dataset.ph); }; });
+    bindCalc(price);
+    $("rep").onclick = function () { reportForm(C, vs); };
+  }
+  function offerCard(o, k) {
+    var hid = CUR.hidden[o.key];
+    return '<div class="of k-' + k + (hid ? " hid" : "") + '"><div class="t"><span class="pn">' + esc(o.partner || o.plan || KIND_LABEL[k]) + "</span>" + (o.scheme ? '<span class="sc">' + esc(o.scheme) + "</span>" : "") + (o.noCost ? '<span class="chip live">No Cost</span>' : "") + (o.type ? '<span class="chip">' + esc(o.type) + "</span>" : "") + (hid ? '<span class="chip closed">Hidden</span>' : "") + "</div>" +
+      (o.benefit ? '<div class="bn">' + esc(o.benefit) + "</div>" : "") + (o.details ? '<div class="d">' + esc(o.details) + "</div>" : "") +
+      '<div class="m">' + (o.tenures && o.tenures.length ? "<span>Tenures: " + o.tenures.map(esc).join(", ") + " months</span>" : "") + (o.validTill ? "<span>Valid till " + esc(o.validTill) + "</span>" : "") + (o.channel ? "<span>" + esc(o.channel) + "</span>" : "") + (o.source ? '<a href="' + esc(o.source) + '" target="_blank" rel="noopener">↗ ' + esc(host(o.source)) + "</a>" : "") + '<span class="chip" style="background:#F4EEFF;color:#5B3FBF">✨ AI · online</span></div>' +
+      (ADMIN ? '<button class="hx" data-hide="' + o.key + '">' + (hid ? "Show again" : "Mark wrong") + "</button>" : "") + "</div>";
+  }
+  function reportCard(r) {
+    var mine = AUTH && r.by && r.by.username && r.by.username.toLowerCase() === AUTH.username.toLowerCase() && r.by.app === AUTH.app;
+    return '<div class="of fr"><div class="t"><span class="pn">' + KIND_ICON[r.kind] + " " + esc(r.partner || KIND_LABEL[r.kind]) + "</span>" + (r.scheme ? '<span class="sc">' + esc(r.scheme) + "</span>" : "") + '<span class="chip">' + esc(r.state) + "</span>" + (r.official ? '<span class="chip live">HO</span>' : r.verified ? '<span class="chip live">✓ Verified</span>' : '<span class="chip warn">Field report</span>') + "</div>" +
+      (r.benefit ? '<div class="bn">' + esc(r.benefit) + "</div>" : "") + '<div class="d">' + esc(r.details) + (r.variant ? " · " + esc(r.variant) : "") + "</div>" +
+      '<div class="m"><span>By ' + esc(r.by.fullName) + " · " + dOnly(r.at) + "</span>" + (r.validTill ? "<span>Valid till " + esc(r.validTill) + "</span>" : "") + (r.photo ? '<a href="javascript:void 0" data-ph="' + r.id + '">📷 Photo</a>' : "") +
+      (ADMIN && !r.official ? '<a href="javascript:void 0" data-ver="' + r.id + '">' + (r.verified ? "Unverify" : "✓ Verify") + "</a>" : "") + (ADMIN || mine ? '<a href="javascript:void 0" data-del="' + r.id + '" style="color:var(--bad)">Delete</a>' : "") + "</div></div>";
+  }
+  function showPhoto(slug, id) {
+    var k = slug + id;
+    var go = function () { var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="' + PICS[k] + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); };
+    if (PICS[k]) return go();
+    api({ action: "aff-photo", slug: slug, id: id }).then(function (r) { if (!r.ok) return toast(r.error); PICS[k] = "data:" + r.mime + ";base64," + r.data; go(); });
+  }
+
+  // ================= EMI calculator =================
+  function calcHtml(price, emi) {
+    var sch = SCHEMES.slice(); emi.forEach(function (o) { if (o.scheme && /^\d+\/\d+$/.test(o.scheme) && sch.indexOf(o.scheme) < 0) sch.push(o.scheme); });
+    sch.sort(function (a, b) { return parseInt(a) - parseInt(b) || parseInt(a.split("/")[1]) - parseInt(b.split("/")[1]); });
+    var def = (emi.find(function (o) { return o.noCost && /^\d+\/\d+$/.test(o.scheme || ""); }) || {}).scheme || "10/0";
+    return '<div class="sh"><h3>🧮 EMI calculator</h3><small>tenure / advance EMIs</small></div><div class="calc"><div class="g3">' +
+      '<div><label>Phone price (₹)</label><input class="tx" id="cp" type="number" inputmode="numeric" value="' + (price || "") + '"></div>' +
+      '<div><label>Scheme</label><select class="tx" id="cs">' + sch.map(function (s) { return "<option" + (s === def ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select></div>" +
+      '<div><label>Instant discount (₹)</label><input class="tx" id="cd" type="number" inputmode="numeric" value="0"></div>' +
+      '<div><label>Processing fee (₹)</label><input class="tx" id="cf" type="number" inputmode="numeric" value="0"></div>' +
+      '<div><label>Interest % p.a. (0 = No Cost)</label><input class="tx" id="ci" type="number" inputmode="decimal" value="0"></div>' +
+      '<div><label>Extra down payment (₹)</label><input class="tx" id="cx" type="number" inputmode="numeric" value="0"></div></div>' +
+      '<div class="res"><div><b id="r1">—</b><span>Customer pays today</span></div><div><b id="r2">—</b><span id="r2l">Monthly EMI</span></div><div><b id="r3">—</b><span>Total paid</span></div></div>' +
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">“10/0” = 10 monthly EMIs, none paid in advance. “8/2” = 8 EMIs with 2 paid upfront at purchase. Processing fee and interest depend on the partner and card.</div></div>';
+  }
+  function bindCalc() {
+    var f = function () {
+      var p = +$("cp").value || 0, d = +$("cd").value || 0, fee = +$("cf").value || 0, ir = +$("ci").value || 0, dp = +$("cx").value || 0, s = $("cs").value.split("/"), n = +s[0] || 1, adv = +s[1] || 0;
+      var fin = Math.max(0, p - d - dp), emi;
+      if (ir > 0) { var r = ir / 1200; emi = fin * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1); } else emi = fin / n;
+      emi = Math.ceil(emi);
+      var today = dp + adv * emi + fee, rest = n - adv;
+      $("r1").textContent = rs(today); $("r2").textContent = rs(emi); $("r2l").textContent = "× " + rest + " months"; $("r3").textContent = rs(dp + emi * n + fee);
+    };
+    ["cp", "cs", "cd", "cf", "ci", "cx"].forEach(function (id) { $(id).oninput = $(id).onchange = f; });
+    f();
+  }
+
+  // ================= report form =================
+  function reportForm(C, vs) {
+    var photo = "", ov = sheet("Report an offer", (C.m && C.m.name || C.base.name) + (ADMIN ? " · HO offers are marked official" : " · " + (CAT.state || "your state")), [["📤", "Submit", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
+      if (g("rd").length < 5) { toast("Describe the offer."); return false; }
+      api({ action: "aff-report-add", slug: C.slug, kind: g("rk"), partner: g("rp"), scheme: g("rsc"), benefit: g("rb"), details: g("rd"), validTill: g("rv"), variant: g("rva"), state: ADMIN ? g("rst") : "", photo: photo }).then(function (r) {
+        if (!r.ok) return toast(r.error); toast("Thanks — offer added"); C.reports.unshift(r.report); drawModel();
+      });
+    }]], '<div class="f2"><div class="g2s"><div><label>Offer type</label><select class="tx" id="rk">' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_ICON[k] + " " + KIND_LABEL[k] + "</option>"; }).join("") + "</select></div>" +
+      '<div><label>Partner / bank</label><input class="tx" id="rp" list="plist" placeholder="e.g. Bajaj Finserv"><datalist id="plist">' + (CAT.partners || []).map(function (p) { return "<option>" + esc(p) + "</option>"; }).join("") + "</datalist></div>" +
+      '<div><label>Scheme (EMI)</label><input class="tx" id="rsc" list="slist" placeholder="e.g. 10/0"><datalist id="slist">' + SCHEMES.map(function (s) { return "<option>" + s + "</option>"; }).join("") + "</datalist></div>" +
+      '<div><label>Benefit</label><input class="tx" id="rb" placeholder="e.g. ₹3,000 cashback"></div>' +
+      '<div><label>Variant (optional)</label><select class="tx" id="rva"><option value="">All variants</option>' + vs.map(function (v) { return "<option>" + esc(vlabel(v)) + "</option>"; }).join("") + "</select></div>" +
+      '<div><label>Valid till</label><input class="tx" id="rv" type="date"></div></div>' +
+      (ADMIN ? '<label>State</label><select class="tx" id="rst"><option>All India</option>' + STATES.map(function (s) { return "<option>" + esc(s) + "</option>"; }).join("") + "</select>" : "") +
+      '<label>Offer details</label><textarea class="tx" id="rd" style="min-height:70px" placeholder="What does the customer get, any conditions, which stores…"></textarea>' +
+      '<label>Photo of standee / circular (optional)</label><div class="row"><button class="btn sec sm" id="rph" type="button">📷 Add photo</button><span class="muted" id="rpt" style="font-size:12px"></span></div></div>');
+    ov.querySelector(".sheet").style.maxWidth = "560px";
+    ov.querySelector("#rph").onclick = function () {
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+      inp.onchange = function () {
+        var f = inp.files[0]; if (!f) return; ov.querySelector("#rpt").textContent = "Uploading…";
+        var img = new Image(), u = URL.createObjectURL(f);
+        img.onload = function () { var k = Math.min(1, 1400 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+          api({ action: "support-upload", name: "offer-" + Date.now() + ".jpg", data: c.toDataURL("image/jpeg", 0.75).split(",")[1] }).then(function (r) { if (!r.ok) { ov.querySelector("#rpt").textContent = r.error; return; } photo = r.att.id; ov.querySelector("#rpt").textContent = "✓ Photo added"; }); };
+        img.onerror = function () { ov.querySelector("#rpt").textContent = "Couldn't read the photo."; };
+        img.src = u;
+      };
+      inp.click();
+    };
+  }
+
+  // ================= COMPARE =================
+  function showCmp() {
+    hero("Compare phones", "Price, EMI and offers side by side — up to 3 models");
+    $("pane").innerHTML = '<div id="cbx" style="margin-top:6px"></div><div class="pch" id="cl"></div><div id="ct"></div>';
+    combo($("cbx"), function (m) { if (CMP.indexOf(m.slug) >= 0) return; if (CMP.length >= 3) CMP.shift(); CMP.push(m.slug); ls("aff-cmp", CMP); drawCmp(); }, "Add a model to compare");
+    drawCmp();
+  }
+  function drawCmp() {
+    clearTimeout(POLL);
+    if (!$("cl")) return;
+    $("cl").innerHTML = CMP.map(function (s) { var m = CAT.models.find(function (x) { return x.slug === s; }); return '<button class="on" data-s="' + s + '">' + esc(m ? m.name : s) + " ✕</button>"; }).join("");
+    [].forEach.call($("cl").children, function (b) { b.onclick = function () { CMP = CMP.filter(function (x) { return x !== b.dataset.s; }); ls("aff-cmp", CMP); drawCmp(); }; });
+    if (CMP.length < 2) { $("ct").innerHTML = '<div class="card empty"><div class="big">⚖️</div>Add ' + (CMP.length ? "one more model" : "2 or 3 models") + " to compare price, variants, the best No Cost EMI, exchange, V-Shield and ABB.</div>"; return; }
+    $("ct").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "aff-many", slugs: CMP }).then(function (r) {
+      if (!$("ct")) return;
+      if (!r.ok) { $("ct").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var it = r.items, any = it.some(function (x) { return x.refreshing; });
+      var best = function (x) { var vs = (x.model && x.model.variants.length ? x.model.variants : x.base.variants) || []; var ps = vs.map(function (v) { return v.price; }).filter(Boolean); return ps.length ? Math.min.apply(null, ps) : null; };
+      var bestP = Math.min.apply(null, it.map(best).filter(Boolean));
+      var vis = function (x, k) { return ((x.model && x.model[k]) || []).filter(function (o) { return !x.hidden[o.key]; }); };
+      var longNoCost = function (x) { var l = vis(x, "emi").filter(function (o) { return o.noCost && o.scheme; }).sort(function (a, b) { return parseInt(b.scheme) - parseInt(a.scheme); }); return l.length ? l[0].scheme + " · " + (l[0].partner || "") : "—"; };
+      var txt = function (x, k) { var l = vis(x, k); return l.length ? l.slice(0, 2).map(function (o) { return esc(o.benefit || o.plan || o.details).slice(0, 90); }).join("<br>") : "—"; };
+      var rows = [
+        ["Starting price", function (x) { var p = best(x); return '<span class="' + (p === bestP ? "best" : "") + '">' + rs(p) + "</span>"; }],
+        ["Variants", function (x) { var vs = (x.model && x.model.variants.length ? x.model.variants : x.base.variants) || []; return vs.map(function (v) { return esc(vlabel(v)) + " · " + rs(v.price); }).join("<br>") || "—"; }],
+        ["Colours", function (x) { var c = (x.model && x.model.colours.length ? x.model.colours : x.base.colours) || []; return c.map(esc).join(", ") || "—"; }],
+        ["Longest No Cost EMI", longNoCost],
+        ["EMI partners", function (x) { var p = vis(x, "emi").map(function (o) { return o.partner; }).filter(function (q, i, a) { return q && a.indexOf(q) === i; }); return p.map(esc).join(", ") || "—"; }],
+        ["Instant discount / cashback", function (x) { var l = vis(x, "emi").concat(vis(x, "cashback")).filter(function (o) { return o.benefit; }); return l.slice(0, 2).map(function (o) { return esc(o.benefit) + (o.partner ? " (" + esc(o.partner) + ")" : ""); }).join("<br>") || "—"; }],
+        ["Exchange / upgrade", function (x) { var a = txt(x, "exchange"), b2 = txt(x, "upgrade"); return [a, b2].filter(function (q) { return q !== "—"; }).join("<br>") || "—"; }],
+        ["V-Shield", function (x) { return txt(x, "vshield"); }],
+        ["ABB", function (x) { return txt(x, "abb"); }],
+        ["Market reports", function (x) { return x.reports.length ? x.reports.length + " from " + x.reports.map(function (q) { return q.state; }).filter(function (q, i, a) { return a.indexOf(q) === i; }).length + " state(s)" : "—"; }],
+        ["Updated", function (x) { return x.refreshing ? "updating…" : ago(x.model && x.model.updatedAt); }]
+      ];
+      $("ct").innerHTML = (any ? '<div class="wait"><div class="spin"></div>Gathering offers for a model — the table fills in automatically.</div>' : "") +
+        '<div class="tscroll" style="margin-top:10px"><table class="ctab"><thead><tr><th></th>' + it.map(function (x) { return "<th>" + esc((x.model && x.model.name) || x.base.name) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+        rows.map(function (rw) { return "<tr><td>" + rw[0] + "</td>" + it.map(function (x) { return "<td>" + rw[1](x) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>" +
+        '<button class="btn sec sm" id="cx2" style="margin-top:10px">⬇ Export comparison</button>';
+      $("cx2").onclick = function () { var tmp = document.createElement("div"); download(xlsx([{ name: "Compare", rows: [["", ].concat(it.map(function (x) { return (x.model && x.model.name) || x.base.name; }))].concat(rows.map(function (rw) { return [rw[0]].concat(it.map(function (x) { tmp.innerHTML = rw[1](x).replace(/<br>/g, " | "); return tmp.textContent; })); })) }]), "vivo_compare_" + istDay(Date.now()) + ".xlsx"); };
+      if (any) POLL = setTimeout(function () { if (TAB === "cmp") drawCmp(); }, 9000);
+    });
+  }
+
+  // ================= STATE-WISE =================
+  var SR = null;
+  function showState() {
+    hero("State-wise offers", "What each state is seeing in market — compare offers across states");
+    $("pane").innerHTML = '<div class="row" style="margin-top:6px"><select class="tx" id="sm" style="flex:2;min-width:180px"><option value="">All models</option>' + CAT.models.map(function (m) { return '<option value="' + m.slug + '">' + esc(m.name) + "</option>"; }).join("") + '</select><select class="tx" id="sk" style="flex:1;min-width:130px"><option value="">All offer types</option>' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_LABEL[k] + "</option>"; }).join("") + "</select></div>" +
+      '<div class="row" style="margin-top:8px"><select class="tx" id="sa" style="flex:1"><option value="">Compare: state A</option></select><select class="tx" id="sb" style="flex:1"><option value="">state B</option></select></div><div id="sl"><div class="loading"><div class="spin"></div></div></div>';
+    if (CAT.state) ls("aff-sa") || ls("aff-sa", CAT.state);
+    var go = function () { api({ action: "aff-states", slug: $("sm").value }).then(function (r) { if (!$("sl")) return; if (!r.ok) { $("sl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } SR = r.reports; drawState(); }); };
+    $("sm").onchange = go; $("sk").onchange = drawState; $("sa").onchange = function () { ls("aff-sa", $("sa").value); drawState(); }; $("sb").onchange = function () { ls("aff-sb", $("sb").value); drawState(); };
+    go();
+  }
+  function drawState() {
+    if (!SR || !$("sl")) return;
+    var k = $("sk").value, list = SR.filter(function (r) { return !k || r.kind === k; });
+    var by = {}; list.forEach(function (r) { (by[r.state] = by[r.state] || []).push(r); });
+    var states = Object.keys(by).sort(function (a, b) { return by[b].length - by[a].length; });
+    var opts = function (sel) { return states.map(function (s) { return "<option" + (s === sel ? " selected" : "") + ">" + esc(s) + "</option>"; }).join(""); };
+    var a = ls("aff-sa") || "", b = ls("aff-sb") || "";
+    $("sa").innerHTML = '<option value="">Compare: state A</option>' + opts(a); $("sb").innerHTML = '<option value="">state B</option>' + opts(b);
+    var li = function (r) { return "<li>" + KIND_ICON[r.kind] + " <b>" + esc(r.model) + "</b> · " + esc(r.partner || KIND_LABEL[r.kind]) + (r.scheme ? " <b>" + esc(r.scheme) + "</b>" : "") + (r.benefit ? " · " + esc(r.benefit) : "") + " — " + esc(r.details) + ' <span class="muted" style="font-size:11.5px">(' + dOnly(r.at) + (r.verified ? ", ✓" : "") + ")</span></li>"; };
+    var html = "";
+    if (a && b && by[a] && by[b]) html += '<div class="g2s" style="margin-top:10px">' + [a, b].map(function (s) { return '<div class="stc"><h4><span>' + esc(s) + "</span><small>" + by[s].length + " offer" + (by[s].length === 1 ? "" : "s") + "</small></h4><ul style=\"padding-left:16px;margin:0\">" + by[s].slice(0, 30).map(li).join("") + "</ul></div>"; }).join("") + "</div>";
+    html += '<div class="tiles" style="margin-top:10px">' + tileS("🗺️", "#EEF0FF", states.length, "States reporting") + tileS("📍", "#E6F4EA", list.length, "Offers reported") + tileS("✓", "#FFF4E5", list.filter(function (r) { return r.verified; }).length, "Verified") + tileS("📱", "#F4EEFF", list.map(function (r) { return r.slug; }).filter(function (x, i, q) { return q.indexOf(x) === i; }).length, "Models") + "</div>";
+    html += states.length ? states.map(function (s) { return '<div class="stc"><h4><span>' + esc(s) + "</span><small>" + by[s].length + " offer" + (by[s].length === 1 ? "" : "s") + "</small></h4><ul style=\"padding-left:16px;margin:0\">" + by[s].slice(0, 12).map(li).join("") + "</ul></div>"; }).join("") :
+      '<div class="card empty"><div class="big">🗺️</div>No state has reported offers yet. Open a model in <b>Find offers</b> and tap <b>＋ Report an offer</b> when you see one in market.</div>';
+    if (list.length) html += '<button class="btn sec sm" id="sx" style="margin-top:10px">⬇ Export state-wise offers</button>';
+    $("sl").innerHTML = html;
+    if ($("sx")) $("sx").onclick = function () { download(xlsx([{ name: "State offers", rows: [["State", "Model", "Type", "Partner", "Scheme", "Benefit", "Details", "Variant", "Valid till", "Reported by", "Date", "Verified", "HO"]].concat(list.map(function (r) { return [r.state, r.model, KIND_LABEL[r.kind], r.partner, r.scheme, r.benefit || "", r.details, r.variant || "", r.validTill, r.by.fullName, dt(r.at), r.verified ? "Yes" : "No", r.official ? "Yes" : ""]; })) }]), "State_offers_" + istDay(Date.now()) + ".xlsx"); };
+  }
+
+  // ================= DATA (admins) =================
+  function showData() {
+    hero("Data & sources", "Automatic AI research — no imports needed");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "aff-status" }).then(function (r) {
+      if (!$("pane")) return;
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var c = r.catalog;
+      $("pane").innerHTML = '<div class="card"><h3>📱 Model list</h3><div class="sub">' + c.count + " models · updated " + ago(c.updatedAt) + (c.refreshing ? " · refreshing now…" : "") + "</div>" + (c.error && c.errorAt > c.updatedAt ? '<div class="notice">' + esc(c.error) + "</div>" : "") +
+        '<div class="row" style="margin-top:10px"><button class="btn pri sm" id="d1">⟳ Refresh model list</button><button class="btn sec sm" id="d2">⟳ Update 8 oldest models</button></div>' +
+        '<div class="muted" style="font-size:12px;margin-top:8px">AI research used today: ' + r.capUsed + " / " + r.capMax + ". Every day at 6:00 AM the oldest models are refreshed automatically; a model is also refreshed when someone opens it and its data is over 24 hours old.</div></div>" +
+        '<div class="card"><h3>🗂️ Models</h3><div class="tscroll"><table><thead><tr><th>Model</th><th>Updated</th><th class="n">Offers</th><th></th></tr></thead><tbody>' +
+        r.models.map(function (m) { return "<tr><td><b>" + esc(m.name) + "</b>" + (m.error ? '<div style="color:var(--bad);font-size:11.5px">' + esc(m.error).slice(0, 90) + "</div>" : "") + "</td><td>" + (m.refreshing ? "updating…" : ago(m.updatedAt)) + '</td><td class="n">' + m.offers + '</td><td><button class="btn ghost sm" data-r="' + m.slug + '">⟳</button></td></tr>'; }).join("") + "</tbody></table></div></div>" +
+        '<div class="notice info">How it works: Gemini searches Google and reads vivo.com / shop.vivo.com, Amazon, Flipkart and partner pages, then saves variants, colours, prices and offers with source links. Admins can hide a wrong AI offer (“Mark wrong”) and add official HO offers from the model page. State teams add offers they see in market; admins verify them.</div>';
+      $("d1").onclick = function () { api({ action: "aff-refresh", catalog: true }).then(function (x) { toast(x.started ? "Model list research started" : x.running ? "Already running" : x.reason || x.error); setTimeout(showData, 1500); }); };
+      $("d2").onclick = function () { api({ action: "aff-refresh-stale", n: 8 }).then(function (x) { toast(x.ok ? x.started + " model(s) started" + (x.reason ? " — " + x.reason : "") : x.error); setTimeout(showData, 1500); }); };
+      [].forEach.call($("pane").querySelectorAll("[data-r]"), function (bt) { bt.onclick = function () { api({ action: "aff-refresh", slug: bt.dataset.r }).then(function (x) { toast(x.started ? "Started" : x.running ? "Already running" : x.reason || x.error); setTimeout(showData, 1200); }); }; });
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
