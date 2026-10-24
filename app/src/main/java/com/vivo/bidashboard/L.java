@@ -290,6 +290,8 @@ final class L {
         put("visits_sub_state", "Punch in / out at stores", "स्टोर पर पंच इन / आउट");
         put("visits_sub_admin", "Team tracker & scorecard", "टीम ट्रैकर और स्कोरकार्ड");
         put("knowledge", "Knowledge", "नॉलेज");
+        put("affordability", "Affordability Corner", "अफ़ोर्डेबिलिटी कॉर्नर");
+        put("affordability_sub", "Prices, EMI, exchange, V-Shield, ABB", "कीमत, EMI, एक्सचेंज, V-Shield, ABB");
         put("knowledge_sub", "BI, AI, dashboards, Power BI", "BI, AI, डैशबोर्ड, Power BI");
         put("take_or_choose_photo", "Take or choose a photo", "फ़ोटो लें या चुनें");
         put("location_needed", "Location permission is needed to punch in and punch out.", "पंच इन और पंच आउट के लिए लोकेशन अनुमति ज़रूरी है।");

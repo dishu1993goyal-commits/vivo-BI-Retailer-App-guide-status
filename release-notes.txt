@@ -1,3 +1,3 @@
-New: Market visits — punch in / punch out at stores with GPS, store details, stock, promoters, sales, feedback and photos
-Admins: team tracker, map, state scorecard and Gemini AI scoring of visits
-New: Knowledge section — BI reports, AI, automated dashboards, Power BI step by step, KPIs & charts
+New: Affordability Corner — every vivo model with variants, colours, market price and running offers
+EMI offers by partner (Bajaj, Pine Labs, banks) with 10/0, 12/0, 24/0 schemes, exchange, upgrade, V-Shield and ABB
+Compare phones, compare offers state-wise, report offers you see in market, EMI calculator

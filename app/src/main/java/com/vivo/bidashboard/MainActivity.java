@@ -1810,6 +1810,7 @@ public class MainActivity extends FragmentActivity {
 
         LinearLayout help = card(page, tr("sec_tools"));
         row(help, "📍", tr("market_visits"), STATE_APP ? tr("visits_sub_state") : tr("visits_sub_admin"), v -> showToolPage("visits.html", tr("market_visits"), "#list"));
+        row(help, "💳", tr("affordability"), tr("affordability_sub"), v -> showToolPage("affordability.html", tr("affordability"), "#list"));
         row(help, "📚", tr("knowledge"), tr("knowledge_sub"), v -> showToolPage("knowledge.html", tr("knowledge"), "#list"));
         row(help, "✉️", tr("messages"), "", v -> showToolPage("chat.html", tr("messages"), "#list"));
         row(help, "🧩", tr("feature_matrix"), "", v -> showToolPage("matrix.html", tr("feature_matrix"), "#list"));
@@ -2908,6 +2909,7 @@ public class MainActivity extends FragmentActivity {
         else if (open.equals("chat")) showToolPage("chat.html", tr("messages"), "#list");
         else if (open.equals("matrix")) showToolPage("matrix.html", tr("feature_matrix"), "#list");
         else if (open.equals("visits")) showToolPage("visits.html", tr("market_visits"), "#list");
+        else if (open.equals("affordability")) showToolPage("affordability.html", tr("affordability"), "#list");
         else if (open.equals("knowledge")) showToolPage("knowledge.html", tr("knowledge"), "#list");
         else if (open.equals("security") && !STATE_APP) showToolPage("security.html", tr("account_security"), "#list");
         else if (open.equals("update")) checkForUpdate(true);
