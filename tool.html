@@ -192,14 +192,29 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
 
 .body2{background:var(--card);border-radius:16px;padding:16px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);font-size:15px;line-height:1.6}
-.body2 h3{color:#2B33A6;margin:16px 0 6px}.body2 ul{padding-left:20px}
-.sb{background:var(--card);border-radius:12px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);font-size:13px}
-.sb .kv2{display:grid;grid-template-columns:140px 1fr;gap:2px 10px;margin-top:6px}.sb .kv2 span{color:var(--mut)}
+.body2 h3{color:var(--tc,#2B33A6);margin:16px 0 6px}.body2 ul{padding-left:20px}
+.banner{display:block;width:100%;max-height:260px;object-fit:cover;border-radius:18px;margin-top:10px;box-shadow:0 6px 20px rgba(20,24,51,.12)}
+.intro{background:var(--card);border-radius:16px;padding:14px 16px;margin-top:10px;border-left:5px solid var(--tc,#4D5BF9);font-size:14.5px;line-height:1.6;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.intro h3{margin:10px 0 4px;color:var(--tc,#2B33A6)}.intro ul{padding-left:20px;margin:4px 0}
+.prog{display:flex;align-items:center;gap:10px;margin:6px 0 10px;padding-top:4px;line-height:1.4;font-size:12.5px;color:var(--mut);font-weight:700}.prog .bar{flex:1;height:8px;border-radius:99px;background:#E6E8F2;overflow:hidden}.prog .bar i{display:block;height:100%;background:var(--tc,#4D5BF9);border-radius:99px;transition:width .25s}
+.fcard{background:var(--card);border-radius:18px;padding:14px 16px 16px;margin-top:10px;box-shadow:0 2px 12px rgba(20,24,51,.06);border-top:5px solid var(--tc,#4D5BF9)}
+.navb{display:flex;gap:8px;margin-top:16px}.navb .btn{flex:1;padding:13px}
+.btn.tc{background:var(--tc,#4D5BF9);color:#fff;border:0}
+.done{text-align:center;padding:26px 18px}.done .big{font-size:52px}.done h2{margin:6px 0 4px}.done p{color:var(--mut);margin:6px 0 14px}
+.sb{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 1px 8px rgba(20,24,51,.06);font-size:13.5px}
+.sb .top2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sb .kv2{display:grid;grid-template-columns:minmax(110px,40%) 1fr;gap:3px 10px;margin-top:8px}.sb .kv2 span{color:var(--mut)}
+.st{border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:800;white-space:nowrap}
+.st.pending{background:#FFF4E5;color:#B26A00}.st.approved{background:#E6F4EA;color:#0F7B4F}.st.rejected{background:#FDECEC;color:#B3402F}.st.returned{background:#EEF0FF;color:#2B33A6}.st.submitted{background:#F1F2F8;color:#3A3F5C}
+.tl{margin:10px 0 0;padding:0 0 0 14px;border-left:2px solid #E1E3EE;font-size:12.5px}.tl div{margin:0 0 7px;position:relative}.tl div:before{content:"";position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--tc,#4D5BF9)}
+.tl b{font-weight:700}.tl i{color:var(--mut);font-style:normal}.tl .cm{display:block;color:#3A3F5C;margin-top:2px}
+.acts4{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.acts4 .btn{flex:1;min-width:90px}
+.flt{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px}.flt button{border:1px solid #E1E3EE;background:#fff;border-radius:99px;padding:6px 12px;font:600 12.5px inherit;white-space:nowrap;cursor:pointer}.flt button.on{background:#1F2340;color:#fff;border-color:#1F2340}
+.photo-ov img{max-width:94vw;max-height:88vh;border-radius:12px}
 </style>
-<script src="cust.js?v=62"></script>
+<script src="cust.js?v=63"></script>
 </head>
 <body>
-<div class="hero">
+<div class="hero" id="hero">
   <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic" id="hic">🧩</span></div>
   <h1 id="h1">Tool</h1><p id="h2"></p>
 </div>
@@ -383,16 +398,22 @@ td.n,th.n{text-align:right;white-space:nowrap}
     [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
     return ov;
   }
-  var VIEW = $("view"), ID = (location.hash || "").replace(/^#/, "").replace(/[^a-z0-9]/gi, ""), T = null, TAB = "fill";
+  var VIEW = $("view"), ID = (location.hash || "").replace(/^#/, "").replace(/[^a-z0-9]/gi, ""), T = null, TL = null, TAB = "fill", LIST = null, EDITING = null, FILTER = "all", PAGE_N = 0, F = null, DRAFTV = {};
+  var ASSETS = {};
+  function asset(id) {
+    if (ASSETS[id]) return ASSETS[id];
+    ASSETS[id] = api({ action: "ct-asset", tool: ID, file: id }).then(function (r) { return r.ok ? "data:" + r.mime + ";base64," + r.data : ""; });
+    return ASSETS[id];
+  }
   function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s || ""; }
   function md(t) {
     var out = [], list = false;
     esc(t).split(/\r?\n/).forEach(function (l) {
-      var x = l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+      var x = l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
       if (/^##\s+/.test(l)) { if (list) { out.push("</ul>"); list = false; } out.push("<h3>" + x.replace(/^##\s+/, "") + "</h3>"); }
       else if (/^\s*[-*•]\s+/.test(l)) { if (!list) { out.push("<ul>"); list = true; } out.push("<li>" + x.replace(/^\s*[-*•]\s+/, "") + "</li>"); }
       else if (!l.trim()) { if (list) { out.push("</ul>"); list = false; } }
-      else { if (list) { out.push("</ul>"); list = false; } out.push("<p>" + x.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>') + "</p>"); }
+      else { if (list) { out.push("</ul>"); list = false; } out.push("<p style=\"margin:4px 0\">" + x + "</p>"); }
     });
     if (list) out.push("</ul>"); return out.join("");
   }
@@ -401,42 +422,120 @@ td.n,th.n{text-align:right;white-space:nowrap}
     var go = function () {
       T = window.CUST && CUST.tool(ID);
       if (!T) { VIEW.innerHTML = '<div class="card empty"><div class="big">🧩</div>This tool isn\'t available for you.</div>'; return; }
-      var tl = T.tool; $("hic").textContent = tl.icon || "🧩"; hero(tl.name, tl.desc || "");
-      if (T.draft) VIEW.insertAdjacentHTML("beforebegin", "");
-      ({ form: showForm, link: showLink, page: showPage, report: showReport })[tl.type]();
+      TL = T.tool; $("hic").textContent = TL.icon || "🧩"; hero(TL.name, TL.desc || "");
+      var c = TL.form && TL.form.color;
+      if (c) { document.documentElement.style.setProperty("--tc", c); $("hero").style.background = "linear-gradient(135deg," + c + ",#1F2340)"; }
+      ({ form: startForm, link: showLink, page: showPage, report: showReport })[TL.type]();
     };
     if (window.CUST && CUST.tool(ID)) go(); else if (window.CUST) CUST.refresh().then(go); else go();
   }
   function draftNote() { return T.draft ? '<div class="notice">Draft — only master admins can see this tool until it is released in Studio.</div>' : ""; }
   function showLink() {
-    var u = T.tool.url;
-    VIEW.innerHTML = draftNote() + '<div class="body2">' + (T.tool.desc ? "<p>" + esc(T.tool.desc) + "</p>" : "") + '<p class="muted" style="word-break:break-all">' + esc(u) + '</p><a class="btn pri block" href="' + esc(u) + '" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;padding:13px">Open ↗</a></div>';
+    var u = TL.url;
+    VIEW.innerHTML = draftNote() + '<div class="body2">' + (TL.desc ? "<p>" + esc(TL.desc) + "</p>" : "") + '<p class="muted" style="word-break:break-all">' + esc(u) + '</p><a class="btn pri block" href="' + esc(u) + '" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;padding:13px">Open ↗</a></div>';
   }
-  function showPage() { VIEW.innerHTML = draftNote() + '<div class="body2">' + md(T.tool.body || "") + "</div>"; }
-  function showReport() { VIEW.innerHTML = draftNote() + '<div class="body2"><p>' + esc(T.tool.desc || "Saved report") + '</p><a class="btn pri block" href="reports.html?v=' + Date.now() + "#tool=" + T.id + '" style="text-align:center;text-decoration:none;padding:13px">📑 Open report</a></div>'; }
+  function showPage() { VIEW.innerHTML = draftNote() + '<div class="body2">' + md(TL.body || "") + "</div>"; }
+  function showReport() { VIEW.innerHTML = draftNote() + '<div class="body2"><p>' + esc(TL.desc || "Saved report") + '</p><a class="btn pri block" href="reports.html?v=' + Date.now() + "#tool=" + T.id + '" style="text-align:center;text-decoration:none;padding:13px">📑 Open report</a></div>'; }
+
+  // ================= FORMS =================
+  var FM = function () { return TL.form || {}; }, STEPS = function () { return (TL.flow && TL.flow.steps) || []; };
+  function startForm() { api({ action: "ct-list", tool: ID }).then(function (r) { LIST = r.ok ? r : { rows: [], all: false, approver: false, pending: 0 }; if (LIST.pending && TAB === "fill" && !EDITING) TAB = "approve"; showForm(); }); }
+  function reloadList(then) { api({ action: "ct-list", tool: ID }).then(function (r) { if (r.ok) LIST = r; (then || showForm)(); }); }
+  function statusTxt(r) {
+    var st = STEPS();
+    if (r.status === "pending") return "⏳ Waiting · " + ((st[r.step] || {}).name || "approval");
+    return { approved: "✅ Approved", rejected: "❌ Rejected", returned: "↩️ Sent back for changes", submitted: "📨 Submitted" }[r.status] || "📨 Submitted";
+  }
   function showForm() {
-    var tabs = '<div class="seg"><button data-t="fill" class="' + (TAB === "fill" ? "on" : "") + '">✍️ Fill</button><button data-t="mine" class="' + (TAB === "mine" ? "on" : "") + '">' + (ADMIN ? "📊 Responses" : "🗂️ My submissions") + "</button></div>";
-    VIEW.innerHTML = draftNote() + tabs + '<div id="pane"></div>';
-    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; showForm(); }; });
-    if (TAB === "fill") {
-      $("pane").innerHTML = '<div class="card"><div id="ff"></div><button class="btn pri block" id="fsub" style="margin-top:14px;padding:13px">Submit</button></div>';
-      var F = CUST.renderFields($("ff"), T.tool.fields, {});
-      $("fsub").onclick = function () { var v = F.collect(); if (v === null) return; var b = this; b.disabled = true; api({ action: "ct-submit", tool: T.id, values: v }).then(function (r) { b.disabled = false; if (!r.ok) return toast(r.error); toast("Submitted ✓"); TAB = "mine"; showForm(); }); };
-    } else {
-      $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
-      api({ action: "ct-list", tool: T.id }).then(function (r) {
-        if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
-        var fs = r.tool.fields;
-        var val = function (f, v) { return f.type === "photo" ? (v ? "📷 photo" : "") : Array.isArray(v) ? v.join(", ") : v == null ? "" : String(v); };
-        $("pane").innerHTML = '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="muted">' + r.rows.length + " submission" + (r.rows.length === 1 ? "" : "s") + "</span>" + (r.all && r.rows.length ? '<button class="btn sec sm" id="fx">⬇ Excel</button>' : "") + "</div>" +
-          (r.rows.length ? r.rows.slice(0, 300).map(function (s) { return '<div class="sb"><b>' + esc(s.by.fullName) + '</b> <span class="muted">' + esc(s.state || "") + " · " + dt(s.at) + '</span><div class="kv2">' + fs.map(function (f) { var v = s.values[f.key]; return "<span>" + esc(f.label) + "</span><div>" + (f.type === "photo" && v ? '<a href="javascript:void 0" data-f="' + esc(v) + '" data-s="' + s.id + '">📷 view</a>' : esc(val(f, v))) + "</div>"; }).join("") + "</div></div>"; }).join("") : '<div class="card empty">No submissions yet.</div>');
-        if ($("fx")) $("fx").onclick = function () { download(xlsx([{ name: T.tool.name.slice(0, 30), rows: [["Submitted", "Name", "State"].concat(fs.map(function (f) { return f.label; }))].concat(r.rows.map(function (s) { return [dt(s.at), s.by.fullName, s.state || ""].concat(fs.map(function (f) { return val(f, s.values[f.key]); })); })) }]), T.tool.name.replace(/[^A-Za-z0-9]+/g, "_") + ".xlsx"); };
-        [].forEach.call($("pane").querySelectorAll("[data-f]"), function (a) { a.onclick = function () { api({ action: "ct-file", tool: T.id, id: a.dataset.s, file: a.dataset.f }).then(function (x) { if (!x.ok) return toast(x.error); var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="data:' + x.mime + ";base64," + x.data + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }); }; });
+    var mine = LIST.rows.filter(function (r) { return r.mine; });
+    var tabs = [["fill", EDITING ? "✏️ Edit & resubmit" : "✍️ Fill"], ["mine", "🗂️ My responses" + (mine.length ? " (" + mine.length + ")" : "")]];
+    if (STEPS().length && (LIST.approver || LIST.pending)) tabs.push(["approve", "✅ Approvals" + (LIST.pending ? " (" + LIST.pending + ")" : "")]);
+    if (LIST.all) tabs.push(["all", "📊 All responses"]);
+    VIEW.innerHTML = draftNote() + '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { if (b.dataset.t !== "fill") EDITING = null; TAB = b.dataset.t; FILTER = "all"; showForm(); }; });
+    ({ fill: showFill, mine: function () { showRows(mine, "mine"); }, approve: function () { showRows(LIST.rows.filter(function (r) { return r.canAct; }), "approve"); }, all: function () { showRows(LIST.rows, "all"); } })[TAB]();
+  }
+  function showFill() {
+    var fm = FM(), pane = $("pane");
+    var closed = fm.closeAt && Date.now() > fm.closeAt && !CUST.master;
+    var already = fm.oneResponse && !EDITING && LIST.rows.some(function (r) { return r.mine; });
+    var head = (fm.banner ? '<img class="banner" id="bnr" alt="">' : "") + (fm.intro && !EDITING ? '<div class="intro">' + md(fm.intro) + "</div>" : "");
+    if (closed) { pane.innerHTML = head + '<div class="card empty"><div class="big">🔒</div>This form closed on ' + dOnly(fm.closeAt) + ".</div>"; return banner(); }
+    if (already) { pane.innerHTML = head + '<div class="card done"><div class="big">✅</div><h2>You\'ve already responded</h2><p>Only one response per person is allowed for this form.</p><button class="btn sec" id="vm">View my response</button></div>'; $("vm").onclick = function () { TAB = "mine"; showForm(); }; return banner(); }
+    var st = STEPS();
+    pane.innerHTML = head + (EDITING ? '<div class="notice info">Sent back' + (EDITING.lastComment ? ": “" + esc(EDITING.lastComment) + "”" : "") + " — make the changes and resubmit.</div>" : "") +
+      '<div class="fcard"><div class="prog" id="pg"></div><div id="ff"></div><div class="navb"><button class="btn sec" id="pb">← Back</button><button class="btn tc" id="nb">Next →</button></div>' +
+      (st.length ? '<div class="muted" style="font-size:12px;margin-top:10px;text-align:center">After you submit: ' + st.map(function (x) { return esc(x.name); }).join(" → ") + "</div>" : "") +
+      (fm.closeAt ? '<div class="muted" style="font-size:12px;margin-top:4px;text-align:center">Open till ' + dOnly(fm.closeAt) + "</div>" : "") + "</div>";
+    banner();
+    F = CUST.renderFields($("ff"), TL.fields, EDITING ? EDITING.values : DRAFTV, function (v) { DRAFTV = v; }, "tool", { asset: asset });
+    PAGE_N = Math.min(PAGE_N, F.pages - 1);
+    var paint = function () {
+      F.setPage(PAGE_N);
+      var last = PAGE_N === F.pages - 1;
+      $("pg").style.display = F.pages > 1 && fm.showProgress !== false ? "" : "none";
+      $("pg").innerHTML = "Step " + (PAGE_N + 1) + " of " + F.pages + '<span class="bar"><i style="width:' + Math.round((PAGE_N + 1) / F.pages * 100) + '%"></i></span>';
+      $("pb").style.display = PAGE_N ? "" : "none";
+      $("nb").textContent = last ? (EDITING ? "Resubmit" : fm.submitLabel || "Submit") : "Next →";
+    };
+    $("pb").onclick = function () { PAGE_N--; paint(); window.scrollTo(0, 0); };
+    $("nb").onclick = function () {
+      if (PAGE_N < F.pages - 1) { if (F.collect(false, PAGE_N) === null) return; PAGE_N++; paint(); window.scrollTo(0, 0); return; }
+      var v = F.collect(); if (v === null) return;
+      var b = this; b.disabled = true;
+      api({ action: "ct-submit", tool: T.id, values: v, id: EDITING ? EDITING.id : undefined }).then(function (r) {
+        b.disabled = false; if (!r.ok) return toast(r.error);
+        DRAFTV = {}; PAGE_N = 0; var was = !!EDITING; EDITING = null;
+        reloadList(function () { thanks(r, was); });
       });
-    }
+    };
+    paint();
+  }
+  function banner() { var fm = FM(); if (fm.banner && $("bnr")) asset(fm.banner).then(function (u) { if (u && $("bnr")) $("bnr").src = u; else if ($("bnr")) $("bnr").remove(); }); }
+  function thanks(r, resub) {
+    var fm = FM();
+    TAB = "fill"; showForm();
+    $("pane").innerHTML = '<div class="card done"><div class="big">' + (r.status === "pending" ? "📨" : "🎉") + "</div><h2>" + (resub ? "Resubmitted" : "Thank you!") + "</h2><p>" + esc(fm.thanks || "Your response has been recorded.") + "</p>" +
+      (r.status === "pending" ? '<div class="notice info" style="text-align:left">Sent for approval: <b>' + esc(r.next || STEPS()[0].name) + "</b>. You'll see each decision under My responses.</div>" : "") +
+      '<div class="navb">' + (fm.oneResponse ? "" : '<button class="btn sec" id="ag">＋ Submit another</button>') + '<button class="btn tc" id="my">My responses</button></div></div>';
+    if ($("ag")) $("ag").onclick = function () { showForm(); };
+    $("my").onclick = function () { TAB = "mine"; showForm(); };
+  }
+  function valTxt(f, v) { if (f.type === "photo") return v ? "📷 photo" : ""; if (f.type === "rating") return v ? "★".repeat(+v) : ""; if (f.type === "location" && v) return "📍 " + v; return Array.isArray(v) ? v.join(", ") : v == null ? "" : String(v); }
+  function dataFields() { return TL.fields.filter(function (f) { return f.type !== "heading" && f.type !== "image"; }); }
+  function showRows(rows, mode) {
+    var pane = $("pane"), fs = dataFields(), st = STEPS();
+    var counts = {}; rows.forEach(function (r) { counts[r.status || "submitted"] = (counts[r.status || "submitted"] || 0) + 1; });
+    var shown = rows.filter(function (r) { return FILTER === "all" || (r.status || "submitted") === FILTER; });
+    pane.innerHTML = (mode !== "approve" && Object.keys(counts).length > 1 ? '<div class="flt">' + [["all", "All " + rows.length]].concat(["pending", "returned", "approved", "rejected", "submitted"].filter(function (k) { return counts[k]; }).map(function (k) { return [k, { pending: "⏳ Pending", returned: "↩️ Sent back", approved: "✅ Approved", rejected: "❌ Rejected", submitted: "📨 Submitted" }[k] + " " + counts[k]]; })).map(function (x) { return '<button data-fl="' + x[0] + '" class="' + (FILTER === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>" : "") +
+      '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="muted">' + shown.length + (mode === "approve" ? " waiting for you" : " response" + (shown.length === 1 ? "" : "s")) + "</span>" + (mode === "all" && shown.length ? '<button class="btn sec sm" id="fx">⬇ Excel</button>' : "") + "</div>" +
+      (shown.length ? shown.slice(0, 300).map(function (s) {
+        var hist = s.history || [];
+        return '<div class="sb" data-id="' + s.id + '"><div class="top2"><b>' + esc(s.by.fullName) + '</b><span class="muted">' + esc(s.state || "") + " · " + dt(s.at) + '</span><span class="grow" style="flex:1"></span><span class="st ' + (s.status || "submitted") + '">' + esc(statusTxt(s)) + "</span></div>" +
+          '<div class="kv2">' + fs.map(function (f) { var v = s.values[f.key]; if (v === "" || v == null || (Array.isArray(v) && !v.length)) return ""; return "<span>" + esc(f.label) + "</span><div>" + (f.type === "photo" ? '<a href="javascript:void 0" data-f="' + esc(v) + '" data-s="' + s.id + '">📷 view</a>' : f.type === "location" ? '<a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + esc(v) + '">📍 ' + esc(v) + "</a>" : esc(valTxt(f, v))) + "</div>"; }).join("") + "</div>" +
+          (st.length && hist.length ? '<div class="tl">' + hist.map(function (h) { return "<div><b>" + esc({ submitted: "Submitted", resubmitted: "Resubmitted", approved: "Approved", rejected: "Rejected", returned: "Sent back" }[h.action] || h.action) + "</b>" + (h.stepName ? " · " + esc(h.stepName) : "") + " <i>by " + esc(h.by.fullName) + " · " + dt(h.at) + "</i>" + (h.comment ? "<span class=\"cm\">“" + esc(h.comment) + "”</span>" : "") + "</div>"; }).join("") + (s.status === "pending" ? '<div style="opacity:.6"><b>Waiting</b> · ' + esc((st[s.step] || {}).name || "") + "</div>" : "") + "</div>" : "") +
+          (s.canAct ? '<div class="acts4"><button class="btn ok" data-d="approve">✅ Approve</button><button class="btn sec" data-d="back">↩️ Send back</button><button class="btn danger" data-d="reject">❌ Reject</button></div>' : "") +
+          (s.mine && s.status === "returned" ? '<div class="acts4"><button class="btn tc" data-ed="1">✏️ Edit & resubmit</button></div>' : "") + "</div>";
+      }).join("") : '<div class="card empty"><div class="big">' + (mode === "approve" ? "✅" : "🗂️") + "</div>" + (mode === "approve" ? "Nothing waiting for your approval." : "No responses yet.") + "</div>");
+    [].forEach.call(pane.querySelectorAll("[data-fl]"), function (b) { b.onclick = function () { FILTER = b.dataset.fl; showRows(rows, mode); }; });
+    if ($("fx")) $("fx").onclick = function () {
+      download(xlsx([{ name: TL.name.replace(/[\\\/?*\[\]:]/g, " ").slice(0, 30), rows: [["Submitted", "Name", "State", "Status", "Current step", "Last comment"].concat(fs.map(function (f) { return f.label; }))].concat(shown.map(function (s) { var h = (s.history || []).filter(function (x) { return x.comment; }).pop(); return [dt(s.at), s.by.fullName, s.state || "", statusTxt(s).replace(/^\S+\s/, ""), s.status === "pending" ? (st[s.step] || {}).name || "" : "", h ? h.comment : ""].concat(fs.map(function (f) { return valTxt(f, s.values[f.key]); })); })) }]), TL.name.replace(/[^A-Za-z0-9]+/g, "_") + ".xlsx");
+    };
+    [].forEach.call(pane.querySelectorAll("[data-f]"), function (a) { a.onclick = function () { api({ action: "ct-file", tool: T.id, id: a.dataset.s, file: a.dataset.f }).then(function (x) { if (!x.ok) return toast(x.error); var w = document.createElement("div"); w.className = "ov photo-ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="data:' + x.mime + ";base64," + x.data + '">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }); }; });
+    [].forEach.call(pane.querySelectorAll("[data-d]"), function (b) { b.onclick = function () {
+      var id = b.closest("[data-id]").dataset.id, d = b.dataset.d;
+      var ov = sheet({ approve: "Approve", back: "Send back for changes", reject: "Reject" }[d], d === "approve" ? "Comment is optional" : "Tell the submitter why", [[{ approve: "✅", back: "↩️", reject: "❌" }[d], { approve: "Approve", back: "Send back", reject: "Reject" }[d], function (ov) {
+        api({ action: "ct-act", tool: T.id, id: id, decision: d, comment: ov.querySelector("#cm").value }).then(function (r) { if (!r.ok) return toast(r.error); toast({ approve: "Approved", back: "Sent back", reject: "Rejected" }[d]); reloadList(); });
+      }, d === "reject" ? "red" : ""]], '<textarea class="tx" id="cm" rows="3" placeholder="Comment" style="margin-top:10px"></textarea>');
+      setTimeout(function () { ov.querySelector("#cm").focus(); }, 50);
+    }; });
+    [].forEach.call(pane.querySelectorAll("[data-ed]"), function (b) { b.onclick = function () {
+      var s = rows.find(function (x) { return x.id === b.closest("[data-id]").dataset.id; }), h = (s.history || []).filter(function (x) { return x.action === "returned"; }).pop();
+      EDITING = { id: s.id, values: s.values, lastComment: h ? h.comment : "" }; TAB = "fill"; PAGE_N = 0; showForm();
+    }; });
   }
   window.addEventListener("hashchange", function () { location.reload(); });
-  window.__pageBack = function () { return false; };
+  window.__pageBack = function () { if (EDITING) { EDITING = null; TAB = "mine"; showForm(); return true; } return false; };
   load();
 })();
 </script>

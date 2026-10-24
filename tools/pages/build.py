@@ -8,6 +8,6 @@ for src, dst in [('chat.src.html', 'chat.html'), ('matrix.src.html', 'matrix.htm
     try: t = open('/home/claude/site-branch/tools/pages/' + src).read()
     except FileNotFoundError: continue
     t = t.replace('/*@@CSS@@*/', css).replace('  /*@@CORE@@*/', core)
-    if 'cust.js' not in t and dst != 'invite.html': t = t.replace('</head>', '<script src="cust.js?v=62"></script>\n</head>', 1)
+    if 'cust.js' not in t and dst != 'invite.html': t = t.replace('</head>', '<script src="cust.js?v=63"></script>\n</head>', 1)
     open('/home/claude/site-branch/' + dst, 'w').write(t)
     print('built', dst, len(t))

@@ -64,7 +64,7 @@
   // custom tools made by master admins (shown in the category they chose)
   function customItems(catId) {
     if (!window.CUST) return [];
-    return CUST.tools().filter(function (x) { return (x.tool.category || "more") === catId; }).map(function (x) { return [x.id, x.tool.icon || "🧩", x.tool.name + (x.draft ? " · draft" : ""), null, "t:tool.html#" + x.id]; });
+    return CUST.tools().filter(function (x) { return (x.tool.category || "more") === catId; }).map(function (x) { return [x.id, x.tool.icon || "🧩", x.tool.name + (x.draft ? " · draft" : ""), null, "t:tool.html#" + x.id, function () { return CTN[x.id]; }]; });
   }
   var QUICK = ADMIN ? [["📍", "Team visits", "#1E9E61", "t:visits.html#team"], ["⚖️", "Disputes", "#E05757", "t:disputes.html", function () { return (N.disputes || {}).assigned; }], ["🗓️", "Auto-reports", "#4D5BF9", "t:reports.html#auto"], ["📥", "Import users", "#8E5CF6", "t:admin-tools.html#import"]]
     : [["📍", "Punch in", "#1E9E61", "t:visits.html"], ["💳", "Offers", "#4D5BF9", "t:affordability.html"], ["❓", "Ask AI", "#E69A00", "t:help.html#faq"], ["⚖️", "Raise dispute", "#E05757", "t:disputes.html#new"]];
@@ -110,8 +110,11 @@
     [].forEach.call(VIEW.querySelectorAll(".it"), function (b) { b.onclick = function () { open(b.dataset.t, b.dataset.l); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var x = QUICK[+b.dataset.q]; open(x[3], x[1]); }; });
   }
+  var CTN = {};   // approvals waiting / responses sent back, per custom tool
+  function ctNotify() { api({ action: "ct-notify" }).then(function (r) { if (r.ok) { var ch = JSON.stringify(r.tools) !== JSON.stringify(CTN); CTN = r.tools; if (ch && !Q) draw(); } }); }
   function load() {
     if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    ctNotify();
     api({ action: "notify" }).then(function (r) {
       if (r.ok) {
         MODS = r.modules || null;
@@ -128,7 +131,7 @@
   }
   window.__custChanged = function () { if (!Q) draw(); };
   window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
-  window.addEventListener("focus", function () { if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; if (!Q) draw(); } }); });
+  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; if (!Q) draw(); } }); });
   load();
 })();
 </script>

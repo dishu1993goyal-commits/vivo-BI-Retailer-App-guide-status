@@ -41,33 +41,79 @@
       if (!fs.length) { box.innerHTML = ""; box.style.display = EDIT ? "" : "none"; return { collect: function () { return {}; }, count: 0 }; }
       return CUST.renderFields(box, fs, values, onChange, formKey);
     },
-    renderFields: function (box, fs, values, onChange, formKey) {
-      values = values || {}; formKey = formKey || "tool";
-      box.style.display = "";
-      box.innerHTML = fs.map(function (f) {
-        var v = values[f.key], id = "cx_" + formKey.replace(/\W/g, "") + "_" + f.key, lab = '<label class="cx-l" for="' + id + '">' + esc(f.label) + (f.required ? ' <b style="color:#E05757">*</b>' : "") + (f.draft ? ' <span class="cx-d">draft</span>' : "") + "</label>";
-        if (f.type === "select") return lab + '<select class="tx" id="' + id + '" data-k="' + f.key + '"><option value="">Choose…</option>' + f.options.map(function (o) { return "<option" + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
-        if (f.type === "multi") return lab + '<div class="cx-ch" data-k="' + f.key + '" data-multi="1">' + f.options.map(function (o) { return '<button type="button" class="' + ((v || []).indexOf(o) >= 0 ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div>";
-        if (f.type === "yesno") return lab + '<div class="cx-ch" data-k="' + f.key + '"><button type="button" class="' + (v === "Yes" ? "on" : "") + '">Yes</button><button type="button" class="' + (v === "No" ? "on" : "") + '">No</button></div>';
-        if (f.type === "rating") return lab + '<div class="cx-ch" data-k="' + f.key + '">' + [1, 2, 3, 4, 5].map(function (n) { return '<button type="button" class="' + (String(v) === String(n) ? "on" : "") + '">' + n + "★</button>"; }).join("") + "</div>";
-        if (f.type === "longtext") return lab + '<textarea class="tx" id="' + id + '" data-k="' + f.key + '">' + esc(v || "") + "</textarea>";
-        if (f.type === "photo") return lab + '<div class="row"><button type="button" class="btn sec sm" data-photo="' + f.key + '">📷 ' + (v ? "Change photo" : "Add photo") + '</button><span class="cx-pn" style="font-size:12px;color:#6B7090">' + (v ? "✓ added" : "") + '</span></div><input type="hidden" data-k="' + f.key + '" value="' + esc(v || "") + '">';
-        return lab + '<input class="tx" id="' + id + '" data-k="' + f.key + '" type="' + (f.type === "number" ? "number" : f.type === "date" ? "date" : "text") + '" value="' + esc(v == null ? "" : v) + '">' + (f.help ? '<div style="font-size:11.5px;color:#6B7090">' + esc(f.help) + "</div>" : "");
-      }).join("");
-      var fire = function () { if (onChange) onChange(collectRaw()); };
+    // opts: { asset: function(id) -> Promise<dataUrl> }  (images inside custom tools)
+    renderFields: function (box, fs, values, onChange, formKey, opts) {
+      values = values || {}; formKey = formKey || "tool"; opts = opts || {};
+      box.style.display = ""; box.classList.add("cx-fs");
+      var page = 0, pages = 1, curPage = -1;
+      var html = fs.map(function (f) {
+        var v = values[f.key], id = "cx_" + formKey.replace(/\W/g, "") + "_" + f.key;
+        var req = f.required ? ' <b style="color:#E05757">*</b>' : "", dr = f.draft ? ' <span class="cx-d">draft</span>' : "";
+        var lab = '<label class="cx-l" for="' + id + '">' + esc(f.label) + req + dr + "</label>", help = f.help ? '<div class="cx-help">' + esc(f.help) + "</div>" : "";
+        var ph = f.placeholder ? ' placeholder="' + esc(f.placeholder) + '"' : "", mm = (f.min != null ? ' min="' + f.min + '"' : "") + (f.max != null ? ' max="' + f.max + '"' : "");
+        var inner;
+        if (f.type === "heading") inner = (f.image ? '<img class="cx-img" data-asset="' + esc(f.image) + '" alt="">' : "") + (f.label ? '<div class="cx-h">' + esc(f.label) + dr + "</div>" : "") + (f.text ? '<div class="cx-ht">' + esc(f.text).replace(/\n/g, "<br>") + "</div>" : "");
+        else if (f.type === "image") inner = '<img class="cx-img" data-asset="' + esc(f.image) + '" alt="">' + (f.label ? '<div class="cx-help" style="text-align:center">' + esc(f.label) + "</div>" : "");
+        else if (f.type === "select") inner = lab + '<select class="tx" id="' + id + '" data-k="' + f.key + '"><option value="">' + esc(f.placeholder || "Choose…") + "</option>" + f.options.map(function (o) { return "<option" + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>" + help;
+        else if (f.type === "multi") inner = lab + '<div class="cx-ch" data-k="' + f.key + '" data-multi="1">' + f.options.map(function (o) { return '<button type="button" class="' + ((v || []).indexOf(o) >= 0 ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div>" + help;
+        else if (f.type === "yesno") inner = lab + '<div class="cx-ch" data-k="' + f.key + '"><button type="button" class="' + (v === "Yes" ? "on" : "") + '">Yes</button><button type="button" class="' + (v === "No" ? "on" : "") + '">No</button></div>' + help;
+        else if (f.type === "rating") inner = lab + '<div class="cx-ch cx-star" data-k="' + f.key + '" data-num="1">' + [1, 2, 3, 4, 5].map(function (n) { return '<button type="button" data-v="' + n + '" class="' + (Number(v) >= n ? "on" : "") + '">★</button>'; }).join("") + "</div>" + help;
+        else if (f.type === "scale") { var lo = f.min != null ? f.min : 0, hi = f.max != null ? f.max : 10, bs = []; for (var n = lo; n <= hi && bs.length < 21; n++) bs.push('<button type="button" data-v="' + n + '" class="' + (String(v) === String(n) ? "on" : "") + '">' + n + "</button>"); inner = lab + '<div class="cx-ch cx-scale" data-k="' + f.key + '" data-num="1">' + bs.join("") + "</div>" + (f.placeholder ? '<div class="cx-help">' + esc(f.placeholder) + "</div>" : "") + help; }
+        else if (f.type === "checkbox") inner = '<label class="cx-cb"><input type="checkbox" data-k="' + f.key + '"' + (v === "Yes" ? " checked" : "") + "> <span>" + esc(f.label) + req + dr + "</span></label>" + help;
+        else if (f.type === "longtext") inner = lab + '<textarea class="tx" id="' + id + '" data-k="' + f.key + '"' + ph + ">" + esc(v || "") + "</textarea>" + help;
+        else if (f.type === "photo") inner = lab + '<div class="cx-row"><button type="button" class="btn sec sm" data-photo="' + f.key + '">📷 ' + (v ? "Change photo" : "Add photo") + '</button><span class="cx-pn">' + (v ? "✓ added" : "") + '</span></div><input type="hidden" data-k="' + f.key + '" value="' + esc(v || "") + '">' + help;
+        else if (f.type === "location") inner = lab + '<div class="cx-row"><button type="button" class="btn sec sm" data-loc="' + f.key + '">📍 ' + (v ? "Update location" : "Capture my location") + '</button><span class="cx-pn">' + esc(v || "") + '</span></div><input type="hidden" data-k="' + f.key + '" value="' + esc(v || "") + '">' + help;
+        else { var ty = { number: "number", date: "date", email: "email", phone: "tel", time: "time", datetime: "datetime-local" }[f.type] || "text"; inner = lab + '<input class="tx" id="' + id + '" data-k="' + f.key + '" type="' + ty + '"' + ph + mm + (f.type === "phone" ? ' inputmode="tel"' : f.type === "number" ? ' inputmode="decimal"' : "") + ' value="' + esc(v == null ? "" : v) + '">' + help; }
+        return '<div class="cx-f cx-t-' + f.type + '" data-f="' + f.key + '" data-page="' + page + '">' + inner + "</div>";
+      });
+      // page numbers: each heading marked "new page" (except a leading one) starts the next page
+      page = 0; var started = false;
+      fs.forEach(function (f, i) { if (f.type === "heading" && f.newPage && started) page++; started = true; f.__p = page; });
+      pages = page + 1;
+      box.innerHTML = html.map(function (h, i) { return h.replace(/data-page="\d+"/, 'data-page="' + fs[i].__p + '"'); }).join("");
+      [].forEach.call(box.querySelectorAll("img[data-asset]"), function (im) { var a = im.getAttribute("data-asset"); if (!a || !opts.asset) { im.remove(); return; } opts.asset(a).then(function (u) { if (u) im.src = u; else im.remove(); }); });
+      var update = function () {
+        var o = collectRaw();
+        fs.forEach(function (f) { var el = box.querySelector('[data-f="' + f.key + '"]'); if (!el) return; var vis = isVis(f, o) && (curPage < 0 || f.__p === curPage); el.style.display = vis ? "" : "none"; });
+      };
+      var fire = function () { update(); if (onChange) onChange(collectRaw()); };
       [].forEach.call(box.querySelectorAll("input[data-k],select[data-k],textarea[data-k]"), function (i) { i.addEventListener("input", fire); i.addEventListener("change", fire); });
-      [].forEach.call(box.querySelectorAll(".cx-ch"), function (g) { [].forEach.call(g.children, function (b) { b.onclick = function () { if (EDIT) return; if (g.dataset.multi) b.classList.toggle("on"); else [].forEach.call(g.children, function (x) { x.classList.toggle("on", x === b && !b.classList.contains("on")); }); fire(); }; }); });
+      [].forEach.call(box.querySelectorAll(".cx-ch"), function (g) { [].forEach.call(g.children, function (b) { b.onclick = function () {
+        if (EDIT) return;
+        if (g.classList.contains("cx-star")) { var n = +b.dataset.v, cur = [].filter.call(g.children, function (x) { return x.classList.contains("on"); }).length; [].forEach.call(g.children, function (x) { x.classList.toggle("on", +x.dataset.v <= (cur === n ? 0 : n)); }); }
+        else if (g.dataset.multi) b.classList.toggle("on"); else [].forEach.call(g.children, function (x) { x.classList.toggle("on", x === b && !b.classList.contains("on")); });
+        fire(); }; }); });
       [].forEach.call(box.querySelectorAll("[data-photo]"), function (b) { b.onclick = function () { pickPhoto(function (id) { box.querySelector('input[data-k="' + b.dataset.photo + '"]').value = id; b.parentNode.querySelector(".cx-pn").textContent = "✓ added"; fire(); }); }; });
+      [].forEach.call(box.querySelectorAll("[data-loc]"), function (b) { b.onclick = function () {
+        if (!navigator.geolocation) return toast("This device can't share location.");
+        b.disabled = true; b.textContent = "📍 Getting location…";
+        navigator.geolocation.getCurrentPosition(function (p) { var v = p.coords.latitude.toFixed(6) + "," + p.coords.longitude.toFixed(6); box.querySelector('input[data-k="' + b.dataset.loc + '"]').value = v; b.parentNode.querySelector(".cx-pn").textContent = v + " (±" + Math.round(p.coords.accuracy) + " m)"; b.disabled = false; b.textContent = "📍 Update location"; fire(); },
+          function () { b.disabled = false; b.textContent = "📍 Capture my location"; toast("Couldn't get your location — turn on GPS and allow location."); }, { enableHighAccuracy: true, timeout: 20000 });
+      }; });
+      function isVis(f, o) { if (!f.show || !f.show.key) return true; var x = o[f.show.key]; return Array.isArray(x) ? x.indexOf(f.show.value) >= 0 : String(x == null ? "" : x) === f.show.value; }
       function collectRaw() {
         var o = {};
         fs.forEach(function (f) {
           var el = box.querySelector('[data-k="' + f.key + '"]'); if (!el) return;
-          if (el.classList.contains("cx-ch")) { var on = [].filter.call(el.children, function (x) { return x.classList.contains("on"); }).map(function (x) { return x.textContent.replace("★", ""); }); o[f.key] = el.dataset.multi ? on : on[0] || ""; }
+          if (el.classList.contains("cx-ch")) { var on = [].filter.call(el.children, function (x) { return x.classList.contains("on"); }); if (el.dataset.num) o[f.key] = el.classList.contains("cx-star") ? (on.length || "") : (on[0] ? +on[0].dataset.v : ""); else { on = on.map(function (x) { return x.textContent; }); o[f.key] = el.dataset.multi ? on : on[0] || ""; } }
+          else if (el.type === "checkbox") o[f.key] = el.checked ? "Yes" : "";
           else o[f.key] = el.value;
         });
         return o;
       }
-      return { count: fs.length, collect: function (quiet) { var o = collectRaw(), miss = fs.filter(function (f) { var v = o[f.key]; return f.required && (v === "" || v == null || (Array.isArray(v) && !v.length)); }); if (miss.length && !quiet) { toast("Please fill: " + miss.map(function (f) { return f.label; }).join(", ")); return null; } return o; } };
+      update();
+      var api2 = { count: fs.filter(function (f) { return f.type !== "heading" && f.type !== "image"; }).length, pages: pages,
+        setPage: function (n) { curPage = n; update(); },
+        collect: function (quiet, onlyPage) {
+          var o = collectRaw();
+          fs.forEach(function (f) { if (!isVis(f, o) && f.key in o) o[f.key] = Array.isArray(o[f.key]) ? [] : ""; });
+          var miss = fs.filter(function (f) { var v = o[f.key]; return f.required && isVis(f, o) && (onlyPage == null || f.__p === onlyPage) && (v === "" || v == null || (Array.isArray(v) && !v.length)); });
+          var bad = fs.filter(function (f) { var v = o[f.key]; if (v === "" || v == null || (onlyPage != null && f.__p !== onlyPage)) return false; if (f.type === "email") return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); if (f.type === "phone") return String(v).replace(/\D/g, "").length < 6; if (f.type === "number") return (f.min != null && +v < f.min) || (f.max != null && +v > f.max); return false; });
+          if ((miss.length || bad.length) && !quiet) { toast(miss.length ? "Please fill: " + miss.map(function (f) { return f.label; }).join(", ") : "Please check: " + bad.map(function (f) { return f.label; }).join(", ")); var first = box.querySelector('[data-f="' + (miss[0] || bad[0]).key + '"]'); if (first && first.scrollIntoView) first.scrollIntoView({ block: "center", behavior: "smooth" }); return null; }
+          return o;
+        } };
+      box.__F = api2;
+      return api2;
     },
     // read-only rows "label: value" for a record's extra values
     extraRows: function (formKey, extra) { extra = extra || {}; return CUST.fields(formKey).filter(function (f) { var v = extra[f.key]; return v != null && v !== "" && !(Array.isArray(v) && !v.length); }).map(function (f) { var v = extra[f.key]; return [f.label, f.type === "photo" ? "📷 photo" : Array.isArray(v) ? v.join(", ") : String(v)]; }); },
@@ -134,10 +180,83 @@
     });
   }
   function markDraft(el, draft) { if (DATA.master && draft && el && el.style) el.style.boxShadow = "inset 0 -2px 0 #F5A623"; }
+  // ---------- extra fields on ANY existing form (not only the ones built with hooks) ----------
+  var NO_AUTO = { dashboard: 1, studio: 1, tool: 1, hub: 1, invite: 1 };
+  var FORM_SEL = "form,.card,.sheet,.f2,.f3,.f4,.f5,.f6,.f8,.flds";
+  function fieldEls(root) { return [].filter.call(root.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=search]),select,textarea"), function (x) { return !x.closest(".cx-panel,.cx-fs,.cx-auto,[data-form]"); }); }
+  // the block that holds a form: a known form wrapper, else the outermost block under the page / pop-up
+  var STOP = "body,.wrap,#view,#pane,.ov,.hero";
+  function formOf(el) {
+    var x = el, best = null;
+    while (x && x.parentElement && !x.parentElement.matches(STOP)) {
+      x = x.parentElement;
+      if (x.matches(FORM_SEL + ",.fs,.fs2")) return x;
+      best = x;
+    }
+    return best || (el.parentElement && !el.parentElement.matches(STOP) ? el.parentElement : null);
+  }
+  function formContainers() {
+    var out = [], seen = [];
+    fieldEls(document).forEach(function (el) {
+      var c = formOf(el); if (!c || seen.indexOf(c) >= 0) return; seen.push(c);
+      if (c.querySelector("[data-form]:not(.cx-auto)")) return;
+      var fs = fieldEls(c); if (fs.length < 2) return;
+      var first = fs.find(function (x) { return x.id; }); if (!first) return;
+      out.push({ el: c, key: "auto:" + PAGE + ":" + first.id, last: fs[fs.length - 1] });
+    });
+    return out;
+  }
+  function autoForms() {
+    if (NO_AUTO[PAGE]) return;
+    formContainers().forEach(function (c) {
+      var fs = CUST.fields(c.key), box = null;
+      [].some.call(c.el.querySelectorAll(".cx-auto"), function (b) { if (b.getAttribute("data-form") === c.key) { box = b; return true; } });
+      if (!fs.length && !EDIT) { if (box) box.remove(); return; }
+      if (!box) {
+        box = document.createElement("div"); box.className = "cx-auto"; box.setAttribute("data-form", c.key);
+        var top = c.last; while (top.parentElement && top.parentElement !== c.el) top = top.parentElement;   // after the block holding the last field
+        while (top.nextElementSibling && top.nextElementSibling.classList.contains("cx-opt")) top = top.nextElementSibling;
+        top.insertAdjacentElement("afterend", box);
+      }
+      var sig = JSON.stringify(fs.map(function (f) { return [f.key, f.label, f.type, f.options, f.required, f.draft]; }));
+      if (box.__sig !== sig) { box.__sig = sig; var keep = box.__F ? box.__F.collect(true) : {}; if (fs.length) CUST.renderFields(box, fs, keep, null, c.key); else { box.innerHTML = ""; box.__F = null; } }
+    });
+  }
+  // When a page saves its form, the answers to the added fields are saved too (and required ones are checked first).
+  var lastBtn = 0;
+  document.addEventListener("click", function (e) { var b = e.target && e.target.closest && e.target.closest("button,.act,[role=button],input[type=submit]"); if (b && !b.closest(".cx-panel,.cx-fab,.cx-add,.cx-auto,.cx-fs")) lastBtn = Date.now(); }, true);
+  var SKIP = /^(cust|ct|cxx|master|mod|notify|ping|hub|login|logout|qr)-?|-(list|get|notify|file|files|search|stats|seen|read|upload|lookup|catalog|models|prices?|history|board|summary|export|detail|details|view|ask|me|my|mine|status|check|config|rules)$|upload|ask/i;
+  var ofetch = window.fetch;
+  if (ofetch && !NO_AUTO[PAGE]) window.fetch = function (url, o) {
+    var self = this, args = arguments;
+    try {
+      if (String(url).indexOf("/api/auth") >= 0 && o && o.method === "POST" && typeof o.body === "string" && Date.now() - lastBtn < 20000) {
+        var body = JSON.parse(o.body), act = String(body.action || "");
+        var boxes = [].filter.call(document.querySelectorAll(".cx-auto"), function (b) { return b.__F && b.offsetParent !== null; });
+        if (act && !SKIP.test(act) && boxes.length) {
+          var vals = [];
+          for (var i = 0; i < boxes.length; i++) { var v = boxes[i].__F.collect(false); if (v === null) return Promise.resolve(new Response(JSON.stringify({ ok: false, error: "Please fill the required fields marked *" }), { status: 400, headers: { "content-type": "application/json" } })); vals.push([boxes[i], v]); }
+          return ofetch.apply(self, args).then(function (r) {
+            r.clone().json().then(function (j) {
+              if (!j || !j.ok) return;
+              var ref = {}; ["id", "visitId", "ticket", "no"].forEach(function (k) { if (j[k] != null) ref[k] = j[k]; }); if (j.item && j.item.id) ref.id = j.item.id; if (j.visit && j.visit.id) ref.id = j.visit.id;
+              vals.forEach(function (x) {
+                var any = Object.keys(x[1]).some(function (k) { var y = x[1][k]; return Array.isArray(y) ? y.length : y !== "" && y != null; });
+                if (any) api({ action: "cxx-save", formKey: x[0].getAttribute("data-form"), values: x[1], from: act, ref: ref });
+                var fs = CUST.fields(x[0].getAttribute("data-form")); if (fs.length) CUST.renderFields(x[0], fs, {}, null, x[0].getAttribute("data-form"));
+              });
+            }).catch(function () { });
+            return r;
+          });
+        }
+      }
+    } catch (e) { }
+    return ofetch.apply(self, args);
+  };
   var pend = 0;
-  function schedule() { if (pend) return; pend = requestAnimationFrame(function () { pend = 0; apply(); if (EDIT) addFieldButtons(); }); }
+  function schedule() { if (pend) return; pend = requestAnimationFrame(function () { pend = 0; apply(); autoForms(); if (EDIT) addFieldButtons(); }); }
   function start() {
-    apply();
+    apply(); autoForms();
     new MutationObserver(function () { if (!applying) schedule(); }).observe(document.body, { childList: true, subtree: true, characterData: true });
     if (DATA.master) masterUi();
   }
@@ -149,7 +268,7 @@
       var wasMaster = DATA.master;
       DATA = { ver: r.ver, items: r.items || [], master: !!r.master, role: r.role };
       try { localStorage.setItem(CK, JSON.stringify(DATA)); } catch (e) { }
-      apply();
+      apply(); autoForms();
       if (DATA.master && !wasMaster) masterUi();
       var after = JSON.stringify(DATA.items.filter(function (x) { return x.kind === "list" || x.kind === "fields" || x.kind === "tool"; }).map(function (x) { return [x.id, x.updatedAt]; }));
       if (before !== after && typeof window.__custChanged === "function") window.__custChanged();
@@ -157,7 +276,11 @@
   }
 
   // ---------- master: ✏️ Customize mode ----------
-  var css = ".cx-l{display:block;font-size:12px;color:#6B7090;font-weight:600;margin:10px 2px 3px}.cx-d{background:#FFF4E5;color:#B26A00;border-radius:6px;padding:0 5px;font-size:10.5px}" +
+  var css = ".cx-help{font-size:11.5px;color:#6B7090;margin:3px 2px 0}.cx-h{font-size:17px;font-weight:800;color:#1F2340;margin:18px 0 2px}.cx-ht{font-size:14px;color:#3A3F5C;line-height:1.55;margin-top:4px}" +
+    ".cx-img{display:block;max-width:100%;border-radius:14px;margin:12px auto 4px}.cx-cb{display:flex!important;gap:10px;align-items:flex-start;margin:14px 2px 2px;font-size:14px;cursor:pointer}.cx-cb input{width:20px;height:20px;margin:0;flex:none}" +
+    ".cx-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cx-pn{font-size:12px;color:#6B7090}.cx-star button{font-size:22px;color:#C9CCDA;padding:2px 8px!important;border:0!important;background:none!important}.cx-star button.on{color:#F5A623!important}" +
+    ".cx-scale button{min-width:38px;padding:7px 0!important}.cx-auto{margin-top:6px}.cx-auto:empty{display:none}" +
+    ".cx-l{display:block;font-size:12px;color:#6B7090;font-weight:600;margin:10px 2px 3px}.cx-d{background:#FFF4E5;color:#B26A00;border-radius:6px;padding:0 5px;font-size:10.5px}" +
     ".cx-ch{display:flex;flex-wrap:wrap;gap:6px}.cx-ch button{border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 12px;font:600 13px inherit;cursor:pointer}.cx-ch button.on{background:#EEF0FF;border-color:#4D5BF9;color:#2B33A6}" +
     ".cx-fab{position:fixed;left:12px;bottom:14px;z-index:2147483000;border:0;border-radius:99px;padding:10px 14px;font:700 13px Segoe UI,Arial;background:#1F2340;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer}" +
     "body:has(.biw-frame) .cx-fab,body:has(.biw-frame) .cx-bar{display:none!important}.cx-fab.on{background:#F5A623;color:#1F2340}.cx-bar{position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#F5A623;color:#1F2340;font:700 12.5px Segoe UI,Arial;padding:7px 12px;text-align:center}" +
@@ -181,6 +304,7 @@
     var fab = document.querySelector(".cx-fab"); if (fab) { fab.classList.toggle("on", EDIT); fab.textContent = EDIT ? "✓ Done customizing" : "✏️ Customize"; }
     if (EDIT) { bar = document.createElement("div"); bar.className = "cx-bar"; bar.textContent = "Customize mode · tap any text, dropdown or form · changes are drafts until released in Studio"; document.body.appendChild(bar); document.addEventListener("click", onClick, true); document.addEventListener("mouseover", onHover, true); document.addEventListener("pointerdown", onDown, true); document.addEventListener("mousedown", onDown, true); document.addEventListener("touchstart", onDown, { capture: true, passive: false }); addFieldButtons(); }
     else { if (bar) bar.remove(); document.removeEventListener("click", onClick, true); document.removeEventListener("mouseover", onHover, true); document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("mousedown", onDown, true); document.removeEventListener("touchstart", onDown, { capture: true, passive: false }); [].forEach.call(document.querySelectorAll("[data-cx-ob]"), function (x) { x.removeAttribute("data-cx-ob"); }); if (hoverEl) hoverEl.classList.remove("cx-hl"); [].forEach.call(document.querySelectorAll(".cx-add"), function (x) { x.remove(); }); closePanel(); }
+    autoForms(); if (EDIT) addFieldButtons();
     [].forEach.call(document.querySelectorAll("[data-cx-hidden]"), function (el) { el.style.display = EDIT ? "" : "none"; el.style.opacity = EDIT ? ".35" : ""; el.style.outline = EDIT ? "2px dashed #E05757" : ""; });
   }
   function onHover(e) { var t = pickTarget(e.target); if (hoverEl && hoverEl !== t) hoverEl.classList.remove("cx-hl"); hoverEl = t; if (t) t.classList.add("cx-hl"); }
@@ -276,19 +400,23 @@
     [].forEach.call(document.querySelectorAll("[data-form]"), function (box) {
       box.style.display = "";
       if (box.querySelector(":scope > .cx-add")) return;
-      var b = document.createElement("button"); b.type = "button"; b.className = "cx-add"; b.textContent = "＋ Add a field to this form (" + box.getAttribute("data-form") + ")";
+      var b = document.createElement("button"); b.type = "button"; b.className = "cx-add"; b.textContent = "＋ Add a field to this form";
       b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); fieldPanel(box.getAttribute("data-form")); };
       box.appendChild(b);
     });
   }
+  var TYPES = [["text", "Short text"], ["longtext", "Long text / paragraph"], ["number", "Number"], ["select", "Dropdown (pick one)"], ["multi", "Checkboxes (pick many)"], ["yesno", "Yes / No"], ["rating", "Star rating"], ["scale", "Scale 0–10"],
+    ["date", "Date"], ["time", "Time"], ["datetime", "Date & time"], ["email", "Email"], ["phone", "Phone"], ["photo", "Photo"], ["location", "GPS location"], ["checkbox", "Tick box (agree / confirm)"], ["heading", "Section title / note"]];
+  CUST.TYPES = TYPES;
   function fieldPanel(formKey) {
-    var pn = openPanel('<h4>＋ New field · ' + esc(formKey) + '</h4><small>Label</small><input id="fl" placeholder="e.g. Display condition"><small>Type</small><select id="ft"><option value="text">Short text</option><option value="longtext">Long text</option><option value="number">Number</option><option value="date">Date</option><option value="select">Dropdown (one)</option><option value="multi">Multiple choice</option><option value="yesno">Yes / No</option><option value="rating">Rating 1–5</option><option value="photo">Photo</option></select>' +
-      '<div id="fo" style="display:none"><small>Options (one per line)</small><textarea id="fop" rows="5"></textarea></div><label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="fr" style="width:auto;margin:0"> Required</label>' +
-      '<div class="r"><button class="p" id="fs">Save draft</button><button class="g" id="fg">Save & release to all</button><button id="fc">Cancel</button></div><small>Existing fields can be edited or removed in 🧩 Studio → Changes.</small>');
+    var pn = openPanel('<h4>＋ New field</h4><small>Label / question</small><input id="fl" placeholder="e.g. Display condition"><small>Type</small><select id="ft">' + TYPES.map(function (t) { return '<option value="' + t[0] + '">' + t[1] + "</option>"; }).join("") + "</select>" +
+      '<div id="fo" style="display:none"><small>Options (one per line)</small><textarea id="fop" rows="5"></textarea></div><small>Hint shown inside the box (optional)</small><input id="fph"><small>Help text under the field (optional)</small><input id="fh"><label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="fr" style="width:auto;margin:0"> Required</label>' +
+      '<div class="r"><button class="p" id="fs">Save draft</button><button class="g" id="fg">Save & release to all</button><button id="fc">Cancel</button></div><small>Answers are saved with each submission — see them in 🧩 Studio → Changes → 📊 Answers. Edit or remove fields there too.</small>');
     pn.querySelector("#ft").onchange = function () { pn.querySelector("#fo").style.display = /select|multi/.test(this.value) ? "" : "none"; };
-    var doSave = function (rel) { var l = pn.querySelector("#fl").value.trim(); if (!l) return toast("Enter the label."); save({ kind: "fields", formKey: formKey, page: "*", fields: [{ label: l, type: pn.querySelector("#ft").value, options: pn.querySelector("#fop").value, required: pn.querySelector("#fr").checked }] }, rel).then(function () { if (window.__custChanged) window.__custChanged(); }); };
+    var doSave = function (rel) { var l = pn.querySelector("#fl").value.trim(); if (!l) return toast("Enter the label."); save({ kind: "fields", formKey: formKey, page: "*", fields: [{ label: l, type: pn.querySelector("#ft").value, options: pn.querySelector("#fop").value, required: pn.querySelector("#fr").checked, placeholder: pn.querySelector("#fph").value, help: pn.querySelector("#fh").value }] }, rel).then(function () { if (window.__custChanged) window.__custChanged(); autoForms(); }); };
     pn.querySelector("#fs").onclick = function () { doSave(false); }; pn.querySelector("#fg").onclick = function () { doSave(true); }; pn.querySelector("#fc").onclick = closePanel;
   }
+
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { start(); refresh(); }); else { start(); refresh(); }
 })();

@@ -822,7 +822,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|master)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -922,7 +922,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("hyg-")) return hygieneAction(b, surveyCtx());
     if (/^(quiz|poll|wall|recog|people|engage)-/.test(b.action)) return engageAction(b, surveyCtx());
     if (b.action.startsWith("autorep-")) return autorepAction(b, Object.assign(surveyCtx(), { jobFetch }));
-    if (/^(cust|ct|master)-/.test(b.action)) return masterAction(b, surveyCtx());
+    if (/^(cust|ct|cxx|master)-/.test(b.action)) return masterAction(b, surveyCtx());
     if (b.action.startsWith("inv-")) return inviteAdminAction(b, Object.assign(surveyCtx(), { normalizePhone, normEmail, vKey, mailFetch }));
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());

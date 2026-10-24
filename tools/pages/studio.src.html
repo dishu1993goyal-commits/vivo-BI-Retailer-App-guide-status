@@ -21,6 +21,15 @@
 .chk2 label.on{background:#EEF0FF;border-color:#9AA1F5;color:#2B33A6;font-weight:700}.chk2 input{display:none}
 .fld{border:1px solid #E6E8F2;border-radius:12px;padding:8px 10px;margin-top:8px}
 .mrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:var(--card);border-radius:12px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05)}
+.qno{min-width:30px;height:30px;border-radius:9px;background:#EEF0FF;color:#2B33A6;font-weight:800;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.fhd{background:#FAFAFE;border-left:4px solid #4D5BF9}.ib{border:0;background:#F3F4FA;border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:13px;flex:none}
+.cbx{display:flex!important;gap:8px;align-items:center;margin:8px 2px 0!important;font-size:13px!important;color:var(--ink)!important;font-weight:500!important;cursor:pointer}.cbx input{width:18px;height:18px;margin:0}
+.lnk{font-size:12.5px;color:#4D5BF9;cursor:pointer;font-weight:600}.more{background:#F7F8FC;border-radius:10px;padding:8px;margin-top:6px}
+.bsec{margin-top:10px}.bh{display:flex;gap:10px;align-items:center;margin-bottom:4px}.bn{width:28px;height:28px;border-radius:50%;background:#1F2340;color:#fff;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.sw8{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.sw8 button{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}.sw8 button.on{box-shadow:0 0 0 3px #1F2340}.sw8 input{width:40px;height:34px;border:0;background:none;padding:0}
+.sbar{position:sticky;bottom:8px;display:flex;gap:8px;margin-top:12px;z-index:5}.sbar .danger{flex:none}
+.arr{text-align:center;color:#9AA1C5;font-size:18px;margin:2px 0}
+.tpl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.tpl button{border:1px solid #E6E8F2;background:#fff;border-radius:14px;padding:12px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit}.tpl button:hover{border-color:#4D5BF9}.tpl small{color:var(--mut);font-size:11.5px}
 .sw{position:relative;width:44px;height:26px;border-radius:99px;background:#D5D8E8;cursor:pointer;border:0;flex:none}.sw.on{background:#1E9E61}.sw:after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}.sw.on:after{left:21px}
 </style>
 </head>
@@ -74,8 +83,8 @@
       '<div class="tiles" style="margin-top:10px">' + tileS("📝", "#FFF4E5", drafts, "Drafts") + tileS("🚀", "#E6F4EA", rows.length - drafts, "Released") + tileS("🧩", "#EEF0FF", ITEMS.filter(function (x) { return x.kind === "tool"; }).length, "Custom tools") + tileS("📄", "#F4EEFF", Object.keys(rows.reduce(function (a, x) { a[x.page || x.listKey || x.formKey] = 1; return a; }, {})).length, "Screens / lists") + "</div>" +
       (rows.length ? '<div class="row" style="margin-top:10px"><label class="muted" style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="sa"> Select all</label><span class="grow"></span><button class="btn ok sm" id="br">🚀 Release selected</button><button class="btn sec sm" id="bd">↩ Back to draft</button><button class="btn danger sm" id="bx">Delete</button></div>' : "") +
       (rows.length ? rows.map(function (x) {
-        var what = x.kind === "text" ? "“" + esc(x.match) + "” → “" + esc(x.value) + "”" + (x.attr ? " (placeholder)" : "") : x.kind === "hide" ? "Hide “" + esc(x.match) + "”" + (x.up ? " (+" + x.up + " level)" : "") : x.kind === "list" ? esc(x.listKey) + ": " + esc(x.items.join(", ")) : esc(x.formKey) + ": " + x.fields.map(function (f) { return esc(f.label) + " (" + f.type + (f.required ? ", required" : "") + ")"; }).join(", ");
-        return '<div class="ch"><input type="checkbox" data-x="' + x.id + '"' + (SELX[x.id] ? " checked" : "") + '><div class="mid"><div class="k">' + KIND[x.kind] + (x.page && x.page !== "*" ? " · " + esc(x.page) : "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w">' + what + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + " · " + esc(x.by) + " · " + dt(x.updatedAt) + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-ed="' + x.id + '">✏️</button></div></div>';
+        var what = x.kind === "text" ? "“" + esc(x.match) + "” → “" + esc(x.value) + "”" + (x.attr ? " (placeholder)" : "") : x.kind === "hide" ? "Hide “" + esc(x.match) + "”" + (x.up ? " (+" + x.up + " level)" : "") : x.kind === "list" ? esc(niceKey(x.listKey)) + ": " + esc(x.items.join(", ")) : esc(niceKey(x.formKey)) + ": " + x.fields.map(function (f) { return esc(f.label) + " (" + f.type + (f.required ? ", required" : "") + ")"; }).join(", ");
+        return '<div class="ch"><input type="checkbox" data-x="' + x.id + '"' + (SELX[x.id] ? " checked" : "") + '><div class="mid"><div class="k">' + KIND[x.kind] + (x.page && x.page !== "*" ? " · " + esc(x.page) : "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w">' + what + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + " · " + esc(x.by) + " · " + dt(x.updatedAt) + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-ed="' + x.id + '">✏️</button>' + (x.kind === "fields" ? '<button data-ans="' + esc(x.formKey) + '">📊 Answers</button>' : "") + "</div></div>";
       }).join("") : '<div class="card empty"><div class="big">✏️</div>No changes yet. Open a screen above and tap ✏️ Customize.</div>');
     [].forEach.call($("pane").querySelectorAll("[data-pg]"), function (b) { b.onclick = function () { openPage(b.dataset.pg); }; });
     [].forEach.call($("pane").querySelectorAll("[data-x]"), function (c) { c.onchange = function () { SELX[c.dataset.x] = c.checked; }; });
@@ -86,6 +95,25 @@
     if ($("bx")) $("bx").onclick = function () { var ids = sel(); if (!ids.length) return toast("Select changes first."); sheet("Delete " + ids.length + " change(s)?", "Screens go back to the original", [["🗑️", "Delete", function () { api({ action: "cust-delete", ids: ids }).then(function () { toast("Deleted"); SELX = {}; load(); }); }, "red"]]); };
     [].forEach.call($("pane").querySelectorAll("[data-rel]"), function (b) { b.onclick = function () { var x = ITEMS.find(function (y) { return y.id === b.dataset.rel; }); audDialog([x.id], x.audience || {}, x.status); }; });
     [].forEach.call($("pane").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { editChange(ITEMS.find(function (y) { return y.id === b.dataset.ed; })); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-ans]"), function (b) { b.onclick = function () { answers(b.dataset.ans); }; });
+  }
+  function niceKey(k) { var m = /^auto:([^:]+):(.+)$/.exec(k || ""); return m ? (PAGES.reduce(function (a, p) { return p[0] === m[1] ? p[1] : a; }, m[1]) + " form (" + m[2] + ")") : k; }
+  // answers given to fields added on an existing form
+  function answers(formKey) {
+    var builtIn = !/^auto:/.test(formKey);
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    hero("Answers", niceKey(formKey));
+    if (builtIn) { $("pane").innerHTML = '<div class="notice info" style="margin-top:8px">These fields are saved inside each record of that screen (visit, dispute, post…). They appear in its detail view and in its Excel export.</div><button class="btn sec" id="bk2" style="margin-top:8px">← Back</button>'; $("bk2").onclick = function () { load(); }; return; }
+    api({ action: "cxx-list", formKey: formKey }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var fs = r.fields.filter(function (f) { return f.type !== "heading" && f.type !== "image"; });
+      var v = function (f, x) { var y = x.values[f.key]; return Array.isArray(y) ? y.join(", ") : y == null ? "" : String(y); };
+      $("pane").innerHTML = '<div class="row" style="margin-top:8px"><button class="btn sec sm" id="bk2">← Back</button><span class="grow"></span>' + (r.rows.length ? '<button class="btn sec sm" id="ax">⬇ Excel</button>' : "") + "</div>" +
+        '<div class="muted" style="margin-top:8px">' + r.rows.length + " answer" + (r.rows.length === 1 ? "" : "s") + "</div>" +
+        (r.rows.length ? r.rows.slice(0, 300).map(function (x) { return '<div class="ch"><div class="mid"><div class="k">' + esc(x.by.fullName) + " · " + esc(x.state) + " · " + dt(x.at) + (x.ref && x.ref.id ? " · ref " + esc(x.ref.id) : "") + '</div><div class="w">' + fs.map(function (f) { var y = v(f, x); return y ? "<b>" + esc(f.label) + ":</b> " + esc(f.type === "photo" ? "📷 photo" : y) : ""; }).filter(Boolean).join("<br>") + "</div></div></div>"; }).join("") : '<div class="card empty">No answers yet.</div>');
+      $("bk2").onclick = function () { load(); };
+      if ($("ax")) $("ax").onclick = function () { download(xlsx([{ name: "Answers", rows: [["Submitted", "Name", "State", "Saved with", "Ref"].concat(fs.map(function (f) { return f.label; }))].concat(r.rows.map(function (x) { return [dt(x.at), x.by.fullName, x.state, x.action, (x.ref && x.ref.id) || ""].concat(fs.map(function (f) { return v(f, x); })); })) }]), "Answers_" + formKey.replace(/[^A-Za-z0-9]+/g, "_") + ".xlsx"); };
+    });
   }
   function editChange(x) {
     var body = x.kind === "text" ? '<label>Original</label><input class="tx" id="e1" value="' + esc(x.match) + '"><label>New wording</label><input class="tx" id="e2" value="' + esc(x.value) + '"><label>Screen</label><input class="tx" id="e3" value="' + esc(x.page) + '" placeholder="page name or * for all screens">'
@@ -103,16 +131,73 @@
       api({ action: "cust-save", item: it }).then(function (r) { toast(r.ok ? "Saved as draft" : r.error); if (r.ok) load(); });
     }], ["🗑️", "Delete", function () { api({ action: "cust-delete", id: x.id }).then(function () { toast("Deleted"); load(); }); }, "red"]], '<div class="f8">' + body + "</div>");
     ov.querySelector(".sheet").style.maxWidth = "600px";
-    if (fields) fieldsEditor(ov.querySelector("#ef"), fields, ov.querySelector("#eaf"));
+    if (fields) fieldsEditor(ov.querySelector("#ef"), fields, ov.querySelector("#eaf"), { images: false });
   }
-  function fieldsEditor(box, fields, addBtn) {
-    var draw = function () {
-      box.innerHTML = fields.map(function (f, i) { return '<div class="fld"><div class="row"><input class="tx" data-i="' + i + '" data-k="label" value="' + esc(f.label) + '" placeholder="Label" style="flex:2"><select class="tx" data-i="' + i + '" data-k="type" style="flex:1">' + [["text", "Short text"], ["longtext", "Long text"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown"], ["multi", "Multiple choice"], ["yesno", "Yes / No"], ["rating", "Rating"], ["photo", "Photo"]].map(function (t) { return '<option value="' + t[0] + '"' + (f.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") + '</select><button class="btn ghost sm" data-rm="' + i + '">✕</button></div>' +
-        (/select|multi/.test(f.type) ? '<textarea class="tx" data-i="' + i + '" data-k="options" rows="3" placeholder="Options, one per line" style="margin-top:6px">' + esc((f.options || []).join("\n")) + "</textarea>" : "") + '<label style="display:flex;gap:6px;align-items:center;margin:6px 0 0;font-size:12.5px;color:var(--ink)"><input type="checkbox" data-i="' + i + '" data-k="required"' + (f.required ? " checked" : "") + "> Required</label></div>"; }).join("");
-      [].forEach.call(box.querySelectorAll("[data-k]"), function (e) { e.oninput = e.onchange = function () { var f = fields[+e.dataset.i], k = e.dataset.k; f[k] = k === "required" ? e.checked : k === "options" ? e.value.split("\n") : e.value; if (k === "type") draw(); }; });
-      [].forEach.call(box.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { fields.splice(+b.dataset.rm, 1); draw(); }; });
+  var FTYPES = [["text", "✏️ Short text"], ["longtext", "📝 Paragraph"], ["number", "🔢 Number"], ["select", "🔽 Dropdown"], ["multi", "☑️ Checkboxes (many)"], ["yesno", "👍 Yes / No"], ["rating", "⭐ Star rating"], ["scale", "📏 Scale / NPS"],
+    ["date", "📅 Date"], ["time", "🕒 Time"], ["datetime", "🗓️ Date & time"], ["email", "✉️ Email"], ["phone", "📞 Phone"], ["photo", "📷 Photo upload"], ["location", "📍 GPS location"], ["checkbox", "✅ Tick box (agree)"], ["heading", "🔖 Section / page break"], ["image", "🖼️ Image"]];
+  var IMG = {};   // uploaded image previews (id -> data url)
+  function upImage(max, cb) {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; var img = new Image(), u = URL.createObjectURL(f);
+      img.onload = function () { var k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u);
+        var d = c.toDataURL("image/jpeg", 0.82); toast("Uploading image…");
+        api({ action: "support-upload", name: "tool-" + Date.now() + ".jpg", data: d.split(",")[1] }).then(function (r) { if (!r.ok) return toast(r.error || "Upload failed"); IMG[r.att.id] = d; cb(r.att.id, d); }); };
+      img.src = u;
     };
-    if (addBtn) addBtn.onclick = function () { fields.push({ label: "", type: "text", options: [], required: false }); draw(); };
+    inp.click();
+  }
+  function thumb(id, toolId) {
+    if (!id) return "";
+    if (IMG[id]) return '<img src="' + IMG[id] + '" alt="" style="max-width:100%;max-height:120px;border-radius:10px;display:block;margin-top:6px">';
+    if (toolId) api({ action: "ct-asset", tool: toolId, file: id }).then(function (r) { if (r.ok) { IMG[id] = "data:" + r.mime + ";base64," + r.data; [].forEach.call(document.querySelectorAll('[data-th="' + id + '"]'), function (x) { x.innerHTML = '<img src="' + IMG[id] + '" alt="" style="max-width:100%;max-height:120px;border-radius:10px;display:block;margin-top:6px">'; }); } });
+    return '<span data-th="' + id + '" class="muted" style="font-size:12px">🖼️ image added</span>';
+  }
+  var nkey = function () { return "q" + Date.now().toString(36).slice(-4) + Math.random().toString(36).slice(2, 5); };
+  // Rich field editor (custom tools and extra fields on existing forms)
+  function fieldsEditor(box, fields, addBtn, opts) {
+    opts = opts || {};
+    fields.forEach(function (f) { if (!f.key) f.key = nkey(); f.options = f.options || []; });
+    var types = FTYPES.filter(function (t) { return opts.images !== false || t[0] !== "image"; });
+    var draw = function () {
+      var qn = 0;
+      box.innerHTML = fields.map(function (f, i) {
+        var nov = f.type === "heading" || f.type === "image"; if (!nov) qn++;
+        var prev = fields.slice(0, i).filter(function (x) { return x.type !== "heading" && x.type !== "image"; });
+        var src = f.show && f.show.key ? fields.find(function (x) { return x.key === f.show.key; }) : null;
+        return '<div class="fld' + (f.type === "heading" ? " fhd" : "") + '" data-i="' + i + '"><div class="row" style="gap:6px"><span class="qno">' + (f.type === "heading" ? "§" : f.type === "image" ? "🖼️" : "Q" + qn) + '</span><select class="tx" data-k="type" style="flex:1;min-width:0">' + types.map(function (t) { return '<option value="' + t[0] + '"' + (f.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") + '</select><button class="ib" data-mv="-1" title="Move up">↑</button><button class="ib" data-mv="1" title="Move down">↓</button><button class="ib" data-dup="1" title="Duplicate">⧉</button><button class="ib" data-rm="1" title="Delete">✕</button></div>' +
+          '<input class="tx" data-k="label" value="' + esc(f.label || "") + '" placeholder="' + (f.type === "heading" ? "Section title (e.g. Store exterior)" : f.type === "image" ? "Caption (optional)" : "Question / label") + '" style="margin-top:6px;font-weight:600">' +
+          (/select|multi/.test(f.type) ? '<textarea class="tx" data-k="options" rows="3" placeholder="Options — one per line" style="margin-top:6px">' + esc((f.options || []).join("\n")) + "</textarea>" : "") +
+          (f.type === "heading" ? '<textarea class="tx" data-k="text" rows="2" placeholder="Description / instructions (optional)" style="margin-top:6px">' + esc(f.text || "") + '</textarea><label class="cbx"><input type="checkbox" data-k="newPage"' + (f.newPage ? " checked" : "") + "> Start a new page here (multi-step form)</label>" : "") +
+          ((f.type === "heading" || f.type === "image") && opts.images !== false ? '<div class="row" style="margin-top:6px"><button class="btn sec sm" data-img="1">🖼️ ' + (f.image ? "Change image" : "Add image") + "</button>" + (f.image ? '<button class="btn ghost sm" data-noimg="1">Remove</button>' : "") + "</div>" + thumb(f.image, opts.toolId) : "") +
+          (/number|scale/.test(f.type) ? '<div class="row" style="margin-top:6px"><input class="tx" data-k="min" type="number" placeholder="Min' + (f.type === "scale" ? " (0)" : "") + '" value="' + (f.min != null ? f.min : "") + '"><input class="tx" data-k="max" type="number" placeholder="Max' + (f.type === "scale" ? " (10)" : "") + '" value="' + (f.max != null ? f.max : "") + '"></div>' : "") +
+          (nov ? "" : '<div class="row" style="margin-top:6px;justify-content:space-between"><label class="cbx" style="margin:0"><input type="checkbox" data-k="required"' + (f.required ? " checked" : "") + '> Required</label><a class="lnk" data-more="1">' + (f.__open ? "▲ Less" : "⚙️ Hint, help, show only if…") + "</a></div>" +
+            (f.__open ? '<div class="more"><input class="tx" data-k="placeholder" value="' + esc(f.placeholder || "") + '" placeholder="' + (f.type === "scale" ? "Scale labels, e.g. 0 = Not likely · 10 = Very likely" : "Hint inside the box, e.g. Enter 10-digit number") + '"><input class="tx" data-k="help" value="' + esc(f.help || "") + '" placeholder="Help text under the field" style="margin-top:6px">' +
+              '<div class="muted" style="font-size:11.5px;margin-top:8px">Show this question only if…</div><div class="row"><select class="tx" data-k="showKey" style="flex:1;min-width:0"><option value="">Always show</option>' + prev.map(function (x) { return '<option value="' + x.key + '"' + (src && src.key === x.key ? " selected" : "") + ">" + esc(x.label || "(untitled)") + "</option>"; }).join("") + "</select>" +
+              (src ? (/select|multi|yesno|checkbox/.test(src.type) ? '<select class="tx" data-k="showVal" style="flex:1;min-width:0">' + (src.type === "yesno" ? ["Yes", "No"] : src.type === "checkbox" ? ["Yes"] : src.options).map(function (o) { return "<option" + (f.show.value === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>" : '<input class="tx" data-k="showVal" placeholder="equals…" value="' + esc(f.show.value || "") + '" style="flex:1">') : "") + "</div></div>" : "")) + "</div>";
+      }).join("") || '<div class="muted" style="padding:10px">No fields yet.</div>';
+      [].forEach.call(box.querySelectorAll(".fld"), function (card) {
+        var i = +card.dataset.i, f = fields[i];
+        [].forEach.call(card.querySelectorAll("[data-k]"), function (e) { e.oninput = e.onchange = function () {
+          var k = e.dataset.k;
+          if (k === "required" || k === "newPage") f[k] = e.checked;
+          else if (k === "options") f.options = e.value.split("\n");
+          else if (k === "min" || k === "max") f[k] = e.value === "" ? null : +e.value;
+          else if (k === "showKey") { f.show = e.value ? { key: e.value, value: "" } : null; var sf = fields.find(function (x) { return x.key === e.value; }); if (sf && f.show) f.show.value = sf.type === "yesno" || sf.type === "checkbox" ? "Yes" : (sf.options || [])[0] || ""; draw(); }
+          else if (k === "showVal") { if (f.show) f.show.value = e.value; }
+          else f[k] = e.value;
+          if (k === "type") { if (/select|multi/.test(f.type) && !f.options.filter(Boolean).length) f.options = ["Option 1", "Option 2"]; draw(); }
+        }; });
+        var q = function (sel) { return card.querySelector(sel); };
+        q("[data-rm]").onclick = function () { fields.splice(i, 1); draw(); };
+        q("[data-dup]").onclick = function () { var c = JSON.parse(JSON.stringify(f)); c.key = nkey(); c.label = (c.label || "") + (c.label ? " (copy)" : ""); fields.splice(i + 1, 0, c); draw(); };
+        [].forEach.call(card.querySelectorAll("[data-mv]"), function (b) { b.onclick = function () { var j = i + (+b.dataset.mv); if (j < 0 || j >= fields.length) return; fields.splice(j, 0, fields.splice(i, 1)[0]); draw(); }; });
+        if (q("[data-more]")) q("[data-more]").onclick = function () { f.__open = !f.__open; draw(); };
+        if (q("[data-img]")) q("[data-img]").onclick = function () { upImage(1400, function (id) { f.image = id; draw(); }); };
+        if (q("[data-noimg]")) q("[data-noimg]").onclick = function () { f.image = ""; draw(); };
+      });
+    };
+    if (addBtn) addBtn.onclick = function () { fields.push({ key: nkey(), label: "", type: "text", options: [], required: false }); draw(); var l = box.lastElementChild; if (l && l.scrollIntoView) l.scrollIntoView({ block: "center" }); };
     draw();
   }
   // Audience: everyone, roles, states, user IDs (typed or from Excel)
@@ -144,30 +229,127 @@
 
   // ================= TOOLS =================
   var CATN = { field: "📍 Field & market", reports: "📊 Reports & insights", engage: "💬 Engage", learn: "📚 Learn & help", support: "🎧 Support", admin: "🛡️ Admin", more: "🧰 More tools" };
+  var COLORS = ["#4D5BF9", "#1E9E61", "#E0533D", "#F5A623", "#7B4DDB", "#0E8FB3", "#D6336C", "#1F2340"];
+  function F(label, type, x) { return Object.assign({ key: nkey(), label: label, type: type, options: [], required: false }, x || {}); }
+  var TEMPLATES = [
+    ["📋", "Store audit checklist", "Multi-page audit with photos, ratings and GPS", function () { return { name: "Store audit", icon: "📋", category: "field", type: "form", desc: "Visit audit — branding, stock, staff", form: { color: "#1E9E61", intro: "## Before you start\n- Stand in front of the store\n- Keep the camera ready for photos", thanks: "Audit saved. Great work!", submitLabel: "Submit audit" },
+      fields: [F("Store details", "heading", { text: "Who and where", newPage: true }), F("Store name", "text", { required: true }), F("Retailer ID", "text"), F("Location", "location", { required: true }),
+        F("Branding", "heading", { text: "Signage and display", newPage: true }), F("Signage condition", "rating", { required: true }), F("Demo phones working?", "yesno", { required: true }), F("What's not working?", "longtext", { show: null }), F("Store front photo", "photo", { required: true }),
+        F("Stock & staff", "heading", { newPage: true }), F("Models out of stock", "multi", { options: ["Y-series", "V-series", "T-series", "X-series"] }), F("Promoter present?", "yesno"), F("Remarks", "longtext")] }; }],
+    ["💸", "Expense claim with approval", "Bill upload → HO review → master approval", function () { return { name: "Expense claim", icon: "💸", category: "admin", type: "form", desc: "Claim travel & market expenses", form: { color: "#E0533D", intro: "Attach a clear photo of each bill. Claims are reviewed within 48 hours.", thanks: "Claim submitted — you'll see each approval step under My responses." },
+      fields: [F("Expense type", "select", { required: true, options: ["Travel", "Food", "Market activity", "POSM", "Other"] }), F("Amount (₹)", "number", { required: true, min: 1 }), F("Expense date", "date", { required: true }), F("Bill photo", "photo", { required: true }), F("Purpose", "longtext", { required: true })],
+      flow: { steps: [{ name: "HO review", roles: ["admin"], users: [], sameState: false, tatHours: 24 }, { name: "Final approval", roles: ["master"], users: [], sameState: false, tatHours: 24 }], allowResubmit: true } }; }],
+    ["📦", "POSM / stock request", "State lead → HO approval flow", function () { return { name: "POSM request", icon: "📦", category: "field", type: "form", desc: "Request POSM, demo units or stock", form: { color: "#F5A623", thanks: "Request sent for approval." },
+      fields: [F("Item", "select", { required: true, options: ["Standee", "Danglers", "Demo unit", "Glow sign", "Other"] }), F("Quantity", "number", { required: true, min: 1, max: 500 }), F("Needed by", "date", { required: true }), F("Store name", "text", { required: true }), F("Reason", "longtext")],
+      flow: { steps: [{ name: "State lead", roles: ["state"], users: [], sameState: true, tatHours: 24 }, { name: "HO approval", roles: ["admin"], users: [], sameState: false, tatHours: 48 }], allowResubmit: true } }; }],
+    ["📣", "Retailer feedback survey", "Anonymous NPS survey, one response each", function () { return { name: "Retailer feedback", icon: "📣", category: "engage", type: "form", desc: "2-minute survey", form: { color: "#7B4DDB", intro: "Your answers are **anonymous**. Thank you for helping us improve!", thanks: "Thanks for your feedback 💜", oneResponse: true, anonymous: true },
+      fields: [F("How likely are you to recommend vivo to other retailers?", "scale", { required: true, min: 0, max: 10, placeholder: "0 = Not likely · 10 = Very likely" }), F("Overall support from the BI team", "rating", { required: true }), F("What helps you most?", "multi", { options: ["Schemes", "EMI offers", "Training", "Quick payouts", "Dashboard"] }), F("Anything we should improve?", "longtext")] }; }],
+    ["🎓", "Training attendance & feedback", "Attendance, rating and consent", function () { return { name: "Training feedback", icon: "🎓", category: "learn", type: "form", desc: "Mark attendance and rate the session", form: { color: "#0E8FB3" },
+      fields: [F("Session", "select", { required: true, options: ["Product training", "Dashboard training", "Scheme briefing"] }), F("Date", "date", { required: true }), F("Rate the session", "rating", { required: true }), F("Most useful topic", "text"), F("I attended the full session", "checkbox", { required: true })] }; }],
+    ["➕", "Blank form", "Start from scratch", function () { return { name: "", icon: "🧩", category: "more", type: "form", form: {}, fields: [F("", "text", { required: true })] }; }]
+  ];
   function showTools() {
-    hero("Studio · Tools", "Build new tools — forms, links, info pages, saved reports");
+    hero("Studio · Tools", "Forms, surveys, approval flows, links, info pages, saved reports");
     var tools = ITEMS.filter(function (x) { return x.kind === "tool"; });
-    $("pane").innerHTML = '<button class="btn pri block" id="nt" style="margin-top:8px">＋ New tool</button>' +
-      (tools.length ? tools.map(function (x) { var tl = x.tool; return '<div class="ch"><div style="font-size:26px">' + esc(tl.icon) + '</div><div class="mid"><div class="k">' + esc({ form: "Form", link: "Link", page: "Info page", report: "Saved report" }[tl.type]) + " · " + esc(CATN[tl.category] || "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w"><b>' + esc(tl.name) + "</b>" + (tl.desc ? " — " + esc(tl.desc) : "") + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-op="' + x.id + '">▶</button><button data-ed="' + x.id + '">✏️</button></div></div>'; }).join("") : '<div class="card empty"><div class="big">🧩</div>No custom tools yet. Build a form (e.g. stock audit, store checklist, training attendance), a link, an info page or a saved report.</div>');
-    $("nt").onclick = function () { toolEdit({ kind: "tool", tool: { name: "", icon: "🧩", category: "more", type: "form", fields: [{ label: "", type: "text", options: [], required: true }] } }); };
+    $("pane").innerHTML = '<div class="row" style="margin-top:8px"><button class="btn pri" id="nt" style="flex:1;padding:12px">＋ New tool</button></div>' +
+      (tools.length ? tools.map(function (x) { var tl = x.tool, st = (tl.flow && tl.flow.steps) || []; return '<div class="ch"><div style="font-size:26px">' + esc(tl.icon) + '</div><div class="mid"><div class="k">' + esc({ form: "Form", link: "Link", page: "Info page", report: "Saved report" }[tl.type]) + (st.length ? " · " + st.length + "-step approval" : "") + (tl.form && tl.form.anonymous ? " · anonymous" : "") + " · " + esc(CATN[tl.category] || "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w"><b>' + esc(tl.name) + "</b>" + (tl.desc ? " — " + esc(tl.desc) : "") + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-op="' + x.id + '" title="Open / test">▶</button><button data-ed="' + x.id + '" title="Edit">✏️</button></div></div>'; }).join("") : '<div class="card empty"><div class="big">🧩</div>No custom tools yet. Start from a template — audits, expense claims with approvals, request flows, surveys.</div>');
+    $("nt").onclick = pickTemplate;
     [].forEach.call($("pane").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { toolEdit(JSON.parse(JSON.stringify(ITEMS.find(function (y) { return y.id === b.dataset.ed; })))); }; });
-    [].forEach.call($("pane").querySelectorAll("[data-op]"), function (b) { b.onclick = function () { var nm = (ITEMS.find(function (y) { return y.id === b.dataset.op; }) || { tool: {} }).tool.name || "Tool"; if (IN_APP && window.BIApp.openTool) return window.BIApp.openTool("tool.html", nm, "#" + b.dataset.op); if (parent !== window) return parent.postMessage({ biOpen: { file: "tool.html", title: nm, hash: "#" + b.dataset.op } }, location.origin); location.href = "tool.html#" + b.dataset.op; }; });
+    [].forEach.call($("pane").querySelectorAll("[data-op]"), function (b) { b.onclick = function () { openTool(b.dataset.op); }; });
     [].forEach.call($("pane").querySelectorAll("[data-rel]"), function (b) { b.onclick = function () { var x = ITEMS.find(function (y) { return y.id === b.dataset.rel; }); audDialog([x.id], x.audience || {}, x.status); }; });
   }
+  function openTool(id) {
+    var nm = (ITEMS.find(function (y) { return y.id === id; }) || { tool: {} }).tool.name || "Tool";
+    if (IN_APP && window.BIApp.openTool) return window.BIApp.openTool("tool.html", nm, "#" + id);
+    if (parent !== window) return parent.postMessage({ biOpen: { file: "tool.html", title: nm, hash: "#" + id } }, location.origin);
+    location.href = "tool.html#" + id;
+  }
+  function pickTemplate() {
+    var ov = sheet("New tool", "Pick a template — everything can be changed", [["🔗", "Link to a website / app", function () { toolEdit({ kind: "tool", tool: { name: "", icon: "🔗", category: "more", type: "link", fields: [], form: {} } }); }], ["📄", "Info page (text, steps, contacts)", function () { toolEdit({ kind: "tool", tool: { name: "", icon: "📄", category: "learn", type: "page", fields: [], form: {} } }); }], ["📑", "Saved report (from Report builder)", function () { toolEdit({ kind: "tool", tool: { name: "", icon: "📑", category: "reports", type: "report", fields: [], form: {} } }); }]],
+      '<div class="tpl">' + TEMPLATES.map(function (t, i) { return '<button data-tp="' + i + '"><span style="font-size:24px">' + t[0] + "</span><b>" + esc(t[1]) + "</b><small>" + esc(t[2]) + "</small></button>"; }).join("") + "</div>");
+    [].forEach.call(ov.querySelectorAll("[data-tp]"), function (b) { b.onclick = function () { ov.remove(); toolEdit({ kind: "tool", tool: TEMPLATES[+b.dataset.tp][3]() }); }; });
+  }
+  // Full-page builder: basics, look & feel, questions, survey settings, approval flow
   function toolEdit(x) {
-    var tl = x.tool; tl.fields = tl.fields || [];
-    var body = function () { return '<div class="f8"><div style="display:grid;grid-template-columns:70px 1fr;gap:8px"><div><label>Icon</label><input class="tx" id="ti" value="' + esc(tl.icon) + '"></div><div><label>Name</label><input class="tx" id="tn" value="' + esc(tl.name) + '" placeholder="e.g. Store checklist"></div></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>Type</label><select class="tx" id="tt">' + [["form", "📝 Form"], ["link", "🔗 Link"], ["page", "📄 Info page"], ["report", "📑 Saved report"]].map(function (o) { return '<option value="' + o[0] + '"' + (tl.type === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label>Show in</label><select class="tx" id="tc">' + Object.keys(CATN).map(function (k) { return '<option value="' + k + '"' + (tl.category === k ? " selected" : "") + ">" + CATN[k] + "</option>"; }).join("") + "</select></div></div>" +
-      '<label>Description</label><input class="tx" id="td" value="' + esc(tl.desc || "") + '">' +
-      (tl.type === "form" ? '<label>Form fields</label><div id="tf"></div><button class="btn sec sm" id="taf" style="margin-top:8px">＋ Field</button>' : "") +
-      (tl.type === "link" ? '<label>Link (https://…)</label><input class="tx" id="tu" value="' + esc(tl.url || "") + '">' : "") +
-      (tl.type === "page" ? '<label>Content (## heading · - bullet · **bold**)</label><textarea class="tx" id="tb" rows="10">' + esc(tl.body || "") + "</textarea>" : "") +
-      (tl.type === "report" ? '<div class="notice info">Build the report in <b>Reports → Report builder</b> and tap <b>🧩 Save as tool</b>.' + (tl.report ? " This tool opens: " + esc(tl.report.ds) + " · " + esc(tl.report.period || "") : "") + "</div>" : "") + "</div>"; };
-    var collect = function (ov) { tl.icon = ov.querySelector("#ti").value; tl.name = ov.querySelector("#tn").value; tl.category = ov.querySelector("#tc").value; tl.desc = ov.querySelector("#td").value; if (ov.querySelector("#tu")) tl.url = ov.querySelector("#tu").value; if (ov.querySelector("#tb")) tl.body = ov.querySelector("#tb").value; };
-    var ov = sheet(x.id ? "Edit tool" : "New tool", "Saved as a draft — test it, then release", [["💾", "Save draft", function (ov) { collect(ov); api({ action: "cust-save", item: { id: x.id, kind: "tool", tool: tl } }).then(function (r) { toast(r.ok ? "Saved as draft — open it with ▶ to test" : r.error); if (r.ok) { if (window.CUST) CUST.refresh(); load(); } }); }]].concat(x.id ? [["🗑️", "Delete tool (and its responses)", function () { api({ action: "cust-delete", id: x.id }).then(function () { toast("Deleted"); load(); }); }, "red"]] : []), '<div id="tbx">' + body() + "</div>");
-    ov.querySelector(".sheet").style.maxWidth = "640px";
-    var bind = function () { ov.querySelector("#tt").onchange = function () { collect(ov); tl.type = this.value; if (tl.type === "form" && !tl.fields.length) tl.fields.push({ label: "", type: "text", options: [] }); ov.querySelector("#tbx").innerHTML = body(); bind(); }; if (ov.querySelector("#tf")) fieldsEditor(ov.querySelector("#tf"), tl.fields, ov.querySelector("#taf")); };
-    bind();
+    var tl = x.tool; tl.fields = tl.fields || []; tl.form = tl.form || {}; tl.flow = tl.flow || { steps: [], allowResubmit: true }; tl.flow.steps = tl.flow.steps || [];
+    hero(x.id ? "Edit tool" : "New tool", "Saved as a draft — test it with ▶, then release");
+    var fm = tl.form;
+    var sec = function (n, t, sub, body) { return '<div class="card bsec"><div class="bh"><span class="bn">' + n + "</span><div><b>" + t + '</b><div class="muted" style="font-size:12px">' + sub + "</div></div></div>" + body + "</div>"; };
+    var isForm = tl.type === "form";
+    $("pane").innerHTML = '<div class="row" style="margin-top:8px"><button class="btn sec sm" id="tbk">← Tools</button><span class="grow"></span>' + (x.id ? '<button class="btn sec sm" id="ttest">▶ Open & test</button><button class="btn ok sm" id="trel">🚀 Release…</button>' : "") + "</div>" +
+      '<div class="f8">' +
+      sec(1, "Basics", "Name, icon and where it shows in All tools",
+        '<div style="display:grid;grid-template-columns:70px 1fr;gap:8px"><div><label>Icon</label><input class="tx" id="ti" value="' + esc(tl.icon) + '" style="text-align:center;font-size:20px"></div><div><label>Name</label><input class="tx" id="tn" value="' + esc(tl.name) + '" placeholder="e.g. Store audit"></div></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>Type</label><select class="tx" id="tt">' + [["form", "📝 Form / survey"], ["link", "🔗 Link"], ["page", "📄 Info page"], ["report", "📑 Saved report"]].map(function (o) { return '<option value="' + o[0] + '"' + (tl.type === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label>Show in</label><select class="tx" id="tc">' + Object.keys(CATN).map(function (k) { return '<option value="' + k + '"' + (tl.category === k ? " selected" : "") + ">" + CATN[k] + "</option>"; }).join("") + "</select></div></div>" +
+        '<label>Short description</label><input class="tx" id="td" value="' + esc(tl.desc || "") + '" placeholder="One line under the name">' +
+        (tl.type === "link" ? '<label>Link (https://…)</label><input class="tx" id="tu" value="' + esc(tl.url || "") + '">' : "") +
+        (tl.type === "page" ? '<label>Content (## heading · - bullet · **bold**)</label><textarea class="tx" id="tb" rows="12">' + esc(tl.body || "") + "</textarea>" : "") +
+        (tl.type === "report" ? '<div class="notice info" style="margin-top:8px">Build the report in <b>Reports → Report builder</b> and tap <b>🧩 Save as tool</b>.' + (tl.report ? " This tool opens: " + esc(tl.report.ds) + " · " + esc(tl.report.period || "") : "") + "</div>" : "")) +
+      (isForm ? sec(2, "Look & feel", "Banner, colour and welcome text",
+        '<label>Banner image</label><div class="row"><button class="btn sec sm" id="bup">🖼️ ' + (fm.banner ? "Change banner" : "Upload banner") + "</button>" + (fm.banner ? '<button class="btn ghost sm" id="bno">Remove</button>' : "") + '</div><div id="bth">' + thumb(fm.banner, x.id) + "</div>" +
+        '<label>Theme colour</label><div class="sw8">' + COLORS.map(function (c) { return '<button data-c="' + c + '" style="background:' + c + '" class="' + ((fm.color || "#4D5BF9") === c ? "on" : "") + '"></button>'; }).join("") + '<input type="color" id="tcol" value="' + (fm.color || "#4D5BF9") + '" title="Custom colour"></div>' +
+        '<label>Welcome / instructions (shown above the form)</label><textarea class="tx" id="tin" rows="4" placeholder="## heading · - bullet · **bold**">' + esc(fm.intro || "") + "</textarea>" +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>Submit button text</label><input class="tx" id="tsl" value="' + esc(fm.submitLabel || "") + '" placeholder="Submit"></div><div><label>Thank-you message</label><input class="tx" id="tth" value="' + esc(fm.thanks || "") + '" placeholder="Your response has been recorded."></div></div>') +
+      sec(3, "Questions", "Add, reorder, duplicate. Use 🔖 Section with “new page” for multi-step forms, and “Show only if” for logic.", '<div id="tf"></div><button class="btn pri block" id="taf" style="margin-top:10px">＋ Add question</button>') +
+      sec(4, "Survey settings", "Who can respond and how often",
+        '<label class="cbx"><input type="checkbox" id="s1"' + (fm.oneResponse ? " checked" : "") + "> One response per person</label>" +
+        '<label class="cbx"><input type="checkbox" id="s2"' + (fm.anonymous ? " checked" : "") + "> Anonymous (names hidden from admins; masters can still see them)</label>" +
+        '<label class="cbx"><input type="checkbox" id="s3"' + (fm.showProgress !== false ? " checked" : "") + "> Show step progress bar on multi-page forms</label>" +
+        '<label>Close the form after (optional)</label><input class="tx" id="s4" type="date" value="' + (fm.closeAt ? new Date(fm.closeAt - 19800000 + 330 * 60000).toISOString().slice(0, 10) : "") + '">') +
+      sec(5, "Approval flow", "Optional. Each response goes through these steps in order — approvers can approve, send back or reject with a comment.", '<div id="tfl"></div><div class="row" style="margin-top:8px"><button class="btn sec sm" id="tas">＋ Add approval step</button><span class="grow"></span><label class="cbx" style="margin:0"><input type="checkbox" id="tar"' + (tl.flow.allowResubmit !== false ? " checked" : "") + "> Allow “send back for changes”</label></div>") : "") +
+      '</div><div class="sbar"><button class="btn pri block" id="tsv" style="padding:14px">💾 Save draft</button>' + (x.id ? '<button class="btn danger sm" id="tdel">Delete</button>' : "") + "</div>";
+    var collect = function () {
+      var g = function (id) { return $(id) ? $(id).value : ""; };
+      tl.icon = g("ti") || "🧩"; tl.name = g("tn"); tl.category = g("tc"); tl.desc = g("td"); if ($("tu")) tl.url = g("tu"); if ($("tb")) tl.body = g("tb");
+      if (isForm) {
+        fm.intro = g("tin"); fm.submitLabel = g("tsl"); fm.thanks = g("tth"); fm.oneResponse = $("s1").checked; fm.anonymous = $("s2").checked; fm.showProgress = $("s3").checked;
+        fm.closeAt = g("s4") ? new Date(g("s4") + "T23:59:59+05:30").getTime() : 0; tl.flow.allowResubmit = $("tar").checked;
+      }
+    };
+    $("tbk").onclick = function () { load(); };
+    $("tt").onchange = function () { collect(); tl.type = this.value; if (tl.type === "form" && !tl.fields.length) tl.fields.push(F("", "text", { required: true })); toolEdit(x); };
+    if (isForm) {
+      fieldsEditor($("tf"), tl.fields, $("taf"), { images: true, toolId: x.id });
+      $("bup").onclick = function () { upImage(1600, function (id) { collect(); fm.banner = id; toolEdit(x); }); };
+      if ($("bno")) $("bno").onclick = function () { collect(); fm.banner = ""; toolEdit(x); };
+      [].forEach.call(document.querySelectorAll(".sw8 [data-c]"), function (b) { b.onclick = function () { fm.color = b.dataset.c; [].forEach.call(document.querySelectorAll(".sw8 [data-c]"), function (y) { y.classList.toggle("on", y === b); }); $("tcol").value = b.dataset.c; }; });
+      $("tcol").oninput = function () { fm.color = this.value; [].forEach.call(document.querySelectorAll(".sw8 [data-c]"), function (y) { y.classList.remove("on"); }); };
+      flowEditor($("tfl"), tl.flow.steps);
+      $("tas").onclick = function () { tl.flow.steps.push({ name: tl.flow.steps.length ? "Final approval" : "Manager approval", roles: ["admin"], users: [], sameState: false, tatHours: 24 }); flowEditor($("tfl"), tl.flow.steps); };
+    }
+    $("tsv").onclick = function () {
+      collect(); var b = this; b.disabled = true;
+      var clean = JSON.parse(JSON.stringify(tl)); clean.fields.forEach(function (f) { delete f.__open; delete f.__p; });
+      api({ action: "cust-save", item: { id: x.id, kind: "tool", tool: clean } }).then(function (r) {
+        b.disabled = false; if (!r.ok) return toast(r.error);
+        toast("Saved as draft — tap ▶ Open & test"); x.id = r.item.id; x.status = r.item.status;
+        if (window.CUST) CUST.refresh();
+        api({ action: "cust-list" }).then(function (q) { if (q.ok) ITEMS = q.items; toolEdit(x); });
+      });
+    };
+    if ($("ttest")) $("ttest").onclick = function () { openTool(x.id); };
+    if ($("trel")) $("trel").onclick = function () { var it = ITEMS.find(function (y) { return y.id === x.id; }) || x; audDialog([x.id], it.audience || {}, it.status); };
+    if ($("tdel")) $("tdel").onclick = function () { sheet("Delete this tool?", "Its responses are deleted too", [["🗑️", "Delete", function () { api({ action: "cust-delete", id: x.id }).then(function () { toast("Deleted"); load(); }); }, "red"]]); };
+    window.scrollTo(0, 0);
+  }
+  function flowEditor(box, steps) {
+    var draw = function () {
+      box.innerHTML = steps.length ? steps.map(function (st, i) {
+        return '<div class="fld stp" data-i="' + i + '"><div class="row" style="gap:6px"><span class="qno">' + (i + 1) + '</span><input class="tx" data-k="name" value="' + esc(st.name) + '" placeholder="Step name, e.g. HO review" style="flex:1;font-weight:600"><button class="ib" data-mv="-1">↑</button><button class="ib" data-mv="1">↓</button><button class="ib" data-rm="1">✕</button></div>' +
+          '<div class="muted" style="font-size:11.5px;margin-top:8px">Who approves — any of these roles…</div><div class="chk2">' + [["state", "State users"], ["admin", "Admins"], ["master", "Masters"]].map(function (r) { return '<label class="' + (st.roles.indexOf(r[0]) >= 0 ? "on" : "") + '" data-r="' + r[0] + '">' + r[1] + "</label>"; }).join("") + "</div>" +
+          '<div class="muted" style="font-size:11.5px;margin-top:8px">…or these user IDs (user name, vChat ID or email)</div><textarea class="tx" data-k="users" rows="2" placeholder="e.g. neha, VC1001, ravi@vivo.com">' + esc(st.users.join(", ")) + '</textarea><div class="row" style="margin-top:4px"><button class="btn ghost sm" data-xl="1" type="button">📥 IDs from Excel</button></div>' +
+          '<div class="row" style="margin-top:6px;justify-content:space-between;flex-wrap:wrap"><label class="cbx" style="margin:0"><input type="checkbox" data-k="sameState"' + (st.sameState ? " checked" : "") + '> Only approvers from the submitter\'s state</label><span style="display:flex;gap:6px;align-items:center;font-size:12.5px">Target <input class="tx" data-k="tatHours" type="number" min="0" value="' + (st.tatHours || "") + '" style="width:70px;padding:6px"> h</span></div></div>';
+      }).join('<div class="arr">↓</div>') : '<div class="muted" style="font-size:13px">No approval — responses are simply collected. Add steps to route each response for approval.</div>';
+      [].forEach.call(box.querySelectorAll(".stp"), function (card) {
+        var i = +card.dataset.i, st = steps[i];
+        [].forEach.call(card.querySelectorAll("[data-k]"), function (e) { e.oninput = e.onchange = function () { var k = e.dataset.k; if (k === "sameState") st[k] = e.checked; else if (k === "users") st.users = e.value.split(/[\s,;]+/).filter(Boolean); else if (k === "tatHours") st[k] = +e.value || 0; else st[k] = e.value; }; });
+        [].forEach.call(card.querySelectorAll("[data-r]"), function (l) { l.onclick = function () { var k = st.roles.indexOf(l.dataset.r); if (k >= 0) st.roles.splice(k, 1); else st.roles.push(l.dataset.r); l.classList.toggle("on", k < 0); }; });
+        card.querySelector("[data-rm]").onclick = function () { steps.splice(i, 1); draw(); };
+        [].forEach.call(card.querySelectorAll("[data-mv]"), function (b) { b.onclick = function () { var j = i + (+b.dataset.mv); if (j < 0 || j >= steps.length) return; steps.splice(j, 0, steps.splice(i, 1)[0]); draw(); }; });
+        card.querySelector("[data-xl]").onclick = function () { readSheet(function (rows) { var ids = rows.map(function (r) { return String(r[0] || "").trim(); }).filter(function (v) { return v && !/^(user|id|vchat|email|name)/i.test(v); }); st.users = st.users.concat(ids); draw(); toast(ids.length + " IDs added"); }); };
+      });
+    };
+    draw();
   }
 
   // ================= ACCESS =================
@@ -213,7 +395,7 @@
       $("mi").onclick = function () { readSheet(function (rows) { grant(rows.map(function (x) { return String(x[0] || "").trim(); }).filter(function (x) { return x && !/^(user|name)/i.test(x); })); }); };
     });
   }
-  window.__pageBack = function () { return false; };
+  window.__pageBack = function () { if (/^(New tool|Edit tool|Answers)/.test($("h1").textContent)) { load(); return true; } return false; };
   if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else load();
 })();
 </script>
