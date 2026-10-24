@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tool</title>
+<style>
+/*@@CSS@@*/
+.body2{background:var(--card);border-radius:16px;padding:16px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);font-size:15px;line-height:1.6}
+.body2 h3{color:#2B33A6;margin:16px 0 6px}.body2 ul{padding-left:20px}
+.sb{background:var(--card);border-radius:12px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);font-size:13px}
+.sb .kv2{display:grid;grid-template-columns:140px 1fr;gap:2px 10px;margin-top:6px}.sb .kv2 span{color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic" id="hic">🧩</span></div>
+  <h1 id="h1">Tool</h1><p id="h2"></p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), ID = (location.hash || "").replace(/^#/, "").replace(/[^a-z0-9]/gi, ""), T = null, TAB = "fill";
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s || ""; }
+  function md(t) {
+    var out = [], list = false;
+    esc(t).split(/\r?\n/).forEach(function (l) {
+      var x = l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+      if (/^##\s+/.test(l)) { if (list) { out.push("</ul>"); list = false; } out.push("<h3>" + x.replace(/^##\s+/, "") + "</h3>"); }
+      else if (/^\s*[-*•]\s+/.test(l)) { if (!list) { out.push("<ul>"); list = true; } out.push("<li>" + x.replace(/^\s*[-*•]\s+/, "") + "</li>"); }
+      else if (!l.trim()) { if (list) { out.push("</ul>"); list = false; } }
+      else { if (list) { out.push("</ul>"); list = false; } out.push("<p>" + x.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>') + "</p>"); }
+    });
+    if (list) out.push("</ul>"); return out.join("");
+  }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    var go = function () {
+      T = window.CUST && CUST.tool(ID);
+      if (!T) { VIEW.innerHTML = '<div class="card empty"><div class="big">🧩</div>This tool isn\'t available for you.</div>'; return; }
+      var tl = T.tool; $("hic").textContent = tl.icon || "🧩"; hero(tl.name, tl.desc || "");
+      if (T.draft) VIEW.insertAdjacentHTML("beforebegin", "");
+      ({ form: showForm, link: showLink, page: showPage, report: showReport })[tl.type]();
+    };
+    if (window.CUST && CUST.tool(ID)) go(); else if (window.CUST) CUST.refresh().then(go); else go();
+  }
+  function draftNote() { return T.draft ? '<div class="notice">Draft — only master admins can see this tool until it is released in Studio.</div>' : ""; }
+  function showLink() {
+    var u = T.tool.url;
+    VIEW.innerHTML = draftNote() + '<div class="body2">' + (T.tool.desc ? "<p>" + esc(T.tool.desc) + "</p>" : "") + '<p class="muted" style="word-break:break-all">' + esc(u) + '</p><a class="btn pri block" href="' + esc(u) + '" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;padding:13px">Open ↗</a></div>';
+  }
+  function showPage() { VIEW.innerHTML = draftNote() + '<div class="body2">' + md(T.tool.body || "") + "</div>"; }
+  function showReport() { VIEW.innerHTML = draftNote() + '<div class="body2"><p>' + esc(T.tool.desc || "Saved report") + '</p><a class="btn pri block" href="reports.html?v=' + Date.now() + "#tool=" + T.id + '" style="text-align:center;text-decoration:none;padding:13px">📑 Open report</a></div>'; }
+  function showForm() {
+    var tabs = '<div class="seg"><button data-t="fill" class="' + (TAB === "fill" ? "on" : "") + '">✍️ Fill</button><button data-t="mine" class="' + (TAB === "mine" ? "on" : "") + '">' + (ADMIN ? "📊 Responses" : "🗂️ My submissions") + "</button></div>";
+    VIEW.innerHTML = draftNote() + tabs + '<div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; showForm(); }; });
+    if (TAB === "fill") {
+      $("pane").innerHTML = '<div class="card"><div id="ff"></div><button class="btn pri block" id="fsub" style="margin-top:14px;padding:13px">Submit</button></div>';
+      var F = CUST.renderFields($("ff"), T.tool.fields, {});
+      $("fsub").onclick = function () { var v = F.collect(); if (v === null) return; var b = this; b.disabled = true; api({ action: "ct-submit", tool: T.id, values: v }).then(function (r) { b.disabled = false; if (!r.ok) return toast(r.error); toast("Submitted ✓"); TAB = "mine"; showForm(); }); };
+    } else {
+      $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+      api({ action: "ct-list", tool: T.id }).then(function (r) {
+        if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+        var fs = r.tool.fields;
+        var val = function (f, v) { return f.type === "photo" ? (v ? "📷 photo" : "") : Array.isArray(v) ? v.join(", ") : v == null ? "" : String(v); };
+        $("pane").innerHTML = '<div class="row" style="margin-top:8px;justify-content:space-between"><span class="muted">' + r.rows.length + " submission" + (r.rows.length === 1 ? "" : "s") + "</span>" + (r.all && r.rows.length ? '<button class="btn sec sm" id="fx">⬇ Excel</button>' : "") + "</div>" +
+          (r.rows.length ? r.rows.slice(0, 300).map(function (s) { return '<div class="sb"><b>' + esc(s.by.fullName) + '</b> <span class="muted">' + esc(s.state || "") + " · " + dt(s.at) + '</span><div class="kv2">' + fs.map(function (f) { var v = s.values[f.key]; return "<span>" + esc(f.label) + "</span><div>" + (f.type === "photo" && v ? '<a href="javascript:void 0" data-f="' + esc(v) + '" data-s="' + s.id + '">📷 view</a>' : esc(val(f, v))) + "</div>"; }).join("") + "</div></div>"; }).join("") : '<div class="card empty">No submissions yet.</div>');
+        if ($("fx")) $("fx").onclick = function () { download(xlsx([{ name: T.tool.name.slice(0, 30), rows: [["Submitted", "Name", "State"].concat(fs.map(function (f) { return f.label; }))].concat(r.rows.map(function (s) { return [dt(s.at), s.by.fullName, s.state || ""].concat(fs.map(function (f) { return val(f, s.values[f.key]); })); })) }]), T.tool.name.replace(/[^A-Za-z0-9]+/g, "_") + ".xlsx"); };
+        [].forEach.call($("pane").querySelectorAll("[data-f]"), function (a) { a.onclick = function () { api({ action: "ct-file", tool: T.id, id: a.dataset.s, file: a.dataset.f }).then(function (x) { if (!x.ok) return toast(x.error); var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="data:' + x.mime + ";base64," + x.data + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }); }; });
+      });
+    }
+  }
+  window.addEventListener("hashchange", function () { location.reload(); });
+  window.__pageBack = function () { return false; };
+  load();
+})();
+</script>
+</body>
+</html>

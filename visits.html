@@ -228,6 +228,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .card.ai{border:1px solid #DCD4FF;background:linear-gradient(180deg,#FBFAFF,#fff)}
 .sticky2{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 35%);padding:16px 0 10px;z-index:5;display:flex;gap:8px}
 </style>
+<script src="cust.js?v=61"></script>
 </head>
 <body>
 <div class="hero">
@@ -416,6 +417,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   var VIEW = $("view"), CFG = null, OPEN = null, TAB = ls("vis-tab") || "visit", STATES = [], timerT = 0, saveT = 0, dirty = false;
   fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  function LST(k, d) { return window.CUST ? CUST.list(k, d) : d; }
+  function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JSON.stringify(d)) + '"'; }
+  var XF = null;
   var TYPES = ["Retailer", "Multi-brand outlet", "Large format store", "vivo exclusive store", "Distributor", "Other"];
   var PURPOSES = ["Routine visit", "Training", "Launch / pre-booking", "Festival", "Issue follow-up", "Hygiene check", "App feedback"];
   var EMI = ["Loan rejections", "High down payment", "Finance partner not available", "Documentation issues", "Low EMI awareness", "Other"];
@@ -467,9 +471,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<div class="g2"><div><label class="fl">District</label><input class="tx" id="s-district" maxlength="60"></div><div><label class="fl">State <span class="req">*</span></label>' +
       (ADMIN ? '<select class="tx" id="s-state"><option value="">Choose state</option>' + STATES.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + "</select>" : '<input class="tx" id="s-state" value="' + esc(st) + '" readonly style="background:#EEF0F6">') + "</div></div>" +
       '<label class="fl">Full address</label><input class="tx" id="s-address" maxlength="200">' +
-      '<div class="g2"><div><label class="fl">Retailer ID (if any)</label><input class="tx" id="s-retailerId" maxlength="40"></div><div><label class="fl">Store type</label><select class="tx" id="s-type">' + TYPES.map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select></div></div>" +
+      '<div class="g2"><div><label class="fl">Retailer ID (if any)</label><input class="tx" id="s-retailerId" maxlength="40"></div><div><label class="fl">Store type</label><select class="tx" id="s-type"' + DL("visits.storeType", TYPES) + '>' + LST("visits.storeType", TYPES).map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select></div></div>" +
       '<div class="g2"><div><label class="fl">Owner / manager name</label><input class="tx" id="s-owner" maxlength="60"></div><div><label class="fl">Owner phone</label><input class="tx" id="s-phone" inputmode="numeric" maxlength="15"></div></div>' +
-      '<label class="fl">Purpose of visit</label><select class="tx" id="s-purpose">' + PURPOSES.map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select>" +
+      '<label class="fl">Purpose of visit</label><select class="tx" id="s-purpose"' + DL("visits.purpose", PURPOSES) + '>' + LST("visits.purpose", PURPOSES).map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</select>" +
       '<div class="gps" id="gps">📍 Your location is captured when you punch in.</div></div>' +
       '<div class="notice info">A visit counts as <b>valid</b> when you stay at least <b>' + CFG.rules.minMinutes + " min</b>, punch out within <b>" + CFG.rules.maxDriftM + " m</b> of where you punched in, and add at least <b>" + CFG.rules.minPhotos + " photo" + (CFG.rules.minPhotos === 1 ? "" : "s") + "</b>.</div>" +
       '<div class="sticky2"><button class="btn ok block" id="pin" style="font-size:16px;padding:14px">📍 Punch in at this store</button></div>';
@@ -508,7 +512,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     hero(v.store.name, v.store.area + ", " + v.store.city + " · " + v.state);
     var p = $("pane");
     var yn = function (k) { return '<div class="yn2" data-yn="' + k + '"><button data-v="Yes" class="' + (FORM[k] === "Yes" ? "on" : "") + '">Yes</button><button data-v="No" class="' + (FORM[k] === "No" ? "on" : "") + '">No</button></div>'; };
-    var multi = function (k, opts) { return '<div class="chips2" data-m="' + k + '">' + opts.map(function (o) { return '<button data-v="' + esc(o) + '" class="' + ((FORM[k] || []).indexOf(o) >= 0 ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div>"; };
+    var multi = function (k, opts) { var lk = "visits." + k; opts = LST(lk, opts); return '<div class="chips2" data-m="' + k + '"' + DL(lk, opts) + '>' + opts.map(function (o) { return '<button data-v="' + esc(o) + '" class="' + ((FORM[k] || []).indexOf(o) >= 0 ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div>"; };
     var tx = function (k, ph, big) { return big ? '<textarea class="tx" data-f="' + k + '" placeholder="' + esc(ph) + '" style="min-height:80px">' + esc(FORM[k] || "") + "</textarea>" : '<input class="tx" data-f="' + k + '" placeholder="' + esc(ph) + '" value="' + esc(FORM[k] || "") + '">'; };
     var nm = function (k, ph) { return '<input class="tx" type="number" inputmode="decimal" min="0" data-n="' + k + '" placeholder="' + esc(ph) + '" value="' + (FORM[k] == null ? "" : FORM[k]) + '">'; };
     p.innerHTML = '<div class="live"><small>In store since ' + dfmt(v.in.t, { hour: "numeric", minute: "2-digit" }) + (v.repeat ? " · repeat store" + (v.storeDistance != null ? " (" + v.storeDistance + " m from its tagged spot)" : "") : " · new store tagged") + '</small><div class="tm" id="tmr">' + hm(mnt(v.in.t)) + '</div><small>📍 Punch-in location ' + (v.in.acc ? "±" + v.in.acc + " m · " : "") + '<a href="' + gmap(v.in) + '" target="_blank" rel="noopener">view on map</a> · minimum ' + CFG.rules.minMinutes + " min for a valid visit</small></div>" +
@@ -520,10 +524,12 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<label class="fl">Retailer\'s rating of our app</label><div class="stars" data-r="appRating">' + [1, 2, 3, 4, 5].map(function (i) { return '<button type="button" data-v="' + i + '" class="' + (FORM.appRating >= i ? "on" : "") + '">★</button>'; }).join("") + '</div><label class="fl">Feedback on our system & apps</label>' + tx("appFeedback", "e.g. OTP login slow; scheme payout status not visible; wants Hindi option", true) + "</div>" +
       '<div class="fs"><h4>🗣️ Retailer & product feedback</h4><label class="fl">Retailer feedback</label>' + tx("retailerFeedback", "Margins, schemes, support, service…", true) + '<label class="fl">Product feedback (customers & retailer)</label>' + tx("productFeedback", "e.g. customers ask for better low-light camera in Y series", true) + "</div>" +
       '<div class="fs"><h4>🎯 Outcome</h4><label class="fl">Improvement areas</label>' + tx("improvement", "What should improve at this store?", true) + '<label class="fl">Outcome of the visit</label>' + tx("outcome", "What was done / agreed?", true) + '<div class="g2"><div><label class="fl">Next action</label>' + tx("nextAction", "e.g. send VBA training") + '</div><div><label class="fl">Follow-up date</label><input class="tx" type="date" data-f="followUp" value="' + esc(FORM.followUp || "") + '"></div></div></div>' +
+      '<div class="fs" id="vxw"><h4>➕ More details</h4><div id="vx"></div></div>' +
       '<div class="fs"><h4>📷 Photos <span class="req" style="color:var(--bad)">' + (CFG.rules.minPhotos ? "*" : "") + '</span></h4><div class="hint">Store front, vivo display, training, issues — at least ' + CFG.rules.minPhotos + ' (up to 6). Photos are compressed automatically.</div><div class="ph" id="ph"></div></div>' +
       '<div class="muted" id="svst" style="font-size:12px;text-align:center;margin-top:10px">Your answers are saved automatically.</div>' +
       '<div class="sticky2"><button class="btn ghost" id="cx">✕</button><button class="btn sec" id="sv">Save</button><button class="btn danger grow" id="pout" style="background:#B3402F;color:#fff;border:0;font-size:15px">📍 Punch out</button></div>';
     bindForm(); drawPhotos(); refreshShow();
+    if (window.CUST) { XF = CUST.renderExtra($("vx"), "visits", FORM.extra || {}, function (x) { FORM.extra = x; touch(); }); $("vxw").style.display = XF.count || CUST.master ? "" : "none"; } else $("vxw").style.display = "none";
     timerT = setInterval(function () { var e = $("tmr"); if (e) e.textContent = hm(mnt(v.in.t)); }, 15000);
     $("sv").onclick = function () { saveDraft(false); };
     $("cx").onclick = function () { sheet("Cancel this visit?", "The visit and its answers will be deleted.", [["✕", "Yes, cancel the visit", function () { api({ action: "visit-cancel", id: v.id }).then(function (r) { if (!r.ok) return toast(r.error); OPEN = null; FORM = PHOTOS = null; dirty = false; changed(); render(); }); }, "red"]]); };
@@ -591,6 +597,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     inp.click();
   }
   function punchOut() {
+    if (XF && XF.count) { var ex = XF.collect(); if (ex === null) return; FORM.extra = ex; }
     var hasFb = (FORM.appFeedback || FORM.retailerFeedback || FORM.productFeedback || "").trim();
     if (!hasFb) return toast("Add feedback on our system & apps (or retailer/product feedback) first.");
     if (PHOTOS.length < CFG.rules.minPhotos) return toast("Add at least " + CFG.rules.minPhotos + " photo(s) first.");
@@ -653,7 +660,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       row("Monthly sales", [f.salesUnits != null ? f.salesUnits + " units" : "", f.salesValue != null ? "₹" + fmtN(f.salesValue) : ""].filter(Boolean).join(" · ")) + row("VBA promoters", f.vbaCount) + row("Daily footfall", f.footfall) + row("Stock issue", f.stockIssue ? f.stockIssue + (f.stockModels ? " — " + f.stockModels : "") : "") +
       row("NPL support", f.nplSupport ? f.nplSupport + (f.nplNote ? " — " + f.nplNote : "") : "") + row("EMI issue", f.emiIssue ? f.emiIssue + ((f.emiIssues || []).length ? " — " + f.emiIssues.join(", ") : "") + (f.emiNote ? ". " + f.emiNote : "") : "") + row("Offers visible", f.offersVisible) +
       row("Competitors", (f.competitors || []).join(", ") + (f.competitorNote ? " — " + f.competitorNote : "")) + row("Retailer app usage", f.appUsage) + row("App rating", f.appRating ? f.appRating + "/5" : "") + row("Feedback on our system & apps", f.appFeedback) + row("Retailer feedback", f.retailerFeedback) +
-      row("Product feedback", f.productFeedback) + row("Improvement areas", f.improvement) + row("Outcome", f.outcome) + row("Next action", [f.nextAction, f.followUp ? "by " + dOnly(Date.parse(f.followUp)) : ""].filter(Boolean).join(" ")) + "</div>" +
+      row("Product feedback", f.productFeedback) + row("Improvement areas", f.improvement) + row("Outcome", f.outcome) + row("Next action", [f.nextAction, f.followUp ? "by " + dOnly(Date.parse(f.followUp)) : ""].filter(Boolean).join(" ")) + (window.CUST ? CUST.extraRows("visits", f.extra).map(function (x) { return row(x[0], x[1]); }).join("") : "") + "</div>" +
       (v.ai ? '<div class="notice info" style="margin-top:10px"><b>AI review: ' + v.ai.score + "/10</b> · " + esc(v.ai.summary) + ((v.ai.issues || []).length ? "<br>Issues: " + esc(v.ai.issues.join(", ")) : "") + "</div>" : "") +
       '<div class="row" style="margin-top:10px">' + (v.in ? '<a class="btn sec sm" target="_blank" rel="noopener" href="' + gmap(v.in) + '">📍 Punch-in map</a>' : "") + (v.out ? '<a class="btn sec sm" target="_blank" rel="noopener" href="' + gmap(v.out) + '">📍 Punch-out map</a>' : "") + "</div>" +
       '<div class="ph" id="vph">' + (v.photos || []).map(function (id) { return '<div class="p" data-p="' + id + '">' + (LOCALPIC[id] ? '<img alt="" src="' + LOCALPIC[id] + '">' : "📷") + "</div>"; }).join("") + "</div>";
@@ -746,11 +753,12 @@ td.n,th.n{text-align:right;white-space:nowrap}
       "Punch-in lat", "Punch-in long", "Punch-in accuracy (m)", "Punch-in map", "Punch-out lat", "Punch-out long", "Punch-out map", "Photos", "Quality /100", "AI score /10", "AI summary",
       "Monthly sales (units)", "Monthly sales (Rs)", "VBA promoters", "Daily footfall", "Stock issue", "Models short", "NPL support", "NPL note", "EMI issue", "EMI issues", "EMI note", "Offers visible", "Competitors", "Competitor note",
       "Retailer app usage", "App rating /5", "Feedback on our system & apps", "Retailer feedback", "Product feedback", "Improvement areas", "Outcome", "Next action", "Follow-up date"];
+    var XC = window.CUST ? CUST.extraColumns("visits") : []; head = head.concat(XC.map(function (c) { return c[1]; }));
     var rows = [head].concat(list.map(function (v) { var f = v.form || {}; return [v.id, v.state, v.by.fullName, v.by.app === "admin" ? "HO admin" : "State BI", v.by.phone || "", v.store.name, v.store.type || "", v.store.retailerId || "", v.store.owner || "", v.store.phone || "", v.store.address || "", v.store.area, v.store.city, v.store.district || "", v.store.purpose || "",
       dt(v.in.t), v.out ? dt(v.out.t) : "", v.minutes != null ? v.minutes : "", v.status === "open" ? "In progress" : v.valid ? "Yes" : "No", (v.invalidWhy || []).join("; "), v.drift != null ? v.drift : "",
       v.in.lat, v.in.lng, v.in.acc != null ? v.in.acc : "", gmap(v.in), v.out ? v.out.lat : "", v.out ? v.out.lng : "", gmap(v.out), (v.photos || []).length, v.quality != null ? v.quality : "", v.ai ? v.ai.score : "", v.ai ? v.ai.summary : "",
       f.salesUnits != null ? f.salesUnits : "", f.salesValue != null ? f.salesValue : "", f.vbaCount != null ? f.vbaCount : "", f.footfall != null ? f.footfall : "", f.stockIssue || "", f.stockModels || "", f.nplSupport || "", f.nplNote || "", f.emiIssue || "", (f.emiIssues || []).join("; "), f.emiNote || "", f.offersVisible || "", (f.competitors || []).join("; "), f.competitorNote || "",
-      f.appUsage || "", f.appRating || "", f.appFeedback || "", f.retailerFeedback || "", f.productFeedback || "", f.improvement || "", f.outcome || "", f.nextAction || "", f.followUp || ""]; }));
+      f.appUsage || "", f.appRating || "", f.appFeedback || "", f.retailerFeedback || "", f.productFeedback || "", f.improvement || "", f.outcome || "", f.nextAction || "", f.followUp || ""].concat(XC.map(function (c) { var x = (f.extra || {})[c[0]]; return Array.isArray(x) ? x.join("; ") : x == null ? "" : x; })); }));
     download(xlsx([{ name: "Visits", rows: rows }]), "Market_visits_" + istDay(Date.now()) + ".xlsx"); toast("Excel exported");
   }
 
@@ -809,6 +817,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     $("rs").onclick = function () { api({ action: "visit-config", set: { minMinutes: $("r1").value, maxDriftM: $("r2").value, minPhotos: $("r3").value, maxHours: $("r4").value } }).then(function (x) { if (!x.ok) return toast(x.error); CFG.rules = x.rules; toast("Rules saved"); }); };
   }
 
+  window.__custChanged = function () { if (TAB === "visit") { if (OPEN && dirty) saveDraft(true); render(); } };
   load();
 })();
 </script>

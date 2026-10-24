@@ -1,3 +1,4 @@
+import { cleanExtra } from "./master-core.mjs";
 // Market hygiene (#7): HO uploads suspicious pre-activated IMEIs → each row goes to its state's team →
 // the team records the action taken → hygiene score per dealer and per state.
 // Storage:
@@ -70,7 +71,7 @@ export async function hygieneAction(b, ctx) {
     if (b.photo) { const pid = String(b.photo).replace(/[^a-z0-9]/gi, ""); const f = await store.get(`att:${pid}`); if (f && ctx.sameUser(f.by, me)) photo = pid; }
     const idx = (Array.isArray(b.rows) ? b.rows : [b.row]).map(Number).filter((n) => isFinite(n));
     let n = 0;
-    c.rows.forEach((r) => { if (idx.includes(r.i)) { r.status = status; r.remark = remark; if (photo) r.photo = photo; r.by = { app, username: rec.username, fullName: rec.fullName }; r.at = t; n++; } });
+    c.rows.forEach((r) => { if (idx.includes(r.i)) { r.status = status; r.remark = remark; const ex = cleanExtra(b.extra); if (Object.keys(ex).length) r.extra = ex; if (photo) r.photo = photo; r.by = { app, username: rec.username, fullName: rec.fullName }; r.at = t; n++; } });
     if (!n) return json(400, { ok: false, error: "Select at least one IMEI." });
     await store.set(k, c);
     return json(200, { ok: true, updated: n });

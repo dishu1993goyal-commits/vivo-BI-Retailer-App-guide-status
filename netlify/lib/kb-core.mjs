@@ -49,7 +49,7 @@ export async function kbAction(b, ctx) {
       const f = await store.get(`att:${c}`); if (f && sameUser(f.by, me) && /^image\//.test(f.mime)) images.push(c);
     }
     const a = Object.assign({}, old || { id: "a" + t.toString(36) + randomBytes(2).toString("hex"), createdAt: t, createdBy: rec.fullName }, {
-      title, body, images, category: KB_CATEGORIES.includes(a0.category) ? a0.category : "Other", summary: str(a0.summary, 300), pinned: a0.pinned === true, updatedAt: t, updatedBy: rec.fullName });
+      title, body, images, category: str(a0.category, 60) || "Other", summary: str(a0.summary, 300), pinned: a0.pinned === true, updatedAt: t, updatedBy: rec.fullName });
     await store.set(`kbart:${a.id}`, a);
     return json(200, { ok: true, article: a });
   }

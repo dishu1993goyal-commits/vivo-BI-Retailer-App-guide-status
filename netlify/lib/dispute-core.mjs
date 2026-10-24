@@ -1,3 +1,4 @@
+import { cleanExtra } from "./master-core.mjs";
 // Disputes (#6): data/report disputes about the dashboard and HTML report files — raise → assign → resolve,
 // with a turnaround-time (TAT) timer per priority.
 // Storage:
@@ -59,7 +60,7 @@ export async function disputeAction(b, ctx) {
     const pr = ["P1", "P2", "P3"].includes(b.priority) ? b.priority : "P2";
     const seq = ((await store.get("dispseq")) || { n: 0 }).n + 1; await store.set("dispseq", { n: seq });
     const id = t.toString(36) + randomBytes(3).toString("hex");
-    const d = { id, no: seq, title, detail, category: DISPUTE_CATS.includes(b.category) ? b.category : "Other", page: str(b.page, 80), shown: str(b.shown, 60), expected: str(b.expected, 60), period: str(b.period, 40),
+    const d = { id, no: seq, title, detail, category: str(b.category, 60) || "Other", extra: cleanExtra(b.extra), page: str(b.page, 80), shown: str(b.shown, 60), expected: str(b.expected, 60), period: str(b.period, 40),
       state: isAdmin ? str(b.state, 40) || "HO" : rec.state || "", priority: pr, status: "Open", by: me, assignee: null, createdAt: t, updatedAt: t, dueAt: t + cfg.tat[pr] * H, atts: await attIds(b.atts),
       log: [{ t, by: me, kind: "created", text: "Raised (" + pr + ", TAT " + cfg.tat[pr] + " h)" }] };
     await store.set(`disp:${id}`, d);

@@ -202,6 +202,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .bar2{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 35%);padding:14px 0 10px;display:flex;gap:8px;z-index:4}
 .f4 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
 </style>
+<script src="cust.js?v=61"></script>
 </head>
 <body>
 <div class="hero">
@@ -438,15 +439,17 @@ td.n,th.n{text-align:right;white-space:nowrap}
     var keys = Object.keys(SELR).filter(function (k) { return SELR[k]; });
     if (!keys.length) return toast("Select one or more IMEIs first.");
     var byState = {}; keys.forEach(function (k) { var p = k.split("|"); (byState[p[0]] = byState[p[0]] || []).push(+p[1]); });
-    var photo = "", status = "";
+    var photo = "", status = "", XF = null;
     var ov = sheet("Action for " + keys.length + " IMEI" + (keys.length > 1 ? "s" : ""), "Choose what was found / done", [["💾", "Save action", function (ov) {
       if (!status) { toast("Choose the action."); return false; }
       var remark = ov.querySelector("#hr").value.trim();
-      Promise.all(Object.keys(byState).map(function (st) { return api({ action: "hyg-act", batch: b.id, state: st, rows: byState[st], status: status, remark: remark, photo: photo }); })).then(function (rs) {
+      var extra = XF ? XF.collect() : {}; if (extra === null) return false;
+      Promise.all(Object.keys(byState).map(function (st) { return api({ action: "hyg-act", batch: b.id, state: st, rows: byState[st], status: status, remark: remark, photo: photo, extra: extra }); })).then(function (rs) {
         var bad = rs.find(function (x) { return !x.ok; }); if (bad) return toast(bad.error);
         toast("Saved for " + keys.length + " IMEI(s)"); showList(b.id);
       });
-    }]], '<div class="f4"><label>Action / finding</label><div class="chips4" style="display:flex;flex-wrap:wrap;gap:6px">' + D.statuses.slice(1).map(function (s) { return '<button type="button" class="btn ghost sm" data-s="' + esc(s) + '">' + esc(s) + "</button>"; }).join("") + '</div><label>Remark</label><textarea class="tx" id="hr" placeholder="e.g. Invoice verified — genuine customer sale / Dealer admitted pre-activation, warned"></textarea><label>Evidence photo (optional)</label><div class="row"><button class="btn sec sm" type="button" id="hph">📷 Add photo</button><span class="muted" id="hpt" style="font-size:12px"></span></div></div>');
+    }]], '<div class="f4"><label>Action / finding</label><div class="chips4" style="display:flex;flex-wrap:wrap;gap:6px">' + D.statuses.slice(1).map(function (s) { return '<button type="button" class="btn ghost sm" data-s="' + esc(s) + '">' + esc(s) + "</button>"; }).join("") + '</div><label>Remark</label><textarea class="tx" id="hr" placeholder="e.g. Invoice verified — genuine customer sale / Dealer admitted pre-activation, warned"></textarea><div id="hxf"></div><label>Evidence photo (optional)</label><div class="row"><button class="btn sec sm" type="button" id="hph">📷 Add photo</button><span class="muted" id="hpt" style="font-size:12px"></span></div></div>');
+    if (window.CUST) XF = CUST.renderExtra(ov.querySelector("#hxf"), "hygiene.action", {});
     [].forEach.call(ov.querySelectorAll("[data-s]"), function (x) { x.onclick = function () { status = x.dataset.s; [].forEach.call(ov.querySelectorAll("[data-s]"), function (y) { y.className = "btn sm " + (y === x ? "pri" : "ghost"); }); }; });
     ov.querySelector("#hph").onclick = function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "environment");

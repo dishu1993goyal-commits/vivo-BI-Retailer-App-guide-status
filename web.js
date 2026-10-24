@@ -181,13 +181,13 @@
     mount(); lock();
     if (barEl) { barEl.remove(); barEl = null; }
     if (loginEl) loginEl.remove();
-    var role = store("biw-role") || "state";
+    var role = store("biw-lt") === "master" ? "master" : store("biw-role") || "state";
     loginEl = el("div", "biw-login");
     loginEl.innerHTML =
       '<div class="biw-lcard biw-f wide"><div class="lf">' +
       '<div class="biw-logo"><img src="brand-logo.png" alt="vivo Business Innovation"></div>' +
       '<h1>BI KPI <em>Dashboard</em></h1><p>Log in with your app user name and password</p>' +
-      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button></div>' +
+      '<div class="biw-seg"><button data-r="state">State user</button><button data-r="admin">Admin user</button><button data-r="master">Master admin</button></div>' +
       '<label>User name</label><input id="biw-u" autocomplete="username" maxlength="40">' +
       '<label>Password</label><input id="biw-p" type="password" autocomplete="current-password" maxlength="64">' +
       '<label style="display:flex;align-items:center;gap:8px;margin-top:8px"><input type="checkbox" id="biw-sp" style="width:auto"> Show password</label>' +
@@ -204,7 +204,7 @@
     var ulab = loginEl.querySelector("#biw-u").previousElementSibling;
     function setRole(r) {
       role = r; [].forEach.call(loginEl.querySelectorAll("[data-r]"), function (b) { b.classList.toggle("on", b.dataset.r === r); });
-      ulab.textContent = r === "state" ? "vChat ID" : "User name";
+      ulab.textContent = r === "state" ? "vChat ID" : r === "master" ? "Admin user name" : "User name";
       u.value = (r === "state" ? store("biw-last-vchat") : store("biw-last-user")) || ""; u.placeholder = r === "state" ? "Your vChat ID" : "";
     }
     [].forEach.call(loginEl.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { setRole(b.dataset.r); }; });
@@ -216,21 +216,48 @@
       if (!u.value.trim() || !p.value) { m.className = "biw-msg err"; m.textContent = role === "state" ? "Enter your vChat ID and password." : "Enter your user name and password."; return; }
       go.disabled = true; go.textContent = "Logging in…";
       var idv = u.value.trim();
-      api({ app: role, action: "login", username: idv, vchatId: role === "state" ? idv : undefined, password: p.value }, false).then(function (res) {
+      var app = role === "master" ? "admin" : role;
+      api({ app: app, action: "login", username: idv, vchatId: role === "state" ? idv : undefined, password: p.value, loginAs: role === "master" ? "master" : undefined }, false).then(function (res) {
         go.disabled = false; go.textContent = "Log in";
-        if (!res.ok) { m.className = "biw-msg err"; m.textContent = res.error || "Login failed."; p.value = ""; return; }
-        AUTH = { app: role, username: res.username, token: res.token };
-        store("biw-auth", AUTH); store("biw-role", role); store("biw-last-user", res.username);
+        if (!res.ok) {
+          m.className = "biw-msg err"; m.textContent = res.error || "Login failed.";
+          if (res.notMaster && res.canClaim) { var pw = p.value; m.innerHTML = esc(res.error) + '<br><a style="font-weight:700;cursor:pointer;text-decoration:underline" id="biw-claim">🔑 Become the first master admin (setup code)</a>'; m.querySelector("#biw-claim").onclick = function () { showClaim(idv, pw); }; }
+          p.value = ""; return;
+        }
+        finishLogin(res, role);
+      });
+    }
+    function finishLogin(res, role) {
+        var app = role === "master" ? "admin" : role;
+        AUTH = { app: app, username: res.username, token: res.token };
+        store("biw-auth", AUTH); store("biw-role", app); store("biw-lt", role === "master" ? "master" : null); store("biw-last-user", res.username);
         if (role === "state" && res.profile && res.profile.vchatId) store("biw-last-vchat", res.profile.vchatId);
         saveProfile(res.profile); store("biw-pwreq", null);
-        loginEl.remove(); loginEl = null;
+        if (loginEl) { loginEl.remove(); loginEl = null; }
+        if (role === "master") toast("Master admin · tap ✏️ Customize on any screen, or open Studio");
         startSession(true);
-      });
+    }
+    function showClaim(user, pass) {
+      var c = authCard('<h1>Master <em>admin</em> setup</h1><p>One-time step: the first master admin activates access with the setup code. After that, masters add other masters in Studio → Masters.</p>' +
+        '<label>Admin user name</label><input id="biw-cu" maxlength="40" autocomplete="username"><label>Admin password</label><input id="biw-cp" type="password" maxlength="64" autocomplete="current-password">' +
+        '<label>Setup code</label><input id="biw-cc" maxlength="40" placeholder="VBI-MASTER-…" style="text-transform:uppercase;letter-spacing:1px"><div class="biw-msg" id="biw-cm"></div>' +
+        '<button class="biw-btn biw-dark" id="biw-cgo">Activate master admin</button><a class="biw-link" id="biw-cbk">← Back to login</a>');
+      c.querySelector("#biw-cu").value = user || ""; c.querySelector("#biw-cp").value = pass || "";
+      c.querySelector("#biw-cbk").onclick = function () { showLogin(); };
+      c.querySelector("#biw-cgo").onclick = function () {
+        var b = this; b.disabled = true;
+        api({ app: "admin", action: "master-claim", username: c.querySelector("#biw-cu").value.trim(), password: c.querySelector("#biw-cp").value, code: c.querySelector("#biw-cc").value.trim() }, false).then(function (res) {
+          b.disabled = false;
+          if (!res.ok) return msg(c, "#biw-cm", res.error || "Couldn't activate.");
+          toast("You're now the master admin 👑"); finishLogin(res, "master");
+        });
+      };
+      setTimeout(function () { c.querySelector(user ? "#biw-cc" : "#biw-cu").focus(); }, 50);
     }
     go.onclick = doLogin;
     p.onkeydown = function (e) { if (e.key === "Enter") doLogin(); };
-    loginEl.querySelector("#biw-su").onclick = function () { showSignup(role); };
-    loginEl.querySelector("#biw-fg").onclick = function () { showForgot(role); };
+    loginEl.querySelector("#biw-su").onclick = function () { showSignup(role === "master" ? "admin" : role); };
+    loginEl.querySelector("#biw-fg").onclick = function () { showForgot(role === "master" ? "admin" : role); };
     if (window.matchMedia && matchMedia("(max-width:600px)").matches) loginEl.querySelector(".biw-qr").style.display = "none"; else startQr(loginEl);
     setTimeout(function () { (u.value ? p : u).focus(); }, 50);
   }
@@ -582,7 +609,13 @@
     c.querySelector("#f-back").onclick = function () { showLogin(); };
   }
 
-  function logoutLocal() { AUTH = null; PROFILE = {}; store("biw-auth", null); store("biw-profile", null); store("biw-photo", null); }
+  function logoutLocal() { AUTH = null; PROFILE = {}; store("biw-auth", null); store("biw-profile", null); store("biw-photo", null); store("biw-lt", null); if (window.CUST && window.CUST.reauth) window.CUST.reauth(); }
+  // Master-admin customizations (labels / hidden items) also apply on the dashboard itself.
+  function custLoad() {
+    if (window.CUST && window.CUST.reauth) { window.CUST.reauth(); return; }
+    window.CUST_PAGE = "dashboard";
+    var s = el("script"); s.src = "/cust.js?v=61"; document.head.appendChild(s);
+  }
 
   // ---------- SESSION START ----------
   function startSession(fresh) {
@@ -593,7 +626,7 @@
         if (!PROFILE.state) { askState(); return; }
         applyStateLock(PROFILE.state);
       }
-      unlock(); buildBar(); refreshBadge(); syncPhoto();
+      unlock(); buildBar(); refreshBadge(); syncPhoto(); custLoad();
     };
     if (fresh) { go(); return; }
     // Check the saved session (also records the visit in the access log).
@@ -739,15 +772,16 @@
   var svFrame = null;
   var TOOLS = { directory: ["directory.html", "vChat directory", "vChat directory"], security: ["security.html", "Account security", "Account security"], survey: ["survey.html", "Surveys", "Survey manager"], chat: ["chat.html", "Messages", "Messages"], matrix: ["matrix.html", "Feature usability", "Feature usability"], visits: ["visits.html", "Market visits", "Market visits"], knowledge: ["knowledge.html", "Knowledge", "Knowledge"], affordability: ["affordability.html", "Affordability Corner", "Affordability Corner"],
     hub: ["hub.html", "All tools", "All tools"], reports: ["reports.html", "Reports", "Reports"], help: ["help.html", "Help centre", "Help centre"], disputes: ["disputes.html", "Disputes", "Disputes"],
-    hygiene: ["hygiene.html", "Market hygiene", "Market hygiene"], engage: ["engage.html", "Engage", "Engage"], schemes: ["schemes.html", "Schemes & payout", "Schemes & payout"], admintools: ["admin-tools.html", "Admin tools", "Admin tools"] };
+    hygiene: ["hygiene.html", "Market hygiene", "Market hygiene"], engage: ["engage.html", "Engage", "Engage"], schemes: ["schemes.html", "Schemes & payout", "Schemes & payout"], admintools: ["admin-tools.html", "Admin tools", "Admin tools"],
+    tool: ["tool.html", "Tool", "Tool"], studio: ["studio.html", "Studio", "Studio · Master admin"] };
   function toolByFile(file) { for (var k in TOOLS) if (TOOLS[k][0] === file) return k; return null; }
   function openSurveys(hash) { openTool("survey", hash); }
-  function openTool(name, hash) {
+  function openTool(name, hash, title) {
     closeDrawer();
     if (svFrame) svFrame.remove();
     var fromHub = !!(svFrame && svFrame.dataset.tool === "hub" && name !== "hub");
     var tl = TOOLS[name] || [name, name, name], f = el("div", "biw-frame"); svFrame = f; f.dataset.tool = name;
-    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + (isAdmin() ? tl[2] : tl[1]) + '</b></div><iframe allow="geolocation; camera; clipboard-write" title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
+    f.innerHTML = '<div class="bar"><button class="biw-back" aria-label="Back">←</button><b style="flex:1">' + esc(title || (isAdmin() ? tl[2] : tl[1])) + '</b></div><iframe allow="geolocation; camera; clipboard-write" title="' + tl[1] + '" src="' + tl[0] + "?v=" + Date.now() + (hash || "#list") + '"></iframe>';
     ROOT.appendChild(f);
     var ifr = f.querySelector("iframe");
     f.querySelector(".biw-back").onclick = function () {
@@ -759,7 +793,7 @@
   window.addEventListener("message", function (e) {
     if (e.origin !== location.origin || !e.data) return;
     if (e.data.biSurvey) refreshBadge();
-    if (e.data.biOpen) { var o = e.data.biOpen, k = toolByFile(String(o.file || "")); if (k) openTool(k, String(o.hash || "#list")); }
+    if (e.data.biOpen) { var o = e.data.biOpen, k = toolByFile(String(o.file || "")); if (k) openTool(k, String(o.hash || "#list"), k === "tool" && o.title ? String(o.title).slice(0, 60) : ""); }
     if (e.data.biNative) {   // hub tiles for screens that live in the dashboard itself
       var n = e.data.biNative; if (svFrame) { svFrame.remove(); svFrame = null; }
       if (n === "support") openSupport(); else if (n === "users") showUsers("state"); else if (n === "logs") openInsights("logs"); else if (n === "supportReport") openInsights("support");
@@ -826,13 +860,14 @@
     var adminItems = [["🪪", "vChat directory", "", function () { openTool("directory"); }], ["🛡️", "Account security", PWREQ ? PWREQ + " reset request" + (PWREQ > 1 ? "s" : "") : "", function () { openTool("security"); }], ["👥", "Registered users", "", function () { showUsers("state"); }], ["📊", "Access logs & insights", "", function () { openInsights("logs"); }], ["🎧", "Support desk report", "", function () { openInsights("support"); }]];
     var helpItems = [["📍", "Market visits", admin ? "Team tracker & scorecard" : "Punch in / out at stores", function () { openTool("visits"); }], ["💳", "Affordability Corner", "Prices, EMI, exchange, V-Shield, ABB", function () { openTool("affordability"); }], ["📚", "Knowledge", "BI, AI, dashboards, Power BI", function () { openTool("knowledge"); }], ["✉️", "Messages", "", function () { openTool("chat"); }], ["🧩", "Feature usability", "", function () { openTool("matrix"); }], ["📋", admin ? "Survey manager" : "Surveys", "", function () { openSurveys(); }], ["🎧", "Support desk", "", function () { closeDrawer(); openSupport(); }], ["🧾", "Payout calculator", "", function () { closeDrawer(); assistant("openCalculator"); }], ["💬", "BI Assistant", "", function () { closeDrawer(); assistant("openChat"); }]];
     var toolItems = [["⊞", "All tools", admin ? "Field, reports, engage, help, admin" : "Field, reports, engage, help", function () { openTool("hub"); }]];
+    if (p.master) toolItems.push(["🧩", "Studio", "Customize, build tools, release, access", function () { openTool("studio"); }], ["✏️", "Customize this dashboard", "Rename / hide labels here", function () { closeDrawer(); if (window.CUST) window.CUST.edit(true); }]);
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
     var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
     var supItems = [["📲", "Get the State app", "APK", function () { location.href = APP_LINKS.state; }], admin ? ["📲", "Get the Admin app", "APK", function () { location.href = APP_LINKS.admin; }] : null,
       ["🔗", "Copy dashboard link", "", function () { try { navigator.clipboard.writeText(location.origin + "/"); toast("Link copied"); } catch (e) { toast(location.origin); } }],
       ["🛡️", "Privacy policy", "", function () { window.open("privacy.html", "_blank"); }], ["📄", "Terms of service", "", function () { window.open("terms.html", "_blank"); }]];
     var about = [["ℹ️", "Version", "Web · " + (window.BIAssist ? "assistant " + window.BIAssist.version : "latest"), null], p.createdAt ? ["📅", "Member since", fmtTime(p.createdAt, { day: "numeric", month: "short", year: "numeric" }), null] : null];
-    var sub = (admin ? "Admin" : "State user") + (p.designation ? " · " + p.designation : "") + (p.state ? " · " + p.state : "");
+    var sub = (p.master ? "👑 Master admin" : admin ? "Admin" : "State user") + (p.designation ? " · " + p.designation : "") + (p.state ? " · " + p.state : "");
     var d = drawer("Profile", null,
       '<div class="biw-prof"><div class="biw-av" id="biw-pav">' + (ph && ph.data ? '<img alt="" src="data:image/jpeg;base64,' + ph.data + '">' : esc(initials(p.fullName || AUTH.username))) + "</div>" +
       '<a class="biw-link" id="biw-chph" style="color:#e6cf86;margin:0 0 6px">📷 Change photo</a><b>' + esc(p.fullName || AUTH.username) + "</b><small>@" + esc(AUTH.username) + (p.phone ? " · " + esc(p.phone) : "") + '</small><br><span class="biw-pill">' + esc(sub) + "</span></div>" +

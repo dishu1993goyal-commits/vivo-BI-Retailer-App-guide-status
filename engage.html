@@ -222,6 +222,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .f5 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
 @media print{.hero,.seg,.btn,.noprint{display:none!important}.cert{border-width:4px}}
 </style>
+<script src="cust.js?v=61"></script>
 </head>
 <body>
 <div class="hero">
@@ -410,6 +411,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
     return ov;
   }
   var VIEW = $("view"), H = location.hash || "", TAB = /polls/.test(H) ? "polls" : /wall/.test(H) ? "wall" : /board/.test(H) ? "board" : "quiz", MODS = {}, CUR = null, ME = {};
+function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JSON.stringify(d)) + '"'; }
+  function LST(k, d) { return window.CUST ? CUST.list(k, d) : d; }
   function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
   function initials(n) { return String(n || "?").split(/\s+/).map(function (x) { return x[0]; }).slice(0, 2).join("").toUpperCase(); }
   function render() {
@@ -594,12 +597,14 @@ td.n,th.n{text-align:right;white-space:nowrap}
     });
   }
   function wallPost(cats) {
-    var photos = [];
+    var photos = [], XF = null, cats0 = cats; cats = LST("wall.category", cats);
     var ov = sheet("Share a best practice", "What did you do, and what was the result?", [["📤", "Post", function (ov) {
       var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
-      api({ action: "wall-post", title: g("wt"), category: g("wcat"), result: g("wr"), text: g("wx"), photos: photos }).then(function (x) { if (!x.ok) return toast(x.error); toast("Shared — thank you!"); showWall(); });
-    }]], '<div class="f5"><label>Title</label><input class="tx" id="wt" placeholder="e.g. Cleared aged Y-series stock with exchange camps"><label>Category</label><select class="tx" id="wcat">' + cats.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + '</select><label>Result (one line)</label><input class="tx" id="wr" placeholder="e.g. 340 units cleared in 3 days"><label>What you did (steps, who, cost)</label><textarea class="tx" id="wx" style="min-height:110px"></textarea><label>Photos (up to 4)</label><div class="row"><button class="btn sec sm" type="button" id="wp">📷 Add photo</button><span class="muted" id="wpn" style="font-size:12px"></span></div></div>');
+      var extra = XF ? XF.collect() : {}; if (extra === null) return false;
+      api({ action: "wall-post", extra: extra, title: g("wt"), category: g("wcat"), result: g("wr"), text: g("wx"), photos: photos }).then(function (x) { if (!x.ok) return toast(x.error); toast("Shared — thank you!"); showWall(); });
+    }]], '<div class="f5"><label>Title</label><input class="tx" id="wt" placeholder="e.g. Cleared aged Y-series stock with exchange camps"><label>Category</label><select class="tx" id="wcat"' + DL("wall.category", cats0) + '>' + cats.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + '</select><label>Result (one line)</label><input class="tx" id="wr" placeholder="e.g. 340 units cleared in 3 days"><label>What you did (steps, who, cost)</label><textarea class="tx" id="wx" style="min-height:110px"></textarea><div id="wxf"></div><label>Photos (up to 4)</label><div class="row"><button class="btn sec sm" type="button" id="wp">📷 Add photo</button><span class="muted" id="wpn" style="font-size:12px"></span></div></div>');
     ov.querySelector(".sheet").style.maxWidth = "580px";
+    if (window.CUST) XF = CUST.renderExtra(ov.querySelector("#wxf"), "wall", {});
     ov.querySelector("#wp").onclick = function () {
       if (photos.length >= 4) return toast("Up to 4 photos.");
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";

@@ -1,3 +1,4 @@
+import { cleanExtra } from "./master-core.mjs";
 // Affordability Corner: vivo models, variants, colours, market price and running offers
 // (EMI by partner, exchange, upgrade, V-Shield, ABB), gathered by Gemini from Google + vivo.com.
 // Nobody imports data. Research runs in a Netlify background function (it takes 20-60 s);
@@ -479,7 +480,7 @@ export async function affAction(b, ctx) {
     const base = cat.models.find((x) => x.slug === slug);
     const id = t.toString(36) + randomBytes(3).toString("hex");
     const r = { id, slug, model: base ? base.name : str(b.model, 60) || slug, state, kind, partner: str(b.partner, 60), scheme: str(b.scheme, 20), benefit: str(b.benefit, 80), details, variant: str(b.variant, 30),
-      validTill: /^\d{4}-\d{2}-\d{2}$/.test(String(b.validTill || "")) ? b.validTill : "", photo, by: Object.assign({}, me, { state: rec.state || "" }), at: t, verified: isAdmin, verifiedBy: isAdmin ? rec.fullName : "", official: isAdmin };
+      validTill: /^\d{4}-\d{2}-\d{2}$/.test(String(b.validTill || "")) ? b.validTill : "", photo, extra: cleanExtra(b.extra), by: Object.assign({}, me, { state: rec.state || "" }), at: t, verified: isAdmin, verifiedBy: isAdmin ? rec.fullName : "", official: isAdmin };
     await store.set(`affr:${slug}:${id}`, r);
     await ctx.logEvent(store, t, app, rec, "offer-reported", { device: (r.model + " · " + (r.partner || kind)).slice(0, 60), ver: "" });
     return json(200, { ok: true, report: r });

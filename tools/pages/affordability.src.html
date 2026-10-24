@@ -86,6 +86,8 @@ html,body{overflow-x:hidden;max-width:100%}
   var KIND_LABEL = { emi: "EMI & finance", exchange: "Exchange", upgrade: "Upgrade", vshield: "V-Shield", abb: "ABB (assured buy-back)", cashback: "Cashback & discounts", other: "Other offers" };
   var KIND_ICON = { emi: "💳", exchange: "🔁", upgrade: "⬆️", vshield: "🛡️", abb: "♻️", cashback: "💸", other: "🎁" };
   var SCHEMES = ["6/0", "8/0", "9/0", "10/0", "12/0", "15/0", "18/0", "24/0", "8/2", "10/2", "12/3"];
+function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JSON.stringify(d)) + '"'; }
+  function LST(k, d) { return window.CUST ? CUST.list(k, d) : d; }
   function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
   function rs(n) { return n == null || n === "" ? "—" : "₹" + Number(n).toLocaleString("en-IN"); }
   function ago(t) { if (!t) return "never"; var m = Math.round((Date.now() - t) / 60000); return m < 2 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " days ago"; }
@@ -302,22 +304,24 @@ html,body{overflow-x:hidden;max-width:100%}
 
   // ================= report form =================
   function reportForm(C, vs) {
-    var photo = "", ov = sheet("Report an offer", (C.m && C.m.name || C.base.name) + (ADMIN ? " · HO offers are marked official" : " · " + (CAT.state || "your state")), [["📤", "Submit", function (ov) {
+    var photo = "", XF = null, ov = sheet("Report an offer", (C.m && C.m.name || C.base.name) + (ADMIN ? " · HO offers are marked official" : " · " + (CAT.state || "your state")), [["📤", "Submit", function (ov) {
       var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
       if (g("rd").length < 5) { toast("Describe the offer."); return false; }
-      api({ action: "aff-report-add", slug: C.slug, kind: g("rk"), partner: g("rp"), scheme: g("rsc"), benefit: g("rb"), details: g("rd"), validTill: g("rv"), variant: g("rva"), state: ADMIN ? g("rst") : "", photo: photo }).then(function (r) {
+      var extra = XF ? XF.collect() : {}; if (extra === null) return false;
+      api({ action: "aff-report-add", extra: extra, slug: C.slug, kind: g("rk"), partner: g("rp"), scheme: g("rsc"), benefit: g("rb"), details: g("rd"), validTill: g("rv"), variant: g("rva"), state: ADMIN ? g("rst") : "", photo: photo }).then(function (r) {
         if (!r.ok) return toast(r.error); toast("Thanks — offer added"); C.reports.unshift(r.report); drawModel();
       });
     }]], '<div class="f2"><div class="g2s"><div><label>Offer type</label><select class="tx" id="rk">' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_ICON[k] + " " + KIND_LABEL[k] + "</option>"; }).join("") + "</select></div>" +
-      '<div><label>Partner / bank</label><input class="tx" id="rp" list="plist" placeholder="e.g. Bajaj Finserv"><datalist id="plist">' + (CAT.partners || []).map(function (p) { return "<option>" + esc(p) + "</option>"; }).join("") + "</datalist></div>" +
+      '<div><label' + DL("aff.partner", CAT.partners || []) + '>Partner / bank</label><input class="tx" id="rp" list="plist" placeholder="e.g. Bajaj Finserv"><datalist id="plist">' + LST("aff.partner", CAT.partners || []).map(function (p) { return "<option>" + esc(p) + "</option>"; }).join("") + "</datalist></div>" +
       '<div><label>Scheme (EMI)</label><input class="tx" id="rsc" list="slist" placeholder="e.g. 10/0"><datalist id="slist">' + SCHEMES.map(function (s) { return "<option>" + s + "</option>"; }).join("") + "</datalist></div>" +
       '<div><label>Benefit</label><input class="tx" id="rb" placeholder="e.g. ₹3,000 cashback"></div>' +
       '<div><label>Variant (optional)</label><select class="tx" id="rva"><option value="">All variants</option>' + vs.map(function (v) { return "<option>" + esc(vlabel(v)) + "</option>"; }).join("") + "</select></div>" +
       '<div><label>Valid till</label><input class="tx" id="rv" type="date"></div></div>' +
       (ADMIN ? '<label>State</label><select class="tx" id="rst"><option>All India</option>' + STATES.map(function (s) { return "<option>" + esc(s) + "</option>"; }).join("") + "</select>" : "") +
       '<label>Offer details</label><textarea class="tx" id="rd" style="min-height:70px" placeholder="What does the customer get, any conditions, which stores…"></textarea>' +
-      '<label>Photo of standee / circular (optional)</label><div class="row"><button class="btn sec sm" id="rph" type="button">📷 Add photo</button><span class="muted" id="rpt" style="font-size:12px"></span></div></div>');
+      '<div id="axf"></div><label>Photo of standee / circular (optional)</label><div class="row"><button class="btn sec sm" id="rph" type="button">📷 Add photo</button><span class="muted" id="rpt" style="font-size:12px"></span></div></div>');
     ov.querySelector(".sheet").style.maxWidth = "560px";
+    if (window.CUST) XF = CUST.renderExtra(ov.querySelector("#axf"), "aff.report", {});
     ov.querySelector("#rph").onclick = function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
       inp.onchange = function () {

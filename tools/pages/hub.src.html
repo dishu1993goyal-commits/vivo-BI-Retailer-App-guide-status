@@ -58,11 +58,18 @@
     { id: "admin", icon: "🛡️", name: "Admin", sub: "HO only", col: "#E8F6FB", admin: true, items: [
       ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
       ["directory", "🪪", "vChat directory", null, "t:directory.html"], ["security", "🛡️", "Account security", null, "t:security.html", function () { return N.pwreq; }], ["insights", "📈", "Access insights", null, "n:logs"],
-      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"]] }
+      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
+    { id: "more", icon: "🧰", name: "More tools", sub: "Custom", col: "#F1F2F6", items: [] }
   ];
+  // custom tools made by master admins (shown in the category they chose)
+  function customItems(catId) {
+    if (!window.CUST) return [];
+    return CUST.tools().filter(function (x) { return (x.tool.category || "more") === catId; }).map(function (x) { return [x.id, x.tool.icon || "🧩", x.tool.name + (x.draft ? " · draft" : ""), null, "t:tool.html#" + x.id]; });
+  }
   var QUICK = ADMIN ? [["📍", "Team visits", "#1E9E61", "t:visits.html#team"], ["⚖️", "Disputes", "#E05757", "t:disputes.html", function () { return (N.disputes || {}).assigned; }], ["🗓️", "Auto-reports", "#4D5BF9", "t:reports.html#auto"], ["📥", "Import users", "#8E5CF6", "t:admin-tools.html#import"]]
     : [["📍", "Punch in", "#1E9E61", "t:visits.html"], ["💳", "Offers", "#4D5BF9", "t:affordability.html"], ["❓", "Ask AI", "#E69A00", "t:help.html#faq"], ["⚖️", "Raise dispute", "#E05757", "t:disputes.html#new"]];
 
+  if (window.CUST && CUST.master) QUICK[3] = ["🧩", "Studio", "#F5A623", "t:studio.html"];
   function open(target, label) {
     var kind = target.slice(0, 2), rest = target.slice(2), file = rest.split("#")[0], hash = rest.indexOf("#") >= 0 ? "#" + rest.split("#")[1] : "#list";
     try {
@@ -80,6 +87,7 @@
   function bd(fn) { var n = fn ? +fn() || 0 : 0; return n > 0 ? '<b class="bd">' + (n > 99 ? "99+" : n) + "</b>" : ""; }
   function visible(it, cat) {
     if (it[6] === "app" && !IN_APP) return false;
+    if (it[6] === "master" && !(window.CUST && CUST.master)) return false;
     if (cat.admin && !ADMIN) return false;
     if (it[3] && MODS && MODS[it[3]] === false) return false;
     return true;
@@ -90,7 +98,7 @@
     if (!q) html += '<div class="quick">' + QUICK.map(function (x, i) { return '<button data-q="' + i + '"><i style="background:' + x[2] + '">' + x[0] + "</i>" + esc(x[1]) + bd(x[4]) + "</button>"; }).join("") + "</div>";
     var any = false;
     CATS.forEach(function (c) {
-      var items = c.items.filter(function (it) { return visible(it, c) && (!q || (it[2] + " " + c.name).toLowerCase().indexOf(q) >= 0); });
+      var items = c.items.concat(customItems(c.id)).filter(function (it) { return visible(it, c) && (!q || (it[2] + " " + c.name).toLowerCase().indexOf(q) >= 0); });
       if (!items.length) return; any = true;
       html += '<div class="cat"><h3><span>' + c.icon + "</span>" + esc(c.name) + "</h3><div class=\"grid\">" + items.map(function (it) {
         return '<button class="it" data-t="' + esc(it[4]) + '" data-l="' + esc(it[2]) + '"><div class="ic3" style="background:' + c.col + '">' + it[1] + "</div><span>" + esc(it[2]) + "</span>" + bd(it[5]) + "</button>";
@@ -113,11 +121,12 @@
       api({ action: "me" }).then(function (m) {
         var p = (m && m.profile) || {};
         $("h1").textContent = "Hi " + String(p.fullName || AUTH.username).split(" ")[0] + " 👋";
-        $("h2").textContent = ADMIN ? "HO admin · all tools" : "State BI · " + (p.state || "");
+        $("h2").textContent = p.master ? "Master admin · all tools + Studio" : ADMIN ? "HO admin · all tools" : "State BI · " + (p.state || "");
       });
       draw();
     });
   }
+  window.__custChanged = function () { if (!Q) draw(); };
   window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
   window.addEventListener("focus", function () { if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; if (!Q) draw(); } }); });
   load();

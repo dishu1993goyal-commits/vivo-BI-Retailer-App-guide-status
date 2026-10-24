@@ -21,16 +21,22 @@ export const MODULES = [
   ["help", "FAQ & Ask AI"], ["flows", "Process flowcharts"], ["contacts", "Escalation contacts"], ["knowledge", "Knowledge"], ["schemes", "Schemes & payout calculator"],
   ["disputes", "Disputes"], ["support", "Support desk"]];
 
+// Per module: mode/states for state users, admin:false to hide from (non-master) admins, allowUsers/denyUsers by user ID (master only).
 export async function modulesFor(store, app, rec) {
   const c = (await store.get("config:modules")) || {};
   const out = {};
+  const ids = [rec.username, rec.vchatId, rec.email].filter(Boolean).map((x) => String(x).toLowerCase());
+  const has = (list) => (list || []).some((u) => ids.includes(String(u).toLowerCase()));
   MODULES.forEach(([id]) => {
     const m = c[id] || { mode: "all" };
-    out[id] = app === "admin" ? true : m.mode === "off" ? false : m.mode === "states" ? (m.states || []).includes(rec.state || "") : true;
+    if (app === "admin" && rec.master) { out[id] = true; return; }
+    if (has(m.denyUsers)) { out[id] = false; return; }
+    if (has(m.allowUsers)) { out[id] = true; return; }
+    out[id] = app === "admin" ? m.admin !== false : m.mode === "off" ? false : m.mode === "states" ? (m.states || []).includes(rec.state || "") : true;
   });
   return out;
 }
-export async function moduleOn(store, id, app, rec) { return app === "admin" || (await modulesFor(store, app, rec))[id] !== false; }
+export async function moduleOn(store, id, app, rec) { return (await modulesFor(store, app, rec))[id] !== false; }
 export const offMsg = () => json(403, { ok: false, error: "This tool isn't switched on for your state yet.", moduleOff: true });
 
 // ---- built-in content (admins can edit/replace) ----
@@ -76,18 +82,36 @@ export async function opsAction(b, ctx) {
   // ---------- modules (#12) ----------
   if (b.action === "mod-get") {
     const c = (await store.get("config:modules")) || {};
-    return json(200, { ok: true, modules: MODULES.map(([id, name]) => ({ id, name, mode: (c[id] || {}).mode || "all", states: (c[id] || {}).states || [] })), mine: await modulesFor(store, app, rec), updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0 });
+    return json(200, { ok: true, master: !!rec.master, modules: MODULES.map(([id, name]) => ({ id, name, mode: (c[id] || {}).mode || "all", states: (c[id] || {}).states || [], admin: (c[id] || {}).admin !== false, allowUsers: (c[id] || {}).allowUsers || [], denyUsers: (c[id] || {}).denyUsers || [] })), mine: await modulesFor(store, app, rec), updatedBy: c.updatedBy || "", updatedAt: c.updatedAt || 0 });
   }
   if (b.action === "mod-set") {
     if (!isAdmin) return adminOnly();
     const c = (await store.get("config:modules")) || {};
     (Array.isArray(b.modules) ? b.modules : []).forEach((m) => {
       if (!MODULES.some(([id]) => id === m.id)) return;
-      c[m.id] = { mode: ["all", "off", "states"].includes(m.mode) ? m.mode : "all", states: (Array.isArray(m.states) ? m.states : []).slice(0, 60).map((s) => str(s, 40)) };
+      const old = c[m.id] || {}, ul = (v) => (Array.isArray(v) ? v : String(v || "").split(/[\s,;]+/)).map((u) => str(u, 60)).filter(Boolean).slice(0, 3000);
+      c[m.id] = { mode: ["all", "off", "states"].includes(m.mode) ? m.mode : "all", states: (Array.isArray(m.states) ? m.states : []).slice(0, 60).map((s) => str(s, 40)),
+        admin: rec.master ? m.admin !== false : old.admin !== false, allowUsers: rec.master ? ul(m.allowUsers) : old.allowUsers || [], denyUsers: rec.master ? ul(m.denyUsers) : old.denyUsers || [] };
     });
     c.updatedBy = rec.fullName; c.updatedAt = t;
     await store.set("config:modules", c);
     return json(200, { ok: true });
+  }
+
+  if (b.action === "mod-import") {   // master: rows of { module, user, access: allow|deny|remove }
+    if (!isAdmin || !rec.master) return json(403, { ok: false, error: "Only a master admin can do this." });
+    const c = (await store.get("config:modules")) || {}, out = { applied: 0, skipped: [] };
+    const byName = {}; MODULES.forEach(([id, name]) => { byName[id] = id; byName[name.toLowerCase()] = id; });
+    (Array.isArray(b.rows) ? b.rows : []).slice(0, 5000).forEach((r, i) => {
+      const id = byName[String(r.module || "").trim().toLowerCase()] || byName[String(r.module || "").trim()];
+      const u = str(r.user, 60), acc = String(r.access || "allow").toLowerCase();
+      if (!id || !u) { out.skipped.push(i + 2); return; }
+      const m = c[id] = c[id] || { mode: "all", states: [] }; m.allowUsers = (m.allowUsers || []).filter((x) => x.toLowerCase() !== u.toLowerCase()); m.denyUsers = (m.denyUsers || []).filter((x) => x.toLowerCase() !== u.toLowerCase());
+      if (/^(deny|remove access|off|no|block)/.test(acc)) m.denyUsers.push(u); else if (!/^(remove|reset|clear)$/.test(acc)) m.allowUsers.push(u);
+      out.applied++;
+    });
+    c.updatedBy = rec.fullName; c.updatedAt = t; await store.set("config:modules", c);
+    return json(200, Object.assign({ ok: true }, out, { skipped: out.skipped.slice(0, 50) }));
   }
 
   // ---------- FAQ (#2) ----------

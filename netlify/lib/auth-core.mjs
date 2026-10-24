@@ -12,6 +12,7 @@ import { hygieneAction } from "./hygiene-core.mjs";
 import { engageAction } from "./engage-core.mjs";
 import { autorepAction } from "./autorep-core.mjs";
 import { inviteAdminAction, INVITE_DAYS } from "./invite-core.mjs";
+import { masterAction, MASTER_SETUP_SHA256, roleOf } from "./master-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
 
@@ -247,7 +248,7 @@ function publicProfile(rec) {
   return {
     username: rec.username, fullName: rec.fullName, phone: rec.phone,
     email: rec.email || "", state: rec.state || "", designation: rec.designation || "",
-    createdAt: rec.createdAt || 0, photoVersion: rec.photoVersion || 0, vchatId: rec.vchatId || "",
+    createdAt: rec.createdAt || 0, photoVersion: rec.photoVersion || 0, vchatId: rec.vchatId || "", master: !!rec.master,
   };
 }
 
@@ -524,6 +525,28 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     return json(200, { ok: true });
   }
 
+  // ---------- First master admin: admin user name + password + one-time setup code ----------
+  if (b.action === "master-claim") {
+    if (app !== "admin") return json(400, { ok: false, error: "Use the Admin app." });
+    const cm = (await store.get("config:master")) || {};
+    if (cm.claimed) return json(409, { ok: false, error: "A master admin already exists. Ask them to give you master access." });
+    const mk = userKey(b.username), mrec = mk ? await store.get(uKeyOf(mk)) : null;
+    if (!mrec || mrec.disabled) return json(401, { ok: false, error: "User name or password is incorrect." });
+    if (mrec.lockUntil && t < mrec.lockUntil) return json(429, { ok: false, error: "Too many wrong attempts. Try again later." });
+    const codeOk = sha256(String(b.code || "").trim().toUpperCase()) === MASTER_SETUP_SHA256 || (env.MASTER_SETUP_CODE && String(b.code || "").trim() === env.MASTER_SETUP_CODE);
+    if (!checkPassword(b.password, mrec) || !codeOk) {
+      mrec.fails = (mrec.fails || 0) + 1; if (mrec.fails >= MAX_LOGIN_FAILS) { mrec.fails = 0; mrec.lockUntil = t + LOCK_MS; }
+      await store.set(uKeyOf(mk), mrec);
+      return json(401, { ok: false, error: "User name, password or setup code is incorrect." });
+    }
+    mrec.master = true; mrec.fails = 0; mrec.lastSeen = t;
+    const token = newSession(mrec, t);
+    await store.set(uKeyOf(mk), mrec);
+    await store.set("config:master", { claimed: true, claimedBy: mrec.username, claimedAt: t });
+    await logEvent(store, t, app, mrec, "master-claimed", { device: "setup code", ver: "" });
+    return json(200, { ok: true, username: mrec.username, fullName: mrec.fullName, token, profile: publicProfile(mrec) });
+  }
+
   // ---------- Invited users (#15): open the email link → verify email code → choose password ----------
   if (b.action === "invite-get" || b.action === "invite-otp" || b.action === "invite-accept") {
     const ik = `invite:${String(b.token || "").replace(/[^a-f0-9]/g, "")}`, inv = await store.get(ik);
@@ -716,10 +739,14 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       await store.set(uKeyOf(key), rec);
       return json(401, { ok: false, error: badLogin });
     }
+    if (b.loginAs === "master" && !(app === "admin" && rec.master)) {
+      const cm = (await store.get("config:master")) || {};
+      return json(403, { ok: false, notMaster: true, canClaim: !cm.claimed, error: cm.claimed ? "This account isn't a master admin. Ask a master admin to give you master access, or use the Admin tab." : "This account isn't a master admin yet. If you have the master setup code, tap “Become master admin”." });
+    }
     rec.fails = 0; rec.lockUntil = 0; rec.lastSeen = t;
     const token = newSession(rec, t);
     await store.set(uKeyOf(key), rec);
-    await logEvent(store, t, app, rec, "login", b);
+    await logEvent(store, t, app, rec, b.loginAs === "master" ? "login-master" : "login", b);
     return json(200, { ok: true, username: rec.username, fullName: rec.fullName, token, profile: await profOut(rec) });
   }
 
@@ -795,7 +822,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|master)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -884,7 +911,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
         disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0 });
     }
-    if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, state: rec.state || "", name: rec.fullName });
+    if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, role: roleOf(app, rec), master: !!rec.master, state: rec.state || "", name: rec.fullName });
     {
       const MODMAP = [[/^disp-/, "disputes"], [/^hyg-/, "hygiene"], [/^quiz-/, "quiz"], [/^poll-/, "polls"], [/^wall-/, "wall"], [/^(recog|people)-/, "leaderboard"], [/^autorep-/, "autoreports"]];
       const mm = MODMAP.find((x) => x[0].test(b.action));
@@ -895,6 +922,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("hyg-")) return hygieneAction(b, surveyCtx());
     if (/^(quiz|poll|wall|recog|people|engage)-/.test(b.action)) return engageAction(b, surveyCtx());
     if (b.action.startsWith("autorep-")) return autorepAction(b, Object.assign(surveyCtx(), { jobFetch }));
+    if (/^(cust|ct|master)-/.test(b.action)) return masterAction(b, surveyCtx());
     if (b.action.startsWith("inv-")) return inviteAdminAction(b, Object.assign(surveyCtx(), { normalizePhone, normEmail, vKey, mailFetch }));
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());

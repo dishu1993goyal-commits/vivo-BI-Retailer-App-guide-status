@@ -211,6 +211,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .chips4{display:flex;flex-wrap:wrap;gap:6px}.chips4 button{border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:7px 12px;font:600 13px inherit;cursor:pointer}
 .chips4 button.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6}
 </style>
+<script src="cust.js?v=61"></script>
 </head>
 <body>
 <div class="hero">
@@ -398,6 +399,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
     return ov;
   }
   var VIEW = $("view"), CFG = null, LIST = [], F = ls("disp-f") || "open", CUR = null, TICK = 0, SKEW = 0;
+function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JSON.stringify(d)) + '"'; }
+  function LST(k, d) { return window.CUST ? CUST.list(k, d) : d; }
   function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
   var H = 3600000;
   function left(ms) { var a = Math.abs(ms), h = Math.floor(a / H), m = Math.floor(a % H / 60000); return (h >= 24 ? Math.floor(h / 24) + "d " + (h % 24) + "h" : h + "h " + m + "m"); }
@@ -447,19 +450,21 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   function newD() {
     var pre = (location.hash || "").indexOf("new") >= 0;
-    var cat = CFG.categories[0], pr = "P2", atts = [];
+    var cats = LST("disputes.category", CFG.categories), cat = cats[0], pr = "P2", atts = [], XF = null;
     var ov = sheet("Raise a dispute", "HO is notified and the turnaround timer starts", [["📤", "Submit", function (ov) {
       var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
-      api({ action: "disp-create", title: g("dt1"), detail: g("dd"), category: cat, priority: pr, page: g("dp"), shown: g("ds"), expected: g("de"), period: g("dper"), state: ADMIN ? g("dst") : "", atts: atts }).then(function (r) { if (!r.ok) return toast(r.error); toast("Dispute #" + r.dispute.no + " raised"); load(function () { openD(r.dispute.id); }); });
+      var extra = XF ? XF.collect() : {}; if (extra === null) return false;
+      api({ action: "disp-create", extra: extra, title: g("dt1"), detail: g("dd"), category: cat, priority: pr, page: g("dp"), shown: g("ds"), expected: g("de"), period: g("dper"), state: ADMIN ? g("dst") : "", atts: atts }).then(function (r) { if (!r.ok) return toast(r.error); toast("Dispute #" + r.dispute.no + " raised"); load(function () { openD(r.dispute.id); }); });
       return true;
-    }]], '<div class="f3"><label>Category</label><div class="chips4" id="dcat">' + CFG.categories.map(function (c, i) { return '<button type="button" data-c="' + esc(c) + '" class="' + (i ? "" : "on") + '">' + esc(c) + "</button>"; }).join("") + "</div>" +
+    }]], '<div class="f3"><label>Category</label><div class="chips4" id="dcat"' + DL("disputes.category", CFG.categories) + '>' + cats.map(function (c, i) { return '<button type="button" data-c="' + esc(c) + '" class="' + (i ? "" : "on") + '">' + esc(c) + "</button>"; }).join("") + "</div>" +
       '<label>Short title</label><input class="tx" id="dt1" maxlength="120" placeholder="e.g. Active retailers count wrong for October">' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 8px"><div><label>Page / report</label><input class="tx" id="dp" placeholder="e.g. Active retailers"></div><div><label>Period</label><input class="tx" id="dper" placeholder="e.g. Oct-26"></div><div><label>Number shown</label><input class="tx" id="ds"></div><div><label>Number expected</label><input class="tx" id="de"></div></div>' +
       (ADMIN ? '<label>State</label><input class="tx" id="dst" placeholder="HO or state name">' : "") +
       '<label>Details</label><textarea class="tx" id="dd" style="min-height:90px" placeholder="What you see, what you expected, and how you checked"></textarea>' +
       '<label>Priority</label><div class="chips4" id="dpr">' + [["P1", "P1 · urgent (" + CFG.tat.P1 + "h)"], ["P2", "P2 · normal (" + CFG.tat.P2 + "h)"], ["P3", "P3 · low (" + CFG.tat.P3 + "h)"]].map(function (p) { return '<button type="button" data-p="' + p[0] + '" class="' + (p[0] === "P2" ? "on" : "") + '">' + p[1] + "</button>"; }).join("") + "</div>" +
-      '<label>Screenshot / file (optional)</label><div class="row"><button class="btn sec sm" type="button" id="dat">📎 Attach</button><span class="muted" id="datn" style="font-size:12px"></span></div></div>');
+      '<div id="dxf"></div><label>Screenshot / file (optional)</label><div class="row"><button class="btn sec sm" type="button" id="dat">📎 Attach</button><span class="muted" id="datn" style="font-size:12px"></span></div></div>');
     ov.querySelector(".sheet").style.maxWidth = "580px";
+    if (window.CUST) XF = CUST.renderExtra(ov.querySelector("#dxf"), "disputes", {});
     [].forEach.call(ov.querySelectorAll("#dcat button"), function (b) { b.onclick = function () { cat = b.dataset.c; [].forEach.call(ov.querySelectorAll("#dcat button"), function (x) { x.classList.toggle("on", x === b); }); }; });
     [].forEach.call(ov.querySelectorAll("#dpr button"), function (b) { b.onclick = function () { pr = b.dataset.p; [].forEach.call(ov.querySelectorAll("#dpr button"), function (x) { x.classList.toggle("on", x === b); }); }; });
     ov.querySelector("#dat").onclick = function () { pickFile(function (a) { atts.push(a.id); ov.querySelector("#datn").textContent = atts.length + " file(s) attached"; }); };
@@ -488,7 +493,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       var adm = ADMIN ? '<div class="card"><h3>⚙️ Manage</h3><div class="row"><select class="tx" id="das" style="flex:2;min-width:150px"><option value="">Unassigned</option>' + CFG.admins.map(function (a) { return '<option value="' + esc(a.username) + '"' + (d.assignee && d.assignee.username === a.username ? " selected" : "") + ">👤 " + esc(a.fullName) + "</option>"; }).join("") + '</select><select class="tx" id="dpp" style="flex:1;min-width:80px">' + ["P1", "P2", "P3"].map(function (p) { return "<option" + (p === d.priority ? " selected" : "") + ">" + p + "</option>"; }).join("") + '</select><select class="tx" id="dss" style="flex:2;min-width:150px">' + CFG.statuses.map(function (s) { return "<option" + (s === d.status ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select></div></div>" : "";
       VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← All disputes</button><div class="dh"><div class="row" style="justify-content:space-between"><span class="chip" style="background:rgba(255,255,255,.18);color:#fff">' + esc(d.status) + " · " + d.priority + "</span>" + timer(d) + '</div><div style="font-size:18px;font-weight:800;margin-top:8px">' + esc(d.title) + '</div><div style="font-size:12.5px;opacity:.85;margin-top:4px">Raised by ' + esc(d.by.fullName) + " · " + dt(d.createdAt) + " · due " + dt(d.dueAt) + (d.assignee ? " · 👤 " + esc(d.assignee.fullName) : "") + "</div>" +
         (d.shown || d.expected ? '<div class="row" style="margin-top:10px;gap:10px"><div style="flex:1;background:rgba(255,255,255,.12);border-radius:10px;padding:8px"><div style="font-size:11px;opacity:.8">Shown' + (d.page ? " · " + esc(d.page) : "") + '</div><div class="big3" style="font-size:20px">' + esc(d.shown || "—") + '</div></div><div style="flex:1;background:rgba(255,255,255,.12);border-radius:10px;padding:8px"><div style="font-size:11px;opacity:.8">Expected' + (d.period ? " · " + esc(d.period) : "") + '</div><div class="big3" style="font-size:20px">' + esc(d.expected || "—") + "</div></div></div>" : "") + "</div>" +
-        '<div class="card" style="white-space:pre-wrap;font-size:14px">' + esc(d.detail) + attList(d.atts, d.id) + "</div>" + adm +
+        '<div class="card" style="white-space:pre-wrap;font-size:14px">' + esc(d.detail) + (window.CUST ? CUST.extraRows("disputes", d.extra).map(function (x) { return '<div style="margin-top:6px;font-size:13px"><span class="muted">' + esc(x[0]) + ":</span> " + esc(x[1]) + "</div>"; }).join("") : "") + attList(d.atts, d.id) + "</div>" + adm +
         '<div class="lg">' + d.log.map(function (e) { return '<div class="e ' + e.kind + '"><div class="dot"></div><div class="bub2"><div class="who">' + esc(e.by.fullName) + (e.by.app === "admin" ? " (HO)" : "") + " · " + dt(e.t) + "</div>" + esc(e.text || "") + attList(e.atts, d.id) + "</div></div>"; }).join("") + "</div>" +
         '<div class="card"><textarea class="tx" id="dmsg" placeholder="' + (ADMIN ? "Reply or add a resolution note…" : "Add information…") + '" style="min-height:70px"></textarea><div class="row" style="margin-top:8px"><button class="btn pri sm" id="dsend">Send</button><button class="btn ghost sm" id="datt">📎</button>' +
         (ADMIN && !done ? '<button class="btn ok sm" id="dres">✓ Resolve with this note</button>' : "") + (!ADMIN && d.status === "Resolved" && mine ? '<button class="btn ok sm" id="dcl">✓ Close (satisfied)</button><button class="btn danger sm" id="dro">↺ Reopen</button>' : "") + "</div><span class=\"muted\" id=\"dattn\" style=\"font-size:12px\"></span></div>" +

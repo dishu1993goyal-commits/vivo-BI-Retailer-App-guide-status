@@ -1,3 +1,4 @@
+import { cleanExtra } from "./master-core.mjs";
 // Market visits (beat plan): users add the store, punch in/out with GPS, fill the visit form and photos.
 // Admins track all visits, score states and get Gemini analysis.
 // Storage:
@@ -44,6 +45,7 @@ function cleanForm(f) {
   const r = Math.round(Number(f.appRating)); if (r >= 1 && r <= 5) o.appRating = r;
   const u = str(f.appUsage, 20); if (["Daily", "Weekly", "Rarely", "Not using"].includes(u)) o.appUsage = u;
   if (/^\d{4}-\d{2}-\d{2}$/.test(String(f.followUp || ""))) o.followUp = f.followUp;
+  const x = cleanExtra(f.extra); if (Object.keys(x).length) o.extra = x;
   return o;
 }
 // 0–100 quality score from the data itself (AI score is separate).

@@ -1,3 +1,4 @@
+import { cleanExtra } from "./master-core.mjs";
 // Engage: quizzes & certificates (#8), leaderboard points & recognition (#9), best-practice wall (#10), polls (#11).
 // Storage:
 //   quiz:<id>            { id, title, topic, intro, questions:[{q, options:[], correct, why}], passPct, minutes, closesAt, status:"live"|"draft"|"closed", createdAt, by }
@@ -115,7 +116,7 @@ export async function engageAction(b, ctx) {
     const title = str(b.title, 120), text = str(b.text, 4000);
     if (title.length < 5 || text.length < 20) return json(400, { ok: false, error: "Add a title and describe what you did and the result (at least a few lines)." });
     const id = nid(t);
-    const p = { id, title, text, result: str(b.result, 200), category: WALL_CATS.includes(b.category) ? b.category : "Other", state: isAdmin ? str(b.state, 40) || "HO" : rec.state || "", by: me, photos: await attOk(b.photos, 4), likes: {}, comments: [], featured: false, createdAt: t };
+    const p = { id, title, text, result: str(b.result, 200), category: str(b.category, 60) || "Other", extra: cleanExtra(b.extra), state: isAdmin ? str(b.state, 40) || "HO" : rec.state || "", by: me, photos: await attOk(b.photos, 4), likes: {}, comments: [], featured: false, createdAt: t };
     await store.set(`wall:${id}`, p);
     await ctx.logEvent(store, t, app, rec, "best-practice", { device: title.slice(0, 50), ver: "" });
     return json(200, { ok: true, id });

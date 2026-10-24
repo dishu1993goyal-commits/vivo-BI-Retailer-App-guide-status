@@ -40,6 +40,8 @@
   "use strict";
   /*@@CORE@@*/
   var VIEW = $("view"), TAB = (location.hash || "").indexOf("auto") >= 0 ? "auto" : "build", DATA = null, MY = "", SEL = ls("rb-sel") || { ds: "state", fields: null, period: "", from: "", to: "", states: [] };
+  var PRESET = null, PNAME = "";
+  (function () { var m = /tool=([a-z0-9]+)/i.exec(location.hash || ""); if (m && window.CUST) { var tl = CUST.tool(m[1]); if (tl && tl.tool.report) { PRESET = tl.tool.report; PNAME = tl.tool.name; TAB = "build"; SEL = { ds: PRESET.ds || "state", fields: PRESET.fields || null, from: "", to: "", states: PRESET.states || [] }; } } })();
   function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
   var P = function (v) { return v == null || v === "" ? "" : Math.round(v * 1000) / 10; };
   var R1 = function (v) { return v == null ? "" : Math.round(v * 10) / 10; };
@@ -65,7 +67,7 @@
 
   // ================= BUILDER =================
   function showBuild() {
-    hero("Report builder", "Pick the data, period, states and columns — download in Excel");
+    hero(PNAME || "Report builder", PNAME ? "Saved report — change anything and download" : "Pick the data, period, states and columns — download in Excel");
     $("pane").innerHTML = '<div class="loading"><div class="spin"></div>Loading dashboard data…</div>';
     KPIDATA.load().then(function (d) { DATA = d; drawBuild(); }).catch(function (e) { $("pane").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
   }
@@ -81,13 +83,15 @@
   function drawBuild() {
     var ds = DS[SEL.ds] || DS.state;
     if (!SEL.fields || !SEL.fields.length || !SEL.fields.every(function (f) { return ds.fields.some(function (x) { return x[0] === f; }); })) SEL.fields = ds.fields.filter(function (f) { return f[2]; }).map(function (f) { return f[0]; });
-    var pos = periodOptions(); if (!SEL.from) { SEL.from = pos[0][0]; SEL.to = pos[0][1]; }
+    var pos = periodOptions();
+    if (PRESET && !PRESET._done) { var pick = PRESET.period === "latest-month" ? pos.find(function (p) { return !/Q\d/.test(p[2]); }) : PRESET.period === "custom" && PRESET.from ? [PRESET.from, PRESET.to] : pos[0]; if (pick) { SEL.from = pick[0]; SEL.to = pick[1]; } }
+    if (!SEL.from) { SEL.from = pos[0][0]; SEL.to = pos[0][1]; }
     var states = DATA.states;
     var html = '<div class="step"><h4><b>1</b>What data?</h4><div class="dsg">' + Object.keys(DS).map(function (k) { return '<button class="ds ' + (SEL.ds === k ? "on" : "") + '" data-ds="' + k + '"><b>' + DS[k].name + "</b><small>" + DS[k].sub + "</small></button>"; }).join("") + "</div></div>" +
       '<div class="step"><h4><b>2</b>Period</h4><div class="row"><select class="tx" id="pp" style="flex:2;min-width:180px"><option value="">Custom dates…</option>' + pos.map(function (p) { return '<option value="' + p[0] + "|" + p[1] + '"' + (SEL.from === p[0] && SEL.to === p[1] ? " selected" : "") + ">" + esc(p[2]) + "</option>"; }).join("") + '</select><input class="tx" type="date" id="pf" value="' + SEL.from + '" style="flex:1;min-width:130px"><input class="tx" type="date" id="pt" value="' + SEL.to + '" style="flex:1;min-width:130px"></div><div class="muted" style="font-size:12px;margin-top:6px">Data available: ' + DATA.span.f + " to " + DATA.span.t + "</div></div>" +
       '<div class="step"><h4><b>3</b>States</h4>' + (ADMIN ? '<div class="flds" id="sts"><label class="' + (!SEL.states.length ? "on" : "") + '"><input type="checkbox" data-s="">All states</label>' + states.map(function (s) { return '<label class="' + (SEL.states.indexOf(s) >= 0 ? "on" : "") + '"><input type="checkbox" data-s="' + esc(s) + '">' + esc(s) + "</label>"; }).join("") + "</div>" : '<div class="muted">Your state: <b>' + esc(MY) + "</b>" + (SEL.ds === "state" ? " (PAN India total row included for comparison)" : "") + "</div>") + "</div>" +
       '<div class="step"><h4><b>4</b>Columns</h4><div class="row" style="margin-bottom:8px"><button class="btn ghost sm" id="fa">Select all</button><button class="btn ghost sm" id="fd">Defaults</button></div><div class="flds" id="fl">' + ds.fields.map(function (f) { return '<label class="' + (SEL.fields.indexOf(f[0]) >= 0 ? "on" : "") + '"><input type="checkbox" data-f="' + f[0] + '">' + esc(f[1]) + "</label>"; }).join("") + "</div></div>" +
-      '<div class="row" style="margin-top:12px"><button class="btn pri grow" id="go">👁️ Preview</button><button class="btn ok grow" id="dl">⬇ Download Excel</button><button class="btn sec" id="csv">CSV</button></div><div id="out"></div>';
+      '<div class="row" style="margin-top:12px"><button class="btn pri grow" id="go">👁️ Preview</button><button class="btn ok grow" id="dl">⬇ Download Excel</button><button class="btn sec" id="csv">CSV</button>' + (window.CUST && CUST.master ? '<button class="btn sec" id="sv2">🧩 Save as tool</button>' : "") + '</div><div id="out"></div>';
     $("pane").innerHTML = html;
     [].forEach.call($("pane").querySelectorAll("[data-ds]"), function (b) { b.onclick = function () { SEL.ds = b.dataset.ds; SEL.fields = null; save(); drawBuild(); }; });
     $("pp").onchange = function () { if (!this.value) return; var v = this.value.split("|"); SEL.from = v[0]; SEL.to = v[1]; $("pf").value = v[0]; $("pt").value = v[1]; save(); };
@@ -98,6 +102,14 @@
     $("fd").onclick = function () { SEL.fields = null; save(); drawBuild(); };
     $("go").onclick = function () { build(function (t) { preview(t); }); };
     $("dl").onclick = function () { build(function (t) { download(xlsx([{ name: ds.name.slice(0, 30), rows: [t.head].concat(t.rows) }]), fname("xlsx")); toast("Downloaded " + t.rows.length + " rows"); }); };
+    if ($("sv2")) $("sv2").onclick = function () {
+      sheet("Save this report as a tool", "It appears in the hub for the people you release it to (Studio)", [["💾", "Save draft", function (ov) {
+        var nm = ov.querySelector("#tn").value.trim(); if (!nm) { toast("Name it."); return false; }
+        fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify({ app: AUTH.app, username: AUTH.username, token: AUTH.token, action: "cust-save", item: { kind: "tool", tool: { name: nm, icon: "📑", category: "reports", type: "report", desc: ov.querySelector("#td").value, report: { ds: SEL.ds, fields: SEL.fields, states: SEL.states, period: ov.querySelector("#tp").value, from: SEL.from, to: SEL.to } } } }) })
+          .then(function (r) { return r.json(); }).then(function (x) { toast(x.ok ? "Saved as a draft tool — release it in Studio" : x.error); if (x.ok && window.CUST) CUST.refresh(); });
+      }]], '<div style="margin-top:8px"><input class="tx" id="tn" placeholder="Report name, e.g. Weekly app usage by state"><input class="tx" id="td" placeholder="Short description (optional)" style="margin-top:8px"><select class="tx" id="tp" style="margin-top:8px"><option value="latest-quarter">Always the latest quarter</option><option value="latest-month">Always the latest month</option><option value="custom">These exact dates</option></select></div>');
+    };
+    if (PRESET && !PRESET._done) { PRESET._done = true; setTimeout(function () { if ($("go")) $("go").click(); }, 50); }
     $("csv").onclick = function () { build(function (t) { var c = [t.head].concat(t.rows).map(function (r) { return r.map(function (v) { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(","); }).join("\n"); download(new Blob(["﻿" + c], { type: "text/csv" }), fname("csv")); }); };
   }
   function save() { ls("rb-sel", SEL); }

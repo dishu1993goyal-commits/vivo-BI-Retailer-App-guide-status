@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Studio</title>
+<style>
+/*@@CSS@@*/
+.ch{background:var(--card);border-radius:14px;padding:11px 13px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);display:flex;gap:10px;align-items:flex-start}
+.ch input[type=checkbox]{width:19px;height:19px;margin-top:3px;flex:none}
+.ch .mid{flex:1;min-width:0}.ch .k{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+.ch .w{font-size:14px;margin-top:2px;word-break:break-word}.ch .a{font-size:12px;color:var(--mut);margin-top:4px}
+.ch .acts3{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.ch .acts3 button{border:0;background:#F3F4FA;border-radius:9px;padding:6px 9px;font:600 12px inherit;cursor:pointer}
+.ch .acts3 .rel{background:#E6F4EA;color:#0F7B4F}
+.how{background:linear-gradient(135deg,#1F2340,#4D5BF9);color:#fff;border-radius:18px;padding:14px 16px;margin-top:6px}
+.how ol{margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.6}
+.pg{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.pg button{border:0;border-radius:99px;padding:7px 11px;font:600 12.5px inherit;cursor:pointer;background:rgba(255,255,255,.16);color:#fff}
+.f8 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+.chk2{display:flex;flex-wrap:wrap;gap:6px}.chk2 label{display:inline-flex;gap:5px;align-items:center;border:1px solid #E1E3EE;border-radius:99px;padding:5px 10px;font-size:12.5px;cursor:pointer;background:#fff;margin:0;color:var(--ink)}
+.chk2 label.on{background:#EEF0FF;border-color:#9AA1F5;color:#2B33A6;font-weight:700}.chk2 input{display:none}
+.fld{border:1px solid #E6E8F2;border-radius:12px;padding:8px 10px;margin-top:8px}
+.mrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:var(--card);border-radius:12px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05)}
+.sw{position:relative;width:44px;height:26px;border-radius:99px;background:#D5D8E8;cursor:pointer;border:0;flex:none}.sw.on{background:#1E9E61}.sw:after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}.sw.on:after{left:21px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧩</span></div>
+  <h1 id="h1">Studio</h1><p id="h2">Master admin · customize, test, release</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = ls("st-tab") || "changes", ITEMS = [], STATES = [], SELX = {}, IN_APP = !!(window.BIApp && window.BIApp.getAuth);
+  fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
+  function hero(t, s) { $("h1").textContent = t; $("h2").textContent = s; }
+  var KIND = { text: "✏️ Label", hide: "🙈 Hidden", list: "📋 Dropdown", fields: "➕ Fields", tool: "🧩 Tool" };
+  var PAGES = [["hub", "All tools"], ["visits", "Market visits"], ["affordability", "Affordability"], ["disputes", "Disputes"], ["hygiene", "Market hygiene"], ["engage", "Engage"], ["help", "Help centre"], ["reports", "Reports"], ["schemes", "Schemes"], ["knowledge", "Knowledge"], ["survey", "Surveys"], ["chat", "Messages"]];
+  function aud(a) {
+    a = a || {}; var p = [];
+    if ((a.roles || []).length) p.push(a.roles.map(function (r) { return { state: "State users", admin: "Admins", master: "Masters" }[r]; }).join(", "));
+    if ((a.states || []).length) p.push(a.states.length + " state" + (a.states.length > 1 ? "s" : ""));
+    if ((a.users || []).length) p.push(a.users.length + " user ID" + (a.users.length > 1 ? "s" : ""));
+    return p.length ? p.join(" · ") : "Everyone";
+  }
+  function render() {
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">Only master admins can open the Studio.</div>'; return; }
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + [["changes", "✏️ Changes"], ["tools", "🧩 Tools"], ["access", "🔐 Access"], ["masters", "👑 Masters"]].map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("st-tab", TAB); load(); }; });
+    ({ changes: showChanges, tools: showTools, access: showAccess, masters: showMasters })[TAB]();
+  }
+  function load(then) {
+    api({ action: "cust-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + (r.error && /master/.test(r.error) ? '<br><br>Log in with the <b>Master admin</b> tab to use the Studio.' : "") + "</div>"; return; }
+      ITEMS = r.items; (then || render)();
+    });
+  }
+  function openPage(file) {
+    try { sessionStorage.setItem("cx-edit", "1"); } catch (e) { }
+    if (IN_APP && window.BIApp.openTool) return window.BIApp.openTool(file + ".html", file, "#list");
+    if (parent !== window) return parent.postMessage({ biOpen: { file: file + ".html", title: file, hash: "#list" } }, location.origin);
+    location.href = file + ".html?v=" + Date.now();
+  }
+
+  // ================= CHANGES =================
+  function showChanges() {
+    hero("Studio · Changes", "Labels, hidden items, dropdowns and fields — draft → release");
+    var rows = ITEMS.filter(function (x) { return x.kind !== "tool"; });
+    var drafts = rows.filter(function (x) { return x.status !== "released"; }).length;
+    $("pane").innerHTML = '<div class="how"><b>How to customize</b><ol><li>Open any screen below (or anywhere in the app) and tap <b>✏️ Customize</b> at the bottom-left.</li><li>Tap a label to rename or hide it, a dropdown to edit its options, or <b>＋ Add a field</b> on a form.</li><li>Changes are <b>drafts</b> — only masters see them. Test, then <b>Release</b> here to everyone, a role, states or specific user IDs.</li></ol><div class="pg">' + PAGES.map(function (p) { return '<button data-pg="' + p[0] + '">' + esc(p[1]) + "</button>"; }).join("") + "</div></div>" +
+      '<div class="tiles" style="margin-top:10px">' + tileS("📝", "#FFF4E5", drafts, "Drafts") + tileS("🚀", "#E6F4EA", rows.length - drafts, "Released") + tileS("🧩", "#EEF0FF", ITEMS.filter(function (x) { return x.kind === "tool"; }).length, "Custom tools") + tileS("📄", "#F4EEFF", Object.keys(rows.reduce(function (a, x) { a[x.page || x.listKey || x.formKey] = 1; return a; }, {})).length, "Screens / lists") + "</div>" +
+      (rows.length ? '<div class="row" style="margin-top:10px"><label class="muted" style="display:flex;gap:6px;align-items:center;font-size:12.5px"><input type="checkbox" id="sa"> Select all</label><span class="grow"></span><button class="btn ok sm" id="br">🚀 Release selected</button><button class="btn sec sm" id="bd">↩ Back to draft</button><button class="btn danger sm" id="bx">Delete</button></div>' : "") +
+      (rows.length ? rows.map(function (x) {
+        var what = x.kind === "text" ? "“" + esc(x.match) + "” → “" + esc(x.value) + "”" + (x.attr ? " (placeholder)" : "") : x.kind === "hide" ? "Hide “" + esc(x.match) + "”" + (x.up ? " (+" + x.up + " level)" : "") : x.kind === "list" ? esc(x.listKey) + ": " + esc(x.items.join(", ")) : esc(x.formKey) + ": " + x.fields.map(function (f) { return esc(f.label) + " (" + f.type + (f.required ? ", required" : "") + ")"; }).join(", ");
+        return '<div class="ch"><input type="checkbox" data-x="' + x.id + '"' + (SELX[x.id] ? " checked" : "") + '><div class="mid"><div class="k">' + KIND[x.kind] + (x.page && x.page !== "*" ? " · " + esc(x.page) : "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w">' + what + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + " · " + esc(x.by) + " · " + dt(x.updatedAt) + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-ed="' + x.id + '">✏️</button></div></div>';
+      }).join("") : '<div class="card empty"><div class="big">✏️</div>No changes yet. Open a screen above and tap ✏️ Customize.</div>');
+    [].forEach.call($("pane").querySelectorAll("[data-pg]"), function (b) { b.onclick = function () { openPage(b.dataset.pg); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-x]"), function (c) { c.onchange = function () { SELX[c.dataset.x] = c.checked; }; });
+    if ($("sa")) $("sa").onchange = function () { var on = this.checked; rows.forEach(function (x) { SELX[x.id] = on; }); showChanges(); };
+    var sel = function () { return rows.filter(function (x) { return SELX[x.id]; }).map(function (x) { return x.id; }); };
+    if ($("br")) $("br").onclick = function () { var ids = sel(); if (!ids.length) return toast("Select changes first."); audDialog(ids, {}); };
+    if ($("bd")) $("bd").onclick = function () { var ids = sel(); if (!ids.length) return toast("Select changes first."); api({ action: "cust-release", ids: ids, status: "draft" }).then(function () { toast("Back to draft"); SELX = {}; load(); }); };
+    if ($("bx")) $("bx").onclick = function () { var ids = sel(); if (!ids.length) return toast("Select changes first."); sheet("Delete " + ids.length + " change(s)?", "Screens go back to the original", [["🗑️", "Delete", function () { api({ action: "cust-delete", ids: ids }).then(function () { toast("Deleted"); SELX = {}; load(); }); }, "red"]]); };
+    [].forEach.call($("pane").querySelectorAll("[data-rel]"), function (b) { b.onclick = function () { var x = ITEMS.find(function (y) { return y.id === b.dataset.rel; }); audDialog([x.id], x.audience || {}, x.status); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { editChange(ITEMS.find(function (y) { return y.id === b.dataset.ed; })); }; });
+  }
+  function editChange(x) {
+    var body = x.kind === "text" ? '<label>Original</label><input class="tx" id="e1" value="' + esc(x.match) + '"><label>New wording</label><input class="tx" id="e2" value="' + esc(x.value) + '"><label>Screen</label><input class="tx" id="e3" value="' + esc(x.page) + '" placeholder="page name or * for all screens">'
+      : x.kind === "hide" ? '<label>Text that is hidden</label><input class="tx" id="e1" value="' + esc(x.match) + '"><label>Levels up (0 = just the text)</label><input class="tx" id="e2" type="number" value="' + (x.up || 0) + '"><label>Screen</label><input class="tx" id="e3" value="' + esc(x.page) + '">'
+      : x.kind === "list" ? '<label>List</label><input class="tx" id="e1" value="' + esc(x.listKey) + '" readonly><label>Options (one per line)</label><textarea class="tx" id="e2" rows="8">' + esc(x.items.join("\n")) + "</textarea>"
+      : '<label>Form</label><input class="tx" id="e1" value="' + esc(x.formKey) + '" readonly><div id="ef"></div><button class="btn sec sm" id="eaf" style="margin-top:8px">＋ Field</button>';
+    var fields = x.kind === "fields" ? JSON.parse(JSON.stringify(x.fields)) : null;
+    var ov = sheet("Edit " + KIND[x.kind].replace(/^\S+\s/, "").toLowerCase(), "Saving puts it back to draft", [["💾", "Save draft", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id) ? ov.querySelector("#" + id).value : ""; };
+      var it = { id: x.id, kind: x.kind, page: x.page };
+      if (x.kind === "text") Object.assign(it, { match: g("e1"), value: g("e2"), page: g("e3"), attr: x.attr });
+      if (x.kind === "hide") Object.assign(it, { match: g("e1"), up: +g("e2"), page: g("e3") });
+      if (x.kind === "list") Object.assign(it, { listKey: x.listKey, items: g("e2").split("\n") });
+      if (x.kind === "fields") Object.assign(it, { formKey: x.formKey, fields: fields });
+      api({ action: "cust-save", item: it }).then(function (r) { toast(r.ok ? "Saved as draft" : r.error); if (r.ok) load(); });
+    }], ["🗑️", "Delete", function () { api({ action: "cust-delete", id: x.id }).then(function () { toast("Deleted"); load(); }); }, "red"]], '<div class="f8">' + body + "</div>");
+    ov.querySelector(".sheet").style.maxWidth = "600px";
+    if (fields) fieldsEditor(ov.querySelector("#ef"), fields, ov.querySelector("#eaf"));
+  }
+  function fieldsEditor(box, fields, addBtn) {
+    var draw = function () {
+      box.innerHTML = fields.map(function (f, i) { return '<div class="fld"><div class="row"><input class="tx" data-i="' + i + '" data-k="label" value="' + esc(f.label) + '" placeholder="Label" style="flex:2"><select class="tx" data-i="' + i + '" data-k="type" style="flex:1">' + [["text", "Short text"], ["longtext", "Long text"], ["number", "Number"], ["date", "Date"], ["select", "Dropdown"], ["multi", "Multiple choice"], ["yesno", "Yes / No"], ["rating", "Rating"], ["photo", "Photo"]].map(function (t) { return '<option value="' + t[0] + '"' + (f.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") + '</select><button class="btn ghost sm" data-rm="' + i + '">✕</button></div>' +
+        (/select|multi/.test(f.type) ? '<textarea class="tx" data-i="' + i + '" data-k="options" rows="3" placeholder="Options, one per line" style="margin-top:6px">' + esc((f.options || []).join("\n")) + "</textarea>" : "") + '<label style="display:flex;gap:6px;align-items:center;margin:6px 0 0;font-size:12.5px;color:var(--ink)"><input type="checkbox" data-i="' + i + '" data-k="required"' + (f.required ? " checked" : "") + "> Required</label></div>"; }).join("");
+      [].forEach.call(box.querySelectorAll("[data-k]"), function (e) { e.oninput = e.onchange = function () { var f = fields[+e.dataset.i], k = e.dataset.k; f[k] = k === "required" ? e.checked : k === "options" ? e.value.split("\n") : e.value; if (k === "type") draw(); }; });
+      [].forEach.call(box.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { fields.splice(+b.dataset.rm, 1); draw(); }; });
+    };
+    if (addBtn) addBtn.onclick = function () { fields.push({ label: "", type: "text", options: [], required: false }); draw(); };
+    draw();
+  }
+  // Audience: everyone, roles, states, user IDs (typed or from Excel)
+  function audDialog(ids, a, status) {
+    a = { roles: (a.roles || []).slice(), states: (a.states || []).slice(), users: (a.users || []).slice() };
+    var ov = sheet("Release to…", ids.length + " item(s) · leave everything empty to release to everyone", [["🚀", "Release now", function (ov) {
+      a.users = ov.querySelector("#au").value.split(/[\s,;]+/).filter(Boolean);
+      api({ action: "cust-release", ids: ids, status: "released", audience: a }).then(function (r) { toast(r.ok ? "Released to " + aud(a) : r.error); SELX = {}; load(); });
+    }]].concat(status === "released" ? [["↩", "Back to draft (hide again)", function () { api({ action: "cust-release", ids: ids, status: "draft" }).then(function () { toast("Back to draft"); load(); }); }]] : []),
+      '<div class="f8"><label>Roles</label><div class="chk2" id="ar">' + [["state", "State users"], ["admin", "Admins"], ["master", "Masters"]].map(function (r) { return '<label class="' + (a.roles.indexOf(r[0]) >= 0 ? "on" : "") + '"><input type="checkbox" data-r="' + r[0] + '">' + r[1] + "</label>"; }).join("") + "</div>" +
+      '<label>States (state users in these states)</label><div class="chk2" id="as">' + STATES.map(function (s) { return '<label class="' + (a.states.indexOf(s) >= 0 ? "on" : "") + '"><input type="checkbox" data-s="' + esc(s) + '">' + esc(s) + "</label>"; }).join("") + "</div>" +
+      '<label>Specific user IDs (user name, vChat ID or email — comma or one per line)</label><textarea class="tx" id="au" rows="4">' + esc(a.users.join("\n")) + '</textarea><div class="row" style="margin-top:6px"><button class="btn sec sm" id="ai" type="button">📥 Import IDs from Excel</button><span class="muted" id="ain" style="font-size:12px"></span></div></div>');
+    ov.querySelector(".sheet").style.maxWidth = "600px";
+    [].forEach.call(ov.querySelectorAll("#ar input"), function (c) { c.parentNode.onclick = function (e) { e.preventDefault(); var k = a.roles.indexOf(c.dataset.r); if (k >= 0) a.roles.splice(k, 1); else a.roles.push(c.dataset.r); c.parentNode.classList.toggle("on", k < 0); }; });
+    [].forEach.call(ov.querySelectorAll("#as input"), function (c) { c.parentNode.onclick = function (e) { e.preventDefault(); var k = a.states.indexOf(c.dataset.s); if (k >= 0) a.states.splice(k, 1); else a.states.push(c.dataset.s); c.parentNode.classList.toggle("on", k < 0); }; });
+    ov.querySelector("#ai").onclick = function () { readSheet(function (rows) { var ids2 = rows.map(function (r) { return String(r[0] || "").trim(); }).filter(function (x) { return x && !/^(user|id|vchat|email|name)/i.test(x); }); var ta = ov.querySelector("#au"); ta.value = (ta.value ? ta.value + "\n" : "") + ids2.join("\n"); ov.querySelector("#ain").textContent = ids2.length + " IDs added"; }); };
+  }
+  function readSheet(cb) {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var file = inp.files[0]; if (!file) return;
+      if (/\.csv$/i.test(file.name)) { file.text().then(function (t) { cb(t.split(/\r?\n/).filter(Boolean).map(function (l) { return l.split(",").map(function (x) { return x.replace(/^"|"$/g, "").trim(); }); })); }); return; }
+      var go = function () { file.arrayBuffer().then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); cb(window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false })); }); };
+      if (window.XLSX) return go();
+      var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = go; s.onerror = function () { toast("Couldn't load the Excel reader — save as CSV and try again."); }; document.head.appendChild(s);
+    };
+    inp.click();
+  }
+
+  // ================= TOOLS =================
+  var CATN = { field: "📍 Field & market", reports: "📊 Reports & insights", engage: "💬 Engage", learn: "📚 Learn & help", support: "🎧 Support", admin: "🛡️ Admin", more: "🧰 More tools" };
+  function showTools() {
+    hero("Studio · Tools", "Build new tools — forms, links, info pages, saved reports");
+    var tools = ITEMS.filter(function (x) { return x.kind === "tool"; });
+    $("pane").innerHTML = '<button class="btn pri block" id="nt" style="margin-top:8px">＋ New tool</button>' +
+      (tools.length ? tools.map(function (x) { var tl = x.tool; return '<div class="ch"><div style="font-size:26px">' + esc(tl.icon) + '</div><div class="mid"><div class="k">' + esc({ form: "Form", link: "Link", page: "Info page", report: "Saved report" }[tl.type]) + " · " + esc(CATN[tl.category] || "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w"><b>' + esc(tl.name) + "</b>" + (tl.desc ? " — " + esc(tl.desc) : "") + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-op="' + x.id + '">▶</button><button data-ed="' + x.id + '">✏️</button></div></div>'; }).join("") : '<div class="card empty"><div class="big">🧩</div>No custom tools yet. Build a form (e.g. stock audit, store checklist, training attendance), a link, an info page or a saved report.</div>');
+    $("nt").onclick = function () { toolEdit({ kind: "tool", tool: { name: "", icon: "🧩", category: "more", type: "form", fields: [{ label: "", type: "text", options: [], required: true }] } }); };
+    [].forEach.call($("pane").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { toolEdit(JSON.parse(JSON.stringify(ITEMS.find(function (y) { return y.id === b.dataset.ed; })))); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-op]"), function (b) { b.onclick = function () { var nm = (ITEMS.find(function (y) { return y.id === b.dataset.op; }) || { tool: {} }).tool.name || "Tool"; if (IN_APP && window.BIApp.openTool) return window.BIApp.openTool("tool.html", nm, "#" + b.dataset.op); if (parent !== window) return parent.postMessage({ biOpen: { file: "tool.html", title: nm, hash: "#" + b.dataset.op } }, location.origin); location.href = "tool.html#" + b.dataset.op; }; });
+    [].forEach.call($("pane").querySelectorAll("[data-rel]"), function (b) { b.onclick = function () { var x = ITEMS.find(function (y) { return y.id === b.dataset.rel; }); audDialog([x.id], x.audience || {}, x.status); }; });
+  }
+  function toolEdit(x) {
+    var tl = x.tool; tl.fields = tl.fields || [];
+    var body = function () { return '<div class="f8"><div style="display:grid;grid-template-columns:70px 1fr;gap:8px"><div><label>Icon</label><input class="tx" id="ti" value="' + esc(tl.icon) + '"></div><div><label>Name</label><input class="tx" id="tn" value="' + esc(tl.name) + '" placeholder="e.g. Store checklist"></div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label>Type</label><select class="tx" id="tt">' + [["form", "📝 Form"], ["link", "🔗 Link"], ["page", "📄 Info page"], ["report", "📑 Saved report"]].map(function (o) { return '<option value="' + o[0] + '"' + (tl.type === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label>Show in</label><select class="tx" id="tc">' + Object.keys(CATN).map(function (k) { return '<option value="' + k + '"' + (tl.category === k ? " selected" : "") + ">" + CATN[k] + "</option>"; }).join("") + "</select></div></div>" +
+      '<label>Description</label><input class="tx" id="td" value="' + esc(tl.desc || "") + '">' +
+      (tl.type === "form" ? '<label>Form fields</label><div id="tf"></div><button class="btn sec sm" id="taf" style="margin-top:8px">＋ Field</button>' : "") +
+      (tl.type === "link" ? '<label>Link (https://…)</label><input class="tx" id="tu" value="' + esc(tl.url || "") + '">' : "") +
+      (tl.type === "page" ? '<label>Content (## heading · - bullet · **bold**)</label><textarea class="tx" id="tb" rows="10">' + esc(tl.body || "") + "</textarea>" : "") +
+      (tl.type === "report" ? '<div class="notice info">Build the report in <b>Reports → Report builder</b> and tap <b>🧩 Save as tool</b>.' + (tl.report ? " This tool opens: " + esc(tl.report.ds) + " · " + esc(tl.report.period || "") : "") + "</div>" : "") + "</div>"; };
+    var collect = function (ov) { tl.icon = ov.querySelector("#ti").value; tl.name = ov.querySelector("#tn").value; tl.category = ov.querySelector("#tc").value; tl.desc = ov.querySelector("#td").value; if (ov.querySelector("#tu")) tl.url = ov.querySelector("#tu").value; if (ov.querySelector("#tb")) tl.body = ov.querySelector("#tb").value; };
+    var ov = sheet(x.id ? "Edit tool" : "New tool", "Saved as a draft — test it, then release", [["💾", "Save draft", function (ov) { collect(ov); api({ action: "cust-save", item: { id: x.id, kind: "tool", tool: tl } }).then(function (r) { toast(r.ok ? "Saved as draft — open it with ▶ to test" : r.error); if (r.ok) { if (window.CUST) CUST.refresh(); load(); } }); }]].concat(x.id ? [["🗑️", "Delete tool (and its responses)", function () { api({ action: "cust-delete", id: x.id }).then(function () { toast("Deleted"); load(); }); }, "red"]] : []), '<div id="tbx">' + body() + "</div>");
+    ov.querySelector(".sheet").style.maxWidth = "640px";
+    var bind = function () { ov.querySelector("#tt").onchange = function () { collect(ov); tl.type = this.value; if (tl.type === "form" && !tl.fields.length) tl.fields.push({ label: "", type: "text", options: [] }); ov.querySelector("#tbx").innerHTML = body(); bind(); }; if (ov.querySelector("#tf")) fieldsEditor(ov.querySelector("#tf"), tl.fields, ov.querySelector("#taf")); };
+    bind();
+  }
+
+  // ================= ACCESS =================
+  function showAccess() {
+    hero("Studio · Access", "Turn any tool on or off for a role or for specific user IDs");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "mod-get" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var M = r.modules;
+      var draw = function () {
+        $("pane").innerHTML = '<div class="notice info" style="margin-top:6px">Masters always see everything. <b>State users</b> rule (all / pilot states / off) is set in Admin tools → Modules per state. Here you control <b>Admins</b> and <b>specific IDs</b> (allow or block), by hand or from Excel.</div>' +
+          '<div class="row" style="margin-top:8px"><button class="btn sec sm" id="xi">📥 Import Excel</button><button class="btn ghost sm" id="xt">⬇ Template</button><button class="btn ghost sm" id="xm">🗺️ State rules</button></div>' +
+          M.map(function (m, i) { return '<div class="card" style="margin-top:8px;padding:12px 14px"><div class="row" style="justify-content:space-between"><b>' + esc(m.name) + '</b><span class="muted" style="font-size:12px">State users: ' + (m.mode === "all" ? "all" : m.mode === "off" ? "off" : "pilot (" + m.states.length + ")") + '</span></div><div class="row" style="margin-top:8px;justify-content:space-between"><span style="font-size:13.5px">Admins can use it</span><button class="sw ' + (m.admin ? "on" : "") + '" data-ad="' + i + '"></button></div>' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><div class="muted" style="font-size:11.5px">Always allow (IDs)</div><textarea class="tx" data-al="' + i + '" rows="2">' + esc(m.allowUsers.join(", ")) + '</textarea></div><div><div class="muted" style="font-size:11.5px">Block (IDs)</div><textarea class="tx" data-dn="' + i + '" rows="2">' + esc(m.denyUsers.join(", ")) + "</textarea></div></div></div>"; }).join("") +
+          '<div style="position:sticky;bottom:10px;margin-top:12px"><button class="btn pri block" id="xs" style="padding:13px">Save access</button></div>';
+        [].forEach.call($("pane").querySelectorAll("[data-ad]"), function (b) { b.onclick = function () { var m = M[+b.dataset.ad]; m.admin = !m.admin; b.classList.toggle("on", m.admin); }; });
+        [].forEach.call($("pane").querySelectorAll("[data-al]"), function (t) { t.oninput = function () { M[+t.dataset.al].allowUsers = t.value.split(/[\s,;]+/).filter(Boolean); }; });
+        [].forEach.call($("pane").querySelectorAll("[data-dn]"), function (t) { t.oninput = function () { M[+t.dataset.dn].denyUsers = t.value.split(/[\s,;]+/).filter(Boolean); }; });
+        $("xs").onclick = function () { api({ action: "mod-set", modules: M }).then(function (x) { toast(x.ok ? "Access saved" : x.error); }); };
+        $("xm").onclick = function () { if (IN_APP && window.BIApp.openTool) return window.BIApp.openTool("admin-tools.html", "Admin tools", "#modules"); if (parent !== window) return parent.postMessage({ biOpen: { file: "admin-tools.html", hash: "#modules" } }, location.origin); location.href = "admin-tools.html#modules"; };
+        $("xt").onclick = function () { download(xlsx([{ name: "Access", rows: [["Module", "User ID", "Access"], ["Polls", "VC1001", "allow"], ["Market hygiene", "neha", "deny"], ["Quizzes & certificates", "ravi@vivo.com", "remove"]].concat([["", "", ""], ["Modules:", M.map(function (m) { return m.name; }).join(" | "), "allow / deny / remove"]]) }]), "Tool_access_template.xlsx"); };
+        $("xi").onclick = function () { readSheet(function (rows) {
+          var data = rows.slice(1).map(function (r) { return { module: r[0], user: r[1], access: r[2] }; }).filter(function (x) { return x.module && x.user && !/^modules:/i.test(x.module); });
+          api({ action: "mod-import", rows: data }).then(function (x) { toast(x.ok ? x.applied + " rules applied" + (x.skipped.length ? " · " + x.skipped.length + " rows skipped" : "") : x.error); showAccess(); });
+        }); };
+      };
+      draw();
+    });
+  }
+
+  // ================= MASTERS =================
+  function showMasters() {
+    hero("Studio · Masters", "Who else can customize and release");
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "master-users" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("pane").innerHTML = '<div class="notice info" style="margin-top:6px">Master admins log in with the <b>Master admin</b> tab using their normal admin user name and password. You can\'t remove yourself.</div>' +
+        r.admins.map(function (a) { return '<div class="mrow"><div><b>' + esc(a.fullName) + '</b> <span class="muted" style="font-size:12px">@' + esc(a.username) + (a.email ? " · " + esc(a.email) : "") + (a.disabled ? " · disabled" : "") + '</span></div><button class="sw ' + (a.master ? "on" : "") + '" data-u="' + esc(a.username) + '" data-m="' + (a.master ? 1 : 0) + '" title="Master admin"></button></div>'; }).join("") +
+        '<div class="card"><b>Grant master by user names</b><textarea class="tx" id="mu" rows="2" placeholder="user names, comma separated" style="margin-top:6px"></textarea><div class="row" style="margin-top:8px"><button class="btn pri sm" id="mg">Grant</button><button class="btn sec sm" id="mi">📥 From Excel</button></div></div>';
+      [].forEach.call($("pane").querySelectorAll("[data-u]"), function (b) { b.onclick = function () { var on = b.dataset.m !== "1"; api({ action: "master-set", target: b.dataset.u, master: on }).then(function (x) { toast(x.ok ? (x.updated ? (on ? "Master access given" : "Master access removed") : "No change (you can't remove yourself)") : x.error); showMasters(); }); }; });
+      var grant = function (names) { api({ action: "master-set", users: names.map(function (n) { return { username: n, master: true }; }) }).then(function (x) { toast(x.ok ? x.updated + " granted" + (x.notFound.length ? " · not found: " + x.notFound.join(", ") : "") : x.error); showMasters(); }); };
+      $("mg").onclick = function () { var n = $("mu").value.split(/[\s,;]+/).filter(Boolean); if (n.length) grant(n); };
+      $("mi").onclick = function () { readSheet(function (rows) { grant(rows.map(function (x) { return String(x[0] || "").trim(); }).filter(function (x) { return x && !/^(user|name)/i.test(x); })); }); };
+    });
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else load();
+})();
+</script>
+</body>
+</html>
