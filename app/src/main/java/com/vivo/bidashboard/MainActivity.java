@@ -1530,12 +1530,12 @@ public class MainActivity extends FragmentActivity {
         bar.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
         bar.addView(barButton("🔍", tr("search"), "openSearch"));
         bar.addView(barButton("💬", tr("assistant"), "openChat"));
-        bar.addView(badgeButton("✉️", tr("messages"), false, v -> showToolPage("chat.html", tr("messages"), "#list")));
-        bar.addView(badgeButton("📋", tr("surveys"), true, v -> showSurveyPage("#list")));
-        TextView visitBtn = barButton("📍", tr("market_visits"), "");
-        visitBtn.setOnClickListener(v -> showToolPage("visits.html", tr("market_visits"), "#list"));
-        bar.addView(visitBtn);
-        bar.addView(supportButton());
+        View tools = badgeButton("⊞", tr("all_tools"), false, v -> showHub());
+        toolsBadge = chatBadge; chatBadge = null;
+        GradientDrawable tg = new GradientDrawable(); tg.setColor(Color.parseColor("#EEF0FF")); tg.setCornerRadius(dp(12));
+        tools.setBackground(tg);
+        bar.addView(tools);
+        setBadge(toolsBadge, authPrefs().getInt("tools_badge", 0));
         topAvatar = new FrameLayout(this);
         topAvatar.setContentDescription(tr("profile"));
         topAvatar.setOnClickListener(v -> showProfile());
@@ -1798,26 +1798,9 @@ public class MainActivity extends FragmentActivity {
         head.addView(badge, blp);
         page.addView(head, hlp);
 
-        if (!STATE_APP) {
-            LinearLayout adm = card(page, tr("sec_admin"));
-            int pr = authPrefs().getInt("pwreq_pending", 0);
-            row(adm, "🪪", tr("vchat_directory"), "", v -> showToolPage("directory.html", tr("vchat_directory"), "#list"));
-            row(adm, "🛡️", tr("account_security"), pr > 0 ? trf("n_reset_requests", pr) : "", v -> showToolPage("security.html", tr("account_security"), "#list"));
-            row(adm, "👥", tr("registered_users"), "", v -> showUsers("state", ""));
-            row(adm, "📊", tr("access_insights"), "", v -> showAdminPage("logs"));
-            row(adm, "🎧", tr("support_report"), "", v -> showAdminPage("support"));
-        }
-
         LinearLayout help = card(page, tr("sec_tools"));
-        row(help, "📍", tr("market_visits"), STATE_APP ? tr("visits_sub_state") : tr("visits_sub_admin"), v -> showToolPage("visits.html", tr("market_visits"), "#list"));
-        row(help, "💳", tr("affordability"), tr("affordability_sub"), v -> showToolPage("affordability.html", tr("affordability"), "#list"));
-        row(help, "📚", tr("knowledge"), tr("knowledge_sub"), v -> showToolPage("knowledge.html", tr("knowledge"), "#list"));
-        row(help, "✉️", tr("messages"), "", v -> showToolPage("chat.html", tr("messages"), "#list"));
-        row(help, "🧩", tr("feature_matrix"), "", v -> showToolPage("matrix.html", tr("feature_matrix"), "#list"));
-        row(help, "📋", STATE_APP ? tr("surveys") : tr("survey_manager"), "", v -> showSurveyPage("#list"));
+        row(help, "⊞", tr("all_tools"), tr(STATE_APP ? "all_tools_sub" : "all_tools_sub_admin"), v -> showHub());
         row(help, "🔳", tr("scan_qr"), "", v -> scanWebLogin());
-        row(help, "🎧", tr("support_desk"), "", v -> showSupportList("all"));
-        row(help, "🧾", tr("payout_calc"), "", v -> { openDashboard(); openAssistant("openCalculator"); });
 
         LinearLayout acc = card(page, tr("sec_account"));
         row(acc, "👤", tr("edit_profile"), p.optString("email", ""), v -> showEditProfile());
@@ -2659,7 +2642,9 @@ public class MainActivity extends FragmentActivity {
     // ---------- Surveys (survey.html, shared with the web; admins build, state users answer) ----------
     private WebView surveyWeb;
     private boolean inSurveyPage = false;
-    private TextView surveyBadge, chatBadge;
+    private TextView surveyBadge, chatBadge, toolsBadge;
+    private String toolFile = null;
+    private boolean toolFromHub = false;
     private long lastNotify = 0;
 
     private class SurveyBridge {
@@ -2668,7 +2653,31 @@ public class MainActivity extends FragmentActivity {
 
         @JavascriptInterface
         public void surveysChanged() { ui.post(MainActivity.this::refreshNotify); }
+
+        // The All-tools hub opens other shared pages, or screens that are native in the app.
+        @JavascriptInterface
+        public void openTool(String file, String title, String hash) {
+            if (file == null || !file.matches("[a-z\\-]+\\.html")) return;
+            ui.post(() -> showToolPage(file, title == null ? "" : title, hash == null || hash.isEmpty() ? "#list" : hash));
+        }
+
+        @JavascriptInterface
+        public void nativeAction(String name) { ui.post(() -> doNative(name == null ? "" : name)); }
     }
+
+    private void doNative(String name) {
+        switch (name) {
+            case "support": showSupportList("all"); break;
+            case "scanqr": scanWebLogin(); break;
+            case "users": if (!STATE_APP) showUsers("state", ""); break;
+            case "logs": if (!STATE_APP) showAdminPage("logs"); break;
+            case "supportReport": if (!STATE_APP) showAdminPage("support"); break;
+            case "calculator": openDashboard(); openAssistant("openCalculator"); break;
+            default: break;
+        }
+    }
+
+    private void showHub() { showToolPage("hub.html", tr("all_tools"), "#list"); }
 
     private void showSurveyPage(String hash) { showToolPage("survey.html", STATE_APP ? tr("surveys") : tr("survey_manager"), hash); }
 
@@ -2706,6 +2715,8 @@ public class MainActivity extends FragmentActivity {
     // Shared web pages used by both apps and the website: survey.html, chat.html, matrix.html, visits.html, knowledge.html.
     private void showToolPage(String file, String title, String hash) {
         if (sessionToken() == null) return;
+        toolFromHub = inSurveyPage && "hub.html".equals(toolFile) && !"hub.html".equals(file);
+        toolFile = file;
         inProfile = true;
         unlocked = false;
         inAdminPage = false;
@@ -2775,6 +2786,8 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void closeSurveyPage() {
+        if (toolFromHub) { toolFromHub = false; showHub(); return; }
+        toolFile = null;
         inSurveyPage = false;
         openDashboard();
         refreshNotify();
@@ -2832,9 +2845,16 @@ public class MainActivity extends FragmentActivity {
             if (!STATE_APP && pr > authPrefs().getInt("pwreq_pending", 0) && unlocked)
                 Toast.makeText(this, "🛡️ " + trf("n_reset_requests", pr), Toast.LENGTH_LONG).show();
             authPrefs().edit().putInt("support_unread", su).putInt("survey_badge", n).putInt("chat_unread", cu).putInt("pwreq_pending", pr).apply();
+            JSONObject dp = res.optJSONObject("disputes");
+            int tot = su + n + cu + (dp == null ? 0 : dp.optInt("unread", 0) + dp.optInt("assigned", 0)) + (res.optInt("hygiene", 0) > 0 ? 1 : 0)
+                    + res.optInt("quizNew", 0) + res.optInt("pollNew", 0) + res.optInt("autorep", 0);
+            JSONObject mx0 = res.optJSONObject("matrix");
+            if (mx0 != null && mx0.optBoolean("pending")) tot++;
+            authPrefs().edit().putInt("tools_badge", tot).apply();
             setBadge(supportBadge, su);
             setBadge(surveyBadge, n);
             setBadge(chatBadge, cu);
+            setBadge(toolsBadge, tot);
             if (STATE_APP && unlocked) {
                 surveyPopup(sv.optJSONArray("surveys"), sv.optInt("pending", 0));
                 matrixPopup(res.optJSONObject("matrix"));
@@ -2909,6 +2929,12 @@ public class MainActivity extends FragmentActivity {
         else if (open.equals("chat")) showToolPage("chat.html", tr("messages"), "#list");
         else if (open.equals("matrix")) showToolPage("matrix.html", tr("feature_matrix"), "#list");
         else if (open.equals("visits")) showToolPage("visits.html", tr("market_visits"), "#list");
+        else if (open.equals("hub")) showHub();
+        else if (open.equals("disputes")) showToolPage("disputes.html", tr("disputes"), "#list");
+        else if (open.equals("hygiene")) showToolPage("hygiene.html", tr("hygiene"), "#list");
+        else if (open.equals("quiz")) showToolPage("engage.html", tr("quizzes"), "#quiz");
+        else if (open.equals("polls")) showToolPage("engage.html", tr("polls"), "#polls");
+        else if (open.equals("autoreports")) showToolPage("reports.html", tr("auto_reports"), "#auto");
         else if (open.equals("affordability")) showToolPage("affordability.html", tr("affordability"), "#list");
         else if (open.equals("knowledge")) showToolPage("knowledge.html", tr("knowledge"), "#list");
         else if (open.equals("security") && !STATE_APP) showToolPage("security.html", tr("account_security"), "#list");

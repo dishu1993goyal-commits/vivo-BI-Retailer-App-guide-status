@@ -139,6 +139,24 @@ public class NotifyWorker extends Worker {
             n.edit().putInt("pwreq", pr).apply();
             auth.edit().putInt("pwreq_pending", pr).apply();
         }
+        JSONObject dp = res.optJSONObject("disputes");
+        if (dp != null) {
+            int du = dp.optInt("unread") + dp.optInt("assigned");
+            if (du > n.getInt("disp", 0)) post(c, 1300, "⚖️ " + L.t(c, "disputes"), L.f(c, "notif_disp_msg", du), "disputes");
+            n.edit().putInt("disp", du).apply();
+        }
+        int hy = res.optInt("hygiene");
+        if (BuildConfig.STATE_APP && hy > n.getInt("hyg", 0)) post(c, 1200, "🧼 " + L.t(c, "hygiene"), L.f(c, "notif_hyg_msg", hy), "hygiene");
+        n.edit().putInt("hyg", hy).apply();
+        int qn = res.optInt("quizNew");
+        if (qn > n.getInt("quiz", 0)) post(c, 1100, "🎓 " + L.t(c, "quizzes"), L.t(c, "notif_quiz_msg"), "quiz");
+        n.edit().putInt("quiz", qn).apply();
+        int pn = res.optInt("pollNew");
+        if (pn > n.getInt("poll", 0)) post(c, 1000, "🗳️ " + L.t(c, "polls"), L.t(c, "notif_poll_msg"), "polls");
+        n.edit().putInt("poll", pn).apply();
+        int ar = res.optInt("autorep");
+        if (ar > 0 && n.getInt("autorep", 0) == 0) post(c, 950, "🗓️ " + L.t(c, "auto_reports"), L.t(c, "notif_autorep_msg"), "autoreports");
+        n.edit().putInt("autorep", ar).apply();
         int su = res.optInt("supportUnread");
         if (su > n.getInt("support", 0)) post(c, 1800, L.t(c, "support_desk"), L.f(c, "notif_support_msg", su), "support");
         n.edit().putInt("support", su).apply();
