@@ -104,7 +104,34 @@
         });
         if (Object.keys(amap).length) [].forEach.call(document.querySelectorAll("[placeholder],[title]"), function (el) { ["placeholder", "title"].forEach(function (a) { var key = "data-cx-o" + a, ov = el.getAttribute(key) || el.getAttribute(a); if (!ov) return; var o = amap[ov.trim()]; if (o && o.attr === a) { if (!el.getAttribute(key)) el.setAttribute(key, ov); if (el.getAttribute(a) !== o.value) el.setAttribute(a, o.value); } }); });
       }
+      applyAutoLists();
     } finally { applying = false; }
+  }
+  function autoKey(sel) { var k = sel.id || sel.getAttribute("name"); return k && !/^cx_/.test(k) ? "auto:" + PAGE + ":" + k : ""; }
+  function origOpts(sel) {
+    var o = sel.getAttribute("data-cx-orig");
+    if (o) try { return JSON.parse(o); } catch (e) { }
+    var list = [].map.call(sel.options, function (x) { return [x.textContent.trim(), x.value]; });
+    sel.setAttribute("data-cx-orig", JSON.stringify(list)); return list;
+  }
+  function applyAutoLists() {
+    var lists = DATA.items.filter(function (x) { return x.kind === "list" && String(x.listKey).indexOf("auto:" + PAGE + ":") === 0; });
+    if (!lists.length) return;
+    lists.forEach(function (l) {
+      var id = l.listKey.slice(("auto:" + PAGE + ":").length);
+      [].forEach.call(document.querySelectorAll("select"), function (sel) {
+        if (sel.hasAttribute("data-list") || (sel.id || sel.getAttribute("name")) !== id) return;
+        var orig = origOpts(sel), want = l.items, cur = [].map.call(sel.options, function (x) { return x.textContent.trim(); });
+        // keep a leading placeholder ("Choose…", "Select …") that the page added
+        var ph = orig.length && /^(choose|select|all\b|--)/i.test(orig[0][0]) && orig[0][1] === "" ? orig[0] : null;
+        var full = (ph ? [ph[0]] : []).concat(want);
+        if (cur.join("\n") === full.join("\n")) return;
+        var val = sel.value, vmap = {}; orig.forEach(function (o) { vmap[o[0]] = o[1]; });
+        sel.innerHTML = full.map(function (t, i) { var v = ph && i === 0 ? "" : (vmap[t] != null ? vmap[t] : t); return '<option value="' + esc(v) + '">' + esc(t) + "</option>"; }).join("");
+        if ([].some.call(sel.options, function (o) { return o.value === val; })) sel.value = val;
+        markDraft(sel, l.draft);
+      });
+    });
   }
   function markDraft(el, draft) { if (DATA.master && draft && el && el.style) el.style.boxShadow = "inset 0 -2px 0 #F5A623"; }
   var pend = 0;
@@ -138,7 +165,7 @@
     ".cx-panel{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;width:min(520px,94vw);max-height:80vh;overflow:auto;background:#fff;border-radius:18px;box-shadow:0 14px 40px rgba(0,0,0,.3);z-index:2147483100;padding:14px;font:14px Segoe UI,Arial;color:#1F2340}" +
     ".cx-panel h4{margin:0 0 8px;font-size:15px}.cx-panel input,.cx-panel textarea,.cx-panel select{width:100%;box-sizing:border-box;border:1px solid #D8DAE5;border-radius:10px;padding:9px 10px;font:14px inherit;margin-top:4px}" +
     ".cx-panel .r{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.cx-panel button{border:0;border-radius:10px;padding:9px 12px;font:700 13px inherit;cursor:pointer;background:#F1F2F8;color:#1F2340}.cx-panel .p{background:#4D5BF9;color:#fff}.cx-panel .g{background:#1E9E61;color:#fff}.cx-panel .d{background:#FDECEC;color:#B3402F}" +
-    ".cx-panel small{color:#6B7090;font-size:12px}.cx-add{display:block;width:100%;margin-top:10px;border:1.5px dashed #F5A623!important;background:#FFFBF2!important;color:#B26A00!important;border-radius:12px;padding:10px;font:700 13px Segoe UI,Arial;cursor:pointer}";
+    ".cx-panel small{color:#6B7090;font-size:12px}.cx-opt{margin-top:4px!important;padding:6px!important;font-size:12px!important}.cx-add{display:block;width:100%;margin-top:10px;border:1.5px dashed #F5A623!important;background:#FFFBF2!important;color:#B26A00!important;border-radius:12px;padding:10px;font:700 13px Segoe UI,Arial;cursor:pointer}";
   function masterUi() {
     if (document.querySelector(".cx-fab")) return;
     var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
@@ -152,8 +179,8 @@
   function setEdit(on) {
     EDIT = !!on; try { sessionStorage.setItem("cx-edit", EDIT ? "1" : "0"); } catch (e) { }
     var fab = document.querySelector(".cx-fab"); if (fab) { fab.classList.toggle("on", EDIT); fab.textContent = EDIT ? "✓ Done customizing" : "✏️ Customize"; }
-    if (EDIT) { bar = document.createElement("div"); bar.className = "cx-bar"; bar.textContent = "Customize mode · tap any text, dropdown or form · changes are drafts until released in Studio"; document.body.appendChild(bar); document.addEventListener("click", onClick, true); document.addEventListener("mouseover", onHover, true); addFieldButtons(); }
-    else { if (bar) bar.remove(); document.removeEventListener("click", onClick, true); document.removeEventListener("mouseover", onHover, true); if (hoverEl) hoverEl.classList.remove("cx-hl"); [].forEach.call(document.querySelectorAll(".cx-add"), function (x) { x.remove(); }); closePanel(); }
+    if (EDIT) { bar = document.createElement("div"); bar.className = "cx-bar"; bar.textContent = "Customize mode · tap any text, dropdown or form · changes are drafts until released in Studio"; document.body.appendChild(bar); document.addEventListener("click", onClick, true); document.addEventListener("mouseover", onHover, true); document.addEventListener("pointerdown", onDown, true); document.addEventListener("mousedown", onDown, true); document.addEventListener("touchstart", onDown, { capture: true, passive: false }); addFieldButtons(); }
+    else { if (bar) bar.remove(); document.removeEventListener("click", onClick, true); document.removeEventListener("mouseover", onHover, true); document.removeEventListener("pointerdown", onDown, true); document.removeEventListener("mousedown", onDown, true); document.removeEventListener("touchstart", onDown, { capture: true, passive: false }); [].forEach.call(document.querySelectorAll("[data-cx-ob]"), function (x) { x.removeAttribute("data-cx-ob"); }); if (hoverEl) hoverEl.classList.remove("cx-hl"); [].forEach.call(document.querySelectorAll(".cx-add"), function (x) { x.remove(); }); closePanel(); }
     [].forEach.call(document.querySelectorAll("[data-cx-hidden]"), function (el) { el.style.display = EDIT ? "" : "none"; el.style.opacity = EDIT ? ".35" : ""; el.style.outline = EDIT ? "2px dashed #E05757" : ""; });
   }
   function onHover(e) { var t = pickTarget(e.target); if (hoverEl && hoverEl !== t) hoverEl.classList.remove("cx-hl"); hoverEl = t; if (t) t.classList.add("cx-hl"); }
@@ -166,11 +193,30 @@
     var x = el; for (var i = 0; i < 4 && x; i++) { if (ownText(x)) return x; x = x.parentElement; }
     return null;
   }
+  function listTarget(el) {
+    if (!el || !el.closest || el.closest(".cx-panel,.cx-fab,.cx-bar,.cx-add")) return null;
+    var l = el.closest("[data-list]"); if (l) return l;
+    var sel = el.closest("select"); if (sel && autoKey(sel)) return sel;
+    return null;
+  }
+  var lastDown = 0;
+  function onDown(e) {
+    var t = listTarget(e.target); if (!t) return;
+    e.preventDefault(); e.stopPropagation();
+    if (Date.now() - lastDown < 600) return; lastDown = Date.now();
+    if (t.blur) try { t.blur(); } catch (x) { }
+    openList(t);
+  }
+  function openList(t) {
+    if (t.hasAttribute("data-list")) return listPanel(t.getAttribute("data-list"), t);
+    var o = origOpts(t), ph = o.length && /^(choose|select|all\b|--)/i.test(o[0][0]) && o[0][1] === "";
+    listPanel(autoKey(t), t, (ph ? o.slice(1) : o).map(function (x) { return x[0]; }));
+  }
   function onClick(e) {
     if (e.target.closest && (e.target.closest(".cx-panel") || e.target.closest(".cx-fab") || e.target.closest(".cx-add"))) return;
     e.preventDefault(); e.stopPropagation();
+    var lt = listTarget(e.target); if (lt) { if (Date.now() - lastDown > 600) { lastDown = Date.now(); openList(lt); } return; }
     var t = pickTarget(e.target); if (!t) return;
-    if (t.hasAttribute("data-list")) return listPanel(t.getAttribute("data-list"), t);
     textPanel(t);
   }
   var panel = null, selEl = null;
@@ -203,17 +249,30 @@
     if (pn.querySelector("#cxx")) pn.querySelector("#cxx").onclick = function () { api({ action: "cust-delete", id: existing.id }).then(function () { location.reload(); }); };
     pn.querySelector("#cxc").onclick = closePanel;
   }
-  function listPanel(key, el) {
-    var def = []; try { def = JSON.parse(el.getAttribute("data-list-default") || "[]"); } catch (e) { }
+  function listPanel(key, el, defs) {
+    var def = defs || []; if (!defs) try { def = JSON.parse(el.getAttribute("data-list-default") || "[]"); } catch (e) { }
     var cur = CUST.list(key, def), existing = DATA.items.find(function (x) { return x.kind === "list" && x.listKey === key; });
     selEl = el; el.classList.add("cx-sel");
     var pn = openPanel('<h4>📋 Dropdown options</h4><small>One option per line — add, remove, rename or reorder.</small><textarea id="cxl" rows="9">' + esc(cur.join("\n")) + '</textarea><div class="r"><button class="p" id="cxs">Save draft</button><button class="g" id="cxr">Save & release to all</button>' + (existing ? '<button class="d" id="cxx">Back to default</button>' : "") + '<button id="cxc">Cancel</button></div><small>Existing records keep their old values.</small>');
-    var doSave = function (rel) { var items = pn.querySelector("#cxl").value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean); if (!items.length) return toast("Add at least one option."); save({ id: existing ? existing.id : "", kind: "list", listKey: key, items: items, page: "*" }, rel).then(function () { if (typeof window.__custChanged === "function") window.__custChanged(); }); };
+    var doSave = function (rel) { var items = pn.querySelector("#cxl").value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean); if (!items.length) return toast("Add at least one option."); save({ id: existing ? existing.id : "", kind: "list", listKey: key, items: items, page: key.indexOf("auto:") === 0 ? PAGE : "*" }, rel).then(function (it) {
+      if (typeof window.__custChanged === "function") window.__custChanged();
+      // a form already open in a pop-up keeps its old options until it is opened again
+      if (it && key.indexOf("auto:") !== 0 && el.isConnected && el.tagName !== "SELECT") toast("Saved ✓ — close and reopen this form to see the new options");
+    }); };
     pn.querySelector("#cxs").onclick = function () { doSave(false); }; pn.querySelector("#cxr").onclick = function () { doSave(true); };
-    if (pn.querySelector("#cxx")) pn.querySelector("#cxx").onclick = function () { api({ action: "cust-delete", id: existing.id }).then(function () { refresh().then(function () { closePanel(); if (window.__custChanged) window.__custChanged(); }); }); };
+    if (pn.querySelector("#cxx")) pn.querySelector("#cxx").onclick = function () { api({ action: "cust-delete", id: existing.id }).then(function () { if (key.indexOf("auto:") === 0) return location.reload(); refresh().then(function () { closePanel(); if (window.__custChanged) window.__custChanged(); }); }); };
     pn.querySelector("#cxc").onclick = closePanel;
   }
   function addFieldButtons() {
+    [].forEach.call(document.querySelectorAll("[data-list],select"), function (el) {
+      if (el.hasAttribute("data-cx-ob") || el.closest(".cx-panel")) return;
+      if (el.tagName === "SELECT" && !el.hasAttribute("data-list") && !autoKey(el)) return;
+      if (el.tagName === "SELECT" && !el.hasAttribute("data-list") && el.parentElement && el.parentElement.closest("[data-list]")) return;
+      el.setAttribute("data-cx-ob", "1");
+      var b = document.createElement("button"); b.type = "button"; b.className = "cx-add cx-opt"; b.textContent = "📋 Edit options";
+      b.onclick = function (e) { e.preventDefault(); e.stopPropagation(); openList(el); };
+      el.insertAdjacentElement("afterend", b);
+    });
     [].forEach.call(document.querySelectorAll("[data-form]"), function (box) {
       box.style.display = "";
       if (box.querySelector(":scope > .cx-add")) return;
