@@ -94,6 +94,15 @@ final class L {
         put("photo_failed", "Couldn't use this photo. Please choose another.", "यह फ़ोटो इस्तेमाल नहीं हो सकी। दूसरी चुनें।");
         put("state_app", "State app", "स्टेट ऐप");
         put("admin_app", "Admin app", "एडमिन ऐप");
+        put("login_as_admin", "Admin", "एडमिन");
+        put("master_admin", "Master admin", "मास्टर एडमिन");
+        put("master_setup_title", "Become master admin", "मास्टर एडमिन बनें");
+        put("master_setup_msg", "This account isn't a master admin yet. The first master admin activates access once with the setup code. After that, masters add other masters in Studio → Masters.", "यह अकाउंट अभी मास्टर एडमिन नहीं है। पहला मास्टर एडमिन सेटअप कोड से एक बार एक्सेस चालू करता है। उसके बाद मास्टर, Studio → Masters में दूसरों को जोड़ते हैं।");
+        put("setup_code", "Setup code (VBI-MASTER-…)", "सेटअप कोड (VBI-MASTER-…)");
+        put("activate", "Activate", "चालू करें");
+        put("master_now", "You're now the master admin 👑", "अब आप मास्टर एडमिन हैं 👑");
+        put("studio", "Studio", "स्टूडियो");
+        put("studio_sub", "Customize, build tools, release, access", "बदलाव, नए टूल, रिलीज़, एक्सेस");
         put("sec_account", "Account", "अकाउंट");
         put("edit_profile", "Edit profile", "प्रोफ़ाइल बदलें");
         put("change_password", "Change password", "पासवर्ड बदलें");

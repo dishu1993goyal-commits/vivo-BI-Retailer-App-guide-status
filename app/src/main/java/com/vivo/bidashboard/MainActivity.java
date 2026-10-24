@@ -757,6 +757,33 @@ public class MainActivity extends FragmentActivity {
         inProfile = false;
         inLink = false;
         LinearLayout box = authHeader(STATE_APP ? tr("login_sub_vchat") : tr("login_sub"));
+        // Admin app: Admin | Master admin (same user name + password; master unlocks Studio + Customize)
+        final boolean[] asMaster = { !STATE_APP && authPrefs().getBoolean("login_master", false) };
+        if (!STATE_APP) {
+            LinearLayout seg = new LinearLayout(this);
+            seg.setOrientation(LinearLayout.HORIZONTAL);
+            TextView a1 = new TextView(this), a2 = new TextView(this);
+            a1.setText(tr("login_as_admin")); a2.setText("👑 " + tr("master_admin"));
+            Runnable paint = () -> {
+                for (int i = 0; i < 2; i++) {
+                    TextView t = i == 0 ? a1 : a2; boolean on = (i == 1) == asMaster[0];
+                    GradientDrawable g = new GradientDrawable(); g.setCornerRadius(dp(99));
+                    g.setColor(on ? BRAND : Color.WHITE); g.setStroke(dp(1), on ? BRAND : Color.parseColor("#D8DAE5"));
+                    t.setBackground(g); t.setTextColor(on ? Color.WHITE : Color.parseColor("#333333"));
+                }
+            };
+            for (int i = 0; i < 2; i++) {
+                TextView t = i == 0 ? a1 : a2; final boolean m = i == 1;
+                t.setGravity(Gravity.CENTER); t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14); t.setTypeface(Typeface.DEFAULT_BOLD);
+                t.setPadding(dp(6), dp(10), dp(6), dp(10));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1); if (i == 1) lp.leftMargin = dp(8);
+                seg.addView(t, lp);
+                t.setOnClickListener(v -> { asMaster[0] = m; authPrefs().edit().putBoolean("login_master", m).apply(); paint.run(); });
+            }
+            paint.run();
+            LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, -2); sp.topMargin = dp(6); sp.bottomMargin = dp(4);
+            box.addView(seg, sp);
+        }
         EditText user = authField(STATE_APP ? tr("vchat_id") : tr("username"), TEXT_PLAIN, 40);
         user.setText(STATE_APP ? authPrefs().getString("last_vchat", "") : lastUsername());
         addField(box, user);
@@ -779,8 +806,15 @@ public class MainActivity extends FragmentActivity {
             if (u.isEmpty() || p.isEmpty()) { setStatus(STATE_APP ? tr("enter_vchat_pass") : tr("enter_user_pass"), true); return; }
             hideKeyboard(pass);
             busy(login, tr("logging_in"));
-            callAuth(STATE_APP ? obj("action", "login", "username", u, "vchatId", u, "password", p) : obj("action", "login", "username", u, "password", p), (ok, res, err) -> {
+            JSONObject lb = STATE_APP ? obj("action", "login", "username", u, "vchatId", u, "password", p) : obj("action", "login", "username", u, "password", p);
+            if (asMaster[0]) { try { lb.put("loginAs", "master"); } catch (Exception ignored) { } }
+            callAuth(lb, (ok, res, err) -> {
                 busy(login, null);
+                if (!ok && res.optBoolean("notMaster", false) && res.optBoolean("canClaim", false)) {
+                    setStatus(err, true);
+                    askMasterClaim(u, p, login);
+                    return;
+                }
                 if (ok) {
                     saveSession(res);
                     authPrefs().edit().remove("pwreq_id").remove("pwreq_user").apply();
@@ -803,6 +837,32 @@ public class MainActivity extends FragmentActivity {
         pass.setImeOptions(EditorInfo.IME_ACTION_DONE);
         pass.setOnEditorActionListener((v, a, e) -> { doLogin.run(); return true; });
         showScreen(box, user.getText().length() > 0 ? pass : user);
+    }
+
+    // First master admin: one-time setup code (later masters are promoted in Studio → Masters)
+    private void askMasterClaim(String u, String p, Button login) {
+        EditText code = new EditText(this);
+        code.setHint(tr("setup_code"));
+        code.setSingleLine(true);
+        code.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        LinearLayout wrap = new LinearLayout(this); wrap.setPadding(dp(20), dp(4), dp(20), 0); wrap.addView(code, new LinearLayout.LayoutParams(-1, -2));
+        new AlertDialog.Builder(this)
+                .setTitle("👑 " + tr("master_setup_title"))
+                .setMessage(tr("master_setup_msg"))
+                .setView(wrap)
+                .setNegativeButton(tr("cancel"), null)
+                .setPositiveButton(tr("activate"), (d, w) -> {
+                    busy(login, tr("logging_in"));
+                    callAuth(obj("action", "master-claim", "username", u, "password", p, "code", code.getText().toString().trim()), (ok, res, err) -> {
+                        busy(login, null);
+                        if (!ok) { setStatus(err, true); return; }
+                        saveSession(res);
+                        Toast.makeText(this, tr("master_now"), Toast.LENGTH_LONG).show();
+                        openDashboard();
+                        refreshSupportBadge();
+                    });
+                })
+                .show();
     }
 
     // ---------- Sign up: profile + password, mobile verified once with Truecaller ----------
@@ -1783,6 +1843,7 @@ public class MainActivity extends FragmentActivity {
         head.addView(un);
         TextView badge = new TextView(this);
         String sub = tr(STATE_APP ? "state_app" : "admin_app");
+        if (p.optBoolean("master", false)) sub = "👑 " + tr("master_admin");
         if (!p.optString("designation").isEmpty()) sub = p.optString("designation") + "  ·  " + sub;
         if (!p.optString("state").isEmpty()) sub = sub + "  ·  " + p.optString("state");
         badge.setText(sub);
@@ -1800,6 +1861,7 @@ public class MainActivity extends FragmentActivity {
 
         LinearLayout help = card(page, tr("sec_tools"));
         row(help, "⊞", tr("all_tools"), tr(STATE_APP ? "all_tools_sub" : "all_tools_sub_admin"), v -> showHub());
+        if (p.optBoolean("master", false)) row(help, "🧩", tr("studio"), tr("studio_sub"), v -> showToolPage("studio.html", tr("studio"), "#list"));
         row(help, "🔳", tr("scan_qr"), "", v -> scanWebLogin());
 
         LinearLayout acc = card(page, tr("sec_account"));
@@ -2675,6 +2737,16 @@ public class MainActivity extends FragmentActivity {
             case "calculator": openDashboard(); openAssistant("openCalculator"); break;
             default: break;
         }
+    }
+
+    // Master-admin customizations (renamed / hidden labels) also apply on the dashboard screen
+    private String custLoaderJs() {
+        String u = sessionUser(), t = sessionToken();
+        if (u == null || t == null || t.isEmpty()) return "void 0";
+        try {
+            JSONObject a = new JSONObject().put("app", APP_ID).put("username", u).put("token", t);
+            return "(function(){if(window.CUST||!/^https:/.test(location.protocol))return;window.__BI_AUTH=" + a + ";window.CUST_PAGE='dashboard';var s=document.createElement('script');s.src='/cust.js?v=61';document.head.appendChild(s);})()";
+        } catch (Exception e) { return "void 0"; }
     }
 
     private void showHub() { showToolPage("hub.html", tr("all_tools"), "#list"); }
@@ -3783,6 +3855,7 @@ public class MainActivity extends FragmentActivity {
                 super.onPageFinished(view, url);
                 if (STATE_APP) view.evaluateJavascript(stateLockScript(), null);
                 view.evaluateJavascript(DOWNLOAD_HOOK_JS, null);
+                view.evaluateJavascript(custLoaderJs(), null);
             }
 
             @Override
