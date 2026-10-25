@@ -15,6 +15,17 @@ import { inviteAdminAction, INVITE_DAYS } from "./invite-core.mjs";
 import { toolsAction } from "./tools-core.mjs";
 import { schemeCalcAction } from "./schemecalc-core.mjs";
 import { mailerAction } from "./mailer-core.mjs";
+const THEME_IDS = ["signature", "classic", "aurora", "emerald", "royal", "sunrise", "midnight"];
+export function cleanTheme(c) {
+  c = c && typeof c === "object" ? c : {};
+  const hex = (v) => (/^#[0-9a-f]{6}$/i.test(String(v || "")) ? String(v).toUpperCase() : undefined);
+  const on = (Array.isArray(c.on) ? c.on : []).filter((x, i, a) => THEME_IDS.includes(x) && a.indexOf(x) === i);
+  const def = THEME_IDS.includes(c.def) ? c.def : "";
+  if (def && on.length && !on.includes(def)) on.push(def);
+  const custom = {};
+  Object.entries(c.custom && typeof c.custom === "object" ? c.custom : {}).forEach(([k, v]) => { if (!THEME_IDS.includes(k) || !v) return; const o = { accent: hex(v.accent), deep: hex(v.deep), tint: hex(v.tint) }; Object.keys(o).forEach((x) => o[x] === undefined && delete o[x]); if (Object.keys(o).length) custom[k] = o; });
+  return { def, on: on.length ? on : THEME_IDS.slice(), allowUser: c.allowUser !== false, auto: c.auto !== false, defAuto: !!c.defAuto, custom, by: c.by ? String(c.by).slice(0, 60) : undefined, at: Number(c.at) || undefined };
+}
 import { masterAction, MASTER_SETUP_SHA256, roleOf } from "./master-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
@@ -458,6 +469,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const app = b.app === "admin" ? "admin" : b.app === "state" ? "state" : null;
   if (!app) return json(400, { ok: false, error: "Unknown app" });
   const t = now();
+  // Theme chosen by HO for everyone (public: the login screen is themed too)
+  if (b.action === "theme-get") return json(200, { ok: true, theme: cleanTheme(await store.get("config:theme")) });
   const uKeyOf = (k) => `user:${app}:${k}`;
   const pKeyOf = (p) => `phone:${app}:${p}`;
   const eKeyOf = (e) => `email:${app}:${e}`;
@@ -836,7 +849,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -941,6 +954,13 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("tl-")) return toolsAction(b, surveyCtx());
     if (b.action.startsWith("sc-")) return schemeCalcAction(b, surveyCtx());
     if (b.action.startsWith("ml-")) return mailerAction(b, Object.assign(surveyCtx(), { mailFetch }));
+    if (b.action === "theme-set") {
+      if (app !== "admin") return json(403, { ok: false, error: "Only HO admins set the theme for everyone." });
+      const th = Object.assign(cleanTheme(b.theme), { by: rec.fullName || rec.username, at: t });
+      await store.set("config:theme", th);
+      await logEvent(store, t, app, rec, "theme-set", { device: th.def || "original", ver: "" });
+      return json(200, { ok: true, theme: th });
+    }
     if (b.action.startsWith("inv-")) return inviteAdminAction(b, Object.assign(surveyCtx(), { normalizePhone, normEmail, vKey, mailFetch }));
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());

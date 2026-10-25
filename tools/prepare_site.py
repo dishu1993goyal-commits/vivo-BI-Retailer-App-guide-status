@@ -18,6 +18,7 @@ HEAD = ('<script id="biw-gate">(function(){var u=navigator.userAgent;if(/; wv\\)
         '<style id="biw-gate-css">html.biw-locked body>*:not(#biw-root){visibility:hidden!important}'
         'html.biw-locked body{background:#0b0b0c}</style>')
 TAIL = '<script id="biw-loader" src="/web.js" defer></script>'
+THEME = '<script id="biw-theme-js" src="/theme.js?v=1"></script>'
 # Voice notes in the Android apps: the in-app browser has no speech recognition, so the apps provide window.BISpeech
 # and this turns it into the standard window.webkitSpeechRecognition before the smart tools load.
 SPEECH = ('<script id="biw-speech">(function(){if(!window.BISpeech)return;var cur=null;'
@@ -32,12 +33,13 @@ SPEECH = ('<script id="biw-speech">(function(){if(!window.BISpeech)return;var cu
 def add_web_layer(html):
     html = re.sub(r'<script id="biw-gate">.*?</script><style id="biw-gate-css">.*?</style>', "", html, flags=re.S)
     html = re.sub(r'<script id="biw-speech">.*?</script>', "", html, flags=re.S)
+    html = re.sub(r'<script id="biw-theme-js"[^>]*></script>', "", html)
     html = html.replace(TAIL, "")
     i = html.find("</head>")   # first </head> is the real one (scripts later contain the text)
     j = html.rfind("</body>")  # last </body> is the real one
     if i < 0 or j < 0 or i > j:
         sys.exit("Couldn't find </head> / </body> in index.html")
-    html = html[:i] + HEAD + SPEECH + html[i:]
+    html = html[:i] + HEAD + SPEECH + THEME + html[i:]
     j = html.rfind("</body>")
     return html[:j] + TAIL + html[j:]
 seen = {}
