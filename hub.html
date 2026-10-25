@@ -406,12 +406,13 @@ td.n,th.n{text-align:right;white-space:nowrap}
       ["visits", "📍", "Market visits", "visits", "t:visits.html"], ["affordability", "💳", "Affordability", "affordability", "t:affordability.html"], ["hygiene", "🧼", "Market hygiene", "hygiene", "t:hygiene.html", function () { return N.hygiene; }]] },
     { id: "reports", icon: "📊", name: "Reports & insights", sub: "Numbers", col: "#EEF0FF", items: [
       ["reports", "📑", "Report builder", "reports", "t:reports.html#build"], ["autoreports", "🗓️", "Auto-reports", "autoreports", "t:reports.html#auto", function () { return N.autorep; }],
-      ["leaderboard", "🏆", "Leaderboard", "leaderboard", "t:engage.html#board"], ["matrix", "🧩", "Feature usability", "matrix", "t:matrix.html", function () { return N.matrix; }]] },
+      ["leaderboard", "🏆", "Leaderboard", "leaderboard", "t:engage.html#board"], ["matrix", "🧩", "Feature usability", "matrix", "t:matrix.html", function () { return N.matrix; }],
+      ["mailer", "📧", "Email reports to states", null, "t:mailer.html#compose", null, "admin"], ["hoinbox", "📬", "Reports from HO", null, "t:mailer.html#inbox", function () { return N.hoReports; }, "state"]] },
     { id: "engage", icon: "💬", name: "Engage", sub: "Team", col: "#F4EEFF", items: [
       ["quiz", "🎓", "Quizzes", "quiz", "t:engage.html#quiz", function () { return N.quizNew; }], ["polls", "🗳️", "Polls", "polls", "t:engage.html#polls", function () { return N.pollNew; }],
       ["wall", "💡", "Best practices", "wall", "t:engage.html#wall"], ["surveys", "📋", "Surveys", "surveys", "t:survey.html", function () { return N.surveys; }], ["chat", "✉️", "Messages", "chat", "t:chat.html", function () { return N.chat; }]] },
     { id: "learn", icon: "📚", name: "Learn & help", sub: "Answers", col: "#FFF4E5", items: [
-      ["help", "❓", "FAQ & Ask AI", "help", "t:help.html#faq"], ["flows", "🔀", "Processes", "flows", "t:help.html#flows"], ["contacts", "☎️", "Escalation contacts", "contacts", "t:help.html#contacts"],
+      ["guide", "📘", "Guide & manual", null, "t:guide.html"], ["help", "❓", "FAQ & Ask AI", "help", "t:help.html#faq"], ["flows", "🔀", "Processes", "flows", "t:help.html#flows"], ["contacts", "☎️", "Escalation contacts", "contacts", "t:help.html#contacts"],
       ["knowledge", "📖", "Knowledge", "knowledge", "t:knowledge.html"], ["schemes", "🧾", "Schemes & calculator", "schemes", "t:schemes.html"], ["schemecalc", "🧮", "Scheme payout calculator", null, "t:schemecalc.html"]] },
     { id: "support", icon: "🎧", name: "Support", sub: "Get help", col: "#FDECEC", items: [
       ["disputes", "⚖️", "Disputes", "disputes", "t:disputes.html", function () { return (N.disputes || {}).unread + (N.disputes || {}).assigned; }], ["support", "🎧", "Support desk", "support", "n:support", function () { return N.supportUnread; }],
@@ -419,11 +420,12 @@ td.n,th.n{text-align:right;white-space:nowrap}
     { id: "admin", icon: "🛡️", name: "Admin", sub: "HO only", col: "#E8F6FB", admin: true, items: [
       ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
       ["directory", "🪪", "vChat directory", null, "t:directory.html"], ["security", "🛡️", "Account security", null, "t:security.html", function () { return N.pwreq; }], ["insights", "📈", "Access insights", null, "n:logs"],
-      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
+      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["config", "⚙️", "Configuration centre", null, "t:config.html"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
     { id: "smart", icon: "✨", name: "Smart tools", sub: "Less manual work", col: "#FFF1E6", items: [
       ["tlv", "🎙️", "Voice notes", null, "n:dash:tool-voice-notes"], ["tlp", "📸", "Photo audit", null, "n:dash:tool-photo-audit"], ["tlb", "🧭", "Smart beat planner", null, "n:dash:tool-beat-planner"],
       ["tls", "📤", "Share a KPI card", null, "n:dash:tool-share-card"], ["tlr", "🔀", "Auto-reconciliation", null, "n:dash:tool-reconciliation"], ["tli", "📈", "Excel to insight", null, "n:dash:tool-excel-insight"],
-      ["tld", "💡", "Idea box", null, "n:dash:tool-idea-box"], ["tlk", "🧮", "Custom KPI builder", null, "n:dash:tool-kpi-builder"], ["fnotes", "🗂️", "Team notes & audits", null, "t:fieldnotes.html"], ["tact", "📊", "Smart tools activity", null, "t:toolactivity.html", null, "admin"]] },
+      ["tld", "💡", "Idea box", null, "n:dash:tool-idea-box"], ["tlk", "🧮", "Custom KPI builder", null, "n:dash:tool-kpi-builder"], ["hygcheck", "🔎", "IMEI hygiene check", null, "t:hygcheck.html"], ["sheetjoin", "🔗", "Sheet joiner", null, "t:sheetjoin.html"], ["targetsplit", "🎯", "Target splitter", null, "t:targetsplit.html"],
+      ["fnotes", "🗂️", "Team notes & audits", null, "t:fieldnotes.html"], ["tact", "📊", "Smart tools activity", null, "t:toolactivity.html", null, "admin"]] },
     { id: "more", icon: "🧰", name: "More tools", sub: "Custom", col: "#F1F2F6", items: [] }
   ];
   // custom tools made by master admins (shown in the category they chose)
@@ -454,6 +456,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     if (it[6] === "app" && !IN_APP) return false;
     if (it[6] === "master" && !(window.CUST && CUST.master)) return false;
     if (it[6] === "admin" && !ADMIN) return false;
+    if (it[6] === "state" && ADMIN) return false;
     if (cat.admin && !ADMIN) return false;
     if (it[3] && MODS && MODS[it[3]] === false) return false;
     return true;
@@ -485,7 +488,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       if (r.ok) {
         MODS = r.modules || null;
         N = { hygiene: r.hygiene, autorep: r.autorep, quizNew: r.quizNew, pollNew: r.pollNew, disputes: r.disputes || {}, supportUnread: r.supportUnread, pwreq: r.pwreq,
-          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0 };
+          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports };
       }
       api({ action: "me" }).then(function (m) {
         var p = (m && m.profile) || {};
@@ -497,7 +500,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   window.__custChanged = function () { if (!Q) draw(); };
   window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
-  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; if (!Q) draw(); } }); });
+  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; N.hoReports = r.hoReports; if (!Q) draw(); } }); });
   load();
 })();
 </script>

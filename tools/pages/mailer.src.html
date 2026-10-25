@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Email reports</title>
+<script src="kpi-data.js?v=3"></script>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.cbx{display:flex;gap:8px;align-items:center;font-size:13.5px;margin-top:8px;cursor:pointer}
+.types{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.types button{border:1.5px solid #E1E4F2;background:var(--card);border-radius:14px;padding:12px;text-align:left;cursor:pointer;font:inherit}
+.types button b{display:block;font-size:14px}.types button small{color:var(--mut);font-size:12px}
+.types button.on{border-color:var(--brand);background:#F4F5FF}
+.chs9{display:flex;flex-wrap:wrap;gap:6px}
+.chs9 span{border:1px solid #DDE0EF;border-radius:99px;padding:5px 10px;font-size:12.5px;cursor:pointer;background:var(--card)}
+.chs9 span.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.chs9 span i{font-style:normal;opacity:.7;font-size:11px;margin-left:3px}
+.pt{width:100%;border-collapse:collapse;font-size:12.5px}
+.pt th{background:#F3F4FA;text-align:left;padding:6px;font-size:11px;color:var(--mut)}
+.pt td{border-top:1px solid #EEF0F6;padding:4px}.pt input,.pt textarea{width:100%;border:1px solid #E1E4F2;border-radius:7px;padding:5px;font:inherit;font-size:12.5px;box-sizing:border-box}
+.prevf{width:100%;height:560px;border:1px solid #E1E4F2;border-radius:12px;background:#fff;margin-top:8px}
+.step2{display:flex;gap:8px;align-items:center;font-weight:800;font-size:14.5px;margin:0 0 8px}.step2 i{font-style:normal;background:var(--brand);color:#fff;border-radius:99px;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+.it2{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 1px 8px rgba(20,24,51,.06);cursor:pointer}
+.it2 b{font-size:14.5px}.it2 .m{font-size:12px;color:var(--mut);margin-top:4px}
+.warnb{background:#FFF4E5;color:#8A5300;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}
+.okb{background:#E6F4EA;color:#0F6B43;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#mailer">📘 How to</a></div>
+  <h1 id="h1">Email reports</h1><p id="h2">Rankings, growth and action plans — pushed to states</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = /sent/.test(location.hash) ? "sent" : /inbox/.test(location.hash) || !ADMIN ? "inbox" : "compose";
+  var DATA = null, CFG = null, RCP = null, ME = { state: "" };
+  var F = ls("ml-form") || {};
+  var KP = [["score", "Score"], ["app", "Retailer App"], ["sales", "Sales"], ["visit", "Visit efficiency"], ["comp", "Competition / SD"], ["vnotice", "v-Notice"], ["new", "New implementation"]];
+  var KL = {}; KP.forEach(function (k) { KL[k[0]] = k[1]; });
+  var D = function () { F = Object.assign({ type: "ranking", kpis: ["score", "app", "sales", "visit", "comp", "vnotice"], states: [], lists: [], extra: "", ccMe: true, useCc: true, attach: true, stateUsers: true, top: 3, sortG: "rank", plans: {} }, F); };
+  D();
+  function save() { var c = Object.assign({}, F); delete c.custom; ls("ml-form", c); }
+  var pc = function (v) { return v == null || v === "" || isNaN(v) ? "—" : (Math.round(v * 1000) / 10) + "%"; };
+  var r1 = function (v) { return v == null || isNaN(v) ? "—" : String(Math.round(v * 10) / 10); };
+  function th() { return (CFG && CFG.thresholds) || { good: 80, warn: 50 }; }
+  function col(v) { var t = th(); if (v == null || isNaN(v)) return "#555"; var p = v * 100; return p >= t.good ? "#0F7B4F" : p >= t.warn ? "#A86400" : "#C62828"; }
+
+  // ---------------- data ----------------
+  function periods() {
+    var ms = DATA.months ? DATA.months() : null, out = [];
+    if (!ms) { var f = DATA.span.f.slice(0, 7), tt = DATA.span.t.slice(0, 7); ms = []; var y = +f.slice(0, 4), m = +f.slice(5, 7); while ((y + "-" + String(m).padStart(2, "0")) <= tt) { ms.push(y + "-" + String(m).padStart(2, "0")); m++; if (m > 12) { m = 1; y++; } } }
+    var ld = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0"); };
+    var lab = function (m) { try { return DATA.KE.monthLabel ? DATA.KE.monthLabel(m) : m; } catch (e) { return m; } };
+    ms.slice().reverse().forEach(function (m) { out.push({ v: m + "-01|" + ld(m), l: lab(m) + (m === DATA.span.t.slice(0, 7) ? " (to date)" : "") }); });
+    var qs = {}; ms.forEach(function (m) { var q = m.slice(0, 4) + " Q" + (Math.floor((+m.slice(5, 7) - 1) / 3) + 1); (qs[q] = qs[q] || []).push(m); });
+    Object.keys(qs).sort().reverse().forEach(function (q) { var l = qs[q]; out.push({ v: l[0] + "-01|" + ld(l[l.length - 1]), l: q + " (" + l.length + " month" + (l.length > 1 ? "s" : "") + ")" }); });
+    return out;
+  }
+  function score(pv) {
+    var p = String(pv || "").split("|"); if (p.length < 2) return [];
+    var sp = DATA.KE.scorePeriod(DATA.RAW, DATA.SETUP, p[0], p[1], "Total");
+    return (sp.kpi_state || []).filter(function (r) { return r.code !== "PAN" && r.state !== "Total" && r.state; }).sort(function (a, b) { return (a.rank || 99) - (b.rank || 99); });
+  }
+  function panRow(pv) { var p = String(pv || "").split("|"); var sp = DATA.KE.scorePeriod(DATA.RAW, DATA.SETUP, p[0], p[1], "Total"); return (sp.kpi_state || []).find(function (r) { return r.code === "PAN" || r.state === "Total"; }); }
+  function plabel(pv) { var o = periods().find(function (x) { return x.v === pv; }); return o ? o.l : String(pv || "").replace("|", " to "); }
+  function selStates() { return F.states.length ? F.states : DATA.states.slice(); }
+
+  // ---------------- email HTML ----------------
+  var E = { tb: 'style="border-collapse:collapse;width:100%;font:13px Arial,sans-serif"', th: 'style="background:#4D5BF9;color:#fff;padding:7px 8px;text-align:left;font-size:12px"', td: 'style="padding:6px 8px;border-bottom:1px solid #E6E8F2"' };
+  function e(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function doc(title, sub, inner) {
+    return '<div style="max-width:760px;margin:0 auto;font:14px/1.5 Arial,sans-serif;color:#1F2340">' +
+      '<div style="background:linear-gradient(135deg,#4D5BF9,#7B4DF9);background-color:#4D5BF9;color:#fff;padding:18px 20px;border-radius:12px 12px 0 0"><div style="font-size:12px;opacity:.85">vivo Business Innovation</div><div style="font-size:20px;font-weight:bold;margin-top:2px">' + e(title) + '</div><div style="font-size:13px;opacity:.9">' + e(sub) + "</div></div>" +
+      '<div style="background:#fff;border:1px solid #E6E8F2;border-top:0;padding:16px 18px;border-radius:0 0 12px 12px">' + (F.intro ? '<p style="white-space:pre-line;margin:0 0 12px">' + e(F.intro) + "</p>" : "") + inner +
+      '<p style="font-size:12px;color:#777;margin:16px 0 0">Open the <a href="' + e(location.origin + "/") + '" style="color:#4D5BF9">BI dashboard</a> or the BI app for the live numbers.</p></div></div>';
+  }
+  function cell(v, isPct, bold) { return "<td " + E.td.replace('"', '"' + (isPct ? "color:" + col(v) + ";" : "") + (bold ? "font-weight:bold;" : "")) + ">" + (isPct ? pc(v) : e(v)) + "</td>"; }
+  function rankingTable(rows, hi) {
+    var ks = F.kpis.filter(function (k) { return k !== "score"; }), n = rows.length, top = +F.top || 0;
+    return "<table " + E.tb + "><tr><th " + E.th + ">#</th><th " + E.th + ">State</th>" + (F.kpis.indexOf("score") >= 0 ? "<th " + E.th + ">Score</th>" : "") + ks.map(function (k) { return "<th " + E.th + ">" + e(KL[k]) + "</th>"; }).join("") + "</tr>" +
+      rows.map(function (r, i) {
+        var bg = r.state === hi ? "background:#FFF4CC;" : i < top ? "background:#EEF9F1;" : i >= n - top && top ? "background:#FDF0F0;" : "";
+        return '<tr style="' + bg + '">' + "<td " + E.td + "><b>" + (r.rank || i + 1) + "</b></td><td " + E.td + ">" + (r.state === hi ? "<b>" + e(r.state) + " ◀</b>" : e(r.state)) + "</td>" + (F.kpis.indexOf("score") >= 0 ? cell(r1(r.score), false, true) : "") + ks.map(function (k) { return cell(r[k], true); }).join("") + "</tr>";
+      }).join("") + "</table>" + (top ? '<p style="font-size:11.5px;color:#777;margin:6px 0 0">Green rows: top ' + top + " · red rows: bottom " + top + " · colours: ≥" + th().good + "% good, ≥" + th().warn + "% watch, below needs action</p>" : "");
+  }
+  function stateLine(r, n) {
+    if (!r) return "";
+    var ks = F.kpis.filter(function (k) { return k !== "score" && r[k] != null; }).sort(function (a, b) { return r[b] - r[a]; });
+    return '<div style="background:#F4F5FF;border-radius:10px;padding:10px 12px;margin:0 0 12px"><b>' + e(r.state) + "</b> is ranked <b>#" + r.rank + "</b> of " + n + " with a score of <b>" + r1(r.score) + "</b>." +
+      (ks.length ? " Strongest: <b>" + e(KL[ks[0]]) + " " + pc(r[ks[0]]) + "</b>." + (ks.length > 1 ? " Needs most work: <b style=\"color:#C62828\">" + e(KL[ks[ks.length - 1]]) + " " + pc(r[ks[ks.length - 1]]) + "</b>." : "") : "") + "</div>";
+  }
+  function build() {   // → { perState:{}, common, sheet:[rows], title }
+    var out = { perState: {}, common: "", sheet: null, title: "" }, sts = selStates();
+    if (F.type === "ranking") {
+      var rows = score(F.pa), pv = plabel(F.pa); if (!rows.length) throw new Error("No KPI data for this period.");
+      out.title = "State ranking — " + pv;
+      sts.forEach(function (s) { out.perState[s] = doc(out.title, "Your state: " + s, stateLine(rows.find(function (r) { return r.state === s; }), rows.length) + rankingTable(rows, s)); });
+      out.common = doc(out.title, "All states", rankingTable(rows, ""));
+      out.sheet = [["Rank", "State"].concat(F.kpis.map(function (k) { return KL[k] + (k === "score" ? "" : " %"); }))].concat(rows.map(function (r) { return [r.rank, r.state].concat(F.kpis.map(function (k) { return k === "score" ? +r1(r.score) : r[k] == null ? "" : Math.round(r[k] * 1000) / 10; })); }));
+    } else if (F.type === "growth") {
+      var A = score(F.pa), B = score(F.pb); if (!A.length || !B.length) throw new Error("No KPI data for one of the periods.");
+      var bm = {}; B.forEach(function (r) { bm[r.state] = r; });
+      var ks = F.kpis.filter(function (k) { return k !== "score"; });
+      var g = A.map(function (r) { var o = bm[r.state] || {}; return { r: r, o: o, mv: o.rank ? o.rank - r.rank : 0, ds: o.score != null ? r.score - o.score : null }; });
+      if (F.sortG === "growth") g.sort(function (x, y) { return (y.ds || -999) - (x.ds || -999); });
+      var la = plabel(F.pa), lb = plabel(F.pb);
+      out.title = "Growth comparison — " + la + " vs " + lb;
+      var dl = function (v, pp) { if (v == null || isNaN(v)) return '<span style="color:#777">—</span>'; var x = Math.round(v * (pp ? 1000 : 10)) / 10; return '<span style="color:' + (x > 0 ? "#0F7B4F" : x < 0 ? "#C62828" : "#777") + ';font-weight:bold">' + (x > 0 ? "▲ +" : x < 0 ? "▼ " : "") + x + (pp ? " pp" : "") + "</span>"; };
+      var table = function (hi) {
+        return "<table " + E.tb + "><tr><th " + E.th + ">State</th><th " + E.th + ">Rank</th><th " + E.th + ">Move</th><th " + E.th + ">Score</th><th " + E.th + ">Δ score</th>" + ks.map(function (k) { return "<th " + E.th + ">" + e(KL[k]) + "</th>"; }).join("") + "</tr>" +
+          g.map(function (x) { return '<tr style="' + (x.r.state === hi ? "background:#FFF4CC;" : "") + '"><td ' + E.td + ">" + (x.r.state === hi ? "<b>" + e(x.r.state) + " ◀</b>" : e(x.r.state)) + "</td><td " + E.td + ">#" + x.r.rank + (x.o.rank ? ' <span style="color:#999;font-size:11px">(was #' + x.o.rank + ")</span>" : "") + "</td><td " + E.td + ">" + (x.mv > 0 ? '<b style="color:#0F7B4F">▲' + x.mv + "</b>" : x.mv < 0 ? '<b style="color:#C62828">▼' + (-x.mv) + "</b>" : "—") + "</td><td " + E.td + ">" + r1(x.r.score) + "</td><td " + E.td + ">" + dl(x.ds) + "</td>" +
+            ks.map(function (k) { return "<td " + E.td + '><span style="color:' + col(x.r[k]) + '">' + pc(x.r[k]) + "</span><br>" + dl(x.o[k] != null && x.r[k] != null ? x.r[k] - x.o[k] : null, true) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table>";
+      };
+      sts.forEach(function (s) {
+        var x = g.find(function (y) { return y.r.state === s; }), line = "";
+        if (x) { var up = ks.filter(function (k) { return x.o[k] != null && x.r[k] != null; }).map(function (k) { return [k, x.r[k] - x.o[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
+          line = '<div style="background:#F4F5FF;border-radius:10px;padding:10px 12px;margin:0 0 12px"><b>' + e(s) + "</b> " + (x.mv > 0 ? "moved up <b>" + x.mv + "</b> place" + (x.mv > 1 ? "s" : "") : x.mv < 0 ? "moved down <b>" + (-x.mv) + "</b> place" + (x.mv < -1 ? "s" : "") : "kept the same rank") + " (#" + (x.o.rank || "—") + " → #" + x.r.rank + "), score " + r1(x.o.score) + " → <b>" + r1(x.r.score) + "</b>." +
+            (up.length ? " Best gain: <b>" + e(KL[up[0][0]]) + " " + dl(up[0][1], true) + "</b>." + (up.length > 1 && up[up.length - 1][1] < 0 ? " Biggest drop: <b>" + e(KL[up[up.length - 1][0]]) + " " + dl(up[up.length - 1][1], true) + "</b>." : "") : "") + "</div>"; }
+        out.perState[s] = doc(out.title, "Your state: " + s, line + table(s));
+      });
+      out.common = doc(out.title, "All states", table(""));
+      out.sheet = [["State", "Rank " + la, "Rank " + lb, "Move", "Score " + la, "Score " + lb, "Δ score"].concat([].concat.apply([], ks.map(function (k) { return [KL[k] + " % " + la, KL[k] + " % " + lb, KL[k] + " Δ pp"]; })))].concat(g.map(function (x) {
+        var p = function (v) { return v == null ? "" : Math.round(v * 1000) / 10; };
+        return [x.r.state, x.r.rank, x.o.rank || "", x.mv, +r1(x.r.score), x.o.score != null ? +r1(x.o.score) : "", x.ds != null ? Math.round(x.ds * 10) / 10 : ""].concat([].concat.apply([], ks.map(function (k) { return [p(x.r[k]), p(x.o[k]), x.r[k] != null && x.o[k] != null ? Math.round((x.r[k] - x.o[k]) * 1000) / 10 : ""]; })));
+      }));
+    } else if (F.type === "plan") {
+      var rows2 = score(F.pa); if (!rows2.length) throw new Error("No KPI data for this period.");
+      ensurePlans(rows2);
+      out.title = "Action plan — " + plabel(F.pa);
+      var planTable = function (s) {
+        var items = (F.plans[s] || []).filter(function (x) { return x.action; });
+        if (!items.length) return '<p style="color:#0F7B4F">No actions needed — every KPI is at or above ' + th().good + "%. Keep it up!</p>";
+        return "<table " + E.tb + "><tr><th " + E.th + ">KPI</th><th " + E.th + ">Now</th><th " + E.th + ">Target</th><th " + E.th + ">Action</th><th " + E.th + ">Owner</th><th " + E.th + ">By</th></tr>" +
+          items.map(function (x, i) { return "<tr><td " + E.td + "><b>" + e(x.kpi) + "</b></td><td " + E.td.replace('"', '"color:' + col(x.now / 100) + ";") + ">" + (x.now === "" || x.now == null ? "—" : x.now + "%") + "</td><td " + E.td + ">" + e(x.target) + "</td><td " + E.td + ">" + e(x.action) + "</td><td " + E.td + ">" + e(x.owner) + "</td><td " + E.td + ">" + e(x.due ? dt2(x.due) : "") + "</td></tr>"; }).join("") + "</table>";
+      };
+      sts.forEach(function (s) { out.perState[s] = doc(out.title, "Your state: " + s, stateLine(rows2.find(function (r) { return r.state === s; }), rows2.length) + planTable(s) + '<p style="font-size:12.5px;margin:10px 0 0">Please share progress on these actions with HO before the due dates.</p>'); });
+      out.common = doc(out.title, "All states", sts.map(function (s) { return '<h3 style="font-size:15px;margin:16px 0 6px">' + e(s) + "</h3>" + planTable(s); }).join(""));
+      out.sheet = [["State", "KPI", "Now %", "Target", "Action", "Owner", "Due"]].concat([].concat.apply([], sts.map(function (s) { return (F.plans[s] || []).filter(function (x) { return x.action; }).map(function (x) { return [s, x.kpi, x.now, x.target, x.action, x.owner, x.due]; }); })));
+    } else {
+      var C = F.custom; out.title = F.subject || "Report";
+      if (!C && !F.intro) throw new Error("Upload a file or write a message.");
+      var tbl = function (rows) { if (!C) return ""; var h = C.rows[0]; return "<table " + E.tb + "><tr>" + h.map(function (x) { return "<th " + E.th + ">" + e(x) + "</th>"; }).join("") + "</tr>" + rows.slice(0, 300).map(function (r) { return "<tr>" + h.map(function (_, i) { return "<td " + E.td + ">" + e(r[i] == null ? "" : r[i]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table>" + (rows.length > 300 ? '<p style="font-size:12px;color:#777">Showing 300 of ' + rows.length + " rows — the full list is attached.</p>" : ""); };
+      var body = C ? C.rows.slice(1) : [];
+      sts.forEach(function (s) { var mineR = C && F.split && C.sc >= 0 ? body.filter(function (r) { return String(r[C.sc] || "").trim().toLowerCase() === s.toLowerCase(); }) : body; out.perState[s] = doc(out.title, "Your state: " + s, C && F.split && !mineR.length ? "<p>No rows for your state in this report.</p>" : tbl(mineR)); });
+      out.common = doc(out.title, "", tbl(body));
+      out.sheet = C ? C.rows : null;
+    }
+    return out;
+  }
+  function dt2(d) { try { var x = new Date(d + "T00:00:00"); return x.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }); } catch (er) { return d; } }
+  function ensurePlans(rows) {
+    var t = th(), lib = (CFG && CFG.actionLib) || {}, due = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10);
+    selStates().forEach(function (s) {
+      if (F.plans[s] && F.plans[s]._p === F.pa) return;
+      var r = rows.find(function (x) { return x.state === s; }); if (!r) { F.plans[s] = []; return; }
+      var weak = KP.filter(function (k) { return k[0] !== "score" && r[k[0]] != null && r[k[0]] * 100 < t.good; }).sort(function (a, b) { return r[a[0]] - r[b[0]]; });
+      var list = weak.map(function (k) { return { kpi: k[1], now: Math.round(r[k[0]] * 1000) / 10, target: t.good + "%", action: ((lib[k[0]] || [])[0]) || "Plan the steps to improve " + k[1], owner: "State BI team", due: due }; });
+      list._p = F.pa; F.plans[s] = list;
+    });
+  }
+
+  // ---------------- pages ----------------
+  function render() {
+    var tabs = ADMIN ? [["compose", "✉️ New report"], ["sent", "📤 Sent"]] : [["inbox", "📬 Reports from HO"]];
+    VIEW.innerHTML = (tabs.length > 1 ? '<div class="seg">' + tabs.map(function (x) { return '<button data-t="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>" : "") + '<div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    if (TAB === "compose") compose(); else list();
+  }
+  function compose() {
+    var P = $("pane"); P.innerHTML = '<div class="loading"><div class="spin"></div>Loading dashboard data…</div>';
+    Promise.all([DATA ? DATA : KPIDATA.load(), CFG ? { ok: 1, config: CFG } : api({ action: "ml-config" }), RCP ? RCP : api({ action: "ml-recipients" })]).then(function (x) {
+      DATA = x[0]; if (x[1].ok) { CFG = x[1].config; CFG._ready = x[1].emailReady; } RCP = x[2].ok ? x[2] : { counts: {}, noEmail: {}, lists: [], emailReady: false };
+      var po = periods(); if (!F.pa || !po.some(function (p) { return p.v === F.pa; })) F.pa = po[0].v; if (!F.pb || !po.some(function (p) { return p.v === F.pb; })) F.pb = (po[1] || po[0]).v;
+      if (!F.subject) F.subject = "";
+      drawCompose();
+    }).catch(function (er) { P.innerHTML = '<div class="err">' + esc(er.message || er) + "</div>"; });
+  }
+  function popts(sel) { return periods().map(function (p) { return '<option value="' + p.v + '"' + (p.v === sel ? " selected" : "") + ">" + esc(p.l) + "</option>"; }).join(""); }
+  function drawCompose() {
+    var P = $("pane"), T = [["ranking", "🏆 Ranking", "Rank, score and KPIs of every state"], ["growth", "📈 Growth comparison", "This period vs an earlier one — rank moves and KPI change"], ["plan", "🗒️ Action plan", "Weak KPIs per state with actions, owner and due date"], ["custom", "📄 Your own report", "Upload any Excel/CSV — each state can get only its rows"]];
+    var sts = DATA.states, ready = RCP.emailReady;
+    var h = '<div class="card"><div class="step2"><i>1</i>What do you want to share?</div><div class="types">' + T.map(function (x) { return '<button data-ty="' + x[0] + '" class="' + (F.type === x[0] ? "on" : "") + '"><b>' + x[1] + "</b><small>" + x[2] + "</small></button>"; }).join("") + "</div></div>";
+    h += '<div class="card"><div class="step2"><i>2</i>Details</div>';
+    if (F.type === "ranking" || F.type === "plan" || F.type === "growth") h += '<label class="lb">' + (F.type === "growth" ? "This period" : "Period") + '</label><select class="tx" id="pa">' + popts(F.pa) + "</select>";
+    if (F.type === "growth") h += '<label class="lb">Compare with</label><select class="tx" id="pb">' + popts(F.pb) + '</select><label class="lb">Order</label><select class="tx" id="sg"><option value="rank">By current rank</option><option value="growth"' + (F.sortG === "growth" ? " selected" : "") + ">Biggest score gain first</option></select>";
+    if (F.type !== "custom" && F.type !== "plan") h += '<label class="lb">KPIs to include</label><div class="chs9" id="kp">' + KP.map(function (k) { return '<span data-k="' + k[0] + '" class="' + (F.kpis.indexOf(k[0]) >= 0 ? "on" : "") + '">' + k[1] + "</span>"; }).join("") + "</div>";
+    if (F.type === "ranking") h += '<label class="lb">Highlight top / bottom</label><select class="tx" id="tp">' + [0, 3, 5].map(function (n) { return '<option value="' + n + '"' + (+F.top === n ? " selected" : "") + ">" + (n ? "Top " + n + " and bottom " + n : "No highlight") + "</option>"; }).join("") + "</select>";
+    if (F.type === "plan") h += '<div class="muted" style="font-size:12.5px;margin-top:8px">Actions are filled in from the KPIs below ' + th().good + '% (change the target and the action library in the Configuration centre). Edit them per state below.</div><label class="lb">Edit the plan for</label><select class="tx" id="ps">' + selStates().map(function (s) { return '<option' + (s === F.pstate ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><div id="pted"></div>';
+    if (F.type === "custom") h += '<button class="btn sec" id="cu" style="margin-top:6px">📄 Upload Excel / CSV</button> <span class="muted" id="cun" style="font-size:12.5px">' + (F.custom ? esc(F.custom.name) + " · " + (F.custom.rows.length - 1) + " rows" : "Optional — or just write a message") + "</span>" +
+      (F.custom && F.custom.sc >= 0 ? '<label class="cbx"><input type="checkbox" id="spl"' + (F.split ? " checked" : "") + "> Each state gets only its own rows (column “" + esc(F.custom.rows[0][F.custom.sc]) + "”)</label>" : "");
+    h += '<label class="lb">Subject</label><input class="tx" id="sj" value="' + esc(F.subject || "") + '" placeholder="e.g. October ranking — please review"><div class="muted" style="font-size:11.5px;margin-top:3px">Each state\'s email gets “— State name” added (or put {state} where you want it).</div>' +
+      '<label class="lb">Message (shown above the report)</label><textarea class="tx" id="in" rows="3" placeholder="Dear team, please find…">' + esc(F.intro || "") + "</textarea></div>";
+    h += '<div class="card"><div class="step2"><i>3</i>Send to</div><div class="row"><button class="btn ghost sm" id="sa">All states</button><span class="muted" style="font-size:12px">' + (F.states.length ? F.states.length + " selected" : "All " + sts.length + " states") + '</span></div><div class="chs9" id="st" style="margin-top:8px">' + sts.map(function (s) { return '<span data-s="' + esc(s) + '" class="' + (F.states.indexOf(s) >= 0 ? "on" : "") + '">' + esc(s) + "<i>" + (RCP.counts[s] || 0) + "✉</i></span>"; }).join("") + "</div>" +
+      '<label class="cbx"><input type="checkbox" id="su"' + (F.stateUsers ? " checked" : "") + "> Email the state BI users of these states (the number on each state)</label>" +
+      (RCP.lists.length ? '<label class="lb">Mailing lists</label><div class="chs9" id="ml">' + RCP.lists.map(function (l) { return '<span data-l="' + l.id + '" class="' + (F.lists.indexOf(l.id) >= 0 ? "on" : "") + '">' + esc(l.name) + "<i>" + l.n + (l.states.length ? " · " + esc(l.states.join(", ")) : "") + "</i></span>"; }).join("") + "</div>" : '<div class="muted" style="font-size:12px;margin-top:8px">Tip: make mailing lists (zonal heads, RSMs…) in the Configuration centre.</div>') +
+      '<label class="lb">Other email addresses</label><textarea class="tx" id="ex" rows="2" placeholder="name@vivo.com, other@vivo.com">' + esc(F.extra || "") + "</textarea>" +
+      (RCP.myEmail ? '<label class="cbx"><input type="checkbox" id="cm"' + (F.ccMe ? " checked" : "") + "> Send me a copy (" + esc(RCP.myEmail) + ")</label>" : "") +
+      (CFG && CFG.cc && CFG.cc.length ? '<label class="cbx"><input type="checkbox" id="uc"' + (F.useCc ? " checked" : "") + "> CC " + esc(CFG.cc.join(", ")) + "</label>" : "") +
+      (F.type !== "custom" || F.custom ? '<label class="cbx"><input type="checkbox" id="at"' + (F.attach ? " checked" : "") + "> Attach the full report as Excel</label>" : "") +
+      '<div class="muted" style="font-size:12px;margin-top:8px">Every state also gets it in <b>Reports from HO</b> in both apps and on the web — even users without an email.</div>' +
+      (ready ? "" : '<div class="warnb">Email sending isn\'t set up yet, so this will only go to the in-app inbox. Add the Brevo key in Account security → Email code.</div>') + "</div>";
+    h += '<div class="card"><div class="step2"><i>4</i>Preview & send</div><div class="row"><select class="tx" id="pvs" style="flex:1"><option value="">Preview: common copy</option>' + selStates().map(function (s) { return '<option' + (s === F.pv ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><button class="btn sec sm" id="pvb">👁 Preview</button><button class="btn ghost sm" id="xl">⬇ Excel</button></div><div id="pvo"></div><button class="btn pri block" id="go" style="margin-top:12px;padding:13px">📨 Send report</button></div>';
+    P.innerHTML = h;
+    var bind = function (id, k, fn) { var el = $(id); if (el) el.onchange = el.oninput = function () { F[k] = el.type === "checkbox" ? el.checked : el.value; save(); if (fn) fn(); }; };
+    [].forEach.call(P.querySelectorAll("[data-ty]"), function (b) { b.onclick = function () { F.type = b.dataset.ty; save(); drawCompose(); }; });
+    bind("pa", "pa", function () { if (F.type === "plan") drawCompose(); }); bind("pb", "pb"); bind("sg", "sortG"); bind("tp", "top"); bind("sj", "subject"); bind("in", "intro"); bind("ex", "extra"); bind("cm", "ccMe"); bind("uc", "useCc"); bind("at", "attach"); bind("su", "stateUsers"); bind("spl", "split"); bind("pvs", "pv");
+    if ($("kp")) [].forEach.call($("kp").children, function (s) { s.onclick = function () { var k = s.dataset.k, i = F.kpis.indexOf(k); if (i >= 0) F.kpis.splice(i, 1); else F.kpis.push(k); F.kpis.sort(function (a, b) { return KP.findIndex(function (x) { return x[0] === a; }) - KP.findIndex(function (x) { return x[0] === b; }); }); s.classList.toggle("on", i < 0); save(); }; });
+    [].forEach.call($("st").children, function (s) { s.onclick = function () { var k = s.dataset.s, i = F.states.indexOf(k); if (i >= 0) F.states.splice(i, 1); else F.states.push(k); save(); drawCompose(); }; });
+    if ($("ml")) [].forEach.call($("ml").children, function (s) { s.onclick = function () { var k = s.dataset.l, i = F.lists.indexOf(k); if (i >= 0) F.lists.splice(i, 1); else F.lists.push(k); s.classList.toggle("on", i < 0); save(); }; });
+    $("sa").onclick = function () { F.states = []; save(); drawCompose(); };
+    if ($("ps")) { if (!F.pstate || selStates().indexOf(F.pstate) < 0) F.pstate = selStates()[0]; $("ps").value = F.pstate; $("ps").onchange = function () { F.pstate = this.value; save(); planEditor(); }; planEditor(); }
+    if ($("cu")) $("cu").onclick = uploadCustom;
+    $("pvb").onclick = function () { try { var o = build(); var html = F.pv && o.perState[F.pv] ? o.perState[F.pv] : o.common; $("pvo").innerHTML = '<iframe class="prevf" sandbox="" title="Preview"></iframe>'; $("pvo").firstChild.srcdoc = '<meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:8px;background:#F3F4F9">' + html; } catch (er) { toast(er.message); } };
+    $("xl").onclick = function () { try { var o = build(); if (!o.sheet) return toast("Nothing to put in Excel."); download(xlsx([{ name: "Report", rows: o.sheet }]), fileName()); } catch (er) { toast(er.message); } };
+    $("go").onclick = confirmSend;
+  }
+  function fileName() { return (F.subject || ({ ranking: "State_ranking", growth: "Growth_comparison", plan: "Action_plan", custom: "Report" })[F.type]).replace(/[^A-Za-z0-9]+/g, "_").slice(0, 50) + ".xlsx"; }
+  function planEditor() {
+    var s = F.pstate, list = F.plans[s]; if (!list) { try { ensurePlans(score(F.pa)); } catch (er) { } list = F.plans[s] || []; }
+    $("pted").innerHTML = '<div style="overflow-x:auto;margin-top:8px"><table class="pt"><tr><th>KPI</th><th>Now %</th><th>Target</th><th style="min-width:160px">Action</th><th>Owner</th><th>Due</th><th></th></tr>' + list.map(function (x, i) {
+      return '<tr><td><input data-pi="' + i + '" data-k="kpi" value="' + esc(x.kpi) + '"></td><td><input data-pi="' + i + '" data-k="now" value="' + esc(x.now) + '" style="width:60px"></td><td><input data-pi="' + i + '" data-k="target" value="' + esc(x.target) + '" style="width:60px"></td><td><textarea data-pi="' + i + '" data-k="action" rows="2">' + esc(x.action) + '</textarea>' + libPick(x.kpi, i) + '</td><td><input data-pi="' + i + '" data-k="owner" value="' + esc(x.owner) + '"></td><td><input type="date" data-pi="' + i + '" data-k="due" value="' + esc(x.due) + '"></td><td><button class="btn ghost sm" data-px="' + i + '">✕</button></td></tr>';
+    }).join("") + '</table></div><button class="btn ghost sm" id="pad" style="margin-top:6px">＋ Add action</button>' + (list.length ? "" : '<div class="okb">No KPI below target for ' + esc(s) + " — add actions by hand if you want.</div>");
+    [].forEach.call($("pted").querySelectorAll("[data-pi]"), function (el) { el.oninput = el.onchange = function () { F.plans[s][+el.dataset.pi][el.dataset.k] = el.value; save(); }; });
+    [].forEach.call($("pted").querySelectorAll("[data-px]"), function (b) { b.onclick = function () { F.plans[s].splice(+b.dataset.px, 1); save(); planEditor(); }; });
+    [].forEach.call($("pted").querySelectorAll("[data-lp]"), function (el) { el.onchange = function () { if (!el.value) return; F.plans[s][+el.dataset.lp].action = el.value; save(); planEditor(); }; });
+    $("pad").onclick = function () { F.plans[s].push({ kpi: "", now: "", target: th().good + "%", action: "", owner: "State BI team", due: new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10) }); save(); planEditor(); };
+  }
+  function libPick(kpiLabel, i) { var k = (KP.find(function (x) { return x[1] === kpiLabel; }) || [])[0], lib = k && CFG && CFG.actionLib ? CFG.actionLib[k] || [] : []; return lib.length > 1 ? '<select class="tx" data-lp="' + i + '" style="margin-top:3px;font-size:12px;padding:4px"><option value="">More suggestions…</option>' + lib.map(function (a) { return "<option>" + esc(a) + "</option>"; }).join("") + "</select>" : ""; }
+  var XL = null;
+  function uploadCustom() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      (XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); }))).then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = window.XLSX.read(buf, { type: "array", cellDates: true }), ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); });
+        if (rows.length < 2) throw new Error("The sheet is empty.");
+        var w = Math.max.apply(null, rows.map(function (r) { return r.length; })); rows = rows.map(function (r) { while (r.length < w) r.push(""); return r.slice(0, 30); });
+        var sc = rows[0].findIndex(function (h) { return /^state/i.test(String(h).trim()); });
+        F.custom = { name: f.name, rows: rows.slice(0, 5001), sc: sc }; F.split = sc >= 0; if (!F.subject) F.subject = f.name.replace(/\.\w+$/, "");
+        drawCompose(); toast((rows.length - 1) + " rows loaded");
+      }).catch(function (er) { toast(er.message || "Couldn't read the file."); });
+    };
+    inp.click();
+  }
+  function b64(blob) { return new Promise(function (res) { var r = new FileReader(); r.onloadend = function () { res(String(r.result).split(",")[1] || ""); }; r.readAsDataURL(blob); }); }
+  function confirmSend() {
+    var o; try { o = build(); } catch (er) { return toast(er.message); }
+    if (!F.subject || !F.subject.trim()) { F.subject = o.title; save(); }
+    var sts = selStates(), n = (F.stateUsers ? sts.reduce(function (a, s) { return a + (RCP.counts[s] || 0); }, 0) : 0) + RCP.lists.filter(function (l) { return F.lists.indexOf(l.id) >= 0; }).reduce(function (a, l) { return a + l.n; }, 0) + (F.extra ? F.extra.split(/[\s,;]+/).filter(function (x) { return /@/.test(x); }).length : 0);
+    sheet("Send “" + F.subject + "”?", sts.length + " state" + (sts.length > 1 ? "s" : "") + " · about " + n + " email" + (n === 1 ? "" : "s") + (RCP.emailReady ? "" : " (email not set up — in-app inbox only)") + " · also in Reports from HO", [["📨", "Send now", function () { doSend(o, sts); }, "pri"]]);
+  }
+  function doSend(o, sts) {
+    $("go").disabled = true; $("go").textContent = "Sending…";
+    var per = {}; sts.forEach(function (s) { per[s] = o.perState[s]; });
+    (F.attach && o.sheet ? b64(xlsx([{ name: "Report", rows: o.sheet }])) : Promise.resolve("")).then(function (att) {
+      return api({ action: "ml-send", type: F.type, subject: F.subject, intro: F.intro || "", perState: per, common: o.common, states: sts, stateUsers: F.stateUsers, lists: F.lists, extra: F.extra, ccMe: F.ccMe, useCc: F.useCc, attachment: att ? { name: fileName(), b64: att } : null });
+    }).then(function (r) {
+      if (!r.ok) { toast(r.error || "Couldn't send."); $("go").disabled = false; $("go").textContent = "📨 Send report"; return; }
+      var s = r.sent; $("pvo").innerHTML = '<div class="' + (s.failed ? "warnb" : "okb") + '">' + (s.emailReady ? "✅ " + s.emails + " email" + (s.emails === 1 ? "" : "s") + " sent" + (s.failed ? " · " + s.failed + " failed (" + esc(s.errors.join("; ")) + ")" : "") : "Email isn't set up — ") + " · in the Reports from HO inbox for " + r.inbox + " state" + (r.inbox === 1 ? "" : "s") + ".</div>";
+      $("go").disabled = false; $("go").textContent = "📨 Send report"; toast("Report sent");
+    });
+  }
+  function list() {
+    var P = $("pane"); P.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "ml-list" }).then(function (r) {
+      if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      if (!ADMIN) api({ action: "ml-seen" });
+      P.innerHTML = r.items.length ? r.items.map(function (x) {
+        return '<div class="it2" data-id="' + x.id + '"><b>' + esc(x.typeLabel ? x.typeLabel.split(" ")[0] : "📄") + " " + esc(x.subject) + "</b>" + (x.fresh && !ADMIN ? ' <span class="chip new">NEW</span>' : "") + (x.attach ? ' <span class="chip">📎 Excel</span>' : "") +
+          '<div class="m">' + esc(x.by || "HO") + " · " + dt(x.at) + (ADMIN ? " · " + x.states.length + " state" + (x.states.length === 1 ? "" : "s") + (x.sent ? " · " + (x.sent.emailReady ? x.sent.emails + " emails" + (x.sent.failed ? ", " + x.sent.failed + " failed" : "") : "inbox only") : "") : "") + "</div></div>";
+      }).join("") : '<div class="empty">' + (ADMIN ? "No reports sent yet. Make one in “New report”." : "No reports from HO yet. Rankings, growth comparisons and action plans that HO shares with your state will show up here.") + "</div>";
+      [].forEach.call(P.querySelectorAll("[data-id]"), function (d) { d.onclick = function () { openRep(d.dataset.id); }; });
+    });
+  }
+  function openRep(id, st) {
+    var P = $("pane"); P.innerHTML = '<div class="loading"><div class="spin"></div>Opening…</div>';
+    api({ action: "ml-get", id: id, state: st || "" }).then(function (r) {
+      if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var x = r.item;
+      P.innerHTML = '<div class="row" style="margin-top:6px"><button class="btn ghost sm" id="bk">← Back</button>' + (ADMIN && x.states.length > 1 ? '<select class="tx" id="vs" style="flex:1">' + x.states.map(function (s) { return "<option" + (s === x.state ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") + (ADMIN ? '<button class="btn danger sm" id="dl">Delete</button>' : "") + "</div>" +
+        (ADMIN && x.sent ? '<div class="muted" style="font-size:12.5px;margin-top:8px">' + Object.keys(x.sent.byState || {}).map(function (s) { return esc(s) + ": " + x.sent.byState[s] + "✉"; }).join(" · ") + (x.sent.general ? " · others: " + x.sent.general : "") + (x.sent.errors && x.sent.errors.length ? '<br><span style="color:var(--bad)">' + esc(x.sent.errors.join("; ")) + "</span>" : "") + "</div>" : "") +
+        '<iframe class="prevf" sandbox="" title="Report"></iframe>';
+      P.querySelector("iframe").srcdoc = '<meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:8px;background:#F3F4F9">' + x.html;
+      $("bk").onclick = list;
+      if ($("vs")) $("vs").onchange = function () { openRep(id, this.value); };
+      if ($("dl")) $("dl").onclick = function () { sheet("Delete this report?", "It disappears from every state's inbox. Emails already sent stay sent.", [["🗑️", "Delete", function () { api({ action: "ml-delete", id: id }).then(function () { toast("Deleted"); list(); }); }, "danger"]]); };
+    });
+  }
+  window.__pageBack = function () { if ($("bk")) { list(); return true; } return false; };
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  if (!ADMIN) { $("h1").textContent = "Reports from HO"; $("h2").textContent = "Rankings, growth comparisons and action plans for your state"; }
+  if (ADMIN) api({ action: "tl-use", tool: "mailer" });
+  render();
+})();
+</script>
+</body>
+</html>

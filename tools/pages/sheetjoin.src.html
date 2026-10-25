@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sheet joiner</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.fs{border:1.5px dashed #C9CDF7;border-radius:14px;padding:12px;text-align:center;cursor:pointer;background:#FAFAFF}
+.fs.on{border-style:solid;border-color:var(--brand);text-align:left;cursor:default}
+.fs b{display:block}.fs small{color:var(--mut);font-size:12px}
+.ops{display:grid;grid-template-columns:1fr;gap:6px}
+.ops button{border:1.5px solid #E1E4F2;background:var(--card);border-radius:12px;padding:10px 12px;text-align:left;cursor:pointer;font:inherit}
+.ops button b{font-size:13.5px}.ops button small{display:block;color:var(--mut);font-size:12px}.ops button.on{border-color:var(--brand);background:#F4F5FF}
+.chs9{display:flex;flex-wrap:wrap;gap:6px}.chs9 span{border:1px solid #DDE0EF;border-radius:99px;padding:4px 10px;font-size:12.5px;cursor:pointer}.chs9 span.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.cbx{display:flex;gap:8px;align-items:center;font-size:13.5px;margin-top:8px;cursor:pointer}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}.tl{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 1px 8px rgba(20,24,51,.06)}.tl b{display:block;font-size:20px}.tl span{font-size:12px;color:var(--mut)}
+.tb{width:100%;border-collapse:collapse;font-size:12px;background:var(--card)}.tb th{background:#F3F4FA;text-align:left;padding:6px 8px;font-size:11px;color:var(--mut);position:sticky;top:0;white-space:nowrap}.tb td{padding:5px 8px;border-top:1px solid #EEF0F6;white-space:nowrap}
+.tbw{overflow:auto;max-height:420px;margin-top:8px;border-radius:12px;border:1px solid #EEF0F6}
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#sheetjoin">📘 How to</a></div>
+  <h1>Sheet joiner</h1><p>VLOOKUP, match, find missing, compare and combine two Excel sheets — no formulas</p>
+</div>
+<div class="wrap" id="view"></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), S = { A: null, B: null }, O = Object.assign({ op: "lookup", ka: -1, kb: -1, bring: [], ci: true, zeros: false, ca: -1, cb: -1 }, ls("sj-opt") || {}), OUT = null;
+  var OPS = [["lookup", "🔍 Bring columns from B into A (VLOOKUP)", "Every row of A, with the columns you pick from the matching row of B"], ["both", "🤝 Rows found in both", "Only keys present in A and B, with columns of both"], ["missA", "❗ In A but missing from B", "e.g. active retailers who did not upload sales"], ["missB", "❓ In B but missing from A", "e.g. IMEIs in activation data but not in the upload list"], ["compare", "⚖️ Compare a number", "Match rows and show A value, B value and the difference"], ["dedupe", "🧹 Remove duplicates from A", "Keep the first row for each key; duplicates listed separately"], ["stack", "📚 Combine A and B one below the other", "Columns with the same name are lined up"]];
+  var XL = null;
+  function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader — check the internet connection.")); }; document.head.appendChild(s); })); }
+  function sv() { ls("sj-opt", { op: O.op, ci: O.ci, zeros: O.zeros }); }
+  function load(which) {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; toast("Reading " + f.name + "…");
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = window.XLSX.read(buf, { type: "array", cellDates: true });
+        S[which] = { name: f.name, wb: wb, sheet: wb.SheetNames[0] }; sheetRows(which); OUT = null;
+        guessKeys(); draw();
+      }).catch(function (e) { toast(e.message || "Couldn't read the file."); });
+    };
+    inp.click();
+  }
+  function sheetRows(which) {
+    var s = S[which], rows = window.XLSX.utils.sheet_to_json(s.wb.Sheets[s.sheet], { header: 1, defval: "", raw: false, dateNF: "yyyy-mm-dd" });
+    var hi = rows.findIndex(function (r) { return r.filter(function (v) { return String(v).trim(); }).length >= Math.min(2, Math.max.apply(null, rows.slice(0, 20).map(function (x) { return x.filter(function (v) { return String(v).trim(); }).length; }))); });
+    if (hi < 0) hi = 0;
+    var head = (rows[hi] || []).map(function (h, i) { return String(h).trim() || "Column " + (i + 1); }), w = head.length;
+    rows.slice(hi + 1).forEach(function (r) { if (r.length > w) w = r.length; }); while (head.length < w) head.push("Column " + (head.length + 1));
+    s.head = head; s.body = rows.slice(hi + 1).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }).map(function (r) { while (r.length < w) r.push(""); return r; });
+  }
+  function guessKeys() {
+    if (!S.A || !S.B) return;
+    var re = /retailer|rid|imei|dealer.?code|code|id$|^id|mobile|phone|vchat/i, la = S.A.head.map(function (h) { return h.toLowerCase(); }), lb = S.B.head.map(function (h) { return h.toLowerCase(); });
+    var same = la.findIndex(function (h) { return re.test(h) && lb.indexOf(h) >= 0; });
+    if (same >= 0) { O.ka = same; O.kb = lb.indexOf(la[same]); }
+    else { O.ka = Math.max(0, la.findIndex(function (h) { return re.test(h); })); O.kb = Math.max(0, lb.findIndex(function (h) { return re.test(h); })); }
+    O.bring = S.B.head.map(function (_, i) { return i; }).filter(function (i) { return i !== O.kb; }).slice(0, 4);
+    O.ca = S.A.head.findIndex(function (h, i) { return i !== O.ka && /qty|units|sales|value|amount|count|target/i.test(h); }); O.cb = S.B.head.findIndex(function (h, i) { return i !== O.kb && /qty|units|sales|value|amount|count|target/i.test(h); });
+  }
+  function slot(w) {
+    var s = S[w];
+    if (!s) return '<div class="fs" data-f="' + w + '"><b>📄 Sheet ' + w + "</b><small>" + (w === "A" ? "Your main list (e.g. active retailers)" : "The list to look up (e.g. sales upload)") + "</small></div>";
+    return '<div class="fs on"><b>' + w + " · " + esc(s.name) + "</b><small>" + s.body.length + " rows · " + s.head.length + " columns</small>" + (s.wb.SheetNames.length > 1 ? '<select class="tx" data-sh="' + w + '" style="margin-top:6px">' + s.wb.SheetNames.map(function (n) { return "<option" + (n === s.sheet ? " selected" : "") + ">" + esc(n) + "</option>"; }).join("") + "</select>" : "") + '<button class="btn ghost sm" data-f="' + w + '" style="margin-top:6px">Change</button></div>';
+  }
+  function colSel(id, s, v, none) { return '<select class="tx" id="' + id + '">' + (none ? '<option value="-1">—</option>' : "") + s.head.map(function (h, i) { return '<option value="' + i + '"' + (i === v ? " selected" : "") + ">" + esc(h) + "</option>"; }).join("") + "</select>"; }
+  function draw() {
+    var h = '<div class="card"><h3>1 · Choose two sheets</h3><div class="g2" style="margin-top:8px">' + slot("A") + slot("B") + '</div><div class="muted" style="font-size:12px;margin-top:6px">Excel or CSV. Files stay on this device.</div></div>';
+    h += '<div class="card"><h3>2 · What do you want?</h3><div class="ops">' + OPS.map(function (o) { return '<button data-op="' + o[0] + '" class="' + (O.op === o[0] ? "on" : "") + '"><b>' + o[1] + "</b><small>" + o[2] + "</small></button>"; }).join("") + "</div></div>";
+    if (S.A && (S.B || O.op === "dedupe")) {
+      h += '<div class="card"><h3>3 · Match on</h3><div class="g2">' + (O.op !== "stack" ? "<div><label class=\"lb\">Key column in A</label>" + colSel("ka", S.A, O.ka) + "</div>" : "") + (S.B && O.op !== "dedupe" && O.op !== "stack" ? "<div><label class=\"lb\">Key column in B</label>" + colSel("kb", S.B, O.kb) + "</div>" : "") + "</div>" +
+        (O.op !== "stack" ? '<label class="cbx"><input type="checkbox" id="ci"' + (O.ci ? " checked" : "") + '> Ignore spaces and capital letters</label><label class="cbx"><input type="checkbox" id="zr"' + (O.zeros ? " checked" : "") + "> Ignore leading zeros (0123 = 123)</label>" : "") +
+        (O.op === "lookup" || O.op === "both" ? '<label class="lb">Columns to bring from B</label><div class="chs9" id="br">' + S.B.head.map(function (hh, i) { return i === O.kb ? "" : '<span data-b="' + i + '" class="' + (O.bring.indexOf(i) >= 0 ? "on" : "") + '">' + esc(hh) + "</span>"; }).join("") + "</div>" : "") +
+        (O.op === "compare" ? '<div class="g2"><div><label class="lb">Number in A</label>' + colSel("ca", S.A, O.ca, 1) + '</div><div><label class="lb">Number in B</label>' + colSel("cb", S.B, O.cb, 1) + "</div></div>" : "") +
+        '<button class="btn pri block" id="go" style="margin-top:12px;padding:12px">▶ Run</button></div><div id="out"></div>';
+    }
+    VIEW.innerHTML = h;
+    [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (b) { b.onclick = function (e) { e.stopPropagation(); load(b.dataset.f); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-sh]"), function (s) { s.onchange = function () { S[s.dataset.sh].sheet = s.value; sheetRows(s.dataset.sh); guessKeys(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-op]"), function (b) { b.onclick = function () { O.op = b.dataset.op; sv(); OUT = null; draw(); }; });
+    var nb = function (id, k) { if ($(id)) $(id).onchange = function () { O[k] = $(id).type === "checkbox" ? $(id).checked : +$(id).value; sv(); }; };
+    nb("ka", "ka"); nb("kb", "kb"); nb("ci", "ci"); nb("zr", "zeros"); nb("ca", "ca"); nb("cb", "cb");
+    if ($("kb")) $("kb").onchange = function () { O.kb = +this.value; O.bring = O.bring.filter(function (i) { return i !== O.kb; }); draw(); };
+    if ($("br")) [].forEach.call($("br").children, function (s) { s.onclick = function () { var i = +s.dataset.b, k = O.bring.indexOf(i); if (k >= 0) O.bring.splice(k, 1); else O.bring.push(i); s.classList.toggle("on", k < 0); }; });
+    if ($("go")) $("go").onclick = run;
+    if (OUT) show();
+  }
+  function key(v) { var s = String(v == null ? "" : v); if (O.ci) s = s.replace(/\s+/g, "").toLowerCase(); else s = s.trim(); if (/^\d+\.0+$/.test(s)) s = s.replace(/\.0+$/, ""); if (O.zeros) s = s.replace(/^0+(?=.)/, ""); return s; }
+  var numv = function (v) { var x = parseFloat(String(v).replace(/[,₹\s]/g, "")); return isNaN(x) ? null : x; };
+  function run() {
+    var A = S.A, B = S.B, op = O.op, head = [], rows = [], extra = null, st = [];
+    var idxB = {}, dupB = 0;
+    if (B && op !== "stack") B.body.forEach(function (r) { var k = key(r[O.kb]); if (!k) return; if (idxB[k]) { dupB++; idxB[k].push(r); } else idxB[k] = [r]; });
+    if (op === "lookup") {
+      head = A.head.concat(O.bring.map(function (i) { return B.head[i] + " (B)"; }), ["Found in B"]); var hit = 0;
+      A.body.forEach(function (r) { var m = idxB[key(r[O.ka])]; if (m) hit++; rows.push(r.concat(O.bring.map(function (i) { return m ? m[0][i] : ""; }), [m ? "Yes" + (m.length > 1 ? " (" + m.length + " matches)" : "") : "No"])); });
+      st = [[A.body.length, "rows in A"], [hit, "found in B"], [A.body.length - hit, "not found"], [dupB, "repeat keys in B (first used)"]];
+    } else if (op === "both") {
+      head = A.head.concat(O.bring.map(function (i) { return B.head[i] + " (B)"; }));
+      A.body.forEach(function (r) { var m = idxB[key(r[O.ka])]; if (m) rows.push(r.concat(O.bring.map(function (i) { return m[0][i]; }))); });
+      st = [[A.body.length, "rows in A"], [B.body.length, "rows in B"], [rows.length, "in both"], [dupB, "repeat keys in B"]];
+    } else if (op === "missA") {
+      head = A.head; rows = A.body.filter(function (r) { var k = key(r[O.ka]); return k && !idxB[k]; });
+      st = [[A.body.length, "rows in A"], [rows.length, "missing from B"], [A.body.length - rows.length, "found in B"]];
+    } else if (op === "missB") {
+      var ia = {}; A.body.forEach(function (r) { ia[key(r[O.ka])] = 1; }); head = B.head; rows = B.body.filter(function (r) { var k = key(r[O.kb]); return k && !ia[k]; });
+      st = [[B.body.length, "rows in B"], [rows.length, "missing from A"], [B.body.length - rows.length, "found in A"]];
+    } else if (op === "compare") {
+      if (O.ca < 0 || O.cb < 0) return toast("Choose the number columns to compare.");
+      head = [A.head[O.ka], A.head[O.ca] + " (A)", B.head[O.cb] + " (B)", "Difference (A − B)", "Result"]; var same = 0, diff = 0, miss = 0;
+      A.body.forEach(function (r) { var m = idxB[key(r[O.ka])]; if (!m) { miss++; rows.push([r[O.ka], r[O.ca], "", "", "Not in B"]); return; } var bs = m.reduce(function (s, x) { return s + (numv(x[O.cb]) || 0); }, 0), a = numv(r[O.ca]) || 0, d = Math.round((a - bs) * 100) / 100; if (d) diff++; else same++; rows.push([r[O.ka], a, bs, d, d ? (d > 0 ? "A higher" : "B higher") : "Same"]); });
+      rows.sort(function (x, y) { return Math.abs(numv(y[3]) || 0) - Math.abs(numv(x[3]) || 0); });
+      st = [[same, "same"], [diff, "different"], [miss, "not in B"], [dupB, "keys repeated in B (added up)"]];
+    } else if (op === "dedupe") {
+      var seen = {}, dups = []; head = A.head;
+      A.body.forEach(function (r) { var k = key(r[O.ka]); if (k && seen[k]) dups.push(r); else { seen[k] = 1; rows.push(r); } });
+      extra = { name: "Duplicates removed", head: A.head, rows: dups };
+      st = [[A.body.length, "rows before"], [rows.length, "unique rows"], [dups.length, "duplicates removed"]];
+    } else {
+      head = A.head.slice(); B.head.forEach(function (x) { if (head.indexOf(x) < 0) head.push(x); }); head = head.concat(["Source"]);
+      var put = function (s, src) { s.body.forEach(function (r) { var o = head.map(function () { return ""; }); s.head.forEach(function (x, i) { o[head.indexOf(x)] = r[i]; }); o[head.length - 1] = src; rows.push(o); }); };
+      put(A, A.name); put(B, B.name); st = [[A.body.length, "from A"], [B.body.length, "from B"], [rows.length, "rows combined"]];
+    }
+    OUT = { head: head, rows: rows, extra: extra, st: st }; show();
+    api({ action: "tl-use", tool: "sheetjoin", kind: "acts" });
+  }
+  function show() {
+    var o = OUT;
+    $("out").innerHTML = '<div class="tiles">' + o.st.map(function (s) { return '<div class="tl"><b>' + s[0] + "</b><span>" + esc(s[1]) + "</span></div>"; }).join("") + '</div><div class="card"><h3>Result · ' + o.rows.length + ' rows</h3><div class="tbw"><table class="tb"><tr>' + o.head.map(function (x) { return "<th>" + esc(x) + "</th>"; }).join("") + "</tr>" + o.rows.slice(0, 100).map(function (r) { return "<tr>" + o.head.map(function (_, i) { return "<td>" + esc(r[i] == null ? "" : r[i]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" + (o.rows.length > 100 ? '<div class="muted" style="font-size:12px;margin-top:4px">Showing 100 — download for all ' + o.rows.length + ".</div>" : "") + '<button class="btn ok block" id="dl" style="margin-top:10px">⬇ Download Excel</button></div>';
+    $("dl").onclick = function () { var sh = [{ name: "Result", rows: [o.head].concat(o.rows) }]; if (o.extra && o.extra.rows.length) sh.push({ name: o.extra.name, rows: [o.extra.head].concat(o.extra.rows) }); download(xlsx(sh), (OPS.find(function (x) { return x[0] === O.op; })[1].replace(/[^A-Za-z ]/g, "").trim().replace(/\s+/g, "_") || "Result") + ".xlsx"); };
+  }
+  window.__pageBack = function () { if (S.A || S.B) { S.A = S.B = null; OUT = null; draw(); return true; } return false; };
+  if (AUTH && AUTH.token) api({ action: "tl-use", tool: "sheetjoin" });
+  draw();
+})();
+</script>
+</body>
+</html>

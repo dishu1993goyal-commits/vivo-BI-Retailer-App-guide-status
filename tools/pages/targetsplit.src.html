@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Target splitter</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ops{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ops button{border:1.5px solid #E1E4F2;background:var(--card);border-radius:12px;padding:10px;text-align:left;cursor:pointer;font:inherit}
+.ops button b{font-size:13px}.ops button small{display:block;color:var(--mut);font-size:11.5px}.ops button.on{border-color:var(--brand);background:#F4F5FF}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card)}.tb th{background:#F3F4FA;text-align:left;padding:6px 8px;font-size:11px;color:var(--mut);position:sticky;top:0}.tb td{padding:5px 8px;border-top:1px solid #EEF0F6}.tb td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbw{overflow:auto;max-height:460px;margin-top:8px;border-radius:12px;border:1px solid #EEF0F6}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.tl{background:var(--card);border-radius:14px;padding:10px;box-shadow:0 1px 8px rgba(20,24,51,.06)}.tl b{display:block;font-size:18px}.tl span{font-size:11.5px;color:var(--mut)}
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#targetsplit">📘 How to</a></div>
+  <h1>Target splitter</h1><p>Split a state / district target across retailers, ASMs or towns — fair, rounded and adding up exactly</p>
+</div>
+<div class="wrap" id="view"></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), X = Object.assign({ total: "", unit: "units", method: "share", mix: 70, growth: 10, step: 1, min: "", max: "", paste: "" }, ls("ts-opt") || {}), LIST = null, RES = null;
+  var M = [["share", "📊 By past sales share", "Bigger sellers get a bigger part"], ["equal", "⚖️ Equal", "Everyone gets the same"], ["mix", "🔀 Mix", "Part by share, part equal (fair for small sellers)"], ["growth", "📈 Growth on past", "Past × (1 + growth %), then fitted to the total"]];
+  var XL = null;
+  function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); })); }
+  function sv() { var c = Object.assign({}, X); ls("ts-opt", c); }
+  var nv = function (v) { var x = parseFloat(String(v == null ? "" : v).replace(/[,₹\s]/g, "")); return isNaN(x) ? 0 : x; };
+  function fromPaste() { return X.paste.split("\n").map(function (l) { var p = l.split(/\t|,|;/); if (p.length < 2) p = l.trim().split(/\s+(?=[\d.,]+$)/); return p.length >= 2 ? { id: p[0].trim(), name: p.length > 2 ? p[1].trim() : "", past: nv(p[p.length - 1]) } : null; }).filter(function (x) { return x && x.id; }); }
+  function draw() {
+    var h = '<div class="card"><h3>1 · Total target</h3><div class="g2"><div><label class="lb">Target to split</label><input class="tx" id="tt" type="number" value="' + esc(X.total) + '" placeholder="e.g. 12000"></div><div><label class="lb">In</label><select class="tx" id="un"><option value="units">Units</option><option value="value"' + (X.unit === "value" ? " selected" : "") + ">₹ value</option></select></div></div></div>";
+    h += '<div class="card"><h3>2 · Who gets a share</h3><div class="row"><button class="btn sec sm" id="up">📄 Upload Excel</button><button class="btn ghost sm" id="sm">⬇ Template</button></div>' + (LIST ? '<div class="muted" style="font-size:12.5px;margin-top:6px">' + LIST.length + " rows from " + esc(LIST.file) + ' · <a href="#" id="cl">use pasted list instead</a></div>' : '<label class="lb">…or paste rows: ID / name, past sales (one per line)</label><textarea class="tx" id="pa" rows="5" placeholder="BRE010294, Shree Mobiles, 420&#10;BRE010300, Raj Telecom, 260&#10;BRE010310, Om Mobile, 90">' + esc(X.paste) + "</textarea>") + "</div>";
+    h += '<div class="card"><h3>3 · How to split</h3><div class="ops">' + M.map(function (m) { return '<button data-m="' + m[0] + '" class="' + (X.method === m[0] ? "on" : "") + '"><b>' + m[1] + "</b><small>" + m[2] + "</small></button>"; }).join("") + "</div>" +
+      (X.method === "mix" ? '<label class="lb">By share %  (rest equal)</label><input class="tx" id="mx" type="number" value="' + X.mix + '">' : "") + (X.method === "growth" ? '<label class="lb">Growth % on past</label><input class="tx" id="gr" type="number" value="' + X.growth + '"><div class="muted" style="font-size:11.5px;margin-top:3px">Leave the total empty to use past × growth as it is.</div>' : "") +
+      '<div class="g2"><div><label class="lb">Minimum each (optional)</label><input class="tx" id="mn" type="number" value="' + esc(X.min) + '"></div><div><label class="lb">Maximum each (optional)</label><input class="tx" id="mxx" type="number" value="' + esc(X.max) + '"></div></div>' +
+      '<label class="lb">Round to multiples of</label><select class="tx" id="st">' + [1, 5, 10, 50, 100, 1000].map(function (n) { return '<option value="' + n + '"' + (+X.step === n ? " selected" : "") + ">" + n + "</option>"; }).join("") + '</select><button class="btn pri block" id="go" style="margin-top:12px;padding:12px">🎯 Split target</button></div><div id="out"></div>';
+    VIEW.innerHTML = h;
+    var b = function (id, k, num) { if ($(id)) $(id).oninput = $(id).onchange = function () { X[k] = num ? (this.value === "" ? "" : +this.value) : this.value; sv(); }; };
+    b("tt", "total", 1); b("un", "unit"); b("pa", "paste"); b("mx", "mix", 1); b("gr", "growth", 1); b("mn", "min", 1); b("mxx", "max", 1); b("st", "step", 1);
+    [].forEach.call(VIEW.querySelectorAll("[data-m]"), function (x) { x.onclick = function () { X.method = x.dataset.m; sv(); draw(); }; });
+    $("up").onclick = upload; $("go").onclick = run; if ($("cl")) $("cl").onclick = function (e) { e.preventDefault(); LIST = null; draw(); };
+    $("sm").onclick = function () { download(xlsx([{ name: "Split", rows: [["ID", "Name", "Past sales"], ["BRE010294", "Shree Mobiles", 420], ["BRE010300", "Raj Telecom", 260], ["BRE010310", "Om Mobile", 90]] }]), "Target_split_template.xlsx"); };
+    if (RES) show();
+  }
+  function upload() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = window.XLSX.read(buf, { type: "array" }), rows = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); });
+        var hd = (rows[0] || []).map(function (h) { return String(h).toLowerCase(); });
+        var ci = hd.findIndex(function (h) { return /id|code|retailer|dealer|asm|town|district|name/.test(h); }); if (ci < 0) ci = 0;
+        var ni = hd.findIndex(function (h, i) { return i !== ci && /name|firm|store/.test(h); });
+        var pi = hd.findIndex(function (h) { return /past|sales|sold|ach|qty|units|value|ly|last/.test(h); }); if (pi < 0) pi = hd.findIndex(function (h, i) { return i !== ci && i !== ni && rows.slice(1, 6).every(function (r) { return !isNaN(parseFloat(r[i])); }); });
+        if (pi < 0) throw new Error("Couldn't find a past-sales column (name it “Past sales”).");
+        LIST = rows.slice(1).map(function (r) { return { id: String(r[ci]).trim(), name: ni >= 0 ? String(r[ni]).trim() : "", past: nv(r[pi]) }; }).filter(function (x) { return x.id; }); LIST.file = f.name;
+        draw(); toast(LIST.length + " rows loaded");
+      }).catch(function (e) { toast(e.message || "Couldn't read the file."); });
+    };
+    inp.click();
+  }
+  // capped proportional allocation, then whole-step rounding that still adds up to the total
+  function split(list, total, w) {
+    var n = list.length, mn = X.min === "" ? 0 : +X.min, mx = X.max === "" ? Infinity : +X.max, alloc = new Array(n), fixed = new Array(n).fill(false);
+    if (mn * n > total) throw new Error("The minimum × " + n + " is more than the total.");
+    if (mx * n < total) throw new Error("The maximum × " + n + " is less than the total.");
+    for (var it = 0; it < 50; it++) {
+      var left = total, sw = 0; for (var i = 0; i < n; i++) if (fixed[i]) left -= alloc[i]; else sw += w[i];
+      var changed = false;
+      for (i = 0; i < n; i++) if (!fixed[i]) alloc[i] = sw > 0 ? left * w[i] / sw : left / (n - fixed.filter(Boolean).length);
+      for (i = 0; i < n; i++) if (!fixed[i]) { if (alloc[i] < mn) { alloc[i] = mn; fixed[i] = true; changed = true; } else if (alloc[i] > mx) { alloc[i] = mx; fixed[i] = true; changed = true; } }
+      if (!changed) break;
+    }
+    var st = +X.step || 1, base = alloc.map(function (a) { return Math.floor(a / st) * st; }), rem = Math.round((total - base.reduce(function (s, x) { return s + x; }, 0)) / st);
+    var order = alloc.map(function (a, i) { return [a - base[i], i]; }).sort(function (a, b) { return b[0] - a[0]; });
+    for (var k = 0; k < order.length && rem > 0; k++) { var j = order[k][1]; if (base[j] + st <= mx) { base[j] += st; rem--; } }
+    return base;
+  }
+  function run() {
+    var list = LIST || fromPaste(); if (!list.length) return toast("Add the list of retailers / ASMs first.");
+    var past = list.map(function (x) { return Math.max(0, x.past); }), sp = past.reduce(function (a, b) { return a + b; }, 0), total = nv(X.total), w;
+    if (X.method === "growth" && !total) total = Math.round(sp * (1 + nv(X.growth) / 100));
+    if (!total) return toast("Enter the total target.");
+    if ((X.method === "share" || X.method === "growth") && !sp) return toast("Past sales are all zero — use Equal.");
+    if (X.method === "equal") w = past.map(function () { return 1; });
+    else if (X.method === "mix") { var m = Math.max(0, Math.min(100, nv(X.mix))) / 100; w = past.map(function (p) { return (sp ? m * p / sp : 0) + (1 - m) / past.length; }); }
+    else w = past.slice();
+    try { var t = split(list, total, w); } catch (e) { return toast(e.message); }
+    RES = list.map(function (x, i) { return { id: x.id, name: x.name, past: past[i], target: t[i], share: Math.round(t[i] / total * 1000) / 10, gr: past[i] ? Math.round((t[i] / past[i] - 1) * 1000) / 10 : null }; });
+    RES.total = total; RES.sp = sp; show();
+    api({ action: "tl-use", tool: "targetsplit", kind: "acts" });
+  }
+  function show() {
+    var R = RES, f = function (v) { return X.unit === "value" ? "₹" + Math.round(v).toLocaleString("en-IN") : Math.round(v).toLocaleString("en-IN"); };
+    $("out").innerHTML = '<div class="tiles"><div class="tl"><b>' + f(R.total) + '</b><span>total target</span></div><div class="tl"><b>' + f(R.sp) + '</b><span>total past</span></div><div class="tl"><b>' + (R.sp ? (Math.round((R.total / R.sp - 1) * 1000) / 10) + "%" : "—") + '</b><span>growth needed</span></div></div>' +
+      '<div class="card"><h3>Targets</h3><div class="tbw"><table class="tb"><tr><th>ID</th><th>Name</th><th class="n">Past</th><th class="n">Target</th><th class="n">Share</th><th class="n">vs past</th></tr>' + R.map(function (r) { return "<tr><td>" + esc(r.id) + "</td><td>" + esc(r.name) + '</td><td class="n">' + f(r.past) + '</td><td class="n"><b>' + f(r.target) + '</b></td><td class="n">' + r.share + '%</td><td class="n" style="color:' + (r.gr == null ? "#777" : r.gr > 30 ? "#C62828" : "#1F2340") + '">' + (r.gr == null ? "new" : (r.gr > 0 ? "+" : "") + r.gr + "%") + "</td></tr>"; }).join("") + '</table></div><div class="muted" style="font-size:11.5px;margin-top:4px">Red = more than 30% above past sales — check these are realistic.</div><button class="btn ok block" id="dl" style="margin-top:10px">⬇ Download Excel</button></div>';
+    $("dl").onclick = function () { download(xlsx([{ name: "Targets", rows: [["ID", "Name", "Past " + X.unit, "Target " + X.unit, "Share %", "Vs past %"]].concat(R.map(function (r) { return [r.id, r.name, r.past, r.target, r.share, r.gr == null ? "" : r.gr]; })).concat([["Total", "", R.sp, R.total, 100, R.sp ? Math.round((R.total / R.sp - 1) * 1000) / 10 : ""]]) }]), "Target_split.xlsx"); };
+  }
+  if (AUTH && AUTH.token) api({ action: "tl-use", tool: "targetsplit" });
+  draw();
+})();
+</script>
+</body>
+</html>

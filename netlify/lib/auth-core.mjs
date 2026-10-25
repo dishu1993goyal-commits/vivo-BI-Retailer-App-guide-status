@@ -14,6 +14,7 @@ import { autorepAction } from "./autorep-core.mjs";
 import { inviteAdminAction, INVITE_DAYS } from "./invite-core.mjs";
 import { toolsAction } from "./tools-core.mjs";
 import { schemeCalcAction } from "./schemecalc-core.mjs";
+import { mailerAction } from "./mailer-core.mjs";
 import { masterAction, MASTER_SETUP_SHA256, roleOf } from "./master-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
 import { vKey, checkVchat, vchatAdminAction, directory, accessCodeFor } from "./vchat-core.mjs";
@@ -835,7 +836,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -921,8 +922,9 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const hy = mods.hygiene ? await jr(hygieneAction({ action: "hyg-notify" }, ctx)) : {};
       const en = await jr(engageAction({ action: "engage-notify" }, ctx));
       const ar = mods.autoreports ? await jr(autorepAction({ action: "autorep-notify" }, ctx)) : {};
+      const ml = await jr(mailerAction({ action: "ml-notify" }, ctx));
       return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
-        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0 });
+        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, hoReports: ml.fresh || 0 });
     }
     if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, role: roleOf(app, rec), master: !!rec.master, state: rec.state || "", name: rec.fullName });
     {
@@ -938,6 +940,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^(cust|ct|cxx|master)-/.test(b.action)) return masterAction(b, surveyCtx());
     if (b.action.startsWith("tl-")) return toolsAction(b, surveyCtx());
     if (b.action.startsWith("sc-")) return schemeCalcAction(b, surveyCtx());
+    if (b.action.startsWith("ml-")) return mailerAction(b, Object.assign(surveyCtx(), { mailFetch }));
     if (b.action.startsWith("inv-")) return inviteAdminAction(b, Object.assign(surveyCtx(), { normalizePhone, normEmail, vKey, mailFetch }));
     if (b.action.startsWith("survey-")) return surveyAction(b, surveyCtx());
     if (b.action.startsWith("chat-")) return chatAction(b, surveyCtx());

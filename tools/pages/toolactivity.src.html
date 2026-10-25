@@ -30,8 +30,8 @@
   "use strict";
   /*@@CORE@@*/
   var VIEW = $("view"), TAB = ls("ta-tab") || "use", DAYS = "30", ST = "", Q = "", CACHE = {};
-  var TN = { tl: ["✨", "Smart tools home"], tlv: ["🎙️", "Voice notes"], tlp: ["📸", "Photo audit"], tlb: ["🧭", "Beat planner"], tlr: ["🔀", "Reconciliation"], tli: ["📈", "Excel to insight"], tlk: ["🧮", "KPI builder"], tls: ["📤", "Share card"], tld: ["💡", "Idea box"] };
-  var ORDER = ["tlv", "tlp", "tlb", "tls", "tlr", "tli", "tld", "tlk", "tl"];
+  var TN = { tl: ["✨", "Smart tools home"], tlv: ["🎙️", "Voice notes"], tlp: ["📸", "Photo audit"], tlb: ["🧭", "Beat planner"], tlr: ["🔀", "Reconciliation"], tli: ["📈", "Excel to insight"], tlk: ["🧮", "KPI builder"], tls: ["📤", "Share card"], tld: ["💡", "Idea box"], hygcheck: ["🔎", "IMEI hygiene check"], sheetjoin: ["🔗", "Sheet joiner"], targetsplit: ["🎯", "Target splitter"], mailer: ["📧", "Email reports"] };
+  var ORDER = ["tlv", "tlp", "tlb", "tls", "tlr", "tli", "tld", "tlk", "hygcheck", "sheetjoin", "targetsplit", "mailer", "tl"];
   function tabs() {
     return '<div class="seg">' + [["use", "📊 Activity"], ["kpi", "🧮 KPIs"], ["beat", "🧭 Beat plans"]].map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + "</div>";
   }

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Configuration centre</title>
+<script src="kpi-data.js?v=3"></script>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lst{border:1px solid #E6E8F2;border-radius:12px;padding:10px;margin-top:8px}
+.lst .row .tx{flex:1}
+.lnk{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.lnk button{border:1px solid #E1E4F2;background:var(--card);border-radius:12px;padding:10px;text-align:left;font:600 13px inherit;cursor:pointer;display:flex;gap:8px;align-items:center}
+.lnk button i{font-style:normal;font-size:20px}
+.okb{background:#E6F4EA;color:#0F6B43;border-radius:12px;padding:10px 12px;font-size:13px}.warnb{background:#FFF4E5;color:#8A5300;border-radius:12px;padding:10px 12px;font-size:13px}
+.savebar{position:sticky;bottom:0;padding:10px 0 4px;background:linear-gradient(transparent,var(--bg) 30%)}
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#config">📘 How to</a></div>
+  <h1>Configuration centre</h1><p>Mailing lists, report defaults, KPI targets, action library and tool settings</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), C = null, READY = false, SENDER = "", STATES = [], dirty = false;
+  var KP = [["app", "Retailer App"], ["sales", "Sales"], ["visit", "Visit efficiency"], ["comp", "Competition / SD"], ["vnotice", "v-Notice"], ["new", "New implementation"]];
+  var IN_APP = !!(window.BIApp && window.BIApp.getAuth);
+  function open(file, label, hash) {
+    try {
+      if (IN_APP && window.BIApp.openTool) return window.BIApp.openTool(file, label, hash || "#list");
+      if (parent !== window) return parent.postMessage({ biOpen: { file: file, title: label, hash: hash || "#list" } }, location.origin);
+    } catch (e) { }
+    location.href = file + "?v=" + Date.now() + (hash || "");
+  }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">The Configuration centre is for HO admins.</div>'; return; }
+    Promise.all([api({ action: "ml-config" }), window.KPIDATA ? KPIDATA.load().catch(function () { return null; }) : null]).then(function (x) {
+      if (!x[0].ok) { VIEW.innerHTML = '<div class="err">' + esc(x[0].error) + "</div>"; return; }
+      C = x[0].config; READY = x[0].emailReady; SENDER = x[0].sender; STATES = x[1] ? x[1].states : [];
+      draw();
+    });
+  }
+  function draw() {
+    var h = '<div class="card"><h3>📧 Email sending</h3>' + (READY ? '<div class="okb">Ready — emails go out from <b>' + esc(SENDER) + "</b> (Brevo).</div>" : '<div class="warnb">Not set up. Add the free Brevo key in Account security → Email code; until then reports reach states only in the app inbox.</div>') +
+      '<div class="g2"><div><label class="lb">Sender name</label><input class="tx" data-c="senderName" value="' + esc(C.senderName) + '" placeholder="vivo BI HO"></div><div><label class="lb">Replies go to</label><input class="tx" data-c="replyTo" value="' + esc(C.replyTo) + '" placeholder="bi.ho@vivo.com"></div></div>' +
+      '<label class="lb">Always CC (comma separated)</label><input class="tx" data-c="cc" value="' + esc(C.cc.join(", ")) + '" placeholder="head.bi@vivo.com">' +
+      '<label class="lb">Signature (added to every report email)</label><textarea class="tx" data-c="signature" rows="3" placeholder="Regards,&#10;BI Team, HO">' + esc(C.signature) + "</textarea></div>";
+    h += '<div class="card"><h3>📮 Mailing lists</h3><div class="muted" style="font-size:12.5px">Groups you can pick when emailing a report — e.g. Zonal heads, RSMs North. Tag a list with states so each state\'s copy goes only to its own people.</div>' +
+      C.lists.map(function (l, i) {
+        return '<div class="lst"><div class="row"><input class="tx" data-l="' + i + '" data-k="name" value="' + esc(l.name) + '" placeholder="List name"><button class="btn danger sm" data-lx="' + i + '">✕</button></div>' +
+          '<label class="lb">Emails (comma or new line)</label><textarea class="tx" rows="2" data-l="' + i + '" data-k="emails">' + esc(l.emails.join(", ")) + "</textarea>" +
+          '<label class="lb">Only for these states (empty = gets the all-states copy)</label><input class="tx" data-l="' + i + '" data-k="states" value="' + esc(l.states.join(", ")) + '" placeholder="e.g. Bihar, Jharkhand" list="stl"></div>';
+      }).join("") + '<datalist id="stl">' + STATES.map(function (s) { return "<option>" + esc(s) + "</option>"; }).join("") + '</datalist><button class="btn sec sm" id="la" style="margin-top:8px">＋ New list</button></div>';
+    h += '<div class="card"><h3>🎯 KPI targets & colours</h3><div class="muted" style="font-size:12.5px">Used in emailed reports (green / amber / red) and to pick the KPIs that need an action plan.</div><div class="g2"><div><label class="lb">Good from (%)</label><input class="tx" type="number" data-t="good" value="' + C.thresholds.good + '"></div><div><label class="lb">Watch from (%) — below is red</label><input class="tx" type="number" data-t="warn" value="' + C.thresholds.warn + '"></div></div></div>';
+    h += '<div class="card"><h3>🧠 Action library</h3><div class="muted" style="font-size:12.5px">Suggested actions for each KPI (one per line). The first one is used automatically in action plans; the rest show as “More suggestions”.</div>' +
+      KP.map(function (k) { return '<label class="lb">' + k[1] + '</label><textarea class="tx" rows="3" data-a="' + k[0] + '">' + esc((C.actionLib[k[0]] || []).join("\n")) + "</textarea>"; }).join("") + "</div>";
+    h += '<div class="card"><h3>🧰 Tool defaults</h3><div class="g2"><div><label class="lb">Scheme calculator: TDS %</label><input class="tx" type="number" data-o="tdsPct" value="' + C.tools.tdsPct + '"></div><div><label class="lb">IMEI check: activated ≥ N days before sale upload</label><input class="tx" type="number" data-o="preActDays" value="' + C.tools.preActDays + '"></div>' +
+      '<div><label class="lb">IMEI check: bulk activations per dealer per day</label><input class="tx" type="number" data-o="bulkPerDay" value="' + C.tools.bulkPerDay + '"></div><div><label class="lb">IMEI check: uploaded but not activated after N days</label><input class="tx" type="number" data-o="notActDays" value="' + C.tools.notActDays + '"></div></div></div>';
+    h += '<div class="card"><h3>🔗 Other settings</h3><div class="lnk">' + [["🎛️", "Modules per state", "admin-tools.html", "#modules"], ["🗓️", "Auto-report schedule", "reports.html", "#auto"], ["🔌", "AI & research keys", "affordability.html", "#data"], ["🛡️", "Account security & email key", "security.html", "#list"], ["📥", "Import users", "admin-tools.html", "#import"], ["🪪", "vChat directory", "directory.html", "#list"]].concat(window.CUST && CUST.master ? [["🧩", "Studio (master)", "studio.html", "#list"]] : []).map(function (x, i) { return '<button data-o2="' + x[2] + "|" + x[3] + "|" + x[1] + '"><i>' + x[0] + "</i>" + esc(x[1]) + "</button>"; }).join("") + "</div></div>";
+    h += '<div class="savebar"><button class="btn pri block" id="sv" style="padding:13px">💾 Save settings</button></div>';
+    VIEW.innerHTML = h;
+    var mark = function () { dirty = true; };
+    [].forEach.call(VIEW.querySelectorAll("[data-c]"), function (el) { el.oninput = function () { var k = el.dataset.c; C[k] = k === "cc" ? el.value.split(/[\s,;]+/).filter(Boolean) : el.value; mark(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-l]"), function (el) { el.oninput = function () { var l = C.lists[+el.dataset.l], k = el.dataset.k; l[k] = k === "name" ? el.value : el.value.split(k === "states" ? /\s*,\s*/ : /[\s,;]+/).map(function (x) { return x.trim(); }).filter(Boolean); mark(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-lx]"), function (b) { b.onclick = function () { C.lists.splice(+b.dataset.lx, 1); mark(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (el) { el.oninput = function () { C.thresholds[el.dataset.t] = +el.value; mark(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-a]"), function (el) { el.oninput = function () { C.actionLib[el.dataset.a] = el.value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean); mark(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-o]"), function (el) { el.oninput = function () { C.tools[el.dataset.o] = +el.value; mark(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-o2]"), function (b) { b.onclick = function () { var p = b.dataset.o2.split("|"); open(p[0], p[2], p[1]); }; });
+    $("la").onclick = function () { C.lists.push({ id: uid ? uid() : String(Date.now()), name: "", emails: [], states: [] }); mark(); draw(); };
+    $("sv").onclick = function () {
+      $("sv").disabled = true;
+      api({ action: "ml-config", save: C }).then(function (r) { $("sv").disabled = false; if (!r.ok) return toast(r.error); C = r.config; dirty = false; toast("Settings saved"); draw(); });
+    };
+  }
+  window.__pageBack = function () { if (dirty) { toast("You have unsaved changes — tap Save settings"); dirty = false; return true; } return false; };
+  load();
+})();
+</script>
+</body>
+</html>

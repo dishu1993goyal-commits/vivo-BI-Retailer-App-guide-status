@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IMEI hygiene check</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cbx{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin-top:8px;cursor:pointer}
+.cbx input[type=number]{width:64px;border:1px solid #DDE0EF;border-radius:8px;padding:3px 6px;font:inherit}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.tl{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 1px 8px rgba(20,24,51,.06)}.tl b{display:block;font-size:22px}.tl span{font-size:12px;color:var(--mut)}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card)}
+.tb th{background:#F3F4FA;text-align:left;padding:7px 8px;font-size:11px;color:var(--mut);position:sticky;top:0}
+.tb td{padding:6px 8px;border-top:1px solid #EEF0F6;vertical-align:top}.tb td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbw{overflow:auto;max-height:420px;margin-top:8px;border-radius:12px;border:1px solid #EEF0F6}
+.bar3{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:6px}.bar3 .tr{flex:1;height:9px;background:#EEF0F6;border-radius:99px;overflow:hidden}.bar3 .tr i{display:block;height:100%;background:#E05757}
+.gr{display:inline-block;min-width:22px;text-align:center;border-radius:6px;font-weight:800;color:#fff;padding:1px 5px}
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#hygcheck">📘 How to</a></div>
+  <h1>IMEI hygiene check</h1><p>Find pre-activations, bulk activations and dummy uploads in your IMEI sheet — on your phone</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), FILE = null, MAP = ls("hc-map") || {}, OPT = null, RES = null;
+  var FIELDS = [["imei", "IMEI *", /imei|serial/], ["upload", "Sale upload date", /upload|sell.?out|sale date|sales date|billing|invoice date|tertiary/], ["activation", "Activation date", /activ/], ["dealerCode", "Dealer / retailer code", /dealer.?code|retailer.?(id|code)|rid|outlet.?code|store.?code|party.?code/], ["dealer", "Dealer / retailer name", /dealer|retailer|outlet|store|party|firm/], ["state", "State", /^state/], ["city", "City / district", /city|district|town/], ["model", "Model", /model|product|sku/]];
+  var XL = null;
+  function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader — check the internet connection.")); }; document.head.appendChild(s); })); }
+  function day(v) {   // → "YYYY-MM-DD" or ""
+    if (v == null || v === "") return "";
+    if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() - v.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10);
+    var s = String(v).trim(), m;
+    if ((m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s))) return m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0");
+    if ((m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/.exec(s))) { var y = m[3].length === 2 ? "20" + m[3] : m[3]; return y + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0"); }
+    var MO = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+    if ((m = /^(\d{1,2})[-\s/]([a-z]{3})[a-z]*[-\s/,]+(\d{2,4})/i.exec(s)) && MO[m[2].toLowerCase()]) { var y2 = m[3].length === 2 ? "20" + m[3] : m[3]; return y2 + "-" + String(MO[m[2].toLowerCase()]).padStart(2, "0") + "-" + m[1].padStart(2, "0"); }
+    if (/^\d{5}(\.\d+)?$/.test(s)) return day(+s);
+    return "";
+  }
+  var dd = function (a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 864e5); };
+  function luhn(s) { var sum = 0; for (var i = 0; i < s.length; i++) { var d = +s[s.length - 1 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } sum += d; } return sum % 10 === 0; }
+  function start() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "tl-use", tool: "hygcheck" });
+    api({ action: "ml-config" }).then(function (r) { var t = (r.ok && r.config.tools) || {}; OPT = Object.assign({ pre: true, preDays: t.preActDays != null ? t.preActDays : 1, noUp: true, bulk: true, bulkN: t.bulkPerDay || 10, notAct: true, notActDays: t.notActDays || 30, dup: true, bad: true }, ls("hc-opt") || {}); step1(); });
+  }
+  function step1() {
+    VIEW.innerHTML = '<div class="card"><h3>📤 Upload the IMEI sheet</h3><div class="muted" style="font-size:13px">Excel or CSV with one row per IMEI — IMEI, sale upload date, activation date, dealer, state… (the vWork / activation dump). Nothing leaves your phone until you choose to send it.</div><div class="row" style="margin-top:10px"><button class="btn pri" id="up">📄 Choose file</button><button class="btn ghost" id="sm">⬇ Sample sheet</button></div></div>' +
+      '<div class="card"><h3>What gets flagged</h3><div class="muted" style="font-size:13px;line-height:1.6">• <b>Pre-activation</b> — activated before the sale was uploaded<br>• <b>Activated, no sale upload</b><br>• <b>Bulk activation</b> — many activations at one dealer on one day<br>• <b>Dummy upload</b> — uploaded but still not activated after many days<br>• <b>Duplicate IMEIs</b> and <b>invalid IMEIs</b> (wrong length / check digit)</div></div>';
+    $("up").onclick = pick; $("sm").onclick = function () { download(xlsx([{ name: "IMEIs", rows: [["IMEI", "Model", "Dealer Code", "Dealer Name", "State", "City", "Sale Upload Date", "Activation Date"], ["356938035643809", "V80", "BRE010294", "Shree Mobiles", "Bihar", "Patna", "2026-10-12", "2026-10-09"], ["356938035643817", "Y300", "BRE010294", "Shree Mobiles", "Bihar", "Patna", "2026-10-12", "2026-10-13"], ["356938035643825", "T4", "BRE010300", "Raj Telecom", "Bihar", "Gaya", "2026-09-10", ""]] }]), "IMEI_hygiene_sample.xlsx"); };
+  }
+  function pick() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return;
+      VIEW.insertAdjacentHTML("afterbegin", '<div class="loading" id="ld"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>");
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = window.XLSX.read(buf, { type: "array" }), best = null;
+        wb.SheetNames.forEach(function (n) { var rows = window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }); var hi = rows.findIndex(function (r, i) { return i < 30 && r.filter(function (v) { return String(v).trim(); }).length >= 2 && r.some(function (v) { v = String(v).trim(); return /^imei|imei\s*(no|number|1)?\.?$/i.test(v) && v.length < 25; }); }); if (hi >= 0 && (!best || rows.length > best.rows.length)) best = { sheet: n, rows: rows, hi: hi }; });
+        if (!best) throw new Error("No column called IMEI was found in any sheet.");
+        var head = best.rows[best.hi].map(function (h) { return String(h).trim(); }), body = best.rows.slice(best.hi + 1).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); });
+        FILE = { name: f.name, sheet: best.sheet, head: head, body: body.slice(0, 200000) };
+        FIELDS.forEach(function (fd) { var saved = MAP[fd[0]], i = saved != null ? head.indexOf(saved) : -1; if (i < 0) i = head.findIndex(function (h, k) { return fd[2].test(h.toLowerCase()) && !FIELDS.some(function (o) { return o !== fd && MAP["_" + o[0]] === k; }); }); MAP["_" + fd[0]] = i; });
+        if (MAP._dealer === MAP._dealerCode) MAP._dealer = head.findIndex(function (h, k) { return k !== MAP._dealerCode && /name/.test(h.toLowerCase()) && /dealer|retailer|outlet|store|party|firm/.test(h.toLowerCase()); });
+        step2();
+      }).catch(function (e) { if ($("ld")) $("ld").remove(); toast(e.message || "Couldn't read the file."); });
+    };
+    inp.click();
+  }
+  function step2() {
+    var h = '<div class="card"><h3>📄 ' + esc(FILE.name) + '</h3><div class="muted" style="font-size:12.5px">Sheet “' + esc(FILE.sheet) + "” · " + FILE.body.length + ' rows</div><div class="g2">' + FIELDS.map(function (fd) { return '<div><label class="lb">' + fd[1] + '</label><select class="tx" data-m="' + fd[0] + '"><option value="-1">— not in the sheet —</option>' + FILE.head.map(function (x, i) { return '<option value="' + i + '"' + (MAP["_" + fd[0]] === i ? " selected" : "") + ">" + esc(x || "Column " + (i + 1)) + "</option>"; }).join("") + "</select></div>"; }).join("") + "</div></div>" +
+      '<div class="card"><h3>⚙️ Rules</h3>' +
+      '<label class="cbx"><input type="checkbox" data-o="pre"' + (OPT.pre ? " checked" : "") + '><span>Pre-activation: activated at least <input type="number" data-n="preDays" value="' + OPT.preDays + '"> day(s) before the sale upload</span></label>' +
+      '<label class="cbx"><input type="checkbox" data-o="noUp"' + (OPT.noUp ? " checked" : "") + "><span>Activated but no sale upload</span></label>" +
+      '<label class="cbx"><input type="checkbox" data-o="bulk"' + (OPT.bulk ? " checked" : "") + '><span>Bulk activation: <input type="number" data-n="bulkN" value="' + OPT.bulkN + '"> or more activations at one dealer on the same day</span></label>' +
+      '<label class="cbx"><input type="checkbox" data-o="notAct"' + (OPT.notAct ? " checked" : "") + '><span>Dummy upload: uploaded but not activated after <input type="number" data-n="notActDays" value="' + OPT.notActDays + '"> days</span></label>' +
+      '<label class="cbx"><input type="checkbox" data-o="dup"' + (OPT.dup ? " checked" : "") + "><span>Same IMEI more than once</span></label>" +
+      '<label class="cbx"><input type="checkbox" data-o="bad"' + (OPT.bad ? " checked" : "") + "><span>Invalid IMEI (not 15 digits or wrong check digit)</span></label>" +
+      '<div class="row" style="margin-top:12px"><button class="btn ghost" id="bk">← Other file</button><button class="btn pri grow" id="go">🔎 Check IMEIs</button></div></div><div id="out"></div>';
+    VIEW.innerHTML = h;
+    [].forEach.call(VIEW.querySelectorAll("[data-m]"), function (s) { s.onchange = function () { var i = +s.value; MAP["_" + s.dataset.m] = i; MAP[s.dataset.m] = i >= 0 ? FILE.head[i] : null; ls("hc-map", MAP); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-o]"), function (c) { c.onchange = function () { OPT[c.dataset.o] = c.checked; ls("hc-opt", OPT); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-n]"), function (c) { c.onclick = function (e) { e.stopPropagation(); }; c.oninput = function () { OPT[c.dataset.n] = +c.value || 0; ls("hc-opt", OPT); }; });
+    $("bk").onclick = step1; $("go").onclick = run;
+    FIELDS.forEach(function (fd) { if (MAP["_" + fd[0]] >= 0) MAP[fd[0]] = FILE.head[MAP["_" + fd[0]]]; }); ls("hc-map", MAP);
+  }
+  function run() {
+    if (MAP._imei < 0) return toast("Choose the IMEI column.");
+    var g = function (r, k) { var i = MAP["_" + k]; return i >= 0 ? r[i] : ""; };
+    var rows = FILE.body.map(function (r, n) { return { n: n, imei: String(g(r, "imei")).replace(/\.0+$/, "").replace(/\D/g, ""), up: day(g(r, "upload")), act: day(g(r, "activation")), code: String(g(r, "dealerCode")).trim(), dealer: String(g(r, "dealer")).trim(), state: String(g(r, "state")).trim(), city: String(g(r, "city")).trim(), model: String(g(r, "model")).trim(), why: [] }; });
+    var asOf = ""; rows.forEach(function (r) { if (r.up > asOf) asOf = r.up; if (r.act > asOf) asOf = r.act; });
+    var cnt = {}, bulk = {};
+    rows.forEach(function (r) { if (r.imei) cnt[r.imei] = (cnt[r.imei] || 0) + 1; if (r.act) { var k = (r.code || r.dealer) + "|" + r.act; bulk[k] = (bulk[k] || 0) + 1; } });
+    var hasUp = MAP._upload >= 0, hasAct = MAP._activation >= 0;
+    rows.forEach(function (r) {
+      if (OPT.bad && (r.imei.length !== 15 || !luhn(r.imei))) r.why.push(["Invalid IMEI", r.imei.length !== 15 ? r.imei.length + " digits" : "check digit wrong"]);
+      if (OPT.dup && r.imei && cnt[r.imei] > 1) r.why.push(["Duplicate IMEI", "appears " + cnt[r.imei] + " times"]);
+      if (OPT.pre && hasUp && hasAct && r.act && r.up && dd(r.act, r.up) >= OPT.preDays) r.why.push(["Pre-activation", "activated " + dd(r.act, r.up) + " day(s) before sale upload"]);
+      if (OPT.noUp && hasUp && hasAct && r.act && !r.up) r.why.push(["Activated, no sale upload", "activated " + r.act]);
+      if (OPT.notAct && hasUp && hasAct && r.up && !r.act && asOf && dd(r.up, asOf) >= OPT.notActDays) r.why.push(["Dummy upload", "uploaded " + dd(r.up, asOf) + " days ago, not activated"]);
+      if (OPT.bulk && r.act && (r.code || r.dealer) && bulk[(r.code || r.dealer) + "|" + r.act] >= OPT.bulkN) r.why.push(["Bulk activation", bulk[(r.code || r.dealer) + "|" + r.act] + " activations on " + r.act]);
+    });
+    var flagged = rows.filter(function (r) { return r.why.length; }), reasons = {};
+    flagged.forEach(function (r) { r.why.forEach(function (w) { reasons[w[0]] = (reasons[w[0]] || 0) + 1; }); });
+    var dl = {}; rows.forEach(function (r) { var k = r.code || r.dealer || "(no dealer)"; var d = dl[k] = dl[k] || { code: r.code, dealer: r.dealer, state: r.state, city: r.city, total: 0, flagged: 0, pre: 0 }; d.total++; if (r.why.length) d.flagged++; if (r.why.some(function (w) { return w[0] === "Pre-activation"; })) d.pre++; });
+    var dealers = Object.keys(dl).map(function (k) { var d = dl[k]; d.score = Math.round((1 - d.flagged / d.total) * 100); d.grade = d.score >= 90 ? "A" : d.score >= 75 ? "B" : d.score >= 50 ? "C" : "D"; return d; }).sort(function (a, b) { return b.flagged - a.flagged || a.score - b.score; });
+    RES = { rows: rows, flagged: flagged, reasons: reasons, dealers: dealers, asOf: asOf };
+    draw();
+  }
+  function draw() {
+    var R = RES, mx = Math.max.apply(null, [1].concat(Object.values(R.reasons))), GC = { A: "#1E9E61", B: "#4D9BF9", C: "#E69A00", D: "#E05757" };
+    var h = '<div class="tiles"><div class="tl"><b>' + R.rows.length + "</b><span>IMEIs checked</span></div><div class=\"tl\"><b style=\"color:#E05757\">" + R.flagged.length + "</b><span>flagged (" + (R.rows.length ? Math.round(R.flagged.length / R.rows.length * 1000) / 10 : 0) + "%)</span></div><div class=\"tl\"><b>" + R.dealers.filter(function (d) { return d.flagged; }).length + "</b><span>dealers with flags</span></div><div class=\"tl\"><b>" + R.dealers.filter(function (d) { return d.grade === "D"; }).length + "</b><span>dealers in grade D</span></div></div>";
+    h += '<div class="card"><h3>Why IMEIs were flagged</h3>' + (Object.keys(R.reasons).length ? Object.keys(R.reasons).sort(function (a, b) { return R.reasons[b] - R.reasons[a]; }).map(function (k) { return '<div class="bar3"><span style="width:150px">' + esc(k) + '</span><span class="tr"><i style="width:' + Math.round(R.reasons[k] / mx * 100) + '%"></i></span><b>' + R.reasons[k] + "</b></div>"; }).join("") : '<div class="muted">Nothing suspicious found with these rules. 👍</div>') + (R.asOf ? '<div class="muted" style="font-size:11.5px;margin-top:6px">Latest date in the sheet: ' + R.asOf + " (used for the dummy-upload rule)</div>" : "") + "</div>";
+    h += '<div class="card"><h3>Dealers — most flags first</h3><div class="tbw"><table class="tb"><tr><th>Dealer</th><th>State</th><th class="n">IMEIs</th><th class="n">Flagged</th><th class="n">Pre-act</th><th class="n">Score</th><th>Grade</th></tr>' + R.dealers.slice(0, 150).map(function (d) { return "<tr><td><b>" + esc(d.dealer || d.code) + "</b>" + (d.code && d.dealer ? '<br><span class="muted" style="font-size:11px">' + esc(d.code) + (d.city ? " · " + esc(d.city) : "") + "</span>" : "") + "</td><td>" + esc(d.state) + '</td><td class="n">' + d.total + '</td><td class="n">' + d.flagged + '</td><td class="n">' + d.pre + '</td><td class="n">' + d.score + '</td><td><span class="gr" style="background:' + GC[d.grade] + '">' + d.grade + "</span></td></tr>"; }).join("") + "</table></div></div>";
+    h += '<div class="card"><h3>Flagged IMEIs</h3><div class="tbw"><table class="tb"><tr><th>IMEI</th><th>Dealer</th><th>Upload</th><th>Activation</th><th>Reason</th></tr>' + R.flagged.slice(0, 300).map(function (r) { return "<tr><td>" + esc(r.imei) + (r.model ? '<br><span class="muted" style="font-size:11px">' + esc(r.model) + "</span>" : "") + "</td><td>" + esc(r.dealer || r.code) + "</td><td>" + esc(r.up) + "</td><td>" + esc(r.act) + "</td><td>" + r.why.map(function (w) { return "<b>" + esc(w[0]) + "</b> — " + esc(w[1]); }).join("<br>") + "</td></tr>"; }).join("") + "</table></div>" + (R.flagged.length > 300 ? '<div class="muted" style="font-size:12px;margin-top:4px">Showing 300 of ' + R.flagged.length + " — download Excel for all.</div>" : "") +
+      '<div class="row" style="margin-top:10px"><button class="btn ok grow" id="xl">⬇ Download Excel</button>' + (ADMIN ? '<button class="btn pri grow" id="mh">🧼 Send to Market hygiene</button>' : "") + "</div>" + (ADMIN ? "" : '<div class="muted" style="font-size:12px;margin-top:6px">Share the Excel with your dealers / ASMs, or with HO to add to Market hygiene.</div>') + "</div>";
+    $("out").innerHTML = h;
+    $("xl").onclick = function () {
+      var fr = function (r) { return [r.imei, r.model, r.code, r.dealer, r.state, r.city, r.up, r.act, r.why.map(function (w) { return w[0]; }).join(", "), r.why.map(function (w) { return w[1]; }).join("; ")]; };
+      var hd = ["IMEI", "Model", "Dealer code", "Dealer", "State", "City", "Sale upload", "Activation", "Flags", "Details"];
+      download(xlsx([{ name: "Flagged IMEIs", rows: [hd].concat(R.flagged.map(fr)) }, { name: "Dealer summary", rows: [["Dealer code", "Dealer", "State", "City", "IMEIs", "Flagged", "Pre-activation", "Hygiene score", "Grade"]].concat(R.dealers.map(function (d) { return [d.code, d.dealer, d.state, d.city, d.total, d.flagged, d.pre, d.score, d.grade]; })) }, { name: "All IMEIs", rows: [hd].concat(R.rows.slice(0, 100000).map(fr)) }]), "IMEI_hygiene_" + (R.asOf || "check") + ".xlsx");
+      api({ action: "tl-use", tool: "hygcheck" });
+    };
+    if ($("mh")) $("mh").onclick = function () {
+      if (MAP._state < 0) return toast("Map the State column first — Market hygiene sends each IMEI to its state.");
+      var ok = R.flagged.filter(function (r) { return r.state && r.imei.length >= 14; });
+      if (!ok.length) return toast("No flagged IMEIs with a state.");
+      sheet("Send " + ok.length + " flagged IMEIs to Market hygiene?", "Each state's team will see its IMEIs and record the action taken.", [["🧼", "Send", function () {
+        api({ action: "hyg-upload", name: "IMEI check · " + FILE.name.replace(/\.\w+$/, "").slice(0, 50), dueDays: 7, rows: ok.slice(0, 20000).map(function (r) { return { imei: r.imei, state: r.state, model: r.model, dealerCode: r.code, dealer: r.dealer, city: r.city, activatedOn: r.act, reason: r.why.map(function (w) { return w[0] + " (" + w[1] + ")"; }).join("; ").slice(0, 120) }; }) })
+          .then(function (x) { toast(x.ok ? "Sent to " + Object.keys(x.states).length + " states" + (x.skippedCount ? " · " + x.skippedCount + " skipped" : "") : x.error); });
+      }, "pri"]]);
+    };
+    $("out").scrollIntoView({ behavior: "smooth" });
+  }
+  window.__pageBack = function () { if (FILE) { FILE = null; step1(); return true; } return false; };
+  start();
+})();
+</script>
+</body>
+</html>
