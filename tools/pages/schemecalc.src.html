@@ -172,7 +172,7 @@
     });
   }
   function readXls(buf) { return lib("xlsx").then(function () { var wb = window.XLSX.read(buf, { type: "array" }); return { text: wb.SheetNames.map(function (n) { return "## " + n + "\n" + window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }).map(function (r) { return r.join(" | "); }).join("\n"); }).join("\n\n") }; }); }
-  function readImage(file) { return new Promise(function (res) { var im = new Image(), u = URL.createObjectURL(file); im.onload = function () { var k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = im.width * k; c.height = im.height * k; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res({ text: "", images: [c.toDataURL("image/jpeg", 0.75)], scanned: true }); }; im.src = u; }); }
+  function readImage(file) { return new Promise(function (res, rej) { var im = new Image(), u = URL.createObjectURL(file); im.onerror = function () { rej(new Error(/hei[cf]/i.test(file.type + file.name) || file.heic ? "This photo is in HEIC format, which can't be opened here. Take a screenshot of it and upload the screenshot." : "Couldn't open this picture. Take a screenshot of it and upload the screenshot.")); }; im.onload = function () { var k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = im.width * k; c.height = im.height * k; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res({ text: "", images: [c.toDataURL("image/jpeg", 0.75)], scanned: true }); }; im.src = u; }); }
   function step1() {
     var p = PARSED;
     $("pane").innerHTML = '<div class="card"><h3 style="margin:0 0 4px">📄 Read the scheme circular</h3><div class="muted" style="font-size:13px">PDF, Word (.docx), Excel or a photo of the circular. The AI picks out slabs, minimum %, rates, kicker, maximum payout, period, sales basis, excluded EMI partners and negative incentives.</div>' +
@@ -191,8 +191,23 @@
         var f = inp.files[0]; if (!f) return; var nm = f.name.toLowerCase();
         if (/\.doc$/.test(nm)) return toast("Old .doc files can't be read. Open it in Word and save as .docx.");
         $("up").disabled = $("upi").disabled = true; $("pane").insertAdjacentHTML("afterbegin", '<div class="loading" id="rd"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>");
-        var reader = /^image\//.test(f.type) ? readImage(f) : f.arrayBuffer().then(function (buf) { return /\.pdf$/.test(nm) ? readPdf(buf) : /\.docx$/.test(nm) ? readDocx(buf) : /\.(xlsx|xls|csv)$/.test(nm) ? readXls(buf) : f.text().then(function (t) { return { text: t }; }); });
-        reader.then(function (x) { PARSED = { file: f.name, text: x.text || "" }; return parse(x.text, x.images, f.name); }).catch(function (e) { toast(e.message || "Couldn't read the file."); step1(); });
+        // Decide the file kind from its first bytes, not only its name/type — phones often hand over pictures with no type or a number as the name.
+        var reader = f.arrayBuffer().then(function (buf) {
+          if (!buf.byteLength) throw new Error("The phone handed over an empty file (0 bytes) for " + f.name + ". Open the picture in the Gallery, take a screenshot, and upload the screenshot — or pick it again from Files.");
+          var b = new Uint8Array(buf.slice(0, 16)), a = String.fromCharCode.apply(null, b), kind =
+            b[0] === 0xFF && b[1] === 0xD8 ? "image/jpeg" : b[0] === 0x89 && a.slice(1, 4) === "PNG" ? "image/png" : a.slice(0, 4) === "RIFF" && a.slice(8, 12) === "WEBP" ? "image/webp" : a.slice(0, 3) === "GIF" ? "image/gif" :
+            a.slice(4, 8) === "ftyp" && /hei|hev|mif1|msf1|avif/.test(a.slice(8, 12)) ? (/avif/.test(a.slice(8, 12)) ? "image/avif" : "image/heic") : a.slice(0, 4) === "%PDF" ? "pdf" : a.slice(0, 2) === "PK" ? "zip" : b[0] === 0xD0 && b[1] === 0xCF ? "ole" : /^image\//.test(f.type) ? f.type : "";
+          if (/^image\//.test(kind)) { var bl = new Blob([buf], { type: kind }); bl.name = f.name; bl.heic = kind === "image/heic"; return readImage(bl); }
+          if (kind === "pdf" || /\.pdf$/.test(nm)) return readPdf(buf);
+          if (kind === "zip" && /\.xlsx$/.test(nm)) return readXls(buf);
+          if (kind === "zip" || /\.docx$/.test(nm)) return readDocx(buf).catch(function () { return readXls(buf); });
+          if (kind === "ole") return /\.doc$/.test(nm) ? Promise.reject(new Error("Old .doc files can't be read. Open it in Word and save as .docx.")) : readXls(buf);
+          if (/\.(xlsx|xls|csv)$/.test(nm)) return readXls(buf);
+          var t = new TextDecoder().decode(buf), bad = (t.match(/\uFFFD|[\u0000-\u0008]/g) || []).length;
+          if (bad > t.length / 50) throw new Error("This file type can't be read. Upload a PDF, Word (.docx), Excel, or a photo/screenshot (JPG or PNG).");
+          return { text: t };
+        });
+        reader.then(function (x) { PARSED = { file: f.name, text: x.text || "" }; if (!String(x.text || "").trim() && !(x.images && x.images.length)) { PARSED.error = "Nothing readable was found in " + f.name + " (" + Math.round(f.size / 1024) + " KB). Try a screenshot of the circular, or the PDF."; return step1(); } return parse(x.text, x.images, f.name); }).catch(function (e) { PARSED = { file: f.name, text: "", error: e.message || "Couldn't read the file." }; step1(); });
       };
       inp.click();
     }
@@ -204,7 +219,7 @@
   // ---- on-device OCR (Tesseract, hosted with the site): used when no online AI can read pictures ----
   var OCRW = null, ocrN = 0, ocrCb = {};
   function ocrRun(buf, psm) {
-    if (!OCRW) { OCRW = new Worker("/vendor/ocr-worker.js?v=1"); OCRW.onmessage = function (e) { var f = ocrCb[e.data.id]; delete ocrCb[e.data.id]; if (f) f(e.data); }; }
+    if (!OCRW) { try { OCRW = new Worker("/vendor/ocr-worker.js?v=1"); } catch (e) { return Promise.resolve({ ok: false, error: "this phone's browser can't run the reader (" + e.message + ")" }); } OCRW.onerror = function (e) { Object.keys(ocrCb).forEach(function (k) { var f = ocrCb[k]; delete ocrCb[k]; f({ ok: false, error: "reader stopped: " + (e.message || "out of memory?") }); }); OCRW = null; }; OCRW.onmessage = function (e) { var f = ocrCb[e.data.id]; delete ocrCb[e.data.id]; if (f) f(e.data); }; }
     var langs = ls("sc-hindi") ? "eng+hin" : "eng";
     return new Promise(function (res) { var id = ++ocrN; ocrCb[id] = res; OCRW.postMessage({ id: id, op: "ocr", image: buf, langs: langs, psm: psm }, [buf]); });
   }
@@ -226,7 +241,7 @@
       passes.forEach(function (ps, i) {
         chain = chain.then(function () { say("Reading the picture on this device — page " + (pi + 1) + "/" + Math.min(images.length, 4) + ", step " + (i + 1) + "/3 (" + ps[2] + ")…"); return ocrPrep(src, ps[0]); })
           .then(function (buf) { return ocrRun(buf, ps[1]); })
-          .then(function (r) { if (r.ok && r.text.trim()) out.push("--- page " + (pi + 1) + " · " + ps[2] + " ---\n" + r.text.trim()); });
+          .then(function (r) { if (!r.ok) localOcr.err = localOcr.err || r.error; if (r.ok && r.text.trim()) out.push("--- page " + (pi + 1) + " · " + ps[2] + " ---\n" + r.text.trim()); });
       });
     });
     return chain.then(function () { return out.join("\n\n"); });
@@ -237,8 +252,9 @@
     if ($("use")) $("use").disabled = true;
     api({ action: "sc-parse", text: text || "", images: text ? undefined : images, fileName: file }).then(function (r) {
       if (!r.ok && r.visionFailed && images && images.length) {
+        localOcr.err = "";
         return localOcr(images, say).then(function (t) {
-          if (t.replace(/\s/g, "").length < 40) return { ok: false, error: "Couldn't find readable text in the picture. Try a sharper screenshot, the PDF, or type the slabs in step 2.", text: t };
+          if (t.replace(/\s/g, "").length < 40) return { ok: false, error: "Couldn't find readable text in the picture" + (localOcr.err ? " (" + localOcr.err + ")" : "") + ". " + r.error + " Try a sharper screenshot, the PDF, or use the NPO / other template below and type the slabs.", text: t };
           say("Text read on this device — AI is turning it into rules…");
           return api({ action: "sc-parse", text: t, fileName: file }).then(function (r2) { r2.text = r2.text || t; r2.ocr = "device"; return r2; });
         });
