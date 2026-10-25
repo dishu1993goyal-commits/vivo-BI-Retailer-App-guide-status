@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Face records</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.cbx{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin-top:10px;cursor:pointer}
+.cam{width:100%;padding:26px 12px;border:2px dashed #C9CDF7;border-radius:18px;background:#FAFAFF;font:700 16px inherit;color:var(--brand);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px}
+.cam span{font-size:40px}.cam small{font-weight:500;color:var(--mut);font-size:12.5px}
+.shot{position:relative;margin-top:10px;border-radius:14px;overflow:hidden;background:#111}
+.shot canvas{width:100%;display:block}
+.res{display:flex;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:12px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.res img,.res .ph{width:84px;height:84px;border-radius:14px;object-fit:cover;flex:none;background:#EEF0F6}
+.res b{font-size:16px;display:block}.res .m{font-size:12.5px;color:var(--mut);margin-top:2px}
+.cf{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:800;margin-top:5px}
+.pp{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:9px 10px;margin-top:7px;box-shadow:0 1px 6px rgba(20,24,51,.05);cursor:pointer}
+.pp img,.pp .ph{width:50px;height:50px;border-radius:12px;object-fit:cover;flex:none;background:#EEF0F6}
+.pp b{font-size:14px;display:block}.pp small{color:var(--mut);font-size:12px;display:block}
+.flt{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.flt .tx{flex:1;min-width:120px}
+.priv{background:#F4F5FF;border-radius:12px;padding:9px 11px;font-size:12px;color:var(--ink2);margin-top:10px;line-height:1.45}
+.mst{display:inline-block;background:#FFF1D6;color:#8A5300;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:800}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🙂</span></div>
+  <h1>Face records</h1><p id="h2">Register people once, recognise them by camera, keep check-in records</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/vendor/faceapi/face-api.js" defer></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = (location.hash || "").replace("#", "") || "scan", PEOPLE = null, MASTER = false, PICS = {}, READY = null, MINE = false;
+  var ROLES = ["Retailer", "Promoter / VBA", "Sales team", "Distributor", "Visitor", "Staff", "Other"];
+  var STRONG = 0.45, LIKELY = 0.55;
+  if (!/^(scan|add|people|log)$/.test(TAB)) TAB = "scan";
+  // ---------- face engine (on this device) ----------
+  function engine() {
+    if (READY) return READY;
+    READY = new Promise(function (res, rej) { var n = 0; (function wait() { if (window.faceapi) return res(); if (++n > 200) return rej(new Error("Couldn't load the face reader — check the internet connection.")); setTimeout(wait, 100); })(); })
+      .then(function () { var tf = faceapi.tf; return (tf.setBackend("webgl").catch(function () { return tf.setBackend("cpu"); })).then(function () { return tf.ready(); }); })
+      .then(function () { var u = "/vendor/faceapi/model"; return Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(u), faceapi.nets.faceLandmark68TinyNet.loadFromUri(u), faceapi.nets.faceRecognitionNet.loadFromUri(u)]); })
+      .catch(function (e) { READY = null; throw e; });
+    return READY;
+  }
+  function photoToCanvas(file) {
+    return new Promise(function (res, rej) {
+      var u = URL.createObjectURL(file), im = new Image();
+      im.onload = function () { var k = Math.min(1, 900 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas"); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c); };
+      im.onerror = function () { rej(new Error("Couldn't open the photo. Try again.")); }; im.src = u;
+    });
+  }
+  function analyse(canvas) {
+    return engine().then(function () {
+      return faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.45 })).withFaceLandmarks(true).withFaceDescriptors();
+    }).then(function (all) {
+      if (!all.length) throw new Error("No face found. Take the photo again — face the camera, good light, no mask or dark glasses.");
+      all.sort(function (a, b) { return b.detection.box.area - a.detection.box.area; });
+      var f = all[0], bx = f.detection.box, m = 0.45, x = Math.max(0, bx.x - bx.width * m), y = Math.max(0, bx.y - bx.height * m), w = Math.min(canvas.width - x, bx.width * (1 + 2 * m)), h = Math.min(canvas.height - y, bx.height * (1 + 2 * m));
+      var crop = function (max, q) { var k = Math.min(1, max / Math.max(w, h)), c = document.createElement("canvas"); c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext("2d").drawImage(canvas, x, y, w, h, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", q); };
+      var res = { desc: Array.from(f.descriptor), photo: crop(360, 0.85), small: crop(200, 0.72), faces: all.length, score: f.detection.score };
+      var g = canvas.getContext("2d"); g.lineWidth = Math.max(3, canvas.width / 150); g.strokeStyle = "#27C281"; g.strokeRect(bx.x, bx.y, bx.width, bx.height);
+      return res;
+    });
+  }
+  function dist(a, b) { var s = 0; for (var i = 0; i < 128; i++) { var d = a[i] - b[i]; s += d * d; } return Math.sqrt(s); }
+  function best(desc) { var r = null; (PEOPLE || []).forEach(function (p) { if (!p.desc) return; var d = dist(desc, p.desc); if (!r || d < r.d) r = { p: p, d: d }; }); return r; }
+  function conf(d) { return Math.max(0, Math.min(99, Math.round((1 - d / 1.1) * 100))); }
+  function take(cb) { var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "user"); inp.onchange = function () { if (inp.files[0]) cb(inp.files[0]); }; inp.click(); }
+  function people(force) { if (PEOPLE && !force) return Promise.resolve(PEOPLE); return api({ action: "face-list", mine: MINE }).then(function (r) { if (!r.ok) throw new Error(r.error); MASTER = r.master; PEOPLE = r.people; return PEOPLE; }); }
+  function pics(ids) { var need = ids.filter(function (id) { return !(id in PICS); }); if (!need.length) return Promise.resolve(); var chunks = []; for (var i = 0; i < need.length; i += 25) chunks.push(need.slice(i, i + 25)); return Promise.all(chunks.map(function (c) { return api({ action: "face-photo", ids: c }).then(function (r) { c.forEach(function (id) { PICS[id] = (r.photos && r.photos[id]) || ""; }); }); })); }
+  function where() { return new Promise(function (res) { if (!navigator.geolocation) return res(null); var done = false; setTimeout(function () { if (!done) { done = true; res(null); } }, 6000); navigator.geolocation.getCurrentPosition(function (p) { if (!done) { done = true; res({ lat: p.coords.latitude, lng: p.coords.longitude }); } }, function () { if (!done) { done = true; res(null); } }, { enableHighAccuracy: true, timeout: 5500, maximumAge: 60000 }); }); }
+  // ---------- pages ----------
+  function render() {
+    var tabs = [["scan", "🔍 Recognise"], ["add", "➕ Register"], ["people", "👥 People"], ["log", "🕒 Check-ins"]];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; render(); }; });
+    ({ scan: scan, add: add, people: list, log: logs })[TAB]();
+  }
+  var PRIV = '<div class="priv">🔒 Faces are compared on this phone. Photos are saved only after the person agrees. ' + "You see the people you registered; master admins can see all records and delete any of them.</div>";
+  function scan() {
+    var P = $("pane");
+    P.innerHTML = '<div class="card"><button class="cam" id="cam"><span>📷</span>Take a photo to recognise<small>Front camera · face the camera in good light</small></button><div id="sres"></div></div>' + PRIV;
+    people().catch(function () { });
+    engine().catch(function () { });
+    $("cam").onclick = function () {
+      take(function (file) {
+        $("sres").innerHTML = '<div class="loading"><div class="spin"></div>Reading the face…</div>';
+        var cv;
+        Promise.all([photoToCanvas(file), people()]).then(function (x) { cv = x[0]; return analyse(cv); }).then(function (a) {
+          var m = best(a.desc), h = '<div class="shot"></div>';
+          if (m && m.d < LIKELY) {
+            var strong = m.d < STRONG, p = m.p;
+            h += '<div class="res"><div class="ph" id="mph"></div><div style="flex:1;min-width:0"><b>' + esc(p.name) + "</b><div class=\"m\">" + esc([p.role, p.refId, p.store, p.city].filter(Boolean).join(" · ")) + '</div><span class="cf" style="background:' + (strong ? "#E6F4EA;color:#0F7B4F" : "#FFF4E5;color:#B26A00") + '">' + (strong ? "Match" : "Possible match") + " · " + conf(m.d) + "%</span></div></div>" +
+              '<label class="lb">Note (optional)</label><input class="tx" id="cnote" placeholder="e.g. Attended training, collected payout">' +
+              '<div class="row" style="margin-top:10px"><button class="btn ok grow" id="cin">✅ Record check-in</button><button class="btn ghost" id="notp">Not this person</button></div>';
+          } else {
+            h += '<div class="res"><div class="ph" style="display:flex;align-items:center;justify-content:center;font-size:34px">❔</div><div><b>Not registered</b><div class="m">' + (PEOPLE.length ? "No one in your records matches this face." : "You haven't registered anyone yet.") + "</div></div></div>" +
+              '<div class="row" style="margin-top:10px"><button class="btn pri grow" id="reg">➕ Register this person</button><button class="btn ghost" id="anon">Record as visitor</button></div>';
+          }
+          if (a.faces > 1) h += '<div class="muted" style="font-size:12px;margin-top:6px">' + a.faces + " faces in the photo — used the biggest one.</div>";
+          $("sres").innerHTML = h; $("sres").querySelector(".shot").appendChild(cv);
+          if (m && m.d < LIKELY) {
+            pics([m.p.id]).then(function () { if ($("mph") && PICS[m.p.id]) $("mph").outerHTML = '<img src="' + PICS[m.p.id] + '" alt="">'; });
+            $("cin").onclick = function () { checkin(m.p, m.d, a, $("cnote").value); };
+            $("notp").onclick = function () { $("cin").disabled = true; $("notp").outerHTML = '<button class="btn pri" id="reg2">➕ Register as new</button>'; $("reg2").onclick = function () { DRAFT = a; TAB = "add"; render(); }; };
+          } else {
+            $("reg").onclick = function () { DRAFT = a; TAB = "add"; render(); };
+            $("anon").onclick = function () { checkin(null, null, a, "Visitor (not registered)"); };
+          }
+        }).catch(function (e) { $("sres").innerHTML = '<div class="err" style="margin-top:10px">' + esc(e.message || e) + "</div>"; });
+      });
+    };
+  }
+  function checkin(p, d, a, note) {
+    var btn = $("cin") || $("anon"); if (btn) btn.disabled = true;
+    where().then(function (loc) {
+      return api({ action: "face-checkin", person: p ? p.id : "", name: p ? "" : "Visitor", score: d == null ? 0 : 1 - d / 1.1, photo: a.small, note: note || "", lat: loc && loc.lat, lng: loc && loc.lng });
+    }).then(function (r) {
+      if (!r.ok) { toast(r.error); if (btn) btn.disabled = false; return; }
+      toast("Check-in recorded" + (p ? " for " + p.name : ""));
+      $("sres").insertAdjacentHTML("beforeend", '<div class="notice info" style="margin-top:10px">✅ Recorded at ' + new Date(r.log.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + (r.log.lat != null ? " · location saved" : "") + "</div>");
+    });
+  }
+  var DRAFT = null, EDIT = null;
+  function add() {
+    var P = $("pane"), e = EDIT || {};
+    P.innerHTML = '<div class="card">' + (EDIT ? "<h3>✏️ Update " + esc(EDIT.name) + "</h3>" : "") + '<button class="cam" id="cam"><span>📷</span>' + (DRAFT ? "Photo taken — tap to retake" : EDIT ? "Take a new photo (needed to update)" : "Take the person's photo") + '<small>One person, facing the camera, good light</small></button><div id="ashot"></div>' +
+      '<label class="lb">Name *</label><input class="tx" id="fn" value="' + esc(e.name || "") + '">' +
+      '<label class="lb">Role</label><select class="tx" id="fr">' + ROLES.map(function (r) { return "<option" + (r === e.role ? " selected" : "") + ">" + r + "</option>"; }).join("") + "</select>" +
+      '<label class="lb">Retailer ID / mobile / employee ID</label><input class="tx" id="fi" value="' + esc(e.refId || "") + '">' +
+      '<div class="row"><div class="grow"><label class="lb">Store / firm</label><input class="tx" id="fs" value="' + esc(e.store || "") + '"></div><div class="grow"><label class="lb">City</label><input class="tx" id="fc" value="' + esc(e.city || "") + '"></div></div>' +
+      '<label class="lb">Notes</label><textarea class="tx" id="fo" rows="2">' + esc(e.notes || "") + "</textarea>" +
+      '<label class="cbx"><input type="checkbox" id="fk"' + (EDIT ? " checked" : "") + "> <span>The person agreed to have their photo and face saved for vivo BI records.</span></label>" +
+      '<div id="dup"></div><button class="btn pri block" id="fsv" style="margin-top:12px;padding:12px">💾 ' + (EDIT ? "Update" : "Register") + " person</button>" + (EDIT ? '<button class="btn ghost block" id="fcx" style="margin-top:6px">Cancel</button>' : "") + "</div>" + PRIV;
+    var showDraft = function () {
+      if (!DRAFT) return; $("ashot").innerHTML = '<div class="res"><img src="' + DRAFT.photo + '" alt=""><div><b>Face captured ✓</b><div class="m">' + (DRAFT.faces > 1 ? DRAFT.faces + " faces in the photo — the biggest one is used." : "Clear face found.") + "</div></div></div>";
+      people().then(function () { var m = best(DRAFT.desc); $("dup").innerHTML = m && m.d < STRONG && (!EDIT || m.p.id !== EDIT.id) ? '<div class="notice" style="margin-top:10px">⚠️ This looks like <b>' + esc(m.p.name) + "</b> (" + conf(m.d) + "% match), already registered. Check before registering again.</div>" : ""; });
+    };
+    showDraft();
+    $("cam").onclick = function () { take(function (f) { $("ashot").innerHTML = '<div class="loading"><div class="spin"></div>Reading the face…</div>'; photoToCanvas(f).then(analyse).then(function (a) { DRAFT = a; showDraft(); }).catch(function (er) { DRAFT = null; $("ashot").innerHTML = '<div class="err" style="margin-top:8px">' + esc(er.message) + "</div>"; }); }); };
+    if ($("fcx")) $("fcx").onclick = function () { EDIT = null; DRAFT = null; TAB = "people"; render(); };
+    $("fsv").onclick = function () {
+      if (!DRAFT) return toast(EDIT ? "Take a new photo to update." : "Take the person's photo first.");
+      if (!$("fn").value.trim()) return toast("Enter the name.");
+      if (!$("fk").checked) return toast("Tick that the person agreed.");
+      this.disabled = true;
+      api({ action: "face-enrol", id: EDIT ? EDIT.id : "", name: $("fn").value, role: $("fr").value, refId: $("fi").value, store: $("fs").value, city: $("fc").value, notes: $("fo").value, consent: true, desc: DRAFT.desc, photo: DRAFT.photo }).then(function (r) {
+        if (!r.ok) { toast(r.error); $("fsv").disabled = false; return; }
+        PICS[r.person.id] = DRAFT.photo; PEOPLE = null; DRAFT = null; EDIT = null; toast("Saved " + r.person.name); TAB = "people"; render();
+      });
+    };
+  }
+  function list() {
+    var P = $("pane"); P.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    people(true).then(function () {
+      var users = {}; PEOPLE.forEach(function (p) { var k = p.by ? p.by.name + (p.by.state ? " · " + p.by.state : "") : "?"; users[k] = 1; });
+      P.innerHTML = (MASTER ? '<div class="row" style="margin-top:8px"><span class="mst">MASTER · ' + (MINE ? "showing only yours" : "all users' records") + '</span><button class="btn ghost sm" id="mine">' + (MINE ? "Show everyone's" : "Show only mine") + "</button></div>" : "") +
+        '<div class="flt"><input class="tx" id="q" placeholder="Search name, ID, store, city"><select class="tx" id="fr2"><option value="">All roles</option>' + ROLES.map(function (r) { return "<option>" + r + "</option>"; }).join("") + "</select>" + (MASTER && !MINE ? '<select class="tx" id="fu"><option value="">Everyone</option>' + Object.keys(users).sort().map(function (u) { return "<option>" + esc(u) + "</option>"; }).join("") + "</select>" : "") + '</div><div class="muted" id="cnt" style="font-size:12px;margin-top:6px"></div><div id="pl"></div><button class="btn ghost sm" id="xl" style="margin-top:10px">⬇ Excel</button>';
+      var draw = function () {
+        var q = $("q").value.toLowerCase(), r0 = $("fr2").value, u0 = $("fu") ? $("fu").value : "";
+        var rows = PEOPLE.filter(function (p) { return (!q || [p.name, p.refId, p.store, p.city, p.notes].join(" ").toLowerCase().indexOf(q) >= 0) && (!r0 || p.role === r0) && (!u0 || (p.by && p.by.name + (p.by.state ? " · " + p.by.state : "")) === u0); });
+        $("cnt").textContent = rows.length + " " + (rows.length === 1 ? "person" : "people");
+        $("pl").innerHTML = rows.slice(0, 300).map(function (p) { return '<div class="pp" data-id="' + p.id + '">' + (PICS[p.id] ? '<img src="' + PICS[p.id] + '" alt="">' : '<div class="ph" data-ph="' + p.id + '"></div>') + "<div style=\"flex:1;min-width:0\"><b>" + esc(p.name) + "</b><small>" + esc([p.role, p.refId, p.store, p.city].filter(Boolean).join(" · ")) + "</small>" + (MASTER && !p.mine && p.by ? "<small>By " + esc(p.by.name) + (p.by.state ? " · " + esc(p.by.state) : "") + " · " + dt(p.at) + "</small>" : "") + "</div></div>"; }).join("") || '<div class="empty">No one registered yet. Use ➕ Register.</div>';
+        pics(rows.slice(0, 60).map(function (p) { return p.id; })).then(function () { [].forEach.call($("pl").querySelectorAll("[data-ph]"), function (d) { var u = PICS[d.dataset.ph]; if (u) d.outerHTML = '<img src="' + u + '" alt="">'; }); });
+        [].forEach.call($("pl").querySelectorAll(".pp"), function (d) { d.onclick = function () { person(PEOPLE.find(function (p) { return p.id === d.dataset.id; })); }; });
+      };
+      $("q").oninput = draw; $("fr2").onchange = draw; if ($("fu")) $("fu").onchange = draw;
+      if ($("mine")) $("mine").onclick = function () { MINE = !MINE; PEOPLE = null; list(); };
+      $("xl").onclick = function () { download(xlsx([{ name: "People", rows: [["Name", "Role", "ID / mobile", "Store", "City", "State", "Notes", "Registered by", "Registered on"]].concat(PEOPLE.map(function (p) { return [p.name, p.role, p.refId, p.store, p.city, p.state, p.notes, p.by ? p.by.name : "", dt(p.at)]; })) }]), "Face_records_people.xlsx"); };
+      draw();
+    }).catch(function (e) { P.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+  }
+  function person(p) {
+    pics([p.id]).then(function () {
+      var can = p.mine || MASTER;
+      var ov = sheet(p.name, [p.role, p.refId].filter(Boolean).join(" · "), (can ? [["✏️", "Update details / photo", function () { EDIT = p; DRAFT = null; TAB = "add"; render(); }], ["🗑️", "Delete this person", function () { sheet("Delete " + p.name + "?", "Their photo and face are removed. Past check-ins stay in the log.", [["🗑️", "Delete", function () { api({ action: "face-delete", id: p.id }).then(function (r) { if (!r.ok) return toast(r.error); PEOPLE = null; toast("Deleted"); list(); }); }, "danger"]]); }, "danger"]] : []),
+        '<div style="text-align:center;margin-top:10px">' + (PICS[p.id] ? '<img src="' + PICS[p.id] + '" style="width:160px;height:160px;border-radius:18px;object-fit:cover" alt="">' : "") + '</div><div class="muted" style="font-size:13px;margin-top:8px;line-height:1.6">' + [p.store && "Store: " + esc(p.store), p.city && "City: " + esc(p.city), p.state && "State: " + esc(p.state), p.notes && "Notes: " + esc(p.notes), p.by && "Registered by " + esc(p.by.name) + " on " + dt(p.at)].filter(Boolean).join("<br>") + "</div>");
+    });
+  }
+  function logs() {
+    var P = $("pane"), t = new Date(), f = new Date(Date.now() - 30 * 864e5), iso = function (d) { return d.toISOString().slice(0, 10); };
+    P.innerHTML = '<div class="card"><div class="row"><input class="tx grow" type="date" id="lf" value="' + iso(f) + '"><input class="tx grow" type="date" id="lt" value="' + iso(t) + '"><button class="btn sec sm" id="lg">Show</button></div>' + (MASTER ? '<label class="cbx"><input type="checkbox" id="lm"' + (MINE ? " checked" : "") + "> Only my check-ins</label>" : "") + '</div><div id="ll"></div>';
+    var go = function () {
+      $("ll").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+      api({ action: "face-logs", from: $("lf").value, to: $("lt").value, mine: MASTER ? ($("lm") ? $("lm").checked : true) : true }).then(function (r) {
+        if (!r.ok) { $("ll").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+        var L = r.logs;
+        $("ll").innerHTML = '<div class="muted" style="font-size:12px;margin-top:8px">' + L.length + " check-ins</div>" + L.slice(0, 400).map(function (x) { return '<div class="pp" style="cursor:default"><div class="ph" style="display:flex;align-items:center;justify-content:center;font-size:22px">' + (x.person ? "🙂" : "❔") + '</div><div style="flex:1;min-width:0"><b>' + esc(x.name) + "</b><small>" + new Date(x.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + (x.score ? " · " + Math.round(x.score * 100) + "% match" : "") + (x.lat != null ? ' · <a href="https://maps.google.com/?q=' + x.lat + "," + x.lng + '" target="_blank" rel="noopener">map</a>' : "") + "</small>" + (x.note ? "<small>" + esc(x.note) + "</small>" : "") + (MASTER && x.by ? "<small>By " + esc(x.by.name) + (x.by.state ? " · " + esc(x.by.state) : "") + "</small>" : "") + "</div></div>"; }).join("") +
+          (L.length ? '<button class="btn ghost sm" id="lx" style="margin-top:10px">⬇ Excel</button>' : '<div class="empty">No check-ins in these dates.</div>');
+        if ($("lx")) $("lx").onclick = function () { download(xlsx([{ name: "Check-ins", rows: [["Date", "Time", "Name", "Role", "ID / mobile", "Store", "Match %", "Note", "Latitude", "Longitude", "Recorded by", "State"]].concat(L.map(function (x) { var d = new Date(x.at); return [d.toLocaleDateString("en-IN"), d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }), x.name, x.role, x.refId, x.store, x.score ? Math.round(x.score * 100) : "", x.note, x.lat, x.lng, x.by ? x.by.name : "", x.state]; })) }]), "Face_records_checkins.xlsx"); };
+      });
+    };
+    $("lg").onclick = go; go();
+  }
+  window.__pageBack = function () { if (TAB !== "scan") { TAB = "scan"; EDIT = null; render(); return true; } return false; };
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  api({ action: "tl-use", tool: "faces" });
+  people().then(function () { if (MASTER) $("h2").innerHTML = 'Register, recognise and keep records · <span class="mst">Master: all faces</span>'; }).catch(function () { }).then(render);
+})();
+</script>
+</body>
+</html>

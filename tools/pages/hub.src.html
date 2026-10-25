@@ -42,11 +42,11 @@
   // id, icon, label, module, target, badge(n)  — target "t:file#hash" opens a shared page; "n:name" a native screen (app) / web panel
   var CATS = [
     { id: "field", icon: "📍", name: "Field & market", sub: "In the market", col: "#E6F4EA", items: [
-      ["visits", "📍", "Market visits", "visits", "t:visits.html"], ["affordability", "💳", "Affordability", "affordability", "t:affordability.html"], ["hygiene", "🧼", "Market hygiene", "hygiene", "t:hygiene.html", function () { return N.hygiene; }]] },
+      ["visits", "📍", "Market visits", "visits", "t:visits.html"], ["affordability", "💳", "Affordability", "affordability", "t:affordability.html"], ["hygiene", "🧼", "Market hygiene", "hygiene", "t:hygiene.html", function () { return N.hygiene; }], ["faces", "🙂", "Face records", null, "t:faces.html"]] },
     { id: "reports", icon: "📊", name: "Reports & insights", sub: "Numbers", col: "#EEF0FF", items: [
       ["reports", "📑", "Report builder", "reports", "t:reports.html#build"], ["autoreports", "🗓️", "Auto-reports", "autoreports", "t:reports.html#auto", function () { return N.autorep; }],
       ["leaderboard", "🏆", "Leaderboard", "leaderboard", "t:engage.html#board"], ["matrix", "🧩", "Feature usability", "matrix", "t:matrix.html", function () { return N.matrix; }],
-      ["mailer", "📧", "Email reports to states", null, "t:mailer.html#compose", null, "admin"], ["hoinbox", "📬", "Reports from HO", null, "t:mailer.html#inbox", function () { return N.hoReports; }, "state"]] },
+      ["statemap", "🗺️", "India state map", null, "t:statemap.html", null, "admin"], ["mailer", "📧", "Email reports to states", null, "t:mailer.html#compose", null, "admin"], ["hoinbox", "📬", "Reports from HO", null, "t:mailer.html#inbox", function () { return N.hoReports; }, "state"]] },
     { id: "engage", icon: "💬", name: "Engage", sub: "Team", col: "#F4EEFF", items: [
       ["quiz", "🎓", "Quizzes", "quiz", "t:engage.html#quiz", function () { return N.quizNew; }], ["polls", "🗳️", "Polls", "polls", "t:engage.html#polls", function () { return N.pollNew; }],
       ["wall", "💡", "Best practices", "wall", "t:engage.html#wall"], ["surveys", "📋", "Surveys", "surveys", "t:survey.html", function () { return N.surveys; }], ["chat", "✉️", "Messages", "chat", "t:chat.html", function () { return N.chat; }]] },

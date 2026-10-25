@@ -15,6 +15,7 @@ import { inviteAdminAction, INVITE_DAYS } from "./invite-core.mjs";
 import { toolsAction } from "./tools-core.mjs";
 import { schemeCalcAction } from "./schemecalc-core.mjs";
 import { mailerAction } from "./mailer-core.mjs";
+import { extrasAction, extrasPublic, servePublicImage } from "./extras-core.mjs";
 const THEME_IDS = ["signature", "classic", "aurora", "emerald", "royal", "sunrise", "midnight"];
 export function cleanTheme(c) {
   c = c && typeof c === "object" ? c : {};
@@ -457,6 +458,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         body: JSON.stringify({ app: u.searchParams.get("a"), username: u.searchParams.get("u"), token: u.searchParams.get("k"), action: "tl-ideas", op: body.action || "list", idea: body.idea, id: body.id, up: body.up, status: body.status }) });
     }
   } catch (e) { }
+  if (req.method === "GET") { try { const im = new URL(req.url).searchParams.get("img"); if (im) return await servePublicImage(im, store); } catch (e) { } }
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
   if (!env.GROQ_API_KEY) {   // key saved by an admin in Affordability Corner → Data → AI keys
     if (Date.now() - KEYCACHE.at > 60000) { try { KEYCACHE = { at: Date.now(), groq: ((await store.get("config:aikeys")) || {}).groq || "" }; } catch (e) { } }
@@ -471,6 +473,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   const t = now();
   // Theme chosen by HO for everyone (public: the login screen is themed too)
   if (b.action === "theme-get") return json(200, { ok: true, theme: cleanTheme(await store.get("config:theme")) });
+  { const pub = await extrasPublic(b, store); if (pub) return pub; }
   const uKeyOf = (k) => `user:${app}:${k}`;
   const pKeyOf = (p) => `phone:${app}:${p}`;
   const eKeyOf = (e) => `email:${app}:${e}`;
@@ -849,7 +852,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -954,6 +957,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("tl-")) return toolsAction(b, surveyCtx());
     if (b.action.startsWith("sc-")) return schemeCalcAction(b, surveyCtx());
     if (b.action.startsWith("ml-")) return mailerAction(b, Object.assign(surveyCtx(), { mailFetch }));
+    if (/^(bnr|map|face)-/.test(b.action)) return extrasAction(b, surveyCtx());
     if (b.action === "theme-set") {
       if (app !== "admin") return json(403, { ok: false, error: "Only HO admins set the theme for everyone." });
       const th = Object.assign(cleanTheme(b.theme), { by: rec.fullName || rec.username, at: t });

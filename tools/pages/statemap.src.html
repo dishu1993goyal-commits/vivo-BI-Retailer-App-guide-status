@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>India state map</title>
+<script src="kpi-data.js?v=3"></script>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mapw{background:var(--card);border-radius:16px;margin-top:12px;padding:8px;box-shadow:0 2px 10px rgba(20,24,51,.05);position:relative}
+.mapw svg{width:100%;height:auto;display:block;touch-action:manipulation}
+.mapw path{stroke:#fff;stroke-width:1.2;cursor:pointer;transition:opacity .15s}
+.mapw path.nd{fill:#E3E5EE}
+.mapw path.sel{stroke:#141833;stroke-width:3}
+.mapw text{font:700 15px system-ui,sans-serif;fill:#141833;paint-order:stroke;stroke:#fff;stroke-width:3px;pointer-events:none}
+.leg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;margin-top:6px;padding:0 6px}.leg i{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:4px}
+.tipc{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tipc h3{margin:0;font-size:17px;display:flex;align-items:center;gap:8px}.kg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.kg div{background:#F5F6FB;border-radius:10px;padding:8px}.kg b{display:block;font-size:16px}.kg span{font-size:11.5px;color:var(--mut)}
+.rk{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--card);border-radius:12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);cursor:pointer;font-size:13.5px}
+.rk i{width:12px;height:28px;border-radius:4px;flex:none}.rk b{flex:1}.rk small{color:var(--mut)}
+.chs9{display:flex;flex-wrap:wrap;gap:6px}.chs9 span{border:1px solid #DDE0EF;border-radius:99px;padding:4px 10px;font-size:12.5px;cursor:pointer;background:var(--card)}.chs9 span.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.mp{border:1px solid #E6E8F2;border-radius:12px;padding:8px 10px;margin-top:6px;font-size:13px}
+.src{font-size:10.5px;color:var(--mut);text-align:right;padding:2px 6px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🗺️</span></div>
+  <h1>India state map</h1><p>Every state's status at a glance — HO admins only</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading map and dashboard data…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), DATA = null, MAP = null, CFG = null, TH = { good: 80, warn: 50 }, REG = null, S = Object.assign({ m: "score", pa: "", pb: "", mode: "status", sel: "" }, ls("sm-opt") || {});
+  var METRICS = [["score", "Overall score"], ["rank", "Rank"], ["app", "Retailer App %"], ["sales", "Sales %"], ["visit", "Visit efficiency %"], ["comp", "Competition / SD %"], ["vnotice", "v-Notice %"], ["new", "New implementation %"], ["growth", "Score growth vs earlier period"]];
+  var DEF_REG = { "Arunachal Pradesh": ["North East"], "Assam": ["North East"], "Manipur": ["North East"], "Meghalaya": ["North East"], "Mizoram": ["North East"], "Nagaland": ["North East"], "Tripura": ["North East"], "Sikkim": ["North East"], "Ladakh": ["Jammu & Kashmir"], "Chandigarh": ["Punjab"], "Maharashtra": ["MHA", "MHN", "MHM", "MHP"] };
+  var STATUS = [["#1E9E61", "Good"], ["#E6A100", "Watch"], ["#E05757", "Needs action"]], RAMP = ["#FDE7E4", "#F8B4A8", "#F5D06F", "#9ED39B", "#3DA56A", "#1B6E44"];
+  function sv() { ls("sm-opt", S); }
+  function periods() {
+    var ms = DATA.months(), out = [], ld = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0"); };
+    var lab = function (m) { try { return DATA.KE.monthLabel ? DATA.KE.monthLabel(m) : m; } catch (e) { return m; } };
+    var qs = {}; ms.forEach(function (m) { var q = m.slice(0, 4) + " Q" + (Math.floor((+m.slice(5, 7) - 1) / 3) + 1); (qs[q] = qs[q] || []).push(m); });
+    Object.keys(qs).sort().reverse().forEach(function (q) { var l = qs[q]; out.push({ v: l[0] + "-01|" + ld(l[l.length - 1]), l: q }); });
+    ms.slice().reverse().forEach(function (m) { out.push({ v: m + "-01|" + ld(m), l: lab(m) }); });
+    return out;
+  }
+  function rows(pv) { var p = String(pv || "").split("|"); if (p.length < 2) return []; var sp = DATA.KE.scorePeriod(DATA.RAW, DATA.SETUP, p[0], p[1], "Total"); return (sp.kpi_state || []).filter(function (r) { return r.code !== "PAN" && r.state !== "Total" && r.state; }); }
+  function regionStates(region) {
+    var reg = REG && REG[region] ? REG[region] : DEF_REG[region] || [region];
+    return reg.filter(function (s) { return DATA.states.indexOf(s) >= 0; });
+  }
+  // value per dashboard state for the chosen metric
+  function values() {
+    var A = rows(S.pa), out = {}, B = S.m === "growth" ? rows(S.pb) : null, bm = {};
+    if (B) B.forEach(function (r) { bm[r.state] = r; });
+    A.forEach(function (r) {
+      var v = S.m === "growth" ? (bm[r.state] && bm[r.state].score != null && r.score != null ? r.score - bm[r.state].score : null) : r[S.m];
+      out[r.state] = { v: v, r: r, n: A.length };
+    });
+    return out;
+  }
+  function regionValue(region, V) {
+    var ss = regionStates(region).filter(function (s) { return V[s] && V[s].v != null; }); if (!ss.length) return null;
+    var avg = ss.reduce(function (a, s) { return a + V[s].v; }, 0) / ss.length;
+    return { v: avg, states: ss };
+  }
+  function colour(v, V) {
+    if (v == null) return null;
+    var m = S.m;
+    if (S.mode === "status") {
+      if (m === "rank") { var n = (Object.values(V)[0] || {}).n || 30; return v <= n / 3 ? STATUS[0][0] : v <= 2 * n / 3 ? STATUS[1][0] : STATUS[2][0]; }
+      if (m === "growth") return v > 0.5 ? STATUS[0][0] : v >= -0.5 ? STATUS[1][0] : STATUS[2][0];
+      if (m === "score") return v >= TH.good ? STATUS[0][0] : v >= TH.warn ? STATUS[1][0] : STATUS[2][0];
+      return v * 100 >= TH.good ? STATUS[0][0] : v * 100 >= TH.warn ? STATUS[1][0] : STATUS[2][0];
+    }
+    var all = Object.values(V).map(function (x) { return x.v; }).filter(function (x) { return x != null; }); var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+    var f = hi > lo ? (v - lo) / (hi - lo) : 1; if (m === "rank") f = 1 - f;
+    return RAMP[Math.min(RAMP.length - 1, Math.floor(f * RAMP.length))];
+  }
+  function fmt(v) { if (v == null) return "—"; if (S.m === "rank") return "#" + Math.round(v); if (S.m === "score") return String(Math.round(v * 10) / 10); if (S.m === "growth") return (v > 0 ? "+" : "") + Math.round(v * 10) / 10; return Math.round(v * 1000) / 10 + "%"; }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">The India state map is for HO admins.</div>'; return; }
+    Promise.all([KPIDATA.load(), fetch("india-states.json?v=1").then(function (r) { return r.json(); }), api({ action: "map-config" }), api({ action: "ml-config" })]).then(function (x) {
+      DATA = x[0]; MAP = x[1]; REG = x[2].ok && x[2].config && x[2].config.regions ? x[2].config.regions : null; if (x[3].ok && x[3].config.thresholds) TH = x[3].config.thresholds;
+      var po = periods(); if (!po.some(function (p) { return p.v === S.pa; })) S.pa = po[0].v; if (!po.some(function (p) { return p.v === S.pb; })) S.pb = (po[1] || po[0]).v;
+      draw();
+    }).catch(function (e) { VIEW.innerHTML = '<div class="err">' + esc(e.message || e) + "</div>"; });
+  }
+  function popts(sel) { return periods().map(function (p) { return '<option value="' + p.v + '"' + (p.v === sel ? " selected" : "") + ">" + esc(p.l) + "</option>"; }).join(""); }
+  function draw() {
+    var V = values(), RV = {};
+    Object.keys(MAP.paths).forEach(function (rg) { RV[rg] = regionValue(rg, V); });
+    var h = '<div class="card"><div class="ctl"><div><label class="lb">Show</label><select class="tx" id="mm">' + METRICS.map(function (m) { return '<option value="' + m[0] + '"' + (m[0] === S.m ? " selected" : "") + ">" + m[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Period</label><select class="tx" id="pa">' + popts(S.pa) + "</select></div>" +
+      (S.m === "growth" ? '<div><label class="lb">Compared with</label><select class="tx" id="pb">' + popts(S.pb) + "</select></div>" : "") +
+      '<div><label class="lb">Colours</label><select class="tx" id="md"><option value="status">Status (good / watch / action)</option><option value="ramp"' + (S.mode === "ramp" ? " selected" : "") + ">Shades (low → high)</option></select></div></div></div>";
+    var svg = '<svg viewBox="0 0 ' + MAP.w + " " + MAP.h + '" xmlns="http://www.w3.org/2000/svg" id="svg"><rect width="100%" height="100%" fill="#fff"/>' + Object.keys(MAP.paths).map(function (rg) {
+      var x = RV[rg], c = x ? colour(x.v, V) : null;
+      return '<path d="' + MAP.paths[rg] + '" data-r="' + esc(rg) + '" class="' + (c ? "" : "nd") + (S.sel === rg ? " sel" : "") + '"' + (c ? ' fill="' + c + '"' : "") + "><title>" + esc(rg) + (x ? " · " + fmt(x.v) : " · no data") + "</title></path>";
+    }).join("") + Object.keys(MAP.labels).map(function (rg) { var x = RV[rg], l = MAP.labels[rg]; return x && !/Chandigarh|Delhi|Puducherry|Lakshadweep|Dadra|Goa/.test(rg) ? '<text x="' + l[0] + '" y="' + l[1] + '" text-anchor="middle">' + esc(fmt(x.v)) + "</text>" : ""; }).join("") + "</svg>";
+    var leg = S.mode === "status" ? STATUS.map(function (s) { return "<span><i style=\"background:" + s[0] + '"></i>' + s[1] + "</span>"; }).join("") + (S.m === "score" || METRICS.slice(2, 8).some(function (m) { return m[0] === S.m; }) ? '<span class="muted">· good ≥' + TH.good + (S.m === "score" ? "" : "%") + ", watch ≥" + TH.warn + (S.m === "score" ? "" : "%") + "</span>" : S.m === "rank" ? '<span class="muted">· top, middle, bottom third</span>' : '<span class="muted">· up, flat (±0.5), down</span>') : '<span>Low</span>' + RAMP.map(function (c) { return '<i style="background:' + c + '"></i>'; }).join("") + "<span>High</span>";
+    h += '<div class="mapw">' + svg + '<div class="leg">' + leg + '<span><i style="background:#E3E5EE"></i>No data</span></div><div class="src">Boundaries: DataMeet India (MIT)</div></div>';
+    h += '<div id="tip"></div><div class="row" style="margin-top:10px"><button class="btn sec sm" id="png">⬇ Map as picture</button><button class="btn ghost sm" id="xl">⬇ Excel</button><button class="btn ghost sm" id="rg">⚙️ Match map regions</button></div>';
+    var list = Object.keys(V).map(function (s) { return [s, V[s].v]; }).filter(function (x) { return x[1] != null; }).sort(function (a, b) { return S.m === "rank" ? a[1] - b[1] : b[1] - a[1]; });
+    h += '<div class="card"><h3>' + esc(METRICS.find(function (m) { return m[0] === S.m; })[1]) + ' — all states</h3>' + list.map(function (x, i) { return '<div class="rk" data-s="' + esc(x[0]) + '"><i style="background:' + (colour(x[1], V) || "#ccc") + '"></i><b>' + (i + 1) + ". " + esc(x[0]) + "</b><small>" + fmt(x[1]) + "</small></div>"; }).join("") + "</div>";
+    VIEW.innerHTML = h;
+    var b = function (id, k) { if ($(id)) $(id).onchange = function () { S[k] = this.value; sv(); draw(); }; };
+    b("mm", "m"); b("pa", "pa"); b("pb", "pb"); b("md", "mode");
+    [].forEach.call(VIEW.querySelectorAll("path[data-r]"), function (p) { p.onclick = function () { S.sel = p.getAttribute("data-r"); sv(); [].forEach.call(VIEW.querySelectorAll("path.sel"), function (q) { q.classList.remove("sel"); }); p.classList.add("sel"); tip(S.sel, V, RV); }; });
+    [].forEach.call(VIEW.querySelectorAll(".rk"), function (d) { d.onclick = function () { var s = d.dataset.s, rg = Object.keys(MAP.paths).find(function (k) { return regionStates(k).indexOf(s) >= 0; }); tip(rg || s, V, RV, s); $("tip").scrollIntoView({ behavior: "smooth", block: "center" }); }; });
+    if (S.sel) tip(S.sel, V, RV);
+    $("png").onclick = png; $("xl").onclick = function () { download(xlsx([{ name: "States", rows: [["State", METRICS.find(function (m) { return m[0] === S.m; })[1]]].concat(list.map(function (x) { return [x[0], fmt(x[1])]; })) }]), "State_map_" + S.m + ".xlsx"); };
+    $("rg").onclick = regions;
+  }
+  function tip(rg, V, RV, only) {
+    var ss = only ? [only] : regionStates(rg);
+    if (!ss.length) { $("tip").innerHTML = '<div class="tipc"><h3>' + esc(rg) + '</h3><div class="muted" style="font-size:13px;margin-top:4px">No dashboard state is linked to this area. Use ⚙️ Match map regions to link it.</div></div>'; return; }
+    $("tip").innerHTML = ss.map(function (s) {
+      var x = V[s], r = x && x.r; if (!r) return '<div class="tipc"><h3>' + esc(s) + '</h3><div class="muted">No data for this period.</div></div>';
+      var k = function (key, lab) { var v = r[key]; return v == null ? "" : '<div><b style="color:' + (v * 100 >= TH.good ? "#1E9E61" : v * 100 >= TH.warn ? "#B87800" : "#D93B3B") + '">' + Math.round(v * 1000) / 10 + "%</b><span>" + lab + "</span></div>"; };
+      return '<div class="tipc"><h3>' + esc(s) + (rg && rg !== s ? ' <span class="chip">' + esc(rg) + "</span>" : "") + '</h3><div class="kg"><div><b>#' + r.rank + "</b><span>Rank of " + x.n + "</span></div><div><b>" + Math.round(r.score * 10) / 10 + "</b><span>Score</span></div>" +
+        k("app", "Retailer App") + k("sales", "Sales") + k("visit", "Visit efficiency") + k("comp", "Competition / SD") + k("vnotice", "v-Notice") + k("new", "New implementation") + "</div></div>";
+    }).join("");
+  }
+  function png() {
+    var svg = $("svg"), s = new XMLSerializer().serializeToString(svg), im = new Image();
+    im.onload = function () { var c = document.createElement("canvas"); c.width = MAP.w; c.height = MAP.h + 90; var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#141833"; g.font = "bold 34px system-ui,sans-serif"; g.fillText(METRICS.find(function (m) { return m[0] === S.m; })[1] + " · " + (periods().find(function (p) { return p.v === S.pa; }) || {}).l, 24, 52); g.drawImage(im, 0, 90); c.toBlob(function (b) { download(b, "India_state_map_" + S.m + ".png"); }, "image/png"); };
+    im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(s.replace("<svg ", '<svg style="font:700 15px sans-serif" '));
+  }
+  function regions() {
+    var cur = {}; Object.keys(MAP.paths).forEach(function (rg) { cur[rg] = (REG && REG[rg]) || DEF_REG[rg] || (DATA.states.indexOf(rg) >= 0 ? [rg] : []); });
+    var body = '<div style="max-height:55vh;overflow:auto;margin-top:8px">' + Object.keys(MAP.paths).sort().map(function (rg) { return '<div class="mp"><b>' + esc(rg) + '</b><div class="chs9" style="margin-top:5px">' + DATA.states.map(function (s) { return '<span data-rg="' + esc(rg) + '" data-st="' + esc(s) + '" class="' + (cur[rg].indexOf(s) >= 0 ? "on" : "") + '">' + esc(s) + "</span>"; }).join("") + "</div></div>"; }).join("") + "</div>";
+    var ov = sheet("Match map regions", "Which dashboard state(s) colour each area of the map. Several = average.", [["💾", "Save", function () { api({ action: "map-config", save: { regions: cur } }).then(function (r) { if (!r.ok) return toast(r.error); REG = r.config.regions; toast("Saved for all admins"); draw(); }); }, "pri"]], body);
+    [].forEach.call(ov.querySelectorAll("[data-rg]"), function (e) { e.onclick = function () { var rg = e.dataset.rg, st = e.dataset.st, a = cur[rg], i = a.indexOf(st); if (i >= 0) a.splice(i, 1); else a.push(st); e.classList.toggle("on", i < 0); }; });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
