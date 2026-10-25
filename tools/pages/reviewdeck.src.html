@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Monthly review deck</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.cbx{display:flex;gap:8px;align-items:center;font-size:13.5px;margin-top:8px;cursor:pointer}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.big button{padding:16px 10px;font-size:15px}
+.sl{background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(20,24,51,.1);margin-top:12px;aspect-ratio:16/9;position:relative;overflow:hidden;font-family:system-ui,sans-serif;color:#1F2340}
+.sl .hd{background:#1B1F5E;color:#fff;padding:3.2% 4%;font-weight:800;font-size:clamp(11px,2.6vw,20px)}
+.sl .bd{padding:3% 4%;font-size:clamp(8px,1.7vw,13px);line-height:1.4}
+.sl table{width:100%;border-collapse:collapse;font-size:clamp(7px,1.5vw,12px)}.sl td,.sl th{padding:2px 4px;border-bottom:1px solid #EEF0F6;text-align:left}.sl th{color:#6B7088}
+.prog{margin-top:10px;font-size:13px}
+.nar{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);font-size:13.5px;line-height:1.5}
+.nar h4{margin:10px 0 4px;font-size:13px;color:var(--ink2)}.nar ul{margin:0;padding-left:18px}
+.okb{background:#E6F4EA;color:#0F6B43;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}.warnb{background:#FFF4E5;color:#8A5300;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📑</span></div>
+  <h1>Monthly review deck</h1><p>One tap: a PPT or PDF per state with score, gaps and an AI action plan</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading the latest dashboard data…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), SNAP = null, ME = "", O = Object.assign({ state: "", per: -1, ai: true, all: false }, ls("rd-opt") || {}), LAST = null;
+  var C = { navy: "1B1F5E", blue: "415FFF", gold: "C9A227", ink: "1F2340", mut: "6B7088", line: "E6E8F2", ok: "1E9E61", warn: "E69A00", bad: "D93B3B", bg: "F5F6FB" };
+  var LIBS = { pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js" }, LOADED = {};
+  function lib(k) { return LOADED[k] || (LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIBS[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load the file maker — check the internet connection.")); }; document.head.appendChild(s); })); }
+  var pc = function (v) { return v == null || isNaN(v) ? "—" : Math.round(v * 1000) / 10 + "%"; };
+  function sv() { ls("rd-opt", O); }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "ins-snapshot" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      SNAP = r.snap; ME = r.myState;
+      if (!ADMIN) O.state = ME; else if (!O.state || SNAP.states.indexOf(O.state) < 0) O.state = SNAP.states[0];
+      if (O.per >= SNAP.months.length) O.per = -1;
+      draw();
+    });
+  }
+  function draw() {
+    var M = SNAP.months;
+    var h = '<div class="card"><div class="g2"><div><label class="lb">State</label>' + (ADMIN ? '<select class="tx" id="st">' + SNAP.states.map(function (s) { return "<option" + (s === O.state ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : '<div class="tx" style="padding:10px 12px">' + esc(ME || "—") + "</div>") + '</div><div><label class="lb">Month</label><select class="tx" id="pe">' + M.map(function (m, i) { return '<option value="' + i + '"' + ((O.per < 0 ? M.length - 1 : O.per) === i ? " selected" : "") + ">" + esc(m.label) + (m.partial ? " (to date)" : "") + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="cbx"><input type="checkbox" id="ai"' + (O.ai ? " checked" : "") + "> 🤖 AI analysis — summary, root causes, action plan and next-month targets</label>" +
+      (ADMIN ? '<label class="cbx"><input type="checkbox" id="all"' + (O.all ? " checked" : "") + "> All states in one deck (" + SNAP.states.length + " states — takes a few minutes)</label>" : "") +
+      '<div class="big"><button class="btn pri" id="ppt">📊 Make PPT</button><button class="btn ok" id="pdf">📄 Make PDF</button></div><button class="btn ghost block" id="pv" style="margin-top:8px">👁 Preview analysis</button><div id="prog" class="prog"></div></div><div id="out"></div>' +
+      '<div class="muted" style="font-size:12px;margin:10px 4px">Data up to ' + esc(SNAP.asOf) + ". The PPT opens in PowerPoint / Google Slides and can be edited; charts are real charts.</div>";
+    VIEW.innerHTML = h;
+    var b = function (id, k, cb) { var e = $(id); if (e) e.onchange = function () { O[k] = e.type === "checkbox" ? e.checked : e.tagName === "SELECT" && k === "per" ? +e.value : e.value; sv(); if (cb) cb(); }; };
+    b("st", "state"); b("pe", "per"); b("ai", "ai"); b("all", "all");
+    $("ppt").onclick = function () { make("pptx"); }; $("pdf").onclick = function () { make("pdf"); }; $("pv").onclick = preview;
+  }
+  function getDeck(state, fresh) { return api({ action: "ins-deck", state: state, period: O.per < 0 ? SNAP.months.length - 1 : O.per, ai: O.ai, fresh: !!fresh }); }
+  function say(t) { if ($("prog")) $("prog").innerHTML = t; }
+  function preview(fresh) {
+    say('<div class="loading"><div class="spin"></div>' + (O.ai ? "AI is analysing " + esc(O.state) + "…" : "Preparing…") + "</div>");
+    getDeck(O.state, fresh === true).then(function (r) {
+      say(""); if (!r.ok) return toast(r.error);
+      LAST = r; var a = r.ai, d = r.data;
+      $("out").innerHTML = '<div class="nar"><b style="font-size:15px">' + esc(a.headline) + "</b>" + (a.by === "ai" ? ' <span class="chip">🤖 AI</span>' : ' <span class="chip">built-in analysis</span>') + '<p style="margin:6px 0 0">' + esc(a.summary) + "</p>" +
+        "<h4>💪 Strengths</h4><ul>" + a.strengths.map(function (x) { return "<li><b>" + esc(x.kpi) + "</b> — " + esc(x.point) + "</li>"; }).join("") + "</ul>" +
+        "<h4>⚠️ Gaps</h4><ul>" + a.gaps.map(function (x) { return "<li><b>" + esc(x.kpi) + "</b> — " + esc(x.issue) + (x.cause ? "<br><i>Likely cause: " + esc(x.cause) + "</i>" : "") + "</li>"; }).join("") + "</ul>" +
+        "<h4>✅ Action plan</h4><ul>" + a.actions.map(function (x) { return "<li>" + esc(x.action) + ' <span class="muted">(' + esc([x.kpi, x.owner, x.due].filter(Boolean).join(" · ")) + ")</span></li>"; }).join("") + "</ul>" +
+        "<h4>🎯 Next-month targets</h4><ul>" + a.targets.map(function (x) { return "<li>" + esc(x.kpi) + ": " + esc(x.now) + " → <b>" + esc(x.target) + "</b></li>"; }).join("") + "</ul>" +
+        (a.message ? '<p style="margin:10px 0 0"><i>“' + esc(a.message) + "”</i></p>" : "") + "</div>" +
+        (r.aiError ? '<div class="warnb">AI not used: ' + esc(r.aiError) + "</div>" : "") +
+        '<div class="row" style="margin-top:8px">' + (a.by === "ai" ? '<button class="btn ghost sm" id="rg">🔄 Ask AI again</button>' : "") + (ADMIN ? '<button class="btn sec sm" id="em">📧 Email PDF to ' + esc(d.state) + "</button>" : "") + "</div>" + slidesHtml(d, a);
+      if ($("rg")) $("rg").onclick = function () { preview(true); };
+      if ($("em")) $("em").onclick = function () { emailDeck(r); };
+    });
+  }
+  // ---------- deck model ----------
+  function status(k) { return k.me == null ? "" : k.pan == null ? (k.me >= 0.8 ? "ok" : "warn") : k.me >= k.pan ? "ok" : k.me >= k.pan * 0.8 ? "warn" : "bad"; }
+  function slides(d, a) {
+    var mv = d.prevRank ? d.prevRank - d.rank : null;
+    return [
+      { t: "title", d: d, a: a, mv: mv },
+      { t: "score", title: "Scorecard — " + d.period, d: d, a: a, mv: mv },
+      { t: "kpis", title: "KPI performance vs PAN India and similar states", d: d },
+      { t: "trend", title: "Weekly score trend", d: d },
+      { t: "sg", title: "Strengths and gaps", a: a },
+      { t: "plan", title: "Action plan", a: a },
+      { t: "targets", title: "Next-month targets" + (d.seg ? " and retailer health" : ""), a: a, d: d },
+      { t: "close", d: d, a: a }
+    ];
+  }
+  function slidesHtml(d, a) {
+    var mv = d.prevRank ? d.prevRank - d.rank : null;
+    return '<div class="muted" style="font-size:12px;margin-top:14px">Slide preview (' + slides(d, a).length + " slides)</div>" +
+      '<div class="sl"><div style="position:absolute;inset:0;background:linear-gradient(135deg,#1B1F5E,#415FFF);color:#fff;padding:6%"><div style="font-size:clamp(9px,1.6vw,13px);letter-spacing:.15em;opacity:.8">VIVO BUSINESS INNOVATION · MONTHLY REVIEW</div><div style="font-size:clamp(18px,5vw,40px);font-weight:800;margin-top:6%">' + esc(d.state) + '</div><div style="font-size:clamp(11px,2.4vw,20px);opacity:.9">' + esc(d.period) + '</div><div style="margin-top:6%;font-size:clamp(12px,3vw,26px);font-weight:800">Rank #' + d.rank + " of " + d.of + (mv ? (mv > 0 ? "  ▲" + mv : "  ▼" + -mv) : "") + " · Score " + d.score + "</div></div></div>" +
+      '<div class="sl"><div class="hd">KPI performance</div><div class="bd"><table><tr><th>KPI</th><th>State</th><th>PAN</th><th>Similar states</th><th>Last month</th></tr>' + d.kpis.map(function (k) { var s = status(k); return "<tr><td>" + esc(k.name) + '</td><td style="font-weight:800;color:#' + (s === "ok" ? C.ok : s === "warn" ? C.warn : C.bad) + '">' + pc(k.me) + "</td><td>" + pc(k.pan) + "</td><td>" + pc(k.peer) + "</td><td>" + pc(k.prev) + "</td></tr>"; }).join("") + "</table></div></div>" +
+      '<div class="sl"><div class="hd">Action plan</div><div class="bd"><table><tr><th>Action</th><th>KPI</th><th>Owner</th><th>By</th></tr>' + a.actions.map(function (x) { return "<tr><td>" + esc(x.action) + "</td><td>" + esc(x.kpi) + "</td><td>" + esc(x.owner) + "</td><td>" + esc(x.due) + "</td></tr>"; }).join("") + "</table></div></div>";
+  }
+  // ---------- PPTX ----------
+  function addPptx(P, d, a) {
+    var S = slides(d, a), W = 13.333;
+    S.forEach(function (s) {
+      var sl = P.addSlide();
+      if (s.t === "title") {
+        sl.background = { color: C.navy };
+        sl.addShape(P.ShapeType.rect, { x: 0, y: 6.9, w: W, h: 0.6, fill: { color: C.blue } });
+        sl.addText("VIVO BUSINESS INNOVATION · MONTHLY BI REVIEW", { x: 0.7, y: 0.6, w: 11, h: 0.4, fontSize: 13, color: "C9CDF7", bold: true, charSpacing: 2 });
+        sl.addText(d.state, { x: 0.7, y: 1.6, w: 11.5, h: 1.2, fontSize: 48, bold: true, color: "FFFFFF" });
+        sl.addText(d.period + (d.partial ? " (month to date)" : ""), { x: 0.7, y: 2.75, w: 11, h: 0.6, fontSize: 22, color: "DDE1FF" });
+        sl.addText([{ text: "Rank #" + d.rank, options: { bold: true, color: "FFFFFF" } }, { text: " of " + d.of + (s.mv ? (s.mv > 0 ? "   ▲ " + s.mv : "   ▼ " + -s.mv) : ""), options: { color: s.mv > 0 ? "7EE2A8" : s.mv < 0 ? "FF9C9C" : "DDE1FF" } }, { text: "     Score " + d.score, options: { color: "F2D675", bold: true } }], { x: 0.7, y: 3.8, w: 11.5, h: 0.8, fontSize: 30 });
+        sl.addText(a.headline || "", { x: 0.7, y: 4.9, w: 11.8, h: 1, fontSize: 18, color: "FFFFFF", italic: true, valign: "top" });
+        sl.addText("Data up to " + d.asOf + (a.by === "ai" ? " · analysis by AI" : ""), { x: 0.7, y: 6.95, w: 11, h: 0.5, fontSize: 11, color: "FFFFFF" });
+        return;
+      }
+      if (s.t === "close") {
+        sl.background = { color: C.navy };
+        sl.addText("Let's make next month better", { x: 0.7, y: 1.5, w: 12, h: 0.9, fontSize: 34, bold: true, color: "FFFFFF" });
+        sl.addText(a.message || "", { x: 0.7, y: 2.6, w: 12, h: 1.2, fontSize: 20, color: "F2D675", italic: true, valign: "top" });
+        var g = d.goal; if (g) sl.addText("Goal: " + (g.targetRank ? "rank #" + g.targetRank : "score " + g.targetScore) + " by " + g.by + " — " + ({ achieved: "achieved ✓", ontrack: "on track", behind: "behind plan" }[g.status] || "") + (g.needWeekly ? " · needs +" + g.needWeekly + " points a week" : ""), { x: 0.7, y: 4.1, w: 12, h: 0.6, fontSize: 16, color: "FFFFFF" });
+        if ((a.risks || []).length) sl.addText("Watch out: " + a.risks.join(" · "), { x: 0.7, y: 4.9, w: 12, h: 1, fontSize: 13, color: "C9CDF7", valign: "top" });
+        sl.addText("Prepared with the vivo BI dashboard · " + new Date().toLocaleDateString("en-IN"), { x: 0.7, y: 6.8, w: 12, h: 0.4, fontSize: 11, color: "9AA0D6" });
+        return;
+      }
+      sl.background = { color: "FFFFFF" };
+      sl.addShape(P.ShapeType.rect, { x: 0, y: 0, w: W, h: 0.95, fill: { color: C.navy } });
+      sl.addText(s.title, { x: 0.5, y: 0.12, w: 10.5, h: 0.7, fontSize: 24, bold: true, color: "FFFFFF" });
+      sl.addText(d ? d.state : "", { x: 10.6, y: 0.12, w: 2.4, h: 0.7, fontSize: 13, color: "C9CDF7", align: "right" });
+      if (s.t === "score") {
+        var tiles = [["Rank", "#" + d.rank + " / " + d.of, s.mv == null ? "" : s.mv > 0 ? "▲ " + s.mv + " vs last month" : s.mv < 0 ? "▼ " + -s.mv + " vs last month" : "same as last month", s.mv > 0 ? C.ok : s.mv < 0 ? C.bad : C.mut],
+          ["Score", String(d.score), "PAN India " + d.panScore, d.score >= d.panScore ? C.ok : C.bad],
+          ["Similar states", d.peers ? "#" + d.peers.rankInGroup + " / " + d.peers.size : "—", d.peers ? d.peers.band + " states by size" : "", C.blue],
+          ["Goal", d.goal ? (d.goal.targetRank ? "#" + d.goal.targetRank : String(d.goal.targetScore)) : "Not set", d.goal ? ({ achieved: "Achieved", ontrack: "On track", behind: "Behind plan" }[d.goal.status] || "") + " · by " + d.goal.by : "Set one in Goals", d.goal ? (d.goal.status === "behind" ? C.bad : C.ok) : C.mut]];
+        tiles.forEach(function (x, i) { var xx = 0.5 + i * 3.1; sl.addShape(P.ShapeType.roundRect, { x: xx, y: 1.3, w: 2.9, h: 1.9, fill: { color: C.bg }, line: { color: C.line }, rectRadius: 0.12 }); sl.addText(x[0], { x: xx + 0.2, y: 1.4, w: 2.5, h: 0.4, fontSize: 13, color: C.mut }); sl.addText(x[1], { x: xx + 0.2, y: 1.8, w: 2.5, h: 0.8, fontSize: 32, bold: true, color: C.ink }); sl.addText(x[2], { x: xx + 0.2, y: 2.6, w: 2.6, h: 0.45, fontSize: 11.5, color: x[3] }); });
+        sl.addText(a.headline || "", { x: 0.5, y: 3.5, w: 12.3, h: 0.6, fontSize: 20, bold: true, color: C.navy });
+        sl.addText(a.summary || "", { x: 0.5, y: 4.15, w: 12.3, h: 2.6, fontSize: 18, color: C.ink, valign: "top", paraSpaceAfter: 6 });
+      }
+      if (s.t === "kpis") {
+        var rows = [[{ text: "KPI", options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }, { text: "State", options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }, { text: "PAN India", options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }, { text: "Similar states", options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }, { text: "Last month", options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }]];
+        d.kpis.forEach(function (k) { var st = status(k); rows.push([k.name, { text: pc(k.me), options: { bold: true, color: st === "ok" ? C.ok : st === "warn" ? C.warn : C.bad } }, pc(k.pan), pc(k.peer), pc(k.prev)]); });
+        sl.addTable(rows, { x: 0.5, y: 1.3, w: 6.3, colW: [2.1, 1.05, 1.05, 1.1, 1.0], fontSize: 12, border: { type: "solid", color: C.line, pt: 0.75 }, rowH: 0.42 });
+        var ks = d.kpis.filter(function (k) { return k.me != null; });
+        sl.addChart(P.ChartType.bar, [{ name: d.state, labels: ks.map(function (k) { return k.name; }), values: ks.map(function (k) { return Math.round(k.me * 1000) / 10; }) }, { name: "PAN India", labels: ks.map(function (k) { return k.name; }), values: ks.map(function (k) { return k.pan == null ? 0 : Math.round(k.pan * 1000) / 10; }) }],
+          { x: 7.0, y: 1.2, w: 5.9, h: 5.6, barDir: "bar", barGrouping: "clustered", chartColors: [C.blue, "B8BCD6"], showLegend: true, legendPos: "b", valAxisMaxVal: 100, valAxisLabelFormatCode: "0", catAxisLabelFontSize: 11, valAxisLabelFontSize: 10, showValue: true, dataLabelFontSize: 9, dataLabelFormatCode: "0" });
+      }
+      if (s.t === "trend") {
+        var w = d.weekly.filter(function (x) { return x.score != null; });
+        if (w.length >= 2) sl.addChart(P.ChartType.line, [{ name: d.state, labels: w.map(function (x) { return x.label; }), values: w.map(function (x) { return x.score; }) }, { name: "PAN India", labels: w.map(function (x) { return x.label; }), values: w.map(function (x) { return x.pan || 0; }) }],
+          { x: 0.5, y: 1.2, w: 8.6, h: 5.6, chartColors: [C.blue, "B8BCD6"], lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 7, showLegend: true, legendPos: "b", catAxisLabelFontSize: 10, valAxisLabelFontSize: 10, showValue: true, dataLabelFontSize: 9, dataLabelPosition: "t", dataLabelFormatCode: "0.0" });
+        else sl.addText("Not enough weekly data yet.", { x: 0.5, y: 2, w: 8, h: 1, fontSize: 16, color: C.mut });
+        var best = w.slice().sort(function (p, q) { return p.rank - q.rank; })[0], lastW = w[w.length - 1];
+        sl.addText([{ text: "Latest week\n", options: { fontSize: 12, color: C.mut } }, { text: lastW ? "#" + lastW.rank + " · " + lastW.score : "—", options: { fontSize: 26, bold: true, color: C.ink, breakLine: true } }, { text: "\nBest week\n", options: { fontSize: 12, color: C.mut } }, { text: best ? "#" + best.rank + " (" + best.label + ")" : "—", options: { fontSize: 18, bold: true, color: C.ok } }], { x: 9.4, y: 1.5, w: 3.5, h: 3.2, valign: "top" });
+      }
+      if (s.t === "sg") {
+        var col = function (x, title, items, color, fn) { sl.addShape(P.ShapeType.roundRect, { x: x, y: 1.25, w: 6.05, h: 5.7, fill: { color: C.bg }, line: { color: C.line }, rectRadius: 0.12 }); sl.addText(title, { x: x + 0.25, y: 1.4, w: 5.5, h: 0.5, fontSize: 18, bold: true, color: color }); sl.addText(items.map(function (it) { return fn(it); }).reduce(function (acc, v) { return acc.concat(v); }, []), { x: x + 0.25, y: 2.0, w: 5.6, h: 4.8, valign: "top", fontSize: 16, fit: "shrink", color: C.ink, paraSpaceAfter: 8 }); };
+        col(0.5, "Strengths", a.strengths, C.ok, function (it) { return [{ text: it.kpi + ": ", options: { bold: true, bullet: true } }, { text: it.point, options: { breakLine: true } }]; });
+        col(6.8, "Gaps", a.gaps, C.bad, function (it) { return [{ text: it.kpi + ": ", options: { bold: true, bullet: true } }, { text: it.issue + (it.cause ? " — likely cause: " + it.cause : ""), options: { breakLine: true } }]; });
+      }
+      if (s.t === "plan") {
+        var hdr = ["#", "Action", "KPI", "Owner", "By", "Expected impact"].map(function (x) { return { text: x, options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }; });
+        sl.addTable([hdr].concat(a.actions.map(function (x, i) { return [String(i + 1), x.action, x.kpi, x.owner, x.due, x.impact || ""]; })), { x: 0.5, y: 1.25, w: 12.3, colW: [0.4, 4.9, 1.6, 1.7, 1.2, 2.5], fontSize: 13, border: { type: "solid", color: C.line, pt: 0.75 }, valign: "middle", autoPage: false });
+      }
+      if (s.t === "targets") {
+        var th = ["KPI", "Now", "Target next month"].map(function (x) { return { text: x, options: { bold: true, color: "FFFFFF", fill: { color: C.blue } } }; });
+        sl.addTable([th].concat(a.targets.map(function (x) { return [x.kpi, x.now, { text: x.target, options: { bold: true, color: C.ok } }]; })), { x: 0.5, y: 1.3, w: 6.3, colW: [2.9, 1.4, 2.0], fontSize: 13, border: { type: "solid", color: C.line, pt: 0.75 }, rowH: 0.48 });
+        if (d.seg) {
+          var sg = d.seg, lab = ["Champions", "Active", "At risk", "Dormant"], val = [sg.champion, sg.active, sg.atrisk, sg.dormant + sg.never];
+          sl.addChart(P.ChartType.doughnut, [{ name: "Retailers", labels: lab, values: val }], { x: 7.1, y: 1.2, w: 5.8, h: 4.2, chartColors: [C.ok, C.blue, C.warn, C.bad], showLegend: true, legendPos: "r", showPercent: true, dataLabelColor: "FFFFFF", holeSize: 55, title: "Retailer app health (" + sg.total + " retailers)", showTitle: true, titleFontSize: 13 });
+          sl.addText("At-risk retailers used the app much less than last month — call them first.", { x: 7.1, y: 5.5, w: 5.8, h: 0.8, fontSize: 12, color: C.mut, valign: "top" });
+        }
+      }
+    });
+  }
+  // ---------- PDF ----------
+  function pdfDeck(doc, d, a, first) {
+    var W = 960, H = 540, hex = function (c) { return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)]; };
+    var fill = function (c) { doc.setFillColor.apply(doc, hex(c)); }, col = function (c) { doc.setTextColor.apply(doc, hex(c)); };
+    var txt = function (t, x, y, w, size, color, bold, maxH) { t = String(t == null ? "" : t).replace(/[^\x20-\x7E -ÿ–—‘-”•…▲▼]/g, ""); t = t.replace(/▲/g, "+").replace(/▼/g, "-"); var s = size, lines; do { doc.setFontSize(s); lines = doc.splitTextToSize(t, w); s -= 0.5; } while (maxH && lines.length * s * 1.25 > maxH && s > 7); doc.setFont("helvetica", bold ? "bold" : "normal"); col(color || C.ink); doc.text(lines, x, y, { baseline: "top", lineHeightFactor: 1.25 }); return lines.length * (s + 0.5) * 1.25; };
+    var page = function (dark) { if (!first.v) doc.addPage([W, H], "landscape"); first.v = false; fill(dark ? C.navy : "FFFFFF"); doc.rect(0, 0, W, H, "F"); };
+    var head = function (t) { fill(C.navy); doc.rect(0, 0, W, 64, "F"); txt(t, 32, 18, 700, 22, "FFFFFF", true); txt(d.state, 720, 22, 210, 13, "C9CDF7"); };
+    var table = function (x, y, cols, rows, size) { var rh = size * 2.1; fill(C.blue); doc.rect(x, y, cols.reduce(function (s, c) { return s + c[1]; }, 0), rh, "F"); var cx = x; cols.forEach(function (c) { txt(c[0], cx + 6, y + 5, c[1] - 10, size, "FFFFFF", true); cx += c[1]; }); y += rh;
+      rows.forEach(function (r, ri) { var hgt = rh; cx = x; var hs = r.map(function (v, i) { doc.setFontSize(size); return doc.splitTextToSize(String(v && v.t != null ? v.t : v || ""), cols[i][1] - 10).length; }); hgt = Math.max(rh, Math.max.apply(null, hs) * size * 1.3 + 8); if (ri % 2) { fill(C.bg); doc.rect(x, y, cols.reduce(function (s, c) { return s + c[1]; }, 0), hgt, "F"); }
+        r.forEach(function (v, i) { txt(v && v.t != null ? v.t : v, cx + 6, y + 5, cols[i][1] - 10, size, v && v.c ? v.c : C.ink, v && v.b); cx += cols[i][1]; }); y += hgt; }); return y; };
+    var mv = d.prevRank ? d.prevRank - d.rank : null;
+    // 1 title
+    page(true); fill(C.blue); doc.rect(0, H - 40, W, 40, "F");
+    txt("VIVO BUSINESS INNOVATION  -  MONTHLY BI REVIEW", 50, 44, 800, 13, "C9CDF7", true); txt(d.state, 50, 110, 860, 46, "FFFFFF", true); txt(d.period + (d.partial ? " (month to date)" : ""), 50, 175, 800, 22, "DDE1FF");
+    txt("Rank #" + d.rank + " of " + d.of + (mv ? (mv > 0 ? "   (up " + mv + ")" : "   (down " + -mv + ")") : "") + "     Score " + d.score, 50, 240, 860, 28, "F2D675", true);
+    txt(a.headline, 50, 310, 860, 18, "FFFFFF", false, 80); txt("Data up to " + d.asOf + (a.by === "ai" ? "  -  analysis by AI" : ""), 50, H - 30, 800, 11, "FFFFFF");
+    // 2 scorecard
+    page(false); head("Scorecard - " + d.period);
+    [["Rank", "#" + d.rank + " / " + d.of, mv == null ? "" : mv > 0 ? "up " + mv + " vs last month" : mv < 0 ? "down " + -mv + " vs last month" : "same as last month", mv > 0 ? C.ok : mv < 0 ? C.bad : C.mut], ["Score", String(d.score), "PAN India " + d.panScore, d.score >= d.panScore ? C.ok : C.bad], ["Similar states", d.peers ? "#" + d.peers.rankInGroup + " / " + d.peers.size : "-", d.peers ? d.peers.band + " states by size" : "", C.blue], ["Goal", d.goal ? (d.goal.targetRank ? "#" + d.goal.targetRank : String(d.goal.targetScore)) : "Not set", d.goal ? ({ achieved: "Achieved", ontrack: "On track", behind: "Behind plan" }[d.goal.status] || "") + " - by " + d.goal.by : "", d.goal && d.goal.status === "behind" ? C.bad : C.ok]].forEach(function (t, i) {
+      var x = 32 + i * 228; fill(C.bg); doc.roundedRect(x, 88, 214, 132, 10, 10, "F"); txt(t[0], x + 14, 98, 190, 12, C.mut); txt(t[1], x + 14, 120, 190, 30, C.ink, true); txt(t[2], x + 14, 186, 190, 11, t[3]); });
+    txt(a.headline, 32, 244, 890, 19, C.navy, true, 50); txt(a.summary, 32, 290, 890, 18, C.ink, false, 220);
+    // 3 KPIs
+    page(false); head("KPI performance vs PAN India and similar states");
+    var ty = table(32, 88, [["KPI", 150], ["State", 76], ["PAN", 76], ["Similar", 76], ["Last month", 82]], d.kpis.map(function (k) { var s = status(k); return [k.name, { t: pc(k.me), b: true, c: s === "ok" ? C.ok : s === "warn" ? C.warn : C.bad }, pc(k.pan), pc(k.peer), pc(k.prev)]; }), 11.5);
+    var ks = d.kpis.filter(function (k) { return k.me != null; }), bx = 540, by = 96, bw = 380, bh = Math.min(30, 400 / Math.max(1, ks.length));
+    ks.forEach(function (k, i) { var y = by + i * (bh + 14); txt(k.name, bx, y - 2, 120, 10, C.mut); fill("E6E8F2"); doc.rect(bx + 125, y, bw - 125, bh / 2 - 1, "F"); fill(C.blue); doc.rect(bx + 125, y, (bw - 125) * Math.min(1, k.me), bh / 2 - 1, "F"); fill("B8BCD6"); doc.rect(bx + 125, y + bh / 2, (bw - 125) * Math.min(1, k.pan || 0), bh / 2 - 2, "F"); txt(pc(k.me), bx + 128 + (bw - 125) * Math.min(1, k.me), y - 2, 50, 8.5, C.ink, true); });
+    fill(C.blue); doc.rect(bx + 125, by + ks.length * (bh + 14) + 6, 10, 8, "F"); txt(d.state, bx + 140, by + ks.length * (bh + 14) + 3, 120, 9, C.mut); fill("B8BCD6"); doc.rect(bx + 260, by + ks.length * (bh + 14) + 6, 10, 8, "F"); txt("PAN India", bx + 275, by + ks.length * (bh + 14) + 3, 100, 9, C.mut);
+    // 4 trend
+    page(false); head("Weekly score trend");
+    var w = d.weekly.filter(function (x) { return x.score != null; });
+    if (w.length >= 2) { var gx = 60, gy = 100, gw = 600, gh = 340, vals = w.map(function (x) { return x.score; }).concat(w.map(function (x) { return x.pan || 0; })), mn = Math.floor(Math.min.apply(null, vals) / 10) * 10, mx2 = Math.ceil(Math.max.apply(null, vals) / 10) * 10 || 10, Y = function (v) { return gy + gh - (v - mn) / Math.max(1, mx2 - mn) * gh; }, X = function (i) { return gx + i * gw / (w.length - 1); };
+      doc.setDrawColor(230, 232, 242); for (var v = mn; v <= mx2; v += 10) { doc.line(gx, Y(v), gx + gw, Y(v)); txt(String(v), gx - 30, Y(v) - 6, 26, 9, C.mut); }
+      var line = function (key, c, wdt) { doc.setDrawColor.apply(doc, hex(c)); doc.setLineWidth(wdt); for (var i = 1; i < w.length; i++) doc.line(X(i - 1), Y(w[i - 1][key] || 0), X(i), Y(w[i][key] || 0)); doc.setLineWidth(1); };
+      line("pan", "B8BCD6", 2); line("score", C.blue, 3.5); w.forEach(function (x, i) { fill(C.blue); doc.circle(X(i), Y(x.score), 4, "F"); txt(String(x.score), X(i) - 12, Y(x.score) - 18, 40, 8.5, C.ink, true); if (i % Math.ceil(w.length / 6) === 0 || i === w.length - 1) txt(x.label, X(i) - 30, gy + gh + 8, 70, 8, C.mut); });
+      var lw = w[w.length - 1]; txt("Latest week", 700, 110, 220, 12, C.mut); txt("#" + lw.rank + "  -  " + lw.score, 700, 130, 220, 24, C.ink, true); var bw2 = w.slice().sort(function (p, q) { return p.rank - q.rank; })[0]; txt("Best week", 700, 190, 220, 12, C.mut); txt("#" + bw2.rank + " (" + bw2.label + ")", 700, 210, 220, 16, C.ok, true);
+      fill(C.blue); doc.rect(700, 270, 12, 4, "F"); txt(d.state, 718, 264, 200, 10, C.mut); fill("B8BCD6"); doc.rect(700, 290, 12, 4, "F"); txt("PAN India", 718, 284, 200, 10, C.mut);
+    } else txt("Not enough weekly data yet.", 32, 100, 600, 16, C.mut);
+    // 5 strengths & gaps
+    page(false); head("Strengths and gaps");
+    [[32, "Strengths", a.strengths, C.ok, function (it) { return it.kpi + ": " + it.point; }], [490, "Gaps", a.gaps, C.bad, function (it) { return it.kpi + ": " + it.issue + (it.cause ? " - likely cause: " + it.cause : ""); }]].forEach(function (c) {
+      fill(C.bg); doc.roundedRect(c[0], 84, 438, 430, 10, 10, "F"); txt(c[1], c[0] + 16, 96, 400, 18, c[3], true); var y = 128; c[2].forEach(function (it) { y += txt("- " + c[4](it), c[0] + 16, y, 406, 15, C.ink, false, 120) + 12; }); });
+    // 6 plan
+    page(false); head("Action plan");
+    table(32, 84, [["#", 26], ["Action", 380], ["KPI", 120], ["Owner", 120], ["By", 80], ["Impact", 170]], a.actions.map(function (x, i) { return [String(i + 1), x.action, x.kpi, x.owner, x.due, x.impact || ""]; }), 12);
+    // 7 targets
+    page(false); head("Next-month targets" + (d.seg ? " and retailer health" : ""));
+    table(32, 88, [["KPI", 200], ["Now", 90], ["Target next month", 150]], a.targets.map(function (x) { return [x.kpi, x.now, { t: x.target, b: true, c: C.ok }]; }), 12.5);
+    if (d.seg) { var sg = d.seg, items = [["Champions", sg.champion, C.ok], ["Active", sg.active, C.blue], ["At risk", sg.atrisk, C.warn], ["Dormant", sg.dormant + sg.never, C.bad]], tot = Math.max(1, sg.total);
+      txt("Retailer app health (" + sg.total + " retailers)", 520, 92, 400, 14, C.ink, true); items.forEach(function (it, i) { var y = 130 + i * 52; txt(it[0], 520, y, 120, 12, C.mut); fill("E6E8F2"); doc.rect(640, y, 260, 22, "F"); fill(it[2]); doc.rect(640, y, 260 * it[1] / tot, 22, "F"); txt(it[1] + " (" + Math.round(it[1] / tot * 100) + "%)", 645, y + 26, 200, 10, C.ink, true); });
+      txt("At-risk retailers used the app much less than last month - call them first.", 520, 350, 400, 11.5, C.mut); }
+    // 8 close
+    page(true); txt("Let's make next month better", 50, 120, 860, 32, "FFFFFF", true); txt(a.message ? '"' + a.message + '"' : "", 50, 180, 860, 19, "F2D675", false, 90);
+    if (d.goal) txt("Goal: " + (d.goal.targetRank ? "rank #" + d.goal.targetRank : "score " + d.goal.targetScore) + " by " + d.goal.by + " - " + ({ achieved: "achieved", ontrack: "on track", behind: "behind plan" }[d.goal.status] || "") + (d.goal.needWeekly ? " - needs +" + d.goal.needWeekly + " points a week" : ""), 50, 290, 860, 15, "FFFFFF");
+    if ((a.risks || []).length) txt("Watch out: " + a.risks.join("  -  "), 50, 340, 860, 13, "C9CDF7", false, 90);
+    txt("Prepared with the vivo BI dashboard  -  " + new Date().toLocaleDateString("en-IN"), 50, H - 40, 860, 11, "9AA0D6");
+  }
+  // ---------- make ----------
+  function make(kind) {
+    var list = ADMIN && O.all ? SNAP.states.slice() : [O.state];
+    var btns = [$("ppt"), $("pdf"), $("pv")]; btns.forEach(function (b) { b.disabled = true; });
+    var done = function () { btns.forEach(function (b) { b.disabled = false; }); };
+    var items = [], i = 0;
+    lib(kind).then(function () {
+      return new Promise(function (res, rej) {
+        (function next() {
+          if (i >= list.length) return res();
+          var st = list[i]; say('<div class="loading"><div class="spin"></div>' + (O.ai ? "AI is analysing " : "Preparing ") + esc(st) + (list.length > 1 ? " (" + (i + 1) + " of " + list.length + ")" : "") + "…</div>");
+          getDeck(st).then(function (r) { if (r.ok) items.push(r); else if (list.length === 1) return rej(new Error(r.error)); i++; next(); }).catch(rej);
+        })();
+      });
+    }).then(function () {
+      if (!items.length) throw new Error("No data for this selection.");
+      say('<div class="loading"><div class="spin"></div>Building the ' + (kind === "pptx" ? "PowerPoint" : "PDF") + "…</div>");
+      var per = SNAP.months[O.per < 0 ? SNAP.months.length - 1 : O.per], name = (items.length > 1 ? "All_states" : items[0].data.state.replace(/[^A-Za-z0-9]+/g, "_")) + "_BI_review_" + per.label.replace(/[^A-Za-z0-9]+/g, "_");
+      if (kind === "pptx") {
+        var P = new window.PptxGenJS(); P.layout = "LAYOUT_WIDE"; P.author = "vivo BI dashboard"; P.title = "Monthly BI review";
+        items.forEach(function (r) { addPptx(P, r.data, r.ai); });
+        return P.write({ outputType: "blob" }).then(function (blob) { download(blob, name + ".pptx"); return items; });
+      }
+      var doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] }), first = { v: true };
+      items.forEach(function (r) { pdfDeck(doc, r.data, r.ai, first); });
+      download(doc.output("blob"), name + ".pdf"); LASTPDF = { doc: doc, name: name + ".pdf", items: items }; return items;
+    }).then(function (items) {
+      var ai = items.filter(function (r) { return r.ai.by === "ai"; }).length;
+      say('<div class="okb">✅ ' + (kind === "pptx" ? "PowerPoint" : "PDF") + " ready — " + items.length + " state" + (items.length > 1 ? "s" : "") + " · " + (ai ? ai + " with AI analysis" : "built-in analysis" + (items[0].aiError ? " (" + esc(items[0].aiError) + ")" : "")) + ". Check your downloads.</div>");
+      api({ action: "tl-use", tool: "reviewdeck", kind: "acts" }); done();
+    }).catch(function (e) { say('<div class="err">' + esc(e.message || e) + "</div>"); done(); });
+  }
+  var LASTPDF = null;
+  function emailDeck(r) {
+    lib("pdf").then(function () {
+      var doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] }); pdfDeck(doc, r.data, r.ai, { v: true });
+      var b64 = doc.output("datauristring").split(",")[1], name = r.data.state.replace(/[^A-Za-z0-9]+/g, "_") + "_BI_review.pdf";
+      sheet("Email the review deck to " + r.data.state + "?", "Goes to the state's BI users (and the Reports from HO inbox), with the PDF attached.", [["📧", "Send", function () {
+        api({ action: "ml-send", type: "plan", subject: r.data.state + ": monthly BI review — " + r.data.period, intro: r.ai.summary, states: [r.data.state], perState: (function () { var o = {}; o[r.data.state] = '<div style="font:14px Arial,sans-serif"><h2 style="margin:0 0 6px">' + esc(r.ai.headline) + "</h2><p>" + esc(r.ai.summary) + "</p><ol>" + r.ai.actions.map(function (x) { return "<li>" + esc(x.action) + " <i>(" + esc(x.owner + ", by " + x.due) + ")</i></li>"; }).join("") + "</ol><p>The full review deck is attached (PDF).</p></div>"; return o; })(), common: "", attachment: { name: name, b64: b64 }, ccMe: true })
+          .then(function (x) { toast(x.ok ? "Sent — " + x.sent.emails + " email(s)" : x.error); });
+      }, "pri"]]);
+    }).catch(function (e) { toast(e.message); });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
