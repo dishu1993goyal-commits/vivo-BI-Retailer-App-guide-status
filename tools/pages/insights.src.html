@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Performance insights</title>
+<script src="insights-engine.js?v=2"></script>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}.tl{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 1px 8px rgba(20,24,51,.06)}.tl b{display:block;font-size:22px}.tl span{font-size:12px;color:var(--mut)}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card)}.tb th{background:#F3F4FA;text-align:left;padding:7px 8px;font-size:11px;color:var(--mut)}.tb td{padding:6px 8px;border-top:1px solid #EEF0F6}.tb td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbw{overflow:auto;max-height:460px;margin-top:8px;border-radius:12px;border:1px solid #EEF0F6}
+.al{display:flex;gap:10px;background:var(--card);border-radius:14px;padding:10px 12px;margin-top:8px;box-shadow:0 1px 6px rgba(20,24,51,.05);border-left:5px solid #ccc}
+.al.high{border-left-color:#D93B3B}.al.med{border-left-color:#E69A00}.al.low{border-left-color:#4D9BF9}
+.al b{font-size:14px;display:block}.al small{color:var(--mut);font-size:12.5px}.al .nw{background:#E53935;color:#fff;border-radius:99px;font-size:10px;font-weight:800;padding:1px 7px;margin-left:6px}
+.bg{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:10px 12px;margin-top:7px;box-shadow:0 1px 6px rgba(20,24,51,.05)}.bg i{font-style:normal;font-size:28px}.bg b{display:block;font-size:14px}.bg small{color:var(--mut)}
+.mh2{font-weight:800;margin:16px 2px 2px;font-size:15px}
+.chs9{display:flex;flex-wrap:wrap;gap:6px}.chs9 span{border:1px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;cursor:pointer;background:var(--card)}.chs9 span.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.bar{height:9px;border-radius:99px;background:#EEF0F6;overflow:hidden;margin-top:4px;position:relative}.bar i{display:block;height:100%;border-radius:99px}
+.st{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12px;font-weight:800}
+.dg{background:#F7F8FC;border-radius:12px;padding:12px;font-family:system-ui,sans-serif;white-space:pre-wrap;font-size:13.5px;line-height:1.5;margin-top:8px;border:1px solid #E6E8F2}
+svg text{font-family:system-ui,sans-serif}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📈</span></div>
+  <h1 id="h1">Performance insights</h1><p id="h2">Goals, alerts, badges, peers and more — from the dashboard's own data</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading the latest dashboard data…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), S = null, GOALS = [], RULES = null, ME = "", E = window.INSENG, TAB = (location.hash || "").replace("#", "") || "goals", ST = ls("in-st") || "";
+  var TABS = [["goals", "🎯 Goals"], ["alerts", "🔔 Alerts"], ["badges", "🏅 Badges"], ["peers", "👥 Peers"], ["impact", "📈 Impact"], ["health", "🏪 Retailer health"], ["digest", "💬 WhatsApp digest"], ["quality", "🧪 Data quality", "admin"]];
+  var TITLES = { goals: ["Goal setter", "Pick a target rank or score — see the weekly improvement needed on each KPI"], alerts: ["Alert centre", "Rank drops, KPIs below PAN, retailers slipping away"], badges: ["Badges & Hall of Fame", "Monthly badges, streaks and the all-time archive"], peers: ["Peer benchmarking", "Compare with similar-sized states — fairer than PAN India alone"], impact: ["Impact analysis", "Does higher retailer-app usage go with better results?"], health: ["Retailer health", "Champions, at-risk and dormant retailers — with call lists"], digest: ["WhatsApp digest", "A ready-to-send state summary in one tap"], quality: ["Data quality checker", "Missing days, spikes, duplicates and unmapped IDs — before you publish"] };
+  if (!TABS.some(function (t) { return t[0] === TAB; })) TAB = "goals";
+  var pc = function (v) { return v == null || isNaN(v) ? "—" : Math.round(v * 1000) / 10 + "%"; };
+  var r1 = function (v) { return v == null || isNaN(v) ? "—" : String(Math.round(v * 10) / 10); };
+  var cur = function () { return S.months[S.months.length - 1]; };
+  function stSel(id) { return ADMIN ? '<select class="tx" id="' + id + '">' + S.states.map(function (s) { return "<option" + (s === ST ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : '<div class="tx" style="padding:10px 12px">' + esc(ME) + "</div>"; }
+  function bindSt(id, fn) { if ($(id)) $(id).onchange = function () { ST = this.value; ls("in-st", ST); fn(); }; }
+  function load(force) {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "ins-snapshot", force: !!force }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      S = r.snap; GOALS = r.goals || []; RULES = r.rules; ME = r.myState;
+      if (!ADMIN) ST = ME; else if (!ST || S.states.indexOf(ST) < 0) ST = S.states[0];
+      render();
+    });
+  }
+  function render() {
+    var tabs = TABS.filter(function (t) { return !t[2] || ADMIN; });
+    $("h1").textContent = TITLES[TAB][0]; $("h2").textContent = TITLES[TAB][1];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div><div class="muted" style="font-size:11.5px;margin:10px 4px">Data up to ' + esc(S.asOf) + (ADMIN ? ' · <a href="#" id="rf">refresh now</a>' : "") + "</div>";
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; history.replaceState(null, "", "#" + TAB); render(); }; });
+    if ($("rf")) $("rf").onclick = function (e) { e.preventDefault(); VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Re-reading the dashboard…</div>'; load(true); };
+    ({ goals: goals, alerts: alerts, badges: badges, peers: peers, impact: impact, health: health, digest: digest, quality: quality })[TAB]();
+    api({ action: "tl-use", tool: "insights" });
+  }
+  // ---------- small SVG charts ----------
+  function lineChart(series, labels, h) {
+    h = h || 180; var W = 340, pad = 28, all = []; series.forEach(function (s) { s.v.forEach(function (v) { if (v != null) all.push(v); }); });
+    if (!all.length) return ""; var mn = Math.floor(Math.min.apply(null, all) / 5) * 5, mx = Math.ceil(Math.max.apply(null, all) / 5) * 5; if (mx === mn) mx = mn + 5;
+    var X = function (i) { return pad + i * (W - pad - 8) / Math.max(1, labels.length - 1); }, Y = function (v) { return 10 + (h - 34) * (1 - (v - mn) / (mx - mn)); };
+    var g = '<svg viewBox="0 0 ' + W + " " + h + '" width="100%"><g stroke="#EEF0F6">' + [0, 0.5, 1].map(function (f) { var v = mn + (mx - mn) * f; return '<line x1="' + pad + '" x2="' + W + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text x="2" y="' + (Y(v) + 4) + '" font-size="9" fill="#888" stroke="none">' + Math.round(v) + "</text>"; }).join("") + "</g>";
+    series.forEach(function (s) { var pts = s.v.map(function (v, i) { return v == null ? null : X(i) + "," + Y(v); }).filter(Boolean); g += '<polyline fill="none" stroke="' + s.c + '" stroke-width="' + (s.w || 2.5) + '" ' + (s.dash ? 'stroke-dasharray="5 4"' : "") + ' points="' + pts.join(" ") + '"/>'; s.v.forEach(function (v, i) { if (v != null && !s.dash) g += '<circle cx="' + X(i) + '" cy="' + Y(v) + '" r="3" fill="' + s.c + '"/>'; }); });
+    [0, Math.floor((labels.length - 1) / 2), labels.length - 1].forEach(function (i) { if (labels[i]) g += '<text x="' + X(i) + '" y="' + (h - 6) + '" font-size="9" fill="#888" text-anchor="middle">' + esc(labels[i]) + "</text>"; });
+    return g + "</svg>";
+  }
+  // ---------- goals ----------
+  function goals() {
+    var P = $("pane"), g = GOALS.find(function (x) { return x.state === ST; }), r = cur().rows[ST];
+    var h = '<div class="card"><div class="g2"><div><label class="lb">State</label>' + stSel("gs") + '</div><div><label class="lb">Now</label><div class="tx" style="padding:10px 12px"><b>#' + (r ? r.rank : "—") + "</b> · score " + (r ? r.score : "—") + "</div></div></div></div>";
+    if (g) {
+      var pr = E.goalProgress(S, g), stc = { achieved: ["#E6F4EA", "#0F7B4F", "Achieved 🎉"], ontrack: ["#E6F4EA", "#0F7B4F", "On track"], behind: ["#FDECEC", "#C62828", "Behind plan"] }[pr.status];
+      h += '<div class="card"><div class="row"><b style="font-size:16px;flex:1">🎯 ' + (g.targetRank ? "Rank #" + g.targetRank : "Score " + g.targetScore) + " by " + esc(g.by) + '</b><span class="st" style="background:' + stc[0] + ";color:" + stc[1] + '">' + stc[2] + "</span></div>" +
+        '<div class="tiles"><div class="tl"><b>' + pr.target + '</b><span>target score</span></div><div class="tl"><b>' + (pr.gap > 0 ? "+" + pr.gap : "✓") + '</b><span>points to go</span></div><div class="tl"><b>' + pr.weeksLeft + '</b><span>weeks left</span></div><div class="tl"><b>' + (pr.needWeekly ? "+" + pr.needWeekly : "—") + "</b><span>points needed per week</span></div></div>" +
+        (pr.path.length > 1 ? '<div class="mh2">Progress</div>' + lineChart([{ v: pr.path.map(function (p) { return p.score; }), c: "#415FFF" }, { v: pr.path.map(function () { return pr.target; }), c: "#1E9E61", dash: 1, w: 1.5 }], pr.path.map(function (p) { return p.label; })) + '<div class="muted" style="font-size:11.5px">Blue: weekly score · green dashed: target</div>' : "") +
+        (pr.gap > 0 ? '<div class="mh2">Weekly improvement needed per KPI</div><div class="tbw"><table class="tb"><tr><th>KPI</th><th class="n">Now</th><th class="n">Needed by ' + esc(g.by) + '</th><th class="n">Per week</th></tr>' + pr.kpis.filter(function (k) { return k.weeklyPp > 0; }).sort(function (a, b) { return b.weeklyPp - a.weeklyPp; }).map(function (k) { return "<tr><td>" + esc(k.name) + '</td><td class="n">' + pc(k.now) + '</td><td class="n"><b>' + pc(k.needAch) + '</b></td><td class="n">+' + k.weeklyPp + " pp</td></tr>"; }).join("") + '</table></div><div class="muted" style="font-size:11.5px;margin-top:4px">The gap is split across KPIs by how much room each has and how much it counts in the score.</div>' : "") +
+        '<div class="muted" style="font-size:12px;margin-top:8px">Set by ' + esc(g.setBy) + (g.base ? " when the state was #" + g.base.rank + " (score " + g.base.score + ")" : "") + '</div><div class="row" style="margin-top:8px"><button class="btn ghost sm" id="ge">✏️ Change goal</button><button class="btn danger sm" id="gd">Remove</button></div></div>';
+    }
+    h += '<div class="card" id="gf"' + (g ? ' style="display:none"' : "") + '><h3>' + (g ? "Change the goal" : "Set a goal for " + esc(ST)) + '</h3><div class="g2"><div><label class="lb">Target rank</label><input class="tx" id="gr" type="number" min="1" placeholder="e.g. 5" value="' + (g && g.targetRank || "") + '"></div><div><label class="lb">…or target score</label><input class="tx" id="gsc" type="number" placeholder="e.g. 70" value="' + (g && g.targetScore || "") + '"></div></div><label class="lb">By</label><input class="tx" type="date" id="gb" value="' + (g ? g.by : new Date(Date.parse(S.asOf) + 56 * 864e5).toISOString().slice(0, 10)) + '"><label class="lb">Note (optional)</label><input class="tx" id="gn" value="' + esc(g && g.note || "") + '"><button class="btn pri block" id="gsv" style="margin-top:10px">🎯 Save goal</button></div>';
+    if (ADMIN) h += '<div class="mh2">All goals</div>' + (GOALS.length ? GOALS.map(function (x) { var p = E.goalProgress(S, x); return '<div class="al ' + (p && p.status === "behind" ? "high" : "low") + '"><div style="flex:1"><b>' + esc(x.state) + " → " + (x.targetRank ? "#" + x.targetRank : x.targetScore) + " by " + esc(x.by) + "</b><small>" + (p ? "Now " + p.nowLabel + " · " + { achieved: "achieved", ontrack: "on track", behind: "behind — needs +" + p.needWeekly + "/week" }[p.status] : "") + "</small></div></div>"; }).join("") : '<div class="muted" style="font-size:13px">No state has set a goal yet.</div>');
+    P.innerHTML = h;
+    bindSt("gs", goals);
+    if ($("ge")) $("ge").onclick = function () { $("gf").style.display = ""; };
+    if ($("gd")) $("gd").onclick = function () { api({ action: "ins-goal-delete", state: ST }).then(function () { GOALS = GOALS.filter(function (x) { return x.state !== ST; }); goals(); }); };
+    $("gsv").onclick = function () { api({ action: "ins-goal-set", state: ST, targetRank: $("gr").value, targetScore: $("gr").value ? "" : $("gsc").value, by: $("gb").value, note: $("gn").value }).then(function (r) { if (!r.ok) return toast(r.error); GOALS = GOALS.filter(function (x) { return x.state !== ST; }).concat([r.goal]); toast("Goal saved"); goals(); }); };
+  }
+  // ---------- alerts ----------
+  function alerts() {
+    var P = $("pane"); P.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "ins-alerts", markSeen: true }).then(function (r) {
+      if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var A = r.alerts, types = {}; A.forEach(function (a) { types[a.type] = (types[a.type] || 0) + 1; });
+      var F = ls("al-f") || "", SF = ADMIN ? ls("al-s") || "" : "";
+      var draw = function () {
+        var L = A.filter(function (a) { return (!F || a.type === F) && (!SF || a.state === SF); });
+        $("al-l").innerHTML = L.length ? L.slice(0, 300).map(function (a) { return '<div class="al ' + a.sev + '"><div style="flex:1"><b>' + esc(a.title) + (a.fresh ? '<span class="nw">NEW</span>' : "") + "</b><small>" + esc(a.type) + " · " + esc(a.detail) + "</small></div></div>"; }).join("") : '<div class="empty">No alerts 🎉</div>';
+      };
+      P.innerHTML = '<div class="tiles"><div class="tl"><b style="color:#D93B3B">' + A.filter(function (a) { return a.sev === "high"; }).length + '</b><span>urgent</span></div><div class="tl"><b>' + A.length + "</b><span>alerts in total</span></div></div>" +
+        '<div class="chs9" id="af" style="margin-top:10px"><span data-f="" class="' + (!F ? "on" : "") + '">All</span>' + Object.keys(types).map(function (t) { return '<span data-f="' + esc(t) + '" class="' + (F === t ? "on" : "") + '">' + esc(t) + " · " + types[t] + "</span>"; }).join("") + "</div>" +
+        (ADMIN ? '<select class="tx" id="as" style="margin-top:8px"><option value="">All states</option>' + S.states.map(function (s) { return "<option" + (s === SF ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") + '<div id="al-l"></div>' + (ADMIN ? '<button class="btn ghost sm" id="ar" style="margin-top:10px">⚙️ Alert rules</button>' : "");
+      [].forEach.call($("af").children, function (c) { c.onclick = function () { F = c.dataset.f; ls("al-f", F); [].forEach.call($("af").children, function (x) { x.classList.toggle("on", x === c); }); draw(); }; });
+      if ($("as")) $("as").onchange = function () { SF = this.value; ls("al-s", SF); draw(); };
+      if ($("ar")) $("ar").onclick = rulesSheet;
+      draw();
+    });
+  }
+  function rulesSheet() {
+    var R = RULES || E.DEF_RULES, f = [["rankDrop", "Rank drop of at least (places)"], ["scoreDrop", "Score drop of at least (points)"], ["belowPan", "KPI below PAN for (months/weeks in a row)"], ["kpiBelow", "KPI watch level (%) — urgent below half of it"], ["dormantPct", "Dormant retailers above (%)"], ["atriskPct", "At-risk retailers above (%)"]];
+    var ov = sheet("Alert rules", "Applies to everyone's alerts", [["💾", "Save", function () { var o = {}; f.forEach(function (x) { o[x[0]] = +ov.querySelector("[data-r=" + x[0] + "]").value; }); api({ action: "ins-rules", save: o }).then(function (r) { if (!r.ok) return toast(r.error); RULES = r.rules; toast("Saved"); alerts(); }); }, "pri"]],
+      f.map(function (x) { return '<label class="lb">' + x[1] + '</label><input class="tx" type="number" data-r="' + x[0] + '" value="' + R[x[0]] + '">'; }).join(""));
+  }
+  // ---------- badges ----------
+  function badges() {
+    var B = E.badges(S), P = $("pane"), sel = ls("bd-m");
+    var mo = B.months.slice().reverse(), m = mo.find(function (x) { return x.m === sel; }) || mo[0];
+    var h = '<div class="chs9" id="bm" style="margin-top:8px">' + mo.map(function (x) { return '<span data-m="' + x.m + '" class="' + (x === m ? "on" : "") + '">' + esc(x.label) + (x.partial ? " (to date)" : "") + "</span>"; }).join("") + "</div>";
+    h += '<div class="mh2">🏅 Badges · ' + esc(m.label) + "</div>" + (m.list.length ? m.list.map(function (b) { return '<div class="bg"' + (b.state === ME ? ' style="outline:2px solid #F2C94C"' : "") + "><i>" + b.b + "</i><div><b>" + esc(b.name) + " — " + esc(b.state) + "</b><small>" + esc(b.why) + "</small></div></div>"; }).join("") : '<div class="muted">No badges this month.</div>');
+    if (B.streaks.length) h += '<div class="mh2">🔥 Streaks</div>' + B.streaks.map(function (b) { return '<div class="bg"><i>' + b.b + "</i><div><b>" + esc(b.state) + " — " + esc(b.name) + "</b><small>" + esc(b.why) + "</small></div></div>"; }).join("");
+    h += '<div class="mh2">🏛️ Hall of Fame</div><div class="tbw"><table class="tb"><tr><th>State</th><th class="n">🏆 Champion</th><th class="n">All badges</th></tr>' + B.fame.map(function (f) { return "<tr" + (f.state === ME ? ' style="background:#FFF8E1"' : "") + "><td>" + esc(f.state) + '</td><td class="n">' + f.gold + '</td><td class="n">' + f.n + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="mh2">Every month</div>' + B.months.slice().reverse().map(function (x) { return '<div class="card" style="margin-top:8px"><b>' + esc(x.label) + "</b><div style=\"font-size:13px;margin-top:4px;line-height:1.7\">" + x.list.map(function (b) { return b.b + " " + esc(b.name) + ": <b>" + esc(b.state) + "</b>"; }).join("<br>") + "</div></div>"; }).join("");
+    P.innerHTML = h;
+    [].forEach.call($("bm").children, function (c) { c.onclick = function () { ls("bd-m", c.dataset.m); badges(); }; });
+  }
+  // ---------- peers ----------
+  function peers() {
+    var P = $("pane"), p = E.peers(S, ST);
+    if (!p) { P.innerHTML = '<div class="empty">No data.</div>'; return; }
+    P.innerHTML = '<div class="card"><div class="g2"><div><label class="lb">State</label>' + stSel("ps") + '</div><div><label class="lb">Peer group</label><div class="tx" style="padding:10px 12px"><b>' + p.band + "</b> states · #" + p.rankInGroup + " of " + p.group.length + '</div></div></div><div class="muted" style="font-size:12px;margin-top:8px">Groups are made by number of onboarded retailers (small / medium / large thirds). Peers: ' + esc(p.order.join(", ")) + "</div></div>" +
+      '<div class="tbw"><table class="tb"><tr><th>KPI</th><th class="n">' + esc(ST) + '</th><th class="n">Peer median</th><th class="n">Best peer</th><th class="n">PAN India</th></tr>' + p.rows.map(function (x) { var f = x.k === "score" ? r1 : pc, good = x.me != null && x.median != null && x.me >= x.median; return "<tr><td>" + esc(x.name) + '</td><td class="n"><b style="color:' + (good ? "#0F7B4F" : "#C62828") + '">' + f(x.me) + '</b></td><td class="n">' + f(x.median) + '</td><td class="n">' + f(x.best) + ' <span class="muted" style="font-size:11px">' + esc(x.bestState) + '</span></td><td class="n">' + f(x.pan) + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="mh2">Peer ranking</div>' + p.order.map(function (s, i) { var r = p.cur.rows[s]; return '<div class="bg"' + (s === ST ? ' style="outline:2px solid #415FFF"' : "") + "><i style=\"font-size:18px;width:28px;text-align:center\">" + (i + 1) + '</i><div style="flex:1"><b>' + esc(s) + "</b><small>score " + r.score + " · India rank #" + r.rank + " · " + (r.onb || 0) + ' retailers</small><div class="bar"><i style="width:' + Math.min(100, r.score) + '%;background:#415FFF"></i></div></div></div>'; }).join("");
+    bindSt("ps", peers);
+  }
+  // ---------- impact ----------
+  function impact() {
+    var P = $("pane"), K = E.KPIS.filter(function (k) { return k[0] !== "new"; }), xk = ls("im-x") || "app", yk = ls("im-y") || "sales";
+    if (xk === yk) yk = xk === "sales" ? "visit" : "sales";
+    var I = E.impact(S, xk, yk), W = 340, H = 260, pad = 34;
+    var opts = function (sel) { return K.map(function (k) { return '<option value="' + k[0] + '"' + (k[0] === sel ? " selected" : "") + ">" + k[1] + "</option>"; }).join(""); };
+    var svg = "";
+    if (I && I.pts.length) {
+      var xs = I.pts.map(function (q) { return q.x; }), ys = I.pts.map(function (q) { return q.y; }), x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+      if (x1 === x0) x1 = x0 + 0.01; if (y1 === y0) y1 = y0 + 0.01;
+      var X = function (v) { return pad + (v - x0) / (x1 - x0) * (W - pad - 12); }, Y = function (v) { return 10 + (H - pad - 10) * (1 - (v - y0) / (y1 - y0)); };
+      svg = '<svg viewBox="0 0 ' + W + " " + H + '" width="100%"><rect x="' + pad + '" y="10" width="' + (W - pad - 12) + '" height="' + (H - pad - 10) + '" fill="#FAFAFE" stroke="#EEF0F6"/>' + I.pts.map(function (q) { return '<circle cx="' + X(q.x) + '" cy="' + Y(q.y) + '" r="' + (q.s === ST ? 7 : 5) + '" fill="' + (q.s === ST ? "#E05757" : "#415FFF") + '" fill-opacity=".8"><title>' + esc(q.s) + ": " + pc(q.x) + ", " + pc(q.y) + "</title></circle>" + (q.s === ST ? '<text x="' + (X(q.x) + 9) + '" y="' + (Y(q.y) + 4) + '" font-size="11" font-weight="700">' + esc(q.s) + "</text>" : ""); }).join("") +
+        '<text x="' + (W / 2) + '" y="' + (H - 6) + '" font-size="11" text-anchor="middle" fill="#666">' + esc(E.KN[xk]) + " →</text><text x='10' y='" + (H / 2) + "' font-size='11' fill='#666' transform='rotate(-90 10 " + (H / 2) + ")' text-anchor='middle'>" + esc(E.KN[yk]) + " →</text>" +
+        '<text x="' + pad + '" y="' + (H - pad + 13) + '" font-size="9" fill="#888">' + pc(x0) + '</text><text x="' + (W - 12) + '" y="' + (H - pad + 13) + '" font-size="9" fill="#888" text-anchor="end">' + pc(x1) + "</text></svg>";
+    }
+    var per = (I ? I.per : []).sort(function (a, b) { return b.r - a.r; });
+    P.innerHTML = '<div class="card"><div class="g2"><div><label class="lb">If this is higher…</label><select class="tx" id="ix">' + opts(xk) + '</select></div><div><label class="lb">…is this better?</label><select class="tx" id="iy">' + opts(yk) + "</select></div></div>" + (ADMIN ? "" : "") + "</div>" +
+      '<div class="card"><b>Across states · ' + esc(I ? I.label : "") + '</b><div class="muted" style="font-size:12.5px;margin-top:2px">' + (I && I.r != null ? "Correlation r = " + I.r.toFixed(2) + " → <b>" + E.words(I.r) + "</b>" : "Not enough variation between states this month to measure.") + "</div>" + svg + '<div class="muted" style="font-size:11.5px">Each dot is a state' + (ST ? " · red: " + esc(ST) : "") + ".</div></div>" +
+      '<div class="card"><b>Week by week, within each state</b><div class="muted" style="font-size:12px;margin:2px 0 6px">r close to +1: when ' + esc(E.KN[xk]) + " went up, " + esc(E.KN[yk]) + ' went up too.</div><div class="tbw"><table class="tb"><tr><th>State</th><th class="n">r</th><th>Meaning</th></tr>' + per.map(function (q) { return "<tr" + (q.s === ST ? ' style="background:#FFF8E1"' : "") + "><td>" + esc(q.s) + '</td><td class="n"><b style="color:' + (q.r > 0.4 ? "#0F7B4F" : q.r < -0.4 ? "#C62828" : "#555") + '">' + q.r.toFixed(2) + "</b></td><td>" + esc(E.words(q.r)) + "</td></tr>"; }).join("") + '</table></div><div class="muted" style="font-size:11.5px;margin-top:6px">A link is not proof of cause, but a strong positive link is good evidence that BI adoption pays off.</div></div>';
+    $("ix").onchange = function () { ls("im-x", this.value); impact(); }; $("iy").onchange = function () { ls("im-y", this.value); impact(); };
+  }
+  // ---------- retailer health ----------
+  var SEGN = { champion: ["🏆", "Champions", "#1E9E61", "8+ active days in the last 30"], active: ["🙂", "Active", "#415FFF", "1–7 active days in the last 30"], atrisk: ["⚠️", "At risk", "#E69A00", "used the app much less than the month before"], dormant: ["😴", "Dormant", "#D93B3B", "no activity in 30 days"], never: ["❔", "Never used", "#8A8FA8", "onboarded but never used the app"] };
+  function health() {
+    var P = $("pane"), c = S.seg[ST] || {};
+    var segs = Object.keys(SEGN), tot = c.total || 1;
+    P.innerHTML = '<div class="card"><div class="g2"><div><label class="lb">State</label>' + stSel("hs") + '</div><div><label class="lb">Retailers</label><div class="tx" style="padding:10px 12px"><b>' + (c.total || 0) + "</b></div></div></div>" +
+      segs.map(function (k) { var n = c[k] || 0; return '<div style="margin-top:10px"><div class="row"><span style="flex:1"><b>' + SEGN[k][0] + " " + SEGN[k][1] + '</b> <span class="muted" style="font-size:12px">' + SEGN[k][3] + "</span></span><b>" + n + '</b><span class="muted" style="width:40px;text-align:right">' + Math.round(n / tot * 100) + '%</span></div><div class="bar"><i style="width:' + (n / tot * 100) + "%;background:" + SEGN[k][2] + '"></i></div></div>'; }).join("") + '</div><div class="card"><b>📞 Call list</b><div class="chs9" id="hf" style="margin-top:8px">' + ["atrisk", "dormant", "never", "champion", "active"].map(function (k, i) { return '<span data-k="' + k + '" class="' + (i === 0 ? "on" : "") + '">' + SEGN[k][1] + "</span>"; }).join("") + '</div><div id="hl"><div class="loading"><div class="spin"></div></div></div></div>';
+    bindSt("hs", health);
+    api({ action: "ins-retailers", state: ST }).then(function (r) {
+      if (!r.ok) { $("hl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var K = "atrisk", draw = function () {
+        var L = r.rows.filter(function (x) { return x[1] === K; }).sort(function (a, b) { return b[3] - a[3] || b[5] - a[5]; });
+        $("hl").innerHTML = '<div class="muted" style="font-size:12px;margin-top:6px">' + L.length + " retailers</div>" + '<div class="tbw"><table class="tb"><tr><th>Retailer ID</th><th class="n">Days (30d)</th><th class="n">Days (prev 30d)</th><th>Last active</th><th>Most used</th></tr>' + L.slice(0, 300).map(function (x) { return "<tr><td>" + esc(x[0]) + '</td><td class="n">' + x[2] + '</td><td class="n">' + x[3] + "</td><td>" + esc(x[4] || "never") + "</td><td>" + esc((x[6] || "").slice(0, 40)) + "</td></tr>"; }).join("") + "</table></div>" + (L.length ? '<button class="btn ok sm" id="hx" style="margin-top:8px">⬇ Call list (Excel)</button>' : "");
+        if ($("hx")) $("hx").onclick = function () { download(xlsx([{ name: SEGN[K][1], rows: [["Retailer ID", "Segment", "Active days (last 30)", "Active days (previous 30)", "Last active", "Total actions", "Most used feature", "In active list", "Called? / remarks"]].concat(L.map(function (x) { return [x[0], SEGN[x[1]][1], x[2], x[3], x[4], x[5], x[6], x[7] ? "Yes" : "No", ""]; })) }]), ST.replace(/[^A-Za-z0-9]+/g, "_") + "_" + SEGN[K][1].replace(/\s+/g, "_") + "_call_list.xlsx"); };
+      };
+      [].forEach.call($("hf").children, function (c2) { c2.onclick = function () { K = c2.dataset.k; [].forEach.call($("hf").children, function (x) { x.classList.toggle("on", x === c2); }); draw(); }; });
+      draw();
+    });
+  }
+  // ---------- digest ----------
+  function digest() {
+    var P = $("pane"), kind = ls("dg-k") || "week";
+    var make = function () {
+      var M = S.months, W = S.weeks, isW = kind === "week", A = isW ? W[W.length - 1] : M[M.length - 1], B = isW ? W[W.length - 2] : M[M.length - 2], r = A.rows[ST], q = B && B.rows[ST];
+      if (!r) return "No data for " + ST + ".";
+      var arrow = function (a, b) { return b == null || a == null ? "" : a > b ? " ⬆️" : a < b ? " ⬇️" : " ➡️"; };
+      var mv = q ? q.rank - r.rank : 0, ks = E.KPIS.filter(function (k) { return k[0] !== "new" && r[k[0]] != null; });
+      var weak = E.focusKpi(r, A.pan)[0];
+      var c = S.seg[ST], g = GOALS.find(function (x) { return x.state === ST; }), gp = g && E.goalProgress(S, g);
+      var lines = ["*" + ST + " · BI " + (isW ? "weekly" : "monthly") + " update*", "📅 " + (isW ? "Week " + A.label : A.label) + "", "", "🏆 Rank: *#" + r.rank + "* of " + Object.keys(A.rows).length + (q ? (mv > 0 ? " (⬆️ " + mv + ")" : mv < 0 ? " (⬇️ " + -mv + ")" : " (same)") : ""), "📊 Score: *" + r.score + "*" + (q ? arrow(r.score, q.score) : "") + "  ·  PAN India " + (A.pan.score || "—"), ""];
+      lines.push("*KPIs*"); ks.forEach(function (k) { lines.push((r[k[0]] >= (A.pan[k[0]] || 0) ? "✅ " : "🔸 ") + k[1] + ": " + pc(r[k[0]]) + (q ? arrow(r[k[0]], q[k[0]]) : "")); });
+      if (weak) lines.push("", "🎯 Focus: *" + weak[1] + "* — " + pc(r[weak[0]]) + " vs PAN " + pc(A.pan[weak[0]]));
+      if (c) lines.push("🏪 Retailers: " + c.champion + " champions · " + c.atrisk + " at risk · " + (c.dormant + c.never) + " dormant");
+      if (gp) lines.push("🥅 Goal " + (g.targetRank ? "#" + g.targetRank : g.targetScore) + " by " + g.by + ": " + { achieved: "achieved 🎉", ontrack: "on track 👍", behind: "behind — +" + gp.needWeekly + " points/week needed" }[gp.status]);
+      lines.push("", "_From the vivo BI dashboard_");
+      return lines.join("\n");
+    };
+    var txt = make();
+    P.innerHTML = '<div class="card"><div class="g2"><div><label class="lb">State</label>' + stSel("ds") + '</div><div><label class="lb">Summary of</label><select class="tx" id="dk"><option value="week">Last week</option><option value="month"' + (kind === "month" ? " selected" : "") + '>This month</option></select></div></div><div class="dg" id="dt">' + esc(txt) + '</div><div class="row" style="margin-top:10px"><button class="btn ok grow" id="dw">🟢 Send on WhatsApp</button><button class="btn sec" id="dc">📋 Copy</button>' + (navigator.share ? '<button class="btn ghost" id="dsh">Share…</button>' : "") + "</div></div>";
+    bindSt("ds", digest); $("dk").onchange = function () { ls("dg-k", this.value); digest(); };
+    $("dc").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () { toast("Copied — paste it in WhatsApp or vChat"); }).catch(function () { var t = document.createElement("textarea"); t.value = txt; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); toast("Copied"); } catch (e) { } t.remove(); }); };
+    $("dw").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent(txt), "_blank"); api({ action: "tl-use", tool: "insights", kind: "acts" }); };
+    if ($("dsh")) $("dsh").onclick = function () { navigator.share({ text: txt }).catch(function () { }); };
+  }
+  // ---------- data quality ----------
+  function quality() {
+    var Q = S.qc, P = $("pane"), n = { high: 0, med: 0, low: 0 }; Q.forEach(function (q) { n[q.sev]++; });
+    P.innerHTML = '<div class="tiles"><div class="tl"><b style="color:#D93B3B">' + n.high + '</b><span>serious</span></div><div class="tl"><b style="color:#E69A00">' + n.med + '</b><span>check</span></div><div class="tl"><b>' + n.low + '</b><span>for information</span></div><div class="tl"><b>' + S.retailers + "</b><span>retailers in the data</span></div></div>" +
+      (Q.length ? Q.map(function (q) { return '<div class="al ' + q.sev + '"><div style="flex:1"><b>' + esc(q.type) + (q.state ? " · " + esc(q.state) : "") + "</b><small>" + esc(q.detail) + "</small></div></div>"; }).join("") : '<div class="empty">No data problems found ✅</div>') +
+      '<div class="row" style="margin-top:10px"><button class="btn ghost sm" id="qx">⬇ Excel</button></div><div class="muted" style="font-size:12px;margin-top:8px">Checks the published dashboard data. After importing new data in the dashboard and saving, use “refresh now” below to re-check.</div>';
+    $("qx").onclick = function () { download(xlsx([{ name: "Data quality", rows: [["Severity", "Check", "State", "Detail"]].concat(Q.map(function (q) { return [q.sev, q.type, q.state, q.detail]; })) }]), "Data_quality_" + S.asOf + ".xlsx"); };
+  }
+  window.__pageBack = function () { return false; };
+  load();
+})();
+</script>
+</body>
+</html>

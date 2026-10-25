@@ -142,6 +142,7 @@
     var base = g.base && g.base.score != null ? g.base.score : (path[0] && path[0].score) || r.score;
     var total = weeksBetween(since || S.asOf, g.by), done = weeksBetween(since || S.asOf, S.asOf), planNow = base + (target - base) * Math.min(1, done / total);
     var status = gap <= 0 ? "achieved" : r.score >= planNow - 1 ? "ontrack" : "behind";
+    if (status === "behind" && g.base && g.base.score === r.score && g.base.rank === r.rank) status = "ontrack";   // no new data since the goal was set
     // per-KPI weekly improvement needed: split the gap by headroom × weight
     var kp = [], head = 0;
     KPIS.forEach(function (k) { var a = r[k[0]], w = r.w[k[0]] || (cur.pan.w && cur.pan.w[k[0]]) || 0; if (a == null || !w) return; var h = Math.max(0, 1 - a) * w; head += h; kp.push({ k: k[0], name: k[1], now: a, w: w, h: h }); });
@@ -192,7 +193,9 @@
     return { pts: pts, r: r, per: per, label: p.label };
   }
   function words(r) { if (r == null) return "not enough data"; var a = Math.abs(r); return (a >= 0.7 ? "strong" : a >= 0.4 ? "moderate" : a >= 0.2 ? "weak" : "no clear") + (a >= 0.2 ? (r > 0 ? " positive" : " negative") : "") + " link"; }
-  var API = { KPIS: KPIS, KN: KN, DEF_RULES: DEF_RULES, snapshot: snapshot, alerts: alerts, goalProgress: goalProgress, badges: badges, peers: peers, impact: impact, corr: corr, words: words, r1: r1 };
+  // the KPI to focus on: lowest one under the target, else the smallest lead over PAN India
+  function focusKpi(r, pan, target) { target = (target || 80) / 100; var ks = KPIS.filter(function (k) { return k[0] !== "new" && r[k[0]] != null; }); var low = ks.filter(function (k) { return r[k[0]] < target; }).sort(function (a, b) { return r[a[0]] - r[b[0]]; }); if (low.length) return low; return ks.sort(function (a, b) { return (r[a[0]] - ((pan || {})[a[0]] || 0)) - (r[b[0]] - ((pan || {})[b[0]] || 0)); }); }
+  var API = { focusKpi: focusKpi, KPIS: KPIS, KN: KN, DEF_RULES: DEF_RULES, snapshot: snapshot, alerts: alerts, goalProgress: goalProgress, badges: badges, peers: peers, impact: impact, corr: corr, words: words, r1: r1 };
   root.INSENG = API;
   if (typeof module !== "undefined" && module.exports) module.exports = API;
 })(typeof window !== "undefined" ? window : globalThis);

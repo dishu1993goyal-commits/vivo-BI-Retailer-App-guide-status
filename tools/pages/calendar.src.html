@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Notices & BI calendar</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cbx{display:flex;gap:8px;align-items:center;font-size:13.5px;margin-top:8px;cursor:pointer}
+.nt{background:var(--card);border-radius:16px;padding:12px 14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06);border-left:5px solid #4D9BF9}
+.nt.important{border-left-color:#E69A00}.nt.urgent{border-left-color:#D93B3B;background:#FFF8F7}
+.nt b{font-size:15px}.nt p{margin:6px 0 0;font-size:13.5px;white-space:pre-line;line-height:1.5}.nt small{color:var(--mut);font-size:12px;display:block;margin-top:6px}
+.nt img{width:100%;border-radius:10px;margin-top:8px;max-height:260px;object-fit:cover}
+.pin{display:inline-block;font-size:11px;font-weight:800;border-radius:99px;padding:1px 8px;margin-left:6px;background:#EEF0FF;color:#3D47C8}.nw{background:#E53935;color:#fff}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal .h{font-size:11px;color:var(--mut);text-align:center;font-weight:700}
+.cal .d{background:var(--card);border-radius:9px;min-height:46px;padding:3px;font-size:11px;position:relative;cursor:pointer;box-shadow:0 1px 4px rgba(20,24,51,.05)}
+.cal .d.o{opacity:.35}.cal .d.t{outline:2px solid var(--brand)}.cal .d.s{background:#EEF0FF}
+.cal .d .dots{display:flex;flex-wrap:wrap;gap:2px;margin-top:2px}.cal .d .dots i{width:7px;height:7px;border-radius:99px}
+.ev{display:flex;gap:10px;background:var(--card);border-radius:14px;padding:10px 12px;margin-top:8px;box-shadow:0 1px 6px rgba(20,24,51,.05)}
+.ev .dd{width:52px;flex:none;text-align:center;border-radius:10px;padding:5px 0;color:#fff;font-weight:800;line-height:1.1}.ev .dd small{display:block;font-size:10.5px;font-weight:600;opacity:.9}
+.ev b{font-size:14px;display:block}.ev .m{font-size:12px;color:var(--mut)}
+.chs9{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chs9 span{border:1px solid #DDE0EF;border-radius:99px;padding:4px 10px;font-size:12px;cursor:pointer;background:var(--card)}.chs9 span.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📅</span></div>
+  <h1 id="h1">Notices & BI calendar</h1><p id="h2">Announcements from HO and every important date</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = /cal/.test(location.hash) ? "cal" : "board", STATES = [];
+  var TYPES = { review: ["Review", "#415FFF"], scheme: ["Scheme", "#E69A00"], data: ["Data due", "#D93B3B"], launch: ["Launch", "#8E5CF6"], festival: ["Festival", "#F2711C"], training: ["Training", "#1E9E61"], meeting: ["Meeting", "#00A3BF"], other: ["Other", "#7A7F99"] };
+  var today = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10), MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var fmtD = function (d) { return d ? +d.slice(8, 10) + " " + MON[+d.slice(5, 7) - 1] + " " + d.slice(0, 4) : ""; };
+  var CM = today.slice(0, 7), SEL = today, EVS = [];
+  function render() {
+    $("h1").textContent = TAB === "board" ? "Notice board" : "BI calendar"; $("h2").textContent = TAB === "board" ? "Announcements from HO, pinned for your state" : "Reviews, scheme dates, data-due dates and launches — with reminders";
+    VIEW.innerHTML = '<div class="seg"><button data-t="board" class="' + (TAB === "board" ? "on" : "") + '">📌 Notice board</button><button data-t="cal" class="' + (TAB === "cal" ? "on" : "") + '">📅 BI calendar</button></div><div id="pane"><div class="loading"><div class="spin"></div></div></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; history.replaceState(null, "", "#" + TAB); render(); }; });
+    if (TAB === "board") board(); else cal();
+  }
+  // ---------- notice board ----------
+  function board() {
+    api({ action: "board-list", markSeen: true, all: ADMIN }).then(function (r) {
+      var P = $("pane"); if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var N = r.notices;
+      P.innerHTML = (ADMIN ? '<button class="btn pri block" id="na" style="margin-top:10px">＋ Post a notice</button>' : "") + (N.length ? N.map(function (n) {
+        var expired = n.to && n.to < today, future = n.from && n.from > today;
+        return '<div class="nt ' + n.level + '"' + (expired ? ' style="opacity:.5"' : "") + "><b>" + (n.level === "urgent" ? "🚨 " : n.level === "important" ? "⚠️ " : "📌 ") + esc(n.title) + "</b>" + (n.pin ? '<span class="pin">PINNED</span>' : "") + (n.fresh && !ADMIN ? '<span class="pin nw">NEW</span>' : "") + (n.body ? "<p>" + esc(n.body) + "</p>" : "") + (n.img ? '<img src="' + esc(n.img) + '" alt="" loading="lazy">' : "") + (n.link ? '<p><a href="' + esc(n.link) + '" target="_blank" rel="noopener">Open link ↗</a></p>' : "") +
+          "<small>" + esc(n.by ? n.by.name : "HO") + " · " + dt(n.at) + (n.to ? " · " + (expired ? "expired " : "until ") + fmtD(n.to) : "") + (future ? " · shows from " + fmtD(n.from) : "") + (ADMIN ? " · " + (n.states && n.states.length ? esc(n.states.join(", ")) : "all states") : "") + "</small>" + (ADMIN ? '<div class="row" style="margin-top:8px"><button class="btn ghost sm" data-e="' + n.id + '">✏️ Edit</button><button class="btn danger sm" data-d="' + n.id + '">Delete</button></div>' : "") + "</div>";
+      }).join("") : '<div class="empty">No notices right now.</div>');
+      if ($("na")) $("na").onclick = function () { noticeEdit({}); };
+      [].forEach.call(P.querySelectorAll("[data-e]"), function (b) { b.onclick = function () { noticeEdit(N.find(function (n) { return n.id === b.dataset.e; })); }; });
+      [].forEach.call(P.querySelectorAll("[data-d]"), function (b) { b.onclick = function () { sheet("Delete this notice?", "", [["🗑️", "Delete", function () { api({ action: "board-delete", id: b.dataset.d }).then(board); }, "danger"]]); }; });
+    });
+  }
+  function noticeEdit(n) {
+    n = JSON.parse(JSON.stringify(n || {})); n.states = n.states || [];
+    var P = $("pane");
+    var draw = function () {
+      P.innerHTML = '<div class="card"><h3>' + (n.id ? "Edit notice" : "New notice") + '</h3><label class="lb">Title</label><input class="tx" id="t" value="' + esc(n.title || "") + '"><label class="lb">Message</label><textarea class="tx" id="b" rows="4">' + esc(n.body || "") + '</textarea><div class="g2"><div><label class="lb">Level</label><select class="tx" id="l"><option value="info">📌 Info</option><option value="important"' + (n.level === "important" ? " selected" : "") + '>⚠️ Important</option><option value="urgent"' + (n.level === "urgent" ? " selected" : "") + '>🚨 Urgent</option></select></div><div><label class="lb">Link (optional)</label><input class="tx" id="k" value="' + esc(n.link || "") + '" placeholder="https://…"></div></div>' +
+        '<div class="g2"><div><label class="lb">Show from</label><input class="tx" type="date" id="f" value="' + esc(n.from || today) + '"></div><div><label class="lb">Expires on</label><input class="tx" type="date" id="x" value="' + esc(n.to || "") + '"></div></div><label class="cbx"><input type="checkbox" id="p"' + (n.pin ? " checked" : "") + '> Pin to the top of every state\'s home</label>' +
+        '<label class="lb">States (none = all states)</label><div class="chs9" id="ss">' + STATES.map(function (s) { return '<span data-s="' + esc(s) + '" class="' + (n.states.indexOf(s) >= 0 ? "on" : "") + '">' + esc(s) + "</span>"; }).join("") + "</div>" + (n.img ? '<img src="' + esc(n.img) + '" style="width:100%;border-radius:10px;margin-top:8px" alt="">' : "") +
+        '<div class="row" style="margin-top:8px"><button class="btn ghost sm" id="im">🖼 ' + (n.img ? "Change" : "Add") + " picture</button>" + (n.img ? '<button class="btn ghost sm" id="ix">Remove picture</button>' : "") + '</div><div class="row" style="margin-top:12px"><button class="btn ghost" id="c">Cancel</button><button class="btn pri grow" id="s">📌 Post</button></div></div>';
+      [].forEach.call($("ss").children, function (c) { c.onclick = function () { var s = c.dataset.s, i = n.states.indexOf(s); if (i >= 0) n.states.splice(i, 1); else n.states.push(s); c.classList.toggle("on", i < 0); }; });
+      var keep = function () { n.title = $("t").value; n.body = $("b").value; n.level = $("l").value; n.link = $("k").value; n.from = $("f").value; n.to = $("x").value; n.pin = $("p").checked; };
+      $("im").onclick = function () { keep(); var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.onchange = function () { var f = inp.files[0]; if (!f) return; var im = new Image(); im.onload = function () { var k = Math.min(1, 1400 / im.naturalWidth), c = document.createElement("canvas"); c.width = im.naturalWidth * k; c.height = im.naturalHeight * k; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); api({ action: "bnr-upload", data: c.toDataURL("image/jpeg", 0.82) }).then(function (r) { if (!r.ok) return toast(r.error); n.img = r.url; draw(); }); }; im.src = URL.createObjectURL(f); }; inp.click(); };
+      if ($("ix")) $("ix").onclick = function () { keep(); n.img = ""; draw(); };
+      $("c").onclick = board;
+      $("s").onclick = function () { keep(); api({ action: "board-save", notice: n }).then(function (r) { if (!r.ok) return toast(r.error); toast("Posted"); board(); }); };
+    };
+    draw();
+  }
+  // ---------- calendar ----------
+  function cal() {
+    var y = +CM.slice(0, 4), m = +CM.slice(5, 7), first = CM + "-01", last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    api({ action: "cal-list", from: new Date(Date.UTC(y, m - 1, -6)).toISOString().slice(0, 10), to: new Date(Date.UTC(y, m, 14)).toISOString().slice(0, 10) }).then(function (r) {
+      var P = $("pane"); if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      EVS = r.events;
+      var on = function (d) { return EVS.filter(function (e) { return e.date <= d && (e.end || e.date) >= d; }); };
+      var start = new Date(Date.UTC(y, m - 1, 1)), pad = (start.getUTCDay() + 6) % 7, cells = [];
+      for (var i = -pad; i < 42 - pad; i++) { var d = new Date(Date.UTC(y, m - 1, 1 + i)).toISOString().slice(0, 10); cells.push(d); if (i >= 27 && d.slice(0, 7) !== CM && (i + pad) % 7 === 6) break; }
+      var h = '<div class="card"><div class="row"><button class="btn ghost sm" id="pm">‹</button><b style="flex:1;text-align:center;font-size:16px">' + MON[m - 1] + " " + y + '</b><button class="btn ghost sm" id="nm">›</button></div><div class="cal">' + ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(function (x) { return '<div class="h">' + x + "</div>"; }).join("") +
+        cells.map(function (d) { var es = on(d); return '<div class="d' + (d.slice(0, 7) !== CM ? " o" : "") + (d === today ? " t" : "") + (d === SEL ? " s" : "") + '" data-d="' + d + '"><b>' + +d.slice(8, 10) + '</b><div class="dots">' + es.slice(0, 6).map(function (e) { return '<i style="background:' + TYPES[e.type][1] + '"></i>'; }).join("") + "</div></div>"; }).join("") + '</div><div class="chs9" style="margin-top:8px">' + Object.keys(TYPES).map(function (k) { return '<span style="cursor:default"><i style="display:inline-block;width:8px;height:8px;border-radius:99px;background:' + TYPES[k][1] + ';margin-right:4px"></i>' + TYPES[k][0] + "</span>"; }).join("") + "</div></div>";
+      var dayEv = on(SEL), up = EVS.filter(function (e) { return (e.end || e.date) >= today; }).slice(0, 12);
+      h += '<div class="card"><div class="row"><b style="flex:1">' + fmtD(SEL) + '</b><button class="btn pri sm" id="ad">＋ Add</button></div>' + (dayEv.length ? dayEv.map(evHtml).join("") : '<div class="muted" style="font-size:13px;margin-top:6px">Nothing on this day.</div>') + "</div>";
+      h += '<div class="card"><div class="row"><b style="flex:1">⏰ Coming up</b>' + (up.length ? '<button class="btn ghost sm" id="ics">⬇ Add all to phone calendar</button>' : "") + "</div>" + (up.length ? up.map(evHtml).join("") : '<div class="muted" style="font-size:13px;margin-top:6px">No upcoming dates.</div>') + "</div>";
+      P.innerHTML = h;
+      $("pm").onclick = function () { CM = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); cal(); };
+      $("nm").onclick = function () { CM = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 7); cal(); };
+      [].forEach.call(P.querySelectorAll(".cal .d"), function (c) { c.onclick = function () { SEL = c.dataset.d; cal(); }; });
+      $("ad").onclick = function () { evEdit({ date: SEL, type: "review", remind: 1 }); };
+      if ($("ics")) $("ics").onclick = function () { ics(up, "BI_calendar.ics"); };
+      [].forEach.call(P.querySelectorAll("[data-ee]"), function (b) { b.onclick = function () { evEdit(EVS.find(function (e) { return e.id === b.dataset.ee; })); }; });
+      [].forEach.call(P.querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { sheet("Delete this date?", "", [["🗑️", "Delete", function () { api({ action: "cal-delete", id: b.dataset.ed }).then(cal); }, "danger"]]); }; });
+      [].forEach.call(P.querySelectorAll("[data-ei]"), function (b) { b.onclick = function () { ics([EVS.find(function (e) { return e.id === b.dataset.ei; })], "event.ics"); }; });
+    });
+  }
+  function evHtml(e) {
+    var t = TYPES[e.type], d = days(e.date);
+    return '<div class="ev"><div class="dd" style="background:' + t[1] + '">' + +e.date.slice(8, 10) + "<small>" + MON[+e.date.slice(5, 7) - 1] + '</small></div><div style="flex:1;min-width:0"><b>' + esc(e.title) + '</b><div class="m">' + t[0] + (e.time ? " · " + e.time : "") + (e.end ? " · until " + fmtD(e.end) : "") + (d > 0 ? " · in " + d + " day" + (d > 1 ? "s" : "") : d === 0 ? " · <b>today</b>" : "") + (ADMIN && e.states && e.states.length ? " · " + esc(e.states.join(", ")) : "") + (e.remind ? " · ⏰ " + e.remind + "d before" + (e.email ? " + email" : "") : "") + "</div>" + (e.notes ? '<div class="m" style="color:var(--ink2)">' + esc(e.notes) + "</div>" : "") + (e.link ? '<div class="m"><a href="' + esc(e.link) + '" target="_blank" rel="noopener">Open link ↗</a></div>' : "") +
+      '<div class="row" style="margin-top:5px;gap:5px"><button class="btn ghost sm" data-ei="' + e.id + '">📲 Phone calendar</button>' + (e.mine || ADMIN ? '<button class="btn ghost sm" data-ee="' + e.id + '">✏️</button><button class="btn danger sm" data-ed="' + e.id + '">✕</button>' : "") + "</div></div></div>";
+  }
+  function days(d) { return Math.round((Date.parse(d + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 864e5); }
+  function evEdit(e) {
+    e = JSON.parse(JSON.stringify(e)); e.states = e.states || [];
+    var P = $("pane");
+    P.innerHTML = '<div class="card"><h3>' + (e.id ? "Edit date" : "Add a date") + '</h3><label class="lb">Title</label><input class="tx" id="t" value="' + esc(e.title || "") + '" placeholder="e.g. Monthly review with HO"><div class="g2"><div><label class="lb">Type</label><select class="tx" id="y">' + Object.keys(TYPES).map(function (k) { return '<option value="' + k + '"' + (k === e.type ? " selected" : "") + ">" + TYPES[k][0] + "</option>"; }).join("") + '</select></div><div><label class="lb">Time (optional)</label><input class="tx" type="time" id="tm" value="' + esc(e.time || "") + '"></div></div>' +
+      '<div class="g2"><div><label class="lb">Date</label><input class="tx" type="date" id="d" value="' + esc(e.date || today) + '"></div><div><label class="lb">Until (optional)</label><input class="tx" type="date" id="en" value="' + esc(e.end || "") + '"></div></div><label class="lb">Notes</label><textarea class="tx" id="n" rows="2">' + esc(e.notes || "") + '</textarea><label class="lb">Link (optional)</label><input class="tx" id="k" value="' + esc(e.link || "") + '"><label class="lb">Remind</label><select class="tx" id="r">' + [0, 1, 2, 3, 7].map(function (v) { return '<option value="' + v + '"' + (+e.remind === v ? " selected" : "") + ">" + (v ? v + " day" + (v > 1 ? "s" : "") + " before" : "No reminder") + "</option>"; }).join("") + "</select>" +
+      (ADMIN ? '<label class="cbx"><input type="checkbox" id="em"' + (e.email ? " checked" : "") + '> Also email the reminder to the state BI users (9 AM)</label><label class="lb">States (none = all states)</label><div class="chs9" id="ss">' + STATES.map(function (s) { return '<span data-s="' + esc(s) + '" class="' + (e.states.indexOf(s) >= 0 ? "on" : "") + '">' + esc(s) + "</span>"; }).join("") + "</div>" : '<div class="muted" style="font-size:12px;margin-top:8px">This date is added for your state.</div>') +
+      '<div class="row" style="margin-top:12px"><button class="btn ghost" id="c">Cancel</button><button class="btn pri grow" id="s">💾 Save</button></div></div>';
+    if ($("ss")) [].forEach.call($("ss").children, function (c) { c.onclick = function () { var s = c.dataset.s, i = e.states.indexOf(s); if (i >= 0) e.states.splice(i, 1); else e.states.push(s); c.classList.toggle("on", i < 0); }; });
+    $("c").onclick = cal;
+    $("s").onclick = function () { Object.assign(e, { title: $("t").value, type: $("y").value, time: $("tm").value, date: $("d").value, end: $("en").value, notes: $("n").value, link: $("k").value, remind: +$("r").value, email: $("em") ? $("em").checked : false }); api({ action: "cal-save", event: e }).then(function (r) { if (!r.ok) return toast(r.error); SEL = r.event.date; CM = SEL.slice(0, 7); toast("Saved"); cal(); }); };
+  }
+  function ics(list, name) {
+    var z = function (s) { return String(s || "").replace(/[\\,;]/g, function (c) { return "\\" + c; }).replace(/\n/g, "\\n"); };
+    var L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//vivo BI//Calendar//EN"];
+    list.forEach(function (e) { var d = e.date.replace(/-/g, ""), end = (e.end || e.date); var e2 = new Date(Date.parse(end + "T00:00:00Z") + 864e5).toISOString().slice(0, 10).replace(/-/g, "");
+      L.push("BEGIN:VEVENT", "UID:" + e.id + "@vivo-bi", "DTSTAMP:" + new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z", e.time && !e.end ? "DTSTART;TZID=Asia/Kolkata:" + d + "T" + e.time.replace(":", "") + "00" : "DTSTART;VALUE=DATE:" + d, e.time && !e.end ? "DURATION:PT1H" : "DTEND;VALUE=DATE:" + e2, "SUMMARY:" + z(e.title), "DESCRIPTION:" + z((TYPES[e.type] || ["Other"])[0] + (e.notes ? " - " + e.notes : "")));
+      if (e.remind) L.push("BEGIN:VALARM", "TRIGGER:-P" + e.remind + "D", "ACTION:DISPLAY", "DESCRIPTION:" + z(e.title), "END:VALARM");
+      L.push("END:VEVENT"); });
+    L.push("END:VCALENDAR");
+    download(new Blob([L.join("\r\n")], { type: "text/calendar" }), name);
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
+  render();
+})();
+</script>
+</body>
+</html>

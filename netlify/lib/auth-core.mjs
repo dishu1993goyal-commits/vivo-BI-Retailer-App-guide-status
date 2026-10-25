@@ -16,7 +16,7 @@ import { toolsAction } from "./tools-core.mjs";
 import { schemeCalcAction } from "./schemecalc-core.mjs";
 import { mailerAction } from "./mailer-core.mjs";
 import { extrasAction, extrasPublic, servePublicImage } from "./extras-core.mjs";
-import { insightsAction } from "./insights-core.mjs";
+import { insightsAction, cachedSnapshot, alertsFor } from "./insights-core.mjs";
 const THEME_IDS = ["signature", "classic", "aurora", "emerald", "royal", "sunrise", "midnight"];
 export function cleanTheme(c) {
   c = c && typeof c === "object" ? c : {};
@@ -853,7 +853,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -940,8 +940,18 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const en = await jr(engageAction({ action: "engage-notify" }, ctx));
       const ar = mods.autoreports ? await jr(autorepAction({ action: "autorep-notify" }, ctx)) : {};
       const ml = await jr(mailerAction({ action: "ml-notify" }, ctx));
+      let notices = 0, calSoon = 0, pinned = [];
+      try {
+        const td = new Date(t + 5.5 * 3600000).toISOString().slice(0, 10), soon = new Date(t + 5.5 * 3600000 + 3 * 864e5).toISOString().slice(0, 10);
+        const nseen = ((await store.get(`noticeseen:${app}:${key}`)) || { ids: [] }).ids;
+        const ns = (await pool(await store.list("notice:"), 30, (k) => store.get(k))).filter((n) => n && (app === "admin" || !n.states || !n.states.length || n.states.includes(rec.state)) && (!n.from || n.from <= td) && (!n.to || n.to >= td));
+        notices = ns.filter((n) => !nseen.includes(n.id)).length; pinned = ns.filter((n) => n.pin).sort((x, y) => y.at - x.at).slice(0, 3).map((n) => ({ id: n.id, title: n.title, body: n.body, level: n.level }));
+        calSoon = (await pool(await store.list("calev:"), 30, (k) => store.get(k))).filter((e) => e && (app === "admin" || !e.states || !e.states.length || e.states.includes(rec.state)) && e.date >= td && e.date <= soon).length;
+      } catch (e) { }
+      let insAlerts = 0;
+      try { const cs = await cachedSnapshot(store); if (cs) { const al = await alertsFor(store, pool, cs.snap, app, rec), seen = ((await store.get(`insseen:${app}:${key}`)) || { ids: [] }).ids; insAlerts = al.filter((x) => !seen.includes(x.id) && (app !== "admin" || x.sev === "high")).length; } } catch (e) { }
       return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
-        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, hoReports: ml.fresh || 0 });
+        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, hoReports: ml.fresh || 0, insAlerts, notices, calSoon, pinned });
     }
     if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, role: roleOf(app, rec), master: !!rec.master, state: rec.state || "", name: rec.fullName });
     {
@@ -959,7 +969,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("sc-")) return schemeCalcAction(b, surveyCtx());
     if (b.action.startsWith("ml-")) return mailerAction(b, Object.assign(surveyCtx(), { mailFetch }));
     if (/^(bnr|map|face)-/.test(b.action)) return extrasAction(b, surveyCtx());
-    if (/^ins-/.test(b.action)) { const r = await insightsAction(b, Object.assign(surveyCtx(), { siteFetch })); if (r) return r; return json(400, { ok: false, error: "Unknown action." }); }
+    if (/^(ins|board|cal|fest|launch|mkt|tr|my)-/.test(b.action)) { const r = await insightsAction(b, Object.assign(surveyCtx(), { siteFetch })); if (r) return r; return json(400, { ok: false, error: "Unknown action." }); }
     if (b.action === "theme-set") {
       if (app !== "admin") return json(403, { ok: false, error: "Only HO admins set the theme for everyone." });
       const th = Object.assign(cleanTheme(b.theme), { by: rec.fullName || rec.username, at: t });

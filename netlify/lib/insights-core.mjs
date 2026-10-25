@@ -166,5 +166,152 @@ export async function insightsAction(b, ctx) {
     }
     return json(200, { ok: true, data: d, ai: ai || ruleNarrative(d), aiError: ai ? "" : aiErr, at: s.at });
   }
+
+  // ---------- shared helpers for content ----------
+  const me = { name: rec.fullName || rec.username, username: rec.username, app, state: rec.state || (isAdmin ? "HO" : "") };
+  const sts = (v) => (Array.isArray(v) ? v : []).map((x) => str(x, 40)).filter(Boolean).slice(0, 60);
+  const forMe = (x) => isAdmin || !x.states || !x.states.length || x.states.includes(rec.state);
+  const today = new Date(t + 5.5 * 3600000).toISOString().slice(0, 10);
+  const okImg = (u) => { u = str(u, 600); return /^(https:\/\/[^\s"'<>]+|\/api\/auth\?img=[a-z0-9]+)$/i.test(u) ? u : ""; };
+  const okLink = (u) => { u = str(u, 600); return /^(https:\/\/|t:|#)[^\s"'<>]*$/i.test(u) ? u : ""; };
+  const listOf = async (prefix) => (await pool(await store.list(prefix), 30, (k) => store.get(k))).filter(Boolean);
+
+  // ---------- notice board ----------
+  if (b.action === "board-list") {
+    const all = (await listOf("notice:")).filter((n) => isAdmin ? (b.all || !n.to || n.to >= today) : forMe(n) && (!n.from || n.from <= today) && (!n.to || n.to >= today));
+    const seenK = `noticeseen:${app}:${key}`, seen = ((await store.get(seenK)) || { ids: [] }).ids;
+    if (b.markSeen) await store.set(seenK, { ids: [...new Set(all.map((n) => n.id).concat(seen))].slice(0, 500) });
+    const o = { urgent: 0, important: 1, info: 2 };
+    return json(200, { ok: true, notices: all.sort((x, y) => (y.pin ? 1 : 0) - (x.pin ? 1 : 0) || o[x.level] - o[y.level] || y.at - x.at).map((n) => Object.assign({}, n, { fresh: !seen.includes(n.id) })) });
+  }
+  if (b.action === "board-save") {
+    if (!isAdmin) return json(403, { ok: false, error: "Only HO admins post notices." });
+    const n = b.notice || {}, title = str(n.title, 120); if (!title) return json(400, { ok: false, error: "Add a title." });
+    const id = str(n.id, 30).replace(/[^a-z0-9]/g, "") || nid(t), old = await store.get(`notice:${id}`);
+    const x = { id, title, body: str(n.body, 2000), link: okLink(n.link), img: okImg(n.img), level: ["urgent", "important", "info"].includes(n.level) ? n.level : "info", pin: !!n.pin, states: sts(n.states), from: okDate(n.from), to: okDate(n.to), by: old ? old.by : me, at: old ? old.at : t, upd: t };
+    await store.set(`notice:${id}`, x); await ctx.logEvent(store, t, app, rec, "notice", { device: title.slice(0, 50), ver: "" });
+    return json(200, { ok: true, notice: x });
+  }
+  if (b.action === "board-delete") { if (!isAdmin) return json(403, { ok: false, error: "Only HO admins." }); await store.delete(`notice:${str(b.id, 30).replace(/[^a-z0-9]/g, "")}`); return json(200, { ok: true }); }
+
+  // ---------- BI calendar ----------
+  const CAL_TYPES = ["review", "scheme", "data", "launch", "festival", "training", "meeting", "other"];
+  if (b.action === "cal-list") {
+    const from = okDate(b.from) || "0000", to = okDate(b.to) || "9999";
+    const ev = (await listOf("calev:")).filter((e) => forMe(e) && (e.end || e.date) >= from && e.date <= to).sort((x, y) => (x.date + (x.time || "")).localeCompare(y.date + (y.time || "")));
+    return json(200, { ok: true, events: ev.map((e) => Object.assign({}, e, { mine: e.by && e.by.username === rec.username && e.by.app === app })) });
+  }
+  if (b.action === "cal-save") {
+    const e = b.event || {}, title = str(e.title, 120), date = okDate(e.date); if (!title || !date) return json(400, { ok: false, error: "Add a title and a date." });
+    const id = str(e.id, 30).replace(/[^a-z0-9]/g, "") || nid(t), old = await store.get(`calev:${id}`);
+    if (old && !(isAdmin || (old.by && old.by.username === rec.username && old.by.app === app))) return json(403, { ok: false, error: "Only the person who added it or an HO admin can change it." });
+    const x = { id, title, type: CAL_TYPES.includes(e.type) ? e.type : "other", date, end: okDate(e.end) && okDate(e.end) >= date ? okDate(e.end) : "", time: /^\d{2}:\d{2}$/.test(String(e.time || "")) ? e.time : "", notes: str(e.notes, 600), link: okLink(e.link),
+      states: isAdmin ? sts(e.states) : [rec.state].filter(Boolean), remind: Math.max(0, Math.min(14, Math.round(Number(e.remind) || 0))), email: !!e.email && isAdmin, by: old ? old.by : me, at: old ? old.at : t, sent: old && old.date === date ? old.sent : null };
+    await store.set(`calev:${id}`, x); return json(200, { ok: true, event: x });
+  }
+  if (b.action === "cal-delete") {
+    const id = str(b.id, 30).replace(/[^a-z0-9]/g, ""), x = await store.get(`calev:${id}`); if (!x) return json(404, { ok: false, error: "Not found." });
+    if (!(isAdmin || (x.by && x.by.username === rec.username && x.by.app === app))) return json(403, { ok: false, error: "Not allowed." });
+    await store.delete(`calev:${id}`); return json(200, { ok: true });
+  }
+
+  // ---------- festive command centre ----------
+  if (b.action === "fest-get") { const f = (await store.get("fest:config")) || { festivals: [], offers: [] }; return json(200, { ok: true, fest: { festivals: f.festivals || [], offers: (f.offers || []).filter((o) => forMe(o) && (isAdmin || !o.to || o.to >= today)), by: f.by, at: f.at } }); }
+  if (b.action === "fest-save") {
+    if (!isAdmin) return json(403, { ok: false, error: "Only HO admins edit the festive centre." });
+    const f = b.fest || {};
+    const festivals = (Array.isArray(f.festivals) ? f.festivals : []).slice(0, 20).map((x) => ({ name: str(x.name, 60), date: okDate(x.date), img: okImg(x.img), note: str(x.note, 200) })).filter((x) => x.name && x.date);
+    const offers = (Array.isArray(f.offers) ? f.offers : []).slice(0, 60).map((x) => ({ id: str(x.id, 20).replace(/[^a-z0-9]/gi, "") || randomBytes(4).toString("hex"), title: str(x.title, 100), partner: str(x.partner, 60), kind: str(x.kind, 30), details: str(x.details, 800), from: okDate(x.from), to: okDate(x.to), img: okImg(x.img), link: okLink(x.link), states: sts(x.states) })).filter((x) => x.title);
+    const c = { festivals, offers, by: me.name, at: t }; await store.set("fest:config", c); return json(200, { ok: true, fest: c });
+  }
+
+  // ---------- launch calendar ----------
+  const LST = ["Not started", "Scheduled", "In progress", "Done"];
+  if (b.action === "launch-list") {
+    const L = (await listOf("launch:")).filter(forMe).sort((x, y) => x.date.localeCompare(y.date));
+    const st = await listOf("launchst:");
+    return json(200, { ok: true, launches: L, status: st.filter((x) => isAdmin || x.state === rec.state), statuses: LST, myState: rec.state || "" });
+  }
+  if (b.action === "launch-save") {
+    if (!isAdmin) return json(403, { ok: false, error: "Only HO admins add launches." });
+    const x = b.launch || {}, model = str(x.model, 80), date = okDate(x.date); if (!model || !date) return json(400, { ok: false, error: "Add the model and launch date." });
+    const id = str(x.id, 30).replace(/[^a-z0-9]/g, "") || nid(t);
+    const l = { id, model, date, img: okImg(x.img), price: str(x.price, 60), notes: str(x.notes, 800), link: okLink(x.link), checklist: (Array.isArray(x.checklist) ? x.checklist : []).map((c) => str(c, 120)).filter(Boolean).slice(0, 20), states: sts(x.states), by: me.name, at: t };
+    await store.set(`launch:${id}`, l); return json(200, { ok: true, launch: l });
+  }
+  if (b.action === "launch-delete") { if (!isAdmin) return json(403, { ok: false, error: "Only HO admins." }); const id = str(b.id, 30).replace(/[^a-z0-9]/g, ""); await store.delete(`launch:${id}`); for (const k of await store.list(`launchst:${id}:`)) await store.delete(k); return json(200, { ok: true }); }
+  if (b.action === "launch-status") {
+    const id = str(b.id, 30).replace(/[^a-z0-9]/g, ""), l = await store.get(`launch:${id}`); if (!l) return json(404, { ok: false, error: "Launch not found." });
+    const st = isAdmin ? str(b.state, 40) : rec.state; if (!st) return json(400, { ok: false, error: "Choose a state." });
+    const x = { launch: id, state: st, training: LST.includes(b.training) ? b.training : "Not started", ticks: (Array.isArray(b.ticks) ? b.ticks : []).map((n) => Math.round(Number(n))).filter((n) => n >= 0 && n < l.checklist.length), notes: str(b.notes, 400), by: me.name, at: t };
+    await store.set(`launchst:${id}:${slug(st)}`, x); return json(200, { ok: true, status: x });
+  }
+
+  // ---------- market data (competition prices & share, channel stock & sell-out) ----------
+  if (b.action === "mkt-upload") {
+    const type = b.type === "chan" ? "chan" : "comp", rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8000);
+    if (!rows.length) return json(400, { ok: false, error: "The file has no rows." });
+    const byState = {};
+    rows.forEach((r) => { const st = isAdmin ? str(r.state, 40) || str(b.state, 40) : rec.state; if (!st) return; const o = {}; Object.keys(r).slice(0, 16).forEach((k) => { const v = r[k]; o[str(k, 30)] = typeof v === "number" ? v : str(v, 80); }); o.state = st; (byState[st] = byState[st] || []).push(o); });
+    if (!Object.keys(byState).length) return json(400, { ok: false, error: "Add a State column (HO) or check the file." });
+    for (const [st, list] of Object.entries(byState)) await store.set(`mkt:${type}:${slug(st)}`, { type, state: st, rows: list, by: me.name, at: t, file: str(b.file, 80) });
+    await ctx.logEvent(store, t, app, rec, "market-" + type, { device: rows.length + " rows", ver: "" });
+    return json(200, { ok: true, states: Object.keys(byState).map((s) => [s, byState[s].length]) });
+  }
+  if (b.action === "mkt-list") {
+    const type = b.type === "chan" ? "chan" : "comp";
+    const all = (await listOf(`mkt:${type}:`)).filter((x) => isAdmin || x.state === rec.state);
+    return json(200, { ok: true, sets: all });
+  }
+
+  // ---------- translations (UI text into Indian languages, cached for everyone) ----------
+  if (b.action === "tr-get") {
+    const LANGS = { hi: "Hindi", ta: "Tamil", te: "Telugu", kn: "Kannada", mr: "Marathi", bn: "Bengali", gu: "Gujarati" };
+    const lang = LANGS[b.lang] ? b.lang : null; if (!lang) return json(400, { ok: false, error: "Unknown language." });
+    const texts = [...new Set((Array.isArray(b.texts) ? b.texts : []).map((x) => str(x, 300)).filter((x) => /[A-Za-z]{2}/.test(x)))].slice(0, 400);
+    const h = (x) => createHash("sha1").update(x).digest("hex").slice(0, 12), buckets = {}, out = {}, miss = [];
+    for (const x of texts) { const k = h(x), bk = `trb:${lang}:${k.slice(0, 2)}`; if (!(bk in buckets)) buckets[bk] = (await store.get(bk)) || {}; if (buckets[bk][k]) out[x] = buckets[bk][k]; else miss.push(x); }
+    let pending = 0;
+    if (miss.length) {
+      const day = `trn:${today}`, used = ((await store.get(day)) || { n: 0 }).n, keys = await aiKeys(store, env || {});
+      if (keys.groq && used < 400) {
+        const batch = miss.slice(0, 70);
+        const r = await groqJSON(keys.groq, `Translate these short user-interface texts from an Indian sales dashboard app into ${LANGS[lang]}. Keep numbers, %, ₹, brand and product names (vivo, V80, PAN India, KPI, IMEI, V-Shield, Excel, PDF, PPT), state names in their usual ${LANGS[lang]} spelling, and emojis. Keep it short and natural, like a phone app. Return JSON only: {"t":["translation 1", ...]} in the same order.\nTEXTS:\n${JSON.stringify(batch)}`, ctx.aiFetch, { validate: (d) => d && Array.isArray(d.t) && d.t.length === batch.length });
+        if (r.ok) { await store.set(day, { n: used + 1 }); batch.forEach((x, i) => { const v = str(r.data.t[i], 400); if (!v) return; out[x] = v; const k = h(x); buckets[`trb:${lang}:${k.slice(0, 2)}`][k] = v; }); for (const [bk, v] of Object.entries(buckets)) await store.set(bk, v); }
+        pending = miss.length - batch.length;
+      } else pending = miss.length;
+    }
+    return json(200, { ok: true, t: out, pending });
+  }
+
+  // ---------- My Day ----------
+  if (b.action === "my-get") return json(200, { ok: true, prefs: (await store.get(`myday:${app}:${key}`)) || {} });
+  if (b.action === "my-set") { const p = { role: ["admin", "head", "exec"].includes(b.role) ? b.role : "", pins: (Array.isArray(b.pins) ? b.pins : []).map((x) => str(x, 40)).slice(0, 12), at: t }; await store.set(`myday:${app}:${key}`, p); return json(200, { ok: true, prefs: p }); }
   return null;
+}
+
+// ---------- hourly: calendar reminders by email ----------
+export async function runReminders(store, env, { mailFetch = fetch, now = () => Date.now() } = {}) {
+  const t = now(), ist = new Date(t + 5.5 * 3600000), hour = ist.getUTCHours(), today = ist.toISOString().slice(0, 10);
+  if (hour !== 9) return { skipped: "not 9 AM IST" };
+  const ec = await store.get("config:email");
+  const key = env.BREVO_API_KEY || (ec && ec.apiKey), from = env.OTP_FROM_EMAIL || (ec && ec.from);
+  if (!key || !from) return { skipped: "email not set up" };
+  let sent = 0;
+  for (const k of await store.list("calev:")) {
+    const e = await store.get(k); if (!e || !e.email || e.sent === today) continue;
+    const due = new Date(Date.parse(e.date + "T00:00:00Z") - (e.remind || 0) * 864e5).toISOString().slice(0, 10);
+    if (due !== today && e.date !== today) continue;
+    const to = [];
+    for (const uk of await store.list("user:state:")) { const u = await store.get(uk); if (u && !u.disabled && u.email && (!e.states.length || e.states.includes(u.state))) to.push(u.email); }
+    if (!to.length) continue;
+    const when = e.date === today ? "today" : "on " + e.date;
+    const html = `<div style="font:14px Arial,sans-serif;max-width:560px"><div style="background:#1B1F5E;color:#fff;padding:14px 16px;border-radius:12px 12px 0 0"><div style="font-size:12px;opacity:.8">vivo BI calendar · reminder</div><div style="font-size:19px;font-weight:bold">${e.title.replace(/[<>&]/g, "")}</div></div><div style="border:1px solid #E6E8F2;border-top:0;padding:14px 16px;border-radius:0 0 12px 12px"><p><b>${when[0].toUpperCase() + when.slice(1)}</b>${e.time ? " at " + e.time : ""}${e.end ? " (until " + e.end + ")" : ""}</p>${e.notes ? "<p>" + e.notes.replace(/[<>&]/g, "") + "</p>" : ""}<p style="color:#777;font-size:12px">Open the BI app → All tools → BI calendar for details.</p></div></div>`;
+    for (let i = 0; i < to.length; i += 50) {
+      const chunk = [...new Set(to)].slice(i, i + 50);
+      try { const r = await mailFetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "api-key": key }, body: JSON.stringify({ sender: { name: (ec && ec.name) || env.OTP_FROM_NAME || "vivo BI", email: from }, to: [{ email: chunk[0] }], bcc: chunk.slice(1).map((x) => ({ email: x })), subject: "Reminder: " + e.title + " (" + when + ")", htmlContent: html }) }); if (r.ok) sent += chunk.length; } catch (err) { }
+    }
+    e.sent = today; await store.set(k, e);
+  }
+  return { sent };
 }

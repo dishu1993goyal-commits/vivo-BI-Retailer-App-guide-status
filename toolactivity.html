@@ -204,6 +204,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .fx{font-family:ui-monospace,Menlo,Consolas,monospace;background:#F7F8FC;border-radius:8px;padding:4px 8px;font-size:12.5px;display:inline-block;margin-top:4px;word-break:break-all}
 </style>
 <script src="theme.js?v=1"></script>
+<script src="lang.js?v=1" defer></script>
 <script src="cust.js?v=64"></script>
 </head>
 <body>
@@ -392,8 +393,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
     return ov;
   }
   var VIEW = $("view"), TAB = ls("ta-tab") || "use", DAYS = "30", ST = "", Q = "", CACHE = {};
-  var TN = { tl: ["✨", "Smart tools home"], tlv: ["🎙️", "Voice notes"], tlp: ["📸", "Photo audit"], tlb: ["🧭", "Beat planner"], tlr: ["🔀", "Reconciliation"], tli: ["📈", "Excel to insight"], tlk: ["🧮", "KPI builder"], tls: ["📤", "Share card"], tld: ["💡", "Idea box"], hygcheck: ["🔎", "IMEI hygiene check"], sheetjoin: ["🔗", "Sheet joiner"], targetsplit: ["🎯", "Target splitter"], mailer: ["📧", "Email reports"], faces: ["🙂", "Face records"], reviewdeck: ["📑", "Review deck"] };
-  var ORDER = ["tlv", "tlp", "tlb", "tls", "tlr", "tli", "tld", "tlk", "hygcheck", "sheetjoin", "targetsplit", "mailer", "faces", "reviewdeck", "tl"];
+  var TN = { tl: ["✨", "Smart tools home"], tlv: ["🎙️", "Voice notes"], tlp: ["📸", "Photo audit"], tlb: ["🧭", "Beat planner"], tlr: ["🔀", "Reconciliation"], tli: ["📈", "Excel to insight"], tlk: ["🧮", "KPI builder"], tls: ["📤", "Share card"], tld: ["💡", "Idea box"], hygcheck: ["🔎", "IMEI hygiene check"], sheetjoin: ["🔗", "Sheet joiner"], targetsplit: ["🎯", "Target splitter"], mailer: ["📧", "Email reports"], faces: ["🙂", "Face records"], reviewdeck: ["📑", "Review deck"], insights: ["📈", "Performance insights"], business: ["🪔", "Business centre"], myday: ["☀️", "My Day"] };
+  var ORDER = ["tlv", "tlp", "tlb", "tls", "tlr", "tli", "tld", "tlk", "hygcheck", "sheetjoin", "targetsplit", "mailer", "faces", "reviewdeck", "insights", "business", "myday", "tl"];
   function tabs() {
     return '<div class="seg">' + [["use", "📊 Activity"], ["kpi", "🧮 KPIs"], ["beat", "🧭 Beat plans"]].map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + "</div>";
   }

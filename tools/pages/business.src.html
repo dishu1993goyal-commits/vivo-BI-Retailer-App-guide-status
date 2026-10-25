@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Business centre</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cd{background:linear-gradient(135deg,#5B1A2E,#F2711C);color:#fff;border-radius:18px;padding:16px;margin-top:10px;position:relative;overflow:hidden;background-size:cover;background-position:center}
+.cd .n{font-size:44px;font-weight:900;line-height:1}.cd .l{font-size:13px;opacity:.9}.cd b{font-size:20px;display:block;margin-top:4px}
+.cds{display:flex;gap:8px;overflow-x:auto;margin-top:8px}.cds div{flex:none;background:var(--card);border-radius:12px;padding:8px 12px;box-shadow:0 1px 6px rgba(20,24,51,.06);font-size:12.5px}.cds b{display:block;font-size:16px}
+.ofs{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px}
+.of{background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.07);display:flex;flex-direction:column}
+.of img{width:100%;aspect-ratio:4/3;object-fit:cover;background:#F1F2F8}.of .ph{width:100%;aspect-ratio:4/3;background:linear-gradient(135deg,#FFF1E6,#FFE0CC);display:flex;align-items:center;justify-content:center;font-size:40px}
+.of .b{padding:9px 10px;font-size:12.5px;flex:1}.of .b b{display:block;font-size:13.5px}.of .b small{color:var(--mut);display:block;margin-top:3px}.of .k{display:inline-block;background:#FFF1E6;color:#B4541A;border-radius:99px;padding:1px 8px;font-size:10.5px;font-weight:800;margin-bottom:4px}
+.ln{display:flex;gap:12px;background:var(--card);border-radius:16px;padding:12px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.ln img,.ln .ph{width:84px;height:84px;border-radius:14px;object-fit:cover;flex:none;background:#EEF0F6;display:flex;align-items:center;justify-content:center;font-size:34px}
+.ln b{font-size:15px;display:block}.ln small{color:var(--mut);font-size:12.5px;display:block}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:6px;cursor:pointer}
+.bar{height:8px;border-radius:99px;background:#EEF0F6;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;background:#1E9E61}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card)}.tb th{background:#F3F4FA;text-align:left;padding:7px 8px;font-size:11px;color:var(--mut)}.tb td{padding:6px 8px;border-top:1px solid #EEF0F6}.tb td.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbw{overflow:auto;max-height:440px;margin-top:8px;border-radius:12px;border:1px solid #EEF0F6}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}.tl{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 1px 8px rgba(20,24,51,.06)}.tl b{display:block;font-size:22px}.tl span{font-size:12px;color:var(--mut)}
+.hb{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:6px}.hb span:first-child{width:110px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hb .tr{flex:1;height:12px;background:#EEF0F6;border-radius:99px;overflow:hidden}.hb .tr i{display:block;height:100%}
+.ed{border:1px solid #E6E8F2;border-radius:12px;padding:10px;margin-top:8px}
+.al{border-left:5px solid #E69A00;background:var(--card);border-radius:12px;padding:9px 11px;margin-top:7px;font-size:13px;box-shadow:0 1px 6px rgba(20,24,51,.05)}.al.high{border-left-color:#D93B3B}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🪔</span></div>
+  <h1 id="h1">Business centre</h1><p id="h2">Festive offers, launches, competition and channel health</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = (location.hash || "").replace("#", "") || "festive", STATES = [], MYST = "";
+  var TABS = [["festive", "🪔 Festive centre", "Festive command centre", "Countdown, scheme calendar and finance & bank offers"], ["launch", "🚀 Launches", "Launch calendar", "Upcoming launches with training status and readiness per state"], ["comp", "⚔️ Competition", "Competition intelligence", "Price and share against competitor brands by state"], ["chan", "📦 Channel health", "Channel health", "Stock aging, dispatch vs sell-out and turnover alerts"]];
+  if (!TABS.some(function (t) { return t[0] === TAB; })) TAB = "festive";
+  var today = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);
+  var days = function (d) { return Math.round((Date.parse(d + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 864e5); };
+  var fmtD = function (d) { if (!d) return ""; var x = new Date(d + "T00:00:00Z"); return x.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); };
+  var XL = null; function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); })); }
+  function upPic(cb) { var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.onchange = function () { var f = inp.files[0]; if (!f) return; toast("Uploading…"); var u = URL.createObjectURL(f), im = new Image(); im.onload = function () { var k = Math.min(1, 1400 / im.naturalWidth), c = document.createElement("canvas"); c.width = im.naturalWidth * k; c.height = im.naturalHeight * k; var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); api({ action: "bnr-upload", data: c.toDataURL("image/jpeg", 0.82) }).then(function (r) { if (!r.ok) return toast(r.error); cb(r.url); }); }; im.src = u; }; inp.click(); }
+  function render() {
+    var t = TABS.find(function (x) { return x[0] === TAB; }); $("h1").textContent = t[2]; $("h2").textContent = t[3];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + TABS.map(function (x) { return '<button data-t="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"><div class="loading"><div class="spin"></div></div></div>';
+    [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; history.replaceState(null, "", "#" + TAB); render(); }; });
+    ({ festive: festive, launch: launch, comp: function () { market("comp"); }, chan: function () { market("chan"); } })[TAB]();
+    api({ action: "tl-use", tool: "business" });
+  }
+  // ---------- festive ----------
+  var FEST = null;
+  function festive() {
+    Promise.all([api({ action: "fest-get" }), api({ action: "cal-list", from: today, to: new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10) })]).then(function (x) {
+      var P = $("pane"); if (!x[0].ok) { P.innerHTML = '<div class="err">' + esc(x[0].error) + "</div>"; return; }
+      FEST = x[0].fest; var F = FEST.festivals.filter(function (f) { return days(f.date) >= 0; }).sort(function (a, b) { return a.date.localeCompare(b.date); }), next = F[0];
+      var kinds = {}; FEST.offers.forEach(function (o) { if (o.kind) kinds[o.kind] = 1; }); var K = ls("fs-k") || "";
+      var h = next ? '<div class="cd" style="' + (next.img ? "background-image:linear-gradient(90deg,rgba(40,10,20,.85),rgba(40,10,20,.2)),url('" + esc(next.img) + "')" : "") + '"><div class="n">' + (days(next.date) || "🎉") + '</div><div class="l">' + (days(next.date) ? "days to go" : "It's today!") + "</div><b>" + esc(next.name) + "</b><div class=\"l\">" + fmtD(next.date) + (next.note ? " · " + esc(next.note) : "") + "</div></div>" : '<div class="card"><div class="muted">No festival dates added yet.' + (ADMIN ? " Use ✏️ Edit festive centre." : "") + "</div></div>";
+      if (F.length > 1) h += '<div class="cds">' + F.slice(1).map(function (f) { return "<div><b>" + days(f.date) + " days</b>" + esc(f.name) + "<br><span class=\"muted\">" + fmtD(f.date) + "</span></div>"; }).join("") + "</div>";
+      var ev = x[1].ok ? x[1].events.filter(function (e) { return e.type === "scheme" || e.type === "festival"; }) : [];
+      h += '<div class="card"><h3>📅 Scheme calendar</h3>' + (ev.length ? ev.map(function (e) { return '<div style="display:flex;gap:10px;padding:7px 0;border-top:1px solid #F0F1F6"><b style="width:76px;flex:none;font-size:12.5px">' + fmtD(e.date).replace(/ \d{4}$/, "") + (e.end ? " –<br>" + fmtD(e.end).replace(/ \d{4}$/, "") : "") + '</b><div style="font-size:13px"><b>' + esc(e.title) + "</b>" + (e.notes ? '<div class="muted" style="font-size:12px">' + esc(e.notes) + "</div>" : "") + "</div></div>"; }).join("") : '<div class="muted" style="font-size:13px">No scheme dates in the next 90 days. Add them in the BI calendar (type: Scheme).</div>') + "</div>";
+      h += '<div class="card"><h3>💳 Finance & bank offers</h3><div class="row" style="margin-top:6px;gap:6px" id="kf"><button class="btn ' + (!K ? "pri" : "ghost") + ' sm" data-k="">All</button>' + Object.keys(kinds).map(function (k) { return '<button class="btn ' + (K === k ? "pri" : "ghost") + ' sm" data-k="' + esc(k) + '">' + esc(k) + "</button>"; }).join("") + '</div><div class="ofs">' + FEST.offers.filter(function (o) { return !K || o.kind === K; }).map(function (o) { return '<div class="of">' + (o.img ? '<img src="' + esc(o.img) + '" alt="" loading="lazy" data-zoom="' + esc(o.img) + '">' : '<div class="ph">💳</div>') + '<div class="b">' + (o.kind ? '<span class="k">' + esc(o.kind) + "</span>" : "") + "<b>" + esc(o.title) + "</b>" + (o.partner ? esc(o.partner) : "") + "<small>" + esc(o.details) + "</small>" + (o.from || o.to ? '<small>Valid ' + (o.from ? fmtD(o.from) : "") + (o.to ? " – " + fmtD(o.to) : "") + (o.to && days(o.to) <= 3 && days(o.to) >= 0 ? ' · <b style="color:#D93B3B">ends soon</b>' : "") + "</small>" : "") + (o.link ? '<small><a href="' + esc(o.link) + '" target="_blank" rel="noopener">Details ↗</a></small>' : "") + "</div></div>"; }).join("") + "</div>" + (FEST.offers.length ? "" : '<div class="muted" style="font-size:13px">No offers yet.</div>') + "</div>";
+      if (ADMIN) h += '<button class="btn sec block" id="fe" style="margin-top:12px">✏️ Edit festive centre</button>';
+      P.innerHTML = h;
+      [].forEach.call(P.querySelectorAll("#kf button"), function (b) { b.onclick = function () { ls("fs-k", b.dataset.k); festive(); }; });
+      [].forEach.call(P.querySelectorAll("[data-zoom]"), function (im) { im.onclick = function () { var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img src="' + im.dataset.zoom + '" style="max-width:96%;max-height:90vh;border-radius:12px" alt="">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); }; });
+      if ($("fe")) $("fe").onclick = festEdit;
+    });
+  }
+  function festEdit() {
+    var D = JSON.parse(JSON.stringify(FEST)), P = $("pane");
+    var draw = function () {
+      P.innerHTML = '<div class="card"><h3>🪔 Festivals (countdown)</h3>' + D.festivals.map(function (f, i) { return '<div class="ed"><div class="g2"><input class="tx" data-f="' + i + '" data-k="name" placeholder="Festival, e.g. Diwali" value="' + esc(f.name) + '"><input class="tx" type="date" data-f="' + i + '" data-k="date" value="' + esc(f.date) + '"></div><input class="tx" data-f="' + i + '" data-k="note" placeholder="Note (optional)" value="' + esc(f.note || "") + '" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="btn ghost sm" data-fp="' + i + '">🖼 ' + (f.img ? "Change" : "Add") + ' picture</button><button class="btn danger sm" data-fx="' + i + '">✕</button></div></div>'; }).join("") + '<button class="btn ghost sm" id="fa" style="margin-top:8px">＋ Festival</button></div>' +
+        '<div class="card"><h3>💳 Offers</h3>' + D.offers.map(function (o, i) { return '<div class="ed">' + (o.img ? '<img src="' + esc(o.img) + '" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px" alt="">' : "") + '<input class="tx" data-o="' + i + '" data-k="title" placeholder="Offer title, e.g. 0% EMI for 9 months" value="' + esc(o.title) + '" style="margin-top:6px"><div class="g2" style="margin-top:6px"><input class="tx" data-o="' + i + '" data-k="partner" placeholder="Partner (HDBFS, DMI, HDFC…)" value="' + esc(o.partner) + '"><input class="tx" data-o="' + i + '" data-k="kind" placeholder="Type (Finance, Bank, Exchange, Scheme)" value="' + esc(o.kind) + '" list="kl"></div><textarea class="tx" data-o="' + i + '" data-k="details" rows="2" placeholder="Details" style="margin-top:6px">' + esc(o.details) + '</textarea><div class="g2" style="margin-top:6px"><label class="muted" style="font-size:11.5px">From<input class="tx" type="date" data-o="' + i + '" data-k="from" value="' + esc(o.from) + '"></label><label class="muted" style="font-size:11.5px">To<input class="tx" type="date" data-o="' + i + '" data-k="to" value="' + esc(o.to) + '"></label></div><input class="tx" data-o="' + i + '" data-k="link" placeholder="Link (optional) https://…" value="' + esc(o.link) + '" style="margin-top:6px"><input class="tx" data-o="' + i + '" data-k="states" placeholder="Only for states (comma separated; empty = all)" value="' + esc((o.states || []).join(", ")) + '" style="margin-top:6px"><div class="row" style="margin-top:6px"><button class="btn ghost sm" data-op="' + i + '">🖼 ' + (o.img ? "Change" : "Add") + ' picture</button><button class="btn danger sm" data-ox="' + i + '">✕ Remove</button></div></div>'; }).join("") + '<datalist id="kl"><option>Finance</option><option>Bank</option><option>Exchange</option><option>Scheme</option><option>Gift</option></datalist><button class="btn ghost sm" id="oa" style="margin-top:8px">＋ Offer</button></div>' +
+        '<div class="row" style="margin-top:12px"><button class="btn ghost" id="fc">Cancel</button><button class="btn pri grow" id="fs">💾 Save for everyone</button></div>';
+      [].forEach.call(P.querySelectorAll("[data-f]"), function (e) { e.oninput = function () { D.festivals[+e.dataset.f][e.dataset.k] = e.value; }; });
+      [].forEach.call(P.querySelectorAll("[data-o]"), function (e) { e.oninput = function () { var k = e.dataset.k; D.offers[+e.dataset.o][k] = k === "states" ? e.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean) : e.value; }; });
+      [].forEach.call(P.querySelectorAll("[data-fp]"), function (e) { e.onclick = function () { upPic(function (u) { D.festivals[+e.dataset.fp].img = u; draw(); }); }; });
+      [].forEach.call(P.querySelectorAll("[data-op]"), function (e) { e.onclick = function () { upPic(function (u) { D.offers[+e.dataset.op].img = u; draw(); }); }; });
+      [].forEach.call(P.querySelectorAll("[data-fx]"), function (e) { e.onclick = function () { D.festivals.splice(+e.dataset.fx, 1); draw(); }; });
+      [].forEach.call(P.querySelectorAll("[data-ox]"), function (e) { e.onclick = function () { D.offers.splice(+e.dataset.ox, 1); draw(); }; });
+      $("fa").onclick = function () { D.festivals.push({ name: "", date: "" }); draw(); };
+      $("oa").onclick = function () { D.offers.unshift({ title: "", partner: "", kind: "Finance", details: "", from: today, to: "", link: "", states: [] }); draw(); };
+      $("fc").onclick = festive;
+      $("fs").onclick = function () { api({ action: "fest-save", fest: D }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); festive(); }); };
+    };
+    draw();
+  }
+  // ---------- launches ----------
+  function launch() {
+    api({ action: "launch-list" }).then(function (r) {
+      var P = $("pane"); if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      MYST = r.myState; var L = r.launches, S2 = r.status, stOf = function (id, st) { return S2.find(function (x) { return x.launch === id && x.state === st; }); };
+      var up = L.filter(function (l) { return days(l.date) >= -30; });
+      P.innerHTML = (up.length ? up.map(function (l) {
+        var d = days(l.date), mine = stOf(l.id, MYST) || { training: "Not started", ticks: [] }, done = S2.filter(function (x) { return x.launch === l.id; });
+        var pct = function (x) { return l.checklist.length ? Math.round((x.ticks || []).length / l.checklist.length * 100) : x.training === "Done" ? 100 : 0; };
+        return '<div class="ln">' + (l.img ? '<img src="' + esc(l.img) + '" alt="">' : '<div class="ph">📱</div>') + '<div style="flex:1;min-width:0"><b>' + esc(l.model) + "</b><small>" + fmtD(l.date) + " · " + (d > 0 ? d + " days to go" : d === 0 ? "launches today 🎉" : "launched " + -d + " days ago") + (l.price ? " · " + esc(l.price) : "") + "</small>" + (l.notes ? '<small style="color:var(--ink2)">' + esc(l.notes) + "</small>" : "") +
+          (!ADMIN && MYST ? '<div style="margin-top:8px"><label class="lb" style="margin:0 0 3px">' + esc(MYST) + ' training</label><select class="tx" data-tr="' + l.id + '">' + r.statuses.map(function (s) { return "<option" + (s === mine.training ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select>" + l.checklist.map(function (c, i) { return '<label class="chk"><input type="checkbox" data-ck="' + l.id + '" data-i="' + i + '"' + ((mine.ticks || []).indexOf(i) >= 0 ? " checked" : "") + "> " + esc(c) + "</label>"; }).join("") + '<div class="bar"><i style="width:' + pct(mine) + '%"></i></div><small>' + pct(mine) + "% ready</small></div>" : "") +
+          (ADMIN ? '<div style="margin-top:8px;font-size:12.5px"><b>Readiness by state</b> <span class="muted">(' + done.length + " of " + (l.states.length || STATES.length || "all") + " states updated)</span>" + done.sort(function (a, b) { return pct(b) - pct(a); }).map(function (x) { return '<div class="hb"><span>' + esc(x.state) + '</span><span class="tr"><i style="width:' + pct(x) + "%;background:" + (pct(x) >= 80 ? "#1E9E61" : pct(x) >= 40 ? "#E69A00" : "#D93B3B") + '"></i></span><span style="width:110px">' + pct(x) + "% · " + esc(x.training) + "</span></div>"; }).join("") + '<div class="row" style="margin-top:8px"><button class="btn ghost sm" data-le="' + l.id + '">✏️ Edit</button><button class="btn danger sm" data-ld="' + l.id + '">Delete</button><button class="btn ghost sm" data-lx="' + l.id + '">⬇ Excel</button></div></div>' : "") + "</div></div>";
+      }).join("") : '<div class="empty">No upcoming launches.' + (ADMIN ? " Add one below." : "") + "</div>") + (ADMIN ? '<button class="btn pri block" id="la" style="margin-top:12px">＋ Add launch</button>' : "");
+      [].forEach.call(P.querySelectorAll("[data-tr],[data-ck]"), function (e) { e.onchange = function () { var id = e.dataset.tr || e.dataset.ck, ticks = [].map.call(P.querySelectorAll('[data-ck="' + id + '"]:checked'), function (c) { return +c.dataset.i; }); api({ action: "launch-status", id: id, training: P.querySelector('[data-tr="' + id + '"]').value, ticks: ticks }).then(function (x) { if (!x.ok) return toast(x.error); toast("Saved"); launch(); }); }; });
+      [].forEach.call(P.querySelectorAll("[data-le]"), function (e) { e.onclick = function () { launchEdit(L.find(function (l) { return l.id === e.dataset.le; })); }; });
+      [].forEach.call(P.querySelectorAll("[data-ld]"), function (e) { e.onclick = function () { sheet("Delete this launch?", "", [["🗑️", "Delete", function () { api({ action: "launch-delete", id: e.dataset.ld }).then(launch); }, "danger"]]); }; });
+      [].forEach.call(P.querySelectorAll("[data-lx]"), function (e) { e.onclick = function () { var l = L.find(function (x) { return x.id === e.dataset.lx; }); download(xlsx([{ name: "Readiness", rows: [["State", "Training", "Checklist done", "Ready %"].concat(l.checklist)].concat(S2.filter(function (x) { return x.launch === l.id; }).map(function (x) { return [x.state, x.training, (x.ticks || []).length + " / " + l.checklist.length, l.checklist.length ? Math.round((x.ticks || []).length / l.checklist.length * 100) : ""].concat(l.checklist.map(function (_, i) { return (x.ticks || []).indexOf(i) >= 0 ? "✓" : ""; })); })) }]), l.model.replace(/[^A-Za-z0-9]+/g, "_") + "_readiness.xlsx"); }; });
+      if ($("la")) $("la").onclick = function () { launchEdit(null); };
+    });
+  }
+  function launchEdit(l) {
+    l = l ? JSON.parse(JSON.stringify(l)) : { model: "", date: "", price: "", notes: "", checklist: ["Product training done for the sales team", "Demo units at top stores", "Branding / POS material placed", "Finance offers briefed to retailers", "Retailer app scheme published"], states: [] };
+    var P = $("pane");
+    var draw = function () {
+      P.innerHTML = '<div class="card"><h3>' + (l.id ? "Edit launch" : "New launch") + "</h3>" + (l.img ? '<img src="' + esc(l.img) + '" style="width:120px;border-radius:12px;margin-top:6px" alt="">' : "") + '<div class="row" style="margin-top:6px"><button class="btn ghost sm" id="lp">🖼 ' + (l.img ? "Change" : "Add") + ' picture</button></div><label class="lb">Model</label><input class="tx" id="lm" value="' + esc(l.model) + '"><div class="g2"><div><label class="lb">Launch date</label><input class="tx" type="date" id="ldt" value="' + esc(l.date) + '"></div><div><label class="lb">Price (optional)</label><input class="tx" id="lpr" value="' + esc(l.price) + '"></div></div><label class="lb">Notes</label><textarea class="tx" id="lnt" rows="2">' + esc(l.notes) + '</textarea><label class="lb">Readiness checklist (one per line)</label><textarea class="tx" id="lck" rows="5">' + esc(l.checklist.join("\n")) + '</textarea><label class="lb">Only for states (comma separated; empty = all)</label><input class="tx" id="lst" value="' + esc(l.states.join(", ")) + '"><div class="row" style="margin-top:12px"><button class="btn ghost" id="lc">Cancel</button><button class="btn pri grow" id="ls">💾 Save</button></div></div>';
+      $("lp").onclick = function () { keep(); upPic(function (u) { l.img = u; draw(); }); };
+      $("lc").onclick = launch;
+      $("ls").onclick = function () { keep(); api({ action: "launch-save", launch: l }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); launch(); }); };
+    };
+    var keep = function () { l.model = $("lm").value; l.date = $("ldt").value; l.price = $("lpr").value; l.notes = $("lnt").value; l.checklist = $("lck").value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean); l.states = $("lst").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean); };
+    draw();
+  }
+  // ---------- market data ----------
+  var TPL = { comp: [["State", "Brand", "Model", "Price", "Share %", "Date", "City"], ["Bihar", "vivo", "V80", 34999, 18, today, "Patna"], ["Bihar", "Samsung", "Galaxy A56", 33999, 21, today, "Patna"], ["Bihar", "OPPO", "Reno 14", 32999, 15, today, "Patna"]],
+    chan: [["State", "Distributor", "Model", "Stock units", "Stock age days", "Dispatch units", "Sell-out units", "Date"], ["Bihar", "Shree Distributors", "V80", 120, 45, 200, 150, today], ["Bihar", "Shree Distributors", "Y300", 300, 95, 150, 60, today]] };
+  var COLS = { comp: { brand: /brand/, model: /model/, price: /price|mop|dp/, share: /share/, date: /date|month/, city: /city|town|district/ }, chan: { dist: /distrib|dealer|partner|channel/, model: /model/, stock: /stock(?!.*age)|inventory|closing/, age: /age|days/, disp: /dispatch|sell.?in|billing|primary/, sell: /sell.?out|secondary|tertiary|sold|sales/, date: /date|month/ } };
+  function market(type) {
+    var P = $("pane");
+    api({ action: "mkt-list", type: type }).then(function (r) {
+      if (!r.ok) { P.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var sets = r.sets, rows = [].concat.apply([], sets.map(function (s) { return s.rows; }));
+      var h = '<div class="card"><div class="row"><button class="btn pri" id="mu">📤 Upload Excel</button><button class="btn ghost" id="mt">⬇ Template</button></div><div class="muted" style="font-size:12px;margin-top:6px">' + (ADMIN ? "One file for all states (State column) or per state. " : "Upload your state's data. ") + "Uploading again replaces that state's data. " + (sets.length ? "Last: " + sets.map(function (s) { return esc(s.state) + " (" + s.rows.length + " rows, " + dt(s.at) + ")"; }).slice(0, 6).join(" · ") : "Nothing uploaded yet.") + "</div></div>";
+      h += rows.length ? (type === "comp" ? compView(rows) : chanView(rows)) : '<div class="empty">Download the template, fill it and upload to see the analysis.</div>';
+      P.innerHTML = h;
+      $("mt").onclick = function () { download(xlsx([{ name: type === "comp" ? "Competition" : "Channel", rows: TPL[type] }]), (type === "comp" ? "Competition" : "Channel_health") + "_template.xlsx"); };
+      $("mu").onclick = function () { upload(type); };
+      if ($("mx")) $("mx").onclick = function () { var hd = Object.keys(rows[0]); download(xlsx([{ name: "Data", rows: [hd].concat(rows.map(function (x) { return hd.map(function (k) { return x[k]; }); })) }]), type + "_data.xlsx"); };
+    });
+  }
+  function norm(type, raw) {
+    var C = COLS[type], hd = Object.keys(raw[0] || {}), map = {};
+    Object.keys(C).forEach(function (k) { var h = hd.find(function (x) { return C[k].test(x.toLowerCase()) && Object.values(map).indexOf(x) < 0; }); if (h) map[k] = h; });
+    var sh = hd.find(function (x) { return /^state/i.test(x); });
+    return raw.map(function (r) { var o = { state: sh ? String(r[sh] || "").trim() : "" }; Object.keys(map).forEach(function (k) { var v = r[map[k]]; o[k] = typeof v === "number" ? v : /^(price|share|stock|age|disp|sell)$/.test(k) ? parseFloat(String(v).replace(/[,₹%\s]/g, "")) || 0 : String(v == null ? "" : v).trim(); }); return o; });
+  }
+  function upload(type) {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () { var f = inp.files[0]; if (!f) return; toast("Reading " + f.name + "…");
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) { var wb = window.XLSX.read(buf, { type: "array", cellDates: false }); var raw = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: true }); if (!raw.length) throw new Error("The sheet is empty.");
+        var rows = norm(type, raw); return api({ action: "mkt-upload", type: type, rows: rows, file: f.name }); }).then(function (r) { if (!r.ok) return toast(r.error); toast("Uploaded: " + r.states.map(function (s) { return s[0] + " " + s[1]; }).join(", ")); market(type); }).catch(function (e) { toast(e.message); }); };
+    inp.click();
+  }
+  function compView(rows) {
+    var brands = {}, byState = {};
+    rows.forEach(function (r) { var b = r.brand || "?"; var x = brands[b] = brands[b] || { n: 0, price: 0, pn: 0, share: 0, sn: 0 }; x.n++; if (r.price) { x.price += r.price; x.pn++; } if (r.share) { x.share += r.share; x.sn++; } var s = byState[r.state] = byState[r.state] || {}; s[b] = (s[b] || []).concat([r.share || 0]); });
+    var B = Object.keys(brands).sort(function (a, b) { return (brands[b].sn ? brands[b].share / brands[b].sn : 0) - (brands[a].sn ? brands[a].share / brands[a].sn : 0); });
+    var COLR = ["#415FFF", "#E05757", "#1E9E61", "#E69A00", "#8E5CF6", "#00A3BF", "#7A7F99"], colOf = function (b, i) { return /vivo/i.test(b) ? "#415FFF" : COLR[(i % 6) + 1]; };
+    var avg = function (a) { return a.length ? a.reduce(function (p, q) { return p + q; }, 0) / a.length : 0; };
+    var h = '<div class="card"><h3>Average share by brand</h3>' + B.map(function (b, i) { var s = brands[b].sn ? brands[b].share / brands[b].sn : 0; return '<div class="hb"><span>' + esc(b) + '</span><span class="tr"><i style="width:' + Math.min(100, s * 2) + "%;background:" + colOf(b, i) + '"></i></span><span style="width:60px;text-align:right">' + Math.round(s * 10) / 10 + "%</span></div>"; }).join("") + "</div>";
+    h += '<div class="card"><h3>Average price by brand</h3>' + B.map(function (b, i) { var p = brands[b].pn ? brands[b].price / brands[b].pn : 0; return '<div class="hb"><span>' + esc(b) + '</span><span style="flex:1">₹' + Math.round(p).toLocaleString("en-IN") + "</span></div>"; }).join("") + "</div>";
+    var vivoS = function (s) { var k = Object.keys(byState[s]).find(function (b) { return /vivo/i.test(b); }); return k ? avg(byState[s][k]) : null; };
+    var leader = function (s) { var o = byState[s]; return Object.keys(o).sort(function (a, b) { return avg(o[b]) - avg(o[a]); })[0]; };
+    h += '<div class="card"><h3>By state</h3><div class="tbw"><table class="tb"><tr><th>State</th><th class="n">vivo share</th><th>Leader</th><th class="n">Leader share</th></tr>' + Object.keys(byState).sort().map(function (s) { var l = leader(s), v = vivoS(s); return "<tr><td>" + esc(s) + '</td><td class="n"><b>' + (v == null ? "—" : Math.round(v * 10) / 10 + "%") + "</b></td><td>" + esc(l) + (/vivo/i.test(l) ? " 🏆" : "") + '</td><td class="n">' + Math.round(avg(byState[s][l]) * 10) / 10 + "%</td></tr>"; }).join("") + '</table></div><button class="btn ghost sm" id="mx" style="margin-top:8px">⬇ Excel</button></div>';
+    return h;
+  }
+  function chanView(rows) {
+    var b = { "0–30": 0, "31–60": 0, "61–90": 0, "90+": 0 }, st = 0, disp = 0, sell = 0, alerts = [];
+    rows.forEach(function (r) { st += r.stock || 0; disp += r.disp || 0; sell += r.sell || 0; var a = r.age || 0; b[a <= 30 ? "0–30" : a <= 60 ? "31–60" : a <= 90 ? "61–90" : "90+"] += r.stock || 0;
+      if (a > 60 && r.stock > 0) alerts.push({ sev: a > 90 ? "high" : "", t: (r.dist || "?") + " · " + (r.model || "?") + " (" + r.state + ")", d: r.stock + " units are " + a + " days old" });
+      if (r.disp > 0 && r.sell / r.disp < 0.6) alerts.push({ sev: r.sell / r.disp < 0.4 ? "high" : "", t: (r.dist || "?") + " · " + (r.model || "?") + " (" + r.state + ")", d: "Sell-out only " + Math.round(r.sell / r.disp * 100) + "% of dispatch — stock may be piling up" }); });
+    var turn = st ? sell / st : 0;
+    var h = '<div class="tiles"><div class="tl"><b>' + st.toLocaleString("en-IN") + '</b><span>units in stock</span></div><div class="tl"><b>' + (disp ? Math.round(sell / disp * 100) : 0) + '%</b><span>sell-out ÷ dispatch</span></div><div class="tl"><b>' + Math.round(turn * 100) / 100 + '×</b><span>turnover (sell-out ÷ stock)</span></div><div class="tl"><b style="color:#D93B3B">' + alerts.length + "</b><span>alerts</span></div></div>";
+    h += '<div class="card"><h3>Stock aging</h3>' + Object.keys(b).map(function (k, i) { return '<div class="hb"><span>' + k + ' days</span><span class="tr"><i style="width:' + (st ? b[k] / st * 100 : 0) + "%;background:" + ["#1E9E61", "#4D9BF9", "#E69A00", "#D93B3B"][i] + '"></i></span><span style="width:90px;text-align:right">' + b[k].toLocaleString("en-IN") + "</span></div>"; }).join("") + "</div>";
+    h += '<div class="card"><h3>Alerts</h3>' + (alerts.length ? alerts.sort(function (x, y) { return (y.sev ? 1 : 0) - (x.sev ? 1 : 0); }).slice(0, 80).map(function (a) { return '<div class="al ' + a.sev + '"><b>' + esc(a.t) + "</b><br>" + esc(a.d) + "</div>"; }).join("") : '<div class="muted">No channel alerts 👍</div>') + '<button class="btn ghost sm" id="mx" style="margin-top:8px">⬇ Excel</button></div>';
+    return h;
+  }
+  window.__pageBack = function () { return false; };
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  fetch("/states.json").then(function (r) { return r.json(); }).then(function (j) { STATES = j.states || []; }).catch(function () { });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>My Day</title>
+<style>
+/*@@CSS@@*/
+.rl{display:flex;gap:6px;margin-top:10px}.rl button{flex:1;border:1.5px solid #E1E4F2;background:var(--card);border-radius:12px;padding:8px 4px;font:600 12.5px inherit;cursor:pointer}.rl button.on{border-color:var(--brand);background:#F4F5FF;color:var(--brand)}
+.bx{background:var(--card);border-radius:16px;padding:12px 14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.bx h3{margin:0 0 6px;font-size:15px;display:flex;align-items:center;gap:8px}.bx h3 .n{margin-left:auto;font-size:12px;color:var(--brand);cursor:pointer;font-weight:700}
+.big{display:flex;gap:10px;align-items:baseline}.big b{font-size:34px;line-height:1}.big span{color:var(--mut);font-size:13px}
+.li{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-top:1px solid #F0F1F6;font-size:13.5px;cursor:pointer}.li:first-of-type{border-top:0}.li i{font-style:normal;width:22px;flex:none;text-align:center}.li small{color:var(--mut);display:block;font-size:12px}
+.qa{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.qa button{border:0;background:#F4F5FF;border-radius:12px;padding:10px 4px;font:600 11.5px inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--ink2)}.qa button span{font-size:22px}
+.cnt{display:inline-block;min-width:22px;text-align:center;border-radius:99px;background:#E53935;color:#fff;font-size:11.5px;font-weight:800;padding:1px 6px}
+.st{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:800}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">☀️</span></div>
+  <h1 id="h1">My Day</h1><p id="h2">The five things that matter most today</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Getting your day ready…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), PREF = {}, ROLE = "", D = {}, E = null;
+  var IN_APP = !!(window.BIApp && window.BIApp.getAuth);
+  var today = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10), MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var pc = function (v) { return v == null ? "—" : Math.round(v * 1000) / 10 + "%"; };
+  function open(target, label) {
+    var kind = target.slice(0, 2), rest = target.slice(2), file = rest.split("#")[0], hash = rest.indexOf("#") >= 0 ? "#" + rest.split("#")[1] : "#list";
+    try { if (IN_APP) { if (kind === "n:" && window.BIApp.nativeAction) return window.BIApp.nativeAction(rest); if (kind === "t:" && window.BIApp.openTool) return window.BIApp.openTool(file, label || "", hash); } else if (parent !== window) { parent.postMessage(kind === "n:" ? { biNative: rest } : { biOpen: { file: file, title: label, hash: hash } }, location.origin); return; } } catch (e) { }
+    if (kind === "t:") location.href = file + "?v=" + Date.now() + hash;
+  }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    var j = function (p) { return p.catch(function () { return { ok: false }; }); };
+    Promise.all([j(api({ action: "my-get" })), j(api({ action: "me" })), j(api({ action: "notify" })), j(api({ action: "ins-snapshot" })), j(api({ action: "ins-alerts" })), j(api({ action: "board-list" })), j(api({ action: "cal-list", from: today, to: new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10) }))]).then(function (x) {
+      PREF = (x[0].ok && x[0].prefs) || {}; var p = (x[1].profile) || {};
+      D = { me: p, n: x[2].ok ? x[2] : {}, snap: x[3].ok ? x[3].snap : null, goals: x[3].ok ? x[3].goals : [], alerts: x[4].ok ? x[4].alerts : [], notices: x[5].ok ? x[5].notices : [], events: x[6].ok ? x[6].events : [] };
+      ROLE = PREF.role || (ADMIN ? "admin" : "head");
+      var h = new Date(Date.now() + 5.5 * 3600000).getUTCHours();
+      $("h1").textContent = (h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening") + ", " + String(p.fullName || AUTH.username).split(" ")[0] + " ☀️";
+      $("h2").textContent = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" }) + (p.state ? " · " + p.state : ADMIN ? " · HO" : "");
+      if (D.snap && !window.INSENG) { var s = document.createElement("script"); s.src = "insights-engine.js?v=2"; s.onload = function () { E = window.INSENG; draw(); }; document.head.appendChild(s); } else { E = window.INSENG; draw(); }
+      api({ action: "tl-use", tool: "myday" });
+    });
+  }
+  function myRow() { if (!D.snap) return null; var M = D.snap.months, c = M[M.length - 1], p = M[M.length - 2], st = D.me.state; return c && c.rows[st] ? { r: c.rows[st], p: p && p.rows[st], pan: c.pan, label: c.label, n: Object.keys(c.rows).length } : null; }
+  function draw() {
+    var roles = ADMIN ? [["admin", "🛡️ HO admin"], ["head", "👔 State head"], ["exec", "🧑‍💻 BI executive"]] : [["head", "👔 State head"], ["exec", "🧑‍💻 BI executive"]];
+    var h = '<div class="rl">' + roles.map(function (r) { return '<button data-r="' + r[0] + '" class="' + (ROLE === r[0] ? "on" : "") + '">' + r[1] + "</button>"; }).join("") + "</div>";
+    var cards = ROLE === "admin" ? [adminAlerts(), adminWork(), movers(), calCard(), noticeCard()] : ROLE === "head" ? [myState(), focus(), stateAlerts(), calCard(), noticeCard()] : [tasks(), callList(), focus(), calCard(), noticeCard()];
+    h += cards.join("") + '<div class="bx"><h3>⚡ Quick actions</h3><div class="qa">' + quick().map(function (q, i) { return '<button data-q="' + i + '"><span>' + q[0] + "</span>" + esc(q[1]) + "</button>"; }).join("") + "</div></div>";
+    VIEW.innerHTML = h;
+    [].forEach.call(VIEW.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { ROLE = b.dataset.r; api({ action: "my-set", role: ROLE }); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-go]"), function (b) { b.onclick = function () { open(b.dataset.go, b.dataset.l || ""); }; });
+    var Q = quick(); [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var q = Q[+b.dataset.q]; open(q[2], q[1]); }; });
+    if (ROLE === "exec" && $("cl")) loadCalls();
+  }
+  function card(icon, title, go, body, label) { return '<div class="bx"><h3>' + icon + " " + esc(title) + (go ? '<span class="n" data-go="' + go + '" data-l="' + esc(label || title) + '">Open ›</span>' : "") + "</h3>" + body + "</div>"; }
+  function myState() {
+    var x = myRow(); if (!x) return card("🏆", "My state", "t:insights.html#goals", '<div class="muted" style="font-size:13px">No data for your state yet.</div>');
+    var mv = x.p ? x.p.rank - x.r.rank : 0, g = (D.goals || []).find(function (q) { return q.state === D.me.state; }), gp = g && E ? E.goalProgress(D.snap, g) : null;
+    return card("🏆", "My state · " + x.label, "t:insights.html#goals", '<div class="big"><b>#' + x.r.rank + "</b><span>of " + x.n + (mv ? (mv > 0 ? ' · <b style="color:#1E9E61">▲ ' + mv + "</b>" : ' · <b style="color:#D93B3B">▼ ' + -mv + "</b>") : "") + " · score " + x.r.score + " (PAN " + x.pan.score + ")</span></div>" +
+      (gp ? '<div style="margin-top:8px;font-size:13px">🎯 Goal ' + (g.targetRank ? "#" + g.targetRank : g.targetScore) + " by " + g.by + ' — <span class="st" style="background:' + (gp.status === "behind" ? "#FDECEC;color:#C62828" : "#E6F4EA;color:#0F7B4F") + '">' + { achieved: "achieved", ontrack: "on track", behind: "behind" }[gp.status] + "</span>" + (gp.needWeekly ? " · +" + gp.needWeekly + " points/week" : "") + "</div>" : '<div class="muted" style="font-size:12.5px;margin-top:6px">No goal yet — tap Open to set one.</div>'), "Goal setter");
+  }
+  function focus() {
+    var x = myRow(); if (!x || !E) return "";
+    var ks = E.focusKpi(x.r, x.pan).slice(0, 2);
+    return card("🎯", "Focus today", "t:reviewdeck.html", ks.map(function (k) { return '<div class="li"><i>🔸</i><div><b>' + esc(k[1]) + "</b> " + pc(x.r[k[0]]) + '<small>PAN India ' + pc(x.pan[k[0]]) + " · " + (x.r[k[0]] < (x.pan[k[0]] || 0) ? "below PAN India — your biggest gap" : "your lowest KPI — push it up") + "</small></div></div>"; }).join("") + '<div class="muted" style="font-size:12px;margin-top:4px">Open for the AI action plan (review deck).</div>', "Monthly review deck");
+  }
+  function stateAlerts() { var A = D.alerts.slice(0, 4); return card("🔔", "Alerts for my state", "t:insights.html#alerts", A.length ? A.map(function (a) { return '<div class="li"><i>' + (a.sev === "high" ? "🚨" : a.sev === "med" ? "⚠️" : "ℹ️") + "</i><div>" + esc(a.title) + "<small>" + esc(a.detail) + "</small></div></div>"; }).join("") : '<div class="muted" style="font-size:13px">No alerts — nice work 🎉</div>', "Alert centre"); }
+  function adminAlerts() { var A = D.alerts.filter(function (a) { return a.sev === "high"; }); return card("🚨", "Urgent alerts", "t:insights.html#alerts", '<div class="big"><b>' + A.length + '</b><span>urgent · ' + D.alerts.length + " in total</span></div>" + A.slice(0, 3).map(function (a) { return '<div class="li"><i>🚨</i><div>' + esc(a.title) + "<small>" + esc(a.detail) + "</small></div></div>"; }).join(""), "Alert centre"); }
+  function adminWork() {
+    var n = D.n, items = [["⚖️", "Disputes assigned to you", (n.disputes || {}).assigned || 0, "t:disputes.html"], ["⏰", "Disputes over TAT", (n.disputes || {}).breached || 0, "t:disputes.html"], ["🧼", "IMEIs waiting for action", n.hygiene || 0, "t:hygiene.html"], ["🎧", "Unread support messages", n.supportUnread || 0, "n:support"], ["🔑", "Password reset requests", n.pwreq || 0, "t:security.html"], ["📋", "New survey responses", (n.surveys && n.surveys.newResponses) || 0, "t:survey.html"]].filter(function (x) { return x[2]; });
+    return card("⏳", "Waiting for you", "", items.length ? items.map(function (x) { return '<div class="li" data-go="' + x[3] + '" data-l="' + esc(x[1]) + '"><i>' + x[0] + '</i><div style="flex:1">' + esc(x[1]) + '</div><span class="cnt">' + x[2] + "</span></div>"; }).join("") : '<div class="muted" style="font-size:13px">Nothing pending ✅</div>');
+  }
+  function tasks() {
+    var n = D.n, items = [["🧼", "IMEIs to check (Market hygiene)", n.hygiene || 0, "t:hygiene.html"], ["📋", "Surveys to answer", (n.surveys && n.surveys.pending) || 0, "t:survey.html"], ["⚖️", "Disputes assigned to you", (n.disputes || {}).assigned || 0, "t:disputes.html"], ["🗳️", "New polls / quizzes", (n.pollNew || 0) + (n.quizNew || 0), "t:engage.html#polls"], ["📬", "New reports from HO", n.hoReports || 0, "t:mailer.html#inbox"], ["✉️", "Unread messages", n.chat || 0, "t:chat.html"]].filter(function (x) { return x[2]; });
+    return card("✅", "My tasks", "", items.length ? items.map(function (x) { return '<div class="li" data-go="' + x[3] + '" data-l="' + esc(x[1]) + '"><i>' + x[0] + '</i><div style="flex:1">' + esc(x[1]) + '</div><span class="cnt">' + x[2] + "</span></div>"; }).join("") : '<div class="muted" style="font-size:13px">All done for today ✅</div>');
+  }
+  function callList() { return card("📞", "Retailers to call today", "t:insights.html#health", '<div id="cl"><div class="loading"><div class="spin"></div></div></div>', "Retailer health"); }
+  function loadCalls() {
+    api({ action: "ins-retailers" }).then(function (r) {
+      if (!$("cl")) return; if (!r.ok) { $("cl").innerHTML = '<div class="muted" style="font-size:13px">' + esc(r.error) + "</div>"; return; }
+      var L = r.rows.filter(function (x) { return x[1] === "atrisk"; }).sort(function (a, b) { return b[3] - a[3]; }).slice(0, 5);
+      $("cl").innerHTML = L.length ? L.map(function (x) { return '<div class="li"><i>⚠️</i><div>' + esc(x[0]) + "<small>" + x[3] + " active days last month → " + x[2] + " this month · last used " + esc(x[4] || "—") + "</small></div></div>"; }).join("") : '<div class="muted" style="font-size:13px">No at-risk retailers 🎉</div>';
+    });
+  }
+  function movers() {
+    if (!D.snap) return ""; var M = D.snap.months, c = M[M.length - 1], p = M[M.length - 2]; if (!c || !p) return "";
+    var mv = Object.keys(c.rows).filter(function (s) { return p.rows[s]; }).map(function (s) { return [s, p.rows[s].rank - c.rows[s].rank]; }).sort(function (a, b) { return b[1] - a[1]; });
+    var up = mv.filter(function (x) { return x[1] > 0; }).slice(0, 3), down = mv.filter(function (x) { return x[1] < 0; }).slice(-3).reverse();
+    return card("🏁", "Biggest movers · " + c.label, "t:statemap.html", up.map(function (x) { return '<div class="li"><i>▲</i><div><b>' + esc(x[0]) + '</b> up ' + x[1] + " · now #" + c.rows[x[0]].rank + "</div></div>"; }).join("") + down.map(function (x) { return '<div class="li"><i style="color:#D93B3B">▼</i><div><b>' + esc(x[0]) + "</b> down " + -x[1] + " · now #" + c.rows[x[0]].rank + "</div></div>"; }).join(""), "India state map");
+  }
+  function calCard() {
+    var E2 = D.events.slice(0, 5), f = function (d) { var n = Math.round((Date.parse(d + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 864e5); return n <= 0 ? "Today" : n === 1 ? "Tomorrow" : +d.slice(8, 10) + " " + MON[+d.slice(5, 7) - 1]; };
+    return card("📅", "Coming up", "t:calendar.html#cal", E2.length ? E2.map(function (e) { return '<div class="li"><i>🗓️</i><div><b>' + f(e.date) + "</b> · " + esc(e.title) + (e.time ? "<small>" + e.time + "</small>" : "") + "</div></div>"; }).join("") : '<div class="muted" style="font-size:13px">Nothing in the next week.</div>', "BI calendar");
+  }
+  function noticeCard() { var N = D.notices.slice(0, 3); return N.length ? card("📌", "Notices", "t:calendar.html#board", N.map(function (n) { return '<div class="li"><i>' + (n.level === "urgent" ? "🚨" : n.level === "important" ? "⚠️" : "📌") + "</i><div><b>" + esc(n.title) + "</b>" + (n.body ? "<small>" + esc(n.body.slice(0, 120)) + (n.body.length > 120 ? "…" : "") + "</small>" : "") + "</div></div>"; }).join(""), "Notice board") : ""; }
+  function quick() {
+    return ROLE === "admin" ? [["📑", "Review deck", "t:reviewdeck.html"], ["📧", "Email states", "t:mailer.html#compose"], ["🗺️", "State map", "t:statemap.html"], ["📌", "Post notice", "t:calendar.html#board"]]
+      : ROLE === "head" ? [["📑", "Review deck", "t:reviewdeck.html"], ["🎯", "Goals", "t:insights.html#goals"], ["💬", "WhatsApp digest", "t:insights.html#digest"], ["👥", "Peers", "t:insights.html#peers"]]
+      : [["📍", "Market visit", "t:visits.html"], ["🏪", "Retailer health", "t:insights.html#health"], ["🧮", "Scheme calculator", "t:schemecalc.html"], ["💬", "WhatsApp digest", "t:insights.html#digest"]];
+  }
+  window.__pageBack = function () { return false; };
+  load();
+})();
+</script>
+</body>
+</html>
