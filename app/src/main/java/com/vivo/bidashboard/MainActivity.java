@@ -4220,6 +4220,12 @@ public class MainActivity extends FragmentActivity {
     }
 
     private class DownloadBridge {
+        // Theme "Auto": tells the page whether the phone is in dark mode (the in-app browser uses a light app theme).
+        @JavascriptInterface
+        public boolean isNight() {
+            return (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        }
+
         @JavascriptInterface
         public void save(String base64, String rawName, String mime) {
             String name = rawName == null ? "" : rawName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();

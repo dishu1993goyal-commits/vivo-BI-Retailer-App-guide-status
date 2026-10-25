@@ -1,4 +1,4 @@
-New: Smart tools — voice notes in 11 Indian languages, photo audit, smart beat planner, share cards, auto-reconciliation, Excel to insight, idea box, custom KPI builder
-Voice notes now use your phone's microphone inside the app
-Your notes, audits, KPIs and beat list sync across your devices; ideas and votes are live for all states
-New: Team notes & audits — HO sees every state, states see their own team
+New: Themes — tap 🎨 at the top to pick vivo Signature, Classic, Aurora, Emerald, Royal Indigo, Sunrise or Midnight (dark mode)
+Auto theme follows your phone's dark mode
+New tools: Email reports from HO, IMEI hygiene check, Sheet joiner, Target splitter, Guide & manual
+Affordability now shows phone photos and banners
