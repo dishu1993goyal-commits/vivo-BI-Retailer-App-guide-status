@@ -27,6 +27,25 @@
     names = names || modelNames(sc, [name]); if (!names.some(function (x) { return mkey(x) === mkey(name); })) names = names.concat([name]);
     var t = 0; Object.keys(m).forEach(function (raw) { var b = bestModel(raw, names); if (b && mkey(b) === mkey(name)) t += n(m[raw]); }); return t;
   }
+  // units per price band (handset price). IMEI rows keep each sale's price; summary rows give "Units <band>" columns (row.pb)
+  function bandLabel(b) { var f = function (v) { return v >= 1000 ? (Math.round(v / 100) / 10) + "K" : String(v); }; return b.label || (n(b.min) <= 0 ? "Below " + f(n(b.max) + 1) : b.max == null || b.max === "" ? f(n(b.min)) + " & above" : f(n(b.min)) + "–" + f(n(b.max))); }
+  function excluded(model, list) { var w = lc(model).split(/[^a-z0-9]+/).filter(Boolean); return (list || []).some(function (x) { var t = lc(x).replace(/\s*series\s*/, "").trim(); return t && w.some(function (y) { return y.indexOf(t) === 0 && (t.length > 1 || /^[a-z]\d/.test(y)); }); }); }
+  function bandUnits(row, sc, r) {
+    var bands = r.bands || [], out = bands.map(function () { return 0; });
+    var list = row.sales && row.sales[sc.basis];
+    if (list) list.forEach(function (x) { if (excluded(x.m, r.excludeModels)) return; var p = n(x.p); for (var i = bands.length - 1; i >= 0; i--) if (p >= n(bands[i].min) && (bands[i].max == null || bands[i].max === "" || p <= n(bands[i].max))) { out[i]++; break; } });
+    else if (row.pb) bands.forEach(function (b, i) { var v = pick(row.pb, bandLabel(b)); out[i] = v == null ? 0 : v; });
+    return out;
+  }
+  function scalePct(sc0, units, vs) {   // additional-incentive % from units + V-Shield tiers, attachment bonus, no-V-Shield cut
+    if (!sc0) return { pct: 100, note: "" };
+    var pct = 100, notes = [];
+    if ((sc0.tiers || []).length) { pct = 0; sc0.tiers.forEach(function (t) { if (units >= n(t.units) && vs >= n(t.vs)) pct = n(t.pct); }); notes.push(pct ? pct + "% (units + V-Shield tier)" : "below the first units + V-Shield tier"); }
+    var att = units > 0 ? vs / units * 100 : 0, add = 0; (sc0.attach || []).forEach(function (a) { if (att >= n(a.pct)) add = n(a.add); });
+    if (add && pct) { pct += add; notes.push("+" + add + "% V-Shield attachment " + Math.round(att) + "%"); }
+    if (n(sc0.noVsCut) && vs < 1 && pct) { pct = pct * (1 - n(sc0.noVsCut) / 100); notes.push("−" + n(sc0.noVsCut) + "% (no V-Shield)"); }
+    return { pct: pct, note: notes.join(", ") };
+  }
   function modelTarget(row, sc, name) { var v = pick(row.mt, name); if (v != null) return v; var d = (sc.models || []).find(function (m) { return mkey(m.name) === mkey(name); }); return d ? n(d.target) : 0; }
   function modelRows(row, sc) { return modelNames(sc).map(function (nm) { var tg = modelTarget(row, sc, nm), sd = modelSold(row, sc, nm); return { name: nm, target: tg, sold: sd, ach: tg > 0 ? sd / tg * 100 : null }; }); }
   function unitsFor(row, sc, rule) {
@@ -69,6 +88,7 @@
       if (n(g.features) && n(d.features) < n(g.features)) fails.push(n(d.features) + " of " + n(g.features) + " app features used");
       if (n(g.mvisits) && n(d.mvisits) < n(g.mvisits)) fails.push(n(d.mvisits) + " of " + n(g.mvisits) + " market visits");
       if (n(g.vsPct) && (n(row.vsTarget) > 0 ? n(row.vsSold) / n(row.vsTarget) * 100 : 0) < n(g.vsPct)) fails.push("V-Shield below " + n(g.vsPct) + "% of target");
+      if (n(g.minUnits) && units < n(g.minUnits)) fails.push(units + " of " + n(g.minUnits) + " units needed");
       if (g.allModels) { var miss = MR.filter(function (m) { return m.target > 0 && m.sold < m.target; }); if (miss.length) fails.push("model target missed: " + miss.map(function (m) { return m.name + " " + m.sold + "/" + m.target; }).join(", ")); }
       if (fails.length) { reasons.push((g.label || "Eligibility") + ": " + fails.join(", ")); if (g.effect === "reduce") reduce = Math.max(reduce, n(g.reducePct)); else gateMode = "zero"; }
     });
@@ -93,6 +113,16 @@
         if (consumed && amt >= 0) slabTxt += " · cash on " + pu + " unit" + (pu === 1 ? "" : "s");
         if (!mainSlab) mainSlab = slabTxt;
       } else if (r.type === "flat_unit") { if (whenOk(r.when, achieved)) amt = n(r.rate) * pu; }
+      else if (r.type === "price_band") {   // ₹ per unit by handset price band (optionally scaled by units / V-Shield tiers)
+        var bu = bandUnits(row, sc, r), base = 0, desc = [];
+        (r.bands || []).forEach(function (b, i) { if (bu[i]) { base += bu[i] * n(b.rate); desc.push(bandLabel(b) + " " + bu[i] + "×₹" + n(b.rate)); } });
+        var SP = scalePct(r.scale, units, n(row.vsSold));
+        amt = base * SP.pct / 100;
+        parts.push({ id: r.id, label: (r.label || "Price-band payout") + (desc.length ? ": " + desc.join(", ") : ": no units in the bands") + (r.scale && SP.note ? " · " + SP.note : ""), type: r.type, amount: amt, slab: r.scale ? Math.round(SP.pct) + "%" : "" });
+        if (r.scale && !mainSlab) mainSlab = Math.round(SP.pct) + "% of " + (r.label || "incentive");
+        pos += amt;
+        return;
+      }
       else if (r.type === "reward") {
         var gz = slabFor(r.slabs, u);
         if (gz) { var gq = n(gz.qty) || 1; amt = gq * n(gz.value); slabTxt = "≥ " + gz.from + " units"; parts.push({ id: r.id, label: "🎁 " + gq + " × " + (gz.item || "Gift") + (r.consume ? " (" + gz.from + " units)" : ""), type: r.type, amount: amt, slab: slabTxt, gift: true }); pos += amt; }
@@ -135,9 +165,10 @@
     if (gateMode === "zero" && pos) { parts.push({ label: "Not eligible", type: "gate", amount: -pos }); pos = 0; }
     else if (reduce && pos) { var rc = pos * reduce / 100; parts.push({ label: "Eligibility cut " + reduce + "%", type: "gate", amount: -rc }); pos -= rc; }
     if (n(sc.cap) > 0 && pos > n(sc.cap)) { parts.push({ label: "Capped at maximum", type: "cap", amount: n(sc.cap) - pos }); pos = n(sc.cap); }
-    var total = Math.round((pos - neg) * 100) / 100;
+    var tds = 0; if (n(sc.tdsPct) > 0 && pos - neg > 0) { tds = Math.round((pos - neg) * n(sc.tdsPct)) / 100; parts.push({ label: "TDS " + n(sc.tdsPct) + "%", type: "tds", amount: -tds }); }
+    var total = Math.round((pos - neg - tds) * 100) / 100;
     return { gifts: gifts, rid: row.rid, name: row.name || "", state: row.state || "", target: tg, targetValue: AP.tv, unitAch: AP.ua, valueAch: AP.va, models: MR, units: units, value: n(row.value), ach: ach, achieved: achieved, upload: n(row.upload), activation: n(row.activation), vsSold: n(row.vsSold), vsTarget: n(row.vsTarget),
-      parts: parts, positive: Math.round(pos * 100) / 100, penalty: Math.round(neg * 100) / 100, total: total, eligible: pos > 0, slab: mainSlab || "", reasons: reasons, dash: d, extra: row.extra || {} };
+      tds: tds, parts: parts, positive: Math.round(pos * 100) / 100, penalty: Math.round(neg * 100) / 100, total: total, eligible: pos > 0, slab: mainSlab || "", reasons: reasons, dash: d, extra: row.extra || {} };
   }
   function bump(row, k, model) {
     var r = JSON.parse(JSON.stringify(row));
@@ -162,6 +193,8 @@
     rules.forEach(function (r) {
       if (r.type === "model_rate") (r.rates || []).forEach(function (x) { if (x.when !== "modelAchieved") return; var mt = modelTarget(row, sc, x.model), sd = modelSold(row, sc, x.model); var need = Math.ceil(mt * n(r.minAch || 100) / 100 - sd - 1e-9); if (mt > 0 && need > 0) mc.push([need, x.model]); });
       if (r.type === "gate" && r.allModels) (res.models || []).forEach(function (m) { if (m.target > 0 && m.sold < m.target) mc.push([m.target - m.sold, m.name]); });
+      if (r.type === "price_band" && r.scale) (r.scale.tiers || []).forEach(function (t) { var need = n(t.units) - u; if (need > 0 && n(row.vsSold) >= n(t.vs)) cands.push(need); });
+      if (r.type === "gate" && n(r.minUnits) > u) cands.push(n(r.minUnits) - u);
     });
     var all = cands.filter(function (x) { return x > 0 && x <= Math.max(50, tg * 2); }).map(function (x) { return [x, null]; }).concat(mc.filter(function (x) { return x[0] <= 200; }));
     all.sort(function (a, b) { return a[0] - b[0]; });
@@ -198,17 +231,17 @@
     list.forEach(function (x) {
       var rid = String(x.rid || "").trim().toUpperCase(); if (!rid) return;
       var imei = String(x.imei || "").trim(); if (imei) { if (seen[imei]) return; seen[imei] = 1; }
-      var o = by[rid] || (by[rid] = { rid: rid, upload: 0, activation: 0, both: 0, either: 0, value: 0, vsSold: 0, excl: 0, fromImei: true, models: { upload: {}, activation: {}, both: {}, either: {} }, val: { upload: 0, activation: 0, both: 0, either: 0 }, vs: { upload: 0, activation: 0, both: 0, either: 0 } });
+      var o = by[rid] || (by[rid] = { rid: rid, upload: 0, activation: 0, both: 0, either: 0, value: 0, vsSold: 0, excl: 0, fromImei: true, models: { upload: {}, activation: {}, both: {}, either: {} }, val: { upload: 0, activation: 0, both: 0, either: 0 }, vs: { upload: 0, activation: 0, both: 0, either: 0 }, sales: { upload: [], activation: [], both: [], either: [] } });
       var p = lc(x.partner);
       if (p && ex.some(function (e) { return p.indexOf(e) >= 0; })) { o.excl++; return; }
       var u = inP(parseDate(x.upload)), a = inP(parseDate(x.activation)), m = String(x.model || "Other").trim() || "Other", price = n(x.price), vsh = /^(y|yes|1|true)$/i.test(String(x.vshield || "").trim());
       var flags = { upload: !!u, activation: !!a, both: !!(u && a), either: !!(u || a) };
-      Object.keys(flags).forEach(function (k) { if (!flags[k]) return; o[k]++; o.models[k][m] = (o.models[k][m] || 0) + 1; o.val[k] += price; if (vsh) o.vs[k]++; });
+      Object.keys(flags).forEach(function (k) { if (!flags[k]) return; o[k]++; o.models[k][m] = (o.models[k][m] || 0) + 1; o.val[k] += price; if (vsh) o.vs[k]++; o.sales[k].push({ p: price, m: m }); });
     });
     return by;
   }
   function finishImei(sc, o) { o.value = o.val[sc.basis] || 0; o.vsSold = o.vs[sc.basis] || 0; return o; }
 
-  var api = { modelNames: modelNames, bestModel: bestModel, compute: compute, computeRow: computeRow, fromImei: fromImei, finishImei: finishImei, parseDate: parseDate, baseUnits: baseUnits, evalFormula: evalFormula, VARS: VARS };
+  var api = { bandLabel: bandLabel, excluded: excluded, modelNames: modelNames, bestModel: bestModel, compute: compute, computeRow: computeRow, fromImei: fromImei, finishImei: finishImei, parseDate: parseDate, baseUnits: baseUnits, evalFormula: evalFormula, VARS: VARS };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.SCENG = api;
 })(typeof window !== "undefined" ? window : globalThis);

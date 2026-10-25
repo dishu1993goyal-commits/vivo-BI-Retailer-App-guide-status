@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Scheme payout calculator</title>
-<script src="scheme-engine.js?v=3"></script>
+<script src="scheme-engine.js?v=4"></script>
 <script src="kpi-data.js?v=3"></script>
 <style>
 /*@@CSS@@*/
@@ -59,6 +59,7 @@
     flat_unit: ["➕", "Flat ₹ per unit", "Always, only if the target is achieved, or only if not achieved"],
     value_pct: ["💰", "% of sale value", "A percentage of the sale value"],
     kicker: ["🚀", "Kicker above target", "₹ per unit sold above the target"],
+    price_band: ["🏷️", "Payout by price band", "₹ per unit by handset price (Below 15K, 15K–19.99K…); optionally a % that depends on units + V-Shield plans and attachment"],
     reward: ["🎁", "Gift / product reward", "e.g. 10 units → 1 vivo V80, 18 units → 2; optionally the units used for the gift are not paid in cash"],
     model_rate: ["📱", "Payout by model", "Different ₹ per unit for each model — e.g. V80 ₹1,099, X300 Pro ₹2,000 — always, or only if the model's target is met"],
     penalty: ["➖", "Negative incentive", "Deduction if the target or the V-Shield target is not met"],
@@ -71,6 +72,10 @@
     ["📦 Unit bands, each band own rate", function () { return { rules: [{ type: "unit_slab", label: "Unit bands", mode: "incremental", slabs: [{ from: 1, to: 20, rate: 50 }, { from: 21, to: 50, rate: 80 }, { from: 51, to: null, rate: 120 }] }] }; }],
     ["➕ Flat ₹/unit if target achieved", function () { return { rules: [{ type: "flat_unit", label: "Per unit on target", rate: 100, when: "achieved" }, { type: "kicker", label: "Kicker above target", rate: 50 }], minAch: 100 }; }],
     ["📱 Model-wise targets & payout", function () { return { models: [{ name: "V80", target: 10 }, { name: "X300 Pro", target: 100 }], rules: [{ type: "model_rate", label: "Model payout", minAch: 100, rates: [{ model: "V80", rate: 1099, when: "always" }, { model: "X300 Pro", rate: 2000, when: "always" }] }] }; }],
+    ["🏷️ Price-band payout + additional incentive (NPO style)", function () { var B = function (r) { return [[0, 14999], [15000, 19999], [20000, 29999], [30000, 44999], [45000, 74999], [75000, null]].map(function (x, i) { return { min: x[0], max: x[1], rate: r[i] }; }); };
+      return { basis: "both", cap: 100000, tdsPct: 10, rules: [{ type: "price_band", label: "Discount (payout)", bands: B([150, 200, 230, 275, 300, 350]), excludeModels: ["T series", "iQOO"] },
+        { type: "price_band", label: "Additional incentive", bands: B([200, 225, 250, 300, 350, 450]), excludeModels: ["T series", "iQOO"], scale: { tiers: [{ units: 25, vs: 1, pct: 50 }, { units: 51, vs: 2, pct: 80 }, { units: 75, vs: 3, pct: 100 }, { units: 101, vs: 4, pct: 120 }], attach: [{ pct: 10, add: 20 }, { pct: 20, add: 30 }, { pct: 30, add: 40 }, { pct: 40, add: 50 }], noVsCut: 10 } },
+        { type: "gate", label: "Minimum sell-out", minUnits: 10, active: false, effect: "zero" }] }; }],
     ["💰 % of sale value", function () { return { rules: [{ type: "value_pct", label: "1% of sale value", pct: 1, when: "always" }] }; }],
     ["➖ Target + V-Shield with negative", function () { return { rules: [{ type: "ach_slab", label: "Achievement slab", pay: "perUnit", slabs: [{ from: 100, to: null, amount: 120 }] }, { type: "penalty", label: "V-Shield not sold", amount: 200, per: "vsShortUnit", when: "vshieldShort", minAch: 100 }] }; }]
   ];
@@ -172,10 +177,12 @@
     var p = PARSED;
     $("pane").innerHTML = '<div class="card"><h3 style="margin:0 0 4px">📄 Read the scheme circular</h3><div class="muted" style="font-size:13px">PDF, Word (.docx), Excel or a photo of the circular. The AI picks out slabs, minimum %, rates, kicker, maximum payout, period, sales basis, excluded EMI partners and negative incentives.</div>' +
       '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="up">📄 File (PDF / Word / Excel)</button><button class="btn pri" id="upi">📷 Photo / screenshot</button><button class="btn sec" id="sk">Skip — set rules by hand →</button></div>' +
-      '<div class="muted" style="font-size:12px;margin-top:8px">Scanned PDFs and photos are read by AI. Old .doc files: open in Word and “Save as” .docx.</div></div>' +
-      (p ? '<div class="card"><b>Text read from ' + esc(p.file) + "</b>" + (p.ocr ? ' <span class="chip warn">read by AI from the scanned pages</span>' : "") + '<div class="muted" style="font-size:12px;margin:4px 0 6px">You can correct the text, then read the rules again.</div><textarea class="txtread" id="tx">' + esc(p.text || "") + '</textarea><div class="row" style="margin-top:8px"><button class="btn sec sm" id="ag">🤖 Read rules again</button></div>' +
+      '<label class="cbx"><input type="checkbox" id="hin"' + (ls("sc-hindi") ? " checked" : "") + '> The circular has Hindi text</label>' +
+      '<div class="muted" style="font-size:12px;margin-top:8px">Photos and scanned PDFs are read by AI online; if that isn\'t available, this device reads them itself. Old .doc files: open in Word and “Save as” .docx.</div></div>' +
+      (p ? '<div class="card"><b>Text read from ' + esc(p.file) + "</b>" + (p.ocr === "device" ? ' <span class="chip warn">read on this device — numbers in coloured boxes may be missed, check the slabs</span>' : p.ocr ? ' <span class="chip warn">read by AI from the picture</span>' : "") + '<div class="muted" style="font-size:12px;margin:4px 0 6px">You can correct the text, then read the rules again.</div><textarea class="txtread" id="tx">' + esc(p.text || "") + '</textarea><div class="row" style="margin-top:8px"><button class="btn sec sm" id="ag">🤖 Read rules again</button></div>' +
         (p.scheme ? '<div class="found"><b>Rules found</b><ul>' + describe(p.scheme).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" + ((p.scheme.notes || []).length ? '<div class="muted" style="font-size:12px"><b>Notes from the AI:</b> ' + p.scheme.notes.map(esc).join(" · ") + "</div>" : "") + '<button class="btn ok block" id="use" style="margin-top:10px;padding:12px">✓ Use these rules</button><div class="muted" style="font-size:12px;margin-top:6px;text-align:center">Always check the rules on the next step — AI can misread a circular.</div></div>' : p.error ? '<div class="err" style="margin-top:8px">' + esc(p.error) + "</div>" : "") + "</div>" : "") +
       '<div class="card"><b>Or start from a template</b><div class="chips9" style="margin-top:6px">' + TEMPLATES.map(function (t, i) { return '<span data-tp="' + i + '">' + esc(t[0]) + "</span>"; }).join("") + "</div></div>";
+    $("hin").onchange = function () { ls("sc-hindi", this.checked ? 1 : null); };
     $("upi").onclick = function () { pickFile("image/*"); };
     $("up").onclick = function () { pickFile(".pdf,.docx,.xlsx,.xls,.csv,.txt"); };
     function pickFile(acc) {
@@ -194,10 +201,50 @@
     if ($("use")) $("use").onclick = function () { var keep = { name: SC && SC.name !== "New scheme" ? SC.name : null }; SC = Object.assign(blank(), PARSED.scheme); if (!SC.period) SC.period = NOW; SC.rules.forEach(function (r) { r.id = r.id || uid(); }); CUR = CUR && CUR.mine ? CUR : null; DONE[1] = 1; toast("Rules loaded — check each one"); go(2); };
     [].forEach.call($("pane").querySelectorAll("[data-tp]"), function (s) { s.onclick = function () { var t = TEMPLATES[+s.dataset.tp][1](); SC = Object.assign(blank(), { name: TEMPLATES[+s.dataset.tp][0].replace(/^\S+\s/, "") }, t); SC.rules.forEach(function (r) { r.id = uid(); }); CUR = null; DONE[1] = 1; go(2); }; });
   }
+  // ---- on-device OCR (Tesseract, hosted with the site): used when no online AI can read pictures ----
+  var OCRW = null, ocrN = 0, ocrCb = {};
+  function ocrRun(buf, psm) {
+    if (!OCRW) { OCRW = new Worker("/vendor/ocr-worker.js?v=1"); OCRW.onmessage = function (e) { var f = ocrCb[e.data.id]; delete ocrCb[e.data.id]; if (f) f(e.data); }; }
+    var langs = ls("sc-hindi") ? "eng+hin" : "eng";
+    return new Promise(function (res) { var id = ++ocrN; ocrCb[id] = res; OCRW.postMessage({ id: id, op: "ocr", image: buf, langs: langs, psm: psm }, [buf]); });
+  }
+  function ocrPrep(src, invert) {
+    return new Promise(function (res) {
+      var im = new Image();
+      im.onload = function () {
+        var k = Math.max(1, Math.min(3, 1900 / im.width)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        var g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(im, 0, 0, c.width, c.height);
+        if (invert) { var d = g.getImageData(0, 0, c.width, c.height), px = d.data; for (var i = 0; i < px.length; i += 4) { var v = 255 - (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]); px[i] = px[i + 1] = px[i + 2] = v; } g.putImageData(d, 0, 0); }
+        c.toBlob(function (b) { b.arrayBuffer().then(res); }, "image/png");
+      };
+      im.src = src;
+    });
+  }
+  function localOcr(images, say) {
+    var passes = [[false, 3, "normal"], [true, 3, "light text on dark"], [false, 11, "numbers in boxes"]], out = [], chain = Promise.resolve();
+    images.slice(0, 4).forEach(function (src, pi) {
+      passes.forEach(function (ps, i) {
+        chain = chain.then(function () { say("Reading the picture on this device — page " + (pi + 1) + "/" + Math.min(images.length, 4) + ", step " + (i + 1) + "/3 (" + ps[2] + ")…"); return ocrPrep(src, ps[0]); })
+          .then(function (buf) { return ocrRun(buf, ps[1]); })
+          .then(function (r) { if (r.ok && r.text.trim()) out.push("--- page " + (pi + 1) + " · " + ps[2] + " ---\n" + r.text.trim()); });
+      });
+    });
+    return chain.then(function () { return out.join("\n\n"); });
+  }
   function parse(text, images, file) {
-    $("pane").insertAdjacentHTML("afterbegin", '<div class="loading" id="pl"><div class="spin"></div>AI is reading the circular…</div>');
+    $("pane").insertAdjacentHTML("afterbegin", '<div class="loading" id="pl"><div class="spin"></div><span id="plt">AI is reading the circular…</span></div>');
+    var say = function (t) { if ($("plt")) $("plt").textContent = t; };
     if ($("use")) $("use").disabled = true;
     api({ action: "sc-parse", text: text || "", images: text ? undefined : images, fileName: file }).then(function (r) {
+      if (!r.ok && r.visionFailed && images && images.length) {
+        return localOcr(images, say).then(function (t) {
+          if (t.replace(/\s/g, "").length < 40) return { ok: false, error: "Couldn't find readable text in the picture. Try a sharper screenshot, the PDF, or type the slabs in step 2.", text: t };
+          say("Text read on this device — AI is turning it into rules…");
+          return api({ action: "sc-parse", text: t, fileName: file }).then(function (r2) { r2.text = r2.text || t; r2.ocr = "device"; return r2; });
+        });
+      }
+      return r;
+    }).then(function (r) {
       PARSED = { file: file, text: r.text || text || "", ocr: r.ocr, scheme: r.ok ? r.scheme : null, error: r.ok ? "" : r.error };
       if (STEP === 1) step1(); else toast(r.ok ? "Circular read — open step 1 to use its rules" : r.error);
     });
@@ -210,6 +257,7 @@
     if ((sc.excludePartners || []).length) o.push("Not counted: IMEIs sold through " + sc.excludePartners.join(", "));
     if (sc.minAch) o.push("Minimum achievement " + sc.minAch + "% (below it: " + (sc.belowMin === "prorata" ? "pro-rata" : "no payout") + ")");
     if (sc.cap) o.push("Maximum payout " + rs(sc.cap));
+    if (sc.tdsPct) o.push("TDS " + sc.tdsPct + "% deducted");
     (sc.rules || []).forEach(function (r) { o.push(ruleText(r)); });
     return o;
   }
@@ -220,11 +268,12 @@
     if (r.type === "flat_unit") return (r.label || "Flat") + ": " + rs(r.rate) + "/unit" + (w[r.when] || "") + m;
     if (r.type === "value_pct") return (r.label || "% of value") + ": " + r.pct + "% of sale value" + (w[r.when] || "");
     if (r.type === "kicker") return (r.label || "Kicker") + ": " + rs(r.rate) + " per unit above target" + m;
+    if (r.type === "price_band") { var sc0 = r.scale; return (r.label || "Price-band payout") + ": " + (r.bands || []).map(function (b) { return SCENG.bandLabel(b) + " " + rs(b.rate); }).join(", ") + "/unit" + ((r.excludeModels || []).length ? " · not paid: " + r.excludeModels.join(", ") : "") + (sc0 ? " · paid at " + (sc0.tiers || []).map(function (t) { return t.pct + "% from " + t.units + " units + " + t.vs + " V-Shield"; }).join(", ") + ((sc0.attach || []).length ? " · V-Shield attachment " + sc0.attach.map(function (a) { return a.pct + "% → +" + a.add + "%"; }).join(", ") : "") + (sc0.noVsCut ? " · −" + sc0.noVsCut + "% without V-Shield" : "") : ""); }
     if (r.type === "reward") return (r.label || "Gift") + ": " + (r.slabs || []).map(function (z) { return z.from + " units → " + z.qty + " × " + z.item + (z.value ? " (" + rs(z.value) + " each)" : ""); }).join(", ") + (r.consume ? " · gift units not paid in cash" : "") + (r.models && r.models.length ? " (models: " + r.models.join(", ") + ")" : "");
     if (r.type === "model_rate") return (r.label || "Payout by model") + ": " + (r.rates || []).map(function (x) { return x.model + " " + rs(x.rate) + "/unit" + (x.when === "modelAchieved" ? " if its target is met" : x.when === "achieved" ? " if overall target met" : x.when === "notAchieved" ? " if overall target not met" : ""); }).join(", ");
     if (r.type === "penalty") return (r.label || "Negative incentive") + ": −" + rs(r.amount) + { fixed: "", shortUnit: " per unit short", vsShortUnit: " per V-Shield plan short" }[r.per] + " when " + { notAchieved: "target (" + r.minAch + "%) not achieved", vshieldShort: "V-Shield target not met", either: "target or V-Shield missed", both: "target and V-Shield both missed" }[r.when];
     if (r.type === "multiplier") return (r.label || "Multiplier") + ": ×" + r.factor + " when achievement ≥" + r.minAch + "%" + (r.maxAch != null ? " and <" + r.maxAch + "%" : "");
-    if (r.type === "gate") { var g = []; if (r.active) g.push("active retailer"); if (r.appDays) g.push("app used ≥" + r.appDays + " days"); if (r.features) g.push("≥" + r.features + " app features"); if (r.mvisits) g.push("≥" + r.mvisits + " market visits"); if (r.vsPct) g.push("V-Shield ≥" + r.vsPct + "%"); if (r.allModels) g.push("every model target met"); return (r.label || "Eligibility") + ": " + (g.join(", ") || "—") + (r.effect === "reduce" ? " (else cut " + r.reducePct + "%)" : " (else no payout)"); }
+    if (r.type === "gate") { var g = []; if (r.active) g.push("active retailer"); if (r.appDays) g.push("app used ≥" + r.appDays + " days"); if (r.features) g.push("≥" + r.features + " app features"); if (r.mvisits) g.push("≥" + r.mvisits + " market visits"); if (r.vsPct) g.push("V-Shield ≥" + r.vsPct + "%"); if (r.allModels) g.push("every model target met"); if (r.minUnits) g.push("at least " + r.minUnits + " units"); return (r.label || "Eligibility") + ": " + (g.join(", ") || "—") + (r.effect === "reduce" ? " (else cut " + r.reducePct + "%)" : " (else no payout)"); }
     if (r.type === "formula") return (r.label || "Formula") + ": " + r.expr;
     return r.type;
   }
@@ -242,6 +291,7 @@
       '<label>Models (optional) — model-wise targets and payouts</label><div id="mdl"></div><div class="row" style="margin-top:4px"><button class="btn ghost sm" id="madd" type="button">＋ Model</button><span class="muted" style="font-size:11.5px">Target here is the default for every retailer; the template can give each retailer its own.</span></div>' +
       '<label>Don\'t count IMEIs sold through these EMI partners (comma separated)</label><input class="tx" id="b_ex" value="' + esc((s.excludePartners || []).join(", ")) + '" placeholder="e.g. Bajaj Finserv, HDB">' +
       '<div class="g3b"><div><label>Minimum achievement %</label><input class="tx" id="b_min" type="number" value="' + (s.minAch || "") + '" placeholder="0 = none"></div><div><label>Below minimum</label><select class="tx" id="b_below"><option value="zero"' + (s.belowMin !== "prorata" ? " selected" : "") + '>No payout</option><option value="prorata"' + (s.belowMin === "prorata" ? " selected" : "") + '>Pro-rata</option></select></div><div><label>Maximum payout ₹ (per retailer)</label><input class="tx" id="b_cap" type="number" value="' + (s.cap || "") + '" placeholder="0 = no cap"></div></div>' +
+      '<div class="g3b"><div><label>TDS % (deducted from the total)</label><input class="tx" id="b_tds" type="number" value="' + (s.tdsPct || "") + '" placeholder="0 = none"></div></div>' +
       '<label>Extra columns in the template (e.g. Model, Beat)</label><input class="tx" id="b_cols" value="' + esc((s.extraCols || []).join(", ")) + '"></div>' +
       '<div class="row" style="justify-content:space-between;margin-top:12px"><b>Payout rules</b><span class="muted" style="font-size:12px">Applied in order · negatives after the cap</span></div><div id="rls"></div>' +
       '<button class="btn pri block" id="ar" style="margin-top:10px;padding:12px">＋ Add rule</button>' +
@@ -263,7 +313,7 @@
     if (!$("b_name")) return;
     SC.name = $("b_name").value.trim() || "Scheme"; SC.period = $("b_period").value; SC.dateFrom = $("b_df").value; SC.dateTo = $("b_dt").value; if (!SC.period && SC.dateFrom) SC.period = SC.dateFrom.slice(0, 7); SC.excludePartners = $("b_ex").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
     SC.models = (SC.models || []).filter(function (m) { return m.name; });
-    SC.minAch = +$("b_min").value || 0; SC.belowMin = $("b_below").value; SC.cap = +$("b_cap").value || 0; SC.extraCols = $("b_cols").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 6); RES = null;
+    SC.minAch = +$("b_min").value || 0; SC.belowMin = $("b_below").value; SC.cap = +$("b_cap").value || 0; SC.tdsPct = +$("b_tds").value || 0; SC.extraCols = $("b_cols").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 6); RES = null;
   }
   function slabTable(r, cols) {
     return '<table class="sl"><tr>' + cols.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "<th></th></tr>" + (r.slabs || []).map(function (z, i) { return "<tr>" + cols.map(function (c) { return '<td><input type="number" data-sl="' + i + '" data-k="' + c[0] + '" value="' + (z[c[0]] == null ? "" : z[c[0]]) + '" placeholder="' + (c[0] === "to" ? "no limit" : "") + '"></td>'; }).join("") + '<td><button class="ib" data-slx="' + i + '">✕</button></td></tr>'; }).join("") + '</table><button class="btn ghost sm" data-sladd="1" style="margin-top:4px">＋ Band</button>';
@@ -277,6 +327,17 @@
     if (r.type === "flat_unit") return '<div class="g2b"><div><label>₹ per unit</label>' + inp("rate", r.rate) + "</div><div><label>When</label>" + whenSel(r) + "</div></div>";
     if (r.type === "value_pct") return '<div class="g2b"><div><label>% of sale value</label>' + inp("pct", r.pct) + "</div><div><label>When</label>" + whenSel(r) + "</div></div>";
     if (r.type === "kicker") return "<label>₹ per unit above target</label>" + inp("rate", r.rate);
+    if (r.type === "price_band") {
+      var sc0 = r.scale;
+      var tbl = function (rows, cols, key) { return '<table class="sl"><tr>' + cols.map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + "<th></th></tr>" + rows.map(function (z, i) { return "<tr>" + cols.map(function (c) { return '<td><input data-pt="' + key + '" data-i="' + i + '" data-k="' + c[0] + '" type="number" value="' + (z[c[0]] == null ? "" : z[c[0]]) + '" placeholder="' + (c[2] || "") + '"></td>'; }).join("") + '<td><button class="ib" data-ptx="' + key + '" data-i="' + i + '" type="button">✕</button></td></tr>'; }).join("") + '</table><button class="btn ghost sm" data-ptadd="' + key + '" type="button" style="margin-top:4px">＋ Row</button>'; };
+      return "<label>Price bands (handset price ₹)</label>" + tbl(r.bands || [], [["min", "From ₹"], ["max", "To ₹", "no limit"], ["rate", "₹ / unit"]], "bands") +
+        '<label>Models not paid (still count for units), comma separated</label><input class="tx" data-f="excludeModels" type="text" value="' + esc((r.excludeModels || []).join(", ")) + '" placeholder="e.g. T series, iQOO">' +
+        '<label class="cbx"><input type="checkbox" data-scale="1"' + (sc0 ? " checked" : "") + "> Pay a % of this that depends on units + V-Shield plans</label>" +
+        (sc0 ? "<label>Tiers (highest one reached is paid)</label>" + tbl(sc0.tiers || [], [["units", "Units ≥"], ["vs", "V-Shield plans ≥"], ["pct", "% paid"]], "tiers") +
+          "<label>V-Shield attachment bonus (extra % of this incentive)</label>" + tbl(sc0.attach || [], [["pct", "Attachment % ≥"], ["add", "Extra %"]], "attach") +
+          '<label>Cut % if no V-Shield sold</label><input class="tx" data-sv="noVsCut" type="number" value="' + (sc0.noVsCut || "") + '" placeholder="0 = none">' : "") +
+        '<div class="muted" style="font-size:11.5px;margin-top:4px">Units per band come from the IMEI sheet (sale value of each handset) or the “Units &lt;band&gt;” columns.</div>';
+    }
     if (r.type === "reward") {
       return '<table class="sl"><tr><th>From units</th><th>Gifts</th><th>Gift</th><th>Value ₹ each</th><th></th></tr>' + (r.slabs || []).map(function (z, i) { return '<tr><td><input data-rw="' + i + '" data-k="from" type="number" value="' + (z.from || "") + '"></td><td><input data-rw="' + i + '" data-k="qty" type="number" value="' + (z.qty || 1) + '"></td><td><input data-rw="' + i + '" data-k="item" type="text" value="' + esc(z.item || "") + '" placeholder="e.g. vivo V80 (8GB+128GB)"></td><td><input data-rw="' + i + '" data-k="value" type="number" value="' + (z.value || "") + '" placeholder="optional"></td><td><button class="ib" data-rwx="' + i + '" type="button">✕</button></td></tr>'; }).join("") + '</table><button class="btn ghost sm" data-rwadd="1" type="button" style="margin-top:4px">＋ Gift slab</button>' +
         '<label class="cbx"><input type="checkbox" data-f="consume"' + (r.consume ? " checked" : "") + '> Units used for the gift are not paid in cash (e.g. 12 units = 1 phone + 2 × ₹4,000)</label><div class="muted" style="font-size:11.5px">Add the value only if the gift should count in the ₹ total.</div>';
@@ -287,7 +348,7 @@
     }
     if (r.type === "penalty") return '<div class="g2b"><div><label>Deduct ₹</label>' + inp("amount", r.amount) + '</div><div><label>Per</label><select class="tx" data-f="per"><option value="fixed"' + (r.per === "fixed" ? " selected" : "") + '>One amount</option><option value="shortUnit"' + (r.per === "shortUnit" ? " selected" : "") + '>Unit short of target</option><option value="vsShortUnit"' + (r.per === "vsShortUnit" ? " selected" : "") + '>V-Shield plan short</option></select></div></div><div class="g2b"><div><label>When</label><select class="tx" data-f="when"><option value="notAchieved"' + (r.when === "notAchieved" ? " selected" : "") + '>Target not achieved</option><option value="vshieldShort"' + (r.when === "vshieldShort" ? " selected" : "") + '>V-Shield target not met</option><option value="either"' + (r.when === "either" ? " selected" : "") + '>Either is missed</option><option value="both"' + (r.when === "both" ? " selected" : "") + '>Both are missed</option></select></div><div><label>Target counts as achieved at %</label>' + inp("minAch", r.minAch == null ? 100 : r.minAch) + "</div></div>";
     if (r.type === "multiplier") return '<div class="g3b"><div><label>From achievement %</label>' + inp("minAch", r.minAch) + "</div><div><label>Below % (optional)</label>" + inp("maxAch", r.maxAch, "no limit") + "</div><div><label>Multiply by</label>" + inp("factor", r.factor, "e.g. 1.2") + "</div></div>";
-    if (r.type === "gate") return '<label class="cbx"><input type="checkbox" data-f="active"' + (r.active ? " checked" : "") + '> Must be an active retailer on the dashboard</label><label class="cbx"><input type="checkbox" data-f="allModels"' + (r.allModels ? " checked" : "") + '> Every model target must be met</label><div class="g2b"><div><label>Retailer app used on at least (days)</label>' + inp("appDays", r.appDays || "") + "</div><div><label>App features used (at least)</label>" + inp("features", r.features || "") + '</div></div><div class="g2b"><div><label>Market visits in the month (at least)</label>' + inp("mvisits", r.mvisits || "") + "</div><div><label>V-Shield sold, % of V-Shield target</label>" + inp("vsPct", r.vsPct || "") + '</div></div><div class="g2b"><div><label>If not met</label><select class="tx" data-f="effect"><option value="zero"' + (r.effect !== "reduce" ? " selected" : "") + '>No payout</option><option value="reduce"' + (r.effect === "reduce" ? " selected" : "") + ">Cut the payout by %</option></select></div><div><label>Cut %</label>" + inp("reducePct", r.reducePct == null ? 50 : r.reducePct) + "</div></div>";
+    if (r.type === "gate") return '<label>Minimum units sold (0 = none)</label>' + inp("minUnits", r.minUnits || "") + '<label class="cbx"><input type="checkbox" data-f="active"' + (r.active ? " checked" : "") + '> Must be an active retailer on the dashboard</label><label class="cbx"><input type="checkbox" data-f="allModels"' + (r.allModels ? " checked" : "") + '> Every model target must be met</label><div class="g2b"><div><label>Retailer app used on at least (days)</label>' + inp("appDays", r.appDays || "") + "</div><div><label>App features used (at least)</label>" + inp("features", r.features || "") + '</div></div><div class="g2b"><div><label>Market visits in the month (at least)</label>' + inp("mvisits", r.mvisits || "") + "</div><div><label>V-Shield sold, % of V-Shield target</label>" + inp("vsPct", r.vsPct || "") + '</div></div><div class="g2b"><div><label>If not met</label><select class="tx" data-f="effect"><option value="zero"' + (r.effect !== "reduce" ? " selected" : "") + '>No payout</option><option value="reduce"' + (r.effect === "reduce" ? " selected" : "") + ">Cut the payout by %</option></select></div><div><label>Cut %</label>" + inp("reducePct", r.reducePct == null ? 50 : r.reducePct) + "</div></div>";
     if (r.type === "formula") return "<label>Formula (₹)</label>" + '<input class="tx" data-f="expr" type="text" value="' + esc(r.expr || "") + '"' + (lock ? " readonly" : "") + ' placeholder="e.g. ach>=110 ? units*25 : 0" style="font-family:ui-monospace,monospace">' + (lock ? '<div class="muted" style="font-size:12px">Set by a master admin.</div>' : '<div class="chips9">' + SCENG.VARS.concat(["min(", "max(", "round("]).map(function (v) { return '<code data-ins="' + v + '">' + v + "</code>"; }).join("") + '</div><div class="muted" style="font-size:11.5px;margin-top:4px">units, target, ach (%), value (₹), vsSold, vsTarget, upload, activation, both, appDays, features, appVisits, mvisits, active (1/0), payout (total of rules above). Use ? : for conditions.</div>');
     return "";
   }
@@ -302,10 +363,16 @@
     [].forEach.call(box.querySelectorAll(".rl"), function (card) {
       var r = SC.rules[+card.dataset.i];
       [].forEach.call(card.querySelectorAll("[data-f]"), function (e) { e.oninput = e.onchange = function () { var f = e.dataset.f; RES = null;
-        if (e.type === "checkbox") r[f] = e.checked; else if (f === "models") r.models = e.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        if (e.type === "checkbox") r[f] = e.checked; else if (f === "models" || f === "excludeModels") r[f] = e.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
         else if (e.type === "number") r[f] = e.value === "" ? (f === "maxAch" ? null : 0) : +e.value; else r[f] = e.value;
         if (f === "pay") drawRules(); }; });
       [].forEach.call(card.querySelectorAll("[data-sl]"), function (e) { e.oninput = function () { var z = r.slabs[+e.dataset.sl]; z[e.dataset.k] = e.value === "" ? null : +e.value; RES = null; }; });
+      [].forEach.call(card.querySelectorAll("[data-pt]"), function (e) { e.oninput = function () { var arr = e.dataset.pt === "bands" ? r.bands : r.scale[e.dataset.pt]; var z = arr[+e.dataset.i]; z[e.dataset.k] = e.value === "" ? (e.dataset.k === "max" ? null : 0) : +e.value; RES = null; }; });
+      [].forEach.call(card.querySelectorAll("[data-ptx]"), function (b) { b.onclick = function () { var arr = b.dataset.ptx === "bands" ? r.bands : r.scale[b.dataset.ptx]; arr.splice(+b.dataset.i, 1); RES = null; drawRules(); }; });
+      [].forEach.call(card.querySelectorAll("[data-ptadd]"), function (b) { b.onclick = function () { var k = b.dataset.ptadd, arr = k === "bands" ? (r.bands = r.bands || []) : (r.scale[k] = r.scale[k] || []), l = arr[arr.length - 1];
+        if (k === "bands") { if (l && l.max == null) l.max = (l.min || 0) + 9999; arr.push({ min: l ? (l.max || 0) + 1 : 0, max: null, rate: l ? l.rate : 0 }); } else if (k === "tiers") arr.push({ units: l ? l.units + 25 : 25, vs: l ? l.vs + 1 : 1, pct: l ? l.pct + 20 : 50 }); else arr.push({ pct: l ? l.pct + 10 : 10, add: l ? l.add + 10 : 20 }); drawRules(); }; });
+      var scb = card.querySelector("[data-scale]"); if (scb) scb.onchange = function () { r.scale = scb.checked ? { tiers: [{ units: 25, vs: 1, pct: 50 }], attach: [], noVsCut: 0 } : undefined; RES = null; drawRules(); };
+      var nvc = card.querySelector("[data-sv]"); if (nvc) nvc.oninput = function () { r.scale.noVsCut = +nvc.value || 0; RES = null; };
       [].forEach.call(card.querySelectorAll("[data-rw]"), function (e) { e.oninput = e.onchange = function () { var z = r.slabs[+e.dataset.rw]; z[e.dataset.k] = e.dataset.k === "item" ? e.value : (+e.value || 0); RES = null; }; });
       [].forEach.call(card.querySelectorAll("[data-rwx]"), function (b) { b.onclick = function () { r.slabs.splice(+b.dataset.rwx, 1); RES = null; drawRules(); }; });
       var rwa = card.querySelector("[data-rwadd]"); if (rwa) rwa.onclick = function () { var l = r.slabs[r.slabs.length - 1]; r.slabs.push({ from: l ? l.from + 8 : 10, qty: l ? l.qty + 1 : 1, item: l ? l.item : "", value: l ? l.value : 0 }); drawRules(); };
@@ -334,6 +401,7 @@
       if (k === "kicker") Object.assign(r, { rate: 50 });
       if (k === "penalty") Object.assign(r, { amount: 500, per: "fixed", when: "notAchieved", minAch: 100 });
       if (k === "multiplier") Object.assign(r, { minAch: 120, maxAch: null, factor: 1.2 });
+      if (k === "price_band") Object.assign(r, { bands: [{ min: 0, max: 14999, rate: 150 }, { min: 15000, max: 19999, rate: 200 }, { min: 20000, max: null, rate: 250 }], excludeModels: [] });
       if (k === "reward") Object.assign(r, { consume: true, slabs: [{ from: 10, qty: 1, item: "vivo V80 (8GB+128GB)", value: 0 }] });
       if (k === "model_rate") Object.assign(r, { minAch: 100, rates: (SC.models || []).length ? SC.models.map(function (m) { return { model: m.name, rate: 0, when: "always" }; }) : [{ model: "", rate: 0, when: "always" }] });
       if (k === "gate") Object.assign(r, { active: true, appDays: 0, features: 0, mvisits: 0, vsPct: 0, effect: "zero", reducePct: 50 });
@@ -379,8 +447,8 @@
       '<div class="row" style="margin-top:8px"><button class="btn sec" id="tp">⬇ Template</button><button class="btn pri" id="im">📤 Import filled file</button></div></div>' +
       '<div class="card"><div class="row" style="justify-content:space-between"><b>✍️ Few retailers — type them in</b><button class="btn ghost sm" id="clr">Clear all</button></div><div class="muted" style="font-size:12.5px">Dashboard columns (active, app use, features, market visits) fill in from the Retailer ID.</div>' +
       '<datalist id="rids">' + activeFor().slice(0, 3000).map(function (x) { return "<option>" + x + "</option>"; }).join("") + "</datalist>" +
-      '<div class="tbw"><table class="dt"><tr>' + colsFor().map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + mNames().map(function (m) { return "<th>Target " + esc(m) + "</th><th>Sold " + esc(m) + "</th>"; }).join("") + ex.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "<th>Active</th><th>App days</th><th>Features</th><th>Market visits</th><th></th></tr>" +
-      ROWS.slice(0, 200).map(function (r, i) { var d = DASH.get(r.rid); return '<tr data-i="' + i + '">' + colsFor().map(function (c) { return '<td><input' + (c[0] === "rid" ? ' class="id" list="rids"' : "") + ' data-c="' + c[0] + '" type="' + (c[0] === "rid" || c[0] === "name" ? "text" : "number") + '" value="' + (r[c[0]] == null ? "" : esc(String(r[c[0]]))) + '"' + (r.fromImei && /upload|activation|both|value|vsSold|excl/.test(c[0]) ? " readonly title=\"From the IMEI sheet\"" : "") + "></td>"; }).join("") + mNames().map(function (m) { var dt0 = (SC.models || []).find(function (x) { return x.name === m; }); return '<td><input type="number" data-mt="' + esc(m) + '" value="' + esc(r.mt && r.mt[m] != null ? String(r.mt[m]) : "") + '" placeholder="' + (dt0 && dt0.target ? dt0.target : "") + '"></td><td><input type="number" data-ms="' + esc(m) + '" value="' + esc(r.ms && r.ms[m] != null ? String(r.ms[m]) : "") + '"' + (r.fromImei ? ' readonly placeholder="IMEI" title="From the IMEI sheet"' : "") + "></td>"; }).join("") + ex.map(function (c) { return '<td><input type="text" data-x="' + esc(c) + '" value="' + esc((r.extra || {})[c] || "") + '"></td>'; }).join("") +
+      '<div class="tbw"><table class="dt"><tr>' + colsFor().map(function (c) { return "<th>" + c[1] + "</th>"; }).join("") + mNames().map(function (m) { return "<th>Target " + esc(m) + "</th><th>Sold " + esc(m) + "</th>"; }).join("") + bNames().map(function (b) { return "<th>Units " + esc(b) + "</th>"; }).join("") + ex.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "<th>Active</th><th>App days</th><th>Features</th><th>Market visits</th><th></th></tr>" +
+      ROWS.slice(0, 200).map(function (r, i) { var d = DASH.get(r.rid); return '<tr data-i="' + i + '">' + colsFor().map(function (c) { return '<td><input' + (c[0] === "rid" ? ' class="id" list="rids"' : "") + ' data-c="' + c[0] + '" type="' + (c[0] === "rid" || c[0] === "name" ? "text" : "number") + '" value="' + (r[c[0]] == null ? "" : esc(String(r[c[0]]))) + '"' + (r.fromImei && /upload|activation|both|value|vsSold|excl/.test(c[0]) ? " readonly title=\"From the IMEI sheet\"" : "") + "></td>"; }).join("") + mNames().map(function (m) { var dt0 = (SC.models || []).find(function (x) { return x.name === m; }); return '<td><input type="number" data-mt="' + esc(m) + '" value="' + esc(r.mt && r.mt[m] != null ? String(r.mt[m]) : "") + '" placeholder="' + (dt0 && dt0.target ? dt0.target : "") + '"></td><td><input type="number" data-ms="' + esc(m) + '" value="' + esc(r.ms && r.ms[m] != null ? String(r.ms[m]) : "") + '"' + (r.fromImei ? ' readonly placeholder="IMEI" title="From the IMEI sheet"' : "") + "></td>"; }).join("") + bNames().map(function (b) { return '<td><input type="number" data-pb="' + esc(b) + '" value="' + esc(r.pb && r.pb[b] != null ? String(r.pb[b]) : "") + '"' + (r.fromImei ? ' readonly placeholder="IMEI" title="From the IMEI sheet"' : "") + "></td>"; }).join("") + ex.map(function (c) { return '<td><input type="text" data-x="' + esc(c) + '" value="' + esc((r.extra || {})[c] || "") + '"></td>'; }).join("") +
         '<td class="' + (d.active ? "ok2" : "no2") + '">' + (d.active ? "✓" : "✗") + '</td><td class="n">' + d.appDays + '</td><td class="n">' + d.features + '</td><td class="n">' + d.mvisits + '</td><td><button class="ib" data-rx="' + i + '">✕</button></td></tr>'; }).join("") + "</table></div>" +
       (ROWS.length > 200 ? '<div class="muted" style="font-size:12px;margin-top:4px">Showing 200 of ' + ROWS.length + " imported rows — all are calculated.</div>" : "") +
       '<button class="btn sec sm" id="addr" style="margin-top:8px">＋ Retailer</button></div>' +
@@ -392,7 +460,7 @@
     [].forEach.call($("pane").querySelectorAll(".dt tr[data-i]"), function (tr) {
       var r = ROWS[+tr.dataset.i];
       [].forEach.call(tr.querySelectorAll("[data-c]"), function (e) { e.onchange = function () { var c = e.dataset.c; r[c] = c === "rid" ? e.value.trim().toUpperCase() : c === "name" ? e.value : e.value === "" ? "" : +e.value; RES = null; saveRows(); if (c === "rid") draw3(); }; });
-      [].forEach.call(tr.querySelectorAll("[data-mt],[data-ms]"), function (e) { e.onchange = function () { var key = e.dataset.mt ? "mt" : "ms", m = e.dataset.mt || e.dataset.ms; r[key] = r[key] || {}; if (e.value === "") delete r[key][m]; else r[key][m] = +e.value; RES = null; saveRows(); }; });
+      [].forEach.call(tr.querySelectorAll("[data-mt],[data-ms],[data-pb]"), function (e) { e.onchange = function () { var key = e.dataset.mt ? "mt" : e.dataset.pb ? "pb" : "ms", m = e.dataset.mt || e.dataset.ms || e.dataset.pb; r[key] = r[key] || {}; if (e.value === "") delete r[key][m]; else r[key][m] = +e.value; RES = null; saveRows(); }; });
       [].forEach.call(tr.querySelectorAll("[data-x]"), function (e) { e.onchange = function () { r.extra = r.extra || {}; r.extra[e.dataset.x] = e.value; saveRows(); }; });
     });
     [].forEach.call($("pane").querySelectorAll("[data-rx]"), function (b) { b.onclick = function () { ROWS.splice(+b.dataset.rx, 1); saveRows(); RES = null; draw3(); }; });
@@ -404,15 +472,15 @@
     return D.activeIds.filter(function (x) { return !D.stateOf || (ADMIN ? (!st || D.stateOf(x) === st) : (!!MYSTATE && D.stateOf(x) === MYSTATE)); });
   }
   function template() {
-    var ex = SC.extraCols || [], pre = $("pf").checked ? activeFor() : [], cols = colsFor(), ms = mNames();
-    var head = cols.map(function (c) { return c[1]; }).concat([].concat.apply([], ms.map(function (m) { return ["Target " + m, "Sold " + m]; }))).concat(ex);
+    var ex = SC.extraCols || [], pre = $("pf").checked ? activeFor() : [], cols = colsFor(), ms = mNames(), bs = bNames();
+    var head = cols.map(function (c) { return c[1]; }).concat([].concat.apply([], ms.map(function (m) { return ["Target " + m, "Sold " + m]; }))).concat(bs.map(function (b) { return "Units " + b; })).concat(ex);
     var sample = { rid: "BRE010294", name: "Shree Mobiles", target: 50, targetValue: 900000, upload: 48, activation: 45, both: 44, value: 720000, vsTarget: 10, vsSold: 7, excl: 2 };
     var mdef = function (m) { var d = (SC.models || []).find(function (x) { return x.name === m; }); return d && d.target ? d.target : ""; };
-    var rows = [head].concat(pre.length ? pre.map(function (id) { return [id].concat(cols.slice(1).map(function () { return ""; })).concat([].concat.apply([], ms.map(function (m) { return [mdef(m), ""]; }))).concat(ex.map(function () { return ""; })); })
-      : [cols.map(function (c) { return sample[c[0]]; }).concat([].concat.apply([], ms.map(function (m, i) { return [mdef(m) || 5, 3 + i]; }))).concat(ex.map(function () { return ""; }))]);
+    var rows = [head].concat(pre.length ? pre.map(function (id) { return [id].concat(cols.slice(1).map(function () { return ""; })).concat([].concat.apply([], ms.map(function (m) { return [mdef(m), ""]; }))).concat(bs.map(function () { return ""; })).concat(ex.map(function () { return ""; })); })
+      : [cols.map(function (c) { return sample[c[0]]; }).concat([].concat.apply([], ms.map(function (m, i) { return [mdef(m) || 5, 3 + i]; }))).concat(bs.map(function (b, i) { return i < 3 ? 10 : ""; })).concat(ex.map(function () { return ""; }))]);
     download(xlsx([{ name: "Retailers", rows: rows },
       { name: "IMEI sales", rows: [["IMEI", "Retailer ID", "Model", "Sale upload date", "Activation date", "Sale value", "EMI partner", "V-Shield (Y/N)"], ["861234567890123", "BRE010294", "Y29", "2026-10-03", "2026-10-05", 15999, "Bajaj Finserv", "Y"]] },
-      { name: "How to fill", rows: [["Scheme", SC.name + (SC.period ? " · " + SC.period : "")], ["Retailers sheet", "One row per retailer / VBA. Target on " + ({ units: "volume (Target units)", value: "₹ value (Target value ₹)", both: "volume AND value — fill both targets", either: "volume OR value — fill both targets" }[SC.targetType || "units"]) + "."], ["Model columns", ms.length ? "Target <model> = that retailer's target for the model (leave empty to use the scheme's default). Sold <model> = units sold — not needed if you fill the IMEI sales sheet. Total target units can be left empty: it becomes the sum of the model targets." : "Add models in the scheme (step 2) to get model-wise target and sold columns."], ["Sales uploaded / Activated", "Units in the month. 'Uploaded + activated (same month)' is used when the scheme counts only units with both."], ["Units via excluded EMI partners", "Units sold through EMI partners the scheme does not count — they are taken out."],
+      { name: "How to fill", rows: [["Scheme", SC.name + (SC.period ? " · " + SC.period : "")], ["Retailers sheet", "One row per retailer / VBA. Target on " + ({ units: "volume (Target units)", value: "₹ value (Target value ₹)", both: "volume AND value — fill both targets", either: "volume OR value — fill both targets" }[SC.targetType || "units"]) + "."], ["Price-band columns", bs.length ? "Units <band> = units sold in that handset price band. Not needed if you fill the IMEI sales sheet with each handset's sale value." : "—"], ["Model columns", ms.length ? "Target <model> = that retailer's target for the model (leave empty to use the scheme's default). Sold <model> = units sold — not needed if you fill the IMEI sales sheet. Total target units can be left empty: it becomes the sum of the model targets." : "Add models in the scheme (step 2) to get model-wise target and sold columns."], ["Sales uploaded / Activated", "Units in the month. 'Uploaded + activated (same month)' is used when the scheme counts only units with both."], ["Units via excluded EMI partners", "Units sold through EMI partners the scheme does not count — they are taken out."],
         ["IMEI sales sheet (optional)", "One row per IMEI. If filled, units, sale value, V-Shield and model counts come from here (dates decide upload / activation in the scheme month, excluded EMI partners are skipped). Keep targets in the Retailers sheet."], ["Sales counted by this scheme", { upload: "Sales uploaded", activation: "Activated", both: "Uploaded and activated in the same month", either: "Uploaded or activated" }[SC.basis]]] }]),
       "Scheme_template_" + (SC.period || NOW) + ".xlsx");
   }
@@ -422,6 +490,7 @@
     return COLS.filter(function (c) { return !(c[0] === "target" && tt === "value") && !(c[0] === "targetValue" && tt === "units"); });
   }
   function mNames() { return (SC.models || []).map(function (m) { return m.name; }).filter(Boolean); }
+  function bNames() { var seen = {}, out = []; (SC.rules || []).forEach(function (r) { if (r.type === "price_band" && !r.off) (r.bands || []).forEach(function (b) { var l = SCENG.bandLabel(b); if (!seen[l]) { seen[l] = 1; out.push(l); } }); }); return out; }
   function hdrMap(hdr, defs) { var m = {}; defs.forEach(function (d) { var re = d[2] || d[1]; var i = hdr.findIndex(function (h, k) { return re.test(String(h).toLowerCase()) && Object.values(m).indexOf(k) < 0; }); if (i >= 0) m[d[0]] = i; }); return m; }
   function findHeader(rows, re) { for (var i = 0; i < Math.min(15, rows.length); i++) if (rows[i].some(function (v) { return re.test(String(v).toLowerCase()); })) return i; return -1; }
   function importFile() {
@@ -441,19 +510,23 @@
           }
           var h2 = findHeader(rows, /retailer|vba|^id$/); if (h2 < 0) return;
           var hd = rows[h2].map(function (h) { return String(h).trim(); }), mtI = {}, msI = {}, used = [];
+          var bl = bNames(), pbI = {};
           hd.forEach(function (h, i) { var lo = h.toLowerCase(), m;
+            var bm = /^units?\s+(.+)$/i.exec(h), bk = bm ? bl.find(function (b) { return b.toLowerCase().replace(/[^a-z0-9]/g, "") === bm[1].toLowerCase().replace(/[^a-z0-9]/g, ""); }) : null;
+            if (bk) { pbI[bk] = i; used.push(i); return; }
             if ((m = /^target\s+(.+)$/i.exec(h)) && !/^(units?|qty|volume|value|value ₹|₹|amount)\b/i.test(m[1].trim())) { mtI[m[1].trim()] = i; used.push(i); }
             else if ((m = /^(sold|sales|units)\s+(.+)$/i.exec(h)) && !/^(uploaded|value|qty|units|₹)/i.test(m[2].trim()) && !/same month|activated|upload|exclud|emi|partner|counted/i.test(lo)) { msI[m[2].trim()] = i; used.push(i); } });
           var cm = hdrMap(hd.map(function (h, i) { return used.indexOf(i) >= 0 ? "" : h; }), COLS), extraIdx = {};
           (SC.extraCols || []).forEach(function (c) { var i = rows[h2].findIndex(function (h) { return String(h).trim().toLowerCase() === c.toLowerCase(); }); if (i >= 0) extraIdx[c] = i; });
           rows.slice(h2 + 1).forEach(function (r) { var o = { extra: {} }; Object.keys(cm).forEach(function (k) { var v = r[cm[k]]; o[k] = k === "rid" ? String(v).trim().toUpperCase() : k === "name" ? String(v) : v === "" ? "" : Number(String(v).replace(/[₹,\s]/g, "")) || 0; }); Object.keys(extraIdx).forEach(function (c) { o.extra[c] = String(r[extraIdx[c]] || ""); });
             Object.keys(mtI).forEach(function (m) { var v = r[mtI[m]]; if (v !== "" && v != null) { o.mt = o.mt || {}; o.mt[m] = Number(String(v).replace(/[,\s]/g, "")) || 0; } });
+            Object.keys(pbI).forEach(function (b) { var v = r[pbI[b]]; if (v !== "" && v != null) { o.pb = o.pb || {}; o.pb[b] = Number(String(v).replace(/[,\s]/g, "")) || 0; } });
             Object.keys(msI).forEach(function (m) { var v = r[msI[m]]; if (v !== "" && v != null) { o.ms = o.ms || {}; o.ms[m] = Number(String(v).replace(/[,\s]/g, "")) || 0; } });
             if (o.rid) out.push(o); });
         });
         if (imei.length) {
           var agg = SCENG.fromImei(SC, imei), map = {}; out.forEach(function (o) { map[o.rid] = o; });
-          Object.keys(agg).forEach(function (rid) { var a = SCENG.finishImei(SC, agg[rid]), o = map[rid] || (map[rid] = { rid: rid, extra: {} }); ["upload", "activation", "both", "either", "value", "vsSold", "excl", "models", "val", "vs"].forEach(function (k) { o[k] = a[k]; }); o.fromImei = true; delete o.ms; if (out.indexOf(o) < 0) out.push(o); });
+          Object.keys(agg).forEach(function (rid) { var a = SCENG.finishImei(SC, agg[rid]), o = map[rid] || (map[rid] = { rid: rid, extra: {} }); ["upload", "activation", "both", "either", "value", "vsSold", "excl", "models", "val", "vs", "sales"].forEach(function (k) { o[k] = a[k]; }); o.fromImei = true; delete o.ms; delete o.pb; if (out.indexOf(o) < 0) out.push(o); });
         }
         if (!out.length) return toast("No retailer rows found. Use the template's Retailers sheet (a 'Retailer ID' column).");
         ROWS = out; saveRows(); RES = null; toast(out.length + " retailers imported" + (imei.length ? " · " + imei.length + " IMEIs counted" : "")); draw3();
@@ -472,7 +545,7 @@
     var S = RES.summary, rows = RES.rows.slice().sort(function (a, b) { return b.total - a.total; });
     var push = RES.rows.filter(function (r) { return r.next; }).sort(function (a, b) { return a.next.need - b.next.need || b.next.gain - a.next.gain; }).slice(0, 15);
     var slabs = Object.keys(S.bySlab).map(function (k) { return [k, Math.round(S.bySlab[k].payout)]; }).sort(function (a, b) { return b[1] - a[1]; });
-    $("pane").innerHTML = '<div class="card" style="text-align:center"><div class="muted">Total tentative payout · ' + esc(SC.name) + (SC.period ? " · " + SC.period : "") + '</div><div class="big2">' + rs(S.total) + "</div>" + (S.penalties ? '<div class="muted" style="font-size:12.5px">after ' + rs(S.penalties) + " negative incentive</div>" : "") + "</div>" +
+    $("pane").innerHTML = '<div class="card" style="text-align:center"><div class="muted">Total tentative payout · ' + esc(SC.name) + (SC.period ? " · " + SC.period : "") + '</div><div class="big2">' + rs(S.total) + "</div>" + (S.penalties ? '<div class="muted" style="font-size:12.5px">after ' + rs(S.penalties) + " negative incentive</div>" : "") + (SC.tdsPct ? '<div class="muted" style="font-size:12.5px">after ' + SC.tdsPct + "% TDS (" + rs(RES.rows.reduce(function (a, r) { return a + (r.tds || 0); }, 0)) + ")</div>" : "") + "</div>" +
       (Object.keys(S.gifts || {}).length ? '<div class="notice info" style="margin-top:8px">🎁 Gifts: ' + Object.keys(S.gifts).map(function (g) { return "<b>" + S.gifts[g] + " × " + esc(g) + "</b>"; }).join(", ") + "</div>" : "") +
       '<div class="tiles">' + tileS("✅", "#E6F4EA", S.eligible + " / " + S.count, "Eligible") + tileS("📦", "#EEF0FF", S.units.toLocaleString("en-IN"), "Units counted") + tileS("🎯", "#FFF4E5", pc(S.avgAch), "Avg achievement") + tileS("📈", "#F4EEFF", push.length, "Close to next slab") + "</div>" +
       '<div class="card"><b>Achievement</b>' + hBars(S.buckets, "#4D5BF9", { lw: 90 }) + "</div>" +
@@ -495,7 +568,7 @@
   function exportXlsx() {
     var rows = RES.rows, ex = SC.extraCols || [];
     download(xlsx([
-      { name: "Payout", rows: [["Retailer ID", "Name", "Target units", "Units counted", "Volume ach %", "Target value", "Sale value", "Value ach %", "Achievement %", "Uploaded", "Activated", "Slab"].concat([].concat.apply([], mNames().map(function (m) { return ["Target " + m, "Sold " + m, m + " ach %"]; }))).concat(["Payout", "Negative", "Total", "Gifts", "Eligible", "Reason", "Active retailer", "App days", "App features", "Market visits"]).concat(ex)].concat(rows.map(function (r) { var r1 = function (v) { return v == null ? "" : Math.round(v * 10) / 10; }; return [r.rid, r.name, r.target, r.units, r1(r.unitAch), r.targetValue || "", Math.round(r.value), r1(r.valueAch), r1(r.ach), r.upload, r.activation, r.slab].concat([].concat.apply([], mNames().map(function (m) { var x = (r.models || []).find(function (y) { return y.name === m; }) || {}; return [x.target || "", x.sold || 0, r1(x.ach)]; }))).concat([r.positive, -r.penalty, r.total, (r.gifts || []).map(function (g) { return g.qty + " × " + g.item; }).join(", "), r.eligible ? "Yes" : "No", r.reasons.join("; "), r.dash.active ? "Yes" : "No", r.dash.appDays || 0, r.dash.features || 0, r.dash.mvisits || 0]).concat(ex.map(function (c) { return r.extra[c] || ""; })); })) },
+      { name: "Payout", rows: [["Retailer ID", "Name", "Target units", "Units counted", "Volume ach %", "Target value", "Sale value", "Value ach %", "Achievement %", "Uploaded", "Activated", "Slab"].concat([].concat.apply([], mNames().map(function (m) { return ["Target " + m, "Sold " + m, m + " ach %"]; }))).concat(["Payout", "Negative", "TDS", "Total", "Gifts", "Eligible", "Reason", "Active retailer", "App days", "App features", "Market visits"]).concat(ex)].concat(rows.map(function (r) { var r1 = function (v) { return v == null ? "" : Math.round(v * 10) / 10; }; return [r.rid, r.name, r.target, r.units, r1(r.unitAch), r.targetValue || "", Math.round(r.value), r1(r.valueAch), r1(r.ach), r.upload, r.activation, r.slab].concat([].concat.apply([], mNames().map(function (m) { var x = (r.models || []).find(function (y) { return y.name === m; }) || {}; return [x.target || "", x.sold || 0, r1(x.ach)]; }))).concat([r.positive, -r.penalty, -(r.tds || 0), r.total, (r.gifts || []).map(function (g) { return g.qty + " × " + g.item; }).join(", "), r.eligible ? "Yes" : "No", r.reasons.join("; "), r.dash.active ? "Yes" : "No", r.dash.appDays || 0, r.dash.features || 0, r.dash.mvisits || 0]).concat(ex.map(function (c) { return r.extra[c] || ""; })); })) },
       { name: "Breakdown", rows: [["Retailer ID", "Rule", "Slab", "Amount"]].concat([].concat.apply([], rows.map(function (r) { return r.parts.map(function (p) { return [r.rid, p.label, p.slab || "", Math.round(p.amount * 100) / 100]; }); }))) },
       { name: "Push list", rows: [["Retailer ID", "Name", "Achievement %", "Sell more", "Model", "Extra payout", "New total"]].concat(rows.filter(function (r) { return r.next; }).sort(function (a, b) { return a.next.need - b.next.need; }).map(function (r) { return [r.rid, r.name, r.ach == null ? "" : Math.round(r.ach * 10) / 10, r.next.need, r.next.model || "", r.next.gain, r.next.newTotal]; })) },
       { name: "Rules", rows: [["Scheme rules"]].concat(describe(SC).map(function (x) { return [x]; })) }

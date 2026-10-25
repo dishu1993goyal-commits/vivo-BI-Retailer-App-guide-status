@@ -9,7 +9,7 @@ const json = (status, body) => new Response(JSON.stringify(body), { status, head
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const cid = (v) => String(v || "").replace(/[^a-z0-9]/gi, "").slice(0, 30);
 const num = (v, d = 0) => { const n = Number(String(v == null ? "" : v).replace(/[₹,%\s]/g, "")); return isFinite(n) ? n : d; };
-const RULE_TYPES = ["ach_slab", "unit_slab", "flat_unit", "value_pct", "kicker", "model_rate", "reward", "penalty", "multiplier", "gate", "formula"];
+const RULE_TYPES = ["ach_slab", "unit_slab", "flat_unit", "value_pct", "kicker", "model_rate", "reward", "price_band", "penalty", "multiplier", "gate", "formula"];
 const WHEN = ["always", "achieved", "notAchieved"];
 
 // ---- rule cleaning (same shape the page uses) ----
@@ -30,9 +30,15 @@ export function cleanRule(r, isMaster, allowed) {
   if (type === "kicker") { o.rate = num(r.rate); }
   if (type === "penalty") { o.amount = Math.abs(num(r.amount)); o.per = r.per === "shortUnit" ? "shortUnit" : r.per === "vsShortUnit" ? "vsShortUnit" : "fixed"; o.when = ["notAchieved", "vshieldShort", "either", "both"].includes(r.when) ? r.when : "notAchieved"; o.minAch = num(r.minAch, 100); }
   if (type === "multiplier") { o.minAch = num(r.minAch, 100); o.factor = num(r.factor, 1); o.maxAch = r.maxAch == null || r.maxAch === "" ? null : num(r.maxAch, null); }
+  if (type === "price_band") {
+    o.bands = (Array.isArray(r.bands) ? r.bands : []).slice(0, 15).map((b) => ({ min: Math.max(0, num(b && b.min)), max: b && b.max != null && b.max !== "" ? num(b.max) : null, rate: num(b && b.rate), label: str(b && b.label, 30) })).sort((x, y) => x.min - y.min);
+    o.excludeModels = (Array.isArray(r.excludeModels) ? r.excludeModels : String(r.excludeModels || "").split(/[,\n]/)).map((x) => str(x, 30)).filter(Boolean).slice(0, 20);
+    if (r.scale && typeof r.scale === "object") o.scale = { tiers: (r.scale.tiers || []).slice(0, 10).map((t) => ({ units: num(t.units), vs: num(t.vs), pct: num(t.pct) })).sort((x, y) => x.units - y.units),
+      attach: (r.scale.attach || []).slice(0, 10).map((a) => ({ pct: num(a.pct), add: num(a.add) })).sort((x, y) => x.pct - y.pct), noVsCut: Math.max(0, Math.min(100, num(r.scale.noVsCut))) };
+  }
   if (type === "reward") { o.consume = r.consume !== false; o.slabs = (Array.isArray(r.slabs) ? r.slabs : []).slice(0, 20).map((z) => ({ from: num(z && z.from, null), qty: Math.max(1, num(z && z.qty, 1)), item: str(z && z.item, 80) || "Gift", value: Math.max(0, num(z && z.value)) })).filter((z) => z.from != null && z.from > 0).sort((x, y) => x.from - y.from); }
   if (type === "model_rate") { o.minAch = num(r.minAch, 100); o.rates = (Array.isArray(r.rates) ? r.rates : []).slice(0, 60).map((x) => ({ model: str(x && x.model, 40), rate: num(x && x.rate), when: ["always", "modelAchieved", "achieved", "notAchieved"].includes(x && x.when) ? x.when : "always" })).filter((x) => x.model); }
-  if (type === "gate") { o.allModels = r.allModels === true; o.active = r.active === true; o.appDays = num(r.appDays); o.features = num(r.features); o.mvisits = num(r.mvisits); o.vsPct = num(r.vsPct); o.effect = r.effect === "reduce" ? "reduce" : "zero"; o.reducePct = num(r.reducePct, 50); }
+  if (type === "gate") { o.minUnits = Math.max(0, num(r.minUnits)); o.allModels = r.allModels === true; o.active = r.active === true; o.appDays = num(r.appDays); o.features = num(r.features); o.mvisits = num(r.mvisits); o.vsPct = num(r.vsPct); o.effect = r.effect === "reduce" ? "reduce" : "zero"; o.reducePct = num(r.reducePct, 50); }
   if (type === "formula") { o.expr = expr; }
   return o;
 }
@@ -43,7 +49,7 @@ export function cleanScheme(s, isMaster, allowed) {
     basis: ["upload", "activation", "both", "either"].includes(s.basis) ? s.basis : "both", targetType: ["value", "both", "either"].includes(s.targetType) ? s.targetType : "units",
     models: (Array.isArray(s.models) ? s.models : []).slice(0, 60).map((m) => ({ name: str(m && m.name, 40), target: Math.max(0, num(m && m.target)) })).filter((m) => m.name),
     excludePartners: (Array.isArray(s.excludePartners) ? s.excludePartners : String(s.excludePartners || "").split(/[,\n]/)).map((x) => str(x, 40)).filter(Boolean).slice(0, 20),
-    minAch: Math.max(0, num(s.minAch)), belowMin: s.belowMin === "prorata" ? "prorata" : "zero", cap: Math.max(0, num(s.cap)), extraCols: (Array.isArray(s.extraCols) ? s.extraCols : []).map((x) => str(x, 30)).filter(Boolean).slice(0, 6),
+    tdsPct: Math.max(0, Math.min(40, num(s.tdsPct))), minAch: Math.max(0, num(s.minAch)), belowMin: s.belowMin === "prorata" ? "prorata" : "zero", cap: Math.max(0, num(s.cap)), extraCols: (Array.isArray(s.extraCols) ? s.extraCols : []).map((x) => str(x, 30)).filter(Boolean).slice(0, 6),
     rules: (Array.isArray(s.rules) ? s.rules : []).slice(0, 25).map((r) => cleanRule(r, isMaster, allowed)).filter(Boolean), notes: (Array.isArray(s.notes) ? s.notes : []).map((x) => str(x, 300)).filter(Boolean).slice(0, 12),
     source: s.source && typeof s.source === "object" ? { file: str(s.source.file, 120), text: str(s.source.text, 30000) } : null };
 }
@@ -55,13 +61,15 @@ Return ONE JSON object:
  "targetType": "units" (volume), "value" (₹ sale value), "both" (must reach both) or "either" (volume or value),
  "models": [{"name":"model name e.g. V80","target":units target for that model}] when targets or payouts are given per model,
  "excludePartners": [EMI / finance partner names whose IMEIs are NOT counted],
- "minAch": minimum achievement % to get any payout (0 if none), "belowMin": "zero" or "prorata", "cap": maximum payout per retailer in ₹ (0 if none),
+ "minAch": minimum achievement % to get any payout (0 if none), "tdsPct": TDS % deducted (e.g. 10 for 194R) or 0, "belowMin": "zero" or "prorata", "cap": maximum payout per retailer in ₹ (0 if none),
  "rules": [ one or more of:
    {"type":"ach_slab","label":"...","pay":"perUnit" (₹ per unit) or "fixed" (one amount),"slabs":[{"from":achievement % lower bound,"to":upper % or null,"amount":₹}]},
    {"type":"unit_slab","label":"...","mode":"retro" (all units at the reached band's rate) or "incremental" (each band at its own rate),"slabs":[{"from":units,"to":units or null,"rate":₹ per unit}]},
    {"type":"flat_unit","label":"...","rate":₹ per unit,"when":"always"|"achieved"|"notAchieved"},
    {"type":"value_pct","label":"...","pct":% of sale value,"when":"always"|"achieved"|"notAchieved"},
    {"type":"kicker","label":"...","rate":₹ per unit sold above target},
+   {"type":"price_band","label":"e.g. Discount or Additional incentive","bands":[{"min":lowest handset price ₹,"max":highest ₹ or null,"rate":₹ per unit}],"excludeModels":["series / brands paid nothing, e.g. T series, iQOO"],"scale":{"tiers":[{"units":minimum units,"vs":minimum V-Shield plans,"pct":% of this incentive paid}],"attach":[{"pct":V-Shield attachment % reached,"add":extra % of this incentive}],"noVsCut":% cut if no V-Shield sold}} — for payouts by handset price band (Below 15K, 15K–19.99K…); add "scale" only to the incentive whose % depends on units / V-Shield,
+   {"type":"gate","minUnits":minimum units sold to get any payout},
    {"type":"reward","label":"...","consume":true if the units used for the gift are NOT also paid in cash (e.g. "12 units = 1 phone + 2 × ₹4,000"),"slabs":[{"from":units needed,"qty":number of gifts,"item":"gift name e.g. vivo V80 (8GB+128GB)","value":₹ value if stated else 0}]} — for phones / products / vouchers given as rewards,
    {"type":"model_rate","label":"...","rates":[{"model":"V80","rate":₹ per unit,"when":"always"|"modelAchieved" (only if that model's target is met)|"achieved" (only if the overall target is met)}]} — use this when the payout differs by model,
    {"type":"penalty","label":"...","amount":₹,"per":"fixed"|"shortUnit" (per unit short of target)|"vsShortUnit" (per V-Shield plan short),"when":"notAchieved"|"vshieldShort"|"either"|"both","minAch":% that counts as achieved},
@@ -75,37 +83,49 @@ const OCR_ASK = "This is a vivo India scheme circular / poster (it may be a phon
 // Image → text. Groq's vision models change over time, so the list is read from Groq; Gemini is the fallback.
 async function readImages(keys, env, images, fetchImpl) {
   const errs = [];
+  const ask = async (label, fn) => { try { const t = await fn(); if (t && t.trim().length > 20) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
+  // 1) Groq: only models it lists right now that can see images
   if (keys.groq) {
     let ids = [];
-    try { const r = await fetchImpl("https://api.groq.com/openai/v1/models", { headers: { authorization: "Bearer " + keys.groq } }); const j = await r.json().catch(() => ({})); ids = (j.data || []).map((m) => m.id).filter(Boolean); } catch (e) { }
-    const pref = ["meta-llama/llama-4-scout-17b-16e-instruct", "meta-llama/llama-4-maverick-17b-128e-instruct"];
-    const vis = ids.filter((id) => /(llama-4|scout|maverick|vision|[-_]vl|vl[-_]|llava|gemma-3|pixtral)/i.test(id) && !/guard|whisper|tts|embed/i.test(id));
-    const list = [...new Set(pref.filter((m) => !ids.length || ids.includes(m)).concat(vis))].slice(0, 6);
-    for (const m of list.length ? list : pref) {
-      try {
+    try { const r = await fetchImpl("https://api.groq.com/openai/v1/models", { headers: { authorization: "Bearer " + keys.groq } }); const j = await r.json().catch(() => ({})); ids = (j.data || []).filter((m) => m.active !== false).map((m) => m.id).filter(Boolean); } catch (e) { }
+    const vis = ids.filter((id) => /(llama-4|scout|maverick|vision|[-_/]vl|vl[-_]|llava|gemma-?3|pixtral|qwen.*(vl|omni)|kimi.*vl|glm.*v)/i.test(id) && !/guard|whisper|tts|embed|playai|orpheus/i.test(id)).slice(0, 4);
+    if (!vis.length) errs.push("Groq: no picture-reading model available right now");
+    for (const m of vis) {
+      const t = await ask("Groq " + m.split("/").pop(), async () => {
         const content = [{ type: "text", text: OCR_ASK }].concat(images.slice(0, 5).map((u) => ({ type: "image_url", image_url: { url: u } })));
         const r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + keys.groq }, body: JSON.stringify({ model: m, messages: [{ role: "user", content }], temperature: 0, max_completion_tokens: 6000 }) });
         const j = await r.json().catch(() => ({}));
-        if (!r.ok) { errs.push("Groq " + m.split("/").pop() + ": " + r.status + " " + String((j.error && j.error.message) || "").slice(0, 90)); if (r.status === 401) break; continue; }
-        const text = (((j.choices || [])[0] || {}).message || {}).content || "";
-        if (text.trim().length > 20) return { ok: true, text, model: m };
-        errs.push("Groq " + m.split("/").pop() + ": empty answer");
-      } catch (e) { errs.push("Groq " + m + ": " + e.message); }
+        if (!r.ok) throw new Error(r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
+        return (((j.choices || [])[0] || {}).message || {}).content || "";
+      });
+      if (t) return { ok: true, text: t, model: "groq/" + m };
     }
   }
+  // 2) Gemini: ask Google which models exist for this key (names change as models are retired)
   if (env && env.GEMINI_API_KEY) {
-    for (const m of [env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"].filter(Boolean)) {
-      try {
+    let names = [];
+    try {
+      const r = await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": env.GEMINI_API_KEY } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) errs.push("Gemini list: " + r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
+      names = (j.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini/i.test(m.name) && !/embed|tts|image-gen|imagen|live|audio|thinking-exp|learnlm|robotics|computer-use/i.test(m.name)).map((m) => m.name.replace(/^models\//, ""));
+    } catch (e) { errs.push("Gemini list: " + e.message); }
+    const ver = (n) => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
+    names.sort((a, b) => (/flash/.test(b) - /flash/.test(a)) || (/lite/.test(a) - /lite/.test(b)) || (ver(b) - ver(a)) || (/preview|exp/.test(a) - /preview|exp/.test(b)));
+    const pick = [...new Set([env.GEMINI_MODEL].filter(Boolean).concat(names))].slice(0, 4);
+    if (!pick.length) errs.push("Gemini: no model available for this key");
+    for (const m of pick) {
+      const t = await ask("Gemini " + m, async () => {
         const parts = [{ text: OCR_ASK }].concat(images.slice(0, 5).map((u) => { const mm = /^data:(image\/[a-z]+);base64,(.+)$/.exec(u); return { inline_data: { mime_type: mm[1], data: mm[2] } }; }));
-        const r = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 6000 } }) });
+        const r = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8000 } }) });
         const j = await r.json().catch(() => ({}));
-        if (!r.ok) { errs.push("Gemini " + m + ": " + r.status); if (r.status === 400 || r.status === 403) break; continue; }
-        const text = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "";
-        if (text.trim().length > 20) return { ok: true, text, model: m };
-      } catch (e) { errs.push("Gemini " + m + ": " + e.message); }
+        if (!r.ok) throw new Error(r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
+        return (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "";
+      });
+      if (t) return { ok: true, text: t, model: "gemini/" + m };
     }
-  }
-  return { ok: false, error: errs.join(" | ") || "no AI key for reading images" };
+  } else errs.push("Gemini: no key");
+  return { ok: false, error: errs.join(" | ") };
 }
 
 export async function schemeCalcAction(b, ctx) {
@@ -125,8 +145,8 @@ export async function schemeCalcAction(b, ctx) {
       const imgs = b.images.filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 3000000).slice(0, 5);
       if (!imgs.length) return json(400, { ok: false, error: "Couldn't read the picture — try a clearer photo or a screenshot." });
       const v = await readImages(keys, env, imgs, aiFetch);
-      if (!v.ok) return json(502, { ok: false, error: "AI couldn't read the picture right now. Details: " + v.error + ". You can type the slabs in step 2, or try again in a minute." });
-      text = str(v.text, 60000); ocr = true;
+      if (!v.ok) return json(502, { ok: false, visionFailed: true, error: "Online picture reading isn't available right now (" + v.error.slice(0, 300) + ")." });
+      text = str(v.text, 60000); ocr = v.model || true;
     }
     if (text.length < 20) return json(400, { ok: false, error: "No text found in the file." });
     const r = await groqJSON(keys.groq, PROMPT + "\n\nCIRCULAR:\n" + text.slice(0, 45000), aiFetch, { validate: (d) => d && Array.isArray(d.rules) });
