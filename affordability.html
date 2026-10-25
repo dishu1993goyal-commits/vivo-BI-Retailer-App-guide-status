@@ -210,7 +210,17 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .vch button small{display:block;font-weight:500;opacity:.8;font-size:11.5px}
 .vch button.on{background:#fff;color:#1F2340;border-color:#fff}
 .cols{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.cols span{font-size:12px;border-radius:99px;padding:4px 10px;background:rgba(255,255,255,.14)}
+.cols span{font-size:12px;border-radius:99px;padding:4px 10px;background:rgba(255,255,255,.14);cursor:pointer;border:1px solid transparent}
+.cols span.on{border-color:#fff;background:rgba(255,255,255,.26)}
+.dd .op .th{width:30px;height:30px;object-fit:contain;flex:none;margin-right:2px}.dd .op span.nm{flex:1;display:flex;align-items:center;gap:8px}
+.mh{overflow:hidden;position:relative}
+.bnr{margin:-16px -16px 14px;position:relative;background:#11142B;aspect-ratio:16/7;overflow:hidden}
+.bnr .trk{display:flex;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.bnr .trk::-webkit-scrollbar{display:none}
+.bnr img{flex:none;width:100%;height:100%;object-fit:cover;scroll-snap-align:start}
+.bnr .dots{position:absolute;bottom:8px;left:0;right:0;display:flex;justify-content:center;gap:5px}.bnr .dots i{width:6px;height:6px;border-radius:99px;background:rgba(255,255,255,.5)}.bnr .dots i.on{background:#fff;width:16px}
+.mtop{display:flex;gap:12px;align-items:flex-start}.mtop .tx2{flex:1;min-width:0}
+.phn{flex:none;width:104px;height:138px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 60%,rgba(255,255,255,.22),rgba(255,255,255,0) 70%);border-radius:14px}
+.phn img{max-width:100%;max-height:100%;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35));transition:opacity .25s}
 .pr{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:14px}
 .pr b{font-size:30px;line-height:1}.pr s{opacity:.7;font-size:14px}.pr .off{background:#27C281;color:#fff;border-radius:8px;padding:3px 8px;font-size:12.5px;font-weight:800}
 .upd{display:flex;align-items:center;gap:8px;font-size:12px;opacity:.9;margin-top:10px;flex-wrap:wrap}
@@ -490,7 +500,7 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
         list = list.map(function (m, i) { return [m, i]; }).sort(function (a, b) { return rank(a[0]) - rank(b[0]) || a[1] - b[1]; }).map(function (x) { return x[0]; }); }
       if (!open) { dd.style.display = "none"; return; }
       var html = "", last = "";
-      list.forEach(function (m, i) { if (!q && m.series !== last) { html += '<div class="gh">' + esc(m.series || "Other") + " series</div>"; last = m.series; } html += '<div class="op' + (i === hi ? " on" : "") + '" data-i="' + i + '"><span>' + esc(m.name) + "</span><small>" + (m.startPrice ? "from " + rs(m.startPrice) : "") + "</small></div>"; });
+      list.forEach(function (m, i) { if (!q && m.series !== last) { html += '<div class="gh">' + esc(m.series || "Other") + " series</div>"; last = m.series; } var th = (CAT.thumbs || {})[m.slug]; html += '<div class="op' + (i === hi ? " on" : "") + '" data-i="' + i + '"><span class="nm">' + (th ? '<img class="th" loading="lazy" referrerpolicy="no-referrer" alt="" src="' + esc(th) + '" onerror="this.remove()">' : "") + esc(m.name) + "</span><small>" + (m.startPrice ? "from " + rs(m.startPrice) : "") + "</small></div>"; });
       dd.innerHTML = html || '<div class="op">No model matches “' + esc(inp.value) + "”</div>";
       dd.style.display = "";
       [].forEach.call(dd.querySelectorAll(".op[data-i]"), function (o) { o.onmousedown = function (e) { e.preventDefault(); pick(list[+o.dataset.i]); }; });
@@ -538,22 +548,60 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     api({ action: "aff-model", slug: base.slug, name: base.name }).then(function (r) {
       if (!$("md")) return;
       if (!r.ok) { $("md").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
-      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, progress: r.progress, note: r.note, ho: r.ho };
+      var keepImg = CUR && CUR.slug === base.slug ? CUR.img : null;
+      CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, progress: r.progress, note: r.note, ho: r.ho, img: keepImg };
       drawModel();
+      if (!keepImg) loadImages(base.slug);
       if (r.refreshing) POLL = setTimeout(function () { if (TAB === "find" && CUR && CUR.slug === base.slug) openModel(base); }, 8000);
     });
+  }
+  // ---- phone photos & banners (from vivo.com, cached on the server) ----
+  var BANN = {};
+  function loadImages(slug, force) {
+    api({ action: "aff-images", slug: slug, force: !!force }).then(function (r) {
+      if (!r.ok || !CUR || CUR.slug !== slug) return;
+      CUR.img = r.images || {};
+      var ph = (CUR.img.set && CUR.img.set.phone) || CUR.img.phone; if (ph) { CAT.thumbs = CAT.thumbs || {}; CAT.thumbs[slug] = ph; }
+      pickBanners(slug, CUR.img).then(function () { if (CUR && CUR.slug === slug && TAB === "find") drawModel(); });
+      if (TAB === "find") drawModel();
+    });
+  }
+  function pickBanners(slug, im) {   // keep only wide pictures (banners), measured in the browser
+    if (im.set && im.set.banners && im.set.banners.length) { BANN[slug] = im.set.banners; return Promise.resolve(); }
+    if (BANN[slug]) return Promise.resolve();
+    var c = (im.banners || []).slice(0, 12);
+    return Promise.all(c.map(function (u) { return new Promise(function (res) { var i = new Image(); i.referrerPolicy = "no-referrer"; var t = setTimeout(function () { res(null); }, 8000); i.onload = function () { clearTimeout(t); res(i.naturalWidth >= 640 && i.naturalWidth / i.naturalHeight >= 1.3 && i.naturalWidth / i.naturalHeight <= 4.2 ? u : null); }; i.onerror = function () { clearTimeout(t); res(null); }; i.src = u; }); }))
+      .then(function (r) { BANN[slug] = r.filter(Boolean).slice(0, 5); });
+  }
+  function phoneFor(im, colour) {
+    if (!im) return ""; if (im.set && im.set.phone && !colour) return im.set.phone;
+    var cs = im.colours || [], k = String(colour || "").toLowerCase();
+    var hit = k && cs.find(function (c) { return c.name && (c.name.indexOf(k) >= 0 || k.indexOf(c.name) >= 0); });
+    return hit ? hit.url : (im.set && im.set.phone) || im.phone || "";
+  }
+  function photoEdit(C) {
+    var im = C.img || {}, st = im.set || {};
+    var body = '<label class="lb" style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">Phone picture link (https://…)</label><input class="tx" id="pe1" value="' + esc(st.phone || "") + '" placeholder="Leave empty to use the vivo.com picture">' +
+      '<label class="lb" style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">Banner picture links (one per line)</label><textarea class="tx" id="pe2" rows="3" placeholder="Leave empty to use vivo.com banners">' + esc((st.banners || []).join("\n")) + "</textarea>" +
+      '<div class="muted" style="font-size:12px;margin-top:6px">Tip: on vivo.com, long-press a picture → Copy image address, and paste it here.</div>';
+    sheet("Phone photos & banners", "Shown on this model for everyone", [["💾", "Save my pictures", function () { api({ action: "aff-images", slug: C.slug, set: { phone: $("pe1").value, banners: $("pe2").value.split(/\s+/) } }).then(function (r) { if (!r.ok) return toast(r.error); delete BANN[C.slug]; C.img = r.images; toast("Saved"); pickBanners(C.slug, C.img).then(drawModel); }); }, "pri"],
+      ["🔄", "Fetch again from vivo.com", function () { delete BANN[C.slug]; toast("Fetching pictures…"); loadImages(C.slug, true); }],
+      ["↩️", "Use vivo.com pictures (remove mine)", function () { api({ action: "aff-images", slug: C.slug, set: "clear" }).then(function (r) { if (!r.ok) return toast(r.error); delete BANN[C.slug]; C.img = r.images; pickBanners(C.slug, C.img).then(drawModel); }); }]], body);
   }
   function offersOf(m, kind, hidden) { return ((m && m[kind]) || []).filter(function (o) { return ADMIN || !hidden[o.key]; }); }
   function drawModel() {
     var C = CUR, m = C.m, b = C.base, ho = C.ho, vs = (ho && ho.variants.length ? ho.variants : m && m.variants.length ? m.variants : b.variants) || [];
     if (SEL.v >= vs.length) SEL.v = 0;
     var v = vs[SEL.v] || {}, price = v.price, mrp = v.mrp, cols = (ho && ho.colours.length ? ho.colours : v.colours && v.colours.length ? v.colours : (m && m.colours.length ? m.colours : b.colours)) || [];
-    var html = '<div class="mh"><h2>' + esc((m && m.name) || b.name) + "</h2>" + (m && m.highlights && m.highlights.length ? '<div class="hl">' + m.highlights.map(esc).join(" · ") + "</div>" : "") +
+    if (SEL.col && cols.indexOf(SEL.col) < 0) SEL.col = "";
+    var bn = BANN[C.slug] || [], ph = phoneFor(C.img, SEL.col);
+    var html = '<div class="mh">' + (bn.length ? '<div class="bnr"><div class="trk" id="btr">' + bn.map(function (u) { return '<img loading="lazy" referrerpolicy="no-referrer" alt="" src="' + esc(u) + '" onerror="this.remove()">'; }).join("") + "</div>" + (bn.length > 1 ? '<div class="dots" id="bdt">' + bn.map(function (_, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</div>" : "") +
+      '<div class="mtop"><div class="tx2"><h2>' + esc((m && m.name) || b.name) + "</h2>" + (m && m.highlights && m.highlights.length ? '<div class="hl">' + m.highlights.map(esc).join(" · ") + "</div>" : "") + "</div>" + (ph ? '<div class="phn"><img id="phi" referrerpolicy="no-referrer" alt="' + esc((m && m.name) || b.name) + '" src="' + esc(ph) + '" onerror="this.parentNode.remove()"></div>' : "") + "</div>" +
       (vs.length ? '<div class="vch">' + vs.map(function (x, i) { return '<button data-v="' + i + '" class="' + (i === SEL.v ? "on" : "") + '">' + esc(vlabel(x)) + "<small>" + rs(x.price) + "</small></button>"; }).join("") + "</div>" : "") +
-      (cols.length ? '<div class="cols">' + cols.map(function (c) { return "<span>● " + esc(c) + "</span>"; }).join("") + "</div>" : "") +
+      (cols.length ? '<div class="cols">' + cols.map(function (c) { return '<span data-col="' + esc(c) + '" class="' + (c === SEL.col ? "on" : "") + '">● ' + esc(c) + "</span>"; }).join("") + "</div>" : "") +
       '<div class="pr"><b>' + rs(price) + "</b>" + (mrp && price && mrp > price ? "<s>MRP " + rs(mrp) + '</s><span class="off">' + Math.round((mrp - price) / mrp * 100) + "% off</span>" : mrp ? "<s>MRP " + rs(mrp) + "</s>" : "") + "</div>" +
       (ho ? '<div class="upd">✅ Official HO price · set by ' + esc(ho.by) + " · " + dOnly(ho.at) + "</div>" : v.priceSource ? '<div class="upd">Best price seen at: ' + esc(v.priceSource) + "</div>" : "") +
-      (ADMIN ? '<div class="upd"><a style="color:#fff;cursor:pointer;text-decoration:underline" id="hoe">✏️ ' + (ho ? "Edit" : "Set") + " official price & variants</a></div>" : "") +
+      (ADMIN ? '<div class="upd"><a style="color:#fff;cursor:pointer;text-decoration:underline" id="hoe">✏️ ' + (ho ? "Edit" : "Set") + ' official price & variants</a> · <a style="color:#fff;cursor:pointer;text-decoration:underline" id="phe">🖼️ Photos</a></div>' : "") +
       '<div class="upd">🕒 Offers updated ' + ago(m && m.updatedAt) + (m && m.url ? ' · <a style="color:#fff" href="' + esc(m.url) + '" target="_blank" rel="noopener">vivo.com page ↗</a>' : "") + (ADMIN ? ' · <a style="color:#fff;cursor:pointer;text-decoration:underline" id="rf">Refresh now</a>' : "") + "</div></div>";
     if (C.refreshing) html += '<div class="wait"><div class="spin"></div><div>' + (m && m.updatedAt ? "Updating with the latest offers…" : "AI is searching vivo.com, Google, Amazon, Flipkart and partner sites for current offers — usually 1–3 minutes.") + (C.progress ? '<div style="font-size:12px;opacity:.85;margin-top:3px">Step: ' + esc(C.progress.stage) + "</div>" : "") + "</div></div>";
     else if (C.note) html += '<div class="notice">' + esc(C.note) + "</div>";
@@ -594,6 +642,10 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     bindCalc(price);
     $("rep").onclick = function () { reportForm(C, vs); };
     if ($("hoe")) $("hoe").onclick = function () { hoEdit(C, vs, cols); };
+    if ($("phe")) $("phe").onclick = function () { photoEdit(C); };
+    [].forEach.call($("md").querySelectorAll("[data-col]"), function (x) { x.onclick = function () { SEL.col = SEL.col === x.dataset.col ? "" : x.dataset.col; var u = phoneFor(C.img, SEL.col); [].forEach.call($("md").querySelectorAll("[data-col]"), function (y) { y.classList.toggle("on", y.dataset.col === SEL.col); }); if ($("phi") && u && $("phi").getAttribute("src") !== u) { $("phi").style.opacity = 0; setTimeout(function () { if ($("phi")) { $("phi").src = u; $("phi").style.opacity = 1; } }, 180); } }; });
+    if ($("btr") && $("bdt")) { var tr = $("btr"), dots = $("bdt").children, cur = 0; tr.onscroll = function () { var i = Math.round(tr.scrollLeft / tr.clientWidth); [].forEach.call(dots, function (d, k) { d.classList.toggle("on", k === i); }); cur = i; };
+      clearInterval(window.__bnT); window.__bnT = setInterval(function () { if (!document.body.contains(tr)) return clearInterval(window.__bnT); cur = (cur + 1) % dots.length; tr.scrollTo({ left: cur * tr.clientWidth, behavior: "smooth" }); }, 4500); }
   }
   function offerCard(o, k) {
     var hid = CUR.hidden[o.key];

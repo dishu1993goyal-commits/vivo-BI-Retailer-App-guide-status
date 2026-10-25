@@ -262,6 +262,55 @@ export function cleanCatalog(d) {
 // ---------- prompts ----------
 function pageText(html, n) { return String(html || "").replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").slice(0, n); }
 async function grab(u, fetchImpl) { try { const r = await fetchImpl(u, { headers: { "user-agent": "Mozilla/5.0 (Linux; Android 14) vivoBI/1.0", "accept-language": "en-IN" } }); return r.ok ? await r.text() : ""; } catch (e) { return ""; } }
+// ---------- phone photos & banners from vivo.com (vivo's own image server) ----------
+//   affimg:<slug>  { slug, at, src, phone, colours:[{name,url}], images:[url], banners:[url], set:{phone,banners} (HO override) }
+//   affimgs        { <slug>: phoneUrl }  small index for thumbnails in the model list
+const IMG_TTL = 7 * DAY;
+const IMG_RE = /(?:https?:)?\/\/[a-z0-9.-]*vivo(?:fs)?\.com\/[^"'\s)<>\\]+?\.(?:png|jpe?g|webp)(?:\?[^"'\s)<>\\]*)?/gi;
+const absU = (u) => { u = String(u || "").replace(/&amp;/g, "&").trim(); if (u.startsWith("//")) u = "https:" + u; return /^https:\/\/[a-z0-9.-]*vivo(fs)?\.com\//i.test(u) ? u.slice(0, 500) : ""; };
+const tsOf = (u) => { const m = /\/(1[5-9]\d{11})\//.exec(u); return m ? +m[1] : 0; };
+export function extractImages(html, colours) {
+  html = String(html || "").replace(/\\\//g, "/");
+  const out = [], seen = {}, cols = [], add = (u) => { u = absU(u); if (u && !seen[u] && !/logo|icon|favicon|sprite|qrcode|qr-code/i.test(u)) { seen[u] = 1; out.push(u); } return u; };
+  const og = /<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)/i.exec(html) || /<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)/i.exec(html);
+  const ogU = og ? add(og[1]) : "";
+  const cl = (colours || []).map((c) => String(c).toLowerCase()).filter(Boolean);
+  (html.match(/<img\b[^>]*>/gi) || []).forEach((tag) => {
+    const a = (k) => { const m = new RegExp("\\s" + k + "\\s*=\\s*[\"']([^\"']*)", "i").exec(tag); return m ? m[1] : ""; };
+    const u = add(a("data-src") || a("data-original") || a("src") || (a("srcset").split(/[\s,]+/)[0]));
+    const alt = (a("alt") || a("title")).toLowerCase().trim();
+    if (u && alt && cl.some((c) => alt.includes(c) || c.includes(alt)) && !cols.some((x) => x.url === u)) cols.push({ name: cl.find((c) => alt.includes(c) || c.includes(alt)), url: u });
+  });
+  (html.match(IMG_RE) || []).forEach(add);
+  // product pictures are uploaded with the launch; site-wide assets are much older — keep the recent ones
+  const maxTs = Math.max(0, ...out.map(tsOf));
+  const fresh = out.filter((u) => !maxTs || !tsOf(u) || tsOf(u) >= maxTs - 400 * DAY);
+  return { og: ogU, colours: cols, images: fresh.slice(0, 40) };
+}
+function vivoSlugs(slug, url) {
+  const m = /vivo\.com\/in\/products\/(?:param\/)?([a-z0-9-]+)/i.exec(String(url || ""));
+  return [...new Set([m && m[1], slug, slug.replace(/-5g$/, ""), slug.replace(/-5g$/, "") + "-5g"].filter(Boolean))].slice(0, 4);
+}
+export async function fetchModelImages(slug, { url, colours, fetchImpl = fetch, mainHtml = "" } = {}) {
+  for (const vs of vivoSlugs(slug, url)) {
+    const [par, main] = await Promise.all([grab(`https://www.vivo.com/in/products/param/${vs}`, fetchImpl), mainHtml && vs === slug ? Promise.resolve(mainHtml) : grab(`https://www.vivo.com/in/products/${vs}`, fetchImpl)]);
+    if (par.length < 500 && main.length < 500) continue;
+    const P = extractImages(par, colours), M = extractImages(main, colours);
+    const colourImgs = P.colours.length ? P.colours : M.colours;
+    const phone = (colourImgs[0] && colourImgs[0].url) || P.images[0] || M.og || "";
+    const banners = [M.og].concat(M.images).filter((u, i, a) => u && a.indexOf(u) === i && !colourImgs.some((c) => c.url === u)).slice(0, 14);
+    if (phone || banners.length) return { src: vs, phone, colours: colourImgs.slice(0, 12), images: P.images.slice(0, 12), banners };
+  }
+  return null;
+}
+export async function saveModelImages(store, slug, r, t) {
+  const old = (await store.get(`affimg:${slug}`)) || {};
+  const rec = Object.assign({ slug }, r || { phone: old.phone || "", colours: old.colours || [], images: old.images || [], banners: old.banners || [], failed: true }, { at: t, set: old.set });
+  await store.set(`affimg:${slug}`, rec);
+  const ph = (rec.set && rec.set.phone) || rec.phone;
+  if (ph) { const idx = (await store.get("affimgs")) || {}; if (idx[slug] !== ph) { idx[slug] = ph; await store.set("affimgs", idx); } }
+  return rec;
+}
 // Starter list (from vivo.com/in and shop.vivo.com/in, Oct 2026) so the page works before/without AI; AI research adds prices and new models.
 export const SEED = [["vivo X Fold6", "X", "x-fold6"], ["vivo X300 Ultra", "X", "x300-ultra"], ["vivo X300 Pro", "X", "x300-pro"], ["vivo X300", "X", "x300"], ["vivo X300 FE", "X", "x300-fe"],
   ["vivo V80", "V", "v80"], ["vivo V70 Elite", "V", "v70-elite"], ["vivo V70", "V", "v70"], ["vivo S2", "S", "s2"], ["vivo S2 FE", "S", "s2-fe"],
@@ -349,6 +398,14 @@ export async function runJob(store, env, jobId, { fetchImpl = fetch, now = () =>
       });
       const models = cleanCatalog({ models: Object.values(byslug) }).map((m) => { const o = byslug[m.slug]; return Object.assign(m, { seed: !!(o && o.seed) }); });
       if (!found && !listed.length) { await store.set("affcat", Object.assign(old, { models, error: "Research found no models. " + diag.join(" | "), errorAt: now(), diag })); return { ok: false, error: "no models" }; }
+      try {
+        await beat("Getting phone photos");
+        const need = [];
+        for (const m of models) { const im = await store.get(`affimg:${m.slug}`); if (!im || (!im.phone && now() - im.at > DAY) || now() - im.at > IMG_TTL) need.push(m); }
+        const q = need.slice(0, 40); let k = 0;
+        await Promise.all(Array.from({ length: 6 }, async () => { while (k < q.length) { const m = q[k++]; if (now() > deadline) return; try { await saveModelImages(store, m.slug, await fetchModelImages(m.slug, { url: m.url, colours: m.colours, fetchImpl }), now()); } catch (e) { } } }));
+        diag.push("photos: " + q.length + " models checked");
+      } catch (e) { diag.push("photos: " + e.message); }
       await store.set("affcat", { models, updatedAt: now(), sources: srcs, by: job.by || "auto", diag, error: results.some((r) => !r.ok) ? "Some series failed: " + diag.filter((d) => !/ models via /.test(d)).join(" | ") : "", errorAt: results.some((r) => !r.ok) ? now() : 0 });
       return { ok: true, n: models.length };
     }
@@ -367,6 +424,7 @@ export async function runJob(store, env, jobId, { fetchImpl = fetch, now = () =>
     m.updatedAt = now(); m.sources = r.sources; m.queries = r.queries; m.aiModel = r.model; m.grounded = r.grounded; m.by = job.by || "auto";
     if (!r.grounded) m.notes = ("Web search was not available, so this is from the vivo.com page only. " + (m.notes || "")).slice(0, 600);
     await store.set(`affm:${job.slug}`, m);
+    try { const im = await fetchModelImages(job.slug, { url: m.url, colours: m.colours, fetchImpl, mainHtml: html }); if (im) await saveModelImages(store, job.slug, im, now()); } catch (e) { }
     // keep the catalog's prices in step with the fresher model research
     const cat = await store.get("affcat");
     if (cat && cat.models && m.variants.length) {
@@ -425,7 +483,7 @@ export async function affAction(b, ctx) {
     const cat2 = (await store.get("affcat")) || cat;
     const cap = (await store.get(`affcap:${istDay(t)}`)) || { n: 0 };
     const refreshing = (start && start.started) || (await running("catalog"));
-    return json(200, { ok: true, models: cat2.models || [], updatedAt: cat2.updatedAt || 0, sources: cat2.sources || [], error: cat2.error && (!cat2.updatedAt || cat2.errorAt > cat2.updatedAt) ? cat2.error : "", errorAt: cat2.errorAt || 0,
+    return json(200, { ok: true, models: cat2.models || [], thumbs: (await store.get("affimgs")) || {}, updatedAt: cat2.updatedAt || 0, sources: cat2.sources || [], error: cat2.error && (!cat2.updatedAt || cat2.errorAt > cat2.updatedAt) ? cat2.error : "", errorAt: cat2.errorAt || 0,
       refreshing, progress: refreshing ? await stageOf("catalog") : null, retryAt: backoff ? cat.errorAt + RETRY_MS : 0, note: start && start.reason ? start.reason : "", partners: PARTNERS, kinds: KINDS, capUsed: cap.n, capMax: Number(ctx.env.AFF_DAILY_CAP || 150), state: rec.state || "", now: t });
   }
 
@@ -538,6 +596,27 @@ export async function affAction(b, ctx) {
       } catch (e) { out.groq = "✗ network " + e.message; }
     } else out.groq = "not set";
     return json(200, { ok: true, result: out });
+  }
+
+  if (b.action === "aff-images") {   // phone photos + banners for one model (fetched from vivo.com and cached for 7 days)
+    const slug = slugify(b.slug); if (!slug) return json(400, { ok: false, error: "Choose a model." });
+    let im = await store.get(`affimg:${slug}`);
+    if (b.set) {   // HO: set or clear own pictures (links from vivo.com or any https image)
+      if (!isAdmin) return json(403, { ok: false, error: "Only HO admins change photos." });
+      const ok = (u) => /^https:\/\/[^\s"'<>]+$/i.test(String(u || "").trim()) ? String(u).trim().slice(0, 500) : "";
+      const set = b.set === "clear" ? undefined : { phone: ok(b.set.phone), banners: (Array.isArray(b.set.banners) ? b.set.banners : String(b.set.banners || "").split(/\s+/)).map(ok).filter(Boolean).slice(0, 8), by: rec.fullName, at: t };
+      im = Object.assign(im || { slug, phone: "", colours: [], images: [], banners: [], at: 0 }, { set });
+      await store.set(`affimg:${slug}`, im);
+      const idx = (await store.get("affimgs")) || {}; const ph = (set && set.phone) || im.phone; if (ph) idx[slug] = ph; else delete idx[slug]; await store.set("affimgs", idx);
+      return json(200, { ok: true, images: im });
+    }
+    const stale = !im || t - (im.at || 0) > IMG_TTL || (im.failed && t - im.at > 6 * 3600000) || (b.force && isAdmin);
+    if (stale) {
+      const cat = (await store.get("affcat")) || { models: [] }, base = cat.models.find((x) => x.slug === slug) || {}, m = (await store.get(`affm:${slug}`)) || {};
+      let r = null; try { r = await fetchModelImages(slug, { url: m.url || base.url, colours: (m.colours && m.colours.length ? m.colours : base.colours) || [], fetchImpl: ctx.imgFetch || fetch }); } catch (e) { }
+      im = await saveModelImages(store, slug, r, t);
+    }
+    return json(200, { ok: true, images: im });
   }
 
   if (b.action === "aff-model-edit") {   // HO sets official prices / variants / colours (shown instead of researched ones)

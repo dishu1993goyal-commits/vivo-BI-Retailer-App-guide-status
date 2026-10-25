@@ -434,7 +434,7 @@ async function supportAction(b, { store, t, app, rec, key }) {
 // store: { get(key) -> object|null, set(key, object), delete(key) }
 let KEYCACHE = { at: 0, groq: "" };
 export function _resetKeyCache() { KEYCACHE = { at: 0, groq: "" }; }
-export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch, jobFetch = fetch }) {
+export async function handle(req, { store, now = () => Date.now(), tcFetch = fetch, env = {}, aiFetch = fetch, mailFetch = fetch, jobFetch = fetch, imgFetch = fetch }) {
   // The dashboard's Idea box talks to a "shared board" URL with plain GET / POST (no headers). tools-sync.js points it
   // here as /api/auth?tl=ideas&a=<app>&u=<user>&k=<token>; turn that into a normal session request.
   try {
@@ -834,7 +834,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
     "visit-config", "visit-stores", "visit-start", "visit-save", "visit-end", "visit-cancel", "visit-get", "visit-list", "visit-live", "visit-stats", "visit-ai-one", "visit-ai-states",
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
-    "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit",
+    "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
@@ -947,7 +947,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (b.action.startsWith("matrix-")) return matrixAction(b, surveyCtx());
     if (b.action.startsWith("visit-")) return visitAction(b, surveyCtx());
     if (b.action.startsWith("kb-")) return kbAction(b, surveyCtx());
-    if (b.action.startsWith("aff-")) return affAction(b, Object.assign(surveyCtx(), { jobFetch }));
+    if (b.action.startsWith("aff-")) return affAction(b, Object.assign(surveyCtx(), { jobFetch, imgFetch }));
 
     // A logged-in app approves (or declines) a web login shown as a QR code.
     if (b.action === "qr-approve") {
