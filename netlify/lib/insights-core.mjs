@@ -266,7 +266,7 @@ export async function insightsAction(b, ctx) {
 
   // ---------- translations (UI text into Indian languages, cached for everyone) ----------
   if (b.action === "tr-get") {
-    const LANGS = { hi: "Hindi", ta: "Tamil", te: "Telugu", kn: "Kannada", mr: "Marathi", bn: "Bengali", gu: "Gujarati" };
+    const LANGS = { hi: "Hindi", ta: "Tamil", te: "Telugu", kn: "Kannada", mr: "Marathi", bn: "Bengali", gu: "Gujarati", zh: "Simplified Chinese" };
     const lang = LANGS[b.lang] ? b.lang : null; if (!lang) return json(400, { ok: false, error: "Unknown language." });
     const texts = [...new Set((Array.isArray(b.texts) ? b.texts : []).map((x) => str(x, 300)).filter((x) => /[A-Za-z]{2}/.test(x)))].slice(0, 400);
     const h = (x) => createHash("sha1").update(x).digest("hex").slice(0, 12), buckets = {}, out = {}, miss = [];
@@ -276,7 +276,7 @@ export async function insightsAction(b, ctx) {
       const day = `trn:${today}`, used = ((await store.get(day)) || { n: 0 }).n, keys = await aiKeys(store, env || {});
       if (keys.groq && used < 400) {
         const batch = miss.slice(0, 70);
-        const r = await groqJSON(keys.groq, `Translate these short user-interface texts from an Indian sales dashboard app into ${LANGS[lang]}. Keep numbers, %, ₹, brand and product names (vivo, V80, PAN India, KPI, IMEI, V-Shield, Excel, PDF, PPT), state names in their usual ${LANGS[lang]} spelling, and emojis. Keep it short and natural, like a phone app. Return JSON only: {"t":["translation 1", ...]} in the same order.\nTEXTS:\n${JSON.stringify(batch)}`, ctx.aiFetch, { validate: (d) => d && Array.isArray(d.t) && d.t.length === batch.length });
+        const r = await groqJSON(keys.groq, `Translate these short user-interface texts from an Indian sales dashboard app into ${LANGS[lang]}. Keep numbers, %, ₹, brand and product names (vivo, V80, PAN India, KPI, IMEI, V-Shield, Excel, PDF, PPT), state names in their usual ${LANGS[lang]} spelling, and emojis.${lang === "zh" ? " Use Simplified Chinese characters (mainland style)." : ""} Keep it short and natural, like a phone app. Return JSON only: {"t":["translation 1", ...]} in the same order.\nTEXTS:\n${JSON.stringify(batch)}`, ctx.aiFetch, { validate: (d) => d && Array.isArray(d.t) && d.t.length === batch.length });
         if (r.ok) { await store.set(day, { n: used + 1 }); batch.forEach((x, i) => { const v = str(r.data.t[i], 400); if (!v) return; out[x] = v; const k = h(x); buckets[`trb:${lang}:${k.slice(0, 2)}`][k] = v; }); for (const [bk, v] of Object.entries(buckets)) await store.set(bk, v); }
         pending = miss.length - batch.length;
       } else pending = miss.length;

@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   if (window.BILANG) return;
-  var LANGS = [["en", "English", "English"], ["hi", "हिन्दी", "Hindi"], ["ta", "தமிழ்", "Tamil"], ["te", "తెలుగు", "Telugu"], ["kn", "ಕನ್ನಡ", "Kannada"], ["mr", "मराठी", "Marathi"], ["bn", "বাংলা", "Bengali"], ["gu", "ગુજરાતી", "Gujarati"]];
+  var LANGS = [["en", "English", "English"], ["hi", "हिन्दी", "Hindi"], ["ta", "தமிழ்", "Tamil"], ["te", "తెలుగు", "Telugu"], ["kn", "ಕನ್ನಡ", "Kannada"], ["mr", "मराठी", "Marathi"], ["bn", "বাংলা", "Bengali"], ["gu", "ગુજરાતી", "Gujarati"], ["zh", "中文", "Chinese"]];
   function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
   var LANG = ls("biw-lang") || "en", DICT = {}, busy = false, timer = null, MO = null, nodes = [];
   function loadDict() { try { DICT = JSON.parse(ls("biw-tr-" + LANG) || "{}") || {}; } catch (e) { DICT = {}; } }

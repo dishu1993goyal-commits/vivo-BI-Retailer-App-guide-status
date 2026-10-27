@@ -17,16 +17,26 @@ import { schemeCalcAction } from "./schemecalc-core.mjs";
 import { mailerAction } from "./mailer-core.mjs";
 import { extrasAction, extrasPublic, servePublicImage } from "./extras-core.mjs";
 import { insightsAction, cachedSnapshot, alertsFor } from "./insights-core.mjs";
-const THEME_IDS = ["signature", "classic", "aurora", "emerald", "royal", "sunrise", "midnight"];
+const THEME_ID = /^[a-z0-9-]{2,24}$/;
+const pick = (v, list) => (list.includes(String(v || "")) ? String(v) : "");
 export function cleanTheme(c) {
   c = c && typeof c === "object" ? c : {};
   const hex = (v) => (/^#[0-9a-f]{6}$/i.test(String(v || "")) ? String(v).toUpperCase() : undefined);
-  const on = (Array.isArray(c.on) ? c.on : []).filter((x, i, a) => THEME_IDS.includes(x) && a.indexOf(x) === i);
-  const def = THEME_IDS.includes(c.def) ? c.def : "";
+  const on = (Array.isArray(c.on) ? c.on : []).filter((x, i, a) => THEME_ID.test(x) && a.indexOf(x) === i).slice(0, 120);
+  const def = THEME_ID.test(c.def || "") ? c.def : "";
   if (def && on.length && !on.includes(def)) on.push(def);
   const custom = {};
-  Object.entries(c.custom && typeof c.custom === "object" ? c.custom : {}).forEach(([k, v]) => { if (!THEME_IDS.includes(k) || !v) return; const o = { accent: hex(v.accent), deep: hex(v.deep), tint: hex(v.tint) }; Object.keys(o).forEach((x) => o[x] === undefined && delete o[x]); if (Object.keys(o).length) custom[k] = o; });
-  return { def, on: on.length ? on : THEME_IDS.slice(), allowUser: c.allowUser !== false, auto: c.auto !== false, defAuto: !!c.defAuto, custom, by: c.by ? String(c.by).slice(0, 60) : undefined, at: Number(c.at) || undefined };
+  Object.entries(c.custom && typeof c.custom === "object" ? c.custom : {}).slice(0, 120).forEach(([k, v]) => { if (!THEME_ID.test(k) || !v) return; const o = { accent: hex(v.accent), deep: hex(v.deep), tint: hex(v.tint) }; Object.keys(o).forEach((x) => o[x] === undefined && delete o[x]); if (Object.keys(o).length) custom[k] = o; });
+  const A = c.art && typeof c.art === "object" ? c.art : {}, url = String(A.url || "");
+  const art = { on: !!A.on, url: /^(https:\/\/[^\s"'<>()]{5,600}|\/api\/auth\?img=[A-Za-z0-9_-]{4,80})$/.test(url) ? url : "", pattern: pick(A.pattern, ["rangoli", "diyas", "waves", "dots", "grid", "diagonal", "confetti", "mandala", "glow"]),
+    strength: pick(A.strength, ["faint", "light", "medium", "strong"]) || "light", blur: pick(A.blur, ["0", "3", "8"]) || "0", fit: pick(A.fit, ["cover", "tile"]) || "cover", scope: pick(A.scope, ["all", "dashboard", "tools"]) || "all" };
+  if (!art.url && !art.pattern) art.on = false;
+  const C = c.card && typeof c.card === "object" ? c.card : {};
+  const card = { style: pick(C.style, ["glass", "soft", "elevated", "outline", "gradient", "flat"]), radius: pick(C.radius, ["sharp", "soft", "rounded", "round", "pill"]), accentBar: pick(C.accentBar, ["left", "top"]), density: pick(C.density, ["compact", "comfortable"]), text: pick(C.text, ["small", "large", "xl"]), font: pick(C.font, ["rounded", "modern", "serif", "condensed"]), hero: pick(C.hero, ["accent", "solid", "compact", "art"]), tiles: pick(C.tiles, ["circle", "square"]), buttons: pick(C.buttons, ["pill", "square"]), scope: pick(C.scope, ["all", "dashboard", "tools"]) || "all" };
+  Object.keys(card).forEach((k) => card[k] === "" && delete card[k]);
+  const I = c.ind && typeof c.ind === "object" ? c.ind : {}, ind = {};
+  ["good", "warn", "bad"].forEach((k) => { if (hex(I[k])) ind[k] = hex(I[k]); });
+  return { def, on, allowUser: c.allowUser !== false, auto: c.auto !== false, defAuto: !!c.defAuto, custom, art, card, ind, by: c.by ? String(c.by).slice(0, 60) : undefined, at: Number(c.at) || undefined };
 }
 import { masterAction, MASTER_SETUP_SHA256, roleOf } from "./master-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
