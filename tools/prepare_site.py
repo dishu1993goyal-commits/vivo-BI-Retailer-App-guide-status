@@ -18,7 +18,7 @@ HEAD = ('<script id="biw-gate">(function(){var u=navigator.userAgent;if(/; wv\\)
         '<style id="biw-gate-css">html.biw-locked body>*:not(#biw-root){visibility:hidden!important}'
         'html.biw-locked body{background:#0b0b0c}</style>')
 TAIL = '<script id="biw-loader" src="/web.js" defer></script>'
-THEME = '<script id="biw-theme-js" src="/theme.js?v=4"></script><script id="biw-dashx-js" src="/dashx.js?v=1" defer></script><script id="biw-lang-js" src="/lang.js?v=3" defer></script>'
+THEME = '<script id="biw-theme-js" src="/theme.js?v=5"></script><script id="biw-dashx-js" src="/dashx.js?v=1" defer></script><script id="biw-lang-js" src="/lang.js?v=3" defer></script>'
 # Voice notes in the Android apps: the in-app browser has no speech recognition, so the apps provide window.BISpeech
 # and this turns it into the standard window.webkitSpeechRecognition before the smart tools load.
 SPEECH = ('<script id="biw-speech">(function(){if(!window.BISpeech)return;var cur=null;'
