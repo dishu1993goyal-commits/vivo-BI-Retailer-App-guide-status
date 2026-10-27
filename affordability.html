@@ -264,8 +264,21 @@ html,body{overflow-x:hidden;max-width:100%}
 .g2s{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media(max-width:560px){.g2s{grid-template-columns:1fr}}
 .f2 label{display:block;font-size:12px;color:var(--mut);font-weight:600;margin:10px 2px 3px}
+.pk{display:inline-flex;align-items:center;gap:5px;border:1.5px solid #CBD0E6;border-radius:99px;padding:3px 10px 3px 7px;font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer;background:#fff;user-select:none}
+.pk i{width:15px;height:15px;border:2px solid #AEB4CF;display:inline-block;box-sizing:border-box;font-style:normal;font-size:10px;line-height:11px;text-align:center;color:#fff}
+.pk.r i{border-radius:99px}.pk.c i{border-radius:4px}
+.of.sel{box-shadow:0 0 0 2px var(--brand),0 6px 18px rgba(65,95,255,.15)}.of.sel .pk{border-color:var(--brand);background:var(--brand);color:#fff}.of.sel .pk i{background:#fff;border-color:#fff;color:var(--brand)}
+.obar{position:fixed;left:0;right:0;bottom:0;z-index:40;background:#14183A;color:#fff;padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;align-items:center;gap:10px;box-shadow:0 -10px 28px rgba(20,24,51,.3)}
+.obar .ot{flex:1;min-width:0}.obar .ot small{display:block;font-size:11.5px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.obar .ot b{font-size:19px}.obar .ot s{opacity:.65;font-size:12px;margin-left:6px}
+.obar button{border:0;border-radius:11px;padding:10px 14px;font:700 13.5px inherit;cursor:pointer}.obar .od{background:#fff;color:#14183A}.obar .ox{background:rgba(255,255,255,.14);color:#fff;padding:10px 12px}
+body.hasbar{padding-bottom:78px}body.hasbar .fbtn{bottom:84px}
+.ol{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px}.ol td{padding:7px 4px;border-bottom:1px solid #EEF0F6}.ol td:last-child{text-align:right;font-weight:700;white-space:nowrap}.ol tr.tot td{font-size:16px;border-bottom:0;color:#14183A}.ol .neg{color:#0F7B4F}.ol .pos{color:#B4232A}
+.oin{width:96px;border:1px solid #D5D8E6;border-radius:8px;padding:5px 7px;font:inherit;font-size:13px;text-align:right}
+.tf{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:6px;align-items:center;margin-top:6px}.tf input.tx,.tf select.tx{padding:7px 9px;font-size:13px}.tf .btn{padding:6px 9px;margin:0}
+.tf .lk{font-size:11px;color:var(--mut);white-space:nowrap}
+.rx{font-size:12.5px;color:var(--ink2);margin-top:3px}.rx b{color:var(--mut);font-weight:600}
 </style>
-<script src="theme.js?v=5"></script>
+<script src="theme.js?v=6"></script>
 <script src="lang.js?v=3" defer></script>
 <script src="cust.js?v=64"></script>
 </head>
@@ -456,6 +469,10 @@ html,body{overflow-x:hidden;max-width:100%}
   }
   var VIEW = $("view"), CAT = null, TAB = ls("aff-tab") || "find", CUR = null, SEL = { v: 0, partner: "All", stateF: "All" }, POLL = 0, STATES = [], CMP = ls("aff-cmp") || [], PICS = {};
   fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  var PICK = {}, AMTS = {}, TEN = {}, OFF = {}, PR = {}, TPLH = null, ALLR = null;
+  var GROUP = { emi: "emi", vshield: "vshield", upgrade: "upg", exchange: "upg", abb: "abb" };
+  var DEF_TPL = { v: 1, name: "Offer report", fields: [{ id: "kind", label: "Offer type", type: "kind", req: true }, { id: "partner", label: "Partner / bank", type: "text", ph: "e.g. Bajaj Finserv" }, { id: "scheme", label: "Scheme (EMI)", type: "text", ph: "e.g. 10/0" }, { id: "benefit", label: "Benefit", type: "text", ph: "e.g. ₹3,000 cashback" }, { id: "variant", label: "Variant (optional)", type: "variant" }, { id: "validTill", label: "Valid till", type: "date" }, { id: "details", label: "Offer details", type: "textarea", req: true, ph: "What does the customer get, any conditions, which stores…" }, { id: "photo", label: "Photo of standee / circular (optional)", type: "photo" }] };
+  var BUILTIN = { kind: 1, partner: 1, scheme: 1, benefit: 1, variant: 1, validTill: 1, details: 1, photo: 1 }, LOCKED = { kind: 1, details: 1 };
   var KIND_LABEL = { emi: "EMI & finance", exchange: "Exchange", upgrade: "Upgrade", vshield: "V-Shield", abb: "ABB (assured buy-back)", cashback: "Cashback & discounts", other: "Other offers" };
   var KIND_ICON = { emi: "💳", exchange: "🔁", upgrade: "⬆️", vshield: "🛡️", abb: "♻️", cashback: "💸", other: "🎁" };
   var SCHEMES = ["6/0", "8/0", "9/0", "10/0", "12/0", "15/0", "18/0", "24/0", "8/2", "10/2", "12/3"];
@@ -474,17 +491,19 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     api({ action: "aff-catalog" }).then(function (r) {
       if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       CAT = r; render();
+      api({ action: "aff-tpl-get" }).then(function (x) { if (x && x.ok) TPLH = x.template; });
       if (!r.models.length && (r.refreshing || r.retryAt)) { clearTimeout(POLL); POLL = setTimeout(load, r.refreshing ? 8000 : Math.max(15000, r.retryAt - r.now + 3000)); }
     });
   }
   function render() {
     clearTimeout(POLL);
-    var tabs = [["find", "💳 Find offers"], ["cmp", "⚖️ Compare"], ["state", "🗺️ State-wise"]];
+    var tabs = [["find", "💳 Find offers"], ["cmp", "⚖️ Compare"], ["state", "🗺️ State-wise"], ["reports", "📋 Reports"]];
     if (ADMIN) tabs.push(["data", "⚙️ Data"]);
     if (!tabs.some(function (t) { return t[0] === TAB; })) TAB = "find";
     VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
     [].forEach.call(VIEW.querySelectorAll(".seg button"), function (b) { b.onclick = function () { TAB = b.dataset.t; ls("aff-tab", TAB); render(); }; });
-    ({ find: showFind, cmp: showCmp, state: showState, data: showData })[TAB]();
+    if (TAB !== "find") bar(false);
+    ({ find: showFind, cmp: showCmp, state: showState, reports: showReports, data: showData })[TAB]();
   }
 
   // ================= model combobox =================
@@ -551,6 +570,7 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
       if (!$("md")) return;
       if (!r.ok) { $("md").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       var keepImg = CUR && CUR.slug === base.slug ? CUR.img : null;
+      if (!CUR || CUR.slug !== base.slug) { PICK = {}; AMTS = {}; TEN = {}; }
       CUR = { slug: base.slug, base: r.base, m: r.model, hidden: r.hidden || {}, reports: r.reports || [], refreshing: r.refreshing, progress: r.progress, note: r.note, ho: r.ho, img: keepImg };
       drawModel();
       if (!keepImg) loadImages(base.slug);
@@ -596,6 +616,7 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     if (SEL.v >= vs.length) SEL.v = 0;
     var v = vs[SEL.v] || {}, price = v.price, mrp = v.mrp, cols = (ho && ho.colours.length ? ho.colours : v.colours && v.colours.length ? v.colours : (m && m.colours.length ? m.colours : b.colours)) || [];
     if (SEL.col && cols.indexOf(SEL.col) < 0) SEL.col = "";
+    OFF = {}; PR = { price: +price || 0, mrp: +mrp || 0, name: ((m && m.name) || b.name) + (vs.length ? " (" + vlabel(v) + ")" : "") };
     var bn = BANN[C.slug] || [], ph = phoneFor(C.img, SEL.col);
     var html = '<div class="mh">' + (bn.length ? '<div class="bnr"><div class="trk" id="btr">' + bn.map(function (u) { return '<img loading="lazy" referrerpolicy="no-referrer" alt="" src="' + esc(u) + '" onerror="this.remove()">'; }).join("") + "</div>" + (bn.length > 1 ? '<div class="dots" id="bdt">' + bn.map(function (_, i) { return '<i class="' + (i ? "" : "on") + '"></i>'; }).join("") + "</div>" : "") + "</div>" : "") +
       '<div class="mtop"><div class="tx2"><h2>' + esc((m && m.name) || b.name) + "</h2>" + (m && m.highlights && m.highlights.length ? '<div class="hl">' + m.highlights.map(esc).join(" · ") + "</div>" : "") + "</div>" + (ph ? '<div class="phn"><img id="phi" referrerpolicy="no-referrer" alt="' + esc((m && m.name) || b.name) + '" src="' + esc(ph) + '" onerror="this.parentNode.remove()"></div>' : "") + "</div>" +
@@ -628,7 +649,7 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     var frs = fr.filter(function (r) { return SEL.stateF === "All" || r.state === SEL.stateF; });
     html += '<div class="sh"><h3>📍 Offers reported from the market</h3><small>' + fr.length + " report" + (fr.length === 1 ? "" : "s") + "</small></div>" +
       (sts.length > 2 ? '<div class="pch" id="sch">' + sts.map(function (s) { return '<button data-s="' + esc(s) + '" class="' + (s === SEL.stateF ? "on" : "") + '">' + esc(s) + "</button>"; }).join("") + "</div>" : "") +
-      (frs.length ? frs.map(reportCard).join("") : '<div class="muted" style="font-size:13px;padding:2px 4px">No state has reported an offer for this model yet.</div>');
+      (frs.length ? frs.map(function (r) { return reportCard(r); }).join("") : '<div class="muted" style="font-size:13px;padding:2px 4px">No state has reported an offer for this model yet.</div>');
     if (m && (m.notes || (m.sources || []).length)) html += '<div class="card" style="margin-top:16px"><h3 style="font-size:14px">🔎 Where this came from</h3>' + (m.notes ? '<div class="muted" style="font-size:12.5px;margin-bottom:6px">' + esc(m.notes) + "</div>" : "") + '<div class="src">' + (m.sources || []).map(function (s) { return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">↗ ' + esc(s.title) + "</a>"; }).join("") + "</div></div>";
     html += '<div class="notice info">Prices and online offers are gathered automatically by AI from vivo.com, Google and partner sites, and refreshed daily. Offers change often — confirm with the partner or the latest circular before quoting to a customer.</div>';
     html += '<div class="fbtn"><button class="btn pri block" id="rep" style="font-size:15px;padding:13px">＋ Report an offer you saw in market</button></div>';
@@ -642,6 +663,9 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     [].forEach.call($("md").querySelectorAll("[data-del]"), function (x) { x.onclick = function () { sheet("Delete this report?", "", [["🗑️", "Delete", function () { api({ action: "aff-report-delete", slug: C.slug, id: x.dataset.del }).then(function (r) { if (!r.ok) return toast(r.error); C.reports = C.reports.filter(function (q) { return q.id !== x.dataset.del; }); drawModel(); }); }, "red"]]); }; });
     [].forEach.call($("md").querySelectorAll("[data-ph]"), function (x) { x.onclick = function () { showPhoto(C.slug, x.dataset.ph); }; });
     bindCalc(price);
+    Object.keys(PICK).forEach(function (k) { if (!OFF[k]) delete PICK[k]; });
+    [].forEach.call($("md").querySelectorAll("[data-pick]"), function (x) { x.onclick = function (e) { e.preventDefault(); togglePick(x.dataset.pick); }; });
+    paintPicks();
     $("rep").onclick = function () { reportForm(C, vs); };
     if ($("hoe")) $("hoe").onclick = function () { hoEdit(C, vs, cols); };
     if ($("phe")) $("phe").onclick = function () { photoEdit(C); };
@@ -649,25 +673,184 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     if ($("btr") && $("bdt")) { var tr = $("btr"), dots = $("bdt").children, cur = 0; tr.onscroll = function () { var i = Math.round(tr.scrollLeft / tr.clientWidth); [].forEach.call(dots, function (d, k) { d.classList.toggle("on", k === i); }); cur = i; };
       clearInterval(window.__bnT); window.__bnT = setInterval(function () { if (!document.body.contains(tr)) return clearInterval(window.__bnT); cur = (cur + 1) % dots.length; tr.scrollTo({ left: cur * tr.clientWidth, behavior: "smooth" }); }, 4500); }
   }
+  function pickBtn(key, k) { return GROUP[k] || k === "cashback" || k === "other" ? '<span class="pk ' + (GROUP[k] ? "r" : "c") + '" data-pick="' + key + '"><i>✓</i>Select</span>' : ""; }
   function offerCard(o, k) {
     var hid = CUR.hidden[o.key];
-    return '<div class="of k-' + k + (hid ? " hid" : "") + '"><div class="t"><span class="pn">' + esc(o.partner || o.plan || KIND_LABEL[k]) + "</span>" + (o.scheme ? '<span class="sc">' + esc(o.scheme) + "</span>" : "") + (o.noCost ? '<span class="chip live">No Cost</span>' : "") + (o.type ? '<span class="chip">' + esc(o.type) + "</span>" : "") + (hid ? '<span class="chip closed">Hidden</span>' : "") + "</div>" +
+    if (!hid) OFF[o.key] = { kind: k, name: o.partner || o.plan || KIND_LABEL[k], scheme: o.scheme || "", benefit: o.benefit || "", details: o.details || o.plan || "", tenures: o.tenures || [], noCost: !!o.noCost };
+    return '<div class="of k-' + k + (hid ? " hid" : "") + '" data-ok="' + o.key + '"><div class="t">' + (hid ? "" : pickBtn(o.key, k)) + '<span class="pn">' + esc(o.partner || o.plan || KIND_LABEL[k]) + "</span>" + (o.scheme ? '<span class="sc">' + esc(o.scheme) + "</span>" : "") + (o.noCost ? '<span class="chip live">No Cost</span>' : "") + (o.type ? '<span class="chip">' + esc(o.type) + "</span>" : "") + (hid ? '<span class="chip closed">Hidden</span>' : "") + "</div>" +
       (o.benefit ? '<div class="bn">' + esc(o.benefit) + "</div>" : "") + (o.details ? '<div class="d">' + esc(o.details) + "</div>" : "") +
       '<div class="m">' + (o.tenures && o.tenures.length ? "<span>Tenures: " + o.tenures.map(esc).join(", ") + " months</span>" : "") + (o.validTill ? "<span>Valid till " + esc(o.validTill) + "</span>" : "") + (o.channel ? "<span>" + esc(o.channel) + "</span>" : "") + (o.source ? '<a href="' + esc(o.source) + '" target="_blank" rel="noopener">↗ ' + esc(host(o.source)) + "</a>" : "") + '<span class="chip" style="background:#F4EEFF;color:#5B3FBF">✨ AI · online</span></div>' +
       (ADMIN ? '<button class="hx" data-hide="' + o.key + '">' + (hid ? "Show again" : "Mark wrong") + "</button>" : "") + "</div>";
   }
-  function reportCard(r) {
+  function extraHtml(r) {
+    var x = r.extra || {}, F = tpl().fields, ks = Object.keys(x).filter(function (k) { return x[k] !== "" && x[k] != null && !(Array.isArray(x[k]) && !x[k].length); });
+    return ks.map(function (k) { var f = F.filter(function (q) { return q.id === k; })[0]; return '<div class="rx"><b>' + esc(f ? f.label : k.replace(/^x_/, "").replace(/_/g, " ")) + ":</b> " + esc(Array.isArray(x[k]) ? x[k].join(", ") : x[k]) + "</div>"; }).join("");
+  }
+  function reportCard(r, withModel) {
     var mine = AUTH && r.by && r.by.username && r.by.username.toLowerCase() === AUTH.username.toLowerCase() && r.by.app === AUTH.app;
-    return '<div class="of fr"><div class="t"><span class="pn">' + KIND_ICON[r.kind] + " " + esc(r.partner || KIND_LABEL[r.kind]) + "</span>" + (r.scheme ? '<span class="sc">' + esc(r.scheme) + "</span>" : "") + '<span class="chip">' + esc(r.state) + "</span>" + (r.official ? '<span class="chip live">HO</span>' : r.verified ? '<span class="chip live">✓ Verified</span>' : '<span class="chip warn">Field report</span>') + "</div>" +
-      (r.benefit ? '<div class="bn">' + esc(r.benefit) + "</div>" : "") + '<div class="d">' + esc(r.details) + (r.variant ? " · " + esc(r.variant) : "") + "</div>" +
-      '<div class="m"><span>By ' + esc(r.by.fullName) + " · " + dOnly(r.at) + "</span>" + (r.validTill ? "<span>Valid till " + esc(r.validTill) + "</span>" : "") + (r.photo ? '<a href="javascript:void 0" data-ph="' + r.id + '">📷 Photo</a>' : "") +
-      (ADMIN && !r.official ? '<a href="javascript:void 0" data-ver="' + r.id + '">' + (r.verified ? "Unverify" : "✓ Verify") + "</a>" : "") + (ADMIN || mine ? '<a href="javascript:void 0" data-del="' + r.id + '" style="color:var(--bad)">Delete</a>' : "") + "</div></div>";
+    var pk = !withModel && GROUP[r.kind] || !withModel && (r.kind === "cashback" || r.kind === "other");
+    if (pk) OFF["r:" + r.id] = { kind: r.kind, name: r.partner || KIND_LABEL[r.kind], scheme: r.scheme || "", benefit: r.benefit || "", details: r.details || "", tenures: [], noCost: /no\s*cost/i.test(r.details + " " + r.benefit), field: r.state };
+    return '<div class="of fr" data-ok="r:' + r.id + '"><div class="t">' + (pk ? pickBtn("r:" + r.id, r.kind) : "") + (withModel ? '<span class="chip" style="background:#EEF0FF;color:#2B33A6">📱 ' + esc(r.model) + "</span>" : "") + '<span class="pn">' + KIND_ICON[r.kind] + " " + esc(r.partner || KIND_LABEL[r.kind]) + "</span>" + (r.scheme ? '<span class="sc">' + esc(r.scheme) + "</span>" : "") + '<span class="chip">' + esc(r.state) + "</span>" + (r.official ? '<span class="chip live">HO</span>' : r.verified ? '<span class="chip live">✓ Verified</span>' : '<span class="chip warn">Field report</span>') + "</div>" +
+      (r.benefit ? '<div class="bn">' + esc(r.benefit) + "</div>" : "") + '<div class="d">' + esc(r.details) + (r.variant ? " · " + esc(r.variant) : "") + "</div>" + extraHtml(r) +
+      '<div class="m"><span>By ' + esc(r.by.fullName) + " · " + dOnly(r.at) + "</span>" + (r.validTill ? "<span>Valid till " + esc(r.validTill) + "</span>" : "") + (r.photo ? '<a href="javascript:void 0" data-ph="' + r.id + '" data-phs="' + r.slug + '">📷 Photo</a>' : "") +
+      (ADMIN && !r.official ? '<a href="javascript:void 0" data-ver="' + r.id + '" data-vs="' + r.slug + '">' + (r.verified ? "Unverify" : "✓ Verify") + "</a>" : "") + (ADMIN || mine ? '<a href="javascript:void 0" data-del="' + r.id + '" data-ds="' + r.slug + '" style="color:var(--bad)">Delete</a>' : "") + "</div></div>";
   }
   function showPhoto(slug, id) {
     var k = slug + id;
     var go = function () { var w = document.createElement("div"); w.className = "ov"; w.style.alignItems = "center"; w.innerHTML = '<img alt="" src="' + PICS[k] + '" style="max-width:94vw;max-height:88vh;border-radius:12px">'; w.onclick = function () { w.remove(); }; document.body.appendChild(w); };
     if (PICS[k]) return go();
     api({ action: "aff-photo", slug: slug, id: id }).then(function (r) { if (!r.ok) return toast(r.error); PICS[k] = "data:" + r.mime + ";base64," + r.data; go(); });
+  }
+
+  // ================= offer selection: effective price =================
+  function parseAmt(t) { var m = String(t || "").replace(/,/g, "").match(/(?:₹|rs\.?|inr)\s*(\d+(?:\.\d+)?)\s*(k\b)?/i); return m ? Math.round(+m[1] * (m[2] ? 1000 : 1)) : 0; }
+  function amtOf(k) { if (AMTS[k] != null && AMTS[k] !== "") return +AMTS[k] || 0; var o = OFF[k]; if (!o) return 0; if (o.kind === "emi") return /cashback|discount|off\b|instant|save/i.test(o.benefit + " " + o.details) ? parseAmt(o.benefit) || parseAmt(o.details) : 0; return parseAmt(o.benefit) || parseAmt(o.details); }
+  function togglePick(k) {
+    var o = OFF[k]; if (!o) return;
+    if (PICK[k]) delete PICK[k]; else { var g = GROUP[o.kind]; if (g) Object.keys(PICK).forEach(function (q) { if (OFF[q] && GROUP[OFF[q].kind] === g) delete PICK[q]; }); PICK[k] = 1; if (o.kind === "emi") TEN = {}; }
+    paintPicks();
+  }
+  function paintPicks() { [].forEach.call(document.querySelectorAll("[data-ok]"), function (c) { c.classList.toggle("sel", !!PICK[c.dataset.ok]); }); bar(Object.keys(PICK).length > 0); }
+  function emiPick() { var k = Object.keys(PICK).filter(function (q) { return OFF[q] && OFF[q].kind === "emi"; })[0]; return k ? { k: k, o: OFF[k] } : null; }
+  function tenOpts(o) { var s = /^(\d+)\/(\d+)$/.exec(o.scheme || ""), l = (o.tenures || []).map(function (x) { return parseInt(x); }).filter(function (x) { return x > 0; }); if (s) l.unshift(+s[1]); l = l.concat([3, 6, 9, 12, 18, 24]); return l.filter(function (x, i, a) { return a.indexOf(x) === i; }).sort(function (a, b) { return a - b; }); }
+  function calcOffers() {
+    var c = { price: PR.price, mrp: PR.mrp || PR.price, lines: [], emiDisc: 0, cb: 0, upg: 0, vsh: 0, abb: 0 };
+    Object.keys(PICK).forEach(function (k) {
+      var o = OFF[k]; if (!o) return; var a = amtOf(k), kd = o.kind;
+      if (kd === "emi") c.emiDisc += a; else if (kd === "cashback" || kd === "other") c.cb += a; else if (kd === "upgrade" || kd === "exchange") c.upg += a; else if (kd === "vshield") c.vsh += a; else if (kd === "abb") c.abb += a;
+      c.lines.push({ k: k, o: o, a: a });
+    });
+    c.net = Math.max(0, c.price - c.emiDisc - c.cb - c.upg + c.vsh);
+    var e = emiPick();
+    if (e) {
+      var s = /^(\d+)\/(\d+)$/.exec(e.o.scheme || ""), n = +(TEN.n || (s ? s[1] : 0) || tenOpts(e.o)[0] || 9), adv = s && +s[1] === n ? +s[2] : 0;
+      var ir = TEN.ir != null ? +TEN.ir || 0 : 0, fee = +TEN.fee || 0, dp = Math.min(+TEN.dp || 0, c.net);
+      var fin = Math.max(0, c.net - dp), r = ir / 1200, emi = n ? (ir > 0 ? fin * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1) : fin / n) : 0; emi = Math.ceil(emi);
+      var intr = ir > 0 ? Math.max(0, emi * n - fin) : 0;
+      c.emi = { n: n, adv: adv, ir: ir, fee: fee, dp: dp, per: emi, interest: intr, opts: tenOpts(e.o), noCost: e.o.noCost };
+      c.today = dp + adv * emi + fee; c.total = dp + fin + intr + fee;
+    } else { c.today = c.net; c.total = c.net; }
+    c.save = Math.max(0, c.mrp - (c.price - c.emiDisc - c.cb - c.upg));
+    return c;
+  }
+  function bar(on) {
+    var b = document.getElementById("obar");
+    if (!on || TAB !== "find" || !CUR) { if (b) b.remove(); document.body.classList.remove("hasbar"); return; }
+    var c = calcOffers();
+    if (!b) { b = document.createElement("div"); b.id = "obar"; b.className = "obar"; document.body.appendChild(b); }
+    document.body.classList.add("hasbar");
+    b.innerHTML = '<div class="ot"><small>' + c.lines.length + " offer" + (c.lines.length === 1 ? "" : "s") + " · " + esc(c.lines.map(function (l) { return l.o.name; }).join(", ")) + "</small><b>" + rs(c.total) + "</b>" + (c.mrp > c.total ? "<s>" + rs(c.mrp) + "</s>" : "") + '<small>Effective price' + (c.emi ? " · " + rs(c.emi.per) + " × " + c.emi.n + " months" : "") + (c.save ? " · save " + rs(c.save) : "") + '</small></div><button class="od" id="obd">Details</button><button class="ox" id="obx" aria-label="Clear">✕</button>';
+    b.querySelector("#obd").onclick = offerDetails;
+    b.querySelector("#obx").onclick = function () { PICK = {}; paintPicks(); };
+  }
+  function summaryText(c) {
+    var L = [PR.name, "MRP " + rs(c.mrp) + (c.price && c.price !== c.mrp ? " · Price " + rs(c.price) : ""), "", "Offers:"];
+    c.lines.forEach(function (l) { L.push("• " + KIND_LABEL[l.o.kind] + ": " + l.o.name + (l.o.scheme ? " " + l.o.scheme : "") + (l.a ? " — " + (l.o.kind === "vshield" ? "+" : l.o.kind === "abb" ? "buy-back " : "−") + rs(l.a) : "") + (l.o.benefit ? " (" + l.o.benefit + ")" : "")); });
+    L.push("", "Net price: " + rs(c.net));
+    if (c.emi) { L.push("Down payment today: " + rs(c.today)); L.push("EMI: " + rs(c.emi.per) + " × " + (c.emi.n - c.emi.adv) + " months" + (c.emi.adv ? " (+" + c.emi.adv + " paid upfront)" : "") + (c.emi.ir ? " · interest " + rs(c.emi.interest) : " · No Cost")); if (c.emi.fee) L.push("Processing fee: " + rs(c.emi.fee)); L.push("Total payable: " + rs(c.total)); }
+    if (c.cb) L.push("Cashback / discounts: " + rs(c.cb));
+    if (c.abb) L.push("Assured buy-back later: " + rs(c.abb));
+    if (c.save) L.push("You save " + rs(c.save) + " vs MRP");
+    L.push("", "Offers are subject to partner terms and may change — please confirm at the store.");
+    return L.join("\n");
+  }
+  function copyTxt(t) { var done = function () { toast("Copied — paste it in WhatsApp or SMS"); }; try { if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(done, fb); } catch (e) { } fb(); function fb() { var a = document.createElement("textarea"); a.value = t; a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); done(); } catch (e) { toast("Couldn't copy"); } a.remove(); } }
+  function offerDetails() {
+    var ov = sheet("Effective price", PR.name, [["📋", "Copy for customer", function () { copyTxt(summaryText(calcOffers())); return false; }], ["🧹", "Clear offers", function () { PICK = {}; paintPicks(); }, "red"]], '<div id="odb"></div>');
+    ov.querySelector(".sheet").style.maxWidth = "560px";
+    var draw = function () {
+      var c = calcOffers(), row = function (l, v, cls) { return "<tr><td>" + l + '</td><td class="' + (cls || "") + '">' + v + "</td></tr>"; };
+      var h = '<table class="ol"><tbody>' + row("MRP", rs(c.mrp)) + (c.price !== c.mrp ? row("Selling price", rs(c.price)) : "");
+      c.lines.forEach(function (l) { var sign = l.o.kind === "vshield" ? "+" : l.o.kind === "abb" ? "" : "−"; h += row(KIND_ICON[l.o.kind] + " " + esc(l.o.name) + (l.o.scheme ? " <b>" + esc(l.o.scheme) + "</b>" : "") + '<div class="muted" style="font-size:11.5px">' + esc(l.o.benefit || l.o.details).slice(0, 90) + (l.o.kind === "abb" ? " · buy-back value later" : "") + "</div>", sign + ' <input class="oin" type="number" inputmode="numeric" data-amt="' + l.k + '" value="' + (l.a || "") + '" placeholder="0">', l.o.kind === "vshield" ? "pos" : "neg"); });
+      h += row("<b>Net price</b>", rs(c.net));
+      if (c.emi) {
+        h += row("EMI tenure", '<select class="oin" id="otn" style="width:auto">' + c.emi.opts.map(function (n) { return "<option" + (n === c.emi.n ? " selected" : "") + ' value="' + n + '">' + n + " months</option>"; }).join("") + "</select>") +
+          row("Interest % p.a." + (c.emi.noCost ? ' <span class="chip live">No Cost</span>' : ""), '<input class="oin" type="number" inputmode="decimal" id="oir" value="' + (c.emi.ir || "") + '" placeholder="0">') +
+          row("Processing fee", '<input class="oin" type="number" inputmode="numeric" id="ofe" value="' + (c.emi.fee || "") + '" placeholder="0">') +
+          row("Extra down payment", '<input class="oin" type="number" inputmode="numeric" id="odp" value="' + (c.emi.dp || "") + '" placeholder="0">') +
+          row("<b>Down payment today</b>", rs(c.today)) + row("<b>EMI per month</b>", rs(c.emi.per) + " × " + (c.emi.n - c.emi.adv) + (c.emi.adv ? " (+" + c.emi.adv + " upfront)" : "")) + row("Interest", rs(c.emi.interest), c.emi.interest ? "pos" : "");
+      } else h += '<tr><td colspan="2" class="muted" style="font-size:12px;text-align:left">Select an EMI offer to see down payment and monthly EMI.</td></tr>';
+      h += row("Cashback & discounts", rs(c.cb + c.emiDisc), "neg") + (c.upg ? row("Upgrade / exchange bonus", rs(c.upg), "neg") : "") + (c.abb ? row("Assured buy-back later", rs(c.abb), "neg") : "") +
+        '<tr class="tot"><td><b>Effective price</b></td><td>' + rs(c.total) + "</td></tr>" + row("<b>Savings vs MRP</b>", rs(c.save), "neg") + (c.abb ? row("Cost after buy-back", rs(Math.max(0, c.total - c.abb))) : "") + "</tbody></table>" +
+        '<div class="muted" style="font-size:11.5px;margin-top:8px">Amounts are read from each offer — correct any of them above. EMI, V-Shield, Upgrade/Exchange and ABB allow one offer each; cashback offers add up.</div>';
+      ov.querySelector("#odb").innerHTML = h;
+      [].forEach.call(ov.querySelectorAll("[data-amt]"), function (i) { i.onchange = function () { AMTS[i.dataset.amt] = i.value; draw(); bar(true); }; });
+      var bindT = function (id, k) { var e = ov.querySelector("#" + id); if (e) e.onchange = function () { TEN[k] = e.value; draw(); bar(true); }; };
+      bindT("otn", "n"); bindT("oir", "ir"); bindT("ofe", "fee"); bindT("odp", "dp");
+    };
+    draw();
+  }
+
+  // ================= report template =================
+  function tplOk(t) { return t && Array.isArray(t.fields) && t.fields.length; }
+  function tpl() {
+    var mine = null; try { mine = JSON.parse(ls("aff-tpl-mine") || "null"); } catch (e) { }
+    var t = JSON.parse(JSON.stringify(tplOk(mine) ? mine : tplOk(TPLH) ? TPLH : DEF_TPL));
+    ["kind", "details"].forEach(function (id) { var f = t.fields.filter(function (q) { return q.id === id; })[0]; if (!f) t.fields.push(JSON.parse(JSON.stringify(DEF_TPL.fields.filter(function (q) { return q.id === id; })[0]))); else { f.on = true; if (id === "details") f.req = true; } });
+    t.src = tplOk(mine) ? "mine" : tplOk(TPLH) ? "ho" : "default";
+    return t;
+  }
+  function tplLabel(t) { return t.src === "mine" ? "My template (this device)" : t.src === "ho" ? "HO default" + (TPLH && TPLH.by ? " · " + TPLH.by : "") : "Original form"; }
+  function tplEditor(after) {
+    var T = tpl(), F = T.fields;
+    var ov = sheet("Report form fields", "Using: " + tplLabel(T), [["💾", "Save on this device", function () { ls("aff-tpl-mine", JSON.stringify({ v: 1, name: T.name, fields: F })); toast("Saved — the report form uses it now"); if (after) after(); }]].concat(ADMIN ? [["📢", "Publish as default for everyone", function () { api({ action: "aff-tpl-set", template: { name: T.name, fields: F } }).then(function (r) { if (!r.ok) return toast(r.error); TPLH = r.template; ls("aff-tpl-mine", null); toast("Published — everyone's form uses it now"); if (after) after(); }); }]] : []).concat(T.src !== "default" ? [["↩️", T.src === "mine" ? "Use " + (TPLH ? "HO default" : "original form") : "Remove HO default (back to original)", function () { if (T.src === "mine") { ls("aff-tpl-mine", null); toast("Back to " + (TPLH ? "HO default" : "original form")); if (after) after(); } else api({ action: "aff-tpl-set", template: null }).then(function (r) { if (!r.ok) return toast(r.error); TPLH = null; toast("HO default removed"); if (after) after(); }); }, "red"]] : []),
+      '<div id="tfb"></div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="tfa">＋ Add field</button><button class="btn sec sm" id="tfx">⬇ Export JSON</button><button class="btn sec sm" id="tfi">⬆ Import JSON</button><button class="btn sec sm" id="tfc">⬆ Bulk import reports (CSV)</button></div><div id="tfp"></div>');
+    ov.querySelector(".sheet").style.maxWidth = "640px";
+    var TY = [["text", "Text"], ["number", "Number"], ["date", "Date"], ["select", "Choice list"], ["textarea", "Long text"]];
+    var draw = function () {
+      ov.querySelector("#tfb").innerHTML = '<div class="muted" style="font-size:12px;margin-top:8px">Rename, reorder, add or remove fields and tick “Required”. Offer type and details always stay.</div>' + F.map(function (f, i) {
+        var b = BUILTIN[f.id], on = f.on !== false;
+        return '<div class="tf" style="' + (on ? "" : "opacity:.5") + '"><span class="lk">' + (b ? "🔒" : "✏️") + '</span><div><input class="tx" data-fl="' + i + '" value="' + esc(f.label) + '" maxlength="40">' + (!b ? '<div class="row" style="gap:6px;margin-top:4px"><select class="tx" data-ft="' + i + '" style="flex:1">' + TY.map(function (y) { return '<option value="' + y[0] + '"' + (f.type === y[0] ? " selected" : "") + ">" + y[1] + "</option>"; }).join("") + "</select>" + (f.type === "select" ? '<input class="tx" data-fo="' + i + '" style="flex:2" placeholder="Choices, comma separated" value="' + esc((f.opts || []).join(", ")) + '">' : "") + "</div>" : "") + "</div>" +
+          '<label class="lk"><input type="checkbox" data-fr="' + i + '"' + (f.req ? " checked" : "") + (LOCKED[f.id] && f.id === "details" ? " disabled" : "") + "> Required</label>" +
+          '<span><button class="btn ghost sm" data-fu="' + i + '"' + (i ? "" : " disabled") + '>↑</button><button class="btn ghost sm" data-fd="' + i + '"' + (i < F.length - 1 ? "" : " disabled") + ">↓</button></span>" +
+          (LOCKED[f.id] ? "<span></span>" : b ? '<button class="btn ghost sm" data-fh="' + i + '" title="' + (on ? "Hide" : "Show") + '">' + (on ? "Hide" : "Show") + "</button>" : '<button class="btn ghost sm" data-fx="' + i + '" style="color:var(--bad)">✕</button>') + "</div>";
+      }).join("");
+      var q = function (s, fn) { [].forEach.call(ov.querySelectorAll(s), fn); };
+      q("[data-fl]", function (e) { e.oninput = function () { F[+e.dataset.fl].label = e.value; }; });
+      q("[data-ft]", function (e) { e.onchange = function () { F[+e.dataset.ft].type = e.value; draw(); }; });
+      q("[data-fo]", function (e) { e.oninput = function () { F[+e.dataset.fo].opts = e.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean); }; });
+      q("[data-fr]", function (e) { e.onchange = function () { F[+e.dataset.fr].req = e.checked; }; });
+      q("[data-fu]", function (e) { e.onclick = function () { var i = +e.dataset.fu; F.splice(i - 1, 0, F.splice(i, 1)[0]); draw(); }; });
+      q("[data-fd]", function (e) { e.onclick = function () { var i = +e.dataset.fd; F.splice(i + 1, 0, F.splice(i, 1)[0]); draw(); }; });
+      q("[data-fh]", function (e) { e.onclick = function () { var f = F[+e.dataset.fh]; f.on = f.on === false; if (!f.on) f.req = false; draw(); }; });
+      q("[data-fx]", function (e) { e.onclick = function () { F.splice(+e.dataset.fx, 1); draw(); }; });
+    };
+    draw();
+    ov.querySelector("#tfa").onclick = function () { F.push({ id: "x_" + Date.now().toString(36), label: "New field", type: "text", req: false }); draw(); var l = ov.querySelectorAll("[data-fl]"); l[l.length - 1].focus(); l[l.length - 1].select(); };
+    ov.querySelector("#tfx").onclick = function () { var j = JSON.stringify({ v: 1, name: T.name, fields: F }, null, 2); download(new Blob([j], { type: "application/json" }), "offer_report_template.json"); copyTxt(j); };
+    ov.querySelector("#tfi").onclick = function () {
+      var p = ov.querySelector("#tfp"); p.innerHTML = '<label class="lb" style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">Paste template JSON — or choose a file</label><textarea class="tx" id="tfj" style="min-height:90px;font-family:monospace;font-size:12px"></textarea><div class="row" style="margin-top:6px"><button class="btn sec sm" id="tff">📁 Choose file</button><button class="btn pri sm" id="tfu">Use this template</button></div>';
+      var use = function (txt) { try { var j = JSON.parse(txt); if (!tplOk(j)) throw 0; F.length = 0; j.fields.slice(0, 40).forEach(function (f) { if (f && f.id && f.label) F.push({ id: String(f.id).replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30), label: String(f.label).slice(0, 40), type: f.type || "text", req: !!f.req, on: f.on !== false, opts: f.opts, ph: f.ph }); }); draw(); p.innerHTML = '<div class="notice info" style="margin-top:8px">Imported ' + F.length + " fields — tap Save" + (ADMIN ? " or Publish" : "") + ".</div>"; } catch (e) { toast("That isn't a template JSON."); } };
+      p.querySelector("#tfu").onclick = function () { use(p.querySelector("#tfj").value); };
+      p.querySelector("#tff").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = ".json,application/json,text/plain"; i.onchange = function () { var f = i.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { p.querySelector("#tfj").value = r.result; use(r.result); }; r.readAsText(f); }; i.click(); };
+    };
+    ov.querySelector("#tfc").onclick = function () { ov.remove(); csvImport(after); };
+  }
+  function parseCSV(t) {
+    var rows = [], row = [], f = "", q = false; t = String(t).replace(/^﻿/, "");
+    for (var i = 0; i < t.length; i++) { var c = t[i]; if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; } else if (c === '"') q = true; else if (c === "," || c === "\t" || c === ";" && !/,/.test(t.split("\n")[0])) { row.push(f); f = ""; } else if (c === "\n" || c === "\r") { if (c === "\r" && t[i + 1] === "\n") i++; row.push(f); f = ""; if (row.some(function (x) { return x.trim(); })) rows.push(row); row = []; } else f += c; }
+    row.push(f); if (row.some(function (x) { return x.trim(); })) rows.push(row); return rows;
+  }
+  function kindOf(v) { v = String(v || "").toLowerCase(); if (KIND_LABEL[v]) return v; if (/emi|financ|loan/.test(v)) return "emi"; if (/shield/.test(v)) return "vshield"; if (/abb|buy.?back/.test(v)) return "abb"; if (/upgrade/.test(v)) return "upgrade"; if (/exchange/.test(v)) return "exchange"; if (/cash|discount/.test(v)) return "cashback"; return "other"; }
+  function csvCols() { var F = tpl().fields.filter(function (f) { return f.on !== false && f.type !== "photo"; }); return [{ id: "model", label: "Model", req: true }].concat(ADMIN ? [{ id: "state", label: "State" }] : []).concat(F); }
+  function csvImport(after) {
+    var cols = csvCols();
+    var ov = sheet("Bulk import reports (CSV)", "One offer per row · first row = column names", [], '<div class="muted" style="font-size:12.5px;margin-top:8px">Columns: <b>' + cols.map(function (c) { return esc(c.label) + (c.req ? "*" : ""); }).join(", ") + '</b>. Offer type can be EMI, Exchange, Upgrade, V-Shield, ABB, Cashback or Other. Dates as YYYY-MM-DD. Up to 300 rows at a time.' + (ADMIN ? " Rows without a State are saved as All India." : " Reports are saved for your state.") + '</div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="csd">⬇ Download blank CSV</button><button class="btn pri sm" id="csf">📁 Choose CSV file</button></div><div id="csp"></div>');
+    ov.querySelector(".sheet").style.maxWidth = "560px";
+    ov.querySelector("#csd").onclick = function () { var line = function (a) { return a.map(function (x) { return /[",\n]/.test(x) ? '"' + String(x).replace(/"/g, '""') + '"' : x; }).join(","); }; var ex = cols.map(function (c) { return { model: "vivo V60", state: "Punjab", kind: "EMI", partner: "Bajaj Finserv", scheme: "10/0", benefit: "₹2,000 instant discount", variant: "8GB + 256GB", validTill: "2026-12-31", details: "No Cost EMI on Bajaj EMI card, zero down payment" }[c.id] || ""; }); download(new Blob(["﻿" + line(cols.map(function (c) { return c.label; })) + "\n" + line(ex) + "\n"], { type: "text/csv" }), "offer_reports_template.csv"); };
+    ov.querySelector("#csf").onclick = function () {
+      var i = document.createElement("input"); i.type = "file"; i.accept = ".csv,text/csv,text/plain"; i.onchange = function () {
+        var f = i.files[0]; if (!f) return; var fr = new FileReader(); fr.onload = function () {
+          var R = parseCSV(fr.result); if (R.length < 2) return toast("No rows found under the header.");
+          var H = R[0].map(function (h) { return h.trim().replace(/\*$/, "").toLowerCase(); }), map = cols.map(function (c) { var j = H.indexOf(c.label.toLowerCase()); if (j < 0) j = H.indexOf(c.id.toLowerCase()); return j; });
+          if (map[0] < 0) return toast("The CSV needs a “Model” column.");
+          var rows = [], miss = 0;
+          R.slice(1, 301).forEach(function (r) { var o = { extra: {} }, bad = false; cols.forEach(function (c, k) { var v = map[k] >= 0 ? String(r[map[k]] || "").trim() : ""; if (c.req && !v) bad = true; if (c.id === "kind") v = kindOf(v); if (BUILTIN[c.id] || c.id === "model" || c.id === "state") o[c.id] = v; else if (v) o.extra[c.id] = v; }); if (bad) miss++; else rows.push(o); });
+          var p = ov.querySelector("#csp"); p.innerHTML = '<div class="notice info" style="margin-top:10px">' + rows.length + " row(s) ready" + (miss ? " · " + miss + " skipped (required column empty)" : "") + (R.length > 301 ? " · only the first 300 are imported" : "") + '</div><button class="btn pri block" id="csg" style="margin-top:8px"' + (rows.length ? "" : " disabled") + ">Import " + rows.length + " report(s)</button>";
+          p.querySelector("#csg").onclick = function () { this.disabled = true; this.textContent = "Importing…"; api({ action: "aff-report-bulk", rows: rows }).then(function (r) { if (!r.ok) { p.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } p.innerHTML = '<div class="notice info" style="margin-top:10px">✅ ' + r.added + " report(s) added." + (r.errors.length ? "<br>" + r.errors.map(function (e) { return "Row " + e.row + ": " + esc(e.error); }).join("<br>") : "") + "</div>"; ALLR = null; if (after) after(); }); };
+        }; fr.readAsText(f);
+      }; i.click();
+    };
   }
 
   function hoEdit(C, vs, cols) {
@@ -719,25 +902,36 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
 
   // ================= report form =================
   function reportForm(C, vs) {
-    var photo = "", XF = null, ov = sheet("Report an offer", (C.m && C.m.name || C.base.name) + (ADMIN ? " · HO offers are marked official" : " · " + (CAT.state || "your state")), [["📤", "Submit", function (ov) {
-      var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
-      if (g("rd").length < 5) { toast("Describe the offer."); return false; }
-      var extra = XF ? XF.collect() : {}; if (extra === null) return false;
-      api({ action: "aff-report-add", extra: extra, slug: C.slug, kind: g("rk"), partner: g("rp"), scheme: g("rsc"), benefit: g("rb"), details: g("rd"), validTill: g("rv"), variant: g("rva"), state: ADMIN ? g("rst") : "", photo: photo }).then(function (r) {
-        if (!r.ok) return toast(r.error); toast("Thanks — offer added"); C.reports.unshift(r.report); drawModel();
+    var photo = "", XF = null, T = tpl(), F = T.fields.filter(function (f) { return f.on !== false; });
+    var input = function (f) {
+      var id = "rf_" + f.id, ph = f.ph ? ' placeholder="' + esc(f.ph) + '"' : "";
+      if (f.type === "kind") return '<select class="tx" id="' + id + '">' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_ICON[k] + " " + KIND_LABEL[k] + "</option>"; }).join("") + "</select>";
+      if (f.type === "variant") return '<select class="tx" id="' + id + '"><option value="">All variants</option>' + vs.map(function (v) { return "<option>" + esc(vlabel(v)) + "</option>"; }).join("") + "</select>";
+      if (f.type === "photo") return '<div class="row"><button class="btn sec sm" id="rph" type="button">📷 Add photo</button><span class="muted" id="rpt" style="font-size:12px"></span></div>';
+      if (f.type === "textarea") return '<textarea class="tx" id="' + id + '" style="min-height:70px"' + ph + "></textarea>";
+      if (f.type === "select") return '<select class="tx" id="' + id + '"><option value=""></option>' + (f.opts || []).map(function (o) { return "<option>" + esc(o) + "</option>"; }).join("") + "</select>";
+      if (f.id === "partner") return '<input class="tx" id="' + id + '" list="plist"' + ph + '><datalist id="plist">' + LST("aff.partner", CAT.partners || []).map(function (p) { return "<option>" + esc(p) + "</option>"; }).join("") + "</datalist>";
+      if (f.id === "scheme") return '<input class="tx" id="' + id + '" list="slist"' + ph + '><datalist id="slist">' + SCHEMES.map(function (s2) { return "<option>" + s2 + "</option>"; }).join("") + "</datalist>";
+      return '<input class="tx" id="' + id + '" type="' + (f.type === "number" ? "number" : f.type === "date" ? "date" : "text") + '"' + ph + ">";
+    };
+    var body = '<div class="f2"><div class="row" style="justify-content:space-between;margin-top:6px"><span class="muted" style="font-size:12px">Form: ' + esc(tplLabel(T)) + '</span><a href="javascript:void 0" id="rtpl" style="font-size:12.5px;font-weight:700;color:var(--brand)">⚙️ Form fields</a></div>' +
+      F.map(function (f) { return "<label" + (f.id === "partner" ? DL("aff.partner", CAT.partners || []) : "") + ">" + esc(f.label) + (f.req ? ' <span style="color:var(--bad)">*</span>' : "") + "</label>" + input(f); }).join("") +
+      (ADMIN ? '<label>State</label><select class="tx" id="rst"><option>All India</option>' + STATES.map(function (s2) { return "<option>" + esc(s2) + "</option>"; }).join("") + "</select>" : "") + '<div id="axf"></div></div>';
+    var ov = sheet("Report an offer", (C.m && C.m.name || C.base.name) + (ADMIN ? " · HO offers are marked official" : " · " + (CAT.state || "your state")), [["📤", "Submit", function (ov) {
+      var g = function (id) { var e = ov.querySelector("#rf_" + id); return e ? e.value.trim() : ""; }, extra = {}, miss = [];
+      F.forEach(function (f) { if (f.type === "photo") { if (f.req && !photo) miss.push(f.label); return; } var v = g(f.id); if (f.req && !v) miss.push(f.label); if (!BUILTIN[f.id] && v) extra[f.id] = v; });
+      if (miss.length) { toast("Please fill: " + miss.join(", ")); return false; }
+      if (g("details").length < 5) { toast("Describe the offer."); return false; }
+      var xx = XF ? XF.collect() : {}; if (xx === null) return false; Object.assign(extra, xx);
+      api({ action: "aff-report-add", extra: extra, slug: C.slug, kind: g("kind") || "other", partner: g("partner"), scheme: g("scheme"), benefit: g("benefit"), details: g("details"), validTill: g("validTill"), variant: g("variant"), state: ADMIN ? ov.querySelector("#rst").value : "", photo: photo }).then(function (r) {
+        if (!r.ok) return toast(r.error); toast("Thanks — offer added"); C.reports.unshift(r.report); ALLR = null; drawModel();
       });
-    }]], '<div class="f2"><div class="g2s"><div><label>Offer type</label><select class="tx" id="rk">' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_ICON[k] + " " + KIND_LABEL[k] + "</option>"; }).join("") + "</select></div>" +
-      '<div><label' + DL("aff.partner", CAT.partners || []) + '>Partner / bank</label><input class="tx" id="rp" list="plist" placeholder="e.g. Bajaj Finserv"><datalist id="plist">' + LST("aff.partner", CAT.partners || []).map(function (p) { return "<option>" + esc(p) + "</option>"; }).join("") + "</datalist></div>" +
-      '<div><label>Scheme (EMI)</label><input class="tx" id="rsc" list="slist" placeholder="e.g. 10/0"><datalist id="slist">' + SCHEMES.map(function (s) { return "<option>" + s + "</option>"; }).join("") + "</datalist></div>" +
-      '<div><label>Benefit</label><input class="tx" id="rb" placeholder="e.g. ₹3,000 cashback"></div>' +
-      '<div><label>Variant (optional)</label><select class="tx" id="rva"><option value="">All variants</option>' + vs.map(function (v) { return "<option>" + esc(vlabel(v)) + "</option>"; }).join("") + "</select></div>" +
-      '<div><label>Valid till</label><input class="tx" id="rv" type="date"></div></div>' +
-      (ADMIN ? '<label>State</label><select class="tx" id="rst"><option>All India</option>' + STATES.map(function (s) { return "<option>" + esc(s) + "</option>"; }).join("") + "</select>" : "") +
-      '<label>Offer details</label><textarea class="tx" id="rd" style="min-height:70px" placeholder="What does the customer get, any conditions, which stores…"></textarea>' +
-      '<div id="axf"></div><label>Photo of standee / circular (optional)</label><div class="row"><button class="btn sec sm" id="rph" type="button">📷 Add photo</button><span class="muted" id="rpt" style="font-size:12px"></span></div></div>');
+    }]], body);
     ov.querySelector(".sheet").style.maxWidth = "560px";
     if (window.CUST) XF = CUST.renderExtra(ov.querySelector("#axf"), "aff.report", {});
-    ov.querySelector("#rph").onclick = function () {
+    ov.querySelector("#rtpl").onclick = function () { ov.remove(); tplEditor(function () { reportForm(C, vs); }); };
+    var rph = ov.querySelector("#rph");
+    if (rph) rph.onclick = function () {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
       inp.onchange = function () {
         var f = inp.files[0]; if (!f) return; ov.querySelector("#rpt").textContent = "Uploading…";
@@ -749,6 +943,35 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
       };
       inp.click();
     };
+  }
+
+  // ================= REPORTS (shared list) =================
+  var RF = { st: ls("aff-rst") || "", q: "", k: "", v: "" };
+  function showReports() {
+    hero("Offer reports", "Every offer reported from the market — shared with all states");
+    $("pane").innerHTML = '<div class="row" style="margin-top:6px;flex-wrap:wrap"><select class="tx" id="rfs" style="flex:1;min-width:130px"></select><select class="tx" id="rfk" style="flex:1;min-width:130px"><option value="">All offer types</option>' + Object.keys(KIND_LABEL).map(function (k) { return '<option value="' + k + '">' + KIND_LABEL[k] + "</option>"; }).join("") + '</select><select class="tx" id="rfv" style="flex:1;min-width:110px"><option value="">All reports</option><option value="v">✓ Verified</option><option value="u">Not verified</option></select></div>' +
+      '<input class="tx" id="rfq" placeholder="Search model, partner or details" style="margin-top:8px"><div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="rft">⚙️ Form fields</button><button class="btn sec sm" id="rfc">⬆ Bulk import (CSV)</button><button class="btn sec sm" id="rfx">⬇ Export</button></div><div id="rl"><div class="loading"><div class="spin"></div></div></div>';
+    $("rfk").value = RF.k; $("rfv").value = RF.v; $("rfq").value = RF.q;
+    $("rfs").onchange = function () { RF.st = this.value; ls("aff-rst", RF.st); drawReports(); }; $("rfk").onchange = function () { RF.k = this.value; drawReports(); }; $("rfv").onchange = function () { RF.v = this.value; drawReports(); }; $("rfq").oninput = function () { RF.q = this.value.toLowerCase().trim(); drawReports(); };
+    $("rft").onclick = function () { tplEditor(function () { if (TAB === "reports") drawReports(); }); };
+    $("rfc").onclick = function () { csvImport(function () { if (TAB === "reports") showReports(); }); };
+    $("rfx").onclick = function () { var L = filtR(), xf = tpl().fields.filter(function (f) { return !BUILTIN[f.id]; }); download(xlsx([{ name: "Offer reports", rows: [["State", "Model", "Type", "Partner", "Scheme", "Benefit", "Details", "Variant", "Valid till"].concat(xf.map(function (f) { return f.label; })).concat(["Reported by", "Date", "Verified", "HO"])].concat(L.map(function (r) { return [r.state, r.model, KIND_LABEL[r.kind], r.partner, r.scheme, r.benefit || "", r.details, r.variant || "", r.validTill].concat(xf.map(function (f) { return (r.extra || {})[f.id] || ""; })).concat([r.by.fullName, dt(r.at), r.verified ? "Yes" : "No", r.official ? "Yes" : ""]); })) }]), "Offer_reports_" + istDay(Date.now()) + ".xlsx"); };
+    if (ALLR) return drawReports();
+    api({ action: "aff-states" }).then(function (r) { if (!$("rl")) return; if (!r.ok) { $("rl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ALLR = r.reports; drawReports(); });
+  }
+  function filtR() { return (ALLR || []).filter(function (r) { return (!RF.st || r.state === RF.st) && (!RF.k || r.kind === RF.k) && (!RF.v || (RF.v === "v" ? r.verified : !r.verified)) && (!RF.q || (r.model + " " + r.partner + " " + r.scheme + " " + r.benefit + " " + r.details + " " + r.by.fullName).toLowerCase().indexOf(RF.q) >= 0); }); }
+  function drawReports() {
+    if (!ALLR || !$("rl")) return;
+    var sts = ALLR.map(function (r) { return r.state; }).filter(function (x, i, a) { return x && a.indexOf(x) === i; }).sort();
+    if (RF.st && sts.indexOf(RF.st) < 0) sts.unshift(RF.st);
+    $("rfs").innerHTML = '<option value="">All states (' + ALLR.length + ")</option>" + sts.map(function (s2) { var n = ALLR.filter(function (r) { return r.state === s2; }).length; return '<option value="' + esc(s2) + '"' + (s2 === RF.st ? " selected" : "") + ">" + esc(s2) + " (" + n + ")</option>"; }).join("");
+    var L = filtR();
+    $("rl").innerHTML = '<div class="tiles" style="margin-top:10px">' + tileS("📍", "#E6F4EA", L.length, "Reports") + tileS("✓", "#FFF4E5", L.filter(function (r) { return r.verified; }).length, "Verified") + tileS("🗺️", "#EEF0FF", L.map(function (r) { return r.state; }).filter(function (x, i, q) { return q.indexOf(x) === i; }).length, "States") + tileS("📱", "#F4EEFF", L.map(function (r) { return r.slug; }).filter(function (x, i, q) { return q.indexOf(x) === i; }).length, "Models") + "</div>" +
+      (L.length ? L.slice(0, 300).map(function (r) { return reportCard(r, true); }).join("") + (L.length > 300 ? '<div class="muted" style="font-size:12px;margin-top:8px">Showing 300 of ' + L.length + " — use the filters or Export.</div>" : "") : '<div class="card empty"><div class="big">📋</div>No reports match. Open a model in <b>Find offers</b> and tap <b>＋ Report an offer</b>, or use <b>Bulk import</b>.</div>');
+    var q = function (s2, fn) { [].forEach.call($("rl").querySelectorAll(s2), fn); };
+    q("[data-ph]", function (x) { x.onclick = function () { showPhoto(x.dataset.phs, x.dataset.ph); }; });
+    q("[data-ver]", function (x) { x.onclick = function () { var r0 = ALLR.filter(function (r) { return r.id === x.dataset.ver; })[0]; api({ action: "aff-report-verify", slug: x.dataset.vs, id: r0.id, verified: !r0.verified }).then(function (r) { if (!r.ok) return toast(r.error); Object.assign(r0, r.report); drawReports(); }); }; });
+    q("[data-del]", function (x) { x.onclick = function () { sheet("Delete this report?", "", [["🗑️", "Delete", function () { api({ action: "aff-report-delete", slug: x.dataset.ds, id: x.dataset.del }).then(function (r) { if (!r.ok) return toast(r.error); ALLR = ALLR.filter(function (q2) { return q2.id !== x.dataset.del; }); drawReports(); }); }, "red"]]); }; });
   }
 
   // ================= COMPARE =================

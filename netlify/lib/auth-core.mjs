@@ -864,7 +864,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
     "visit-config", "visit-stores", "visit-start", "visit-save", "visit-end", "visit-cancel", "visit-get", "visit-list", "visit-live", "visit-stats", "visit-ai-one", "visit-ai-states",
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
-    "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images",
+    "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {

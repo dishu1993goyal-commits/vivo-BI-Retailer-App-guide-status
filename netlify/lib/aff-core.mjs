@@ -466,6 +466,20 @@ export async function startJob(ctx, kind, model, { force = false } = {}) {
 }
 
 // ---------- session actions ----------
+const TPL_TYPES = ["text", "number", "date", "select", "textarea", "kind", "variant", "photo"];
+export function cleanTpl(x) {
+  if (!x || !Array.isArray(x.fields)) return null;
+  const seen = {}, fields = [];
+  x.fields.slice(0, 40).forEach((f) => {
+    if (!f || typeof f !== "object") return;
+    const id = String(f.id || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 30); if (!id || seen[id]) return; seen[id] = 1;
+    const o = { id, label: str(f.label, 40) || id, type: TPL_TYPES.includes(f.type) ? f.type : "text", req: !!f.req, on: f.on !== false };
+    if (o.type === "select") o.opts = (Array.isArray(f.opts) ? f.opts : String(f.opts || "").split(",")).map((v) => str(v, 40)).filter(Boolean).slice(0, 30);
+    if (f.ph) o.ph = str(f.ph, 60);
+    fields.push(o);
+  });
+  return fields.length ? { v: 1, name: str(x.name, 40) || "Offer report", fields } : null;
+}
 export async function affAction(b, ctx) {
   const { store, t, app, rec, pool, sameUser, who } = ctx;
   const isAdmin = app === "admin";
@@ -542,6 +556,35 @@ export async function affAction(b, ctx) {
     await store.set(`affr:${slug}:${id}`, r);
     await ctx.logEvent(store, t, app, rec, "offer-reported", { device: (r.model + " · " + (r.partner || kind)).slice(0, 60), ver: "" });
     return json(200, { ok: true, report: r });
+  }
+
+  if (b.action === "aff-tpl-get") return json(200, { ok: true, template: (await store.get("config:afftpl")) || null });
+  if (b.action === "aff-tpl-set") {
+    if (!isAdmin) return json(403, { ok: false, error: "Only admins can publish the default template." });
+    if (b.template === null) { await store.delete("config:afftpl"); return json(200, { ok: true, template: null }); }
+    const tpl = cleanTpl(b.template); if (!tpl) return json(400, { ok: false, error: "The template has no fields." });
+    tpl.by = rec.fullName || rec.username; tpl.at = t;
+    await store.set("config:afftpl", tpl); return json(200, { ok: true, template: tpl });
+  }
+  if (b.action === "aff-report-bulk") {   // CSV import: many reports at once
+    const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 300);
+    if (!rows.length) return json(400, { ok: false, error: "No rows to import." });
+    const cat = (await store.get("affcat")) || { models: [] }, out = [], bad = [];
+    const find = (n) => { const k = nameKey(n), sl = slugify(n); return cat.models.find((m) => m.slug === sl || nameKey(m.name) === k) || cat.models.find((m) => k && (nameKey(m.name).startsWith(k) || k.startsWith(nameKey(m.name)))); };
+    for (let i = 0; i < rows.length; i++) {
+      const x = rows[i] || {}, base = find(x.model);
+      if (!base) { bad.push({ row: i + 2, error: "Model not found: " + str(x.model, 40) }); continue; }
+      const details = str(x.details, 400) || [str(x.partner, 60), str(x.scheme, 20), str(x.benefit, 80)].filter(Boolean).join(" · ");
+      if (details.length < 5) { bad.push({ row: i + 2, error: "Offer details missing" }); continue; }
+      const state = isAdmin ? str(x.state, 40) || "All India" : rec.state || "";
+      if (!state) { bad.push({ row: i + 2, error: "No state" }); continue; }
+      const id = (t + i).toString(36) + randomBytes(3).toString("hex");
+      const r = { id, slug: base.slug, model: base.name, state, kind: KINDS.includes(x.kind) ? x.kind : "other", partner: str(x.partner, 60), scheme: str(x.scheme, 20), benefit: str(x.benefit, 80), details, variant: str(x.variant, 30),
+        validTill: /^\d{4}-\d{2}-\d{2}$/.test(String(x.validTill || "")) ? x.validTill : "", photo: "", extra: cleanExtra(x.extra), by: Object.assign({}, me, { state: rec.state || "" }), at: t + i, verified: isAdmin, verifiedBy: isAdmin ? rec.fullName : "", official: isAdmin, bulk: true };
+      await store.set(`affr:${base.slug}:${id}`, r); out.push(r);
+    }
+    if (out.length) await ctx.logEvent(store, t, app, rec, "offer-reported", { device: ("CSV import · " + out.length + " offers").slice(0, 60), ver: "" });
+    return json(200, { ok: true, added: out.length, errors: bad.slice(0, 50), reports: out });
   }
 
   if (b.action === "aff-report-delete" || b.action === "aff-report-verify") {
