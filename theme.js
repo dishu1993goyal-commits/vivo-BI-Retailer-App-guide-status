@@ -236,6 +236,32 @@
   };
   var CARD_SEL = { dashboard: [".rp .card", ".rp .tile", ".rp .pp", ".rp .m-card", ".rp .sdc", ".rp .t5", ".rp a.rm-tile", ".rp .cpan", ".rp .fgroup", ".rp .rm-out", ".rp .tip"], tools: [".card", ".tl", ".bx", ".it2", ".al", ".pp", ".res", ".sv", ".of", ".ln", ".nt", ".ev", ".gi", ".tipc", ".mapw", ".it", ".quick button", ".lst", ".rk", ".bg", ".wc", ".mp", ".nar", ".dg", ".types button", ".ops button"] };
   function inScope(sc) { return !sc || sc === "all" || sc === PAGE; }
+  // ---------- dashboard tab layout (order / show / rename) ----------
+  var DEF_TABS = [["overview", "Overview"], ["rank", "Rankings"], ["trend", "Trends"], ["app", "Retailer app"], ["retv", "Active retailers"], ["sd", "Support desk"], ["plan", "Action plan"], ["rm", "Roadmap 2027"], ["how", "How to use"], ["kq4", "KPI framework"], ["grw", "Growth"], ["cmp", "Compare"], ["onb", "Onboarded"], ["q3", "Q3 rankings"], ["dl", "Get the app"], ["tl", "Smart tools"]];
+  function labelOf(b) { var sp = b.querySelector(".tl"); return (sp ? sp.textContent : b.textContent).trim(); }
+  function setLabel(b, t) { var sp = b.querySelector(".tl"); if (sp) sp.textContent = t; else if (b.querySelector("svg")) { var n = Array.prototype.filter.call(b.childNodes, function (c) { return c.nodeType === 3 && c.nodeValue.trim(); })[0]; if (n) n.nodeValue = t; } else b.textContent = t; }
+  function tabList() {
+    var tb = document.getElementById("tabs"), out = [], seen = {};
+    if (tb) Array.prototype.forEach.call(tb.querySelectorAll("button[data-t]"), function (b) { var k = b.dataset.t; if (seen[k]) return; seen[k] = 1; if (b.dataset.bto == null) b.dataset.bto = labelOf(b); out.push([k, b.dataset.bto]); });
+    return out.length ? out : DEF_TABS;
+  }
+  function applyTabs() {
+    var tb = document.getElementById("tabs"); if (!tb || PAGE !== "dashboard") return;
+    var T = CFG.tabs || {}, hide = T.hide || [], names = T.names || {}, order = T.order || [];
+    var btns = Array.prototype.slice.call(tb.querySelectorAll("button[data-t]")); if (!btns.length) return;
+    var links = Array.prototype.slice.call(document.querySelectorAll("#mlist a[data-t]"));
+    btns.concat(links).forEach(function (b) {
+      var k = b.dataset.t; if (b.dataset.bto == null) b.dataset.bto = labelOf(b);
+      var want = names[k] || b.dataset.bto; if (labelOf(b) !== want) setLabel(b, want);
+      var off = k !== "overview" && hide.indexOf(k) >= 0; if (off !== (b.style.display === "none")) b.style.display = off ? "none" : "";
+    });
+    if (order.length) {
+      var rank = function (b) { var i = order.indexOf(b.dataset.t); return i < 0 ? 900 + btns.indexOf(b) : i; };
+      var sorted = btns.slice().sort(function (a, b) { return rank(a) - rank(b); });
+      if (sorted.some(function (b, i) { return b !== btns[i]; })) { sorted.forEach(function (b) { tb.appendChild(b); }); Array.prototype.forEach.call(tb.querySelectorAll(".tgl"), function (g) { g.style.display = "none"; }); }
+      var ml = document.getElementById("mlist"); if (ml) links.slice().sort(function (a, b) { var x = order.indexOf(a.dataset.t), y = order.indexOf(b.dataset.t); return (x < 0 ? 900 : x) - (y < 0 ? 900 : y); }).forEach(function (a) { ml.appendChild(a); });
+    }
+  }
   function studio() {
     var C = CFG.card || {}, A = CFG.art || {}, T = CUR || prep(BYID[SRC]), acc = T.accent, deep = T.deep, tint = T.tint, dark = !!(CUR && CUR.dark), x = "";
     var sel = function (extra) { return CARD_SEL[PAGE].map(function (q) { return "html body " + q + (extra || ""); }).join(","); };
@@ -268,13 +294,14 @@
       var op = { faint: 0.9, light: 0.78, medium: 0.6, strong: 0.36 }[A.strength] || 0.78, base = dark ? deep : tint;
       var img = A.pattern && PATTERNS[A.pattern] ? (A.pattern === "glow" ? "radial-gradient(60% 50% at 20% 10%," + acc + "55,transparent 70%),radial-gradient(50% 40% at 90% 30%," + deep + "44,transparent 70%),radial-gradient(60% 50% at 50% 100%," + acc + "33,transparent 70%)" : 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(PATTERNS[A.pattern](acc)) + '")') : 'url("' + String(A.url).replace(/"/g, "") + '")';
       var tile = A.pattern && A.pattern !== "glow" || A.fit === "tile";
-      x += "html,html body{background:transparent!important}" + (PAGE === "dashboard" ? "html body .rp .bnr,html body .rp[data-layout=hub] .filters{background:transparent!important}" : "html body .wrap{background:transparent!important}");
+      x += "html,html body{background:transparent!important}" + (PAGE === "dashboard" ? "html body #rp,html body .rp,html body #dash-root,html body .rp .bnr,html body .rp[data-layout=hub] .filters,html body .rp .wrap,html body .rp main{background:transparent!important}html body .rp .top{background:" + (dark ? "rgba(14,16,22,.82)" : "rgba(255,255,255,.82)") + "!important;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}" : "html body .wrap{background:transparent!important}");
       if (!layer && document.body) { layer = document.createElement("div"); layer.id = "bt-art"; layer.setAttribute("data-bt-skip", "1"); layer.setAttribute("aria-hidden", "true"); document.body.insertBefore(layer, document.body.firstChild); }
       if (layer) {
         layer.style.cssText = "position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:" + base + ";background-image:" + img + ";background-size:" + (tile ? "auto" : "cover") + ";background-position:center;background-repeat:" + (tile ? "repeat" : "no-repeat") + (A.blur ? ";filter:blur(" + (+A.blur) + "px);transform:scale(1.04)" : "");
         layer.innerHTML = '<i style="position:absolute;inset:0;background:' + base + ";opacity:" + (A.pattern ? 0 : op) + '"></i>';
       }
     } else if (layer) layer.remove();
+    applyTabs();
     var st = document.getElementById("bt-studio");
     if (!x) { if (st) st.remove(); return; }
     if (!st) { st = document.createElement("style"); st.id = "bt-studio"; st.setAttribute("data-bt-skip", "1"); }
@@ -322,6 +349,7 @@
     ".btp-g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.btp-g2 label{display:block!important;margin:0!important;font-size:12px;color:#6B7088}" +
     ".btp-art{height:130px;border-radius:12px;overflow:hidden;border:1px solid #E3E5EF;margin-top:8px;background:#F4F5F9}.btp-art img{width:100%;height:100%;object-fit:cover}" +
     ".btp-thumbs{display:flex;gap:8px;overflow-x:auto;margin-top:6px;padding-bottom:4px}.btp-thumbs img,.btp-thumbs span{flex:none;width:92px;height:58px;border-radius:9px;object-fit:cover;border:2px solid #E3E5EF;cursor:pointer;font-size:11px;font-weight:700;color:#2A2F4A;display:flex;align-items:flex-end;justify-content:center;padding-bottom:3px;box-sizing:border-box;text-transform:capitalize}.btp-thumbs .on{border-color:#415FFF;box-shadow:0 0 0 3px rgba(65,95,255,.2)}" +
+    ".btp-tl{margin-top:8px;display:flex;flex-direction:column;gap:6px}.btp-tr{display:flex;align-items:center;gap:6px}.btp-tr .btp-btn{padding:6px 10px;margin:0}.btp-tr .btp-btn[disabled]{opacity:.35}.btp-tn{flex:1;min-width:0;border:1px solid #D5D8E6;border-radius:9px;padding:7px 9px;font:inherit;font-size:13px}" +
     ".btp-pv{color:#fff;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800}";
   function css() { if (document.getElementById("btp-css")) return; var s = document.createElement("style"); s.id = "btp-css"; s.setAttribute("data-bt-skip", "1"); s.textContent = CSS; (document.head || document.documentElement).appendChild(s); }
   function paintButton() { var b = document.getElementById("btp-b"); if (b) b.title = "Theme: " + (CUR ? CUR.name : "original"); }
@@ -380,7 +408,7 @@
   }
   function openStudio() {
     css();
-    var D = JSON.parse(JSON.stringify(CFG || {})); D.custom = D.custom || {}; D.art = D.art || {}; D.card = D.card || {}; D.ind = D.ind || {};
+    var D = JSON.parse(JSON.stringify(CFG || {})); D.custom = D.custom || {}; D.art = D.art || {}; D.card = D.card || {}; D.ind = D.ind || {}; D.tabs = D.tabs || {};
     var KEEP = JSON.parse(JSON.stringify(CFG || {})), tab = "themes", banners = null, saved = false;
     var ov = document.createElement("div"); ov.className = "btp-ov"; ov.setAttribute("data-bt-skip", "1"); ov.setAttribute("data-noi18n", "1"); document.body.appendChild(ov);
     var a0 = auth();
@@ -389,7 +417,7 @@
     var sel = function (id, opts, val) { return '<select data-k="' + id + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(val || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>"; };
     var draw = function (msg) {
       var on = Array.isArray(D.on) && D.on.length ? D.on : THEMES.map(function (t) { return t.id; });
-      var h = '<div class="btp-s"><h3>🛡️ Design studio</h3><div class="m">For everyone — dashboard, both apps and the web. Changes preview live; tap Save to publish.</div><div class="btp-tabs">' + [["themes", "🎨 Themes"], ["art", "🖼️ Background art"], ["cards", "🧩 Cards & layout"], ["ind", "🚦 Indicators"]].map(function (t) { return '<span data-tab="' + t[0] + '" class="' + (tab === t[0] ? "on" : "") + '">' + t[1] + "</span>"; }).join("") + "</div><div class=\"btp-adm\" style=\"border:0;padding-top:4px\">";
+      var h = '<div class="btp-s"><h3>🛡️ Design studio</h3><div class="m">For everyone — dashboard, both apps and the web. Changes preview live; tap Save to publish.</div><div class="btp-tabs">' + [["themes", "🎨 Themes"], ["art", "🖼️ Background art"], ["cards", "🧩 Cards & layout"], ["tabs", "📑 Dashboard tabs"], ["ind", "🚦 Indicators"]].map(function (t) { return '<span data-tab="' + t[0] + '" class="' + (tab === t[0] ? "on" : "") + '">' + t[1] + "</span>"; }).join("") + "</div><div class=\"btp-adm\" style=\"border:0;padding-top:4px\">";
       if (tab === "themes") {
         h += '<label style="display:block">Default theme for everyone<select id="btp-def"><option value="">Original look (no theme)</option>' + CATS.map(function (c) { return '<optgroup label="' + c + '">' + THEMES.filter(function (t) { return t.cat === c; }).map(function (t) { return '<option value="' + t.id + '"' + (t.id === D.def ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + "</select></label>" +
           '<div class="m" style="margin-top:10px">Themes people can pick (' + on.length + " of " + THEMES.length + ')</div><div class="btp-row" style="margin-top:4px"><button class="btp-btn" id="btp-all">All</button><button class="btp-btn" id="btp-none">None</button></div>' + CATS.map(function (c) { return '<div class="m" style="margin-top:8px;font-weight:700">' + c + '</div><div class="btp-chk">' + THEMES.filter(function (t) { return t.cat === c; }).map(function (t) { return '<label><input type="checkbox" data-on="' + t.id + '"' + (on.indexOf(t.id) >= 0 ? " checked" : "") + '> <i style="display:inline-block;width:10px;height:10px;border-radius:99px;background:' + t.accent + '"></i> ' + esc(t.name) + "</label>"; }).join("") + "</div>"; }).join("") +
@@ -422,6 +450,12 @@
           "<label>Apply to" + sel("card.scope", [["all", "Dashboard + tools"], ["dashboard", "Dashboard only"], ["tools", "Tools only"]], C.scope || "all") + "</label></div>" +
           '<div class="btp-row"><button class="btp-btn" id="btp-crst">↺ Reset cards & layout</button></div>';
       }
+      if (tab === "tabs") {
+        var TL = tabList(), TT = D.tabs, ord = (TT.order || []).filter(function (k) { return TL.some(function (x) { return x[0] === k; }); });
+        TL.forEach(function (x) { if (ord.indexOf(x[0]) < 0) ord.push(x[0]); });
+        h += '<div class="m">Choose which dashboard tabs everyone sees, their order and their names. Overview always stays.' + (PAGE !== "dashboard" ? " (Open the dashboard to preview.)" : "") + '</div><div class="btp-tl">' + ord.map(function (k, i) { var o = TL.filter(function (x) { return x[0] === k; })[0]; return '<div class="btp-tr" data-tk="' + k + '"><input type="checkbox" data-tv' + ((TT.hide || []).indexOf(k) < 0 ? " checked" : "") + (k === "overview" ? " disabled" : "") + '><input class="btp-tn" data-tn placeholder="' + esc(o[1]) + '" value="' + esc((TT.names || {})[k] || "") + '" maxlength="24"><button class="btp-btn" data-up' + (i ? "" : " disabled") + '>↑</button><button class="btp-btn" data-dn' + (i < ord.length - 1 ? "" : " disabled") + ">↓</button></div>"; }).join("") + '</div><div class="m" style="margin-top:6px">Leave a name empty to keep the original.</div><div class="btp-row"><button class="btp-btn" id="btp-trst">↺ Original tabs</button></div>';
+        D._ord = ord;
+      }
       if (tab === "ind") {
         var I = D.ind;
         h += '<div class="m">Colours of good / watch / needs-action indicators (arrows, chips, scores, map, alerts). Thresholds are in the Configuration centre.</div><div class="btp-cols">' + [["good", "Good", "#1E9E61"], ["warn", "Watch", "#E69A00"], ["bad", "Needs action", "#D93B3B"]].map(function (x) { return "<label>" + x[1] + '<input type="color" data-ind="' + x[0] + '" value="' + (I[x[0]] || x[2]).toLowerCase() + '"></label>'; }).join("") + '</div><div class="btp-row"><span class="btp-pv" style="background:' + (I.good || "#1E9E61") + '">▲ 2.9 pt</span><span class="btp-pv" style="background:' + (I.warn || "#E69A00") + '">watch</span><span class="btp-pv" style="background:' + (I.bad || "#D93B3B") + '">▼ 4 places</span></div>' +
@@ -449,6 +483,12 @@
         Array.prototype.forEach.call(ov.querySelectorAll("[data-burl]"), function (im) { im.onclick = function () { D.art.url = im.getAttribute("data-burl"); D.art.pattern = ""; D.art.on = true; preview(); draw(); }; });
         Array.prototype.forEach.call(ov.querySelectorAll("[data-pat]"), function (p) { p.onclick = function () { D.art.pattern = p.getAttribute("data-pat"); D.art.on = true; preview(); draw(); }; });
       }
+      if (tab === "tabs") {
+        var rd = function () { var o = [], hd = [], nm = {}; Array.prototype.forEach.call(ov.querySelectorAll("[data-tk]"), function (r) { var k = r.getAttribute("data-tk"); o.push(k); if (!r.querySelector("[data-tv]").checked && k !== "overview") hd.push(k); var v = r.querySelector("[data-tn]").value.trim(); if (v) nm[k] = v; }); D.tabs = { order: o, hide: hd, names: nm }; preview(); };
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-tv],[data-tn]"), function (i) { i.onchange = rd; });
+        Array.prototype.forEach.call(ov.querySelectorAll("[data-up],[data-dn]"), function (b) { b.onclick = function () { var r = b.closest("[data-tk]"), sib = b.hasAttribute("data-up") ? r.previousElementSibling : r.nextElementSibling; if (!sib) return; if (b.hasAttribute("data-up")) r.parentNode.insertBefore(r, sib); else r.parentNode.insertBefore(sib, r); rd(); draw(); }; });
+        $o("#btp-trst").onclick = function () { D.tabs = {}; preview(); draw(); };
+      }
       if (tab === "cards") $o("#btp-crst").onclick = function () { D.card = {}; preview(); draw(); };
       if (tab === "ind") {
         Array.prototype.forEach.call(ov.querySelectorAll("[data-ind]"), function (i) { i.onchange = function () { D.ind[i.getAttribute("data-ind")] = i.value.toUpperCase(); preview(); draw(); }; });
@@ -466,7 +506,7 @@
       if (D.def && D.on.indexOf(D.def) < 0) D.on.push(D.def);
     };
     var save = function () {
-      var c = { def: D.def || "", on: D.on, allowUser: D.allowUser, auto: D.auto, defAuto: D.defAuto, custom: D.custom, art: D.art, card: D.card, ind: D.ind };
+      var c = { def: D.def || "", on: D.on, allowUser: D.allowUser, auto: D.auto, defAuto: D.defAuto, custom: D.custom, art: D.art, card: D.card, ind: D.ind, tabs: { order: (D.tabs.order || []), hide: D.tabs.hide || [], names: D.tabs.names || {} } };
       var parts = [], a = auth(), jobs = [];
       if (a && a.app === "admin") jobs.push(post({ app: "admin", username: a.username, token: a.token, action: "theme-set", theme: c }).then(function (r) { if (r && r.ok) { CFG = r.theme; KEEP = JSON.parse(JSON.stringify(CFG)); saved = true; ls("biw-theme-cfg", JSON.stringify(CFG)); parts.push("✅ Saved for everyone — apps and web update on their next open."); } else parts.push("⚠️ " + ((r && r.error) || "Couldn't save online.")); }));
       if (fileAdmin()) { try { var api = window.__DASHAPI; api.META.theme = c; FILE = c; api.markDirty(); parts.push("📄 Also stored in this dashboard file — now use <b>Export & share → Save updated file</b>."); } catch (e) { } }
@@ -486,7 +526,7 @@
   };
   refresh();
   var tries = 0; (function place() { placeButton(); if (!document.getElementById("btp-b") && tries++ < 40) setTimeout(place, 250); })();
-  document.addEventListener("DOMContentLoaded", function () { placeButton(); studio(); if (window.__DASHAPI) BITHEME.fileDefault(window.__DASHAPI.META && window.__DASHAPI.META.theme); });
+  document.addEventListener("DOMContentLoaded", function () { placeButton(); studio(); [400, 1500, 4000].forEach(function (ms) { setTimeout(applyTabs, ms); }); if (window.__DASHAPI) BITHEME.fileDefault(window.__DASHAPI.META && window.__DASHAPI.META.theme); });
   setInterval(function () { if (!document.getElementById("btp-b")) placeButton(); }, 3000);
   loadCfg();
 })();

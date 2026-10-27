@@ -36,7 +36,10 @@ export function cleanTheme(c) {
   Object.keys(card).forEach((k) => card[k] === "" && delete card[k]);
   const I = c.ind && typeof c.ind === "object" ? c.ind : {}, ind = {};
   ["good", "warn", "bad"].forEach((k) => { if (hex(I[k])) ind[k] = hex(I[k]); });
-  return { def, on, allowUser: c.allowUser !== false, auto: c.auto !== false, defAuto: !!c.defAuto, custom, art, card, ind, by: c.by ? String(c.by).slice(0, 60) : undefined, at: Number(c.at) || undefined };
+  const TB = c.tabs && typeof c.tabs === "object" ? c.tabs : {}, tk = (x) => /^[a-z0-9]{1,10}$/.test(String(x || ""));
+  const tabs = { order: (Array.isArray(TB.order) ? TB.order : []).filter((x, i, a) => tk(x) && a.indexOf(x) === i).slice(0, 40), hide: (Array.isArray(TB.hide) ? TB.hide : []).filter((x, i, a) => tk(x) && x !== "overview" && a.indexOf(x) === i).slice(0, 40), names: {} };
+  Object.entries(TB.names && typeof TB.names === "object" ? TB.names : {}).slice(0, 40).forEach(([k, v]) => { const t = String(v || "").replace(/[<>]/g, "").trim().slice(0, 24); if (tk(k) && t) tabs.names[k] = t; });
+  return { def, on, allowUser: c.allowUser !== false, auto: c.auto !== false, defAuto: !!c.defAuto, custom, art, card, ind, tabs, by: c.by ? String(c.by).slice(0, 60) : undefined, at: Number(c.at) || undefined };
 }
 import { masterAction, MASTER_SETUP_SHA256, roleOf } from "./master-core.mjs";
 import { matrixAction } from "./matrix-core.mjs";
