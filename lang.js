@@ -41,7 +41,8 @@
     if (miss.length && !busy) fetchSome(miss, 0);
   }
   function fetchSome(miss, round) {
-    var a = auth(); if (!a || !a.token || round > 8) return;
+    var a = auth(); if (round > 8) return;
+    if (!a || !a.token) { if ((fetchSome.w = (fetchSome.w || 0) + 1) < 60) setTimeout(function () { if (!busy) apply(); }, 1000); return; }   // in the apps the login arrives a moment after the page loads
     busy = true;
     fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify({ app: a.app, username: a.username, token: a.token, action: "tr-get", lang: LANG, texts: miss.slice(0, 400) }) })
       .then(function (r) { return r.json(); }).then(function (r) {
@@ -90,6 +91,7 @@
   loadDict();
   var tries = 0; (function p() { place(); if (!document.getElementById("btl-b") && tries++ < 40) setTimeout(p, 300); })();
   setInterval(function () { if (!document.getElementById("btl-b")) place(); }, 3000);
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && LANG !== "en") { fetchSome.w = 0; apply(); } });
   function start() { if (LANG !== "en") { document.documentElement.lang = LANG; watch(); apply(); } }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(start, 200); }); else setTimeout(start, 200);
 })();

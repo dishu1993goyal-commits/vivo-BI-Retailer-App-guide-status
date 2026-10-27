@@ -529,4 +529,8 @@
   document.addEventListener("DOMContentLoaded", function () { placeButton(); studio(); [400, 1500, 4000].forEach(function (ms) { setTimeout(applyTabs, ms); }); if (window.__DASHAPI) BITHEME.fileDefault(window.__DASHAPI.META && window.__DASHAPI.META.theme); });
   setInterval(function () { if (!document.getElementById("btp-b")) placeButton(); }, 3000);
   loadCfg();
+  // apps keep the page open in the background: pick up new HO design settings when it comes back
+  var lastCfg = Date.now();
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && Date.now() - lastCfg > 30000) { lastCfg = Date.now(); loadCfg(); } });
+  [2500, 6000].forEach(function (ms) { setTimeout(function () { SIG = ""; refresh(); }, ms); });
 })();
