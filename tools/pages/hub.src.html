@@ -48,7 +48,7 @@
       ["leaderboard", "🏆", "Leaderboard", "leaderboard", "t:engage.html#board"], ["matrix", "🧩", "Feature usability", "matrix", "t:matrix.html", function () { return N.matrix; }],
       ["statemap", "🗺️", "India state map", null, "t:statemap.html", null, "admin"], ["mailer", "📧", "Email reports to states", null, "t:mailer.html#compose", null, "admin"], ["hoinbox", "📬", "Reports from HO", null, "t:mailer.html#inbox", function () { return N.hoReports; }, "state"]] },
     { id: "perf", icon: "🚀", name: "Performance", sub: "Goals & insights", col: "#E7F7EF", items: [
-      ["reviewdeck", "📑", "Monthly review deck", null, "t:reviewdeck.html"], ["ingoals", "🎯", "Goal setter", null, "t:insights.html#goals"], ["inalerts", "🔔", "Alert centre", null, "t:insights.html#alerts", function () { return N.insAlerts; }],
+      ["deckstudio", "🎬", "One-Page Studio", null, "t:deckstudio.html"], ["reviewdeck", "📑", "Monthly review deck", null, "t:reviewdeck.html"], ["ingoals", "🎯", "Goal setter", null, "t:insights.html#goals"], ["inalerts", "🔔", "Alert centre", null, "t:insights.html#alerts", function () { return N.insAlerts; }],
       ["inbadges", "🏅", "Badges & Hall of Fame", null, "t:insights.html#badges"], ["inpeers", "👥", "Peer benchmarking", null, "t:insights.html#peers"], ["inimpact", "📈", "Impact analysis", null, "t:insights.html#impact"],
       ["inhealth", "🏪", "Retailer health", null, "t:insights.html#health"], ["indigest", "💬", "WhatsApp digest", null, "t:insights.html#digest"], ["inqc", "🧪", "Data quality checker", null, "t:insights.html#quality", null, "admin"]] },
     { id: "biz", icon: "🪔", name: "Business", sub: "Festive & market", col: "#FFF1E6", items: [
@@ -67,7 +67,7 @@
     { id: "admin", icon: "🛡️", name: "Admin", sub: "HO only", col: "#E8F6FB", admin: true, items: [
       ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
       ["directory", "🪪", "vChat directory", null, "t:directory.html"], ["security", "🛡️", "Account security", null, "t:security.html", function () { return N.pwreq; }], ["insights", "📈", "Access insights", null, "n:logs"],
-      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["config", "⚙️", "Configuration centre", null, "t:config.html"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
+      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["config", "⚙️", "Configuration centre", null, "t:config.html"], ["access", "🔐", "Access control", null, "t:access.html", null, "master"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
     { id: "smart", icon: "✨", name: "Smart tools", sub: "Less manual work", col: "#FFF1E6", items: [
       ["tlv", "🎙️", "Voice notes", null, "n:dash:tool-voice-notes"], ["tlp", "📸", "Photo audit", null, "n:dash:tool-photo-audit"], ["tlb", "🧭", "Smart beat planner", null, "n:dash:tool-beat-planner"],
       ["tls", "📤", "Share a KPI card", null, "n:dash:tool-share-card"], ["tlr", "🔀", "Auto-reconciliation", null, "n:dash:tool-reconciliation"], ["tli", "📈", "Excel to insight", null, "n:dash:tool-excel-insight"],
@@ -106,13 +106,15 @@
     if (it[6] === "state" && ADMIN) return false;
     if (cat.admin && !ADMIN) return false;
     if (it[3] && MODS && MODS[it[3]] === false) return false;
+    if (window.BIACCESS && !BIACCESS.ok("tool:" + it[0])) return false;
     return true;
   }
   function draw() {
     var q = Q.trim().toLowerCase();
     var html = '<div class="hsearch"><input class="tx" id="q" placeholder="Find a tool — e.g. visits, quiz, dispute" value="' + esc(Q) + '" autocomplete="off"></div>';
     if (!q && PINS.length) html += PINS.slice(0, 3).map(function (p) { return '<div data-pin="1" style="background:' + (p.level === "urgent" ? "#FDECEC" : p.level === "important" ? "#FFF4E5" : "#EEF0FF") + ';border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;cursor:pointer"><b>' + (p.level === "urgent" ? "🚨 " : p.level === "important" ? "⚠️ " : "📌 ") + esc(p.title) + "</b>" + (p.body ? '<div style="color:var(--ink2);margin-top:2px">' + esc(p.body.slice(0, 140)) + (p.body.length > 140 ? "…" : "") + "</div>" : "") + "</div>"; }).join("");
-    if (!q) html += '<div class="quick">' + QUICK.map(function (x, i) { return '<button data-q="' + i + '"><i style="background:' + x[2] + '">' + x[0] + "</i>" + esc(x[1]) + bd(x[4]) + "</button>"; }).join("") + "</div>";
+    var qOff = function (x) { if (!window.BIACCESS) return false; var hit = null; CATS.forEach(function (c) { c.items.forEach(function (it) { if (it[4] === x[3]) hit = it; }); }); return hit && !BIACCESS.ok("tool:" + hit[0]); };
+    if (!q) html += '<div class="quick">' + QUICK.map(function (x, i) { if (qOff(x)) return ""; return '<button data-q="' + i + '"><i style="background:' + x[2] + '">' + x[0] + "</i>" + esc(x[1]) + bd(x[4]) + "</button>"; }).join("") + "</div>";
     var any = false;
     CATS.forEach(function (c) {
       var items = c.items.concat(customItems(c.id)).filter(function (it) { return visible(it, c) && (!q || (it[2] + " " + c.name).toLowerCase().indexOf(q) >= 0); });
@@ -130,6 +132,7 @@
   }
   var CTN = {};   // approvals waiting / responses sent back, per custom tool
   function ctNotify() { api({ action: "ct-notify" }).then(function (r) { if (r.ok) { var ch = JSON.stringify(r.tools) !== JSON.stringify(CTN); CTN = r.tools; if (ch && !Q) draw(); } }); }
+  if (window.BIACCESS) BIACCESS.onChange(function () { draw(); });
   function load() {
     if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
     ctNotify();

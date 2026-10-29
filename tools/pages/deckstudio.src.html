@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>One-Page Studio</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:520px){.g3{grid-template-columns:1fr 1fr}}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card);user-select:none}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.fgh{font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;margin:10px 2px 5px}
+.ths{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.ths span{flex:none;border:2px solid #E3E5EF;border-radius:12px;padding:6px;cursor:pointer;font-size:11.5px;font-weight:700;text-align:center;min-width:76px;background:#fff}.ths span.on{border-color:var(--brand);box-shadow:0 0 0 3px rgba(65,95,255,.18)}
+.ths i{display:flex;height:26px;border-radius:7px;overflow:hidden;margin-bottom:4px}.ths i b{flex:1}
+.bns{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}.bns>*{flex:none;width:96px;height:54px;border-radius:9px;border:2px solid #E3E5EF;cursor:pointer;object-fit:cover;background:#F4F5F9;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--ink2);box-sizing:border-box;text-align:center}.bns .on{border-color:var(--brand);box-shadow:0 0 0 3px rgba(65,95,255,.18)}
+.acts2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.acts2 .btn{margin:0}
+.pvw{margin-top:14px}.pg{position:relative;margin:0 auto 14px;box-shadow:0 8px 24px rgba(20,24,51,.16);border-radius:6px;overflow:hidden;background:#fff}
+.pgt{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mut);margin:0 2px 5px}.pgt .row{gap:4px}.pgt button{border:0;background:#EEF0F7;border-radius:8px;padding:4px 8px;cursor:pointer;font-size:12px}
+.prog2{font-size:13px;margin-top:10px}
+.sum{background:#EEF0FF;color:#2B33A6;border-radius:12px;padding:8px 10px;font-size:12.5px;margin-top:10px}
+textarea.tx{min-height:60px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎬</span></div>
+  <h1>One-Page Studio</h1><p>Editable PPTs, one-pagers, creatives and documents — built from live dashboard data with AI</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), W = null, DA = null, ME = "", STATES = [], PERIODS = [], BANNERS = [], LOGO = "", PAGES = [], SL = [], BUSY = false, CACHE = {}, SNAP = null;
+  var O = Object.assign({ scope: "PAN India", per: "", focus: ["summary", "overall", "rank", "trend"], kpi: "app", fmt: "deck", layout: "corporate", theme: "blue", font: "Calibri", size: "normal", ai: true, tone: "professional", n: 1, banner: "brand", title: "", sub: "", cover: true, agenda: true, close: true, custom: "", logo: true, accent: "" }, ls("ds-opt") || {});
+  function sv() { ls("ds-opt", O); }
+  var KPIS = [["app", "Retailer App"], ["sales", "Sales"], ["visit", "Visit efficiency"], ["comp", "Competition / SD"], ["vnotice", "v-Notice"], ["new", "New implementation"]];
+  var KN = {}; KPIS.forEach(function (k) { KN[k[0]] = k[1]; });
+  var FOCUS = [
+    ["perf", "📊 Performance", [["summary", "Executive summary"], ["overall", "Overall performance"], ["kpi", "Specific KPI"], ["rank", "Rankings & top 5"], ["trend", "Trends"], ["app", "Retailer app usage"], ["health", "Retailer health"], ["achieve", "Key achievements"], ["actionplan", "Action plan"]]],
+    ["proj", "🚀 Projects & plans", [["roadmap", "Roadmap 2027"], ["running", "Running projects"], ["pilot", "Pilot projects"], ["upcoming", "Upcoming projects"], ["pilotplan", "Upcoming plan of pilots"], ["rollout", "Features rollout done"], ["news", "BI newsletter highlights"]]],
+    ["prog", "🧩 Programs", [["sd", "Student discount"], ["cd", "Corporate discount"], ["aff", "Affordability"], ["hub", "Affordability Hub"], ["rma", "Retailer app — upcoming version"], ["calc", "Schemes calculator"], ["material", "Material management"], ["survey", "Survey tools"], ["vbm", "VBM support desk"], ["rsd", "Retailer support desk"], ["custom", "Custom topic"]]]];
+  var FL = {}; FOCUS.forEach(function (g) { g[2].forEach(function (f) { FL[f[0]] = f[1]; }); });
+  var THEMES = {
+    blue: { n: "vivo Blue", dark: "0A1C5C", acc: "415FFF", acc2: "8EA2FF", card: "F2F5FF", ink: "141833", mut: "5E6484", line: "DFE3F3" },
+    gold: { n: "Black & Gold", dark: "0B0B0C", acc: "C9A227", acc2: "E6CF86", card: "FBF8EE", ink: "151515", mut: "6B6657", line: "EADFC4" },
+    royal: { n: "Royal Indigo", dark: "12153A", acc: "5146C9", acc2: "A9A3F0", card: "F5F5FB", ink: "141833", mut: "5F6280", line: "E2E1F3" },
+    emerald: { n: "Emerald", dark: "0B3B3C", acc: "0E9F8E", acc2: "7FD6CB", card: "EEF8F6", ink: "102A2A", mut: "4F6B6A", line: "D5EBE7" },
+    sunrise: { n: "Sunrise", dark: "5B1A2E", acc: "F2711C", acc2: "F8B37F", card: "FFF5EC", ink: "2A1218", mut: "75545C", line: "F2DCCB" },
+    diwali: { n: "Diwali Gold", dark: "3B1F00", acc: "E0A82E", acc2: "F3D38A", card: "FFF9EC", ink: "2A1A05", mut: "765F3D", line: "F0E1BE" },
+    graphite: { n: "Graphite", dark: "111827", acc: "4B5563", acc2: "9CA3AF", card: "F5F6F8", ink: "111827", mut: "5B6270", line: "E3E5E9" },
+    ocean: { n: "Ocean", dark: "03304D", acc: "0077B6", acc2: "7CC4EA", card: "EAF6FC", ink: "0B2233", mut: "4B6577", line: "D4E9F4" },
+    ruby: { n: "Ruby", dark: "3A0614", acc: "B3123A", acc2: "E57A93", card: "FFF1F4", ink: "2A0A12", mut: "77505A", line: "F1D6DD" },
+    midnight: { n: "Midnight (dark)", dark: "0B0F1C", acc: "8B9BFF", acc2: "C5CDFF", card: "1A2240", ink: "F1F3FF", mut: "A9B1D6", line: "2A3358", darkAll: true }
+  };
+  var FONTS = ["Calibri", "Arial", "Segoe UI", "Georgia", "Verdana", "Trebuchet MS", "Tahoma", "Century Gothic"];
+  var FMTS = { deck: { n: "Slides 16:9", w: 13.333, h: 7.5 }, onepager: { n: "One-pager A4", w: 8.27, h: 11.69 }, square: { n: "Square creative", w: 7.5, h: 7.5 }, story: { n: "Story 9:16", w: 6.75, h: 12 } };
+  var LAYOUTS = { corporate: "Corporate (header band)", cards: "Modern cards", bold: "Bold (dark slides)", minimal: "Minimal" };
+  var LIBS = { pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js", zip: "/vendor/jszip.min.js", ins: "/insights-engine.js" }, LOADED = {};
+  function lib(k) { return LOADED[k] || (LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIBS[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load a file maker — check the internet connection.")); }; document.head.appendChild(s); })); }
+  var pc = function (v) { return v == null || isNaN(v) ? "—" : Math.round(v * 1000) / 10 + "%"; };
+  var r1 = function (v) { return Math.round((+v || 0) * 10) / 10; };
+  var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function say(t) { if ($("prog")) $("prog").innerHTML = t; }
+
+  // ================= load the dashboard (hidden) — exactly the data and content the dashboard shows =================
+  var DASH = null;
+  function dash() {
+    if (DASH) return DASH;
+    DASH = new Promise(function (res, rej) {
+      var f = document.createElement("iframe"); f.id = "dsf"; f.setAttribute("aria-hidden", "true"); f.tabIndex = -1;
+      f.style.cssText = "position:fixed;left:-20000px;top:0;width:1200px;height:900px;border:0;visibility:hidden";
+      f.src = "/index.html?studio=" + Date.now();
+      var t0 = Date.now(), poll = setInterval(function () {
+        var w = null; try { w = f.contentWindow; } catch (e) { }
+        if (w && w.__DASHAPI && w.KE && w.__DASHAPI.RAW) { clearInterval(poll); W = w; DA = w.__DASHAPI; res(); }
+        else if (Date.now() - t0 > 90000) { clearInterval(poll); DASH = null; rej(new Error("The dashboard took too long to open — check the connection and try again.")); }
+      }, 300);
+      document.body.appendChild(f);
+    });
+    return DASH;
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // set the hidden dashboard's own filters to the chosen state, so tab text matches the deck
+  function dashScope() {
+    try {
+      var d = W.document, s = d.getElementById("scope-sel"); if (!s) return;
+      var want = O.scope === "PAN India" ? "" : O.scope, opt = [].filter.call(s.options, function (o) { return want ? (o.value === want || o.text.trim() === want) : /pan india|all states/i.test(o.text) || o.value === "" || o.value === "PAN"; })[0];
+      if (opt && s.value !== opt.value) { s.value = opt.value; s.dispatchEvent(new W.Event("change", { bubbles: true })); }
+    } catch (e) { }
+  }
+  function scrape(page, isTab) {   // render one dashboard page and read its headings, flows, chips and text
+    var k = page + "|" + O.scope; if (CACHE[k]) return Promise.resolve(CACHE[k]);
+    try { if (isTab) DA.showTab(page); else DA.go(page, ""); } catch (e) { return Promise.resolve(null); }
+    return wait(700).then(function () {
+      var d = W.document, el = isTab ? d.getElementById("pane-" + page) : null;
+      if (!el) { var pd = d.getElementById("pane-detail"); el = pd && pd.offsetParent ? pd : d.querySelector(".pane.on") || d.body; }
+      var heads = [].map.call(el.querySelectorAll("h1,h2,h3"), function (h) { return h.innerText.trim(); }).filter(Boolean).slice(0, 20);
+      var flows = [].map.call(el.querySelectorAll(".rm-flow"), function (f) {
+        var steps = [].map.call(f.querySelectorAll(".rm-step"), function (s) { var b = s.querySelector("b"), m = s.querySelector("small"); return { t: b ? b.innerText.trim() : "", s: m ? m.innerText.trim() : "" }; }).filter(function (x) { return x.t; });
+        var title = "", all = [].slice.call(el.querySelectorAll("h2,h3,.rm-sec h4,.sec-h"));
+        all.forEach(function (h) { if (h.compareDocumentPosition(f) & 4) title = h.innerText.trim(); });
+        return { title: title, steps: steps };
+      }).filter(function (x) { return x.steps.length >= 2; });
+      var chips = [].map.call(el.querySelectorAll(".rm-chip b, .m-chips span"), function (c) { return c.innerText.trim(); }).filter(Boolean).slice(0, 20);
+      var text = el.innerText.replace(/\n{2,}/g, "\n").replace(/[›‹←→]/g, " ").slice(0, 6000);
+      var out = { page: page, heads: heads, flows: flows, chips: chips, text: text };
+      CACHE[k] = out; return out;
+    });
+  }
+  function projects() { try { return (W.HOX && W.HOX.state().projects) || []; } catch (e) { return []; } }
+  function news() { try { return (W.HOX && W.HOX.state().news) || []; } catch (e) { return []; } }
+  function RMd() { return (DA && DA.RM) || {}; }
+
+  // ================= numbers =================
+  function periods() {
+    var sp = W.KE.span(DA.RAW); if (!sp) return [];
+    var ms = {}; DA.RAW.days.forEach(function (d) { if (d >= sp.f && d <= sp.t) ms[d.slice(0, 7)] = 1; });
+    var M = Object.keys(ms).sort(), out = [], q = {};
+    var last = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0"); };
+    M.forEach(function (m) { var qq = m.slice(0, 4) + "-Q" + (Math.floor((+m.slice(5, 7) - 1) / 3) + 1); (q[qq] = q[qq] || []).push(m); });
+    Object.keys(q).sort().reverse().forEach(function (k) { var ms2 = q[k], f = ms2[0] + "-01", t = last(ms2[ms2.length - 1]); out.push({ id: "q:" + k, label: k.slice(5) + " " + k.slice(0, 4), f: f < sp.f ? sp.f : f, t: t > sp.t ? sp.t : t, months: ms2 }); });
+    M.slice().reverse().forEach(function (m) { var f = m + "-01", t = last(m); out.push({ id: "m:" + m, label: MN[+m.slice(5, 7) - 1] + " " + m.slice(0, 4), f: f < sp.f ? sp.f : f, t: t > sp.t ? sp.t : t, months: [m] }); });
+    return out;
+  }
+  function P() { return PERIODS.filter(function (p) { return p.id === O.per; })[0] || PERIODS[0]; }
+  var SC = {};
+  function score(f, t) {
+    var k = f + "|" + t; if (SC[k]) return SC[k];
+    var sp = W.KE.scorePeriod(DA.RAW, DA.SETUP, f, t, "Total"), rows = {}, pan = {};
+    (sp.kpi_state || []).forEach(function (r) { if (r.code === "PAN" || r.state === "Total") pan = r; else if (r.state) rows[r.state] = r; });
+    var st = Object.keys(rows).sort(function (a, b) { return (rows[b].score || 0) - (rows[a].score || 0); });
+    st.forEach(function (s, i) { if (rows[s].rank == null) rows[s].rank = i + 1; });
+    return (SC[k] = { rows: rows, pan: pan, order: st, of: st.length });
+  }
+  function prevPeriod(p) { var i = PERIODS.indexOf(p), same = PERIODS.filter(function (x) { return x.id.slice(0, 2) === p.id.slice(0, 2) && x.f < p.f; }); return same[0] || null; }
+  function me(S) { return O.scope === "PAN India" ? S.pan : S.rows[O.scope] || {}; }
+  function kpiList(r, S) { return KPIS.filter(function (k) { return r[k[0]] != null && !(k[0] === "new" && !r[k[0]] && !(S.pan || {})[k[0]]); }).map(function (k) { return { k: k[0], name: k[1], me: r[k[0]], pan: (S.pan || {})[k[0]], rank: r["rank_" + k[0]] || null, w: (DA.SETUP.weights || {})[k[0]] }; }); }
+  function monthly(n) { var p = P(), ms = PERIODS.filter(function (x) { return x.id.slice(0, 2) === "m:" && x.f <= p.t; }).slice(0, n || 6).reverse(); return ms.map(function (m) { var S = score(m.f, m.t), r = me(S); return { label: m.label, score: r1(r.score), pan: r1(S.pan.score), rank: O.scope === "PAN India" ? null : r.rank, row: r, pr: S.pan }; }); }
+
+  // ================= deck content per focus =================
+  function factsFor(f) {   // the data handed to AI (and to the rule-based slides)
+    var p = P(), S = score(p.f, p.t), r = me(S), pv = prevPeriod(p), SP = pv ? score(pv.f, pv.t) : null, rp = SP ? me(SP) : null, scope = O.scope;
+    var base = { scope: scope, period: p.label, dates: p.f + " to " + p.t };
+    var kp = kpiList(r, S).map(function (k) { return { kpi: k.name, value: pc(k.me), pan: pc(k.pan), rank: k.rank, weight: k.w }; });
+    var top = S.order.slice(0, 5).map(function (s, i) { return { rank: i + 1, state: s, score: r1(S.rows[s].score) }; }), bottom = S.order.slice(-3).map(function (s) { return { rank: S.rows[s].rank, state: s, score: r1(S.rows[s].score) }; });
+    var movers = SP ? S.order.map(function (s) { var a = S.rows[s], b = SP.rows[s]; return b && b.rank && a.rank ? { state: s, from: b.rank, to: a.rank, change: b.rank - a.rank } : null; }).filter(Boolean).sort(function (a, b) { return b.change - a.change; }) : [];
+    var perf = Object.assign({}, base, { score: r1(r.score), rank: scope === "PAN India" ? null : r.rank, of: S.of, pan_score: r1(S.pan.score), previous: rp ? { period: pv.label, score: r1(rp.score), rank: rp.rank } : null, kpis: kp, top5: top, bottom3: bottom });
+    var pj = projects();
+    if (f === "summary" || f === "overall") return perf;
+    if (f === "kpi") { var k = O.kpi; return Object.assign({}, base, { kpi: KN[k], value: pc(r[k]), pan: pc(S.pan[k]), weight: (DA.SETUP.weights || {})[k], top_states: S.order.slice().sort(function (a, b) { return (S.rows[b][k] || 0) - (S.rows[a][k] || 0); }).slice(0, 8).map(function (s) { return { state: s, value: pc(S.rows[s][k]) }; }), trend: monthly(6).map(function (m) { return { month: m.label, value: pc(m.row[k]), pan: pc(m.pr[k]) }; }) }); }
+    if (f === "rank") return Object.assign({}, base, { top5: top, bottom3: bottom, all: S.order.map(function (s) { return [S.rows[s].rank, s, r1(S.rows[s].score)]; }), movers_up: movers.slice(0, 5), movers_down: movers.slice(-3).reverse() });
+    if (f === "trend") return Object.assign({}, base, { months: monthly(6).map(function (m) { return { month: m.label, score: m.score, pan: m.pan, rank: m.rank }; }) });
+    if (f === "achieve") return Object.assign({}, perf, { rank_gainers: movers.filter(function (m) { return m.change > 0; }).slice(0, 5), projects_live_or_done: pj.filter(function (x) { return /live|done/.test(x.stage); }).map(function (x) { return { name: x.name, stage: x.stage, states: x.states, update: x.update }; }), news: news().slice(0, 5) });
+    if (f === "health") return Object.assign({}, base, { retailer_health: healthOf() });
+    if (/^(running|pilot|upcoming|pilotplan|rollout)$/.test(f)) {
+      var want = { running: /live|pilot|risk/, pilot: /pilot/, upcoming: /upcoming/, pilotplan: /pilot|upcoming/, rollout: /live|done/ }[f];
+      return Object.assign({}, base, { projects: pj.filter(function (x) { return want.test(x.stage); }).map(function (x) { return { name: x.name, stage: x.stage, states: x.states, owner: x.owner, start: x.start, end: x.end, progress: x.progress, update: x.update }; }), roadmap_2027: f === "pilotplan" || f === "rollout" ? gantRows() : undefined, news: f === "rollout" ? news().slice(0, 6) : undefined });
+    }
+    if (f === "news") return Object.assign({}, base, { news: news().slice(0, 8), projects: pj.slice(0, 6).map(function (x) { return { name: x.name, stage: x.stage, update: x.update }; }) });
+    if (f === "custom") return Object.assign({}, perf, { topic: O.custom, projects: pj.map(function (x) { return { name: x.name, stage: x.stage, update: x.update }; }) });
+    return base;
+  }
+  function healthOf() {
+    if (!SNAP) return null; var seg = SNAP.seg || {};
+    if (O.scope !== "PAN India") return seg[O.scope] || null;
+    var t = { champion: 0, active: 0, atrisk: 0, dormant: 0, never: 0, total: 0 }; Object.keys(seg).forEach(function (s) { if (s === "Unmapped") return; Object.keys(t).forEach(function (k) { t[k] += seg[s][k] || 0; }); }); return t;
+  }
+  function gantRows() { var G = RMd().GANT || [], PHC = { d: "Design", b: "Build", p: "Pilot", l: "Live" }; return G.map(function (g) { return { name: g[0], plan: (g[3] || []).map(function (s) { return PHC[s[2]] + " " + MN[s[0] - 1] + (s[1] !== s[0] ? "–" + MN[s[1] - 1] : ""); }).join(", ") }; }); }
+  var PAGEOF = { roadmap: ["rm"], sd: ["rms"], cd: ["rms"], aff: ["rms", "rmh"], hub: ["rmh"], rma: ["rma"], calc: ["rmc"], material: ["rmm"], survey: ["rmv"], rsd: ["sd", 1], vbm: ["sd", 1], actionplan: ["plan", 1], app: ["app", 1] };
+  function contentFor(f) {   // scraped dashboard pages for this focus
+    var pg = PAGEOF[f]; if (!pg) return Promise.resolve(null);
+    if (pg[1] === 1) return scrape(pg[0], true);
+    return pg.reduce(function (pr, id) { return pr.then(function (acc) { return scrape(id, false).then(function (x) { if (x) acc.push(x); return acc; }); }); }, Promise.resolve([])).then(function (l) { return l.length ? { heads: [].concat.apply([], l.map(function (x) { return x.heads; })), flows: [].concat.apply([], l.map(function (x) { return x.flows; })), chips: [].concat.apply([], l.map(function (x) { return x.chips; })), text: l.map(function (x) { return x.text; }).join("\n").slice(0, 7000) } : null; });
+  }
+
+  // ---------- rule-based slides (also the data slides that sit next to AI's narrative) ----------
+  function dataSlides(f, F, C) {
+    var p = P(), S = score(p.f, p.t), r = me(S), out = [], scope = O.scope, kl = kpiList(r, S);
+    var tag = function (s) { s.focus = f; s.src = "data"; return s; };
+    if (f === "summary" || f === "overall") {
+      var best = scope === "PAN India" ? kl.slice().sort(function (a, b) { return b.me - a.me; }) : kl.filter(function (k) { return k.pan != null; }).sort(function (a, b) { return (b.me - b.pan) - (a.me - a.pan); }), worst = best.slice().reverse();
+      var lost = kl.filter(function (k) { return k.w; }).map(function (k) { return { n: k.name, l: r1(k.w * (1 - Math.min(1, k.me || 0))) }; }).sort(function (a, b) { return b.l - a.l; });
+      out.push(tag({ type: "stats", title: f === "summary" ? "Executive summary — " + p.label : "Overall performance — " + p.label, sub: scope, stats: [{ v: String(r1(r.score)), l: "BI KPI score (of 100)" }].concat(scope === "PAN India" ? [{ v: String(S.of), l: "states ranked" }, { v: S.order[0] || "—", l: "No. 1 state" }] : [{ v: "#" + r.rank, l: "rank of " + S.of }, { v: String(r1(S.pan.score)), l: "PAN India score" }]).concat(best[0] ? [{ v: best[0].name, l: scope === "PAN India" ? "highest KPI (" + pc(best[0].me) + ")" : "strongest KPI vs PAN" }] : []),
+        bullets: f === "summary" ? [best[0] ? "Strongest: " + best[0].name + " at " + pc(best[0].me) + (scope !== "PAN India" && best[0].pan != null ? " (PAN " + pc(best[0].pan) + ")" : "") : "", worst[0] ? "Weakest: " + worst[0].name + " at " + pc(worst[0].me) + (scope !== "PAN India" && worst[0].pan != null ? " (PAN " + pc(worst[0].pan) + ")" : "") : "", lost[0] ? "Most points lost: " + lost[0].n + " (" + lost[0].l + " of " + (DA.SETUP.weights || {})[kl.filter(function (k) { return k.name === lost[0].n; })[0].k] + ")" : "", scope === "PAN India" ? "Top 3: " + S.order.slice(0, 3).join(", ") : "PAN India score: " + r1(S.pan.score)].filter(Boolean) : null,
+        insight: scope === "PAN India" ? "PAN India scored " + r1(r.score) + "; top state " + (S.order[0] || "") + " at " + r1((S.rows[S.order[0]] || {}).score) + "." : scope + (r.score >= S.pan.score ? " is ahead of" : " is behind") + " PAN India by " + Math.abs(r1(r.score - S.pan.score)) + " points — " + (worst[0] ? "biggest gap: " + worst[0].name + "." : "") }));
+      if (kl.length && f === "overall") out.push(tag({ type: "table", title: "Points earned and lost", sub: scope, rows: [["KPI", "Achievement", "Weight", "Points earned", "Points lost"]].concat(kl.filter(function (k) { return k.w; }).map(function (k) { var e2 = r1(k.w * Math.min(1, k.me || 0)); return [k.name, pc(k.me), String(k.w), String(e2), String(r1(k.w - e2))]; })), insight: lost[0] ? lost[0].n + " costs the most points (" + lost[0].l + ")." : "" }));
+      if (kl.length && f === "overall") out.push(tag({ type: "two", title: "KPI scorecard", sub: scope + " vs PAN India", bullets: kl.map(function (k) { return k.name + ": " + pc(k.me) + (scope !== "PAN India" && k.pan != null ? " (PAN " + pc(k.pan) + ")" : "") + (k.w ? " · weight " + k.w : ""); }), chart: { type: "bar", labels: kl.map(function (k) { return k.name; }), series: [{ name: scope, values: kl.map(function (k) { return r1(k.me * 100); }) }].concat(scope !== "PAN India" ? [{ name: "PAN India", values: kl.map(function (k) { return r1((k.pan || 0) * 100); }) }] : []), unit: "%" } }));
+    }
+    if (f === "kpi") { var k = O.kpi, ord = S.order.slice().sort(function (a, b) { return (S.rows[b][k] || 0) - (S.rows[a][k] || 0); }).slice(0, 10), mo = monthly(6);
+      out.push(tag({ type: "chart", title: KN[k] + " — top states", sub: p.label, chart: { type: "bar", labels: ord, series: [{ name: KN[k], values: ord.map(function (s) { return r1((S.rows[s][k] || 0) * 100); }) }], unit: "%" }, insight: (scope === "PAN India" ? "PAN India " : scope + " ") + KN[k] + " is " + pc(r[k]) + (scope !== "PAN India" ? " vs PAN " + pc(S.pan[k]) : "") + "." }));
+      if (mo.length > 1) out.push(tag({ type: "chart", title: KN[k] + " — monthly trend", sub: scope, chart: { type: "line", labels: mo.map(function (m) { return m.label; }), series: [{ name: scope, values: mo.map(function (m) { return r1((m.row[k] || 0) * 100); }) }].concat(scope !== "PAN India" ? [{ name: "PAN India", values: mo.map(function (m) { return r1((m.pr[k] || 0) * 100); }) }] : []), unit: "%" } })); }
+    if (f === "rank") { var t10 = S.order.slice(0, 10);
+      out.push(tag({ type: "two", title: "Top 5 states — " + p.label, bullets: S.order.slice(0, 5).map(function (s, i) { return "#" + (i + 1) + " " + s + " — " + r1(S.rows[s].score); }), chart: { type: "bar", labels: t10, series: [{ name: "Score", values: t10.map(function (s) { return r1(S.rows[s].score); }) }] }, insight: scope !== "PAN India" ? scope + " is #" + r.rank + " of " + S.of + " with " + r1(r.score) + " points." : "" }));
+      out.push(tag({ type: "table", title: "State ranking", sub: p.label, rows: [["Rank", "State", "Score", "vs PAN"]].concat(S.order.slice(0, 12).map(function (s) { var x = S.rows[s]; return ["#" + x.rank, s, String(r1(x.score)), (x.score >= S.pan.score ? "+" : "") + r1(x.score - S.pan.score)]; })) })); }
+    if (f === "trend") { var m6 = monthly(6); if (m6.length > 1) out.push(tag({ type: "chart", title: "Score trend", sub: scope + " · last " + m6.length + " months", chart: { type: "line", labels: m6.map(function (m) { return m.label; }), series: [{ name: scope, values: m6.map(function (m) { return m.score; }) }].concat(scope !== "PAN India" ? [{ name: "PAN India", values: m6.map(function (m) { return m.pan; }) }] : []) }, insight: m6.length > 1 ? "From " + m6[0].score + " to " + m6[m6.length - 1].score + " points over " + m6.length + " months." : "" }));
+      else out.push(tag({ type: "bullets", title: "Trend", bullets: ["Only one month of data so far — trend appears from next month."] })); }
+    if (f === "app") { out.push(tag({ type: "stats", title: "Retailer app usage", sub: scope + " · " + p.label, stats: [{ v: pc(r.app), l: "Retailer App KPI" }].concat(["sa", "sp", "an", "av"].filter(function (x) { return r[x] != null; }).map(function (x) { return { v: pc(r[x]), l: { sa: "Scheme announcement", sp: "Scheme payout", an: "Announcements", av: "App visits" }[x] }; })).slice(0, 4), insight: scope !== "PAN India" ? "PAN India app KPI: " + pc(S.pan.app) + "." : "" })); }
+    if (f === "health") { var h = healthOf(); if (h && h.total) out.push(tag({ type: "two", title: "Retailer health", sub: scope + " · last 30 days", bullets: [["champion", "Champions (8+ active days)"], ["active", "Active"], ["atrisk", "At risk (slowing down)"], ["dormant", "Dormant"], ["never", "Never used the app"]].map(function (x) { return x[1] + ": " + (h[x[0]] || 0).toLocaleString("en-IN") + " (" + Math.round((h[x[0]] || 0) / h.total * 100) + "%)"; }), chart: { type: "doughnut", labels: ["Champions", "Active", "At risk", "Dormant", "Never"], series: [{ name: "Retailers", values: [h.champion, h.active, h.atrisk, h.dormant, h.never] }] }, insight: Math.round((h.dormant + h.never) / h.total * 100) + "% of " + h.total.toLocaleString("en-IN") + " retailers had no app activity in 30 days." })); }
+    if (/^(running|pilot|upcoming|pilotplan|rollout|achieve)$/.test(f) && F.projects && F.projects.length) {
+      out.push(tag({ type: "table", title: FL[f], sub: scope, rows: [["Project", "Stage", "States", "When", "Progress"]].concat(F.projects.slice(0, 7).map(function (x) { return [x.name, x.stage, x.states || "", (x.start || "") + (x.end ? " → " + x.end : ""), (x.progress || 0) + "%"]; })) }));
+      if (F.projects.some(function (x) { return x.progress; })) out.push(tag({ type: "chart", title: "Progress by project", chart: { type: "bar", labels: F.projects.slice(0, 8).map(function (x) { return x.name.slice(0, 26); }), series: [{ name: "Progress", values: F.projects.slice(0, 8).map(function (x) { return x.progress || 0; }) }], unit: "%" } }));
+    }
+    if (f === "roadmap" || f === "pilotplan") { var G = RMd().GANT || []; if (G.length) out.push(tag({ type: "gantt", title: "2027 roadmap at a glance", sub: "Design · Build · Pilot · Live", gantt: G.map(function (g) { return { name: g[0], segs: g[3] || [] }; }) }));
+      var FO = RMd().FOCUS || []; if (FO.length && f === "roadmap") out.push(tag({ type: "table", title: "2027 focus areas", rows: [["Focus area", "What", "Stage", "KPI focus"]].concat(FO.map(function (x) { return [x.n, x.s, (RMd().PHN || [])[x.ph] || "", x.kpi || ""]; })) })); }
+    if (C && C.flows && C.flows.length) {
+      var fl = C.flows; if (f === "sd") fl = fl.filter(function (x) { return /student|sd\b/i.test(x.title) || fl.indexOf(x) === 0; }).slice(0, 1); else if (f === "cd") fl = fl.filter(function (x) { return /corporate|cd\b/i.test(x.title); }).slice(0, 1).concat(fl.length > 1 && !fl.some(function (x) { return /corporate/i.test(x.title); }) ? [fl[1]] : []);
+      fl.slice(0, 2).forEach(function (x) { out.push(tag({ type: "flow", title: x.title && !/^process flow$/i.test(x.title) ? x.title : FL[f] + " — process flow", sub: "From the dashboard", steps: x.steps.slice(0, 7) })); });
+    }
+    if (C && !out.length) { var hd = C.heads.filter(function (h) { return h.length > 3 && !/^(←|back)/i.test(h); }).slice(0, 6); if (hd.length) out.push(tag({ type: "bullets", title: FL[f], sub: scope, bullets: hd })); }
+    if (f === "news" && F.news && F.news.length) out.push(tag({ type: "bullets", title: "BI newsletter highlights", bullets: F.news.slice(0, 6).map(function (n) { return n.title || n.name || n.head || String(n.text || "").slice(0, 90); }).filter(Boolean) }));
+    if (!out.length) out.push(tag({ type: "bullets", title: FL[f] || "Highlights", sub: scope + " · " + p.label, bullets: ["No data for this area in the dashboard yet."], insight: "" }));
+    return out;
+  }
+  function packForAI(f, F, C) { var d = { facts: F }; if (C) d.dashboard_page = { headings: C.heads, flows: C.flows, chips: C.chips, text: C.text.slice(0, 5000) }; return JSON.stringify(d); }
+  function aiSlides(f, F, C) {
+    if (!O.ai) return Promise.resolve([]);
+    return api({ action: "ds-ai", focus: f === "custom" ? (O.custom || "Custom topic") : FL[f] + (f === "kpi" ? " (" + KN[O.kpi] + ")" : ""), scope: O.scope, period: P().label, tone: O.tone, slides: O.n, extra: f === "custom" ? O.custom : "", data: packForAI(f, F, C) }).then(function (r) { if (!r.ok) { AIERR = r.error; return []; } return r.slides.map(function (s) { s.focus = f; s.src = "ai"; return s; }); });
+  }
+  var AIERR = "";
+  var NUMERIC = { summary: 1, overall: 1, kpi: 1, rank: 1, trend: 1, app: 1, health: 1 };
+  function build() {
+    if (BUSY) return; if (!O.focus.length) return toast("Pick at least one slide focus.");
+    BUSY = true; AIERR = ""; say('<div class="loading"><div class="spin"></div>Reading the dashboard…</div>');
+    var p = P(), list = O.focus.slice(), all = [];
+    dash().then(function () { dashScope(); return O.focus.indexOf("health") >= 0 && !SNAP ? lib("ins").then(function () { SNAP = window.INSENG.snapshot({ KE: W.KE, RAW: DA.RAW, SETUP: DA.SETUP }); }).catch(function () { }) : null; }).then(function () {
+      var i = 0;
+      var next = function () {
+        if (i >= list.length) return Promise.resolve();
+        var f = list[i++]; say('<div class="loading"><div class="spin"></div>' + (O.ai ? "AI is writing" : "Building") + " “" + esc(FL[f]) + "” (" + i + " of " + list.length + ")…</div>");
+        var F = factsFor(f);
+        return contentFor(f).then(function (C) {
+          var ds = dataSlides(f, F, C);
+          return aiSlides(f, F, C).then(function (A) {
+            var mine = NUMERIC[f] ? ds.concat(A) : (A.length ? A.concat(ds.filter(function (s) { return /^(gantt|table|chart|two)$/.test(s.type) || s.type === "flow" && !A.some(function (a) { return a.type === "flow"; }); })) : ds);
+            if (f !== "summary" && A.length && NUMERIC[f]) mine = ds.slice(0, 3).concat(A);
+            all.push({ f: f, slides: mine });
+          });
+        }).then(next);
+      };
+      return next();
+    }).then(function () {
+      SL = [];
+      if (O.cover) SL.push({ type: "cover", focus: "cover" });
+      if (O.agenda && all.length > 1 && O.fmt === "deck") SL.push({ type: "agenda", title: "Agenda", focus: "agenda", bullets: all.map(function (x) { return x.f === "custom" ? O.custom || "Custom topic" : FL[x.f]; }) });
+      all.forEach(function (x) { if (all.length > 2 && O.fmt === "deck") SL.push({ type: "section", focus: x.f, title: x.f === "custom" ? O.custom || "Custom topic" : FL[x.f] }); SL = SL.concat(x.slides); });
+      if (O.close) SL.push({ type: "close", focus: "close" });
+      BUSY = false; say(AIERR ? '<div class="warnb">AI not used for some slides: ' + esc(AIERR) + " — data slides are included.</div>" : ""); render();
+      api({ action: "tl-use", tool: "deckstudio", kind: "acts" });
+    }).catch(function (e) { BUSY = false; say('<div class="err">' + esc(e.message || String(e)) + "</div>"); });
+  }
+
+  // ================= layout engine → elements (inches) =================
+  function mix(a, b, t) { var x = function (h, i) { return parseInt(h.substr(i, 2), 16); }, c = [0, 2, 4].map(function (i) { return Math.round(x(a, i) * (1 - t) + x(b, i) * t).toString(16).padStart(2, "0"); }); return c.join("").toUpperCase(); }
+  function TH() {
+    var t = Object.assign({}, THEMES[O.theme] || THEMES.blue); if (/^[0-9A-F]{6}$/i.test(O.accent || "")) t.acc = O.accent.toUpperCase();
+    var dark = t.darkAll || O.layout === "bold";
+    t.bg = dark ? t.dark : "FFFFFF"; t.text = dark ? "F4F5FA" : t.ink; t.sub = dark ? mix(t.dark, "FFFFFF", 0.62) : t.mut; t.box = dark ? mix(t.dark, "FFFFFF", 0.1) : t.card; t.rule = dark ? mix(t.dark, "FFFFFF", 0.2) : t.line; t.isDark = dark;
+    t.ok = "1E9E61"; t.bad = "D93B3B"; t.warn = "E69A00"; t.font = O.font; t.k = { normal: 1, large: 1.12, compact: 0.9 }[O.size] || 1;
+    t.pal = [t.acc, dark ? "F4F5FA" : t.dark, t.acc2, "E69A00", "1E9E61", "D93B3B", "8E5CF6"].map(function (c) { return c; });
+    return t;
+  }
+  function fit(text, w, h, max, min, bullets) {   // largest font size (pt) that fits the box
+    var paras = Array.isArray(text) ? text : String(text || "").split("\n");
+    for (var s = max; s >= min; s -= 0.5) { var cpl = Math.max(8, w * 72 / (s * 0.5)), lines = 0; paras.forEach(function (p) { lines += Math.max(1, Math.ceil(String(p).length / (cpl - (bullets ? 2 : 0)))); }); if (lines * s * (bullets ? 1.45 : 1.25) / 72 <= h) return s; }
+    return min;
+  }
+  function E() { var a = []; return { a: a, rect: function (o) { o.k = "rect"; a.push(o); }, text: function (o) { o.k = "text"; a.push(o); }, img: function (o) { o.k = "img"; a.push(o); }, chart: function (o) { o.k = "chart"; a.push(o); }, table: function (o) { o.k = "table"; a.push(o); }, line: function (o) { o.k = "line"; a.push(o); }, chev: function (o) { o.k = "chev"; a.push(o); }, ell: function (o) { o.k = "ell"; a.push(o); } }; }
+  function card(e, T, x, y, w, h, fill) { var st = O.layout; if (st === "minimal") e.rect({ x: x, y: y, w: w, h: h, fill: null, line: T.rule, lw: 0.75, r: 0 }); else e.rect({ x: x, y: y, w: w, h: h, fill: fill || T.box, line: st === "cards" ? T.rule : null, lw: 0.75, r: st === "cards" || st === "bold" ? 0.12 : 0.06 }); }
+  function body(e, T, s, b) {   // draw a slide's content inside box b {x,y,w,h}
+    var k = T.k, ins = s.insight && s.type !== "quote" ? 0.62 * k : 0, bb = { x: b.x, y: b.y, w: b.w, h: b.h - (ins ? ins + 0.12 : 0) }, narrow = b.w < 5.2;
+    var bullets = function (L, x, y, w, h) { if (!L || !L.length) return; var fs = fit(L, w, h, 20 * k, 10, true); e.text({ x: x, y: y, w: w, h: h, t: L, s: fs, c: T.text, bul: true, va: "t" }); };
+    if (s.type === "stats") {
+      var hasB, n = s.stats.length, cols = narrow && n > 2 ? 2 : n, rows = Math.ceil(n / cols), gw = 0.22, cw = (bb.w - gw * (cols - 1)) / cols, hasB = s.bullets && s.bullets.length, ch = Math.min(hasB ? 2.1 * k : 3.0 * k, (bb.h - gw * (rows - 1)) / rows);
+      s.stats.forEach(function (x, i) { var cx = bb.x + (i % cols) * (cw + gw), cy = bb.y + Math.floor(i / cols) * (ch + gw); card(e, T, cx, cy, cw, ch); e.rect({ x: cx, y: cy, w: 0.08, h: ch, fill: T.acc }); var vs = fit(x.v, cw - 0.4, ch * 0.5, 40 * k, 14); e.text({ x: cx + 0.25, y: cy + 0.15, w: cw - 0.4, h: ch * 0.55, t: x.v, s: vs, b: true, c: T.isDark ? T.acc2 : T.dark, va: "m" }); e.text({ x: cx + 0.25, y: cy + ch * 0.6, w: cw - 0.4, h: ch * 0.34, t: x.l, s: fit(x.l, cw - 0.4, ch * 0.34, 14 * k, 9), c: T.sub, va: "t" }); });
+      if (rows * (ch + gw) < bb.h - 0.8 && s.bullets && s.bullets.length) bullets(s.bullets, bb.x, bb.y + rows * (ch + gw) + 0.1, bb.w, bb.h - rows * (ch + gw) - 0.1);
+    } else if (s.type === "bullets" || s.type === "agenda") {
+      if (s.type === "agenda") { var L = s.bullets, rh = Math.min(0.62 * k, bb.h / L.length); L.forEach(function (x, i) { e.ell({ x: bb.x, y: bb.y + i * rh + 0.06, w: rh - 0.16, h: rh - 0.16, fill: T.acc, t: String(i + 1), c: "FFFFFF", s: 13 * k }); e.text({ x: bb.x + rh + 0.05, y: bb.y + i * rh, w: bb.w - rh, h: rh, t: x, s: Math.min(20 * k, fit(x, bb.w - rh, rh, 22 * k, 10)), c: T.text, va: "m" }); }); }
+      else bullets(s.bullets, bb.x, bb.y, bb.w, bb.h);
+    } else if (s.type === "flow" || s.type === "timeline") {
+      var st = s.steps, n2 = st.length, horiz = b.w / b.h > 1.5 && n2 <= 6;
+      if (horiz) { var gap = 0.12, sw = (bb.w - gap * (n2 - 1)) / n2, sh = Math.min(bb.h, 2.6 * k), sy = bb.y + (bb.h - sh) / 2;
+        if (s.type === "timeline") { e.line({ x1: bb.x, y1: sy + 0.45, x2: bb.x + bb.w, y2: sy + 0.45, c: T.acc, lw: 2.5 }); st.forEach(function (x, i) { var cx = bb.x + i * (sw + gap); e.ell({ x: cx + sw / 2 - 0.17, y: sy + 0.28, w: 0.34, h: 0.34, fill: T.acc }); e.text({ x: cx, y: sy + 0.75, w: sw, h: 0.45, t: x.t, s: fit(x.t, sw, 0.45, 15 * k, 9), b: true, c: T.text, al: "c" }); e.text({ x: cx, y: sy + 1.2, w: sw, h: sh - 1.25, t: x.s || "", s: fit(x.s, sw, sh - 1.25, 12 * k, 8), c: T.sub, al: "c", va: "t" }); }); }
+        else st.forEach(function (x, i) { var cx = bb.x + i * (sw + gap), c = i % 2 ? mix(T.acc, T.isDark ? "000000" : "FFFFFF", 0.18) : T.acc; e.chev({ x: cx, y: sy, w: sw + (i < n2 - 1 ? 0.1 : 0), h: 0.7, fill: c, first: i === 0 }); e.text({ x: cx + 0.22, y: sy, w: sw - 0.3, h: 0.7, t: (i + 1) + "  " + x.t, s: fit((i + 1) + "  " + x.t, sw - 0.3, 0.7, 14 * k, 8), b: true, c: "FFFFFF", va: "m" }); card(e, T, cx, sy + 0.85, sw - 0.04, sh - 0.85); e.text({ x: cx + 0.1, y: sy + 0.95, w: sw - 0.24, h: sh - 1.05, t: x.s || "", s: fit(x.s, sw - 0.24, sh - 1.05, 13 * k, 8), c: T.text, va: "t" }); }); }
+      else { var rh2 = Math.min(1.0 * k, bb.h / n2); st.forEach(function (x, i) { var cy = bb.y + i * rh2; e.ell({ x: bb.x, y: cy + 0.06, w: rh2 * 0.55, h: rh2 * 0.55, fill: T.acc, t: String(i + 1), c: "FFFFFF", s: 12 * k }); if (i < n2 - 1) e.line({ x1: bb.x + rh2 * 0.275, y1: cy + 0.06 + rh2 * 0.55, x2: bb.x + rh2 * 0.275, y2: cy + rh2 + 0.06, c: T.acc2, lw: 2 }); e.text({ x: bb.x + rh2 * 0.75, y: cy, w: bb.w - rh2 * 0.75, h: rh2 * 0.42, t: x.t, s: fit(x.t, bb.w - rh2 * 0.8, rh2 * 0.42, 16 * k, 9), b: true, c: T.text, va: "m" }); e.text({ x: bb.x + rh2 * 0.75, y: cy + rh2 * 0.42, w: bb.w - rh2 * 0.75, h: rh2 * 0.5, t: x.s || "", s: fit(x.s, bb.w - rh2 * 0.8, rh2 * 0.5, 13 * k, 8), c: T.sub, va: "t" }); }); }
+    } else if (s.type === "table") {
+      var R = s.rows, fs = Math.max(8, Math.min(14 * k, bb.h * 72 / (R.length * 1.9)));
+      e.table({ x: bb.x, y: bb.y, w: bb.w, h: Math.min(bb.h, R.length * fs * 2.1 / 72), rows: R, s: fs, head: T.acc, c: T.text, line: T.rule, zebra: T.box });
+    } else if (s.type === "chart") {
+      e.chart({ x: bb.x, y: bb.y, w: bb.w, h: bb.h, ch: s.chart, T: T });
+    } else if (s.type === "two") {
+      if (narrow) { var hh = bb.h * 0.45; bullets(s.bullets, bb.x, bb.y, bb.w, hh); e.chart({ x: bb.x, y: bb.y + hh + 0.1, w: bb.w, h: bb.h - hh - 0.1, ch: s.chart, T: T }); }
+      else { var lw = bb.w * 0.46; bullets(s.bullets, bb.x, bb.y, lw, bb.h); e.chart({ x: bb.x + lw + 0.3, y: bb.y, w: bb.w - lw - 0.3, h: bb.h, ch: s.chart, T: T }); }
+    } else if (s.type === "gantt") {
+      var G = s.gantt, lw2 = Math.min(3.2, bb.w * 0.34), mw = (bb.w - lw2) / 12, gh = Math.min(0.5 * k, (bb.h - 0.4) / G.length), PC = { d: T.acc2, b: T.acc, p: "E69A00", l: "1E9E61" };
+      MN.forEach(function (m, i) { e.text({ x: bb.x + lw2 + i * mw, y: bb.y, w: mw, h: 0.32, t: m, s: 10 * k, c: T.sub, al: "c", b: true }); });
+      G.forEach(function (g, i) { var cy = bb.y + 0.38 + i * gh; if (i % 2 === 0) e.rect({ x: bb.x, y: cy, w: bb.w, h: gh, fill: T.box }); e.text({ x: bb.x + 0.08, y: cy, w: lw2 - 0.1, h: gh, t: g.name, s: fit(g.name, lw2 - 0.1, gh, 12 * k, 8), c: T.text, va: "m" }); (g.segs || []).forEach(function (sg) { e.rect({ x: bb.x + lw2 + (sg[0] - 1) * mw + 0.03, y: cy + gh * 0.2, w: (sg[1] - sg[0] + 1) * mw - 0.06, h: gh * 0.6, fill: PC[sg[2]] || T.acc, r: 0.06 }); }); });
+      var lgy = bb.y + 0.42 + G.length * gh; if (lgy < bb.y + bb.h - 0.2) [["d", "Design"], ["b", "Build"], ["p", "Pilot"], ["l", "Live"]].forEach(function (x, i) { e.rect({ x: bb.x + lw2 + i * 1.3, y: lgy + 0.06, w: 0.22, h: 0.18, fill: PC[x[0]], r: 0.04 }); e.text({ x: bb.x + lw2 + i * 1.3 + 0.28, y: lgy, w: 1, h: 0.3, t: x[1], s: 10 * k, c: T.sub }); });
+    } else if (s.type === "quote") { e.text({ x: bb.x, y: bb.y, w: bb.w, h: bb.h, t: "“" + (s.bullets[0] || s.insight || "") + "”", s: fit(s.bullets[0] || s.insight, bb.w, bb.h, 30 * k, 12), i: true, c: T.text, al: "c", va: "m" }); }
+    if (ins) { var iy = b.y + b.h - ins; e.rect({ x: b.x, y: iy, w: b.w, h: ins, fill: T.isDark ? mix(T.dark, T.acc, 0.25) : mix(T.acc, "FFFFFF", 0.88), r: O.layout === "minimal" ? 0 : 0.08 }); e.rect({ x: b.x, y: iy, w: 0.07, h: ins, fill: T.acc }); e.text({ x: b.x + 0.2, y: iy, w: b.w - 0.3, h: ins, t: "💡 " + s.insight, s: fit("💡 " + s.insight, b.w - 0.3, ins, 15 * k, 9), c: T.text, va: "m", b: true }); }
+  }
+  function header(e, T, Wd, s, idx) {
+    var st = O.layout, title = s.title || "", sub = s.sub || "", hh = Wd > 8 ? 1.05 : 1.15;
+    if (st === "corporate") { e.rect({ x: 0, y: 0, w: Wd, h: hh, fill: T.dark }); e.rect({ x: 0, y: hh, w: Wd, h: 0.06, fill: T.acc }); e.text({ x: 0.5, y: 0.1, w: Wd - (LOGO && O.logo ? 2.6 : 1), h: hh * 0.62, t: title, s: fit(title, Wd - 2.6, hh * 0.62, 26 * T.k, 13), b: true, c: "FFFFFF", va: "m" }); if (sub) e.text({ x: 0.5, y: hh * 0.62, w: Wd - 3, h: hh * 0.32, t: sub, s: 12 * T.k, c: mix(T.dark, "FFFFFF", 0.7), va: "t" }); if (LOGO && O.logo) e.img({ x: Wd - 1.95, y: 0.2, w: 1.55, h: hh - 0.4, src: LOGO, fit: "contain", plate: true }); return hh + 0.3; }
+    if (st === "bold") { e.text({ x: 0.5, y: 0.3, w: Wd - 2.4, h: 0.8, t: title, s: fit(title, Wd - 2.4, 0.8, 30 * T.k, 14), b: true, c: "FFFFFF", va: "m" }); e.rect({ x: 0.5, y: 1.12, w: 1.2, h: 0.08, fill: T.acc }); if (sub) e.text({ x: 0.5, y: 1.25, w: Wd - 1, h: 0.35, t: sub, s: 12 * T.k, c: T.sub }); if (LOGO && O.logo) e.img({ x: Wd - 1.85, y: 0.32, w: 1.4, h: 0.6, src: LOGO, fit: "contain", plate: true }); return sub ? 1.75 : 1.45; }
+    if (st === "minimal") { e.text({ x: 0.5, y: 0.3, w: Wd - 2.4, h: 0.75, t: title, s: fit(title, Wd - 2.4, 0.75, 26 * T.k, 13), c: T.text, va: "m" }); if (sub) e.text({ x: 0.5, y: 1.0, w: Wd - 1, h: 0.32, t: sub, s: 11.5 * T.k, c: T.acc, b: true }); e.line({ x1: 0.5, y1: 1.38, x2: Wd - 0.5, y2: 1.38, c: T.rule, lw: 1 }); if (LOGO && O.logo) e.img({ x: Wd - 1.8, y: 0.38, w: 1.3, h: 0.55, src: LOGO, fit: "contain" }); return 1.6; }
+    e.rect({ x: 0.5, y: 0.42, w: 0.12, h: 0.7, fill: T.acc, r: 0.03 }); e.text({ x: 0.75, y: 0.3, w: Wd - 2.6, h: 0.65, t: title, s: fit(title, Wd - 2.6, 0.65, 26 * T.k, 13), b: true, c: T.text, va: "m" }); if (sub) e.text({ x: 0.75, y: 0.9, w: Wd - 2, h: 0.32, t: sub, s: 12 * T.k, c: T.sub }); if (LOGO && O.logo) e.img({ x: Wd - 1.85, y: 0.36, w: 1.4, h: 0.6, src: LOGO, fit: "contain" }); return 1.5;
+  }
+  function footer(e, T, Wd, Hd, n) { e.text({ x: 0.5, y: Hd - 0.42, w: Wd - 2, h: 0.3, t: "vivo Business Innovation · " + O.scope + " · " + P().label, s: 9, c: T.sub }); if (n) e.text({ x: Wd - 1.2, y: Hd - 0.42, w: 0.7, h: 0.3, t: String(n), s: 9, c: T.sub, al: "r" }); }
+  function coverTitle() { return O.title || (O.focus.length === 1 ? (O.focus[0] === "custom" ? O.custom || "Custom topic" : FL[O.focus[0]]) : "BI review"); }
+  function cover(e, T, Wd, Hd) {
+    var bn = bannerSrc(), title = coverTitle(), sub = O.sub || (O.scope + " · " + P().label), dark = T.dark;
+    e.rect({ x: 0, y: 0, w: Wd, h: Hd, fill: O.layout === "minimal" ? "FFFFFF" : dark });
+    if (bn) { var bh = O.layout === "minimal" ? Hd * 0.45 : Hd; e.img({ x: 0, y: 0, w: Wd, h: bh, src: bn, fit: "cover" }); if (O.layout !== "minimal") e.rect({ x: 0, y: 0, w: Wd, h: Hd, fill: dark, op: 0.55 }); }
+    var tc = O.layout === "minimal" ? T.ink : "FFFFFF", ty = O.layout === "minimal" ? Hd * 0.5 : Hd * 0.36;
+    e.text({ x: 0.6, y: ty - 0.55, w: Wd - 1.2, h: 0.4, t: "VIVO BUSINESS INNOVATION", s: 12, b: true, c: O.layout === "minimal" ? T.acc : mix(T.acc, "FFFFFF", 0.35), sp: 3 });
+    e.text({ x: 0.6, y: ty, w: Wd - 1.2, h: Hd * 0.26, t: title, s: fit(title, Wd - 1.2, Hd * 0.26, Wd > 8 ? 46 : 34, 18), b: true, c: tc, va: "t" });
+    e.rect({ x: 0.6, y: ty + Hd * 0.27, w: 1.6, h: 0.09, fill: T.acc });
+    e.text({ x: 0.6, y: ty + Hd * 0.3, w: Wd - 1.2, h: 0.6, t: sub, s: Wd > 8 ? 20 : 16, c: O.layout === "minimal" ? T.mut : "E9ECF8" });
+    if (LOGO && O.logo) e.img({ x: Wd - 2.2, y: Hd - 1.05, w: 1.7, h: 0.7, src: LOGO, fit: "contain", plate: true });
+    e.text({ x: 0.6, y: Hd - 0.7, w: Wd - 3, h: 0.35, t: "Prepared " + new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + " · data from the BI KPI dashboard", s: 10, c: O.layout === "minimal" ? T.mut : "C9CDE0" });
+  }
+  function closing(e, T, Wd, Hd) { e.rect({ x: 0, y: 0, w: Wd, h: Hd, fill: T.dark }); var bn = bannerSrc(); if (bn) { e.img({ x: 0, y: 0, w: Wd, h: Hd, src: bn, fit: "cover" }); e.rect({ x: 0, y: 0, w: Wd, h: Hd, fill: T.dark, op: 0.7 }); } e.text({ x: 0.6, y: Hd * 0.36, w: Wd - 1.2, h: 1, t: "Thank you", s: Wd > 8 ? 44 : 34, b: true, c: "FFFFFF", al: "c" }); e.text({ x: 0.6, y: Hd * 0.36 + 1, w: Wd - 1.2, h: 0.5, t: "vivo Business Innovation · Innovate · Collaborate · Grow", s: 14, c: mix(T.acc, "FFFFFF", 0.4), al: "c" }); if (LOGO && O.logo) e.img({ x: Wd / 2 - 0.9, y: Hd * 0.36 - 1.1, w: 1.8, h: 0.75, src: LOGO, fit: "contain", plate: true }); }
+  function section(e, T, Wd, Hd, s) { e.rect({ x: 0, y: 0, w: Wd, h: Hd, fill: T.dark }); e.rect({ x: 0, y: Hd * 0.62, w: Wd, h: 0.08, fill: T.acc }); e.text({ x: 0.7, y: Hd * 0.36, w: Wd - 1.4, h: Hd * 0.24, t: s.title, s: fit(s.title, Wd - 1.4, Hd * 0.24, 40, 18), b: true, c: "FFFFFF", va: "b" }); e.text({ x: 0.7, y: Hd * 0.66, w: Wd - 1.4, h: 0.5, t: O.scope + " · " + P().label, s: 16, c: mix(T.acc, "FFFFFF", 0.4) }); }
+  function layoutPages() {
+    var T = TH(), F = FMTS[O.fmt], Wd = F.w, Hd = F.h, pages = [];
+    var mk = function () { var e = E(); e.rect({ x: 0, y: 0, w: Wd, h: Hd, fill: T.bg }); return e; };
+    if (O.fmt === "onepager") {   // header once, then sections stacked; overflow goes to the next page
+      var e = mk(), y = 0, bn = bannerSrc(), pn = 1;
+      var top = function (first) { if (first && O.cover) { if (bn) { e.img({ x: 0, y: 0, w: Wd, h: 2.1, src: bn, fit: "cover" }); e.rect({ x: 0, y: 0, w: Wd, h: 2.1, fill: T.dark, op: 0.45 }); } else e.rect({ x: 0, y: 0, w: Wd, h: 2.1, fill: T.dark }); e.text({ x: 0.45, y: 0.35, w: Wd - 2.6, h: 0.3, t: "VIVO BUSINESS INNOVATION", s: 10, b: true, c: mix(T.acc, "FFFFFF", 0.4) }); e.text({ x: 0.45, y: 0.7, w: Wd - 2.6, h: 0.8, t: coverTitle(), s: fit(coverTitle(), Wd - 2.6, 0.8, 26, 14), b: true, c: "FFFFFF", va: "m" }); e.text({ x: 0.45, y: 1.5, w: Wd - 1, h: 0.4, t: O.sub || O.scope + " · " + P().label, s: 12, c: "E9ECF8" }); if (LOGO && O.logo) e.img({ x: Wd - 1.85, y: 0.4, w: 1.4, h: 0.6, src: LOGO, fit: "contain", plate: true }); y = 2.35; } else { e.rect({ x: 0, y: 0, w: Wd, h: 0.5, fill: T.dark }); e.text({ x: 0.45, y: 0.08, w: Wd - 1, h: 0.34, t: coverTitle() + " · " + O.scope + " · " + P().label, s: 10, c: "FFFFFF", b: true, va: "m" }); y = 0.7; } };
+      top(true);
+      SL.forEach(function (s, i) {
+        if (/^(cover|agenda|section|close)$/.test(s.type)) return;
+        var need = { stats: 1.9, bullets: 0.45 + (s.bullets || []).length * 0.34, flow: 2.3, timeline: 2.3, table: 0.5 + (s.rows || []).length * 0.3, chart: 3, two: 3, gantt: 0.6 + (s.gantt || []).length * 0.32, quote: 1.2 }[s.type] || 2;
+        need = Math.min(need, Hd - 1.6) + (s.insight ? 0.72 : 0) + 0.55;
+        if (y + need > Hd - 0.5) { footer(e, T, Wd, Hd, pn++); pages.push(e.a); e = mk(); top(false); }
+        e.text({ x: 0.45, y: y, w: Wd - 0.9, h: 0.38, t: s.title, s: 14 * T.k, b: true, c: T.isDark ? T.acc2 : T.dark }); e.rect({ x: 0.45, y: y + 0.4, w: 0.8, h: 0.05, fill: T.acc });
+        body(e, T, s, { x: 0.45, y: y + 0.55, w: Wd - 0.9, h: need - 0.6, slide: i }); y += need + 0.2;
+      });
+      footer(e, T, Wd, Hd, pages.length ? pn : 0); pages.push(e.a); return pages;
+    }
+    SL.forEach(function (s, i) {
+      var e = mk();
+      if (s.type === "cover") cover(e, T, Wd, Hd); else if (s.type === "close") closing(e, T, Wd, Hd); else if (s.type === "section") section(e, T, Wd, Hd, s);
+      else { var hy = header(e, T, Wd, s, i), mar = Wd > 8 ? 0.5 : 0.4; body(e, T, s, { x: mar, y: hy, w: Wd - mar * 2, h: Hd - hy - 0.6 }); footer(e, T, Wd, Hd, i + 1); if (s.src === "ai") e.text({ x: Wd - 2.7, y: Hd - 0.42, w: 1.4, h: 0.3, t: "✨ AI-assisted", s: 8, c: T.sub, al: "r" }); }
+      pages.push(e.a);
+    });
+    return pages;
+  }
+
+  // ================= HTML preview (same elements) =================
+  function hx(c) { return "#" + c; }
+  function svgChart(o, px) {
+    var ch = o.ch, T = o.T, w = o.w * px, h = o.h * px, fs = Math.max(9, px * 0.13), pal = T.pal, out = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" style="position:absolute;left:' + o.x * px + "px;top:" + o.y * px + 'px;overflow:visible">';
+    var L = ch.labels, S = ch.series, max = Math.max.apply(null, [1].concat([].concat.apply([], S.map(function (s) { return s.values; })))), u = ch.unit || "";
+    var tx = function (x, y, t, a, c, b, sz) { return '<text x="' + x + '" y="' + y + '" font-size="' + (sz || fs) + '" text-anchor="' + (a || "start") + '" fill="' + hx(c || T.sub) + '"' + (b ? ' font-weight="700"' : "") + ">" + esc(String(t)) + "</text>"; };
+    var legend = S.length > 1 ? S.map(function (s, i) { return '<rect x="' + (i * w / 3) + '" y="' + (h - fs) + '" width="' + fs + '" height="' + fs * 0.7 + '" fill="' + hx(pal[i]) + '"/>' + tx(i * w / 3 + fs * 1.4, h - fs * 0.25, s.name); }).join("") : "", lh = S.length > 1 ? fs * 1.8 : 0;
+    if (ch.type === "doughnut" || ch.type === "pie") {
+      var vals = S[0].values, tot = vals.reduce(function (a, b) { return a + b; }, 0) || 1, R = Math.min(w * 0.45, h - lh) / 2 - 4, cx = R + 4, cy = (h - lh) / 2, a0 = -Math.PI / 2;
+      vals.forEach(function (v, i) { var a1 = a0 + v / tot * Math.PI * 2, lg = a1 - a0 > Math.PI ? 1 : 0; if (v > 0) out += '<path d="M' + cx + " " + cy + " L" + (cx + R * Math.cos(a0)) + " " + (cy + R * Math.sin(a0)) + " A" + R + " " + R + " 0 " + lg + " 1 " + (cx + R * Math.cos(a1 - 0.0001)) + " " + (cy + R * Math.sin(a1 - 0.0001)) + ' Z" fill="' + hx(pal[i % pal.length]) + '"/>'; a0 = a1; });
+      if (ch.type === "doughnut") out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + R * 0.55 + '" fill="' + hx(T.bg) + '"/>';
+      L.forEach(function (l, i) { var yy = 10 + i * fs * 1.6; out += '<rect x="' + (2 * R + 18) + '" y="' + yy + '" width="' + fs + '" height="' + fs + '" fill="' + hx(pal[i % pal.length]) + '"/>' + tx(2 * R + 18 + fs * 1.5, yy + fs * 0.85, l + " — " + vals[i].toLocaleString("en-IN") + " (" + Math.round(vals[i] / tot * 100) + "%)", "start", T.text); });
+      return out + "</svg>";
+    }
+    if (ch.type === "bar") {   // horizontal
+      var lw = Math.min(w * 0.36, Math.max.apply(null, L.map(function (l) { return String(l).length; })) * fs * 0.55 + 8), ah = h - lh, gh = ah / L.length, bw = (gh * 0.7) / S.length;
+      L.forEach(function (l, i) { out += tx(lw - 6, i * gh + gh / 2 + fs * 0.35, l, "end", T.text); S.forEach(function (s, j) { var v = s.values[i] || 0, bl = (w - lw - fs * 3.2) * v / max; out += '<rect x="' + lw + '" y="' + (i * gh + gh * 0.15 + j * bw) + '" width="' + Math.max(1, bl) + '" height="' + (bw - 1) + '" rx="2" fill="' + hx(pal[j]) + '"/>' + tx(lw + bl + 4, i * gh + gh * 0.15 + j * bw + bw * 0.75, r1(v) + u, "start", T.text, true, fs * 0.9); }); });
+      return out + legend + "</svg>";
+    }
+    var ah2 = h - lh - fs * 1.8, gw = (w - 10) / L.length, base = ah2;
+    for (var g = 0; g <= 4; g++) { var gy = base - ah2 * g / 4; out += '<line x1="0" y1="' + gy + '" x2="' + w + '" y2="' + gy + '" stroke="' + hx(T.rule) + '" stroke-width="1"/>'; }
+    L.forEach(function (l, i) { out += tx(10 + i * gw + gw / 2, base + fs * 1.3, String(l).slice(0, 14), "middle", T.sub); });
+    var all2 = [].concat.apply([], S.map(function (s) { return s.values; })), lo = Math.min.apply(null, all2), hi = Math.max.apply(null, all2), pad = Math.max(1, (hi - lo) * 0.25), y0 = Math.max(0, lo - pad), y1 = hi + pad;
+    if (ch.type === "line") S.forEach(function (s, j) { var pts = s.values.map(function (v, i) { return [10 + i * gw + gw / 2, base - ah2 * ((v || 0) - y0) / (y1 - y0)]; }); out += '<polyline fill="none" stroke="' + hx(pal[j]) + '" stroke-width="3" points="' + pts.map(function (p) { return p.join(","); }).join(" ") + '"/>' + pts.map(function (p, i) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="4" fill="' + hx(pal[j]) + '"/>' + (j === 0 ? tx(p[0], p[1] - 8, r1(s.values[i]) + u, "middle", T.text, true, fs * 0.9) : ""); }).join(""); });
+    else S.forEach(function (s, j) { var bw2 = gw * 0.7 / S.length; s.values.forEach(function (v, i) { var bh = ah2 * (v || 0) / max * 0.9, x = 10 + i * gw + gw * 0.15 + j * bw2; out += '<rect x="' + x + '" y="' + (base - bh) + '" width="' + (bw2 - 2) + '" height="' + bh + '" rx="2" fill="' + hx(pal[j]) + '"/>' + tx(x + bw2 / 2, base - bh - 4, r1(v) + u, "middle", T.text, true, fs * 0.85); }); });
+    return out + legend + "</svg>";
+  }
+  function htmlPage(els, px) {
+    var F = FMTS[O.fmt], T = TH(), ff = "'" + T.font + "',Calibri,'Segoe UI',Arial,sans-serif";
+    var h = '<div xmlns="http://www.w3.org/1999/xhtml" style="position:relative;width:' + F.w * px + "px;height:" + F.h * px + "px;overflow:hidden;font-family:" + ff + ';">';
+    els.forEach(function (o) {
+      var st = "position:absolute;left:" + o.x * px + "px;top:" + o.y * px + "px;width:" + o.w * px + "px;height:" + o.h * px + "px;box-sizing:border-box;";
+      if (o.k === "rect") h += '<div style="' + st + (o.fill ? "background:#" + o.fill + ";" : "") + (o.line ? "border:" + Math.max(1, (o.lw || 1) * px / 72) + "px solid #" + o.line + ";" : "") + (o.r ? "border-radius:" + o.r * px + "px;" : "") + (o.op != null ? "opacity:" + o.op + ";" : "") + '"></div>';
+      else if (o.k === "img") h += (o.plate ? '<div style="' + st + 'background:rgba(255,255,255,.92);border-radius:' + 0.08 * px + 'px;"></div>' : "") + '<img src="' + o.src + '" style="' + st + "object-fit:" + (o.fit || "cover") + ";" + (o.plate ? "padding:" + 0.06 * px + "px;" : "") + '"/>';
+      else if (o.k === "text") {
+        var sz = o.s * px / 72, list = Array.isArray(o.t) ? o.t : [o.t];
+        var inner = o.bul ? list.map(function (t) { return '<div style="display:flex;gap:' + sz * 0.5 + "px;margin-bottom:" + sz * 0.42 + 'px"><span style="color:#' + TH().acc + ';flex:none">●</span><span>' + esc(t) + "</span></div>"; }).join("") : esc(list.join("\n")).replace(/\n/g, "<br/>");
+        h += '<div style="' + st + "display:flex;flex-direction:column;justify-content:" + ({ m: "center", b: "flex-end" }[o.va] || "flex-start") + ";text-align:" + ({ c: "center", r: "right" }[o.al] || "left") + ";font-size:" + sz + "px;line-height:1.22;color:#" + (o.c || "000") + ";" + (o.b ? "font-weight:700;" : "") + (o.i ? "font-style:italic;" : "") + (o.sp ? "letter-spacing:" + o.sp + "px;" : "") + 'overflow:hidden;"><div>' + inner + "</div></div>";
+      } else if (o.k === "ell") h += '<div style="' + st + "border-radius:50%;background:#" + o.fill + ";display:flex;align-items:center;justify-content:center;color:#" + (o.c || "FFF") + ";font-weight:700;font-size:" + (o.s || 12) * px / 72 + 'px">' + esc(o.t || "") + "</div>";
+      else if (o.k === "chev") h += '<div style="' + st + "background:#" + o.fill + ";clip-path:polygon(" + (o.first ? "0 0" : "0 0") + ",calc(100% - " + 0.22 * px + "px) 0,100% 50%,calc(100% - " + 0.22 * px + "px) 100%,0 100%" + (o.first ? "" : "," + 0.22 * px + "px 50%") + ');"></div>';
+      else if (o.k === "line") { var x1 = o.x1 * px, y1 = o.y1 * px, x2 = o.x2 * px, y2 = o.y2 * px; h += '<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;left:0;top:0;overflow:visible" width="1" height="1"><line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="#' + o.c + '" stroke-width="' + (o.lw || 1) * px / 72 + '"/></svg>'; }
+      else if (o.k === "chart") h += svgChart(o, px);
+      else if (o.k === "table") { var fsz = o.s * px / 72, cw = colW(o.rows, o.w); h += '<table style="' + st + "height:auto;border-collapse:collapse;font-size:" + fsz + "px;color:#" + o.c + ';table-layout:fixed">' + o.rows.map(function (r, i) { return "<tr>" + r.map(function (c, j) { return '<td style="width:' + cw[j] * px + "px;padding:" + fsz * 0.35 + "px " + fsz * 0.5 + "px;border-bottom:1px solid #" + o.line + ";" + (i === 0 ? "background:#" + o.head + ";color:#fff;font-weight:700;" : i % 2 === 0 ? "background:#" + o.zebra + ";" : "") + 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table>"; }
+    });
+    return h + "</div>";
+  }
+  function colW(rows, w) { var n = Math.max.apply(null, rows.map(function (r) { return r.length; })), L = []; for (var j = 0; j < n; j++) L.push(Math.max(3, Math.min(34, Math.max.apply(null, rows.map(function (r) { return String(r[j] || "").length; }))))); var s = L.reduce(function (a, b) { return a + b; }, 0); return L.map(function (x) { return w * x / s; }); }
+
+  // ================= PPTX =================
+  function pptx() {
+    return lib("pptx").then(function () {
+      var Pp = new window.PptxGenJS(), F = FMTS[O.fmt], T = TH();
+      Pp.defineLayout({ name: "BI", width: F.w, height: F.h }); Pp.layout = "BI"; Pp.author = "vivo Business Innovation"; Pp.title = coverTitle();
+      PAGES.forEach(function (els) {
+        var s = Pp.addSlide();
+        els.forEach(function (o) {
+          if (o.k === "rect") { if (o.x === 0 && o.y === 0 && o.w >= F.w - 0.01 && o.h >= F.h - 0.01 && o.op == null && o.fill) { s.background = { color: o.fill }; return; } s.addShape(o.r ? Pp.ShapeType.roundRect : Pp.ShapeType.rect, { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill ? { color: o.fill, transparency: o.op != null ? Math.round((1 - o.op) * 100) : 0 } : { type: "none" }, line: o.line ? { color: o.line, width: o.lw || 0.75 } : { type: "none" }, rectRadius: o.r ? Math.min(0.5, o.r / Math.min(o.w, o.h)) : undefined }); }
+          else if (o.k === "img") { if (o.plate) s.addShape(Pp.ShapeType.roundRect, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: "FFFFFF", transparency: 8 }, line: { type: "none" }, rectRadius: 0.1 }); var im = IMG[o.src]; if (!im) return; var sz = o.fit === "contain" ? { type: "contain", w: o.w - (o.plate ? 0.12 : 0), h: o.h - (o.plate ? 0.12 : 0) } : { type: "cover", w: o.w, h: o.h }; s.addImage({ data: o.src, x: o.x + (o.plate ? 0.06 : 0), y: o.y + (o.plate ? 0.06 : 0), w: sz.w, h: sz.h, sizing: sz }); }
+          else if (o.k === "text") { var base = { x: o.x, y: o.y, w: o.w, h: o.h, fontSize: o.s, fontFace: T.font, color: o.c || "000000", bold: !!o.b, italic: !!o.i, align: { c: "center", r: "right" }[o.al] || "left", valign: { m: "middle", b: "bottom" }[o.va] || "top", margin: 2, fit: "shrink", charSpacing: o.sp || undefined };
+            if (o.bul) s.addText((Array.isArray(o.t) ? o.t : [o.t]).map(function (t) { return { text: t, options: { bullet: { code: "25CF" }, breakLine: true, paraSpaceAfter: o.s * 0.4 } }; }), base); else s.addText(Array.isArray(o.t) ? o.t.join("\n") : String(o.t), base); }
+          else if (o.k === "ell") s.addText(o.t || "", { shape: Pp.ShapeType.ellipse, x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill }, color: o.c || "FFFFFF", bold: true, fontSize: o.s || 12, fontFace: T.font, align: "center", valign: "middle", margin: 0 });
+          else if (o.k === "chev") s.addShape(o.first ? Pp.ShapeType.homePlate : Pp.ShapeType.chevron, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: o.fill }, line: { type: "none" } });
+          else if (o.k === "line") s.addShape(Pp.ShapeType.line, { x: Math.min(o.x1, o.x2), y: Math.min(o.y1, o.y2), w: Math.max(0.01, Math.abs(o.x2 - o.x1)), h: Math.max(0.0, Math.abs(o.y2 - o.y1)), line: { color: o.c, width: o.lw || 1 } });
+          else if (o.k === "table") { var cw = colW(o.rows, o.w); s.addTable(o.rows.map(function (r, i) { return r.map(function (c) { return { text: String(c), options: i === 0 ? { bold: true, color: "FFFFFF", fill: { color: o.head } } : { color: o.c, fill: i % 2 === 0 ? { color: o.zebra } : undefined } }; }); }), { x: o.x, y: o.y, w: o.w, colW: cw, fontSize: o.s, fontFace: T.font, border: { type: "solid", color: o.line, pt: 0.75 }, autoPage: false }); }
+          else if (o.k === "chart") { var ch = o.ch, t = { bar: Pp.ChartType.bar, column: Pp.ChartType.bar, line: Pp.ChartType.line, doughnut: Pp.ChartType.doughnut, pie: Pp.ChartType.pie }[ch.type] || Pp.ChartType.bar;
+            s.addChart(t, ch.series.map(function (x) { return { name: x.name, labels: ch.labels, values: x.values }; }), { x: o.x, y: o.y, w: o.w, h: o.h, barDir: ch.type === "bar" ? "bar" : "col", chartColors: o.T.pal.slice(0, Math.max(ch.series.length, ch.type === "doughnut" || ch.type === "pie" ? ch.labels.length : 1)), showLegend: ch.series.length > 1 || ch.type === "doughnut" || ch.type === "pie", legendPos: ch.type === "doughnut" || ch.type === "pie" ? "r" : "b", legendColor: o.T.text, legendFontFace: T.font, catAxisLabelColor: o.T.text, valAxisLabelColor: o.T.sub, catAxisLabelFontSize: 10, valAxisLabelFontSize: 9, catAxisLabelFontFace: T.font, showValue: ch.type !== "doughnut" && ch.type !== "pie", showPercent: ch.type === "doughnut" || ch.type === "pie", dataLabelFontSize: 9, dataLabelColor: ch.type === "doughnut" || ch.type === "pie" ? "FFFFFF" : o.T.text, valGridLine: { color: o.T.rule, size: 0.5 }, catGridLine: { style: "none" }, lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 7, holeSize: 55, dataLabelFormatCode: "0.0", dataLabelPosition: ch.type === "line" ? "t" : undefined, valAxisMinVal: ch.type === "line" ? Math.max(0, Math.floor(Math.min.apply(null, [].concat.apply([], ch.series.map(function (x) { return x.values; }))) * 0.9)) : undefined }); }
+        });
+      });
+      return Pp.write({ outputType: "blob" });
+    });
+  }
+  var IMG = {};
+  // ================= PNG / PDF / DOCX =================
+  function pageCanvas(i, scale) {
+    var F = FMTS[O.fmt], px = 96 * (scale || 2), html = htmlPage(PAGES[i], px);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + F.w * px + '" height="' + F.h * px + '"><foreignObject x="0" y="0" width="100%" height="100%">' + html + "</foreignObject></svg>";
+    return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { var c = document.createElement("canvas"); c.width = F.w * px; c.height = F.h * px; var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0); res(c); }; im.onerror = function () { rej(new Error("Couldn't draw the picture.")); }; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+  }
+  function images(kind) {
+    var mime = kind === "jpg" ? "image/jpeg" : "image/png", out = [];
+    return PAGES.reduce(function (p, _, i) { return p.then(function () { say('<div class="loading"><div class="spin"></div>Drawing page ' + (i + 1) + " of " + PAGES.length + "…</div>"); return pageCanvas(i, 2).then(function (c) { out.push(c.toDataURL(mime, 0.92)); }); }); }, Promise.resolve()).then(function () { return out; });
+  }
+  function fname(ext) { return (coverTitle() + "_" + O.scope + "_" + P().label).replace(/[^\w]+/g, "_").replace(/_+/g, "_").slice(0, 80) + "." + ext; }
+  function docx() {
+    return lib("zip").then(function () {
+      var X = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+      var p = function (t, o) { o = o || {}; return '<w:p><w:pPr>' + (o.h ? '<w:spacing w:before="240" w:after="80"/>' : "") + (o.bul ? '<w:ind w:left="360" w:hanging="220"/>' : "") + "</w:pPr><w:r><w:rPr>" + (o.b || o.h ? "<w:b/>" : "") + '<w:color w:val="' + (o.c || "1F2340") + '"/><w:sz w:val="' + (o.sz || 22) + '"/><w:rFonts w:ascii="' + O.font + '" w:hAnsi="' + O.font + '"/></w:rPr><w:t xml:space="preserve">' + (o.bul ? "• " : "") + X(t) + "</w:t></w:r></w:p>"; };
+      var tbl = function (rows) { return '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders><w:top w:val="single" w:sz="4" w:color="DDDDDD"/><w:bottom w:val="single" w:sz="4" w:color="DDDDDD"/><w:insideH w:val="single" w:sz="4" w:color="DDDDDD"/></w:tblBorders></w:tblPr>' + rows.map(function (r, i) { return "<w:tr>" + r.map(function (c) { return '<w:tc><w:tcPr>' + (i === 0 ? '<w:shd w:val="clear" w:fill="' + TH().acc + '"/>' : "") + "</w:tcPr>" + p(c, { b: i === 0, c: i === 0 ? "FFFFFF" : "1F2340", sz: 20 }) + "</w:tc>"; }).join("") + "</w:tr>"; }).join("") + "</w:tbl>"; };
+      var b = p(coverTitle(), { h: true, sz: 40, c: TH().dark }) + p(O.sub || O.scope + " · " + P().label, { c: "6B7088" });
+      SL.forEach(function (s) {
+        if (/^(cover|close|section)$/.test(s.type)) return;
+        b += p(s.title, { h: true, sz: 28, c: TH().acc }); if (s.sub) b += p(s.sub, { c: "6B7088", sz: 20 });
+        (s.stats || []).forEach(function (x) { b += p(x.v + " — " + x.l, { bul: true }); });
+        (s.bullets || []).forEach(function (x) { b += p(x, { bul: true }); });
+        (s.steps || []).forEach(function (x, i) { b += p((i + 1) + ". " + x.t + (x.s ? " — " + x.s : "")); });
+        if (s.rows && s.rows.length) b += tbl(s.rows);
+        if (s.chart) b += tbl([["", ].concat(s.chart.series.map(function (x) { return x.name; }))].concat(s.chart.labels.map(function (l, i) { return [l].concat(s.chart.series.map(function (x) { return String(x.values[i]) + (s.chart.unit || ""); })); })));
+        if (s.gantt) b += tbl([["Project", "Plan"]].concat(s.gantt.map(function (g) { return [g.name, (g.segs || []).map(function (sg) { return ({ d: "Design", b: "Build", p: "Pilot", l: "Live" }[sg[2]]) + " " + MN[sg[0] - 1] + "–" + MN[sg[1] - 1]; }).join(", ")]; })));
+        if (s.insight) b += p("💡 " + s.insight, { b: true, c: TH().dark });
+      });
+      var z = new window.JSZip();
+      z.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+      z.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+      z.file("word/document.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + b + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>');
+      return z.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+    });
+  }
+  function make(kind) {
+    if (!PAGES.length) return toast("Build the slides first.");
+    var done = function (blob, name) { say(""); download(blob, name); toast("Saved " + name); };
+    var fail = function (e) { say('<div class="err">' + esc(e.message || String(e)) + "</div>"); };
+    if (kind === "pptx") { say('<div class="loading"><div class="spin"></div>Making the PowerPoint…</div>'); return pptx().then(function (b) { done(b, fname("pptx")); }).catch(fail); }
+    if (kind === "docx") return docx().then(function (b) { done(b, fname("docx")); }).catch(fail);
+    if (kind === "pdf") return lib("pdf").then(function () { return images("jpg"); }).then(function (L) { var F = FMTS[O.fmt], doc = new window.jspdf.jsPDF({ orientation: F.w > F.h ? "landscape" : "portrait", unit: "in", format: [F.w, F.h] }); L.forEach(function (d, i) { if (i) doc.addPage([F.w, F.h], F.w > F.h ? "landscape" : "portrait"); doc.addImage(d, "JPEG", 0, 0, F.w, F.h); }); done(doc.output("blob"), fname("pdf")); }).catch(fail);
+    return images(kind).then(function (L) {
+      if (L.length === 1) return done(b64ToBlob(L[0].split(",")[1], kind === "jpg" ? "image/jpeg" : "image/png"), fname(kind));
+      return lib("zip").then(function () { var z = new window.JSZip(); L.forEach(function (d, i) { z.file("page_" + String(i + 1).padStart(2, "0") + "." + kind, d.split(",")[1], { base64: true }); }); return z.generateAsync({ type: "blob" }); }).then(function (b) { done(b, fname("zip").replace(/\.zip$/, "_" + kind + ".zip")); });
+    }).catch(fail);
+  }
+
+  // ================= banners & logo =================
+  function toData(url, max) { return fetch(url).then(function (r) { if (!r.ok) throw 0; return r.blob(); }).then(function (b) { return new Promise(function (res) { var im = new Image(), u = URL.createObjectURL(b); im.onload = function () { var k = Math.min(1, (max || 1600) / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas"); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL(/png/i.test(b.type) ? "image/png" : "image/jpeg", 0.88)); }; im.onerror = function () { res(""); }; im.src = u; }); }).catch(function () { return ""; }); }
+  function bannerSrc() { if (O.banner === "none") return ""; var b = BANNERS.filter(function (x) { return x.id === O.banner; })[0]; return b ? b.src : ""; }
+  function loadBanners() {
+    BANNERS = [];
+    toData("brand-logo.png", 600).then(function (d) { LOGO = d; if (d) IMG[d] = 1; });
+    var add = function (id, name, src) { if (src) { IMG[src] = 1; BANNERS.push({ id: id, name: name, src: src }); } };
+    var mine = ls("ds-up"); if (mine) add("up", "My upload", mine);
+    api({ action: "bnr-get" }).then(function (r) {
+      var items = r && r.ok ? (r.banners.items || []).filter(function (x) { return x.img; }).slice(0, 6) : [];
+      return items.reduce(function (p, x, i) { return p.then(function () { return toData(x.img, 1600).then(function (d) { add("d" + i, x.title || "Banner " + (i + 1), d); }); }); }, Promise.resolve());
+    }).then(function () {
+      return dash().then(function () { var m = DA.media || {}, src = (m.hero && (m.hero.src || m.hero)) || ""; if (typeof src === "string" && /^data:image/.test(src)) return toData(src, 1600).then(function (d) { add("brand", "Dashboard hero", d); }); }).catch(function () { });
+    }).then(function () { if (!BANNERS.some(function (b) { return b.id === O.banner; }) && O.banner !== "none") O.banner = BANNERS.length ? BANNERS[0].id : "none"; if (TAB !== "out") draw(); });
+  }
+
+  // ================= UI =================
+  var TAB = "cfg";
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; draw(); }).catch(function () { });
+    api({ action: "me" }).then(function (r) { if (r && r.ok && r.profile) ME = r.profile.state || ""; if (!ADMIN && O.scope !== "PAN India" && O.scope !== ME) O.scope = ME || "PAN India"; draw(); });
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Opening the dashboard data…</div>';
+    dash().then(function () { PERIODS = periods(); if (!PERIODS.some(function (p) { return p.id === O.per; })) O.per = PERIODS[0] ? PERIODS[0].id : ""; draw(); loadBanners(); }).catch(function (e) { VIEW.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+  }
+  function chips(list, sel, attr, multi) { return '<div class="fx">' + list.map(function (x) { var on = multi ? sel.indexOf(x[0]) >= 0 : sel === x[0]; return "<span " + attr + '="' + esc(x[0]) + '" class="' + (on ? "on" : "") + '">' + esc(x[1]) + "</span>"; }).join("") + "</div>"; }
+  function draw() {
+    if (!PERIODS.length) return;
+    var scopes = ["PAN India"].concat(ADMIN ? STATES : ME ? [ME] : []);
+    var h = '<div class="card"><div class="g2"><div><label class="lb">For</label><select class="tx" id="sc">' + scopes.map(function (s) { return "<option" + (s === O.scope ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select></div><div><label class="lb">Period</label><select class="tx" id="pe">' + PERIODS.map(function (p) { return '<option value="' + p.id + '"' + (p.id === O.per ? " selected" : "") + ">" + esc(p.label) + (p.id[0] === "q" ? " (quarter)" : "") + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="lb">Slide focus <span class="muted" style="font-weight:500">— tap in the order you want; pick as many as you like</span></label>' + FOCUS.map(function (g) { return '<div class="fgh">' + g[1] + "</div>" + chips(g[2], O.focus, "data-f", true); }).join("") +
+      (O.focus.indexOf("kpi") >= 0 ? '<label class="lb">Which KPI</label>' + chips(KPIS.slice(0, 5), O.kpi, "data-k") : "") +
+      (O.focus.indexOf("custom") >= 0 ? '<label class="lb">Custom topic — what should the slides cover?</label><input class="tx" id="cu" value="' + esc(O.custom) + '" placeholder="e.g. Diwali sales push plan for Punjab">' : "") +
+      (O.focus.length ? '<div class="sum">Order: ' + O.focus.map(function (f, i) { return (i + 1) + ". " + esc(f === "custom" ? O.custom || "Custom topic" : FL[f]); }).join(" · ") + "</div>" : "") + "</div>" +
+      '<div class="card"><h3 style="margin:0 0 4px;font-size:15px">🎨 Design</h3><label class="lb">Format</label>' + chips(Object.keys(FMTS).map(function (k) { return [k, FMTS[k].n]; }), O.fmt, "data-fm") +
+      '<label class="lb">Layout</label>' + chips(Object.keys(LAYOUTS).map(function (k) { return [k, LAYOUTS[k]]; }), O.layout, "data-ly") +
+      '<label class="lb">Theme</label><div class="ths">' + Object.keys(THEMES).map(function (k) { var t = THEMES[k]; return '<span data-th="' + k + '" class="' + (k === O.theme ? "on" : "") + '"><i><b style="background:#' + t.dark + '"></b><b style="background:#' + t.acc + '"></b><b style="background:#' + t.card + '"></b></i>' + esc(t.n) + "</span>"; }).join("") + "</div>" +
+      '<div class="g3"><div><label class="lb">Font</label><select class="tx" id="fo">' + FONTS.map(function (f) { return "<option" + (f === O.font ? " selected" : "") + ">" + f + "</option>"; }).join("") + '</select></div><div><label class="lb">Text size</label><select class="tx" id="sz">' + [["compact", "Compact"], ["normal", "Normal"], ["large", "Large"]].map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === O.size ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Accent colour</label><input class="tx" id="ac" type="color" value="#' + (O.accent || THEMES[O.theme].acc) + '" style="height:42px;padding:3px"></div></div>' +
+      '<label class="lb">Banner</label><div class="bns"><span data-bn="none" class="' + (O.banner === "none" ? "on" : "") + '">No banner</span>' + BANNERS.map(function (b) { return '<img data-bn="' + b.id + '" src="' + b.src + '" class="' + (O.banner === b.id ? "on" : "") + '" alt="' + esc(b.name) + '" title="' + esc(b.name) + '">'; }).join("") + '<span id="bup">📤 Upload</span></div>' +
+      '<div class="g2"><div><label class="lb">Title</label><input class="tx" id="ti" value="' + esc(O.title) + '" placeholder="' + esc(coverTitle()) + '"></div><div><label class="lb">Subtitle</label><input class="tx" id="su" value="' + esc(O.sub) + '" placeholder="' + esc(O.scope + " · " + (P() ? P().label : "")) + '"></div></div>' +
+      '<div class="fx" style="margin-top:10px">' + [["cover", "Cover"], ["agenda", "Agenda"], ["close", "Thank-you slide"], ["logo", "vivo BI logo"]].map(function (x) { return '<span data-tg="' + x[0] + '" class="' + (O[x[0]] ? "on" : "") + '">' + (O[x[0]] ? "✓ " : "") + x[1] + "</span>"; }).join("") + "</div></div>" +
+      '<div class="card"><h3 style="margin:0 0 4px;font-size:15px">✨ AI</h3><div class="fx">' + '<span data-tg="ai" class="' + (O.ai ? "on" : "") + '">' + (O.ai ? "✓ " : "") + "Use AI for insights, flows and narrative</span></div>" +
+      (O.ai ? '<div class="g2"><div><label class="lb">Tone</label><select class="tx" id="tn">' + [["professional", "Professional"], ["crisp", "Crisp"], ["detailed", "Detailed"]].map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === O.tone ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">AI slides per focus</label><select class="tx" id="nn">' + [1, 2, 3].map(function (n) { return "<option" + (n === O.n ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select></div></div>" : "") +
+      '<div class="muted" style="font-size:12px;margin-top:8px">Numbers always come from the dashboard; AI only writes the words, flows and insights around them.</div></div>' +
+      '<button class="btn pri block" id="go" style="font-size:16px;padding:14px;margin-top:12px">🎬 Build slides</button><div id="prog" class="prog2"></div><div id="out"></div>';
+    VIEW.innerHTML = h; bind(); if (PAGES.length) showOut();
+  }
+  function bind() {
+    var ch = function (sel, fn) { [].forEach.call(VIEW.querySelectorAll(sel), function (e) { e.onclick = function () { fn(e); sv(); draw(); }; }); };
+    ch("[data-f]", function (e) { var f = e.dataset.f, i = O.focus.indexOf(f); if (i >= 0) O.focus.splice(i, 1); else O.focus.push(f); });
+    ch("[data-k]", function (e) { O.kpi = e.dataset.k; }); ch("[data-fm]", function (e) { O.fmt = e.dataset.fm; relayout(); }); ch("[data-ly]", function (e) { O.layout = e.dataset.ly; relayout(); });
+    ch("[data-th]", function (e) { O.theme = e.dataset.th; O.accent = ""; relayout(); }); ch("[data-tg]", function (e) { O[e.dataset.tg] = !O[e.dataset.tg]; rebuildFrame(); });
+    ch("[data-bn]", function (e) { O.banner = e.dataset.bn; relayout(); });
+    var on = function (id, k, cb) { var e = $(id); if (e) e.onchange = function () { O[k] = e.type === "number" ? +e.value : k === "n" ? +e.value : e.value; sv(); if (cb) cb(); }; };
+    on("sc", "scope", function () { CACHE = {}; draw(); }); on("pe", "per", draw); on("fo", "font", relayout); on("sz", "size", relayout); on("tn", "tone"); on("nn", "n"); on("ti", "title", relayout); on("su", "sub", relayout); on("cu", "custom");
+    var ac = $("ac"); if (ac) ac.onchange = function () { O.accent = ac.value.replace("#", "").toUpperCase(); sv(); relayout(); };
+    $("bup").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = function () { var f = i.files[0]; if (!f) return; var u = URL.createObjectURL(f); toData(u, 1600).then(function (d) { if (!d) return toast("Couldn't open this picture."); ls("ds-up", d.length < 2500000 ? d : null); BANNERS = BANNERS.filter(function (b) { return b.id !== "up"; }); IMG[d] = 1; BANNERS.unshift({ id: "up", name: "My upload", src: d }); O.banner = "up"; sv(); draw(); relayout(); }); }; i.click(); };
+    $("go").onclick = build;
+  }
+  function rebuildFrame() { if (!SL.length) return; SL = SL.filter(function (s) { return !/^(cover|agenda|close)$/.test(s.type); }); var foc = []; SL.forEach(function (s) { if (s.focus && FL[s.focus] && foc.indexOf(s.focus) < 0) foc.push(s.focus); }); if (O.agenda && foc.length > 1 && O.fmt === "deck") SL.unshift({ type: "agenda", title: "Agenda", focus: "agenda", bullets: foc.map(function (f) { return FL[f]; }) }); if (O.cover) SL.unshift({ type: "cover", focus: "cover" }); if (O.close) SL.push({ type: "close", focus: "close" }); relayout(); }
+  function relayout() { if (!SL.length) return; PAGES = layoutPages(); }
+  function render() { PAGES = layoutPages(); showOut(); }
+  function showOut() {
+    if (!$("out")) return; PAGES = layoutPages();
+    var w = Math.min(VIEW.clientWidth - 4, 900), F = FMTS[O.fmt], px = Math.min(w / F.w, 560 / F.h * (F.w > F.h ? 2 : 1)), one = O.fmt === "onepager";
+    var h = '<div class="card"><b>' + PAGES.length + (one ? " page" : " slide") + (PAGES.length === 1 ? "" : "s") + ' ready</b><div class="acts2"><button class="btn pri" data-mk="pptx">📊 Editable PPTX</button><button class="btn ok" data-mk="pdf">📄 PDF</button><button class="btn sec" data-mk="png">🖼️ PNG</button><button class="btn sec" data-mk="jpg">🖼️ JPG</button><button class="btn sec" data-mk="docx">📝 Word document</button><button class="btn ghost" id="rb">🔄 Rebuild</button></div><div class="muted" style="font-size:12px;margin-top:8px">The PPTX opens in PowerPoint / Google Slides with editable text, shapes, tables and real charts. Change design options above — slides update instantly.</div></div><div class="pvw">';
+    PAGES.forEach(function (els, i) {
+      var s = one ? null : SL[i];
+      h += '<div class="pgt"><span>' + (one ? "Page " + (i + 1) : (i + 1) + ". " + esc(s.type === "cover" ? "Cover" : s.type === "close" ? "Thank you" : s.title || s.type) + (s.src === "ai" ? " · ✨ AI" : "")) + "</span>" + (one ? "" : '<span class="row"><button data-up="' + i + '"' + (i ? "" : " disabled") + '>↑</button><button data-dn="' + i + '">↓</button>' + (/^(cover|close)$/.test(s.type) ? "" : '<button data-ed="' + i + '">✏️ Edit</button>') + '<button data-rm="' + i + '">🗑</button></span>') + "</div>" +
+        '<div class="pg" style="width:' + F.w * px + "px;height:" + F.h * px + 'px">' + htmlPage(els, px) + "</div>";
+    });
+    $("out").innerHTML = h + "</div>";
+    [].forEach.call($("out").querySelectorAll("[data-mk]"), function (b) { b.onclick = function () { make(b.dataset.mk); }; });
+    $("rb").onclick = function () { CACHE = {}; build(); };
+    var mv = function (i, d) { var j = i + d; if (j < 0 || j >= SL.length) return; var t = SL[i]; SL[i] = SL[j]; SL[j] = t; showOut(); };
+    [].forEach.call($("out").querySelectorAll("[data-up]"), function (b) { b.onclick = function () { mv(+b.dataset.up, -1); }; });
+    [].forEach.call($("out").querySelectorAll("[data-dn]"), function (b) { b.onclick = function () { mv(+b.dataset.dn, 1); }; });
+    [].forEach.call($("out").querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { SL.splice(+b.dataset.rm, 1); showOut(); }; });
+    [].forEach.call($("out").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { edit(+b.dataset.ed); }; });
+  }
+  function edit(i) {
+    var s = SL[i], lines = function (a, f) { return (a || []).map(f).join("\n"); };
+    var body = '<div class="f2"><label class="lb">Title</label><input class="tx" id="e1" value="' + esc(s.title || "") + '"><label class="lb">Subtitle</label><input class="tx" id="e2" value="' + esc(s.sub || "") + '">' +
+      (s.stats && s.stats.length ? '<label class="lb">Numbers (value | label, one per line)</label><textarea class="tx" id="e3">' + esc(lines(s.stats, function (x) { return x.v + " | " + x.l; })) + "</textarea>" : "") +
+      (s.bullets ? '<label class="lb">Bullets (one per line)</label><textarea class="tx" id="e4" style="min-height:110px">' + esc((s.bullets || []).join("\n")) + "</textarea>" : "") +
+      (s.steps && s.steps.length ? '<label class="lb">Steps (title | detail, one per line)</label><textarea class="tx" id="e5" style="min-height:110px">' + esc(lines(s.steps, function (x) { return x.t + " | " + (x.s || ""); })) + "</textarea>" : "") +
+      (s.rows && s.rows.length ? '<label class="lb">Table (cells separated by |, first line = header)</label><textarea class="tx" id="e6" style="min-height:110px">' + esc(lines(s.rows, function (r) { return r.join(" | "); })) + "</textarea>" : "") +
+      '<label class="lb">Insight / takeaway</label><textarea class="tx" id="e7">' + esc(s.insight || "") + "</textarea>" +
+      '<label class="lb">Slide type</label><select class="tx" id="e8">' + [["bullets", "Bullets"], ["stats", "Numbers"], ["flow", "Process flow"], ["timeline", "Timeline"], ["table", "Table"], ["chart", "Chart"], ["two", "Bullets + chart"], ["quote", "Big statement"], ["gantt", "Roadmap (gantt)"], ["agenda", "Agenda"], ["section", "Section divider"]].filter(function (x) { return x[0] === s.type || (x[0] === "chart" || x[0] === "two" ? !!s.chart : x[0] === "gantt" ? !!s.gantt : x[0] !== "agenda" && x[0] !== "section"); }).map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === s.type ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></div>";
+    var ov = sheet("Edit slide " + (i + 1), "", [["💾", "Save", function (ov) {
+      var g = function (id) { var e = ov.querySelector("#" + id); return e ? e.value : null; }, L = function (v) { return String(v || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean); };
+      s.title = g("e1"); s.sub = g("e2"); s.insight = g("e7").trim(); s.type = g("e8");
+      if (g("e3") != null) s.stats = L(g("e3")).map(function (l) { var p = l.split("|"); return { v: p[0].trim(), l: (p[1] || "").trim() }; });
+      if (g("e4") != null) s.bullets = L(g("e4"));
+      if (g("e5") != null) s.steps = L(g("e5")).map(function (l) { var p = l.split("|"); return { t: p[0].trim(), s: (p[1] || "").trim() }; });
+      if (g("e6") != null) s.rows = L(g("e6")).map(function (l) { return l.split("|").map(function (c) { return c.trim(); }); });
+      if (s.type === "flow" || s.type === "timeline") { if (!s.steps || !s.steps.length) s.steps = (s.bullets || []).map(function (b) { return { t: b.slice(0, 34), s: b.length > 34 ? b.slice(34) : "" }; }); }
+      if ((s.type === "bullets" || s.type === "quote") && !s.bullets) s.bullets = (s.steps || []).map(function (x) { return x.t + (x.s ? " — " + x.s : ""); });
+      if (s.type === "stats" && (!s.stats || !s.stats.length)) s.type = "bullets";
+      if (s.type === "table" && (!s.rows || s.rows.length < 2)) s.type = "bullets";
+      s.src = s.src === "ai" ? "ai" : "you"; showOut();
+    }]], body);
+    ov.querySelector(".sheet").style.maxWidth = "600px";
+  }
+  load();
+})();
+</script>
+</body>
+</html>

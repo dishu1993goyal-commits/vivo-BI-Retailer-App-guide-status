@@ -1,0 +1,68 @@
+// One-Page Studio: AI writes slide content (bullets, stats, flows, charts, insights) for a chosen focus area
+// from the dashboard data the page sends. Numbers come only from that data; results are cached.
+// Storage:  dsai:<hash>   { at, slides }
+import { groqJSON, aiKeys } from "./aff-core.mjs";
+import { createHash } from "node:crypto";
+const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+const TYPES = ["bullets", "stats", "flow", "timeline", "table", "chart", "two", "quote"];
+const CH = ["bar", "column", "line", "doughnut", "pie"];
+const num = (v) => { const n = Number(String(v).replace(/[^0-9.\-]/g, "")); return isFinite(n) ? Math.round(n * 100) / 100 : 0; };
+
+export function cleanSlides(d) {
+  const out = [];
+  (Array.isArray(d && d.slides) ? d.slides : []).slice(0, 6).forEach((s) => {
+    if (!s || typeof s !== "object") return;
+    const type = TYPES.includes(s.type) ? s.type : "bullets";
+    const o = { type, title: str(s.title, 80) || "Highlights", sub: str(s.sub || s.subtitle, 120), insight: str(s.insight, 200) };
+    o.bullets = (Array.isArray(s.bullets) ? s.bullets : []).slice(0, 7).map((b) => str(typeof b === "object" ? (b.text || b.t || "") : b, 160)).filter(Boolean);
+    o.stats = (Array.isArray(s.stats) ? s.stats : []).slice(0, 4).map((x) => ({ v: str(x && (x.v ?? x.value), 14), l: str(x && (x.l || x.label), 40) })).filter((x) => x.v && x.l);
+    o.steps = (Array.isArray(s.steps) ? s.steps : []).slice(0, 7).map((x) => ({ t: str(x && (x.t || x.title), 34), s: str(x && (x.s || x.sub || x.detail), 70) })).filter((x) => x.t);
+    o.rows = (Array.isArray(s.rows) ? s.rows : []).slice(0, 9).map((r) => (Array.isArray(r) ? r : []).slice(0, 5).map((c) => str(c, 60)));
+    if (s.chart && typeof s.chart === "object" && Array.isArray(s.chart.labels)) {
+      const labels = s.chart.labels.slice(0, 12).map((l) => str(l, 24));
+      const series = (Array.isArray(s.chart.series) ? s.chart.series : []).slice(0, 3).map((x) => ({ name: str(x && x.name, 30) || "Value", values: labels.map((_, i) => num(((x && x.values) || [])[i])) }));
+      if (labels.length && series.length) o.chart = { type: CH.includes(s.chart.type) ? s.chart.type : "bar", labels, series, unit: str(s.chart.unit, 8) };
+    }
+    if (type === "flow" && o.steps.length < 2) o.type = "bullets";
+    if (type === "stats" && !o.stats.length) o.type = "bullets";
+    if (type === "table" && o.rows.length < 2) o.type = "bullets";
+    if ((type === "chart" || type === "two") && !o.chart) o.type = "bullets";
+    if (o.type === "bullets" && !o.bullets.length && !o.insight) return;
+    out.push(o);
+  });
+  return out;
+}
+
+export async function deckAction(b, ctx) {
+  const { store, t, app, rec } = ctx;
+  if (b.action !== "ds-ai") return json(400, { ok: false, error: "Unknown action." });
+  const focus = str(b.focus, 80), scope = str(b.scope, 40) || "PAN India", period = str(b.period, 40), tone = ["crisp", "detailed", "professional"].includes(b.tone) ? b.tone : "professional";
+  if (app !== "admin" && scope !== "PAN India" && rec.state && scope !== rec.state) return json(403, { ok: false, error: "You can make decks for your state and PAN India." });
+  const data = String(typeof b.data === "string" ? b.data : JSON.stringify(b.data || {})).slice(0, 14000);
+  if (!focus || data.length < 20) return json(400, { ok: false, error: "Nothing to write about yet." });
+  const n = Math.max(1, Math.min(5, Number(b.slides) || 2));
+  const key = "dsai:" + createHash("sha1").update(JSON.stringify([focus, scope, period, tone, n, str(b.extra, 300), data])).digest("hex").slice(0, 20);
+  const hit = await store.get(key); if (hit && !b.fresh && t - hit.at < 12 * 3600000) return json(200, { ok: true, slides: hit.slides, cached: true });
+  const keys = await aiKeys(store, ctx.env || {}); if (!keys.groq) return json(200, { ok: false, error: "AI key not set (ask HO: Affordability → Data → Groq key)." });
+  const prompt = `You are a senior BI analyst at vivo India (Business Innovation team) writing PowerPoint slides for management.
+Focus area: "${focus}". Scope: ${scope}. Period: ${period || "latest"}. Tone: ${tone}.${b.extra ? " Extra instructions: " + str(b.extra, 300) : ""}
+Write ${n} slide(s) for this focus. Use ONLY facts and numbers present in DATA — never invent numbers, names or dates. Keep text short (slide bullets, max 16 words each).
+Pick the best slide type for the content:
+- "stats": 2-4 headline numbers {v,l} + insight
+- "bullets": 3-6 bullets + insight
+- "flow": process / plan as 3-6 steps {t,s} (use when DATA has steps, stages or a sequence)
+- "timeline": milestones as steps {t: when, s: what}
+- "table": rows (first row = header), max 6 rows x 4 columns
+- "chart": chart {type: bar|column|line|doughnut, labels:[], series:[{name, values:[]}], unit} built only from DATA numbers + insight
+- "two": bullets on the left + chart on the right
+Every slide needs a title (max 8 words) and an "insight" (one sentence: so what / what to do next).
+Return JSON only: {"slides":[{"type":"","title":"","sub":"","bullets":[],"stats":[],"steps":[],"rows":[],"chart":null,"insight":""}]}
+DATA:
+${data}`;
+  const r = await groqJSON(keys.groq, prompt, ctx.aiFetch || fetch, { validate: (d) => cleanSlides(d).length > 0 });
+  if (!r.ok) return json(200, { ok: false, error: r.error });
+  const slides = cleanSlides(r.data);
+  await store.set(key, { at: t, slides });
+  return json(200, { ok: true, slides });
+}

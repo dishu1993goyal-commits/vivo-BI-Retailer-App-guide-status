@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Access control</title>
+<script src="access-catalog.js?v=1"></script>
+<style>
+/*@@CSS@@*/
+.gch{display:flex;gap:6px;overflow-x:auto;margin-top:8px;padding-bottom:2px}.gch span{flex:none;border:1px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.gch span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.grp{margin-top:16px}.grp h3{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:15px;margin:0 2px 6px}.grp h3 small{font-weight:500;color:var(--mut);font-size:12px}
+.fr{background:var(--card);border-radius:13px;padding:10px 12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);cursor:pointer;border-left:4px solid #1E9E61}
+.fr.part{border-left-color:#E69A00}.fr.off{border-left-color:#D93B3B}.fr.chg{box-shadow:0 0 0 2px var(--brand)}
+.fr .nm{display:flex;justify-content:space-between;gap:8px;font-weight:700;font-size:14px}.fr .nm small{color:var(--mut);font-weight:500;font-size:11px}
+.sm2{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.sm2 span{font-size:11.5px;border-radius:99px;padding:2px 8px;background:#EEF7F1;color:#13693F}.sm2 span.o{background:#FDECEC;color:#A12727}.sm2 span.p{background:#FFF4E5;color:#8A5A00}.sm2 span.u{background:#EEF0FF;color:#2B33A6}
+.ed{background:#F7F8FC;border-radius:12px;padding:10px;margin-top:8px;cursor:default}
+.ed label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.tg{display:inline-flex;border:1px solid #D5D8E6;border-radius:10px;overflow:hidden}.tg button{border:0;background:#fff;padding:7px 14px;font:600 13px inherit;cursor:pointer;color:var(--ink2)}.tg button.on{background:var(--brand);color:#fff}.tg button.on.no{background:#D93B3B}
+.stc2{display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow:auto}.stc2 span{border:1px solid #DDE0EF;border-radius:99px;padding:3px 9px;font-size:12px;cursor:pointer;background:#fff}.stc2 span.on{background:#D93B3B;border-color:#D93B3B;color:#fff}.stc2.only span.on{background:#1E9E61;border-color:#1E9E61}
+.savebar{position:sticky;bottom:10px;margin-top:14px;z-index:5;display:flex;gap:8px;background:#14183A;color:#fff;border-radius:14px;padding:10px 12px;align-items:center;box-shadow:0 10px 26px rgba(20,24,51,.3)}.savebar span{flex:1;font-size:13px}
+.imp table{font-size:12px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔐</span></div>
+  <h1>Access control</h1><p>Turn any tool, admin setting, dashboard tab, filter or report on or off — for everyone, admins, states or single users</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), RULES = {}, DRAFT = {}, CAT = [], STATES = [], G = ls("acc-g") || "all", Q = "", OPEN = "", META = {};
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  var XL = null; function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); })); }
+  function def() { return { st: true, ad: true, only: [], xs: [], allow: [], deny: [] }; }
+  function rule(id) { var r = id in DRAFT ? DRAFT[id] : RULES[id]; return Object.assign(def(), r ? JSON.parse(JSON.stringify(r)) : {}); }
+  function isDef(r) { return r.st && r.ad && !r.only.length && !r.xs.length && !r.allow.length && !r.deny.length; }
+  function setRule(id, r) { var base = RULES[id] ? JSON.stringify(Object.assign(def(), RULES[id])) : JSON.stringify(def()); if (JSON.stringify(r) === base) delete DRAFT[id]; else DRAFT[id] = isDef(r) ? null : r; }
+  function feats() { var out = []; CAT.forEach(function (g) { g.items.forEach(function (it) { out.push({ id: it[0], name: it[1], g: g.g, k: g.k }); }); }); return out; }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "acc-get" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      RULES = r.rules || {}; META = { by: r.by, at: r.at };
+      CAT = JSON.parse(JSON.stringify(window.BIACCESS_CAT || []));
+      var tg = CAT.filter(function (g) { return g.k === "tab"; })[0];
+      if (tg) (r.tabs || []).forEach(function (x) { if (!tg.items.some(function (it) { return it[0] === "tab:" + x[0]; })) tg.items.push(["tab:" + x[0], x[1], ""]); });
+      Object.keys(RULES).forEach(function (id) { if (!feats().some(function (f) { return f.id === id; })) { var g = CAT.filter(function (q) { return q.k === id.split(":")[0]; })[0]; if (g) g.items.push([id, id.split(":")[1], ""]); } });
+      draw();
+    });
+  }
+  function summary(r) {
+    var s = [];
+    s.push(!r.st ? (r.only.length ? '<span class="p">States: only ' + esc(r.only.join(", ")) + "</span>" : '<span class="o">State users: off</span>') : r.xs.length ? '<span class="p">Off for ' + esc(r.xs.join(", ")) + "</span>" : "<span>State users: on</span>");
+    s.push(r.ad ? "<span>Admins: on</span>" : '<span class="o">Admins: off</span>');
+    if (r.allow.length) s.push('<span class="u">+' + r.allow.length + " allowed</span>");
+    if (r.deny.length) s.push('<span class="o">−' + r.deny.length + " blocked</span>");
+    return s.join("");
+  }
+  function cls(r) { return !r.st && !r.ad ? "off" : isDef(r) ? "" : "part"; }
+  function draw() {
+    var F = feats(), q = Q.toLowerCase(), groups = ["all"].concat(CAT.map(function (g) { return g.g; })), nCh = Object.keys(DRAFT).length;
+    var h = '<div class="card"><div class="muted" style="font-size:12.5px">Changes reach the apps and the web the next time a page opens or the app comes back to the front. The master admin always keeps full access. ' + (META.at ? "Last saved by " + esc(META.by) + " · " + dt(META.at) : "") + '</div>' +
+      '<input class="tx" id="q" placeholder="Search — e.g. visits, rankings, Excel" value="' + esc(Q) + '" style="margin-top:8px"><div class="gch">' + groups.map(function (g) { return '<span data-g="' + esc(g) + '" class="' + (g === G ? "on" : "") + '">' + (g === "all" ? "All" : esc(g)) + "</span>"; }).join("") + "</div>" +
+      '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="xo">⬇ Download Excel</button><button class="btn sec sm" id="xi">⬆ Import Excel</button><button class="btn ghost sm" id="xt">⬇ Blank template</button></div></div><div id="imp"></div>';
+    CAT.forEach(function (g) {
+      if (G !== "all" && G !== g.g) return;
+      var items = g.items.filter(function (it) { return !q || (it[1] + " " + it[0] + " " + g.g).toLowerCase().indexOf(q) >= 0; });
+      if (!items.length) return;
+      h += '<div class="grp"><h3><span>' + esc(g.g) + ' <small>' + items.length + '</small></span><span class="row" style="gap:6px"><button class="btn ghost sm" data-ball="' + esc(g.g) + '" data-v="0">All off for states</button><button class="btn ghost sm" data-ball="' + esc(g.g) + '" data-v="1">All on</button></span></h3>' +
+        items.map(function (it) { var r = rule(it[0]); return '<div class="fr ' + cls(r) + (it[0] in DRAFT ? " chg" : "") + '" data-f="' + it[0] + '"><div class="nm"><span>' + esc(it[1]) + '</span><small>' + esc(it[0]) + '</small></div><div class="sm2">' + summary(r) + "</div>" + (OPEN === it[0] ? editor(it[0], r) : "") + "</div>"; }).join("") + "</div>";
+    });
+    h += nCh ? '<div class="savebar"><span>' + nCh + " change" + (nCh === 1 ? "" : "s") + ' not saved</span><button class="btn ghost sm" id="un" style="color:#fff">Undo</button><button class="btn pri sm" id="sv">💾 Save</button></div>' : "";
+    VIEW.innerHTML = h; bind();
+  }
+  function editor(id, r) {
+    var tg = function (k, on) { return '<div class="tg" data-k="' + k + '"><button data-v="1" class="' + (on ? "on" : "") + '">On</button><button data-v="0" class="' + (on ? "" : "on no") + '">Off</button></div>'; };
+    return '<div class="ed" data-ed="' + id + '"><label class="lb">State users</label>' + tg("st", r.st) +
+      (STATES.length ? '<label class="lb">' + (r.st ? "Except these states (tap to switch off)" : "Only these states (tap to switch on)") + '</label><div class="stc2' + (r.st ? "" : " only") + '">' + STATES.map(function (s) { var on = r.st ? r.xs.indexOf(s) >= 0 : r.only.indexOf(s) >= 0; return '<span data-s="' + esc(s) + '" class="' + (on ? "on" : "") + '">' + esc(s) + "</span>"; }).join("") + "</div>" : "") +
+      '<label class="lb">Admins (non-master)</label>' + tg("ad", r.ad) +
+      '<label class="lb">Always allow these users <span class="muted" style="font-weight:500">(username, vChat ID or email — one per line)</span></label><textarea class="tx" data-u="allow" style="min-height:52px">' + esc(r.allow.join("\n")) + '</textarea>' +
+      '<label class="lb">Always block these users</label><textarea class="tx" data-u="deny" style="min-height:52px">' + esc(r.deny.join("\n")) + '</textarea>' +
+      '<div class="row" style="margin-top:8px"><button class="btn ghost sm" data-rst="' + id + '">↺ Back to default (on for everyone)</button><button class="btn sec sm" data-close="1">Done</button></div></div>';
+  }
+  function bind() {
+    var q = $("q"); q.oninput = function () { Q = q.value; var p = q.selectionStart; draw(); var n = $("q"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
+    [].forEach.call(VIEW.querySelectorAll("[data-g]"), function (b) { b.onclick = function () { G = b.dataset.g; ls("acc-g", G); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll(".fr"), function (f) { f.onclick = function (e) { if (e.target.closest(".ed")) return; OPEN = OPEN === f.dataset.f ? "" : f.dataset.f; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-ball]"), function (b) { b.onclick = function () { var g = CAT.filter(function (x) { return x.g === b.dataset.ball; })[0], on = b.dataset.v === "1"; g.items.forEach(function (it) { if (it[0] === "tool:access") return; var r = rule(it[0]); if (on) r = def(); else { r.st = false; r.only = []; } setRule(it[0], r); }); draw(); }; });
+    var ed = VIEW.querySelector("[data-ed]");
+    if (ed) {
+      var id = ed.dataset.ed, r = rule(id), upd = function () { setRule(id, r); draw(); };
+      [].forEach.call(ed.querySelectorAll(".tg"), function (t) { [].forEach.call(t.children, function (b) { b.onclick = function () { r[t.dataset.k] = b.dataset.v === "1"; if (t.dataset.k === "st") { r.only = []; r.xs = []; } upd(); }; }); });
+      [].forEach.call(ed.querySelectorAll("[data-s]"), function (s) { s.onclick = function () { var l = r.st ? r.xs : r.only, i = l.indexOf(s.dataset.s); if (i >= 0) l.splice(i, 1); else l.push(s.dataset.s); upd(); }; });
+      [].forEach.call(ed.querySelectorAll("[data-u]"), function (a) { a.onchange = function () { r[a.dataset.u] = a.value.split(/[\n,;]+/).map(function (x) { return x.trim(); }).filter(Boolean); upd(); }; });
+      ed.querySelector("[data-rst]").onclick = function () { r = def(); upd(); };
+      ed.querySelector("[data-close]").onclick = function () { OPEN = ""; draw(); };
+    }
+    if ($("sv")) $("sv").onclick = save;
+    if ($("un")) $("un").onclick = function () { DRAFT = {}; draw(); };
+    $("xo").onclick = function () { exportX(false); }; $("xt").onclick = function () { exportX(true); }; $("xi").onclick = importX;
+  }
+  function save() {
+    var b = $("sv"); b.disabled = true; b.textContent = "Saving…";
+    api({ action: "acc-set", rules: DRAFT }).then(function (r) { if (!r.ok) { toast(r.error); b.disabled = false; b.textContent = "💾 Save"; return; } RULES = r.rules; DRAFT = {}; META = { by: (AUTH && AUTH.username) || "", at: r.at }; toast("Saved — apps and web update on their next open"); if (window.BIACCESS) BIACCESS.refresh(); draw(); });
+  }
+  // ---------- Excel ----------
+  function rowsOf(id, r, name) {
+    var out = [];
+    if (!r.st) { out.push([id, name, "All state users", "No"]); r.only.forEach(function (s) { out.push([id, name, "State: " + s, "Yes"]); }); }
+    r.xs.forEach(function (s) { out.push([id, name, "State: " + s, "No"]); });
+    if (!r.ad) out.push([id, name, "All admins", "No"]);
+    r.allow.forEach(function (u) { out.push([id, name, u, "Yes"]); }); r.deny.forEach(function (u) { out.push([id, name, u, "No"]); });
+    return out;
+  }
+  function exportX(blank) {
+    var F = feats(), rows = [["Feature", "Feature name", "Who", "Access"]];
+    if (!blank) F.forEach(function (f) { rows = rows.concat(rowsOf(f.id, rule(f.id), f.name)); });
+    else rows.push(["tool:visits", "Market visits", "All state users", "No"], ["tool:visits", "Market visits", "State: Punjab", "Yes"], ["tab:rank", "Rankings", "ravi.kumar", "No"], ["rep:excel", "Excel downloads", "All admins", "No"], ["flt:state", "State filter", "VC1234", "Yes"]);
+    var list = [["Feature", "Feature name", "Group"]].concat(F.map(function (f) { return [f.id, f.name, f.g]; }));
+    var help = [["How to fill the Access rules sheet"], ["Feature: the code from the Features sheet (or the exact feature name)."], ["Who: All state users · All admins · Everyone · State: <state name> · or a username / vChat ID / email."], ["Access: Yes (give access) · No (remove access) · Reset (clear a user's own rule)."], ["Rows are applied top to bottom. A user rule beats the state rule; the master admin always keeps access."]];
+    download(xlsx([{ name: "Access rules", rows: rows }, { name: "Features", rows: list }, { name: "How to", rows: help }]), blank ? "Access_template.xlsx" : "Access_rules_" + istDay(Date.now()) + ".xlsx");
+  }
+  function importX() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; $("imp").innerHTML = '<div class="loading"><div class="spin"></div>Reading…</div>';
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = XLSX.read(buf, { type: "array" }), ws = wb.Sheets["Access rules"] || wb.Sheets[wb.SheetNames[0]], A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+        var H = (A[0] || []).map(function (h) { return String(h).trim().toLowerCase(); }), rows = [];
+        var names = {}; feats().forEach(function (x) { names[x.name.toLowerCase()] = x.id; names[x.id.toLowerCase()] = x.id; });
+        var fi = H.indexOf("feature"), wi = H.findIndex(function (h) { return /^(who|user|users|username|vchat id|email)$/.test(h); }), ai = H.indexOf("access");
+        if (fi >= 0 && wi >= 0 && ai >= 0) A.slice(1).forEach(function (r, i) { if (String(r[fi]).trim()) rows.push({ row: i + 2, feature: String(r[fi]).trim(), who: String(r[wi]).trim(), access: String(r[ai]).trim() }); });
+        else if (wi >= 0) A.slice(1).forEach(function (r, i) { H.forEach(function (h, j) { if (j === wi || !String(r[j]).trim()) return; rows.push({ row: i + 2, feature: String(A[0][j]).trim(), who: String(r[wi]).trim(), access: String(r[j]).trim() }); }); });
+        else throw new Error("Use the columns Feature, Who, Access — or a User column with one column per feature (Yes / No). Download the template for an example.");
+        if (!rows.length) throw new Error("No rows found.");
+        return api({ action: "acc-import", rows: rows, names: names, dry: true }).then(function (r) {
+          if (!r.ok) throw new Error(r.error);
+          $("imp").innerHTML = '<div class="card imp"><b>' + r.applied + " row(s) ready</b>" + (r.errors.length ? " · " + r.errors.length + " with problems:" + '<div class="tscroll" style="max-height:160px;overflow:auto"><table><tbody>' + r.errors.map(function (e) { return "<tr><td>Row " + e.row + "</td><td>" + esc(e.error) + "</td></tr>"; }).join("") + "</tbody></table></div>" : "") +
+            '<div class="row" style="margin-top:8px"><button class="btn pri sm" id="ia"' + (r.applied ? "" : " disabled") + ">Apply " + r.applied + ' row(s) now</button><button class="btn ghost sm" id="ix">Cancel</button></div><div class="muted" style="font-size:12px;margin-top:6px">Applying saves straight away (unsaved changes on this screen are kept separately).</div></div>';
+          $("ix").onclick = function () { $("imp").innerHTML = ""; };
+          $("ia").onclick = function () { this.disabled = true; api({ action: "acc-import", rows: rows, names: names }).then(function (x) { if (!x.ok) return toast(x.error); RULES = x.rules; toast("✅ " + x.applied + " row(s) applied"); $("imp").innerHTML = ""; if (window.BIACCESS) BIACCESS.refresh(); draw(); }); };
+        });
+      }).catch(function (e) { $("imp").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+    };
+    inp.click();
+  }
+  load();
+})();
+</script>
+</body>
+</html>

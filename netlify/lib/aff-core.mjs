@@ -558,6 +558,29 @@ export async function affAction(b, ctx) {
     return json(200, { ok: true, report: r });
   }
 
+  if (b.action === "aff-amounts") {   // AI: rupee value of each selected offer (discount, plan cost, buy-back value)
+    const price = Math.max(0, Number(b.price) || 0), mrp = Math.max(0, Number(b.mrp) || 0);
+    const offers = (Array.isArray(b.offers) ? b.offers : []).slice(0, 12).map((o) => ({ key: str(o.key, 40), kind: KINDS.includes(o.kind) ? o.kind : "other", name: str(o.name, 60), scheme: str(o.scheme, 20), benefit: str(o.benefit, 160), details: str(o.details, 300) })).filter((o) => o.key);
+    if (!offers.length || !price) return json(400, { ok: false, error: "Choose offers and a price." });
+    const sig = createHash("sha1").update(JSON.stringify([str(b.model, 60), price, mrp, offers])).digest("hex").slice(0, 16), ck = `affamt:${sig}`;
+    const hit = await store.get(ck); if (hit && t - hit.at < 3 * DAY) return json(200, { ok: true, amounts: hit.amounts, cached: true });
+    const keys = await aiKeys(store, ctx.env || {}); if (!keys.groq) return json(200, { ok: false, error: "AI key not set (Affordability → Data)." });
+    const prompt = `You price phone offers for vivo India store staff. Phone: ${str(b.model, 60)}, selling price ₹${price}${mrp ? ", MRP ₹" + mrp : ""}.
+For EACH offer below give rupee amounts for THIS phone and price:
+- "sub": money taken off what the customer pays (instant/bank discount, cashback, upgrade or exchange bonus, discount on a plan). For "up to X%" use X% of the price, capped by any "up to ₹" limit. For non-cash freebies (cloud storage, subscriptions) give their approximate retail value only if the customer would otherwise pay for it, else 0.
+- "add": cost the customer pays extra for a plan (V-Shield / protection plan price, ABB plan fee, EMI processing fee). If the plan price is not written, estimate the usual vivo India price of that plan for a phone at this price.
+- "later": assured buy-back value paid later (ABB only, e.g. 70% of price), else 0.
+- "note": max 12 words on how you got it; say "estimate" when not written in the offer.
+Whole rupees, no ranges. Return JSON only: {"a":{"<key>":{"sub":0,"add":0,"later":0,"note":""}}}
+OFFERS:
+${JSON.stringify(offers)}`;
+    const r = await groqJSON(keys.groq, prompt, ctx.aiFetch || fetch, { validate: (d) => d && d.a && typeof d.a === "object" });
+    if (!r.ok) return json(200, { ok: false, error: r.error });
+    const out = {}, n = (v) => Math.max(0, Math.min(price * 2 + 50000, Math.round(Number(v) || 0)));
+    offers.forEach((o) => { const x = r.data.a[o.key]; if (x && typeof x === "object") out[o.key] = { sub: n(x.sub), add: n(x.add), later: n(x.later), note: str(x.note, 100) }; });
+    await store.set(ck, { at: t, amounts: out });
+    return json(200, { ok: true, amounts: out });
+  }
   if (b.action === "aff-tpl-get") return json(200, { ok: true, template: (await store.get("config:afftpl")) || null });
   if (b.action === "aff-tpl-set") {
     if (!isAdmin) return json(403, { ok: false, error: "Only admins can publish the default template." });
