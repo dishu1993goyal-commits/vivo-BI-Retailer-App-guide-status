@@ -352,7 +352,10 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     var t = (o.benefit || "") + " " + (o.details || ""), R = nums(t), p = pctOf(t), cap = capOf(t), b = bare(o.benefit), pv = p ? Math.round(price * p / 100) : 0, g = { sub: 0, add: 0, later: 0 };
     if (cap && pv > cap) pv = cap;
     var best = Math.max.apply(null, R.concat([b, 0]));
-    if (o.kind === "emi") { if (/discount|cashback|cash\s*back|off\b|instant|save/i.test(t)) g.sub = Math.max(pv, R[0] || 0); var f = String(t).replace(/(\d),(?=\d)/g, "$1").match(/processing\s*fee[^₹\d]{0,12}(?:₹|rs\.?)\s*(\d+)/i); if (f) g.add = +f[1]; }
+    if (o.kind === "emi") { var t2 = String(t).replace(/(\d),(?=\d)/g, "$1"); if (/discount|cashback|cash\s*back|off\b|instant|save/i.test(t)) g.sub = Math.max(pv && !/interest/i.test(t) ? pv : 0, R[0] || 0);
+      var f = t2.match(/processing\s*fee[^₹\d]{0,14}(?:₹|rs\.?)\s*(\d+)/i); if (f) g.fee = +f[1]; else if (/(zero|no|nil|₹\s*0)\s*processing\s*fee|processing\s*fee\s*(waived|nil|₹\s*0)/i.test(t2)) g.fee = 0;
+      var ir = t2.match(/(\d+(?:\.\d+)?)\s*%\s*(?:p\.?\s*a\.?|per\s*annum|interest|rate)/i); if (o.noCost || /no[\s-]*cost|0\s*%\s*interest|interest[\s-]*free/i.test(t2)) g.ir = 0; else if (ir) g.ir = +ir[1];
+      var dp = t2.match(/down\s*payment[^₹\d]{0,12}(?:₹|rs\.?)\s*(\d+)/i); if (dp) g.dp = +dp[1]; else if (/(zero|no|nil|₹\s*0)\s*down\s*payment/i.test(t2)) g.dp = 0; }
     else if (o.kind === "cashback" || o.kind === "other") g.sub = p && /%/.test(t) && !R.length ? pv : Math.max(R[0] || b || 0, pv && R.length === 0 ? pv : 0);
     else if (o.kind === "upgrade" || o.kind === "exchange") g.sub = Math.max(best, pv);
     else if (o.kind === "vshield") { g.add = R[0] || b || 0; if (p && /off|discount|save/i.test(t) && g.add) g.sub = Math.round(g.add * p / 100); else if (R.length > 1 && /off|discount|save/i.test(t)) g.sub = Math.min.apply(null, R); }
@@ -364,7 +367,12 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     ["sub", "add", "later"].forEach(function (f) { if (u[f] != null && u[f] !== "") { out[f] = +u[f] || 0; out.src[f] = "you"; } else if (g[f]) { out[f] = g[f]; out.src[f] = "offer"; } else if (ai && ai[f]) { out[f] = ai[f]; out.src[f] = "ai"; } else out[f] = 0; });
     out.note = ai && ai.note || ""; return out;
   }
-  function needAI(k) { var o = OFF[k]; if (!o) return false; var g = guess(o, PR.price); if (o.kind === "vshield") return !g.add; if (o.kind === "abb") return !g.later || !g.add; if (o.kind === "emi") return false; return !g.sub; }
+  function needAI(k) { var o = OFF[k]; if (!o) return false; var g = guess(o, PR.price); if (o.kind === "vshield") return !g.add; if (o.kind === "abb") return !g.later || !g.add; if (o.kind === "emi") return g.fee == null || g.ir == null || g.dp == null; return !g.sub; }
+  function emiTerms(k) {   // interest, fee and down payment for the chosen EMI offer: typed > offer text > AI
+    var o = OFF[k], g = o ? guess(o, PR.price) : {}, ai = AIAMT[k] || {}, out = { src: {} };
+    [["ir", "ir"], ["fee", "fee"], ["dp", "dp"]].forEach(function (x) { var f = x[0]; if (TEN[f] != null && TEN[f] !== "") { out[f] = +TEN[f] || 0; out.src[f] = "you"; } else if (g[f] != null) { out[f] = g[f]; out.src[f] = "offer"; } else if (ai.emi && ai[f] != null) { out[f] = +ai[f] || 0; out.src[f] = "ai"; } else { out[f] = 0; out.src[f] = ""; } });
+    return out;
+  }
   function fetchAI(cb) {
     var ks = Object.keys(PICK).filter(function (k) { return OFF[k] && !AIAMT[k] && needAI(k); });
     if (!ks.length || AIBUSY || !PR.price) return;
@@ -398,10 +406,10 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     var e = emiPick();
     if (e) {
       var s = /^(\d+)\/(\d+)$/.exec(e.o.scheme || ""), n = +(TEN.n || (s ? s[1] : 0) || tenOpts(e.o)[0] || 9), adv = s && +s[1] === n ? +s[2] : 0;
-      var ir = TEN.ir != null ? +TEN.ir || 0 : 0, fee = +TEN.fee || 0, dp = Math.min(+TEN.dp || 0, c.net);
+      var et = emiTerms(e.k), ir = et.ir, fee = et.fee, dp = Math.min(et.dp, c.net); if (et.src.ir === "ai" || et.src.fee === "ai" || et.src.dp === "ai") c.ai = true;
       var fin = Math.max(0, c.net - dp), r = ir / 1200, emi = n ? (ir > 0 ? fin * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1) : fin / n) : 0; emi = Math.ceil(emi);
       var intr = ir > 0 ? Math.max(0, emi * n - fin) : 0;
-      c.emi = { n: n, adv: adv, ir: ir, fee: fee, dp: dp, per: emi, interest: intr, opts: tenOpts(e.o), noCost: e.o.noCost };
+      c.emi = { n: n, adv: adv, ir: ir, fee: fee, dp: dp, per: emi, interest: intr, opts: tenOpts(e.o), noCost: e.o.noCost || ir === 0, src: et.src };
       c.today = dp + adv * emi + fee; c.total = dp + fin + intr + fee;
     } else { c.today = c.net; c.total = c.net; }
     c.save = Math.max(0, c.mrp - c.price + c.sub);
@@ -425,7 +433,7 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     if (c.upg) L.push("Upgrade / exchange bonus: −" + rs(c.upg));
     if (c.add) L.push("Plans added (V-Shield / ABB / fees): +" + rs(c.add));
     L.push("Net price: " + rs(c.net));
-    if (c.emi) { L.push("Down payment today: " + rs(c.today)); L.push("EMI: " + rs(c.emi.per) + " × " + (c.emi.n - c.emi.adv) + " months" + (c.emi.adv ? " (+" + c.emi.adv + " paid upfront)" : "") + (c.emi.ir ? " · interest " + rs(c.emi.interest) : " · No Cost")); if (c.emi.fee) L.push("Processing fee: " + rs(c.emi.fee)); }
+    if (c.emi) { L.push("Down payment today: " + rs(c.today)); L.push("EMI: " + rs(c.emi.per) + " × " + (c.emi.n - c.emi.adv) + " months" + (c.emi.adv ? " (+" + c.emi.adv + " paid upfront)" : "") + (c.emi.ir ? " · interest " + rs(c.emi.interest) : " · No Cost")); L.push("Processing fee: " + rs(c.emi.fee) + " · Interest " + c.emi.ir + "% p.a."); }
     L.push("Effective price: " + rs(c.total));
     if (c.later) L.push("Assured buy-back later: " + rs(c.later) + " → cost after buy-back " + rs(Math.max(0, c.total - c.later)));
     if (c.save) L.push("You save " + rs(c.save) + " vs MRP");
@@ -434,9 +442,9 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
   }
   function copyTxt(t) { var done = function () { toast("Copied — paste it in WhatsApp or SMS"); }; try { if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(t).then(done, fb); } catch (e) { } fb(); function fb() { var a = document.createElement("textarea"); a.value = t; a.style.position = "fixed"; a.style.opacity = "0"; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); done(); } catch (e) { toast("Couldn't copy"); } a.remove(); } }
   function offerDetails() {
-    var ov = sheet("Effective price", PR.name, [["📋", "Copy for customer", function () { copyTxt(summaryText(calcOffers())); return false; }], ["✨", "Re-check amounts with AI", function () { Object.keys(PICK).forEach(function (k) { delete AIAMT[k]; AMTS[k] = {}; }); var keep = needAI; needAI = function () { return true; }; fetchAI(draw); needAI = keep; draw(); return false; }], ["🧹", "Clear offers", function () { PICK = {}; paintPicks(); }, "red"]], '<div id="odb"></div>');
+    var ov = sheet("Effective price", PR.name, [["📋", "Copy for customer", function () { copyTxt(summaryText(calcOffers())); return false; }], ["✨", "Re-check amounts with AI", function () { Object.keys(PICK).forEach(function (k) { delete AIAMT[k]; AMTS[k] = {}; }); TEN = { n: TEN.n }; var keep = needAI; needAI = function () { return true; }; fetchAI(draw); needAI = keep; draw(); return false; }], ["🧹", "Clear offers", function () { PICK = {}; paintPicks(); }, "red"]], '<div id="odb"></div>');
     ov.querySelector(".sheet").style.maxWidth = "560px";
-    var tag = function (s) { return s === "ai" ? ' <span class="chip" style="background:#F4EEFF;color:#5B3FBF">✨ AI</span>' : s === "you" ? ' <span class="chip">edited</span>' : ""; };
+    var tag = window.__atag = function (s) { return s === "ai" ? ' <span class="chip" style="background:#F4EEFF;color:#5B3FBF">✨ AI</span>' : s === "you" ? ' <span class="chip">edited</span>' : ""; };
     var inp = function (k, f, v, s) { return '<input class="oin" type="number" inputmode="numeric" data-amt="' + k + '" data-f="' + f + '" value="' + (v || "") + '" placeholder="0">' + tag(s); };
     var draw = function () {
       if (!document.body.contains(ov)) return;
@@ -450,10 +458,10 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
       h += row("Discounts & cashback", "−" + rs(c.cb), "neg") + (c.upg ? row("Upgrade / exchange bonus", "−" + rs(c.upg), "neg") : "") + (c.add ? row("Plans added (V-Shield / ABB / fees)", "+" + rs(c.add), "pos") : "") + row("<b>Net price</b>", "<b>" + rs(c.net) + "</b>");
       if (c.emi) {
         h += row("EMI tenure", '<select class="oin" id="otn" style="width:auto">' + c.emi.opts.map(function (n) { return "<option" + (n === c.emi.n ? " selected" : "") + ' value="' + n + '">' + n + " months</option>"; }).join("") + "</select>") +
-          row("Interest % p.a." + (c.emi.noCost ? ' <span class="chip live">No Cost</span>' : ""), '<input class="oin" type="number" inputmode="decimal" id="oir" value="' + (c.emi.ir || "") + '" placeholder="0">') +
-          row("Processing fee", '<input class="oin" type="number" inputmode="numeric" id="ofe" value="' + (c.emi.fee || "") + '" placeholder="0">') +
-          row("Extra down payment", '<input class="oin" type="number" inputmode="numeric" id="odp" value="' + (c.emi.dp || "") + '" placeholder="0">') +
-          row("<b>Down payment today</b>", rs(c.today)) + row("<b>EMI per month</b>", rs(c.emi.per) + " × " + (c.emi.n - c.emi.adv) + (c.emi.adv ? " (+" + c.emi.adv + " upfront)" : "")) + row("Interest", rs(c.emi.interest), c.emi.interest ? "pos" : "");
+          row("Interest % p.a." + (c.emi.ir === 0 ? ' <span class="chip live">No Cost</span>' : ""), '<input class="oin" type="number" inputmode="decimal" id="oir" value="' + c.emi.ir + '">' + tag(c.emi.src.ir)) +
+          row("Processing fee", '<input class="oin" type="number" inputmode="numeric" id="ofe" value="' + c.emi.fee + '">' + tag(c.emi.src.fee)) +
+          row("Down payment", '<input class="oin" type="number" inputmode="numeric" id="odp" value="' + c.emi.dp + '">' + tag(c.emi.src.dp)) +
+          row("<b>Pay today</b>" + '<div class="muted" style="font-size:11px">down payment' + (c.emi.adv ? " + " + c.emi.adv + " advance EMI" : "") + " + processing fee</div>", rs(c.today)) + row("<b>EMI per month</b>", rs(c.emi.per) + " × " + (c.emi.n - c.emi.adv) + (c.emi.adv ? " (+" + c.emi.adv + " upfront)" : "")) + row("Interest", rs(c.emi.interest), c.emi.interest ? "pos" : "");
       } else h += '<tr><td colspan="2" class="muted" style="font-size:12px;text-align:left">Select an EMI offer to see down payment and monthly EMI.</td></tr>';
       h += '<tr class="tot"><td><b>Effective price</b></td><td>' + rs(c.total) + "</td></tr>" + row("<b>Savings vs MRP</b>", rs(c.save), "neg") + (c.later ? row("Assured buy-back later", rs(c.later), "neg") + row("Cost after buy-back", rs(Math.max(0, c.total - c.later))) : "") + "</tbody></table>" +
         '<div class="muted" style="font-size:11.5px;margin-top:8px">Effective price = selling price − discounts, cashback and upgrade bonus + plan costs (V-Shield, ABB, fees) + EMI interest. Amounts come from the offer text; where it gives none, AI estimates them (✨). Change any amount above.</div>';

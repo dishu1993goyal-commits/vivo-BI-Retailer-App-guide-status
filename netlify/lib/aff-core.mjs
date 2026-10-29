@@ -570,14 +570,15 @@ For EACH offer below give rupee amounts for THIS phone and price:
 - "sub": money taken off what the customer pays (instant/bank discount, cashback, upgrade or exchange bonus, discount on a plan). For "up to X%" use X% of the price, capped by any "up to ₹" limit. For non-cash freebies (cloud storage, subscriptions) give their approximate retail value only if the customer would otherwise pay for it, else 0.
 - "add": cost the customer pays extra for a plan (V-Shield / protection plan price, ABB plan fee, EMI processing fee). If the plan price is not written, estimate the usual vivo India price of that plan for a phone at this price.
 - "later": assured buy-back value paid later (ABB only, e.g. 70% of price), else 0.
+- For EMI / finance offers ONLY also give: "ir": interest % per year (0 for No Cost EMI; otherwise the usual rate of that bank/NBFC card EMI), "fee": processing fee in ₹ (as written, else the usual fee of that partner, e.g. Bajaj ₹199-₹499, bank card EMI ₹199-₹299), "dp": down payment in ₹ due at purchase excluding advance EMIs (0 for zero down payment schemes). Do NOT put the processing fee in "add" for EMI offers.
 - "note": max 12 words on how you got it; say "estimate" when not written in the offer.
-Whole rupees, no ranges. Return JSON only: {"a":{"<key>":{"sub":0,"add":0,"later":0,"note":""}}}
+Whole rupees, no ranges. Return JSON only: {"a":{"<key>":{"sub":0,"add":0,"later":0,"ir":0,"fee":0,"dp":0,"note":""}}}
 OFFERS:
 ${JSON.stringify(offers)}`;
     const r = await groqJSON(keys.groq, prompt, ctx.aiFetch || fetch, { validate: (d) => d && d.a && typeof d.a === "object" });
     if (!r.ok) return json(200, { ok: false, error: r.error });
     const out = {}, n = (v) => Math.max(0, Math.min(price * 2 + 50000, Math.round(Number(v) || 0)));
-    offers.forEach((o) => { const x = r.data.a[o.key]; if (x && typeof x === "object") out[o.key] = { sub: n(x.sub), add: n(x.add), later: n(x.later), note: str(x.note, 100) }; });
+    offers.forEach((o) => { const x = r.data.a[o.key]; if (x && typeof x === "object") out[o.key] = { sub: n(x.sub), add: n(x.add), later: n(x.later), note: str(x.note, 100) }; if (o.kind === "emi") { const ir = Number(x.ir); out[o.key].ir = isFinite(ir) ? Math.max(0, Math.min(48, Math.round(ir * 10) / 10)) : 0; out[o.key].fee = Math.min(5000, n(x.fee)); out[o.key].dp = n(x.dp); out[o.key].emi = true; } });
     await store.set(ck, { at: t, amounts: out });
     return json(200, { ok: true, amounts: out });
   }

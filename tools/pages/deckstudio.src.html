@@ -33,11 +33,12 @@ textarea.tx{min-height:60px}
   "use strict";
   /*@@CORE@@*/
   var VIEW = $("view"), W = null, DA = null, ME = "", STATES = [], PERIODS = [], BANNERS = [], LOGO = "", PAGES = [], SL = [], BUSY = false, CACHE = {}, SNAP = null;
-  var O = Object.assign({ scope: "PAN India", per: "", focus: ["summary", "overall", "rank", "trend"], kpi: "app", fmt: "deck", layout: "corporate", theme: "blue", font: "Calibri", size: "normal", ai: true, tone: "professional", n: 1, banner: "brand", title: "", sub: "", cover: true, agenda: true, close: true, custom: "", logo: true, accent: "" }, ls("ds-opt") || {});
+  var O = Object.assign({ scope: "PAN India", per: "", focus: ["summary", "overall", "rank", "trend"], kpi: "app", fmt: "deck", layout: "corporate", theme: "blue", font: "Calibri", size: "normal", ai: true, tone: "professional", n: 1, banner: "brand", title: "", sub: "", cover: true, agenda: true, close: true, custom: "", logo: true, accent: "", upAI: true, upTopic: "", useFiles: true }, ls("ds-opt") || {});
   function sv() { ls("ds-opt", O); }
   var KPIS = [["app", "Retailer App"], ["sales", "Sales"], ["visit", "Visit efficiency"], ["comp", "Competition / SD"], ["vnotice", "v-Notice"], ["new", "New implementation"]];
   var KN = {}; KPIS.forEach(function (k) { KN[k[0]] = k[1]; });
   var FOCUS = [
+    ["files", "📎 My files", [["files", "From my uploaded files"]]],
     ["perf", "📊 Performance", [["summary", "Executive summary"], ["overall", "Overall performance"], ["kpi", "Specific KPI"], ["rank", "Rankings & top 5"], ["trend", "Trends"], ["app", "Retailer app usage"], ["health", "Retailer health"], ["achieve", "Key achievements"], ["actionplan", "Action plan"]]],
     ["proj", "🚀 Projects & plans", [["roadmap", "Roadmap 2027"], ["running", "Running projects"], ["pilot", "Pilot projects"], ["upcoming", "Upcoming projects"], ["pilotplan", "Upcoming plan of pilots"], ["rollout", "Features rollout done"], ["news", "BI newsletter highlights"]]],
     ["prog", "🧩 Programs", [["sd", "Student discount"], ["cd", "Corporate discount"], ["aff", "Affordability"], ["hub", "Affordability Hub"], ["rma", "Retailer app — upcoming version"], ["calc", "Schemes calculator"], ["material", "Material management"], ["survey", "Survey tools"], ["vbm", "VBM support desk"], ["rsd", "Retailer support desk"], ["custom", "Custom topic"]]]];
@@ -57,7 +58,7 @@ textarea.tx{min-height:60px}
   var FONTS = ["Calibri", "Arial", "Segoe UI", "Georgia", "Verdana", "Trebuchet MS", "Tahoma", "Century Gothic"];
   var FMTS = { deck: { n: "Slides 16:9", w: 13.333, h: 7.5 }, onepager: { n: "One-pager A4", w: 8.27, h: 11.69 }, square: { n: "Square creative", w: 7.5, h: 7.5 }, story: { n: "Story 9:16", w: 6.75, h: 12 } };
   var LAYOUTS = { corporate: "Corporate (header band)", cards: "Modern cards", bold: "Bold (dark slides)", minimal: "Minimal" };
-  var LIBS = { pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js", zip: "/vendor/jszip.min.js", ins: "/insights-engine.js" }, LOADED = {};
+  var LIBS = { xlsx: "/vendor/xlsx.full.min.js", pdf2: "", pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js", zip: "/vendor/jszip.min.js", pdfjs: "/vendor/pdf.js", ins: "/insights-engine.js" }, LOADED = {};
   function lib(k) { return LOADED[k] || (LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIBS[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load a file maker — check the internet connection.")); }; document.head.appendChild(s); })); }
   var pc = function (v) { return v == null || isNaN(v) ? "—" : Math.round(v * 1000) / 10 + "%"; };
   var r1 = function (v) { return Math.round((+v || 0) * 10) / 10; };
@@ -213,12 +214,136 @@ textarea.tx{min-height:60px}
     if (!out.length) out.push(tag({ type: "bullets", title: FL[f] || "Highlights", sub: scope + " · " + p.label, bullets: ["No data for this area in the dashboard yet."], insight: "" }));
     return out;
   }
-  function packForAI(f, F, C) { var d = { facts: F }; if (C) d.dashboard_page = { headings: C.heads, flows: C.flows, chips: C.chips, text: C.text.slice(0, 5000) }; return JSON.stringify(d); }
+  function packForAI(f, F, C) { var d = { facts: F }; if (UP.length && O.useFiles) d.uploaded_files = upText(4500); if (C) d.dashboard_page = { headings: C.heads, flows: C.flows, chips: C.chips, text: C.text.slice(0, 5000) }; return JSON.stringify(d); }
   function aiSlides(f, F, C) {
     if (!O.ai) return Promise.resolve([]);
     return api({ action: "ds-ai", focus: f === "custom" ? (O.custom || "Custom topic") : FL[f] + (f === "kpi" ? " (" + KN[O.kpi] + ")" : ""), scope: O.scope, period: P().label, tone: O.tone, slides: O.n, extra: f === "custom" ? O.custom : "", data: packForAI(f, F, C) }).then(function (r) { if (!r.ok) { AIERR = r.error; return []; } return r.slides.map(function (s) { s.focus = f; s.src = "ai"; return s; }); });
   }
   var AIERR = "";
+  // ================= uploaded files: image, PPT, PDF, Word, Excel/CSV, text =================
+  var UP = [];   // [{ name, kind, text, secs:[{title, lines:[], imgs:[], rows:null}] }]
+  function xmlText(x) { return String(x || "").replace(/<a:br\/>|<w:br\/>|<w:tab\/>/g, " ").replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim(); }
+  function imgData(blob, max) { return new Promise(function (res) { var u = URL.createObjectURL(blob), im = new Image(); im.onload = function () { var k = Math.min(1, (max || 1400) / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas"); c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k)); var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.width > 40 && c.height > 40 ? c.toDataURL("image/jpeg", 0.85) : ""); }; im.onerror = function () { URL.revokeObjectURL(u); res(""); }; im.src = u; }); }
+  function mediaMap(z, relPath, base) {   // rId -> data URL for pictures in a pptx slide / docx
+    var rf = z.file(relPath); if (!rf) return Promise.resolve({});
+    return rf.async("string").then(function (x) {
+      var out = {}, jobs = [], re = /<Relationship [^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*>/g, m;
+      while ((m = re.exec(x))) { if (!/\.(png|jpe?g|gif|bmp|webp)$/i.test(m[2])) continue; (function (id, tg) { var p = (base + tg).replace(/[^/]+\/\.\.\//g, ""); var f = z.file(p) || z.file(tg.replace(/^\//, "")); if (f) jobs.push(f.async("blob").then(function (b) { return imgData(b); }).then(function (d) { if (d) out[id] = d; })); })(m[1], m[2]); }
+      return Promise.all(jobs).then(function () { return out; });
+    });
+  }
+  function readPptx(buf) {
+    return lib("zip").then(function () { return window.JSZip.loadAsync(buf); }).then(function (z) {
+      var names = Object.keys(z.files).filter(function (n) { return /^ppt\/slides\/slide\d+\.xml$/.test(n); }).sort(function (a, b) { return parseInt(a.match(/\d+/)[0]) - parseInt(b.match(/\d+/)[0]); }).slice(0, 40), secs = [];
+      return names.reduce(function (p, n) { return p.then(function () {
+        return Promise.all([z.file(n).async("string"), mediaMap(z, n.replace("slides/", "slides/_rels/") + ".rels", "ppt/slides/")]).then(function (r) {
+          var x = r[0], media = r[1], title = "", lines = [], rows = null;
+          (x.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).forEach(function (sp) { var paras = (sp.match(/<a:p>[\s\S]*?<\/a:p>/g) || []).map(xmlText).filter(Boolean); if (!paras.length) return; if (!title && /<p:ph[^>]*type="(title|ctrTitle)"/.test(sp)) title = paras.join(" "); else lines = lines.concat(paras); });
+          var tb = x.match(/<a:tbl>[\s\S]*?<\/a:tbl>/); if (tb) rows = (tb[0].match(/<a:tr[\s\S]*?<\/a:tr>/g) || []).slice(0, 10).map(function (tr) { return (tr.match(/<a:tc[\s\S]*?<\/a:tc>/g) || []).slice(0, 6).map(xmlText); });
+          var imgs = (x.match(/r:embed="([^"]+)"/g) || []).map(function (e) { return media[e.slice(9, -1)]; }).filter(Boolean);
+          if (!title && lines.length) title = lines.shift();
+          secs.push({ title: title.slice(0, 90), lines: lines.filter(function (l) { return !/^\d{1,3}$/.test(l); }).slice(0, 14), imgs: imgs.slice(0, 2), rows: rows && rows.length > 1 ? rows : null });
+        });
+      }); }, Promise.resolve()).then(function () { return secs; });
+    });
+  }
+  function readDocx(buf) {
+    return lib("zip").then(function () { return window.JSZip.loadAsync(buf); }).then(function (z) {
+      return Promise.all([z.file("word/document.xml").async("string"), mediaMap(z, "word/_rels/document.xml.rels", "word/")]).then(function (r) {
+        var x = r[0], media = r[1], secs = [], cur = null, push = function (t) { cur = { title: t, lines: [], imgs: [], rows: null }; secs.push(cur); };
+        var body = x.split("<w:body>")[1] || x, blocks = body.match(/<w:tbl>[\s\S]*?<\/w:tbl>|<w:p[ >][\s\S]*?<\/w:p>/g) || [];
+        blocks.forEach(function (b) {
+          if (/^<w:tbl>/.test(b)) { var rows = (b.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || []).slice(0, 10).map(function (tr) { return (tr.match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []).slice(0, 6).map(xmlText); }); if (rows.length > 1) { if (!cur || cur.rows) push(cur ? cur.title + " (table)" : "Table"); cur.rows = rows; } return; }
+          var t = xmlText(b), heading = /<w:pStyle w:val="(Heading\d|Title|Subtitle)"/i.test(b), im = (b.match(/r:embed="([^"]+)"/g) || []).map(function (e) { return media[e.slice(9, -1)]; }).filter(Boolean);
+          if (heading && t) push(t.slice(0, 90)); else { if (!cur) push(t ? t.slice(0, 90) : "Document"); else if (t) cur.lines.push(t.slice(0, 400)); }
+          if (im.length && cur) cur.imgs = cur.imgs.concat(im).slice(0, 2);
+          if (cur && cur.lines.length > 14) push(cur.title + " (cont.)");
+        });
+        return secs.filter(function (s) { return s.lines.length || s.imgs.length || s.rows; }).slice(0, 30);
+      });
+    });
+  }
+  function readPdfFile(buf) {
+    return lib("pdfjs").then(function () { var pj = window.pdfjsLib; pj.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.js"; return pj.getDocument({ data: buf }).promise; }).then(function (doc) {
+      var secs = [], n = Math.min(doc.numPages, 25), chain = Promise.resolve();
+      for (var i = 1; i <= n; i++) (function (i) { chain = chain.then(function () { return doc.getPage(i).then(function (pg) { return pg.getTextContent().then(function (tc) {
+        var L = {}, out = []; tc.items.forEach(function (it) { var y = Math.round(it.transform[5] / 3) * 3; (L[y] = L[y] || []).push([it.transform[4], it.str]); });
+        Object.keys(L).map(Number).sort(function (a, b) { return b - a; }).forEach(function (y) { var t = L[y].sort(function (a, b) { return a[0] - b[0]; }).map(function (x) { return x[1]; }).join(" ").replace(/\s+/g, " ").trim(); if (t) out.push(t); });
+        if (out.length) { secs.push({ title: out[0].slice(0, 90), lines: out.slice(1, 15), imgs: [], rows: null }); return; }
+        var vp0 = pg.getViewport({ scale: 1 }), vp = pg.getViewport({ scale: Math.min(2, 1400 / vp0.width) }), cv = document.createElement("canvas"); cv.width = vp.width; cv.height = vp.height;
+        return pg.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise.then(function () { secs.push({ title: "Page " + i, lines: [], imgs: [cv.toDataURL("image/jpeg", 0.85)], rows: null }); });
+      }); }); }); })(i);
+      return chain.then(function () { return secs; });
+    });
+  }
+  function readSheet(buf, name) {
+    return lib("xlsx").then(function () {
+      var wb = window.XLSX.read(buf, { type: "array" }), secs = [];
+      wb.SheetNames.slice(0, 6).forEach(function (sn) { var A = window.XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); if (A.length < 2) return; secs.push({ title: (wb.SheetNames.length > 1 ? sn : name.replace(/\.[^.]+$/, "")).slice(0, 90), lines: [], imgs: [], rows: A.slice(0, 25).map(function (r) { return r.slice(0, 8).map(function (c) { return String(c).slice(0, 60); }); }) }); });
+      return secs;
+    });
+  }
+  function readText(t, name) {
+    var parts = String(t).split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean), secs = [], cur = null;
+    parts.forEach(function (p) { var L = p.split("\n").map(function (x) { return x.replace(/^[-*•#\s]+/, "").trim(); }).filter(Boolean); if (!L.length) return; if (!cur || L.length > 1 || cur.lines.length > 8) { cur = { title: L.length > 1 ? L[0].slice(0, 90) : (cur ? cur.title : name), lines: L.length > 1 ? L.slice(1) : L, imgs: [], rows: null }; secs.push(cur); } else cur.lines = cur.lines.concat(L); });
+    return secs.slice(0, 30);
+  }
+  var OCRW = null, ocrN = 0, ocrCb = {};
+  function ocr(dataUrl) {
+    return new Promise(function (res) {
+      try { if (!OCRW) { OCRW = new Worker("/vendor/ocr-worker.js?v=1"); OCRW.onmessage = function (e) { var f = ocrCb[e.data.id]; if (f) { delete ocrCb[e.data.id]; f(e.data); } }; OCRW.onerror = function () { Object.keys(ocrCb).forEach(function (k) { ocrCb[k]({ ok: false }); delete ocrCb[k]; }); }; } } catch (e) { return res(""); }
+      fetch(dataUrl).then(function (r) { return r.arrayBuffer(); }).then(function (buf) { var id = ++ocrN; ocrCb[id] = function (r) { res(r && r.ok ? r.text || "" : ""); }; OCRW.postMessage({ id: id, op: "ocr", image: buf, langs: "eng", psm: 3 }, [buf]); setTimeout(function () { if (ocrCb[id]) { delete ocrCb[id]; res(""); } }, 45000); }).catch(function () { res(""); });
+    });
+  }
+  function addFiles(files) {
+    var list = [].slice.call(files || []).slice(0, 8); if (!list.length) return;
+    var i = 0, step = function () {
+      if (i >= list.length) { if (O.focus.indexOf("files") < 0) O.focus.unshift("files"); sv(); say(""); draw(); return; }
+      var f = list[i++], n = f.name || "file", ext = (n.split(".").pop() || "").toLowerCase();
+      say('<div class="loading"><div class="spin"></div>Reading ' + esc(n) + "…</div>");
+      var p = /^(png|jpe?g|gif|webp|bmp|heic)$/.test(ext) || /^image\//.test(f.type) ? imgData(f, 1600).then(function (d) { if (!d) throw new Error("Couldn't open " + n); return ocr(d).then(function (t) { var L = t.split("\n").map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 2; }); return { kind: "image", secs: [{ title: n.replace(/\.[^.]+$/, ""), lines: L.slice(0, 10), imgs: [d], rows: null }], text: t }; }); })
+        : ext === "pptx" ? f.arrayBuffer().then(readPptx).then(function (s) { return { kind: "ppt", secs: s }; })
+        : ext === "docx" ? f.arrayBuffer().then(readDocx).then(function (s) { return { kind: "word", secs: s }; })
+        : ext === "pdf" ? f.arrayBuffer().then(readPdfFile).then(function (s) { return { kind: "pdf", secs: s }; })
+        : /^(xlsx|xls|csv)$/.test(ext) ? f.arrayBuffer().then(function (b) { return readSheet(b, n); }).then(function (s) { return { kind: "data", secs: s }; })
+        : /^(txt|md|json|text)$/.test(ext) || /^text\//.test(f.type) ? f.text().then(function (t) { return { kind: "text", secs: readText(t, n.replace(/\.[^.]+$/, "")) }; })
+        : Promise.reject(new Error(n + ": use a picture, PPTX, PDF, DOCX, XLSX/CSV or TXT file (old .ppt/.doc: save as the new format first)."));
+      p.then(function (r) {
+        r.name = n; r.text = r.text || r.secs.map(function (s) { return [s.title].concat(s.lines).concat(s.rows ? s.rows.slice(0, 15).map(function (x) { return x.join(" | "); }) : []).join("\n"); }).join("\n\n");
+        r.secs.forEach(function (s) { s.imgs.forEach(function (d) { IMG[d] = 1; }); });
+        if (!r.secs.length) throw new Error(n + ": nothing readable found.");
+        UP.push(r); step();
+      }).catch(function (e) { toast(e.message || String(e)); step(); });
+    };
+    step();
+  }
+  function upText(max) { return UP.map(function (u) { return "### " + u.name + " (" + u.kind + ")\n" + u.text; }).join("\n\n").slice(0, max || 9000); }
+  function fileSlides() {   // uploaded content turned into slides in the chosen theme (no AI)
+    var out = [];
+    UP.forEach(function (u) {
+      u.secs.forEach(function (s) {
+        var t = { focus: "files", src: "file", title: s.title || u.name, sub: u.name };
+        if (s.rows) {
+          var R = s.rows, head = R[0], num = head.map(function (_, j) { return j > 0 && R.slice(1).filter(function (r) { return /^-?[\d,.]+%?$/.test(String(r[j]).trim()); }).length >= Math.max(2, (R.length - 1) * 0.6); }), nj = num.indexOf(true);
+          out.push(Object.assign({}, t, { type: "table", rows: R.slice(0, 9).map(function (r) { return r.slice(0, 5); }) }));
+          if (nj > 0 && R.length > 2) out.push(Object.assign({}, t, { type: "chart", title: t.title + " — " + head[nj], chart: { type: R.length > 8 ? "bar" : "column", labels: R.slice(1, 13).map(function (r) { return String(r[0]).slice(0, 24); }), series: [{ name: String(head[nj]).slice(0, 30), values: R.slice(1, 13).map(function (r) { return parseFloat(String(r[nj]).replace(/[,%]/g, "")) || 0; }) }], unit: /%/.test(R[1][nj]) ? "%" : "" } }));
+          if (!s.lines.length && !s.imgs.length) return;
+        }
+        if (s.imgs.length) out.push(Object.assign({}, t, { type: "pic", img: s.imgs[0], bullets: s.lines.slice(0, 6).map(function (l) { return l.slice(0, 160); }) }));
+        else if (s.lines.length) {
+          var L = s.lines.map(function (l) { return l.slice(0, 180); });
+          for (var k = 0; k < L.length; k += 7) out.push(Object.assign({}, t, { type: "bullets", title: t.title + (k ? " (cont.)" : ""), bullets: L.slice(k, k + 7) }));
+        }
+      });
+    });
+    return out;
+  }
+  function filesFocus() {
+    var keep = fileSlides();
+    if (!O.ai || !O.upAI) return Promise.resolve(keep);
+    return api({ action: "ds-ai", focus: "Content from the uploaded files" + (O.upTopic ? " — " + O.upTopic : ""), scope: O.scope, period: P().label, tone: O.tone, slides: Math.min(5, Math.max(2, Math.ceil(keep.length / 2))), extra: "Rearrange the uploaded material into clear management slides: pick flows for processes, charts for numbers, tables for lists, stats for headline numbers. Keep the uploaded facts and numbers exactly." + (O.upTopic ? " Focus on: " + O.upTopic : ""), data: JSON.stringify({ uploaded_files: upText(12000) }) })
+      .then(function (r) { if (!r.ok) { AIERR = r.error; return keep; } var A = r.slides.map(function (s) { s.focus = "files"; s.src = "ai"; return s; }); return A.concat(keep.filter(function (s) { return s.type === "pic" || s.type === "chart"; }).slice(0, 6)); });
+  }
   var NUMERIC = { summary: 1, overall: 1, kpi: 1, rank: 1, trend: 1, app: 1, health: 1 };
   function build() {
     if (BUSY) return; if (!O.focus.length) return toast("Pick at least one slide focus.");
@@ -229,6 +354,7 @@ textarea.tx{min-height:60px}
       var next = function () {
         if (i >= list.length) return Promise.resolve();
         var f = list[i++]; say('<div class="loading"><div class="spin"></div>' + (O.ai ? "AI is writing" : "Building") + " “" + esc(FL[f]) + "” (" + i + " of " + list.length + ")…</div>");
+        if (f === "files") return (UP.length ? filesFocus() : Promise.resolve([{ type: "bullets", focus: "files", src: "data", title: "From my files", bullets: ["No files uploaded — tap 📎 Upload files."] }])).then(function (sl) { all.push({ f: f, slides: sl }); }).then(next);
         var F = factsFor(f);
         return contentFor(f).then(function (C) {
           var ds = dataSlides(f, F, C);
@@ -270,7 +396,7 @@ textarea.tx{min-height:60px}
   function card(e, T, x, y, w, h, fill) { var st = O.layout; if (st === "minimal") e.rect({ x: x, y: y, w: w, h: h, fill: null, line: T.rule, lw: 0.75, r: 0 }); else e.rect({ x: x, y: y, w: w, h: h, fill: fill || T.box, line: st === "cards" ? T.rule : null, lw: 0.75, r: st === "cards" || st === "bold" ? 0.12 : 0.06 }); }
   function body(e, T, s, b) {   // draw a slide's content inside box b {x,y,w,h}
     var k = T.k, ins = s.insight && s.type !== "quote" ? 0.62 * k : 0, bb = { x: b.x, y: b.y, w: b.w, h: b.h - (ins ? ins + 0.12 : 0) }, narrow = b.w < 5.2;
-    var bullets = function (L, x, y, w, h) { if (!L || !L.length) return; var fs = fit(L, w, h, 20 * k, 10, true); e.text({ x: x, y: y, w: w, h: h, t: L, s: fs, c: T.text, bul: true, va: "t" }); };
+    var bullets = function (L, x, y, w, h) { if (!L || !L.length) return; var fs = fit(L, w, h, (L.length <= 4 ? 26 : 22) * k, 10, true); e.text({ x: x, y: y, w: w, h: h, t: L, s: fs, c: T.text, bul: true, va: "t" }); };
     if (s.type === "stats") {
       var hasB, n = s.stats.length, cols = narrow && n > 2 ? 2 : n, rows = Math.ceil(n / cols), gw = 0.22, cw = (bb.w - gw * (cols - 1)) / cols, hasB = s.bullets && s.bullets.length, ch = Math.min(hasB ? 2.1 * k : 3.0 * k, (bb.h - gw * (rows - 1)) / rows);
       s.stats.forEach(function (x, i) { var cx = bb.x + (i % cols) * (cw + gw), cy = bb.y + Math.floor(i / cols) * (ch + gw); card(e, T, cx, cy, cw, ch); e.rect({ x: cx, y: cy, w: 0.08, h: ch, fill: T.acc }); var vs = fit(x.v, cw - 0.4, ch * 0.5, 40 * k, 14); e.text({ x: cx + 0.25, y: cy + 0.15, w: cw - 0.4, h: ch * 0.55, t: x.v, s: vs, b: true, c: T.isDark ? T.acc2 : T.dark, va: "m" }); e.text({ x: cx + 0.25, y: cy + ch * 0.6, w: cw - 0.4, h: ch * 0.34, t: x.l, s: fit(x.l, cw - 0.4, ch * 0.34, 14 * k, 9), c: T.sub, va: "t" }); });
@@ -297,6 +423,10 @@ textarea.tx{min-height:60px}
       MN.forEach(function (m, i) { e.text({ x: bb.x + lw2 + i * mw, y: bb.y, w: mw, h: 0.32, t: m, s: 10 * k, c: T.sub, al: "c", b: true }); });
       G.forEach(function (g, i) { var cy = bb.y + 0.38 + i * gh; if (i % 2 === 0) e.rect({ x: bb.x, y: cy, w: bb.w, h: gh, fill: T.box }); e.text({ x: bb.x + 0.08, y: cy, w: lw2 - 0.1, h: gh, t: g.name, s: fit(g.name, lw2 - 0.1, gh, 12 * k, 8), c: T.text, va: "m" }); (g.segs || []).forEach(function (sg) { e.rect({ x: bb.x + lw2 + (sg[0] - 1) * mw + 0.03, y: cy + gh * 0.2, w: (sg[1] - sg[0] + 1) * mw - 0.06, h: gh * 0.6, fill: PC[sg[2]] || T.acc, r: 0.06 }); }); });
       var lgy = bb.y + 0.42 + G.length * gh; if (lgy < bb.y + bb.h - 0.2) [["d", "Design"], ["b", "Build"], ["p", "Pilot"], ["l", "Live"]].forEach(function (x, i) { e.rect({ x: bb.x + lw2 + i * 1.3, y: lgy + 0.06, w: 0.22, h: 0.18, fill: PC[x[0]], r: 0.04 }); e.text({ x: bb.x + lw2 + i * 1.3 + 0.28, y: lgy, w: 1, h: 0.3, t: x[1], s: 10 * k, c: T.sub }); });
+    } else if (s.type === "pic") {
+      var hb = s.bullets && s.bullets.length, pw2 = hb ? (narrow ? bb.w : bb.w * 0.56) : bb.w, ph2 = hb && narrow ? bb.h * 0.55 : bb.h;
+      card(e, T, bb.x, bb.y, pw2, ph2); if (s.img) e.img({ x: bb.x + 0.08, y: bb.y + 0.08, w: pw2 - 0.16, h: ph2 - 0.16, src: s.img, fit: "contain" });
+      if (hb) { if (narrow) bullets(s.bullets, bb.x, bb.y + ph2 + 0.15, bb.w, bb.h - ph2 - 0.15); else bullets(s.bullets, bb.x + pw2 + 0.3, bb.y, bb.w - pw2 - 0.3, bb.h); }
     } else if (s.type === "quote") { e.text({ x: bb.x, y: bb.y, w: bb.w, h: bb.h, t: "“" + (s.bullets[0] || s.insight || "") + "”", s: fit(s.bullets[0] || s.insight, bb.w, bb.h, 30 * k, 12), i: true, c: T.text, al: "c", va: "m" }); }
     if (ins) { var iy = b.y + b.h - ins; e.rect({ x: b.x, y: iy, w: b.w, h: ins, fill: T.isDark ? mix(T.dark, T.acc, 0.25) : mix(T.acc, "FFFFFF", 0.88), r: O.layout === "minimal" ? 0 : 0.08 }); e.rect({ x: b.x, y: iy, w: 0.07, h: ins, fill: T.acc }); e.text({ x: b.x + 0.2, y: iy, w: b.w - 0.3, h: ins, t: "💡 " + s.insight, s: fit("💡 " + s.insight, b.w - 0.3, ins, 15 * k, 9), c: T.text, va: "m", b: true }); }
   }
@@ -332,7 +462,7 @@ textarea.tx{min-height:60px}
       top(true);
       SL.forEach(function (s, i) {
         if (/^(cover|agenda|section|close)$/.test(s.type)) return;
-        var need = { stats: 1.9, bullets: 0.45 + (s.bullets || []).length * 0.34, flow: 2.3, timeline: 2.3, table: 0.5 + (s.rows || []).length * 0.3, chart: 3, two: 3, gantt: 0.6 + (s.gantt || []).length * 0.32, quote: 1.2 }[s.type] || 2;
+        var need = { pic: 3.4, stats: 1.9, bullets: 0.45 + (s.bullets || []).length * 0.34, flow: 2.3, timeline: 2.3, table: 0.5 + (s.rows || []).length * 0.3, chart: 3, two: 3, gantt: 0.6 + (s.gantt || []).length * 0.32, quote: 1.2 }[s.type] || 2;
         need = Math.min(need, Hd - 1.6) + (s.insight ? 0.72 : 0) + 0.55;
         if (y + need > Hd - 0.5) { footer(e, T, Wd, Hd, pn++); pages.push(e.a); e = mk(); top(false); }
         e.text({ x: 0.45, y: y, w: Wd - 0.9, h: 0.38, t: s.title, s: 14 * T.k, b: true, c: T.isDark ? T.acc2 : T.dark }); e.rect({ x: 0.45, y: y + 0.4, w: 0.8, h: 0.05, fill: T.acc });
@@ -433,6 +563,7 @@ textarea.tx{min-height:60px}
   }
   function fname(ext) { return (coverTitle() + "_" + O.scope + "_" + P().label).replace(/[^\w]+/g, "_").replace(/_+/g, "_").slice(0, 80) + "." + ext; }
   function docx() {
+    var DIMG = [];
     return lib("zip").then(function () {
       var X = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
       var p = function (t, o) { o = o || {}; return '<w:p><w:pPr>' + (o.h ? '<w:spacing w:before="240" w:after="80"/>' : "") + (o.bul ? '<w:ind w:left="360" w:hanging="220"/>' : "") + "</w:pPr><w:r><w:rPr>" + (o.b || o.h ? "<w:b/>" : "") + '<w:color w:val="' + (o.c || "1F2340") + '"/><w:sz w:val="' + (o.sz || 22) + '"/><w:rFonts w:ascii="' + O.font + '" w:hAnsi="' + O.font + '"/></w:rPr><w:t xml:space="preserve">' + (o.bul ? "• " : "") + X(t) + "</w:t></w:r></w:p>"; };
@@ -446,14 +577,23 @@ textarea.tx{min-height:60px}
         (s.steps || []).forEach(function (x, i) { b += p((i + 1) + ". " + x.t + (x.s ? " — " + x.s : "")); });
         if (s.rows && s.rows.length) b += tbl(s.rows);
         if (s.chart) b += tbl([["", ].concat(s.chart.series.map(function (x) { return x.name; }))].concat(s.chart.labels.map(function (l, i) { return [l].concat(s.chart.series.map(function (x) { return String(x.values[i]) + (s.chart.unit || ""); })); })));
+        if (s.type === "pic" && s.img) b += "%%IMG" + (DIMG.push(s.img) - 1) + "%%";
         if (s.gantt) b += tbl([["Project", "Plan"]].concat(s.gantt.map(function (g) { return [g.name, (g.segs || []).map(function (sg) { return ({ d: "Design", b: "Build", p: "Pilot", l: "Live" }[sg[2]]) + " " + MN[sg[0] - 1] + "–" + MN[sg[1] - 1]; }).join(", ")]; })));
         if (s.insight) b += p("💡 " + s.insight, { b: true, c: TH().dark });
       });
-      var z = new window.JSZip();
-      z.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
-      z.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
-      z.file("word/document.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>' + b + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>');
-      return z.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      var z = new window.JSZip(), rels = "", dims = DIMG.map(function (d) { return new Promise(function (res) { var im = new Image(); im.onload = function () { res([im.naturalWidth, im.naturalHeight]); }; im.onerror = function () { res([4, 3]); }; im.src = d; }); });
+      return Promise.all(dims).then(function (D) {
+        DIMG.forEach(function (d, k) {
+          z.file("word/media/img" + k + ".jpeg", d.split(",")[1], { base64: true }); rels += '<Relationship Id="rIm' + k + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/img' + k + '.jpeg"/>';
+          var w = 5486400, h = Math.round(w * D[k][1] / Math.max(1, D[k][0])); if (h > 6400800) { w = Math.round(w * 6400800 / h); h = 6400800; }
+          b = b.replace("%%IMG" + k + "%%", '<w:p><w:r><w:drawing><wp:inline><wp:extent cx="' + w + '" cy="' + h + '"/><wp:docPr id="' + (k + 1) + '" name="Picture ' + (k + 1) + '"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="' + (k + 1) + '" name="img' + k + '.jpeg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIm' + k + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + w + '" cy="' + h + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>');
+        });
+        z.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+        z.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+        z.file("word/_rels/document.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + rels + "</Relationships>");
+        z.file("word/document.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>' + b + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1000" w:right="1000" w:bottom="1000" w:left="1000"/></w:sectPr></w:body></w:document>');
+        return z.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      });
     });
   }
   function make(kind) {
@@ -503,6 +643,10 @@ textarea.tx{min-height:60px}
       (O.focus.indexOf("kpi") >= 0 ? '<label class="lb">Which KPI</label>' + chips(KPIS.slice(0, 5), O.kpi, "data-k") : "") +
       (O.focus.indexOf("custom") >= 0 ? '<label class="lb">Custom topic — what should the slides cover?</label><input class="tx" id="cu" value="' + esc(O.custom) + '" placeholder="e.g. Diwali sales push plan for Punjab">' : "") +
       (O.focus.length ? '<div class="sum">Order: ' + O.focus.map(function (f, i) { return (i + 1) + ". " + esc(f === "custom" ? O.custom || "Custom topic" : FL[f]); }).join(" · ") + "</div>" : "") + "</div>" +
+      '<div class="card"><h3 style="margin:0 0 4px;font-size:15px">📎 Use my files</h3><div class="muted" style="font-size:12.5px">Upload pictures, PPT (.pptx), PDF, Word (.docx), Excel / CSV or text. They are rebuilt in your chosen theme as editable slides, and AI can use them for any focus.</div>' +
+        (UP.length ? '<div style="margin-top:8px">' + UP.map(function (u, i) { return '<div class="row" style="justify-content:space-between;background:#F5F6FB;border-radius:10px;padding:7px 10px;margin-top:5px;font-size:13px"><span>' + ({ image: "🖼️", ppt: "📊", word: "📝", pdf: "📄", data: "📈", text: "🗒️" }[u.kind] || "📎") + " <b>" + esc(u.name) + "</b> · " + u.secs.length + " part" + (u.secs.length === 1 ? "" : "s") + '</span><button class="btn ghost sm" data-ux="' + i + '">✕</button></div>'; }).join("") + "</div>" : "") +
+        '<div class="row" style="margin-top:8px"><button class="btn sec sm" id="upf">📎 Upload files</button></div>' +
+        (UP.length ? '<div class="fx" style="margin-top:8px"><span data-tg="upAI" class="' + (O.upAI ? "on" : "") + '">' + (O.upAI ? "✓ " : "") + "✨ AI rearranges my files into new slides</span><span data-tg=\"useFiles\" class=\"" + (O.useFiles ? "on" : "") + '">' + (O.useFiles ? "✓ " : "") + 'Use my files in every focus</span></div><label class="lb">What should the slides from my files focus on? (optional)</label><input class="tx" id="ut" value="' + esc(O.upTopic) + '" placeholder="e.g. key achievements and next steps">' + (!O.upAI ? '<div class="muted" style="font-size:12px;margin-top:6px">AI off for files: each page / slide / sheet becomes a slide as it is, restyled in the theme.</div>' : "") : "") + "</div>" +
       '<div class="card"><h3 style="margin:0 0 4px;font-size:15px">🎨 Design</h3><label class="lb">Format</label>' + chips(Object.keys(FMTS).map(function (k) { return [k, FMTS[k].n]; }), O.fmt, "data-fm") +
       '<label class="lb">Layout</label>' + chips(Object.keys(LAYOUTS).map(function (k) { return [k, LAYOUTS[k]]; }), O.layout, "data-ly") +
       '<label class="lb">Theme</label><div class="ths">' + Object.keys(THEMES).map(function (k) { var t = THEMES[k]; return '<span data-th="' + k + '" class="' + (k === O.theme ? "on" : "") + '"><i><b style="background:#' + t.dark + '"></b><b style="background:#' + t.acc + '"></b><b style="background:#' + t.card + '"></b></i>' + esc(t.n) + "</span>"; }).join("") + "</div>" +
@@ -527,6 +671,9 @@ textarea.tx{min-height:60px}
     var ac = $("ac"); if (ac) ac.onchange = function () { O.accent = ac.value.replace("#", "").toUpperCase(); sv(); relayout(); };
     $("bup").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = function () { var f = i.files[0]; if (!f) return; var u = URL.createObjectURL(f); toData(u, 1600).then(function (d) { if (!d) return toast("Couldn't open this picture."); ls("ds-up", d.length < 2500000 ? d : null); BANNERS = BANNERS.filter(function (b) { return b.id !== "up"; }); IMG[d] = 1; BANNERS.unshift({ id: "up", name: "My upload", src: d }); O.banner = "up"; sv(); draw(); relayout(); }); }; i.click(); };
     $("go").onclick = build;
+    on("ut", "upTopic");
+    $("upf").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = "image/*,.pptx,.pdf,.docx,.xlsx,.xls,.csv,.txt,.md"; i.onchange = function () { addFiles(i.files); }; i.click(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-ux]"), function (b) { b.onclick = function () { UP.splice(+b.dataset.ux, 1); if (!UP.length) O.focus = O.focus.filter(function (f) { return f !== "files"; }); sv(); draw(); }; });
   }
   function rebuildFrame() { if (!SL.length) return; SL = SL.filter(function (s) { return !/^(cover|agenda|close)$/.test(s.type); }); var foc = []; SL.forEach(function (s) { if (s.focus && FL[s.focus] && foc.indexOf(s.focus) < 0) foc.push(s.focus); }); if (O.agenda && foc.length > 1 && O.fmt === "deck") SL.unshift({ type: "agenda", title: "Agenda", focus: "agenda", bullets: foc.map(function (f) { return FL[f]; }) }); if (O.cover) SL.unshift({ type: "cover", focus: "cover" }); if (O.close) SL.push({ type: "close", focus: "close" }); relayout(); }
   function relayout() { if (!SL.length) return; PAGES = layoutPages(); }
@@ -557,7 +704,7 @@ textarea.tx{min-height:60px}
       (s.steps && s.steps.length ? '<label class="lb">Steps (title | detail, one per line)</label><textarea class="tx" id="e5" style="min-height:110px">' + esc(lines(s.steps, function (x) { return x.t + " | " + (x.s || ""); })) + "</textarea>" : "") +
       (s.rows && s.rows.length ? '<label class="lb">Table (cells separated by |, first line = header)</label><textarea class="tx" id="e6" style="min-height:110px">' + esc(lines(s.rows, function (r) { return r.join(" | "); })) + "</textarea>" : "") +
       '<label class="lb">Insight / takeaway</label><textarea class="tx" id="e7">' + esc(s.insight || "") + "</textarea>" +
-      '<label class="lb">Slide type</label><select class="tx" id="e8">' + [["bullets", "Bullets"], ["stats", "Numbers"], ["flow", "Process flow"], ["timeline", "Timeline"], ["table", "Table"], ["chart", "Chart"], ["two", "Bullets + chart"], ["quote", "Big statement"], ["gantt", "Roadmap (gantt)"], ["agenda", "Agenda"], ["section", "Section divider"]].filter(function (x) { return x[0] === s.type || (x[0] === "chart" || x[0] === "two" ? !!s.chart : x[0] === "gantt" ? !!s.gantt : x[0] !== "agenda" && x[0] !== "section"); }).map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === s.type ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></div>";
+      '<label class="lb">Slide type</label><select class="tx" id="e8">' + [["pic", "Picture + text"], ["bullets", "Bullets"], ["stats", "Numbers"], ["flow", "Process flow"], ["timeline", "Timeline"], ["table", "Table"], ["chart", "Chart"], ["two", "Bullets + chart"], ["quote", "Big statement"], ["gantt", "Roadmap (gantt)"], ["agenda", "Agenda"], ["section", "Section divider"]].filter(function (x) { return x[0] === s.type || (x[0] === "chart" || x[0] === "two" ? !!s.chart : x[0] === "gantt" ? !!s.gantt : x[0] === "pic" ? !!s.img : x[0] !== "agenda" && x[0] !== "section"); }).map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === s.type ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></div>";
     var ov = sheet("Edit slide " + (i + 1), "", [["💾", "Save", function (ov) {
       var g = function (id) { var e = ov.querySelector("#" + id); return e ? e.value : null; }, L = function (v) { return String(v || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean); };
       s.title = g("e1"); s.sub = g("e2"); s.insight = g("e7").trim(); s.type = g("e8");
