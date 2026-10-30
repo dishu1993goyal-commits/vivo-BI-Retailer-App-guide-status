@@ -20,6 +20,7 @@ import { insightsAction, cachedSnapshot, alertsFor } from "./insights-core.mjs";
 import { accessAction } from "./access-core.mjs";
 import { deckAction } from "./deck-core.mjs";
 import { pmailAction } from "./pmail-core.mjs";
+import { portalAction } from "./portal-core.mjs";
 const THEME_ID = /^[a-z0-9-]{2,24}$/;
 const pick = (v, list) => (list.includes(String(v || "")) ? String(v) : "");
 export function cleanTheme(c) {
@@ -869,7 +870,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -987,6 +988,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^(bnr|map|face)-/.test(b.action)) return extrasAction(b, surveyCtx());
     if (/^acc-/.test(b.action)) return accessAction(b, surveyCtx());
     if (/^ds-/.test(b.action)) return deckAction(b, surveyCtx());
+    if (/^pt-/.test(b.action)) return portalAction(b, surveyCtx());
     if (/^pm-/.test(b.action)) return pmailAction(b, Object.assign(surveyCtx(), { mailFetch }));
     if (/^(ins|board|cal|fest|launch|mkt|tr|my)-/.test(b.action)) { const r = await insightsAction(b, Object.assign(surveyCtx(), { siteFetch })); if (r) return r; return json(400, { ok: false, error: "Unknown action." }); }
     if (b.action === "theme-set") {

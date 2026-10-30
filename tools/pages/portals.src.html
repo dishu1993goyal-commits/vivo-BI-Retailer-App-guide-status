@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Partner portals</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pg4{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}@media(min-width:620px){.pg4{grid-template-columns:repeat(5,1fr)}}
+.pt{position:relative;background:var(--card);border-radius:16px;padding:12px 6px 10px;text-align:center;box-shadow:0 2px 10px rgba(20,24,51,.06);cursor:pointer;border:0;font:inherit;color:var(--ink)}
+.pt .ic{width:54px;height:54px;border-radius:14px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;background:#F3F4FA}
+.pt .ic img{width:100%;height:100%;object-fit:contain}
+.pt b{display:block;font-size:12.5px;line-height:1.25}.pt small{display:block;color:var(--mut);font-size:10.5px;margin-top:2px}
+.pt .k{position:absolute;top:6px;right:6px;font-size:11px}.pt .mo{position:absolute;top:2px;left:2px;border:0;background:none;font-size:16px;color:#9AA0B8;padding:4px 6px;cursor:pointer}
+.cath{font-size:13px;font-weight:800;margin:16px 2px 0;color:var(--ink2)}
+.how{background:#EEF0FF;border-radius:14px;padding:12px;font-size:12.5px;line-height:1.5;margin-top:10px}
+.ed{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 1px 6px rgba(20,24,51,.05)}
+.ed .hd{display:flex;align-items:center;gap:8px}.ed .hd b{flex:1}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:520px){.g2{grid-template-columns:1fr}}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+textarea.tx{min-height:64px;font-family:monospace;font-size:12px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔗</span></div>
+  <h1>Partner portals</h1><p>All partner websites in one place — open inside the app, signed in</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), IT = [], MY = {}, TAB = "open", ED = null, Q = "", STATES = [], KEYS = {};
+  var APPV = !!(window.BIApp && window.BIApp.portalVersion), OLDAPP = !!(window.BIApp && window.BIApp.getAuth && !APPV);
+  fetch("/states.json").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j && j.states) STATES = j.states; }).catch(function () { });
+  function hostOf(u) { try { return new URL(u).hostname; } catch (e) { return ""; } }
+  function iconHtml(p) { var fav = p.url ? "https://www.google.com/s2/favicons?sz=128&domain=" + encodeURIComponent(hostOf(p.url)) : ""; return p.icon ? '<img src="' + esc(p.icon) + '" alt="">' : p.emoji ? esc(p.emoji) : fav ? '<img src="' + esc(fav) + '" alt="" onerror="this.parentNode.textContent=\'🌐\'">' : "🌐"; }
+  function saved(p) { try { return APPV ? window.BIApp.hasCred(p.id) || "" : ""; } catch (e) { return ""; } }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "pt-list" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } IT = r.items; MY = r.myIds || {}; draw(); });
+  }
+  function draw() {
+    var h = ADMIN ? '<div class="seg"><button data-tb="open" class="' + (TAB === "open" ? "on" : "") + '">🔗 Portals</button><button data-tb="admin" class="' + (TAB === "admin" ? "on" : "") + '">⚙️ Manage</button></div>' : "";
+    VIEW.innerHTML = h + '<div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; if (TAB === "admin") loadAdmin(); else draw(); }; });
+    if (TAB === "admin") return drawAdmin();
+    var list = IT.filter(function (p) { return !Q || (p.name + " " + p.cat + " " + p.desc).toLowerCase().indexOf(Q) >= 0; }), cats = [];
+    list.forEach(function (p) { if (cats.indexOf(p.cat) < 0) cats.push(p.cat); });
+    var x = (OLDAPP ? '<div class="warnb">Update the app to the latest version to open partner sites inside the app and sign in automatically. Until then they open in your browser.</div>' : "") +
+      (IT.length > 6 ? '<input class="tx" id="q" placeholder="Search partner — e.g. EMI, Servify" value="' + esc(Q) + '" style="margin-top:6px">' : "") +
+      (IT.length ? cats.map(function (c) { return '<div class="cath">' + esc(c) + '</div><div class="pg4">' + list.filter(function (p) { return p.cat === c; }).map(function (p) { var s = p.mode === "autofill" && saved(p); return '<button class="pt" data-op="' + p.id + '"' + (p.color ? ' style="border-top:4px solid ' + esc(p.color) + '"' : "") + '><span class="mo" data-mo="' + p.id + '" aria-label="Sign-in settings">⋮</span>' + (p.mode === "api" ? '<span class="k" title="Signs in automatically">⚡</span>' : s ? '<span class="k" title="Login saved on this phone">🔑</span>' : "") + '<div class="ic">' + iconHtml(p) + "</div><b>" + esc(p.name) + "</b>" + (p.desc ? "<small>" + esc(p.desc) + "</small>" : "") + "</button>"; }).join("") + "</div>"; }).join("")
+        : '<div class="card empty"><div class="big">🔗</div>' + (ADMIN ? "No partner portals yet — open ⚙️ Manage to add EMI, Upgrade, V-Shield and other partner websites." : "HO hasn't added partner portals yet.") + "</div>") +
+      '<div class="how"><b>How sign-in works</b><br>⚡ = signs you in automatically through the partner. 🔑 = your login is saved on this phone and filled in for you. Tap ⋮ on a tile to save or change your login. Once signed in, the site remembers you on this phone.<br><span class="muted">Your partner passwords are stored only on this phone, encrypted — never on vivo servers.</span></div>';
+    $("pane").innerHTML = x;
+    if ($("q")) $("q").oninput = function () { Q = this.value.toLowerCase().trim(); var p = this.selectionStart; draw(); var n = $("q"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
+    [].forEach.call(VIEW.querySelectorAll("[data-op]"), function (b) { b.onclick = function (e) { if (e.target.closest("[data-mo]")) return; open(IT.filter(function (p) { return p.id === b.dataset.op; })[0]); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-mo]"), function (b) { b.onclick = function (e) { e.stopPropagation(); loginSheet(IT.filter(function (p) { return p.id === b.dataset.mo; })[0]); }; });
+  }
+  function cfgFor(p, url) { return JSON.stringify({ id: p.id, name: p.name, url: url || p.url, home: p.home || "", hosts: p.hosts || [], desktop: !!p.desktop, sso: p.mode === "api", fill: p.mode === "autofill" ? p.fill : {} }); }
+  function go(p, url) {
+    api({ action: "tl-use", tool: "portals", kind: "acts" });
+    if (APPV) return window.BIApp.openPortal(cfgFor(p, url));
+    if (OLDAPP) { location.href = url || p.url; return; }
+    window.open(url || p.url, "_blank", "noopener");
+  }
+  function open(p) {
+    if (!p) return;
+    if (p.mode === "api") { toast("Signing you in…"); return api({ action: "pt-sso", id: p.id }).then(function (r) { if (r.ok) return go(p, r.url); toast(r.error); if (r.needId) loginSheet(p); else go(p); }); }
+    if (p.mode === "autofill" && APPV && !saved(p)) return loginSheet(p, true);
+    go(p);
+  }
+  function loginSheet(p, thenOpen) {
+    if (!p) return;
+    if (p.mode === "api") {
+      var lab = (p.sso && p.sso.idLabel) || "";
+      if (!lab) return toast(p.name + " signs you in automatically — nothing to set.");
+      sheet(p.name, "Signs in automatically using your " + lab, [["💾", "Save", function (ov) { var v = ov.querySelector("#pi").value.trim(); api({ action: "pt-myid", id: p.id, value: v }).then(function (r) { if (!r.ok) return toast(r.error); MY = r.myIds; toast("Saved"); }); }]], '<label class="lb">' + esc(lab) + '</label><input class="tx" id="pi" value="' + esc(MY[p.id] || "") + '">');
+      return;
+    }
+    if (p.mode === "remember") return sheet(p.name, "Sign in once inside the app — the site remembers you on this phone. HO can turn on saved logins for this partner.", [["🔗", "Open " + p.name, function () { go(p); }]]);
+    if (!APPV) return sheet(p.name, OLDAPP ? "Update the app to save your login for automatic sign-in." : "On the web, use your browser's own password saving. Automatic sign-in works in the vivo BI apps.", [["🔗", "Open " + p.name, function () { go(p); }]]);
+    var u0 = saved(p), ul = (p.fill && p.fill.idLabel) || "User ID / mobile / email";
+    var ov = sheet(p.name + " — my login", "Saved only on this phone, encrypted. Filled in only on " + hostOf(p.url) + ".", [["💾", "Save" + (thenOpen ? " and open" : ""), function (ov) {
+      var u = ov.querySelector("#cu").value.trim(), pw = ov.querySelector("#cp").value;
+      if (!pw && u0) { if (thenOpen) go(p); return; }
+      if (!pw) { toast("Enter the password."); return false; }
+      var r = window.BIApp.saveCred(p.id, u, pw); if (r !== "ok") { toast("Couldn't save on this phone."); return false; }
+      toast("Saved on this phone 🔑"); draw(); if (thenOpen) go(p);
+    }]].concat(u0 ? [["🗑️", "Remove my saved login", function () { window.BIApp.deleteCred(p.id); toast("Removed"); draw(); }, "red"]] : []).concat(thenOpen ? [["🔗", "Open without saving", function () { go(p); }]] : []),
+      '<label class="lb">' + esc(ul) + '</label><input class="tx" id="cu" autocomplete="off" value="' + esc(u0) + '"><label class="lb">Password' + (u0 ? " (leave empty to keep the saved one)" : "") + '</label><input class="tx" id="cp" type="password" autocomplete="new-password"><div class="muted" style="font-size:11.5px;margin-top:8px">If the partner sends an OTP, you’ll type it once; after that the site keeps you signed in.</div>');
+  }
+  // ---------------- admin ----------------
+  function loadAdmin() { api({ action: "pt-list", all: true }).then(function (r) { if (!r.ok) return toast(r.error); ED = r.items.map(function (p) { KEYS[p.id] = p.hasKey; delete p.hasKey; return p; }); draw(); }); }
+  function blank() { return { id: Math.random().toString(36).slice(2, 10), name: "", url: "https://", home: "", icon: "", emoji: "", cat: "EMI & finance", desc: "", color: "", hosts: [], who: "all", states: [], mode: "remember", desktop: false, on: true, fill: { us: "", ps: "", ss: "", auto: true, two: false, idLabel: "" }, sso: { method: "POST", url: "", headers: "", body: "", path: "url", idLabel: "" }, _open: true }; }
+  function drawAdmin() {
+    if (!ED) { $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>'; return; }
+    var cats = ["EMI & finance", "Upgrade & exchange", "Protection (V-Shield)", "Buy-back (ABB)", "Payments", "vivo", "Other"];
+    var h = '<div class="muted" style="font-size:12.5px;margin:6px 2px">Add each partner website once — everyone (or the states you choose) sees its icon in the apps and on the web.</div>' + ED.map(function (p, i) {
+      var sel = function (k, opts, v) { return '<select class="tx" data-k="' + k + '" data-i="' + i + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (v === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>"; };
+      var inp = function (k, v, ph, t) { return '<input class="tx" data-k="' + k + '" data-i="' + i + '" value="' + esc(v || "") + '" placeholder="' + esc(ph || "") + '"' + (t ? ' type="' + t + '"' : "") + ">"; };
+      return '<div class="ed"><div class="hd"><span class="pt" style="padding:0;box-shadow:none;background:none"><span class="ic" style="width:38px;height:38px;margin:0">' + iconHtml(p) + "</span></span><b>" + esc(p.name || "New partner") + '<div class="muted" style="font-size:11.5px;font-weight:500">' + esc(hostOf(p.url)) + " · " + { remember: "remembers login", autofill: "saved login on phone", api: "sign-in API" }[p.mode] + (p.on ? "" : " · hidden") + '</div></b><button class="btn ghost sm" data-up="' + i + '"' + (i ? "" : " disabled") + '>↑</button><button class="btn ghost sm" data-ex="' + i + '">' + (p._open ? "Close" : "Edit") + "</button></div>" +
+        (p._open ? '<div class="g2"><div><label class="lb">Name</label>' + inp("name", p.name, "e.g. Bajaj Finserv EMI") + '</div><div><label class="lb">Category</label>' + sel("cat", cats.map(function (c) { return [c, c]; }).concat(cats.indexOf(p.cat) < 0 ? [[p.cat, p.cat]] : []), p.cat) + "</div></div>" +
+          '<label class="lb">Login page link (https://…)</label>' + inp("url", p.url, "https://partner.example.com/login") +
+          '<div class="g2"><div><label class="lb">Home page after login (optional)</label>' + inp("home", p.home, "https://partner.example.com/dashboard") + '</div><div><label class="lb">Short note on the tile</label>' + inp("desc", p.desc, "e.g. No Cost EMI") + "</div></div>" +
+          '<label class="lb">Icon</label><div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn sec sm" data-ic="' + i + '">📤 Upload logo</button>' + inp("emoji", p.emoji, "or an emoji 💳") + '<button class="btn ghost sm" data-icx="' + i + '">Use the site’s icon</button></div>' +
+          '<label class="lb">Who sees it</label>' + sel("who", [["all", "Everyone"], ["state", "State users (and admins)"], ["admin", "Admins only"]], p.who) + (STATES.length && p.who !== "admin" ? '<div class="fx" style="margin-top:6px">' + STATES.map(function (s) { return '<span data-st="' + esc(s) + '" data-i="' + i + '" class="' + (p.states.indexOf(s) >= 0 ? "on" : "") + '">' + esc(s) + "</span>"; }).join("") + '</div><div class="muted" style="font-size:11.5px">No state selected = all states.</div>' : "") +
+          '<label class="lb">How users sign in</label>' + sel("mode", [["remember", "1 · Sign in once — the site remembers them"], ["autofill", "2 · Saved login on the phone, filled in automatically"], ["api", "3 · Partner sign-in API (no login screen)"]], p.mode) +
+          (p.mode === "autofill" ? '<div class="g2"><div><label class="lb">Label for the user ID</label>' + inp("fill.idLabel", p.fill.idLabel, "e.g. Dealer code") + '</div><div><label class="lb">Submit automatically</label>' + sel("fill.auto", [["1", "Yes — straight to the home page"], ["0", "No — user taps Login"]], p.fill.auto ? "1" : "0") + '</div></div><details style="margin-top:8px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">Advanced: field selectors (only if auto-fill misses a field)</summary><div class="g2"><div><label class="lb">User ID field (CSS)</label>' + inp("fill.us", p.fill.us, "#username") + '</div><div><label class="lb">Password field (CSS)</label>' + inp("fill.ps", p.fill.ps, "#password") + '</div><div><label class="lb">Login button (CSS)</label>' + inp("fill.ss", p.fill.ss, "button[type=submit]") + '</div><div><label class="lb">Two-step login (ID first, then password)</label>' + sel("fill.two", [["0", "No"], ["1", "Yes"]], p.fill.two ? "1" : "0") + "</div></div></details>" : "") +
+          (p.mode === "api" ? '<div class="notice info" style="margin-top:8px;font-size:12px">Ask the partner for a “single sign-on / login-link API”: vivo’s server sends the user’s ID with a secret key and the partner returns a one-time link that opens their home page already signed in. Use {{partnerId}}, {{vchatId}}, {{username}}, {{email}}, {{phone}}, {{state}}, {{name}}, {{key}} (the secret) and {{ts}} in the fields below.</div>' +
+            '<div class="g2"><div><label class="lb">Method</label>' + sel("sso.method", [["POST", "POST"], ["GET", "GET"]], p.sso.method) + '</div><div><label class="lb">User ID the partner needs (label)</label>' + inp("sso.idLabel", p.sso.idLabel, "e.g. Bajaj dealer code — leave empty if not needed") + "</div></div>" +
+            '<label class="lb">API link</label>' + inp("sso.url", p.sso.url, "https://api.partner.com/sso/login-link") + '<label class="lb">Headers (JSON)</label><textarea class="tx" data-k="sso.headers" data-i="' + i + '" placeholder=\'{"x-api-key":"{{key}}"}\'>' + esc(p.sso.headers) + '</textarea><label class="lb">Body (JSON)</label><textarea class="tx" data-k="sso.body" data-i="' + i + '" placeholder=\'{"dealerCode":"{{partnerId}}","mobile":"{{phone}}"}\'>' + esc(p.sso.body) + '</textarea>' +
+            '<div class="g2"><div><label class="lb">Where the link is in the answer</label>' + inp("sso.path", p.sso.path, "data.loginUrl") + '</div><div><label class="lb">Secret key (stored on the server, never shown again)</label><div class="row" style="gap:6px"><input class="tx" id="sk' + i + '" type="password" autocomplete="off" placeholder="' + (KEYS[p.id] ? "Saved — paste to change" : "Paste the partner key") + '"><button class="btn sec sm" data-sk="' + i + '">Save key</button></div></div></div>' : "") +
+          '<label class="lb">Other web addresses of this partner (optional, comma separated)</label>' + inp("hosts", (p.hosts || []).join(", "), "e.g. auth.partner.com, partner.co.in") +
+          '<div class="fx" style="margin-top:10px"><span data-tg="on" data-i="' + i + '" class="' + (p.on ? "on" : "") + '">' + (p.on ? "✓ Shown" : "Hidden") + '</span><span data-tg="desktop" data-i="' + i + '" class="' + (p.desktop ? "on" : "") + '">' + (p.desktop ? "✓ " : "") + 'Open as desktop site</span></div><div class="row" style="margin-top:10px"><button class="btn ghost sm" data-del="' + i + '" style="color:var(--bad)">🗑 Remove</button><button class="btn sec sm" data-try="' + i + '">🔗 Try it</button></div>' : "") + "</div>";
+    }).join("") + '<div class="row" style="margin-top:12px"><button class="btn sec" id="add">＋ Add partner</button><button class="btn pri" id="sv" style="flex:1">💾 Save for everyone</button></div>' +
+      '<div class="how"><b>Which sign-in to choose</b><br>1 · <b>Remember</b> — works for every website: users sign in once in the app (including OTP) and stay signed in on that phone.<br>2 · <b>Saved login</b> — each user saves their own partner ID and password on their phone (encrypted, never sent to vivo); the app fills the login page and taps Login, landing on the home page.<br>3 · <b>Sign-in API</b> — the cleanest, no login page at all, but the partner must provide an SSO / login-link API and a key.</div>';
+    $("pane").innerHTML = h;
+    var q = function (s, fn) { [].forEach.call($("pane").querySelectorAll(s), fn); }, P = function (e) { return ED[+e.dataset.i]; };
+    q("[data-k]", function (e) { e.onchange = function () { var p = P(e), k = e.dataset.k.split("."), v = e.value; if (k[1] === "auto" || k[1] === "two") v = v === "1"; if (k[0] === "hosts") v = v.split(/[\s,;]+/).filter(Boolean); if (k.length > 1) p[k[0]][k[1]] = v; else p[k[0]] = v; if (k[0] === "url" && !p.name) p.name = hostOf(v).replace(/^www\./, "").split(".")[0]; if (/^(mode|who|url|emoji)$/.test(k[0])) drawAdmin(); }; });
+    q("[data-st]", function (e) { e.onclick = function () { var p = P(e), j = p.states.indexOf(e.dataset.st); if (j >= 0) p.states.splice(j, 1); else p.states.push(e.dataset.st); drawAdmin(); }; });
+    q("[data-tg]", function (e) { e.onclick = function () { var p = P(e); p[e.dataset.tg] = !p[e.dataset.tg]; drawAdmin(); }; });
+    q("[data-ex]", function (e) { e.onclick = function () { var p = ED[+e.dataset.ex]; p._open = !p._open; drawAdmin(); }; });
+    q("[data-up]", function (e) { e.onclick = function () { var i = +e.dataset.up; ED.splice(i - 1, 0, ED.splice(i, 1)[0]); drawAdmin(); }; });
+    q("[data-del]", function (e) { e.onclick = function () { ED.splice(+e.dataset.del, 1); drawAdmin(); }; });
+    q("[data-try]", function (e) { e.onclick = function () { var p = ED[+e.dataset.try]; if (!/^https:\/\/\S+\.\S+/.test(p.url)) return toast("Add the https:// link first."); go(p); }; });
+    q("[data-icx]", function (e) { e.onclick = function () { var p = ED[+e.dataset.icx]; p.icon = ""; p.emoji = ""; drawAdmin(); }; });
+    q("[data-ic]", function (e) { e.onclick = function () { var p = ED[+e.dataset.ic], inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.onchange = function () { var f = inp.files[0]; if (!f) return; var im = new Image(), u = URL.createObjectURL(f); im.onload = function () { var k = Math.min(1, 256 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); api({ action: "bnr-upload", data: c.toDataURL("image/png") }).then(function (r) { if (!r.ok) return toast(r.error); p.icon = r.url; p.emoji = ""; drawAdmin(); }); }; im.src = u; }; inp.click(); }; });
+    q("[data-sk]", function (e) { e.onclick = function () { var i = +e.dataset.sk, v = $("sk" + i).value.trim(); api({ action: "pt-key", id: ED[i].id, secret: v }).then(function (r) { if (!r.ok) return toast(r.error); KEYS[ED[i].id] = r.hasKey; toast(r.hasKey ? "Key saved on the server" : "Key removed"); drawAdmin(); }); }; });
+    $("add").onclick = function () { ED.forEach(function (p) { p._open = false; }); ED.push(blank()); drawAdmin(); };
+    $("sv").onclick = function () { var bad = ED.filter(function (p) { return !/^https:\/\/\S+\.\S+/.test(p.url); }); if (bad.length) return toast("Add a valid https:// link for " + (bad[0].name || "the new partner")); api({ action: "pt-save", items: ED }).then(function (r) { if (!r.ok) return toast(r.error); IT = r.items.filter(function (p) { return p.on; }); toast("Saved — everyone sees the update on their next open"); loadAdmin(); }); };
+  }
+  load();
+})();
+</script>
+</body>
+</html>

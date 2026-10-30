@@ -42,7 +42,7 @@
   // id, icon, label, module, target, badge(n)  — target "t:file#hash" opens a shared page; "n:name" a native screen (app) / web panel
   var CATS = [
     { id: "field", icon: "📍", name: "Field & market", sub: "In the market", col: "#E6F4EA", items: [
-      ["visits", "📍", "Market visits", "visits", "t:visits.html"], ["affordability", "💳", "Affordability", "affordability", "t:affordability.html"], ["hygiene", "🧼", "Market hygiene", "hygiene", "t:hygiene.html", function () { return N.hygiene; }], ["faces", "🙂", "Face records", null, "t:faces.html"]] },
+      ["visits", "📍", "Market visits", "visits", "t:visits.html"], ["affordability", "💳", "Affordability", "affordability", "t:affordability.html"], ["portals", "🔗", "Partner portals", null, "t:portals.html"], ["hygiene", "🧼", "Market hygiene", "hygiene", "t:hygiene.html", function () { return N.hygiene; }], ["faces", "🙂", "Face records", null, "t:faces.html"]] },
     { id: "reports", icon: "📊", name: "Reports & insights", sub: "Numbers", col: "#EEF0FF", items: [
       ["reports", "📑", "Report builder", "reports", "t:reports.html#build"], ["autoreports", "🗓️", "Auto-reports", "autoreports", "t:reports.html#auto", function () { return N.autorep; }],
       ["leaderboard", "🏆", "Leaderboard", "leaderboard", "t:engage.html#board"], ["matrix", "🧩", "Feature usability", "matrix", "t:matrix.html", function () { return N.matrix; }],
