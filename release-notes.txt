@@ -1,4 +1,4 @@
-New: Themes — tap 🎨 at the top to pick vivo Signature, Classic, Aurora, Emerald, Royal Indigo, Sunrise or Midnight (dark mode)
-Auto theme follows your phone's dark mode
-New tools: Email reports from HO, IMEI hygiene check, Sheet joiner, Target splitter, Guide & manual
-Affordability now shows phone photos and banners
+New: Partner portals — open EMI, Upgrade, V-Shield and other partner websites inside the app (All tools → Partner portals)
+Save your partner login once on this phone — the app signs you in automatically next time
+Your partner passwords stay only on your phone, encrypted
+New tools: One-Page Studio, Personal mailer, App usability lab, Access control

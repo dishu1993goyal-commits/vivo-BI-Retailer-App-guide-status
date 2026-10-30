@@ -1569,6 +1569,7 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void openDashboard() {
+        inPortal = false;
         unlocked = true;
         inProfile = false;
         if (webView == null) setupWebView();
@@ -2734,6 +2735,264 @@ public class MainActivity extends FragmentActivity {
 
         @JavascriptInterface
         public void nativeAction(String name) { ui.post(() -> doNative(name == null ? "" : name)); }
+
+        // Partner portals (v6.4)
+        @JavascriptInterface
+        public String portalVersion() { return "1"; }
+
+        @JavascriptInterface
+        public void openPortal(String json) {
+            try {
+                JSONObject c = new JSONObject(json);
+                String u = c.optString("url", "");
+                if (!u.startsWith("https://") && !u.startsWith("http://")) return;
+                ui.post(() -> showPortal(c));
+            } catch (Exception ignored) { }
+        }
+
+        @JavascriptInterface
+        public String saveCred(String id, String user, String pass) {
+            if (id == null || !id.matches("[A-Za-z0-9_-]{1,40}") || pass == null || pass.isEmpty()) return "bad";
+            return portalSave(id, user == null ? "" : user, pass) ? "ok" : "fail";
+        }
+
+        @JavascriptInterface
+        public String hasCred(String id) {
+            JSONObject c = id == null ? null : portalLoad(id);
+            return c == null ? "" : c.optString("u", "");   // only the user name, never the password
+        }
+
+        @JavascriptInterface
+        public void deleteCred(String id) { if (id != null) portalPrefs().edit().remove(portalPrefKey(id)).apply(); }
+    }
+
+    // ---------- Partner portals: partner websites inside the app, signed in automatically ----------
+    // The user's partner password is stored only on this phone, encrypted with a key held in the Android Keystore,
+    // and filled only into the partner's own web addresses. vivo's servers never see it.
+    private WebView portalWeb;
+    private boolean inPortal = false;
+    private JSONObject portalCfg;
+    private int portalAutoLeft = 1;
+
+    private javax.crypto.SecretKey portalKey() throws Exception {
+        java.security.KeyStore ks = java.security.KeyStore.getInstance("AndroidKeyStore");
+        ks.load(null);
+        if (!ks.containsAlias("bi_portal_v1")) {
+            javax.crypto.KeyGenerator kg = javax.crypto.KeyGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+            kg.init(new android.security.keystore.KeyGenParameterSpec.Builder("bi_portal_v1",
+                    android.security.keystore.KeyProperties.PURPOSE_ENCRYPT | android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+                    .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256).build());
+            kg.generateKey();
+        }
+        return ((java.security.KeyStore.SecretKeyEntry) ks.getEntry("bi_portal_v1", null)).getSecretKey();
+    }
+    private SharedPreferences portalPrefs() { return getSharedPreferences("portal_creds", MODE_PRIVATE); }
+    private String portalPrefKey(String id) { return String.valueOf(sessionUser()).toLowerCase() + "|" + APP_ID + "|" + id; }
+    private boolean portalSave(String id, String user, String pass) {
+        try {
+            javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(javax.crypto.Cipher.ENCRYPT_MODE, portalKey());
+            byte[] ct = c.doFinal(obj("u", user, "p", pass).toString().getBytes(StandardCharsets.UTF_8));
+            portalPrefs().edit().putString(portalPrefKey(id), Base64.encodeToString(c.getIV(), Base64.NO_WRAP) + ":" + Base64.encodeToString(ct, Base64.NO_WRAP)).apply();
+            return true;
+        } catch (Throwable e) { return false; }
+    }
+    private JSONObject portalLoad(String id) {
+        try {
+            String s = portalPrefs().getString(portalPrefKey(id), null);
+            if (s == null || !s.contains(":")) return null;
+            String[] p = s.split(":", 2);
+            javax.crypto.Cipher c = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+            c.init(javax.crypto.Cipher.DECRYPT_MODE, portalKey(), new javax.crypto.spec.GCMParameterSpec(128, Base64.decode(p[0], Base64.NO_WRAP)));
+            return new JSONObject(new String(c.doFinal(Base64.decode(p[1], Base64.NO_WRAP)), StandardCharsets.UTF_8));
+        } catch (Throwable e) { return null; }
+    }
+    private boolean portalHostOk(String url) {
+        try {
+            String h = Uri.parse(url).getHost(); if (h == null || portalCfg == null) return false;
+            h = h.toLowerCase();
+            org.json.JSONArray hs = portalCfg.optJSONArray("hosts");
+            if (hs != null) for (int i = 0; i < hs.length(); i++) { String a = hs.optString(i, "").toLowerCase().replaceAll("^\\*\\.", ""); if (!a.isEmpty() && (h.equals(a) || h.endsWith("." + a))) return true; }
+            String base = Uri.parse(portalCfg.optString("url")).getHost();
+            return base != null && (h.equals(base.toLowerCase()) || h.endsWith("." + base.toLowerCase()));
+        } catch (Throwable e) { return false; }
+    }
+    private static final String PORTAL_FILL_JS =
+            "(function(c){try{" +
+            "function vis(e){var r=e.getBoundingClientRect();var s=getComputedStyle(e);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';}" +
+            "function q(s){if(!s)return null;try{return document.querySelector(s);}catch(e){return null;}}" +
+            "function set(el,v){var d=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value')||Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');el.focus();d.set.call(el,v);" +
+            "['input','change','keyup','blur'].forEach(function(t){el.dispatchEvent(new Event(t,{bubbles:true}));});}" +
+            "function btn(scope){var b=q(c.ss);if(b)return b;var L=[].filter.call((scope||document).querySelectorAll('button,input[type=submit],a[role=button],[type=button]'),vis);" +
+            "return L.filter(function(x){return /log ?in|sign ?in|submit|continue|next|proceed|login/i.test((x.innerText||x.value||'').trim());})[0]||(scope&&scope.querySelector&&scope.querySelector('button[type=submit],input[type=submit]'));}" +
+            "var p=q(c.ps)||[].filter.call(document.querySelectorAll('input[type=password]'),vis)[0];" +
+            "var ins=[].filter.call(document.querySelectorAll('input'),function(i){return vis(i)&&/^(text|email|tel|number|)$/i.test(i.type||'')&&!i.readOnly&&!i.disabled;});" +
+            "var u=q(c.us);if(!u){var k=-1;ins.forEach(function(i,n){if(p&&(i.compareDocumentPosition(p)&4))k=n;});u=p?(k>=0?ins[k]:null):(c.two?ins[0]:null);}" +
+            "if(!p&&!(c.two&&u))return 'none';" +
+            "if(p&&p.value)return 'already';" +
+            "if(u&&c.u&&!u.value)set(u,c.u);if(p)set(p,c.p);" +
+            "if(c.auto){setTimeout(function(){var f=(p||u).form,b=btn(f);if(b)b.click();else if(f){if(f.requestSubmit)f.requestSubmit();else f.submit();}},500);return 'submitted';}" +
+            "return 'filled';}catch(e){return 'err';}})";
+
+    private void portalFill(boolean force) {
+        if (portalWeb == null || portalCfg == null) return;
+        String url = portalWeb.getUrl();
+        if (url == null || !portalHostOk(url)) return;
+        JSONObject cr = portalLoad(portalCfg.optString("id"));
+        if (cr == null) return;
+        JSONObject f = portalCfg.optJSONObject("fill"); if (f == null) f = new JSONObject();
+        boolean auto = f.optBoolean("auto", true) && (portalAutoLeft > 0 || force);
+        try {
+            JSONObject c = new JSONObject().put("u", cr.optString("u")).put("p", cr.optString("p")).put("us", f.optString("us", "")).put("ps", f.optString("ps", ""))
+                    .put("ss", f.optString("ss", "")).put("auto", auto).put("two", f.optBoolean("two", false));
+            final WebView w = portalWeb;
+            w.evaluateJavascript(PORTAL_FILL_JS + "(" + c + ")", v -> { if (v != null && v.contains("submitted")) portalAutoLeft--; });
+        } catch (Exception ignored) { }
+    }
+
+    private void showPortal(JSONObject cfg) {
+        if (sessionToken() == null) return;
+        portalCfg = cfg;
+        portalAutoLeft = 1;
+        inPortal = true;
+        inSurveyPage = false;
+        if (portalWeb != null) { try { portalWeb.destroy(); } catch (Throwable ignored) { } }
+        portalWeb = new WebView(this);
+        WebSettings ws = portalWeb.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setDatabaseEnabled(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        ws.setBuiltInZoomControls(true);
+        ws.setDisplayZoomControls(false);
+        ws.setSupportMultipleWindows(false);
+        ws.setJavaScriptCanOpenWindowsAutomatically(true);
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        ws.setGeolocationEnabled(true);
+        if (cfg.optBoolean("desktop", false)) ws.setUserAgentString(ws.getUserAgentString().replace("; wv", "").replace("Mobile ", ""));
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(portalWeb, true);
+        final ProgressBar pb = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        pb.setMax(100);
+        portalWeb.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                Uri u = request.getUrl(); String s = u.getScheme();
+                if ("http".equals(s) || "https".equals(s)) return false;   // partner pages, payment and bank pages stay in the app
+                try {
+                    if ("intent".equals(s)) { Intent it = Intent.parseUri(u.toString(), Intent.URI_INTENT_SCHEME); it.addCategory(Intent.CATEGORY_BROWSABLE); it.setComponent(null); it.setSelector(null); startActivity(it); return true; }
+                } catch (Throwable e) { return true; }
+                openExternally(u);   // upi:, tel:, mailto:, whatsapp: …
+                return true;
+            }
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                CookieManager.getInstance().flush();
+                ui.postDelayed(() -> portalFill(false), 400);
+                ui.postDelayed(() -> portalFill(false), 1800);
+                ui.postDelayed(() -> portalFill(false), 4000);
+            }
+        });
+        portalWeb.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public void onProgressChanged(WebView view, int p) { pb.setProgress(p); pb.setVisibility(p >= 100 ? View.GONE : View.VISIBLE); }
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                filePathCallback = callback;
+                boolean image = false;
+                for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("image")) image = true;
+                if (image && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    pendingImageChooser = true;
+                    requestPermissions(new String[]{Manifest.permission.CAMERA}, CAM_PERM_REQUEST);
+                    return true;
+                }
+                return launchFileChooser(image);
+            }
+            @Override
+            public void onGeolocationPermissionsShowPrompt(String origin, android.webkit.GeolocationPermissions.Callback cb) {
+                if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                        || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) { cb.invoke(origin, true, false); return; }
+                geoOrigin = origin; geoCallback = cb;
+                requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, GEO_REQUEST);
+            }
+        });
+        portalWeb.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
+            if (url.startsWith("blob:") || url.startsWith("data:")) { Toast.makeText(this, "This file can't be saved from here — use ⋮ → Open in browser", Toast.LENGTH_LONG).show(); return; }
+            try {
+                String name = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+                req.setMimeType(mimeType);
+                req.addRequestHeader("cookie", CookieManager.getInstance().getCookie(url));
+                req.addRequestHeader("User-Agent", userAgent);
+                req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
+                ((DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE)).enqueue(req);
+                Toast.makeText(this, "Downloading " + name, Toast.LENGTH_SHORT).show();
+            } catch (Exception e) { openExternally(Uri.parse(url)); }
+        });
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        LinearLayout bar = profileHeaderBar(cfg.optString("name", "Partner"), this::portalBack);
+        View sp = new View(this); bar.addView(sp, new LinearLayout.LayoutParams(0, 1, 1f));
+        TextView rel = new TextView(this); rel.setText("⟳"); rel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22); rel.setPadding(dp(10), dp(4), dp(10), dp(4)); rel.setTextColor(Color.parseColor("#111111"));
+        rel.setOnClickListener(v -> portalWeb.reload()); bar.addView(rel);
+        TextView more = new TextView(this); more.setText("⋮"); more.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22); more.setPadding(dp(10), dp(4), dp(6), dp(4)); more.setTextColor(Color.parseColor("#111111"));
+        more.setOnClickListener(v -> {
+            String[] items = {"🔑 Sign in again", "🏠 Home page", "🌐 Open in browser", "🚪 Sign out of this site on this phone"};
+            new AlertDialog.Builder(this).setItems(items, (d, which) -> {
+                if (which == 0) { portalAutoLeft = 1; portalWeb.loadUrl(cfg.optString("url")); }
+                else if (which == 1) portalWeb.loadUrl(cfg.optString("home", cfg.optString("url")));
+                else if (which == 2) { String u = portalWeb.getUrl(); openExternally(Uri.parse(u == null ? cfg.optString("url") : u)); }
+                else portalSignOut();
+            }).show();
+        });
+        bar.addView(more);
+        page.addView(bar);
+        page.addView(pb, new LinearLayout.LayoutParams(-1, dp(3)));
+        page.addView(portalWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
+        detachWebView();
+        setContentView(page);
+        String start = cfg.optString("url");
+        if (portalLoad(cfg.optString("id")) == null && cfg.has("home") && !cfg.optString("home").isEmpty() && !cfg.optBoolean("sso", false)) start = cfg.optString("home");
+        portalWeb.loadUrl(start);
+    }
+    private void portalSignOut() {
+        try {
+            CookieManager cm = CookieManager.getInstance();
+            java.util.List<String> hosts = new java.util.ArrayList<>();
+            hosts.add(Uri.parse(portalCfg.optString("url")).getHost());
+            org.json.JSONArray hs = portalCfg.optJSONArray("hosts");
+            if (hs != null) for (int i = 0; i < hs.length(); i++) hosts.add(hs.optString(i).replaceAll("^\\*\\.", ""));
+            for (String h : hosts) {
+                if (h == null || h.isEmpty()) continue;
+                String ck = cm.getCookie("https://" + h);
+                if (ck == null) continue;
+                for (String part : ck.split(";")) { String n = part.split("=", 2)[0].trim(); if (n.isEmpty()) continue;
+                    cm.setCookie("https://" + h, n + "=; Max-Age=0; Path=/"); cm.setCookie("https://" + h, n + "=; Max-Age=0; Path=/; Domain=." + h); }
+            }
+            cm.flush();
+            portalWeb.clearCache(false);
+            portalWeb.evaluateJavascript("try{localStorage.clear();sessionStorage.clear();}catch(e){}", null);
+            portalAutoLeft = 0;
+            portalWeb.loadUrl(portalCfg.optString("url"));
+            Toast.makeText(this, "Signed out of this site", Toast.LENGTH_SHORT).show();
+        } catch (Throwable ignored) { }
+    }
+    private void portalBack() {
+        if (portalWeb != null && portalWeb.canGoBack()) { portalWeb.goBack(); return; }
+        closePortal();
+    }
+    private void closePortal() {
+        inPortal = false;
+        CookieManager.getInstance().flush();
+        if (portalWeb != null) { try { portalWeb.stopLoading(); portalWeb.destroy(); } catch (Throwable ignored) { } portalWeb = null; }
+        showToolPage("portals.html", tr("all_tools"), "#list");
     }
 
     private void doNative(String name) {
@@ -2803,6 +3062,7 @@ public class MainActivity extends FragmentActivity {
     // Shared web pages used by both apps and the website: survey.html, chat.html, matrix.html, visits.html, knowledge.html.
     private void showToolPage(String file, String title, String hash) {
         if (sessionToken() == null) return;
+        if (inPortal && portalWeb != null) { inPortal = false; try { portalWeb.destroy(); } catch (Throwable ignored) { } portalWeb = null; }
         toolFromHub = inSurveyPage && "hub.html".equals(toolFile) && !"hub.html".equals(file);
         toolFile = file;
         inProfile = true;
@@ -4301,6 +4561,7 @@ public class MainActivity extends FragmentActivity {
     @Override
     public void onBackPressed() {
         if (inLink) { super.onBackPressed(); return; }
+        if (inPortal) { portalBack(); return; }
         if (inSurveyPage) {
             surveyBack();
             return;
