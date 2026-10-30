@@ -36,6 +36,26 @@ export function cleanSlides(d) {
 
 export async function deckAction(b, ctx) {
   const { store, t, app, rec } = ctx;
+  if (b.action === "ds-ua") {   // App usability lab: AI picks the fairest formula from the computed comparison
+    const data = String(typeof b.data === "string" ? b.data : JSON.stringify(b.data || {})).slice(0, 16000);
+    if (data.length < 50) return json(400, { ok: false, error: "Run the comparison first." });
+    const key = "dsua:" + createHash("sha1").update(data).digest("hex").slice(0, 20);
+    const hit = await store.get(key); if (hit && !b.fresh && t - hit.at < 24 * 3600000) return json(200, { ok: true, advice: hit.advice, cached: true });
+    const keys = await aiKeys(store, ctx.env || {}); if (!keys.groq) return json(200, { ok: false, error: "AI key not set (Affordability → Data → Groq key)." });
+    const prompt = `You are advising vivo India's HO Business Innovation team on a fair KPI for Retailer App usability across Indian states.
+State BI teams complain the current method (unique app users per feature ÷ eligible retailers reported by each state) is unfair: small states vs big states, hard terrain, inactive or virtual retailers with under 5 units a month, unregistered retailers, states disabling IDs or under-reporting eligible counts.
+Below are several candidate formulas computed on the same data, with fairness diagnostics: size_bias = correlation of the score with log(state size) (closer to 0 is fairer), gaming = how much a state can lift its score by under-reporting eligible retailers or disabling inactive IDs (0 = cannot), spread, rank_moves vs current.
+Recommend ONE formula (or a blend) that is transparent, fair to small and large states, hard to game and simple to explain. Use only the numbers given.
+Return JSON only: {"best":"<option id>","title":"","why":["",""],"how_to_calculate":"one plain sentence","data_needed":[""],"risks":[""],"rollout":["step 1",""],"tweaks":[""],"verdicts":[{"id":"","verdict":"one short line"}]}
+DATA:
+${data}`;
+    const r = await groqJSON(keys.groq, prompt, ctx.aiFetch || fetch, { validate: (d) => d && d.best && Array.isArray(d.why) });
+    if (!r.ok) return json(200, { ok: false, error: r.error });
+    const L = (v, n, m) => (Array.isArray(v) ? v : []).slice(0, n).map((x) => str(typeof x === "object" ? JSON.stringify(x) : x, m)).filter(Boolean);
+    const d = r.data, advice = { best: str(d.best, 20), title: str(d.title, 100), why: L(d.why, 6, 240), how: str(d.how_to_calculate, 300), data: L(d.data_needed, 6, 160), risks: L(d.risks, 5, 200), rollout: L(d.rollout, 6, 200), tweaks: L(d.tweaks, 5, 200), verdicts: (Array.isArray(d.verdicts) ? d.verdicts : []).slice(0, 8).map((x) => ({ id: str(x && x.id, 20), v: str(x && x.verdict, 160) })) };
+    await store.set(key, { at: t, advice });
+    return json(200, { ok: true, advice });
+  }
   if (b.action !== "ds-ai") return json(400, { ok: false, error: "Unknown action." });
   const focus = str(b.focus, 80), scope = str(b.scope, 40) || "PAN India", period = str(b.period, 40), tone = ["crisp", "detailed", "professional"].includes(b.tone) ? b.tone : "professional";
   if (app !== "admin" && scope !== "PAN India" && rec.state && scope !== rec.state) return json(403, { ok: false, error: "You can make decks for your state and PAN India." });

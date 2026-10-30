@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Personal mailer</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.stp{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;margin:0 0 6px}.stp i{font-style:normal;width:26px;height:26px;border-radius:99px;background:var(--brand);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.stp.ok i{background:#1E9E61}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ph{display:inline-block;background:#EEF0FF;color:#2B33A6;border-radius:6px;padding:1px 6px;font-size:11.5px;margin:2px;cursor:pointer;font-family:monospace}
+.mt{width:100%;border-collapse:collapse;font-size:12.5px}.mt th,.mt td{padding:6px 7px;border-bottom:1px solid #EEF0F6;text-align:left;vertical-align:top}.mt th{background:#F5F6FF;font-size:11.5px}
+.st{border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}.st.ok{background:#E6F4EA;color:#13693F}.st.w{background:#FFF4E5;color:#8A5A00}.st.b{background:#FDECEC;color:#A12727}.st.s{background:#EEF0FF;color:#2B33A6}
+.pbar{height:10px;border-radius:99px;background:#EEF0F6;overflow:hidden;margin-top:8px}.pbar i{display:block;height:100%;background:linear-gradient(90deg,#415FFF,#1E9E61);transition:width .3s}
+.pv{border:1px solid #E3E5EF;border-radius:12px;padding:12px;background:#fff;margin-top:8px;font:14px/1.5 Arial,sans-serif;max-height:420px;overflow:auto}
+.tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}@media(max-width:520px){.tiles4{grid-template-columns:1fr 1fr}}.tiles4 div{background:#F5F6FB;border-radius:12px;padding:9px;text-align:center}.tiles4 b{display:block;font-size:20px}.tiles4 span{font-size:11.5px;color:var(--mut)}
+textarea.tx{min-height:120px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">✉️</span></div>
+  <h1>Personal mailer</h1><p>Each user gets only their own row and their own files — on their registered email, in one click</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), H = [], ROWS = [], IDC = 0, FILES = [], MATCH = {}, READY = false, MYEMAIL = "", RUN = null, TAB = "new";
+  var D = Object.assign({ subject: "Your {{" + "Month" + "}} details — vivo BI", body: "Dear {{Name}},\n\nPlease find your details below and your file attached.\n\nRegards,\nHO BI team", table: true, cols: null, fallback: false, attCol: "", sheet: 0 }, ls("pm-draft") || {});
+  function sv() { ls("pm-draft", { subject: D.subject, body: D.body, table: D.table, fallback: D.fallback }); }
+  var XL = null; function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); })); }
+  var ZP = null; function zp() { return ZP || (ZP = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/jszip.min.js"; s.onload = res; s.onerror = function () { ZP = null; rej(new Error("Couldn't load the ZIP reader.")); }; document.head.appendChild(s); })); }
+  var kb = function (n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; };
+  var lowk = function (s) { return String(s || "").trim().toLowerCase(); };
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">This tool is for HO admins.</div>'; return; }
+    api({ action: "pm-match", ids: [] }).then(function (r) { if (r.ok) { READY = r.emailReady; MYEMAIL = r.myEmail; } draw(); });
+  }
+  function draw() {
+    var h = '<div class="seg"><button data-tb="new" class="' + (TAB === "new" ? "on" : "") + '">✉️ New send</button><button data-tb="log" class="' + (TAB === "log" ? "on" : "") + '">📋 Sent log</button></div><div id="pane"></div>';
+    VIEW.innerHTML = h; [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    if (TAB === "log") return logs();
+    var p = $("pane"), ok1 = ROWS.length > 0, ok2 = FILES.length > 0, users = ROWS.length;
+    var x = (!READY ? '<div class="warnb">Email isn’t set up on the server yet (Brevo key) — you can prepare and preview, but sending will fail.</div>' : "") +
+      '<div class="card"><div class="stp' + (ok1 ? " ok" : "") + '"><i>1</i>Import the Excel matrix</div><div class="muted" style="font-size:12.5px">First column = user ID (username, vChat ID, email or mobile of a state or admin user). Every other column is yours — any headings. Optional column <b>Attachment</b> with file names; optional <b>Email</b> column used only if you allow it below.</div>' +
+      '<div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="xi">📥 Import Excel / CSV</button><button class="btn ghost sm" id="xt">⬇ Template</button></div>' +
+      (ok1 ? '<div class="sum" style="margin-top:8px;background:#EEF0FF;border-radius:10px;padding:8px 10px;font-size:13px">✅ ' + users + " users · " + H.length + " columns: " + H.map(esc).join(", ") + "</div>" : "") + "</div>" +
+      '<div class="card"><div class="stp' + (ok2 ? " ok" : "") + '"><i>2</i>Add each user’s attachments <span class="muted" style="font-weight:500;font-size:12px">(optional)</span></div><div class="muted" style="font-size:12.5px">Pick all the files at once (PDF, picture, Excel, Word…) or one ZIP. A file goes to the user whose ID is its name — e.g. <b>VC1234.pdf</b>, <b>VC1234_payslip.pdf</b> — or whose Attachment column names it. A user can have several files (max about 4 MB per user).</div>' +
+      '<div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="fa">📎 Add files or ZIP</button>' + (FILES.length ? '<button class="btn ghost sm" id="fc">Clear ' + FILES.length + " files</button>" : "") + "</div>" + (FILES.length ? '<div class="muted" style="font-size:12.5px;margin-top:6px">' + FILES.length + " files · " + kb(FILES.reduce(function (a, f) { return a + f.size; }, 0)) + (unmatched().length ? ' · <b style="color:#A12727">' + unmatched().length + " not matched to anyone:</b> " + unmatched().slice(0, 6).map(function (f) { return esc(f.name); }).join(", ") : " · all matched") + "</div>" : "") + "</div>" +
+      '<div class="card"><div class="stp' + (D.subject && D.body ? " ok" : "") + '"><i>3</i>Write the email</div><div class="muted" style="font-size:12px">Tap a column to insert it: ' + ["Name"].concat(H.slice(1)).filter(function (c, i, a) { return a.indexOf(c) === i; }).map(function (c) { return '<span class="ph" data-ph="' + esc(c) + '">{{' + esc(c) + "}}</span>"; }).join("") + " — {{Name}} is the registered name.</div>" +
+      '<label class="lb">Subject</label><input class="tx" id="su" value="' + esc(D.subject) + '"><label class="lb">Message</label><textarea class="tx" id="bo">' + esc(D.body) + "</textarea>" +
+      '<div class="fx" style="margin-top:8px"><span data-tg="table" class="' + (D.table ? "on" : "") + '">' + (D.table ? "✓ " : "") + "Add a table of the user’s row</span><span data-tg=\"fallback\" class=\"" + (D.fallback ? "on" : "") + '">' + (D.fallback ? "✓ " : "") + "Use the Email column when a user has no registered email</span></div>" +
+      (D.table && H.length > 1 ? '<label class="lb">Columns in the table</label><div class="fx">' + H.slice(1).filter(function (c) { return !/^(attachment|attachments|email)$/i.test(c); }).map(function (c) { var on = !D.cols || D.cols.indexOf(c) >= 0; return '<span data-co="' + esc(c) + '" class="' + (on ? "on" : "") + '">' + esc(c) + "</span>"; }).join("") + "</div>" : "") + "</div>" +
+      (ok1 ? checkCard() : "");
+    p.innerHTML = x; bind();
+  }
+  // ---------- step 1: Excel ----------
+  function importX() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; toast("Reading " + f.name + "…");
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = XLSX.read(buf, { type: "array" }), ws = wb.Sheets[wb.SheetNames[0]], A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); });
+        if (A.length < 2) throw new Error("The sheet needs a header row and at least one user.");
+        H = A[0].map(function (h, i) { return String(h).trim() || "Column " + (i + 1); });
+        var seen = {}; ROWS = A.slice(1).map(function (r) { var o = {}; H.forEach(function (h, i) { o[h] = String(r[i] == null ? "" : r[i]).trim(); }); return o; }).filter(function (o) { var id = lowk(o[H[0]]); if (!id || seen[id]) return false; seen[id] = 1; return true; });
+        if (A.length - 1 !== ROWS.length) toast((A.length - 1 - ROWS.length) + " empty or repeated user ID row(s) skipped");
+        D.cols = null; MATCH = {};
+        return api({ action: "pm-match", ids: ROWS.map(function (o) { return o[H[0]]; }) });
+      }).then(function (r) { if (r && r.ok) { READY = r.emailReady; MYEMAIL = r.myEmail; r.users.forEach(function (u) { MATCH[lowk(u.id)] = u; }); } else if (r) toast(r.error); draw(); }).catch(function (e) { toast(e.message); });
+    };
+    inp.click();
+  }
+  function template() { download(xlsx([{ name: "Users", rows: [["User ID", "Month", "Target", "Achieved", "Payout (₹)", "Remarks", "Attachment", "Email"], ["VC1234", "October 2026", "120", "134", "8,400", "Well done", "VC1234_payslip.pdf", ""], ["ravi.kumar", "October 2026", "90", "71", "3,550", "Push V60 EMI", "", ""]] }, { name: "How to", rows: [["Column A must be the user ID (username, vChat ID, email or mobile). Other columns can be anything."], ["Attachment (optional): file name(s) separated by commas. Or simply name each file with the user ID, e.g. VC1234.pdf."], ["Email (optional): used only if you allow it and the user has no registered email."]] }]), "Personal_mailer_template.xlsx"); }
+  // ---------- step 2: files ----------
+  function addFiles() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.multiple = true;
+    inp.onchange = function () {
+      var list = [].slice.call(inp.files || []); if (!list.length) return;
+      list.reduce(function (p, f) { return p.then(function () {
+        if (/\.zip$/i.test(f.name)) return zp().then(function () { return window.JSZip.loadAsync(f); }).then(function (z) { var jobs = []; z.forEach(function (path, e) { if (e.dir || /(^|\/)(__MACOSX|\.)/.test(path)) return; jobs.push(e.async("blob").then(function (b) { FILES.push({ name: path.split("/").pop(), size: b.size, blob: b }); })); }); return Promise.all(jobs); });
+        FILES.push({ name: f.name, size: f.size, blob: f });
+      }); }, Promise.resolve()).then(function () { var seen = {}; FILES = FILES.filter(function (x) { var k = lowk(x.name); return seen[k] ? false : (seen[k] = 1); }); draw(); }).catch(function (e) { toast(e.message); });
+    };
+    inp.click();
+  }
+  function attCol() { return H.filter(function (h) { return /^attachments?$|^files?$|^file names?$/i.test(h); })[0] || ""; }
+  function emailCol() { return H.filter(function (h) { return /^e-?mail( id)?$/i.test(h); })[0] || ""; }
+  function filesFor(o) {
+    var id = lowk(o[H[0]]), ac = attCol(), named = ac ? String(o[ac] || "").split(/[,;\n]+/).map(lowk).filter(Boolean) : [];
+    return FILES.filter(function (f) { var n = lowk(f.name), base = n.replace(/\.[^.]+$/, ""); return named.indexOf(n) >= 0 || named.indexOf(base) >= 0 || base === id || (base.indexOf(id) === 0 && /^[\s_.\-()]/.test(base.slice(id.length))); });
+  }
+  function unmatched() { if (!ROWS.length) return FILES; var used = {}; ROWS.forEach(function (o) { filesFor(o).forEach(function (f) { used[lowk(f.name)] = 1; }); }); return FILES.filter(function (f) { return !used[lowk(f.name)]; }); }
+  // ---------- step 3: email ----------
+  function fill(tpl, o) { var m = MATCH[lowk(o[H[0]])] || {}; return String(tpl || "").replace(/\{\{\s*([^}]+?)\s*\}\}/g, function (_, k) { if (lowk(k) === "name" && !H.some(function (h) { return lowk(h) === "name"; })) return m.name || o[H[0]]; var h = H.filter(function (x) { return lowk(x) === lowk(k); })[0]; return h ? o[h] : ""; }); }
+  function html(o) {
+    var e = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+    var cols = H.slice(1).filter(function (c) { return !/^(attachment|attachments|email)$/i.test(c) && (!D.cols || D.cols.indexOf(c) >= 0); });
+    var tb = D.table && cols.length ? '<table style="border-collapse:collapse;margin:14px 0;font:14px Arial,sans-serif;min-width:300px">' + cols.map(function (c, i) { return '<tr style="background:' + (i % 2 ? "#ffffff" : "#F5F6FB") + '"><td style="padding:8px 12px;border:1px solid #E3E5EF;color:#555;font-weight:bold">' + e(c) + '</td><td style="padding:8px 12px;border:1px solid #E3E5EF;color:#111">' + e(o[c]) + "</td></tr>"; }).join("") + "</table>" : "";
+    var body = e(fill(D.body, o)).replace(/\n/g, "<br>"), parts = body.split(/<br><br>/);
+    var withTable = parts.length > 1 ? parts.slice(0, -1).join("<br><br>") + tb + parts[parts.length - 1] : body + tb;
+    return '<div style="font:14px/1.6 Arial,sans-serif;color:#222">' + withTable + '<p style="font-size:11px;color:#888;margin-top:18px">This email is personal and confidential — it was sent only to you from the vivo BI tools.</p></div>';
+  }
+  // ---------- step 4: check + send ----------
+  function rowState(o) {
+    var m = MATCH[lowk(o[H[0]])], fs = filesFor(o), size = fs.reduce(function (a, f) { return a + f.size; }, 0), ec = emailCol(), fb = D.fallback && ec && /@/.test(o[ec] || "");
+    if (size > 4.2 * 1048576) return { s: "b", t: "Files too large", fs: fs, size: size };
+    if (!m || !m.found) return fb ? { s: "w", t: "Not registered — Email column", fs: fs, size: size } : { s: "b", t: "Not a registered user", fs: fs, size: size };
+    if (m.disabled) return { s: "b", t: "User disabled", fs: fs, size: size };
+    if (!m.hasEmail) return fb ? { s: "w", t: "Email column", fs: fs, size: size } : { s: "b", t: "No registered email", fs: fs, size: size };
+    var key = (m.app || "") + "|" + lowk(m.name) + "|" + m.email, dup = ROWS.filter(function (x) { var q = MATCH[lowk(x[H[0]])]; return q && q.found && (q.app || "") + "|" + lowk(q.name) + "|" + q.email === key; });
+    if (dup.length > 1 && dup[0] !== o) return { s: "w", t: "Same user as " + dup[0][H[0]] + " — gets a 2nd email", fs: fs, size: size };
+    if (attCol() && String(o[attCol()] || "").trim() && !fs.length) return { s: "w", t: "File named in sheet not found", fs: fs, size: size };
+    return { s: "ok", t: "Ready", fs: fs, size: size };
+  }
+  function checkCard() {
+    var st = ROWS.map(rowState), ready = st.filter(function (x) { return x.s !== "b"; }).length, withF = st.filter(function (x) { return x.fs.length; }).length, P = ROWS[0];
+    return '<div class="card"><div class="stp"><i>4</i>Check and send</div><div class="tiles4"><div><b>' + ROWS.length + "</b><span>users in sheet</span></div><div><b>" + ready + '</b><span>will get an email</span></div><div><b style="color:#A12727">' + (ROWS.length - ready) + "</b><span>can’t be sent</span></div><div><b>" + withF + "</b><span>with attachments</span></div></div>" +
+      '<label class="lb">Preview for</label><select class="tx" id="pv">' + ROWS.map(function (o, i) { return '<option value="' + i + '">' + esc(o[H[0]]) + ((MATCH[lowk(o[H[0]])] || {}).name ? " — " + esc(MATCH[lowk(o[H[0]])].name) : "") + "</option>"; }).join("") + '</select><div id="pvb"></div>' +
+      '<div class="tscroll" style="max-height:340px;overflow:auto;margin-top:10px"><table class="mt"><thead><tr><th>User ID</th><th>Name</th><th>Email</th><th>Files</th><th>Status</th></tr></thead><tbody>' + ROWS.map(function (o, i) { var s = st[i], m = MATCH[lowk(o[H[0]])] || {}; return "<tr><td>" + esc(o[H[0]]) + "</td><td>" + esc(m.name || "") + (m.state ? '<div class="muted" style="font-size:11px">' + esc(m.state) + "</div>" : "") + "</td><td>" + esc(m.email || (s.s === "w" ? o[emailCol()] : "") || "—") + "</td><td>" + (s.fs.length ? s.fs.map(function (f) { return esc(f.name); }).join("<br>") + '<div class="muted" style="font-size:11px">' + kb(s.size) + "</div>" : "—") + '</td><td><span class="st ' + s.s + '" id="rs' + i + '">' + esc(s.t) + "</span></td></tr>"; }).join("") + "</tbody></table></div>" +
+      '<div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn sec" id="te">🧪 Send test to me' + (MYEMAIL ? " (" + esc(MYEMAIL) + ")" : "") + '</button><button class="btn pri" id="go"' + (ready ? "" : " disabled") + ">✉️ Send to " + ready + " user" + (ready === 1 ? "" : "s") + '</button></div><div id="prg"></div>' +
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">Emails go only to each user’s registered email (shown masked). The data and files are not stored — only who was sent, when, and the result. Large sends run in batches; keep this screen open until it finishes. Your email service may have a daily sending limit.</div></div>';
+  }
+  function b64(blob) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(",")[1] || ""); }; r.onerror = function () { rej(new Error("Couldn't read a file.")); }; r.readAsDataURL(blob); }); }
+  function itemFor(o) { var fs = filesFor(o), ec = emailCol(); return Promise.all(fs.map(function (f) { return b64(f.blob).then(function (d) { return { name: f.name, b64: d }; }); })).then(function (files) { return { id: o[H[0]], subject: fill(D.subject, o), html: html(o), files: files, fallback: ec ? o[ec] : "" }; }); }
+  function send(test, override, log0, sure) {
+    if (RUN && RUN.on) return;
+    var list = override || (test ? [ROWS[+($("pv") ? $("pv").value : 0)] || ROWS[0]] : ROWS.filter(function (o) { return rowState(o).s !== "b"; }));
+    if (!list.length) return;
+    if (!test && !sure) { sheet("Send personal emails to " + list.length + " user" + (list.length === 1 ? "" : "s") + "?", "Each user gets only their own row and files on their registered email.", [["✉️", "Send now", function () { send(false, override, log0, true); }]]); return; }
+    RUN = { on: true, i: 0, list: list, log: log0 || "", sent: 0, failed: 0, test: test };
+    var prg = $("prg"), paint = function () { var r = RUN; prg.innerHTML = '<div class="pbar"><i style="width:' + Math.round(r.i / r.list.length * 100) + '%"></i></div><div class="row" style="justify-content:space-between;font-size:13px;margin-top:6px"><span>' + (r.on ? "Sending… " : r.paused ? "Paused · " : "Done · ") + r.i + " / " + r.list.length + " · ✅ " + r.sent + (r.failed ? " · ❌ " + r.failed : "") + "</span>" + (r.on ? '<button class="btn ghost sm" id="ps">⏸ Pause</button>' : r.paused ? '<button class="btn pri sm" id="rsm">▶ Resume</button>' : r.failed && !r.test ? '<button class="btn sec sm" id="rt">🔁 Retry failed</button>' : "") + "</div>"; if ($("ps")) $("ps").onclick = function () { RUN.on = false; RUN.paused = true; paint(); }; if ($("rsm")) $("rsm").onclick = function () { RUN.on = true; RUN.paused = false; step(); }; if ($("rt")) $("rt").onclick = retry; };
+    var step = function () {
+      if (!RUN.on) return paint();
+      if (RUN.i >= RUN.list.length) { RUN.on = false; paint(); toast(test ? "Test sent to your email" : "Finished — " + RUN.sent + " sent" + (RUN.failed ? ", " + RUN.failed + " failed" : "")); api({ action: "tl-use", tool: "pmail", kind: "acts" }); return; }
+      var batch = [], size = 0, j = RUN.i;
+      var take = function () { if (j >= RUN.list.length || batch.length >= 5) return Promise.resolve(); return itemFor(RUN.list[j]).then(function (it) { var s = JSON.stringify(it).length; if (batch.length && size + s > 4500000) return; batch.push(it); size += s; j++; return take(); }); };
+      take().then(function () {
+        return api({ action: "pm-send", items: batch, log: RUN.log, test: !!test, allowColumn: !!D.fallback, total: RUN.list.length, subjectTpl: D.subject });
+      }).then(function (r) {
+        if (!r.ok) { RUN.on = false; RUN.paused = true; toast(r.error); return paint(); }
+        RUN.log = r.log; r.results.forEach(function (x) { var idx = ROWS.findIndex(function (o) { return lowk(o[H[0]]) === lowk(x.id); }), el = $("rs" + idx); if (x.status === "sent") RUN.sent++; else RUN.failed++; if (el && !test) { el.className = "st " + (x.status === "sent" ? "s" : "b"); el.textContent = x.status === "sent" ? "✓ Sent" : x.error || x.status; } if (test && x.status !== "sent") toast(x.error || "Test failed"); });
+        RUN.i = j; paint(); setTimeout(step, 250);
+      }).catch(function (e) { RUN.on = false; RUN.paused = true; toast(e.message || "Network error — tap Resume"); paint(); });
+    };
+    paint(); step();
+  }
+  function retry() { var failed = RUN.list.filter(function (o) { var el = $("rs" + ROWS.indexOf(o)); return el && el.className.indexOf(" b") >= 0; }); if (!failed.length) return; var log = RUN.log; RUN = null; send(false, failed, log, true); }
+  function bind() {
+    var on = function (id, fn) { var e = $(id); if (e) e.onclick = fn; };
+    on("xi", importX); on("xt", template); on("fa", addFiles); on("fc", function () { FILES = []; draw(); });
+    var su = $("su"), bo = $("bo"), last = bo;
+    if (su) { su.oninput = function () { D.subject = su.value; sv(); }; su.onfocus = function () { last = su; }; }
+    if (bo) { bo.oninput = function () { D.body = bo.value; sv(); pv(); }; bo.onfocus = function () { last = bo; }; }
+    [].forEach.call(VIEW.querySelectorAll("[data-ph]"), function (p) { p.onclick = function () { var t = "{{" + p.dataset.ph + "}}", e = last || bo, a = e.selectionStart || e.value.length; e.value = e.value.slice(0, a) + t + e.value.slice(e.selectionEnd || a); e.dispatchEvent(new Event("input")); e.focus(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-tg]"), function (t) { t.onclick = function () { D[t.dataset.tg] = !D[t.dataset.tg]; sv(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-co]"), function (t) { t.onclick = function () { var all = H.slice(1).filter(function (c) { return !/^(attachment|attachments|email)$/i.test(c); }); if (!D.cols) D.cols = all.slice(); var i = D.cols.indexOf(t.dataset.co); if (i >= 0) D.cols.splice(i, 1); else D.cols.push(t.dataset.co); draw(); }; });
+    if ($("pv")) { $("pv").onchange = pv; pv(); }
+    on("te", function () { send(true); }); on("go", function () { send(false); });
+  }
+  function pv() { if (!$("pvb") || !ROWS.length) return; var o = ROWS[+$("pv").value] || ROWS[0], s = rowState(o); $("pvb").innerHTML = '<div class="pv"><div style="font-size:12px;color:#888">To: ' + esc((MATCH[lowk(o[H[0]])] || {}).email || (s.s === "w" ? o[emailCol()] : "—")) + "</div><div style=\"font-weight:bold;margin:4px 0 10px\">" + esc(fill(D.subject, o)) + "</div>" + html(o) + (s.fs.length ? '<div style="margin-top:10px;font-size:12.5px">📎 ' + s.fs.map(function (f) { return esc(f.name) + " (" + kb(f.size) + ")"; }).join(", ") + "</div>" : "") + "</div>"; }
+  function logs() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pm-logs" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("pane").innerHTML = r.logs.length ? r.logs.map(function (l) { return '<div class="card" style="cursor:pointer" data-lg="' + l.id + '"><b>' + esc(l.subject || "Personal mail") + '</b><div class="muted" style="font-size:12.5px">' + dt(l.at) + " · by " + esc(l.by) + " · ✅ " + l.sent + " sent" + (l.failed ? " · ❌ " + l.failed + " not sent" : "") + " of " + l.total + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">📋</div>No personal mails sent yet.</div>';
+      [].forEach.call($("pane").querySelectorAll("[data-lg]"), function (c) { c.onclick = function () { api({ action: "pm-log", id: c.dataset.lg }).then(function (x) { if (!x.ok) return toast(x.error); var L = x.log; download(xlsx([{ name: "Delivery", rows: [["User ID", "Name", "Email", "Files", "Status", "Reason", "Time"]].concat(L.rows.map(function (q) { return [q.id, q.name, q.to || "", q.files || 0, q.status, q.error || "", dt(q.at)]; })) }]), "Personal_mail_report_" + istDay(L.at) + ".xlsx"); }); }; });
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

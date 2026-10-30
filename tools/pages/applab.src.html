@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>App usability lab</title>
+<script src="kpi-data.js?v=3"></script>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}@media(max-width:520px){.g3{grid-template-columns:1fr 1fr}}
+.op{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);border-left:5px solid var(--brand)}
+.op h4{margin:0;font-size:15px;display:flex;justify-content:space-between;gap:8px}.op .f{font-family:monospace;font-size:12px;background:#F5F6FB;border-radius:8px;padding:7px 9px;margin-top:6px;white-space:pre-wrap}
+.op .pc{font-size:12.5px;margin-top:6px;line-height:1.45}
+.dg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}.dg div{background:#F5F6FB;border-radius:10px;padding:6px 8px;text-align:center}.dg b{display:block;font-size:16px}.dg span{font-size:11px;color:var(--mut)}
+.rt{width:100%;border-collapse:collapse;font-size:12.5px}.rt th,.rt td{padding:6px 7px;border-bottom:1px solid #EEF0F6;text-align:right;white-space:nowrap}.rt th:first-child,.rt td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.rt th{background:#F5F6FF;font-size:11.5px}
+.rt td small{color:var(--mut);margin-left:4px}.up{color:#13693F}.dn{color:#A12727}
+.best{box-shadow:0 0 0 2px #1E9E61}.chipb{border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;background:#E6F4EA;color:#13693F}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ai{background:linear-gradient(135deg,#F4EEFF,#EEF0FF);border-radius:14px;padding:14px;margin-top:10px}.ai h3{margin:0 0 6px}.ai ul{margin:4px 0 8px;padding-left:18px}.ai li{margin:3px 0;font-size:13.5px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧪</span></div>
+  <h1>App usability lab</h1><p>Compare fair ways to measure Retailer App usability — on sample data, your own file or the dashboard</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), R = [], ST = {}, SRC = "", RES = null, ADV = null, TAB = "data";
+  var C = Object.assign({ min: 5, days: 12, wT: 40, wS: 30, wE: 30, bands: 3, per: "" }, ls("al-cfg") || {});
+  function sv() { ls("al-cfg", C); }
+  var F4 = ["sa", "sp", "an", "av"], FN = { sa: "Scheme announcement", sp: "Scheme payout", an: "Announcements", av: "App visits" };
+  var OPTS = [
+    { id: "CUR", n: "Current method", c: "#8A8FA8", f: "App usability = average of the 4 features of\n  unique retailers who used the feature ÷ eligible retailers (count shared by the state)", pros: "Simple; already in use.", cons: "Denominator comes from the state, so it can be under-reported. Counts virtual / non-selling retailers. Big states with huge bases are pulled down.", game: "high" },
+    { id: "TRB", n: "Transacting retailer base", c: "#415FFF", f: "Base = retailers with ≥ {min} vivo units sold in the month (from DMS / vWork sell-out — not editable by states)\nApp usability = average of the 4 features of\n  users of the feature in the base ÷ retailers in the base", pros: "Removes inactive, virtual and very-low-sales retailers automatically. Disabling IDs or reporting fewer eligible retailers does not change it.", cons: "Needs monthly sell-out per retailer; retailers below the threshold are not pushed to use the app.", game: "none" },
+    { id: "SWU", n: "Sales-weighted usability", c: "#0E9F8E", f: "Same base as above. Each retailer counts by its sell-out units:\nApp usability = average of the 4 features of\n  Σ units of retailers who used the feature ÷ Σ units of all retailers in the base", pros: "A retailer selling 60 units matters more than one selling 6 — measures the share of vivo business that runs through the app. Fair to small states because it is a ratio.", cons: "A state can look good by converting only its top retailers; harder to explain than a count.", game: "none" },
+    { id: "EDI", n: "Engagement depth index", c: "#8E5CF6", f: "For every retailer in the base:\n  engagement = ½ × min(active days ÷ {days}, 1) + ½ × (features used ÷ 4)\nApp usability = average engagement of the base", pros: "Rewards real, repeated use — not a one-time login. Partial credit for partial use, so states improve step by step.", cons: "Needs active-day counts from the app log; slightly more data work.", game: "none" },
+    { id: "PBP", n: "Peer-band percentile", c: "#E69A00", f: "States split into {bands} size bands by base size (small / medium / large)\nScore = percentile of the state's Transacting-base usability within its own band (0–100)", pros: "Small states are compared with small states, big with big — removes the size effect completely; good for rankings.", cons: "Relative, not absolute: a band can be weak as a whole and still score high. Best used for ranking, not targets.", game: "none" },
+    { id: "FBI", n: "Fair blended index", c: "#1E9E61", f: "Score = {wT}% × Transacting base + {wS}% × Sales-weighted + {wE}% × Engagement depth", pros: "Balances coverage (how many), value (how much business) and depth (how well). Hard to game on any single lever.", cons: "Three numbers to explain — share the breakdown with states.", game: "none" }
+  ];
+  var tf = function (s) { return String(s).replace(/\{(\w+)\}/g, function (_, k) { return C[k]; }); };
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); }
+  // ================= data =================
+  function rnd(seed) { var s = seed; return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }
+  function sample() {   // realistic test data: big and small states, virtual and low-sales retailers, unregistered retailers, one state under-reporting eligible
+    var r = rnd(20261030), names = ["Uttar Pradesh", "Maharashtra", "Bihar", "West Bengal", "Rajasthan", "Madhya Pradesh", "Tamil Nadu", "Karnataka", "Gujarat", "Andhra Pradesh", "Telangana", "Odisha", "Kerala", "Jharkhand", "Assam", "Punjab", "Haryana", "Chhattisgarh", "Delhi", "Jammu & Kashmir", "Uttarakhand", "Himachal Pradesh", "Goa", "North East"];
+    var size = [5200, 4300, 3200, 2900, 2600, 2400, 2300, 2100, 1900, 1800, 1500, 1300, 1200, 1100, 900, 850, 800, 700, 600, 450, 380, 300, 160, 260];
+    R = []; ST = {};
+    names.forEach(function (st, i) {
+      var n = size[i], big = Math.min(1, n / 5000), virt = 0.04 + big * 0.2 + r() * 0.06, low = 0.12 + big * 0.25 + r() * 0.1, regRate = 0.62 + r() * 0.36, push = 0.25 + r() * 0.45 + (n < 800 ? 0.08 : 0), hard = /Jammu|North East|Himachal|Uttarakhand|Assam/.test(st) ? 0.75 : 1;
+      var regN = 0;
+      for (var k = 0; k < n; k++) {
+        var isV = r() < virt, isLow = !isV && r() < low, units = isV ? 0 : isLow ? Math.floor(r() * 5) : Math.round(5 + Math.pow(r(), 2.2) * 90), reg = r() < regRate + (units > 30 ? 0.15 : 0);
+        var p = !reg ? 0 : Math.min(0.95, push * hard * (0.55 + Math.min(1, units / 40)) * (isV ? 0.15 : 1)), user = r() < p, days = user ? Math.max(1, Math.round(r() * r() * 26 + 1)) : 0;
+        var f = {}; F4.forEach(function (x, j) { f[x] = user && r() < [0.78, 0.62, 0.55, 0.92][j] * (0.7 + r() * 0.3); });
+        if (reg) regN++;
+        R.push({ state: st, id: st.slice(0, 3).toUpperCase() + k, reg: reg, units: units, virt: isV, days: days, f: f });
+      }
+      var shared = Math.round(regN * (0.85 + r() * 0.1));
+      if (st === "Haryana" || st === "Odisha") shared = Math.round(regN * 0.55);   // under-reported eligible count
+      ST[st] = { elig: shared, total: n };
+    });
+    SRC = "Sample data — " + R.length.toLocaleString("en-IN") + " retailers in " + names.length + " states (2 states under-report eligible retailers)";
+  }
+  function yes(v) { return /^(y|yes|1|true|registered|active)$/i.test(String(v).trim()); }
+  function importX() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; say('<div class="loading"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>");
+      new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); }).then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = XLSX.read(buf, { type: "array" }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" }), col = function (o, re) { var k = Object.keys(o).filter(function (h) { return re.test(h); })[0]; return k == null ? undefined : o[k]; };
+        if (!A.length) throw new Error("No rows in the first sheet.");
+        R = A.map(function (o) { var f = {}; F4.forEach(function (x) { f[x] = yes(col(o, { sa: /announce.*scheme|scheme.*announce/i, sp: /payout/i, an: /^(?!.*scheme).*(announcement|notification)/i, av: /visit|login/i }[x]) || ""); }); var used = F4.some(function (x) { return f[x]; }); var d = +col(o, /active.?days|days/i); return { state: String(col(o, /^state$/i) || "").trim(), id: String(col(o, /retailer.?id|^id$|code/i) || ""), reg: col(o, /registered|on app/i) === undefined ? true : yes(col(o, /registered|on app/i)), units: +String(col(o, /unit|sell.?out|sales/i) || 0).replace(/,/g, "") || 0, virt: yes(col(o, /virtual|no.?shop/i) || ""), days: isFinite(d) && d > 0 ? d : used ? 1 : 0, f: f }; }).filter(function (x) { return x.state; });
+        ST = {}; var S2 = wb.SheetNames[1] ? XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]], { defval: "" }) : [];
+        S2.forEach(function (o) { var s = String(col(o, /^state$/i) || "").trim(); if (s) ST[s] = { elig: +col(o, /eligible/i) || 0, total: +col(o, /total/i) || 0 }; });
+        SRC = "Your file " + f.name + " — " + R.length.toLocaleString("en-IN") + " retailers"; RES = null; ADV = null; run();
+      }).catch(function (e) { say('<div class="err">' + esc(e.message) + "</div>"); });
+    };
+    inp.click();
+  }
+  function fromDash() {
+    say('<div class="loading"><div class="spin"></div>Reading the dashboard data…</div>');
+    KPIDATA.load().then(function (K) {
+      var ms = K.months(), m = C.per && ms.indexOf(C.per) >= 0 ? C.per : ms[ms.length - 1];
+      var nrm = function (s) { return String(s || "").toLowerCase().replace(/\s+/g, " ").trim(); }, PC = { "scheme announcement": "sa", "scheme payout": "sp", "announcement/notifications": "an", "announcements & notifications": "an", "announcements and notifications": "an", "announcement/notification": "an", "app visits": "av", "app visit": "av" }, fm = {};
+      (K.SETUP.fmap || []).forEach(function (x) { var p = PC[nrm(x[1])]; if (p) fm[nrm(x[0])] = p; });
+      var per = {}, rows = K.KE.rows(K.RAW, "app") || [];
+      rows.forEach(function (r) { if (String(r[2]).slice(0, 7) !== m) return; var id = String(r[0]).toUpperCase(), p = per[id] || (per[id] = { d: {}, f: {} }); p.d[r[2]] = 1; p.f[fm[nrm(r[1])] || "av"] = true; });
+      var rids = String(K.SETUP.rids || "").split(",").map(function (x) { return x.trim().toUpperCase(); }).filter(Boolean), all = {};
+      rids.forEach(function (x) { all[x] = 1; }); Object.keys(per).forEach(function (x) { all[x] = 1; });
+      R = Object.keys(all).map(function (id) { var p = per[id]; return { state: K.stateOfRid(id), id: id, reg: true, units: null, virt: false, days: p ? Object.keys(p.d).length : 0, f: p ? p.f : {} }; }).filter(function (x) { return x.state; });
+      ST = {}; var y = +m.slice(0, 4), mo = +m.slice(5, 7), last = m + "-" + String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0"), sp = K.KE.scorePeriod(K.RAW, K.SETUP, m + "-01", last, "Total");
+      (sp.kpi_counts || []).forEach(function (c) { if (c.state) (ST[c.state] = ST[c.state] || { elig: 0, total: 0 }).elig += c.elig || 0; });
+      SRC = "Dashboard data · " + m + " — " + R.length.toLocaleString("en-IN") + " retailers (no sell-out per retailer in the dashboard: the base is all onboarded retailers)"; RES = null; ADV = null; run();
+    }).catch(function (e) { say('<div class="err">' + esc(e.message) + "</div>"); });
+  }
+  function template() { download(xlsx([{ name: "Retailers", rows: [["State", "Retailer ID", "Registered on app", "Monthly sell-out units", "Virtual / no shop", "Active days in app (30 days)", "Scheme announcement used", "Scheme payout used", "Announcements used", "App visits"], ["Punjab", "PB1001", "Y", "24", "N", "9", "Y", "Y", "N", "Y"], ["Punjab", "PB1002", "N", "3", "N", "0", "N", "N", "N", "N"], ["Uttarakhand", "UK2001", "Y", "11", "N", "4", "Y", "N", "Y", "Y"]] }, { name: "States", rows: [["State", "Eligible retailers (shared by state)", "Total retailers (DMS)"], ["Punjab", "820", "850"], ["Uttarakhand", "350", "380"]] }]), "App_usability_sample_template.xlsx"); }
+  // ================= engine =================
+  function pear(x, y) { var n = x.length; if (n < 3) return 0; var mx = x.reduce(function (a, b) { return a + b; }, 0) / n, my = y.reduce(function (a, b) { return a + b; }, 0) / n, sxy = 0, sx = 0, sy = 0; for (var i = 0; i < n; i++) { sxy += (x[i] - mx) * (y[i] - my); sx += (x[i] - mx) * (x[i] - mx); sy += (y[i] - my) * (y[i] - my); } return sx && sy ? sxy / Math.sqrt(sx * sy) : 0; }
+  function compute(R0, ST0) {
+    var by = {}; R0.forEach(function (r) { (by[r.state] = by[r.state] || []).push(r); });
+    var noSales = R0.every(function (r) { return r.units == null; });
+    var out = {};
+    Object.keys(by).forEach(function (st) {
+      var L = by[st], reg = L.filter(function (r) { return r.reg; }), elig = (ST0[st] && ST0[st].elig) || reg.length || L.length;
+      var base = noSales ? reg : L.filter(function (r) { return !r.virt && (r.units || 0) >= C.min; }), U = base.reduce(function (a, r) { return a + (r.units || 0); }, 0);
+      var avg = function (fn) { return F4.reduce(function (a, f) { return a + fn(f); }, 0) / 4; };
+      var cur = Math.min(100, avg(function (f) { return L.filter(function (r) { return r.f[f]; }).length / elig; }) * 100);
+      var trb = base.length ? avg(function (f) { return base.filter(function (r) { return r.f[f]; }).length / base.length; }) * 100 : 0;
+      var swu = U ? avg(function (f) { return base.filter(function (r) { return r.f[f]; }).reduce(function (a, r) { return a + (r.units || 0); }, 0) / U; }) * 100 : trb;
+      var edi = base.length ? base.reduce(function (a, r) { var k = F4.filter(function (f) { return r.f[f]; }).length; return a + 0.5 * Math.min(1, (r.days || 0) / C.days) + 0.5 * k / 4; }, 0) / base.length * 100 : 0;
+      out[st] = { st: st, n: L.length, base: base.length, reg: reg.length, elig: elig, total: (ST0[st] && ST0[st].total) || L.length, CUR: cur, TRB: trb, SWU: swu, EDI: edi };
+    });
+    var S = Object.keys(out).map(function (k) { return out[k]; }).sort(function (a, b) { return a.base - b.base; }), nb = Math.max(1, Math.min(C.bands, S.length)), per = Math.ceil(S.length / nb);
+    S.forEach(function (s, i) { s.band = Math.floor(i / per); });
+    S.forEach(function (s) { var g = S.filter(function (x) { return x.band === s.band; }); var below = g.filter(function (x) { return x.TRB < s.TRB; }).length, eq = g.filter(function (x) { return x.TRB === s.TRB; }).length; s.PBP = g.length > 1 ? (below + (eq - 1) / 2) / (g.length - 1) * 100 : 50; s.FBI = (C.wT * s.TRB + C.wS * s.SWU + C.wE * s.EDI) / Math.max(1, C.wT + C.wS + C.wE); });
+    OPTS.forEach(function (o) { S.slice().sort(function (a, b) { return b[o.id] - a[o.id]; }).forEach(function (s, i) { s["r" + o.id] = i + 1; }); });
+    return { states: S, noSales: noSales };
+  }
+  function run() {
+    if (!R.length) return;
+    var A = compute(R, ST);
+    // gaming tests: (1) a state reports 25% fewer eligible retailers; (2) a state disables 30% of its non-using registered IDs
+    var game = {}; OPTS.forEach(function (o) { game[o.id] = 0; });
+    var g1 = {}; Object.keys(ST).forEach(function (k) { g1[k] = { elig: Math.round((ST[k].elig || 0) * 0.75), total: ST[k].total }; });
+    var B1 = compute(R, Object.keys(g1).length ? g1 : (function () { var x = {}; A.states.forEach(function (s) { x[s.st] = { elig: Math.round(s.reg * 0.75), total: s.total }; }); return x; })());
+    var drop = {}; var R2 = R.map(function (r, i) { if (r.reg && !F4.some(function (f) { return r.f[f]; }) && (i % 10) < 3) { return Object.assign({}, r, { reg: false }); } return r; });
+    var B2 = compute(R2, ST);
+    OPTS.forEach(function (o) { var d1 = 0, d2 = 0, n = 0; A.states.forEach(function (s) { var a = B1.states.filter(function (x) { return x.st === s.st; })[0], b = B2.states.filter(function (x) { return x.st === s.st; })[0]; if (!a || !b || !s[o.id]) return; d1 += Math.abs(a[o.id] - s[o.id]) / Math.max(1, s[o.id]); d2 += Math.abs(b[o.id] - s[o.id]) / Math.max(1, s[o.id]); n++; }); game[o.id] = n ? Math.round(Math.max(d1, d2) / n * 1000) / 10 : 0; });
+    var diag = {}; OPTS.forEach(function (o) {
+      var xs = A.states.map(function (s) { return Math.log(Math.max(1, s.total)); }), ys = A.states.map(function (s) { return s[o.id]; }), mu = ys.reduce(function (a, b) { return a + b; }, 0) / ys.length, sd = Math.sqrt(ys.reduce(function (a, b) { return a + (b - mu) * (b - mu); }, 0) / ys.length);
+      var mv = A.states.reduce(function (a, s) { return a + Math.abs(s["r" + o.id] - s.rCUR); }, 0) / A.states.length;
+      diag[o.id] = { bias: Math.round(pear(xs, ys) * 100) / 100, game: game[o.id], avg: Math.round(mu * 10) / 10, sd: Math.round(sd * 10) / 10, moves: Math.round(mv * 10) / 10 };
+    });
+    RES = { states: A.states, diag: diag, noSales: A.noSales }; TAB = "res"; say(""); draw();
+  }
+  // ================= UI =================
+  function say(t) { if ($("prog")) $("prog").innerHTML = t; }
+  var r1 = function (v) { return Math.round((+v || 0) * 10) / 10; };
+  function draw() {
+    var h = '<div class="seg" style="overflow-x:auto">' + [["data", "📥 Data"], ["opts", "📐 Formulas"], ["res", "📊 Compare"], ["ai", "✨ AI advice"]].map(function (t) { return '<button data-tb="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="prog"></div><div id="pane"></div>';
+    VIEW.innerHTML = h; [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    ({ data: pData, opts: pOpts, res: pRes, ai: pAI })[TAB]();
+  }
+  function pData() {
+    $("pane").innerHTML = '<div class="card"><h3 style="margin:0 0 4px">Choose the data</h3><div class="muted" style="font-size:12.5px">The lab calculates every formula on the same retailers so you can compare them side by side.</div>' +
+      '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri sm" id="d1">🎲 Use sample data</button><button class="btn sec sm" id="d2">📥 Upload my sample (Excel)</button><button class="btn sec sm" id="d3">📊 Use dashboard data</button><button class="btn ghost sm" id="d4">⬇ Template</button></div>' +
+      (SRC ? '<div class="notice info" style="margin-top:10px">' + esc(SRC) + "</div>" : "") +
+      '<div class="muted" style="font-size:12px;margin-top:10px">Best results: one row per retailer with State, Retailer ID, Registered on app, Monthly sell-out units (from DMS / vWork), Virtual / no shop, Active days in app, and Y/N for the 4 features. Optional second sheet “States” with the eligible count each state shared and the total retailers in DMS.</div></div>' +
+      '<div class="card"><h3 style="margin:0 0 4px">Settings</h3><div class="g3"><div><label class="lb">Min. units a month to count a retailer</label><input class="tx" type="number" id="c1" value="' + C.min + '"></div><div><label class="lb">Active days for full credit</label><input class="tx" type="number" id="c2" value="' + C.days + '"></div><div><label class="lb">Size bands</label><input class="tx" type="number" id="c3" value="' + C.bands + '"></div></div>' +
+      '<label class="lb">Blend weights (Transacting / Sales-weighted / Depth %)</label><div class="g3"><input class="tx" type="number" id="w1" value="' + C.wT + '"><input class="tx" type="number" id="w2" value="' + C.wS + '"><input class="tx" type="number" id="w3" value="' + C.wE + '"></div>' +
+      (R.length ? '<button class="btn pri block" id="rr" style="margin-top:12px">🔄 Recalculate</button>' : "") + "</div>";
+    $("d1").onclick = function () { sample(); RES = null; ADV = null; run(); }; $("d2").onclick = importX; $("d3").onclick = fromDash; $("d4").onclick = template;
+    [["c1", "min"], ["c2", "days"], ["c3", "bands"], ["w1", "wT"], ["w2", "wS"], ["w3", "wE"]].forEach(function (x) { $(x[0]).onchange = function () { C[x[1]] = Math.max(0, +$(x[0]).value || 0); sv(); }; });
+    if ($("rr")) $("rr").onclick = function () { ADV = null; run(); };
+  }
+  function pOpts() {
+    $("pane").innerHTML = '<div class="muted" style="font-size:12.5px;margin:4px 2px">Every formula is open and rule-based — each state can recalculate its own number. All results are 0–100.</div>' + OPTS.map(function (o) { var d = RES && RES.diag[o.id]; return '<div class="op' + (ADV && ADV.best === o.id ? " best" : "") + '" style="border-left-color:' + o.c + '"><h4><span>' + esc(o.n) + (o.id === "CUR" ? "" : ' <small class="muted">· option ' + OPTS.indexOf(o) + "</small>") + "</span>" + (ADV && ADV.best === o.id ? '<span class="chipb">✨ AI pick</span>' : "") + '</h4><div class="f">' + esc(tf(o.f)) + '</div><div class="pc">✅ ' + esc(o.pros) + "<br>⚠️ " + esc(o.cons) + "<br>🛡️ Can a state game it? <b>" + (o.game === "high" ? "Yes — by sharing a smaller eligible count" : "No — the base comes from system data") + "</b></div>" + (d ? '<div class="dg"><div><b>' + d.bias + "</b><span>size bias (0 = fair)</span></div><div><b>" + d.game + "%</b><span>change if gamed</span></div><div><b>" + d.moves + "</b><span>avg rank move vs now</span></div></div>" : "") + "</div>"; }).join("");
+  }
+  function pRes() {
+    if (!RES) { $("pane").innerHTML = '<div class="card empty"><div class="big">📊</div>Choose data first (sample, your file or the dashboard).</div>'; return; }
+    var S = RES.states.slice().sort(function (a, b) { return b.total - a.total; }), D = RES.diag;
+    var fair = OPTS.slice(1).map(function (o) { return [o, Math.abs(D[o.id].bias) + D[o.id].game / 10]; }).sort(function (a, b) { return a[1] - b[1]; })[0][0];
+    var h = (RES.noSales ? '<div class="warnb">The dashboard has no sell-out per retailer, so the “transacting base” here is all onboarded retailers. Upload a sample with sell-out units to see the real effect.</div>' : "") +
+      '<div class="card"><h3 style="margin:0 0 6px">Fairness at a glance</h3><div class="tscroll"><table class="rt"><thead><tr><th>Formula</th><th>PAN avg</th><th>Spread</th><th>Size bias</th><th>Gaming effect</th><th>Rank moves</th></tr></thead><tbody>' + OPTS.map(function (o) { var d = D[o.id]; return '<tr><td><b style="color:' + o.c + '">●</b> ' + esc(o.n) + (o === fair ? ' <span class="chipb">fairest by numbers</span>' : "") + "</td><td>" + d.avg + "</td><td>" + d.sd + '</td><td class="' + (Math.abs(d.bias) > 0.35 ? "dn" : "up") + '">' + d.bias + '</td><td class="' + (d.game > 3 ? "dn" : "up") + '">' + d.game + "%</td><td>" + d.moves + "</td></tr>"; }).join("") + '</tbody></table></div><div class="muted" style="font-size:11.5px;margin-top:6px">Size bias: correlation between a state’s score and its size (−1…1, near 0 = small and big states treated alike). Gaming effect: average change in score when a state reports 25% fewer eligible retailers or disables 30% of its idle IDs (0% = can’t be gamed).</div></div>' +
+      '<div class="card"><h3 style="margin:0 0 6px">State scores and ranks</h3><div class="muted" style="font-size:12px">Largest states first. Small number = rank; green/red = rank move vs the current method.</div><div class="tscroll" style="margin-top:6px"><table class="rt"><thead><tr><th>State</th><th>Retailers</th><th>Base</th>' + OPTS.map(function (o) { return '<th style="color:' + o.c + '">' + o.id + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      S.map(function (s) { return "<tr><td>" + esc(s.st) + "</td><td>" + s.total.toLocaleString("en-IN") + "</td><td>" + s.base.toLocaleString("en-IN") + "</td>" + OPTS.map(function (o) { var mv = s.rCUR - s["r" + o.id]; return "<td>" + r1(s[o.id]) + "<small>#" + s["r" + o.id] + "</small>" + (o.id !== "CUR" && mv ? '<small class="' + (mv > 0 ? "up" : "dn") + '">' + (mv > 0 ? "▲" : "▼") + Math.abs(mv) + "</small>" : "") + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>" +
+      '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="ex">⬇ Export comparison (Excel)</button><button class="btn pri sm" id="ga">✨ Ask AI which is best</button></div></div>' +
+      '<div class="card"><h3 style="margin:0 0 6px">Small vs big states</h3><div id="ch"></div></div>';
+    $("pane").innerHTML = h;
+    var groups = [["Small", S.slice(-Math.ceil(S.length / 3))], ["Medium", S.slice(Math.ceil(S.length / 3), S.length - Math.ceil(S.length / 3))], ["Large", S.slice(0, Math.ceil(S.length / 3))]];
+    $("ch").innerHTML = gbars(groups.map(function (g) { return g[0] + " states"; }), OPTS.map(function (o) { return { name: o.id, color: o.c, values: groups.map(function (g) { return g[1].length ? r1(g[1].reduce(function (a, s) { return a + s[o.id]; }, 0) / g[1].length) : 0; }) }; })) + '<div class="muted" style="font-size:11.5px">Average score per size group. A fair formula keeps the bars of a colour at a similar height across the groups.</div>';
+    $("ex").onclick = exportX; $("ga").onclick = function () { TAB = "ai"; draw(); };
+  }
+  function gbars(labels, series) {   // grouped columns
+    var W = 360, Hh = 200, pb = 24, pt = 14, max = Math.max(1, Math.max.apply(null, [].concat.apply([], series.map(function (x) { return x.values; })))), gw = W / labels.length, bw = (gw - 16) / series.length, g = '<svg viewBox="0 0 ' + W + " " + (Hh + 18) + '" style="width:100%">';
+    labels.forEach(function (l, i) { series.forEach(function (x, j) { var v = x.values[i], bh = (Hh - pb - pt) * v / max, xx = i * gw + 8 + j * bw; g += '<rect x="' + xx + '" y="' + (Hh - pb - bh) + '" width="' + (bw - 2) + '" height="' + bh + '" rx="2" fill="' + x.color + '"/><text x="' + (xx + bw / 2 - 1) + '" y="' + (Hh - pb - bh - 3) + '" font-size="7" text-anchor="middle" fill="#555">' + Math.round(v) + "</text>"; }); g += '<text x="' + (i * gw + gw / 2) + '" y="' + (Hh - 8) + '" font-size="10" text-anchor="middle" fill="#333" font-weight="700">' + esc(l) + "</text>"; });
+    g += series.map(function (x, j) { return '<rect x="' + (j * 58 + 4) + '" y="' + (Hh + 6) + '" width="9" height="9" fill="' + x.color + '"/><text x="' + (j * 58 + 16) + '" y="' + (Hh + 14) + '" font-size="9" fill="#333">' + x.name + "</text>"; }).join("");
+    return g + "</svg>";
+  }
+  function exportX() {
+    var S = RES.states, D = RES.diag;
+    download(xlsx([{ name: "Comparison", rows: [["State", "Retailers", "Registered", "Eligible (shared)", "Transacting base"].concat([].concat.apply([], OPTS.map(function (o) { return [o.n + " score", o.n + " rank"]; })))].concat(S.map(function (s) { return [s.st, s.total, s.reg, s.elig, s.base].concat([].concat.apply([], OPTS.map(function (o) { return [r1(s[o.id]), s["r" + o.id]]; }))); })) },
+      { name: "Fairness", rows: [["Formula", "PAN average", "Spread", "Size bias", "Gaming effect %", "Avg rank move"]].concat(OPTS.map(function (o) { var d = D[o.id]; return [o.n, d.avg, d.sd, d.bias, d.game, d.moves]; })) },
+      { name: "Formulas", rows: [["Formula", "How it is calculated", "Pros", "Cons"]].concat(OPTS.map(function (o) { return [o.n, tf(o.f), o.pros, o.cons]; })) }].concat(ADV ? [{ name: "AI advice", rows: [["Best", ADV.title || ADV.best], ["How", ADV.how]].concat(ADV.why.map(function (x) { return ["Why", x]; })).concat(ADV.risks.map(function (x) { return ["Risk", x]; })).concat(ADV.rollout.map(function (x) { return ["Rollout", x]; })) }] : [])), "App_usability_formulas_" + istDay(Date.now()) + ".xlsx");
+  }
+  function pAI() {
+    if (!RES) { $("pane").innerHTML = '<div class="card empty"><div class="big">✨</div>Run the comparison first.</div>'; return; }
+    var show = function () {
+      var o = OPTS.filter(function (x) { return x.id === ADV.best; })[0];
+      $("pane").innerHTML = '<div class="ai"><h3>✨ Recommended: ' + esc(ADV.title || (o ? o.n : ADV.best)) + "</h3>" + (ADV.how ? '<div style="font-size:13.5px"><b>How:</b> ' + esc(ADV.how) + "</div>" : "") + "<h4 style=\"margin:10px 0 2px\">Why</h4><ul>" + ADV.why.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" +
+        (ADV.data.length ? "<h4 style=\"margin:6px 0 2px\">Data needed</h4><ul>" + ADV.data.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") + (ADV.risks.length ? "<h4 style=\"margin:6px 0 2px\">Watch out</h4><ul>" + ADV.risks.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
+        (ADV.rollout.length ? "<h4 style=\"margin:6px 0 2px\">Rollout</h4><ul>" + ADV.rollout.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") + (ADV.tweaks.length ? "<h4 style=\"margin:6px 0 2px\">Fine-tuning</h4><ul>" + ADV.tweaks.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
+        (ADV.verdicts.length ? "<h4 style=\"margin:6px 0 2px\">Each option</h4><ul>" + ADV.verdicts.map(function (x) { var q = OPTS.filter(function (y) { return y.id === x.id; })[0]; return "<li><b>" + esc(q ? q.n : x.id) + ":</b> " + esc(x.v) + "</li>"; }).join("") + "</ul>" : "") +
+        '<div class="row"><button class="btn ghost sm" id="ag">🔄 Ask again</button><button class="btn sec sm" id="ex2">⬇ Export with advice</button></div><div class="muted" style="font-size:11.5px;margin-top:6px">AI only reads the comparison numbers above — check them before deciding.</div></div>';
+      $("ag").onclick = function () { ADV = null; ask(true); }; $("ex2").onclick = exportX;
+    };
+    var ask = function (fresh) {
+      $("pane").innerHTML = '<div class="loading"><div class="spin"></div>AI is comparing the formulas…</div>';
+      var S = RES.states, pack = { source: SRC, settings: { min_units: C.min, full_credit_days: C.days, bands: C.bands, blend: [C.wT, C.wS, C.wE] }, options: OPTS.map(function (o) { return { id: o.id, name: o.n, formula: tf(o.f), state_can_game: o.game, diagnostics: RES.diag[o.id] }; }), states: S.map(function (s) { var x = { state: s.st, retailers: s.total, base: s.base, eligible_shared: s.elig }; OPTS.forEach(function (o) { x[o.id] = r1(s[o.id]); }); return x; }) };
+      api({ action: "ds-ua", data: JSON.stringify(pack), fresh: !!fresh }).then(function (r) { if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ADV = r.advice; show(); api({ action: "tl-use", tool: "applab", kind: "acts" }); });
+    };
+    if (ADV) show(); else ask(false);
+  }
+  load();
+})();
+</script>
+</body>
+</html>

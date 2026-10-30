@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Personal mailer</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.stp{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:800;margin:0 0 6px}.stp i{font-style:normal;width:26px;height:26px;border-radius:99px;background:var(--brand);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.stp.ok i{background:#1E9E61}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.ph{display:inline-block;background:#EEF0FF;color:#2B33A6;border-radius:6px;padding:1px 6px;font-size:11.5px;margin:2px;cursor:pointer;font-family:monospace}
+.mt{width:100%;border-collapse:collapse;font-size:12.5px}.mt th,.mt td{padding:6px 7px;border-bottom:1px solid #EEF0F6;text-align:left;vertical-align:top}.mt th{background:#F5F6FF;font-size:11.5px}
+.st{border-radius:99px;padding:2px 8px;font-size:11px;font-weight:700;white-space:nowrap}.st.ok{background:#E6F4EA;color:#13693F}.st.w{background:#FFF4E5;color:#8A5A00}.st.b{background:#FDECEC;color:#A12727}.st.s{background:#EEF0FF;color:#2B33A6}
+.pbar{height:10px;border-radius:99px;background:#EEF0F6;overflow:hidden;margin-top:8px}.pbar i{display:block;height:100%;background:linear-gradient(90deg,#415FFF,#1E9E61);transition:width .3s}
+.pv{border:1px solid #E3E5EF;border-radius:12px;padding:12px;background:#fff;margin-top:8px;font:14px/1.5 Arial,sans-serif;max-height:420px;overflow:auto}
+.tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}@media(max-width:520px){.tiles4{grid-template-columns:1fr 1fr}}.tiles4 div{background:#F5F6FB;border-radius:12px;padding:9px;text-align:center}.tiles4 b{display:block;font-size:20px}.tiles4 span{font-size:11.5px;color:var(--mut)}
+textarea.tx{min-height:120px}
+</style>
+<script src="theme.js?v=6"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=1"></script>
+<script src="cust.js?v=64"></script>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">✉️</span></div>
+  <h1>Personal mailer</h1><p>Each user gets only their own row and their own files — on their registered email, in one click</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), H = [], ROWS = [], IDC = 0, FILES = [], MATCH = {}, READY = false, MYEMAIL = "", RUN = null, TAB = "new";
+  var D = Object.assign({ subject: "Your {{" + "Month" + "}} details — vivo BI", body: "Dear {{Name}},\n\nPlease find your details below and your file attached.\n\nRegards,\nHO BI team", table: true, cols: null, fallback: false, attCol: "", sheet: 0 }, ls("pm-draft") || {});
+  function sv() { ls("pm-draft", { subject: D.subject, body: D.body, table: D.table, fallback: D.fallback }); }
+  var XL = null; function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); })); }
+  var ZP = null; function zp() { return ZP || (ZP = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/jszip.min.js"; s.onload = res; s.onerror = function () { ZP = null; rej(new Error("Couldn't load the ZIP reader.")); }; document.head.appendChild(s); })); }
+  var kb = function (n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; };
+  var lowk = function (s) { return String(s || "").trim().toLowerCase(); };
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    if (!ADMIN) { VIEW.innerHTML = '<div class="err">This tool is for HO admins.</div>'; return; }
+    api({ action: "pm-match", ids: [] }).then(function (r) { if (r.ok) { READY = r.emailReady; MYEMAIL = r.myEmail; } draw(); });
+  }
+  function draw() {
+    var h = '<div class="seg"><button data-tb="new" class="' + (TAB === "new" ? "on" : "") + '">✉️ New send</button><button data-tb="log" class="' + (TAB === "log" ? "on" : "") + '">📋 Sent log</button></div><div id="pane"></div>';
+    VIEW.innerHTML = h; [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    if (TAB === "log") return logs();
+    var p = $("pane"), ok1 = ROWS.length > 0, ok2 = FILES.length > 0, users = ROWS.length;
+    var x = (!READY ? '<div class="warnb">Email isn’t set up on the server yet (Brevo key) — you can prepare and preview, but sending will fail.</div>' : "") +
+      '<div class="card"><div class="stp' + (ok1 ? " ok" : "") + '"><i>1</i>Import the Excel matrix</div><div class="muted" style="font-size:12.5px">First column = user ID (username, vChat ID, email or mobile of a state or admin user). Every other column is yours — any headings. Optional column <b>Attachment</b> with file names; optional <b>Email</b> column used only if you allow it below.</div>' +
+      '<div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="xi">📥 Import Excel / CSV</button><button class="btn ghost sm" id="xt">⬇ Template</button></div>' +
+      (ok1 ? '<div class="sum" style="margin-top:8px;background:#EEF0FF;border-radius:10px;padding:8px 10px;font-size:13px">✅ ' + users + " users · " + H.length + " columns: " + H.map(esc).join(", ") + "</div>" : "") + "</div>" +
+      '<div class="card"><div class="stp' + (ok2 ? " ok" : "") + '"><i>2</i>Add each user’s attachments <span class="muted" style="font-weight:500;font-size:12px">(optional)</span></div><div class="muted" style="font-size:12.5px">Pick all the files at once (PDF, picture, Excel, Word…) or one ZIP. A file goes to the user whose ID is its name — e.g. <b>VC1234.pdf</b>, <b>VC1234_payslip.pdf</b> — or whose Attachment column names it. A user can have several files (max about 4 MB per user).</div>' +
+      '<div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="fa">📎 Add files or ZIP</button>' + (FILES.length ? '<button class="btn ghost sm" id="fc">Clear ' + FILES.length + " files</button>" : "") + "</div>" + (FILES.length ? '<div class="muted" style="font-size:12.5px;margin-top:6px">' + FILES.length + " files · " + kb(FILES.reduce(function (a, f) { return a + f.size; }, 0)) + (unmatched().length ? ' · <b style="color:#A12727">' + unmatched().length + " not matched to anyone:</b> " + unmatched().slice(0, 6).map(function (f) { return esc(f.name); }).join(", ") : " · all matched") + "</div>" : "") + "</div>" +
+      '<div class="card"><div class="stp' + (D.subject && D.body ? " ok" : "") + '"><i>3</i>Write the email</div><div class="muted" style="font-size:12px">Tap a column to insert it: ' + ["Name"].concat(H.slice(1)).filter(function (c, i, a) { return a.indexOf(c) === i; }).map(function (c) { return '<span class="ph" data-ph="' + esc(c) + '">{{' + esc(c) + "}}</span>"; }).join("") + " — {{Name}} is the registered name.</div>" +
+      '<label class="lb">Subject</label><input class="tx" id="su" value="' + esc(D.subject) + '"><label class="lb">Message</label><textarea class="tx" id="bo">' + esc(D.body) + "</textarea>" +
+      '<div class="fx" style="margin-top:8px"><span data-tg="table" class="' + (D.table ? "on" : "") + '">' + (D.table ? "✓ " : "") + "Add a table of the user’s row</span><span data-tg=\"fallback\" class=\"" + (D.fallback ? "on" : "") + '">' + (D.fallback ? "✓ " : "") + "Use the Email column when a user has no registered email</span></div>" +
+      (D.table && H.length > 1 ? '<label class="lb">Columns in the table</label><div class="fx">' + H.slice(1).filter(function (c) { return !/^(attachment|attachments|email)$/i.test(c); }).map(function (c) { var on = !D.cols || D.cols.indexOf(c) >= 0; return '<span data-co="' + esc(c) + '" class="' + (on ? "on" : "") + '">' + esc(c) + "</span>"; }).join("") + "</div>" : "") + "</div>" +
+      (ok1 ? checkCard() : "");
+    p.innerHTML = x; bind();
+  }
+  // ---------- step 1: Excel ----------
+  function importX() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+    inp.onchange = function () {
+      var f = inp.files[0]; if (!f) return; toast("Reading " + f.name + "…");
+      xl().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = XLSX.read(buf, { type: "array" }), ws = wb.Sheets[wb.SheetNames[0]], A = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); });
+        if (A.length < 2) throw new Error("The sheet needs a header row and at least one user.");
+        H = A[0].map(function (h, i) { return String(h).trim() || "Column " + (i + 1); });
+        var seen = {}; ROWS = A.slice(1).map(function (r) { var o = {}; H.forEach(function (h, i) { o[h] = String(r[i] == null ? "" : r[i]).trim(); }); return o; }).filter(function (o) { var id = lowk(o[H[0]]); if (!id || seen[id]) return false; seen[id] = 1; return true; });
+        if (A.length - 1 !== ROWS.length) toast((A.length - 1 - ROWS.length) + " empty or repeated user ID row(s) skipped");
+        D.cols = null; MATCH = {};
+        return api({ action: "pm-match", ids: ROWS.map(function (o) { return o[H[0]]; }) });
+      }).then(function (r) { if (r && r.ok) { READY = r.emailReady; MYEMAIL = r.myEmail; r.users.forEach(function (u) { MATCH[lowk(u.id)] = u; }); } else if (r) toast(r.error); draw(); }).catch(function (e) { toast(e.message); });
+    };
+    inp.click();
+  }
+  function template() { download(xlsx([{ name: "Users", rows: [["User ID", "Month", "Target", "Achieved", "Payout (₹)", "Remarks", "Attachment", "Email"], ["VC1234", "October 2026", "120", "134", "8,400", "Well done", "VC1234_payslip.pdf", ""], ["ravi.kumar", "October 2026", "90", "71", "3,550", "Push V60 EMI", "", ""]] }, { name: "How to", rows: [["Column A must be the user ID (username, vChat ID, email or mobile). Other columns can be anything."], ["Attachment (optional): file name(s) separated by commas. Or simply name each file with the user ID, e.g. VC1234.pdf."], ["Email (optional): used only if you allow it and the user has no registered email."]] }]), "Personal_mailer_template.xlsx"); }
+  // ---------- step 2: files ----------
+  function addFiles() {
+    var inp = document.createElement("input"); inp.type = "file"; inp.multiple = true;
+    inp.onchange = function () {
+      var list = [].slice.call(inp.files || []); if (!list.length) return;
+      list.reduce(function (p, f) { return p.then(function () {
+        if (/\.zip$/i.test(f.name)) return zp().then(function () { return window.JSZip.loadAsync(f); }).then(function (z) { var jobs = []; z.forEach(function (path, e) { if (e.dir || /(^|\/)(__MACOSX|\.)/.test(path)) return; jobs.push(e.async("blob").then(function (b) { FILES.push({ name: path.split("/").pop(), size: b.size, blob: b }); })); }); return Promise.all(jobs); });
+        FILES.push({ name: f.name, size: f.size, blob: f });
+      }); }, Promise.resolve()).then(function () { var seen = {}; FILES = FILES.filter(function (x) { var k = lowk(x.name); return seen[k] ? false : (seen[k] = 1); }); draw(); }).catch(function (e) { toast(e.message); });
+    };
+    inp.click();
+  }
+  function attCol() { return H.filter(function (h) { return /^attachments?$|^files?$|^file names?$/i.test(h); })[0] || ""; }
+  function emailCol() { return H.filter(function (h) { return /^e-?mail( id)?$/i.test(h); })[0] || ""; }
+  function filesFor(o) {
+    var id = lowk(o[H[0]]), ac = attCol(), named = ac ? String(o[ac] || "").split(/[,;\n]+/).map(lowk).filter(Boolean) : [];
+    return FILES.filter(function (f) { var n = lowk(f.name), base = n.replace(/\.[^.]+$/, ""); return named.indexOf(n) >= 0 || named.indexOf(base) >= 0 || base === id || (base.indexOf(id) === 0 && /^[\s_.\-()]/.test(base.slice(id.length))); });
+  }
+  function unmatched() { if (!ROWS.length) return FILES; var used = {}; ROWS.forEach(function (o) { filesFor(o).forEach(function (f) { used[lowk(f.name)] = 1; }); }); return FILES.filter(function (f) { return !used[lowk(f.name)]; }); }
+  // ---------- step 3: email ----------
+  function fill(tpl, o) { var m = MATCH[lowk(o[H[0]])] || {}; return String(tpl || "").replace(/\{\{\s*([^}]+?)\s*\}\}/g, function (_, k) { if (lowk(k) === "name" && !H.some(function (h) { return lowk(h) === "name"; })) return m.name || o[H[0]]; var h = H.filter(function (x) { return lowk(x) === lowk(k); })[0]; return h ? o[h] : ""; }); }
+  function html(o) {
+    var e = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+    var cols = H.slice(1).filter(function (c) { return !/^(attachment|attachments|email)$/i.test(c) && (!D.cols || D.cols.indexOf(c) >= 0); });
+    var tb = D.table && cols.length ? '<table style="border-collapse:collapse;margin:14px 0;font:14px Arial,sans-serif;min-width:300px">' + cols.map(function (c, i) { return '<tr style="background:' + (i % 2 ? "#ffffff" : "#F5F6FB") + '"><td style="padding:8px 12px;border:1px solid #E3E5EF;color:#555;font-weight:bold">' + e(c) + '</td><td style="padding:8px 12px;border:1px solid #E3E5EF;color:#111">' + e(o[c]) + "</td></tr>"; }).join("") + "</table>" : "";
+    var body = e(fill(D.body, o)).replace(/\n/g, "<br>"), parts = body.split(/<br><br>/);
+    var withTable = parts.length > 1 ? parts.slice(0, -1).join("<br><br>") + tb + parts[parts.length - 1] : body + tb;
+    return '<div style="font:14px/1.6 Arial,sans-serif;color:#222">' + withTable + '<p style="font-size:11px;color:#888;margin-top:18px">This email is personal and confidential — it was sent only to you from the vivo BI tools.</p></div>';
+  }
+  // ---------- step 4: check + send ----------
+  function rowState(o) {
+    var m = MATCH[lowk(o[H[0]])], fs = filesFor(o), size = fs.reduce(function (a, f) { return a + f.size; }, 0), ec = emailCol(), fb = D.fallback && ec && /@/.test(o[ec] || "");
+    if (size > 4.2 * 1048576) return { s: "b", t: "Files too large", fs: fs, size: size };
+    if (!m || !m.found) return fb ? { s: "w", t: "Not registered — Email column", fs: fs, size: size } : { s: "b", t: "Not a registered user", fs: fs, size: size };
+    if (m.disabled) return { s: "b", t: "User disabled", fs: fs, size: size };
+    if (!m.hasEmail) return fb ? { s: "w", t: "Email column", fs: fs, size: size } : { s: "b", t: "No registered email", fs: fs, size: size };
+    var key = (m.app || "") + "|" + lowk(m.name) + "|" + m.email, dup = ROWS.filter(function (x) { var q = MATCH[lowk(x[H[0]])]; return q && q.found && (q.app || "") + "|" + lowk(q.name) + "|" + q.email === key; });
+    if (dup.length > 1 && dup[0] !== o) return { s: "w", t: "Same user as " + dup[0][H[0]] + " — gets a 2nd email", fs: fs, size: size };
+    if (attCol() && String(o[attCol()] || "").trim() && !fs.length) return { s: "w", t: "File named in sheet not found", fs: fs, size: size };
+    return { s: "ok", t: "Ready", fs: fs, size: size };
+  }
+  function checkCard() {
+    var st = ROWS.map(rowState), ready = st.filter(function (x) { return x.s !== "b"; }).length, withF = st.filter(function (x) { return x.fs.length; }).length, P = ROWS[0];
+    return '<div class="card"><div class="stp"><i>4</i>Check and send</div><div class="tiles4"><div><b>' + ROWS.length + "</b><span>users in sheet</span></div><div><b>" + ready + '</b><span>will get an email</span></div><div><b style="color:#A12727">' + (ROWS.length - ready) + "</b><span>can’t be sent</span></div><div><b>" + withF + "</b><span>with attachments</span></div></div>" +
+      '<label class="lb">Preview for</label><select class="tx" id="pv">' + ROWS.map(function (o, i) { return '<option value="' + i + '">' + esc(o[H[0]]) + ((MATCH[lowk(o[H[0]])] || {}).name ? " — " + esc(MATCH[lowk(o[H[0]])].name) : "") + "</option>"; }).join("") + '</select><div id="pvb"></div>' +
+      '<div class="tscroll" style="max-height:340px;overflow:auto;margin-top:10px"><table class="mt"><thead><tr><th>User ID</th><th>Name</th><th>Email</th><th>Files</th><th>Status</th></tr></thead><tbody>' + ROWS.map(function (o, i) { var s = st[i], m = MATCH[lowk(o[H[0]])] || {}; return "<tr><td>" + esc(o[H[0]]) + "</td><td>" + esc(m.name || "") + (m.state ? '<div class="muted" style="font-size:11px">' + esc(m.state) + "</div>" : "") + "</td><td>" + esc(m.email || (s.s === "w" ? o[emailCol()] : "") || "—") + "</td><td>" + (s.fs.length ? s.fs.map(function (f) { return esc(f.name); }).join("<br>") + '<div class="muted" style="font-size:11px">' + kb(s.size) + "</div>" : "—") + '</td><td><span class="st ' + s.s + '" id="rs' + i + '">' + esc(s.t) + "</span></td></tr>"; }).join("") + "</tbody></table></div>" +
+      '<div class="row" style="margin-top:12px;flex-wrap:wrap"><button class="btn sec" id="te">🧪 Send test to me' + (MYEMAIL ? " (" + esc(MYEMAIL) + ")" : "") + '</button><button class="btn pri" id="go"' + (ready ? "" : " disabled") + ">✉️ Send to " + ready + " user" + (ready === 1 ? "" : "s") + '</button></div><div id="prg"></div>' +
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">Emails go only to each user’s registered email (shown masked). The data and files are not stored — only who was sent, when, and the result. Large sends run in batches; keep this screen open until it finishes. Your email service may have a daily sending limit.</div></div>';
+  }
+  function b64(blob) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(",")[1] || ""); }; r.onerror = function () { rej(new Error("Couldn't read a file.")); }; r.readAsDataURL(blob); }); }
+  function itemFor(o) { var fs = filesFor(o), ec = emailCol(); return Promise.all(fs.map(function (f) { return b64(f.blob).then(function (d) { return { name: f.name, b64: d }; }); })).then(function (files) { return { id: o[H[0]], subject: fill(D.subject, o), html: html(o), files: files, fallback: ec ? o[ec] : "" }; }); }
+  function send(test, override, log0, sure) {
+    if (RUN && RUN.on) return;
+    var list = override || (test ? [ROWS[+($("pv") ? $("pv").value : 0)] || ROWS[0]] : ROWS.filter(function (o) { return rowState(o).s !== "b"; }));
+    if (!list.length) return;
+    if (!test && !sure) { sheet("Send personal emails to " + list.length + " user" + (list.length === 1 ? "" : "s") + "?", "Each user gets only their own row and files on their registered email.", [["✉️", "Send now", function () { send(false, override, log0, true); }]]); return; }
+    RUN = { on: true, i: 0, list: list, log: log0 || "", sent: 0, failed: 0, test: test };
+    var prg = $("prg"), paint = function () { var r = RUN; prg.innerHTML = '<div class="pbar"><i style="width:' + Math.round(r.i / r.list.length * 100) + '%"></i></div><div class="row" style="justify-content:space-between;font-size:13px;margin-top:6px"><span>' + (r.on ? "Sending… " : r.paused ? "Paused · " : "Done · ") + r.i + " / " + r.list.length + " · ✅ " + r.sent + (r.failed ? " · ❌ " + r.failed : "") + "</span>" + (r.on ? '<button class="btn ghost sm" id="ps">⏸ Pause</button>' : r.paused ? '<button class="btn pri sm" id="rsm">▶ Resume</button>' : r.failed && !r.test ? '<button class="btn sec sm" id="rt">🔁 Retry failed</button>' : "") + "</div>"; if ($("ps")) $("ps").onclick = function () { RUN.on = false; RUN.paused = true; paint(); }; if ($("rsm")) $("rsm").onclick = function () { RUN.on = true; RUN.paused = false; step(); }; if ($("rt")) $("rt").onclick = retry; };
+    var step = function () {
+      if (!RUN.on) return paint();
+      if (RUN.i >= RUN.list.length) { RUN.on = false; paint(); toast(test ? "Test sent to your email" : "Finished — " + RUN.sent + " sent" + (RUN.failed ? ", " + RUN.failed + " failed" : "")); api({ action: "tl-use", tool: "pmail", kind: "acts" }); return; }
+      var batch = [], size = 0, j = RUN.i;
+      var take = function () { if (j >= RUN.list.length || batch.length >= 5) return Promise.resolve(); return itemFor(RUN.list[j]).then(function (it) { var s = JSON.stringify(it).length; if (batch.length && size + s > 4500000) return; batch.push(it); size += s; j++; return take(); }); };
+      take().then(function () {
+        return api({ action: "pm-send", items: batch, log: RUN.log, test: !!test, allowColumn: !!D.fallback, total: RUN.list.length, subjectTpl: D.subject });
+      }).then(function (r) {
+        if (!r.ok) { RUN.on = false; RUN.paused = true; toast(r.error); return paint(); }
+        RUN.log = r.log; r.results.forEach(function (x) { var idx = ROWS.findIndex(function (o) { return lowk(o[H[0]]) === lowk(x.id); }), el = $("rs" + idx); if (x.status === "sent") RUN.sent++; else RUN.failed++; if (el && !test) { el.className = "st " + (x.status === "sent" ? "s" : "b"); el.textContent = x.status === "sent" ? "✓ Sent" : x.error || x.status; } if (test && x.status !== "sent") toast(x.error || "Test failed"); });
+        RUN.i = j; paint(); setTimeout(step, 250);
+      }).catch(function (e) { RUN.on = false; RUN.paused = true; toast(e.message || "Network error — tap Resume"); paint(); });
+    };
+    paint(); step();
+  }
+  function retry() { var failed = RUN.list.filter(function (o) { var el = $("rs" + ROWS.indexOf(o)); return el && el.className.indexOf(" b") >= 0; }); if (!failed.length) return; var log = RUN.log; RUN = null; send(false, failed, log, true); }
+  function bind() {
+    var on = function (id, fn) { var e = $(id); if (e) e.onclick = fn; };
+    on("xi", importX); on("xt", template); on("fa", addFiles); on("fc", function () { FILES = []; draw(); });
+    var su = $("su"), bo = $("bo"), last = bo;
+    if (su) { su.oninput = function () { D.subject = su.value; sv(); }; su.onfocus = function () { last = su; }; }
+    if (bo) { bo.oninput = function () { D.body = bo.value; sv(); pv(); }; bo.onfocus = function () { last = bo; }; }
+    [].forEach.call(VIEW.querySelectorAll("[data-ph]"), function (p) { p.onclick = function () { var t = "{{" + p.dataset.ph + "}}", e = last || bo, a = e.selectionStart || e.value.length; e.value = e.value.slice(0, a) + t + e.value.slice(e.selectionEnd || a); e.dispatchEvent(new Event("input")); e.focus(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-tg]"), function (t) { t.onclick = function () { D[t.dataset.tg] = !D[t.dataset.tg]; sv(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-co]"), function (t) { t.onclick = function () { var all = H.slice(1).filter(function (c) { return !/^(attachment|attachments|email)$/i.test(c); }); if (!D.cols) D.cols = all.slice(); var i = D.cols.indexOf(t.dataset.co); if (i >= 0) D.cols.splice(i, 1); else D.cols.push(t.dataset.co); draw(); }; });
+    if ($("pv")) { $("pv").onchange = pv; pv(); }
+    on("te", function () { send(true); }); on("go", function () { send(false); });
+  }
+  function pv() { if (!$("pvb") || !ROWS.length) return; var o = ROWS[+$("pv").value] || ROWS[0], s = rowState(o); $("pvb").innerHTML = '<div class="pv"><div style="font-size:12px;color:#888">To: ' + esc((MATCH[lowk(o[H[0]])] || {}).email || (s.s === "w" ? o[emailCol()] : "—")) + "</div><div style=\"font-weight:bold;margin:4px 0 10px\">" + esc(fill(D.subject, o)) + "</div>" + html(o) + (s.fs.length ? '<div style="margin-top:10px;font-size:12.5px">📎 ' + s.fs.map(function (f) { return esc(f.name) + " (" + kb(f.size) + ")"; }).join(", ") + "</div>" : "") + "</div>"; }
+  function logs() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pm-logs" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("pane").innerHTML = r.logs.length ? r.logs.map(function (l) { return '<div class="card" style="cursor:pointer" data-lg="' + l.id + '"><b>' + esc(l.subject || "Personal mail") + '</b><div class="muted" style="font-size:12.5px">' + dt(l.at) + " · by " + esc(l.by) + " · ✅ " + l.sent + " sent" + (l.failed ? " · ❌ " + l.failed + " not sent" : "") + " of " + l.total + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">📋</div>No personal mails sent yet.</div>';
+      [].forEach.call($("pane").querySelectorAll("[data-lg]"), function (c) { c.onclick = function () { api({ action: "pm-log", id: c.dataset.lg }).then(function (x) { if (!x.ok) return toast(x.error); var L = x.log; download(xlsx([{ name: "Delivery", rows: [["User ID", "Name", "Email", "Files", "Status", "Reason", "Time"]].concat(L.rows.map(function (q) { return [q.id, q.name, q.to || "", q.files || 0, q.status, q.error || "", dt(q.at)]; })) }]), "Personal_mail_report_" + istDay(L.at) + ".xlsx"); }); }; });
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
