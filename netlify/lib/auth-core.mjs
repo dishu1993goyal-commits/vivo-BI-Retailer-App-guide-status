@@ -996,7 +996,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^ds-/.test(b.action)) return deckAction(b, surveyCtx());
     if (/^pt-/.test(b.action)) return portalAction(b, surveyCtx());
     if (/^nl-/.test(b.action)) return newsletterAction(b, Object.assign(surveyCtx(), { mailFetch }));
-    if (/^ag-/.test(b.action)) return appguideAction(b, surveyCtx());
+    if (/^ag-/.test(b.action)) return appguideAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^geo-/.test(b.action)) return geoAction(b, surveyCtx());
     if (/^rw-/.test(b.action)) return rewardsAction(b, Object.assign(surveyCtx(), { siteFetch }));
     if (/^pm-/.test(b.action)) return pmailAction(b, Object.assign(surveyCtx(), { mailFetch }));

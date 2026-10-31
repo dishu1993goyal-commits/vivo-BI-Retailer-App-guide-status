@@ -181,7 +181,7 @@ textarea.tx{min-height:120px}
   function pVideos() {
     if (!O.feat || !fk(O.feat)) O.feat = FEATS[0] ? FEATS[0].k : "";
     var P = CFG.presenter || {}, vids = CFG.videos || [];
-    $("pane").innerHTML = (vids.length ? '<div class="card"><b>🎬 Presenter videos</b>' + vids.map(function (v) { return '<div class="vid" data-v="' + v.id + '"><div class="row"><b style="flex:1;font-size:14px">' + esc(v.title) + '</b><span class="muted" style="font-size:12px">' + esc(v.lang) + " · " + dOnly(v.at) + "</span></div>" + (v.status === "done" ? '<div class="row" style="margin-top:6px"><button class="btn pri sm" data-exp="' + v.id + '">🎬 Explainer (slides + voice)</button><button class="btn sec sm" data-play="' + v.id + '">▶ Presenter only</button>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '" style="color:var(--bad)">🗑</button>' : "") + '</div><div class="vbox" id="vb-' + v.id + '"></div>' : v.status === "error" ? '<div class="err" style="margin-top:6px">Failed: ' + esc(v.error || "") + '</div>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '">Remove</button>' : "") : '<div class="muted" style="margin-top:6px"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Making the video… (1–3 minutes)</div>') + "</div>"; }).join("") + "</div>" : "") +
+    $("pane").innerHTML = (vids.length ? '<div class="card"><b>🎬 Presenter videos</b>' + vids.map(function (v) { return '<div class="vid" data-v="' + v.id + '"><div class="row"><b style="flex:1;font-size:14px">' + esc(v.title) + '</b><span class="muted" style="font-size:12px">' + esc(v.lang) + " · " + dOnly(v.at) + "</span></div>" + (v.status === "done" ? '<div class="row" style="margin-top:6px"><button class="btn pri sm" data-exp="' + v.id + '">🎬 Explainer (slides + voice)</button><button class="btn sec sm" data-play="' + v.id + '">▶ Presenter only</button>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '" style="color:var(--bad)">🗑</button>' : "") + '</div><div class="vbox" id="vb-' + v.id + '"></div>' : v.status === "error" ? '<div class="err" style="margin-top:6px">Failed: ' + esc(v.error || "") + '</div>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '">Remove</button>' : "") : '<div class="muted" style="margin-top:6px"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> <span class="stg">' + esc(v.stage || (v.provider === "hf" ? "Free model working… (3–10 minutes)" : "Making the video… (1–3 minutes)")) + '</span></div>') + "</div>"; }).join("") + "</div>" : "") +
       (ADMIN ? '<div class="card"><b>✨ Make a video</b><div class="muted" style="font-size:12.5px">Pick a feature: AI writes the narration in ' + esc(O.lang) + '; then make a free captioned slideshow' + ", an AI presenter explainer, or record yourself with the teleprompter" + '.</div><div class="fg">' + FEATS.map(function (f) { return '<div class="fc' + (f.k === O.feat ? " on" : "") + '" data-f="' + f.k + '">' + (icon(f.k) ? '<img src="' + icon(f.k) + '" alt="">' : "") + "<b>" + esc(f.name) + "</b><small>" + esc(f.tag.slice(0, 60)) + "</small></div>"; }).join("") + '</div><button class="btn sec block" id="ws" style="margin-top:10px">✍️ Write the narration</button><div id="scr"></div></div>' : (vids.length ? "" : '<div class="card empty"><div class="big">🎬</div>No videos yet. HO will add feature videos here.</div>'));
     [].forEach.call($("pane").querySelectorAll("[data-f]"), function (c) { c.onclick = function () { O.feat = c.dataset.f; sv(); SCR = null; pVideos(); }; });
     [].forEach.call($("pane").querySelectorAll("[data-play]"), function (b) { b.onclick = function () { play(b.dataset.play); }; });
@@ -202,7 +202,7 @@ textarea.tx{min-height:120px}
   function busyEnd() { BUSY = Math.max(0, BUSY - 1); }
   function poll(id) {
     if (POLLING[id]) return; POLLING[id] = 1;
-    var tick = function () { api({ action: "ag-avatar-status", id: id }).then(function (r) { var v = CFG.videos.filter(function (x) { return x.id === id; })[0]; if (!v) { delete POLLING[id]; return; } if (r.ok && r.status !== "making") { v.status = r.status; v.error = r.error; delete POLLING[id]; if (r.url) VURL[id] = r.url; if (TAB === "videos" && !BUSY && !$("dlv")) pVideos(); else if (TAB === "videos") REDRAW = true; toast(r.status === "done" ? "Video ready ✓" : "Video failed"); } else setTimeout(tick, 8000); }); };
+    var tick = function () { api({ action: "ag-avatar-status", id: id }).then(function (r) { var v = CFG.videos.filter(function (x) { return x.id === id; })[0]; if (!v) { delete POLLING[id]; return; } if (r.ok && r.status !== "making") { v.status = r.status; v.error = r.error; delete POLLING[id]; if (r.url) VURL[id] = r.url; if (TAB === "videos" && !BUSY && !$("dlv")) pVideos(); else if (TAB === "videos") REDRAW = true; toast(r.status === "done" ? "Video ready ✓" : "Video failed"); } else { if (r.stage && r.stage !== v.stage) { v.stage = r.stage; var el = document.querySelector('[data-v="' + id + '"] .stg'); if (el) el.textContent = r.stage; } setTimeout(tick, 8000); } }); };
     setTimeout(tick, 6000);
   }
   function writeScript() {
@@ -219,7 +219,7 @@ textarea.tx{min-height:120px}
     $("st").oninput = keep; $("sx").oninput = keep;
     $("lis").onclick = function () { speak($("sx").value); };
     if ($("sl")) $("sl").onclick = function () { keep(); slideshow(f, SCR); };
-    if ($("av")) $("av").onclick = function () { keep(); if (V.provider === "hf") { hfMake(f, { title: SCR.title, tag: f.tag, pname: (CFG.presenter || {}).name || "", scenes: SCR.scenes }, SCR.script, $("vo")); return; } this.disabled = true; api({ action: "ag-avatar", text: SCR.script, lang: SCR.lang, title: SCR.title, tag: f.tag, k: SCR.k, scenes: SCR.scenes }).then(function (r) { if (!r.ok) { $("av").disabled = false; if (/credit|quota|insufficient|balance|payment/i.test(r.error || "")) { $("vo").innerHTML = '<div class="notice info" style="margin-top:10px">The ' + esc(pname) + ' account has no credits left. Switch the method to <b>Free · Hugging Face</b> in 🧑‍💼 Presenter, or use <b>🎬 Record with teleprompter</b>.</div>'; return; } toast(r.error); return; } CFG.videos.unshift(r.video); toast("Making the presenter — it appears at the top in 1–3 minutes, then tap 🎬 Explainer"); pVideos(); window.scrollTo(0, 0); }); };
+    if ($("av")) $("av").onclick = function () { keep(); this.disabled = true; api({ action: "ag-avatar", text: SCR.script, lang: SCR.lang, title: SCR.title, tag: f.tag, k: SCR.k, scenes: SCR.scenes }).then(function (r) { if (!r.ok) { $("av").disabled = false; if (/credit|quota|insufficient|balance|payment/i.test(r.error || "")) { $("vo").innerHTML = '<div class="notice info" style="margin-top:10px">The ' + esc(pname) + ' account has no credits left. Switch the method to <b>Free · Hugging Face</b> in 🧑‍💼 Presenter, or use <b>🎬 Record with teleprompter</b>.</div>'; return; } toast(r.error); return; } CFG.videos.unshift(r.video); toast(V.provider === "hf" ? "Sent to the free model — it appears at the top; free videos can take 3–10 minutes" : "Making the presenter — it appears at the top in 1–3 minutes, then tap 🎬 Explainer"); pVideos(); window.scrollTo(0, 0); }); };
     if ($("tp")) $("tp").onclick = function () { keep(); teleprompter(f, { title: SCR.title, tag: f.tag, pname: (CFG.presenter || {}).name || "", scenes: SCR.scenes }, SCR.script); };
     if ($("clip")) $("clip").onclick = function () { $("clipf").click(); };
     if ($("clipf")) $("clipf").onchange = function () { var fl = this.files[0]; if (!fl) return; keep(); var S2 = { title: SCR.title, tag: f.tag, pname: (CFG.presenter || {}).name || "", scenes: SCR.scenes }; var pvc = document.createElement("video"); pvc.playsInline = true; pvc.muted = false; pvc.preload = "auto"; pvc.src = URL.createObjectURL(fl); $("vo").innerHTML = '<div class="loading"><div class="spin"></div>Preparing your clip…</div>'; pvc.onloadedmetadata = function () { if (pvc.duration > 180) { $("vo").innerHTML = '<div class="err">Please use a clip under 3 minutes.</div>'; return; } slideshow(f, S2, pvc, $("vo"), SCR.title + " — presenter clip", { real: true }); }; pvc.onerror = function () { $("vo").innerHTML = '<div class="err">Couldn’t open that video — try an MP4 recorded on the phone.</div>'; }; };
@@ -380,79 +380,10 @@ textarea.tx{min-height:120px}
     [].forEach.call(document.querySelectorAll("[data-kr]"), function (b) { b.onclick = function () { api({ action: "ag-key", which: b.dataset.kr, value: "" }).then(function (r) { CFG.video = Object.assign(VC(), { keys: r.keys }); pPresenter(); }); }; });
     $("vsv").onclick = function () { api({ action: "ag-save", video: { provider: prov, show: show, hfSpace: $("hfs").value, hfApi: $("hfa").value, motion: $("hgm").value, expr: $("hge").value } }).then(function (r) { if (!r.ok) return toast(r.error); CFG.video = r.video; toast("Video settings saved — " + PROV[r.video.provider][0]); pPresenter(); }); };
     $("hfc").onclick = function () {
-      var out = $("hfr"); out.innerHTML = '<span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Connecting…';
-      api({ action: "ag-save", video: { provider: prov, show: show, hfSpace: $("hfs").value, hfApi: $("hfa").value, motion: $("hgm").value, expr: $("hge").value } }).then(function (r) { if (r.ok) CFG.video = r.video; return hfPlan(); })
-        .then(function (pl) { out.innerHTML = "✅ Ready: <b>" + esc(pl.space) + " " + esc(pl.ep) + "</b> — photo → “" + esc(pl.map.image) + "”, script → “" + esc(pl.map.text) + "”" + (pl.map.lang ? ", language → “" + esc(pl.map.lang) + "”" : "") + (pl.map.prompt ? ", gestures → “" + esc(pl.map.prompt) + "”" : "") + "."; })
-        .catch(function (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message || String(e)) + "</span>"; });
+      var out = $("hfr"); out.innerHTML = '<span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Checking the Space from the server…';
+      api({ action: "ag-save", video: { provider: prov, show: show, hfSpace: $("hfs").value, hfApi: $("hfa").value, motion: $("hgm").value, expr: $("hge").value } }).then(function (r) { if (r.ok) CFG.video = r.video; if (r.ok && r.video) $("hfs").value = r.video.hfSpace; return api({ action: "ag-hf-check" }); })
+        .then(function (r) { if (!r.ok) { out.innerHTML = '<span style="color:var(--bad)">' + esc(r.error) + "</span>"; return; } var m = r.map; out.innerHTML = "✅ Ready: <b>" + esc(r.space) + " " + esc(m.endpoint) + "</b> — photo → “" + esc(m.image) + "”, script → “" + esc(m.text) + "”" + (m.lang ? ", language → “" + esc(m.lang) + "”" : "") + (m.prompt ? ", gestures → “" + esc(m.prompt) + "”" : "") + "." + (r.token ? "" : " <br>Tip: save your Hugging Face token for more free GPU time."); });
     };
-  }
-  // ---- free presenter: open-source model on a Hugging Face Space, called from this device ----
-  var GRADIO = null;
-  function gradio() { return GRADIO || (GRADIO = import("https://cdn.jsdelivr.net/npm/@gradio/client@1/dist/index.min.js").catch(function () { GRADIO = null; throw new Error("Couldn't load the Hugging Face connector — check the internet."); })); }
-  function hfPlan() {   // connect, read the model's inputs, and work out where the photo / text / language go
-    return api({ action: "ag-hf-cred" }).then(function (cr) {
-      if (!cr.ok) throw new Error(cr.error);
-      if (!/^[\w.-]+\/[\w.-]+$/.test(cr.space)) throw new Error("“" + cr.space + "” isn’t a Space name. Enter it as owner/space-name — for example alexnasa/OmniAvatar (copy it from the Space’s web address after huggingface.co/spaces/).");
-      return gradio().then(function (G) {
-        return G.Client.connect(cr.space, cr.token ? { hf_token: cr.token } : {}).catch(function (e) { throw new Error("Couldn't open the Space “" + cr.space + "”: " + (e && e.message || e) + " — it may be sleeping, private or broken; try another."); }).then(function (client) {
-          return client.view_api().then(function (info) {
-            var eps = (info && info.named_endpoints) || {}, best = null, bestScore = -1;
-            Object.keys(eps).forEach(function (name) {
-              if (cr.api && name !== cr.api && "/" + cr.api.replace(/^\//, "") !== name) return;
-              var e = eps[name], ps = e.parameters || [], comp = function (p) { return String(p.component || "").toLowerCase(); }, lab = function (p) { return String((p.label || "") + " " + (p.parameter_name || "")).toLowerCase(); };
-              var img = ps.filter(function (p) { return comp(p) === "image" || (/image|photo|portrait|face|source|avatar/.test(lab(p)) && /file|image/.test(comp(p))); })[0];
-              var tbs = ps.filter(function (p) { return comp(p) === "textbox"; }), rank = function (p) { var l = lab(p); return /speech|script|say|tts|speak|words|narrat|transcript/.test(l) ? 4 : /text|sentence|content/.test(l) && !/prompt|negative/.test(l) ? 3 : /input/.test(l) ? 2 : /prompt/.test(l) && !/negative/.test(l) ? 1 : 0; };
-              var txt = tbs.slice().sort(function (a, b) { return rank(b) - rank(a); })[0];
-              var vidOut = (e.returns || []).some(function (r) { return /video/.test(String(r.component || "").toLowerCase()) || /video/.test(String(r.label || "").toLowerCase()); });
-              var sc = (img ? 3 : 0) + (txt ? 3 : 0) + (vidOut ? 2 : 0) - (ps.some(function (p) { return comp(p) === "audio" && !p.parameter_has_default; }) && !txt ? 3 : 0);
-              if (img && txt && sc > bestScore) { best = { name: name, e: e, img: img, txt: txt }; bestScore = sc; }
-            });
-            if (!best) throw new Error("This Space has no endpoint that takes a photo and text. Pick a Space whose demo has a portrait/photo input and a text box, and gives a video.");
-            var lang = (best.e.parameters || []).filter(function (p) { return /lang/.test(String((p.label || "") + (p.parameter_name || "")).toLowerCase()); })[0];
-            var prm = (best.e.parameters || []).filter(function (p) { var l = String((p.label || "") + " " + (p.parameter_name || "")).toLowerCase(); return p !== best.txt && String(p.component || "").toLowerCase() === "textbox" && /prompt|motion|action|describe|scene/.test(l) && !/negative/.test(l); })[0];
-            return { G: G, client: client, space: cr.space, ep: best.name, e: best.e, map: { image: best.img.label || best.img.parameter_name, text: best.txt.label || best.txt.parameter_name, lang: lang ? lang.label || lang.parameter_name : "", prompt: prm ? prm.label || prm.parameter_name : "" }, P: { img: best.img, txt: best.txt, lang: lang, prm: prm } };
-          });
-        });
-      });
-    });
-  }
-  function hfMake(f, S, script, mount) {
-    BUSY++;
-    mount.innerHTML = '<div class="loading"><div class="spin"></div><span id="hfp">Connecting to the free model…</span></div>';
-    var say = function (s) { if ($("hfp")) $("hfp").textContent = s; };
-    Promise.all([hfPlan(), api({ action: "ag-photo-get" })]).then(function (r) {
-      var pl = r[0], ph = r[1]; if (!ph.ok || !ph.data) throw new Error("Upload the presenter photo first.");
-      return fetch(ph.data).then(function (x) { return x.blob(); }).then(function (blob) {
-        var ps = pl.e.parameters || [], data = ps.map(function (p) {
-          if (p === pl.P.img) return pl.G.handle_file(blob);
-          if (p === pl.P.txt) return script;
-          if (p === pl.P.prm) return "A friendly person presenting to the camera, talking naturally, " + ((VC().motion) || "gesturing with both hands") + ", steady camera, realistic";
-          if (p === pl.P.lang) { var en = (p.type && p.type.enum) || (p.python_type && p.python_type.type && (String(p.python_type.type).match(/'([^']+)'/g) || []).map(function (s) { return s.slice(1, -1); })) || []; var want = O.lang === "Hinglish" ? "Hindi" : O.lang; var m = en.filter(function (o) { return String(o).toLowerCase().indexOf(want.toLowerCase()) >= 0 || String(o).toLowerCase() === (LC[O.lang] || "").slice(0, 2); })[0]; if (m) return m; }
-          return p.parameter_has_default ? p.parameter_default : (p.example_input != null ? p.example_input : null);
-        });
-        say("Queued on the free GPU… (this can take a few minutes)");
-        var job = pl.client.submit(pl.ep, data), result = null;
-        return (async function () {
-          for await (var msg of job) {
-            if (msg.type === "status") { if (msg.stage === "error") throw new Error(msg.message || "The model reported an error."); say(msg.stage === "pending" ? "Waiting in the free queue" + (msg.position != null ? " — position " + (msg.position + 1) : "") + (msg.eta ? " · about " + Math.round(msg.eta) + "s" : "") : msg.stage === "generating" || msg.stage === "processing" ? "The model is making the video…" : "Working…"); }
-            if (msg.type === "data") { result = msg.data; break; }
-          }
-          return result;
-        })();
-      }).then(function (out) {
-        var url = null; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/^https?:.*\.(mp4|webm|mov)(\?|$)/i.test(x)) url = x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { if (x.url && /video|mp4|webm/i.test((x.mime_type || "") + x.url + (x.orig_name || ""))) { url = x.url; return; } if (x.video) walk(x.video); Object.keys(x).forEach(function (k) { if (k !== "video") walk(x[k]); }); } })(out);
-        if (!url) throw new Error("The model finished but returned no video.");
-        say("Downloading the presenter video…");
-        return fetch(url).then(function (x) { if (!x.ok) throw new Error("Couldn't download the result."); return x.blob(); });
-      });
-    }).then(function (vb) {
-      var pvh = document.createElement("video"); pvh.playsInline = true; pvh.preload = "auto"; pvh.muted = false; pvh.src = URL.createObjectURL(vb);
-      pvh.onloadeddata = function () { if (pvh._go) return; pvh._go = 1; slideshow(f, S, pvh, mount, S.title + " — presenter"); busyEnd(); };
-      pvh.onerror = function () { busyEnd(); mount.innerHTML = '<div class="err">The model’s video couldn’t be played on this device.</div>'; };
-    }).catch(function (e) {
-      var m = String(e && e.message || e); if (/quota|ZeroGPU|exceeded|GPU limit/i.test(m)) m = "The free daily GPU time is used up for this Hugging Face account — try again tomorrow, add a token from another free account, or switch method in 🧑‍💼 Presenter.";
-      busyEnd(); mount.innerHTML = '<div class="err">' + esc(m) + "</div>";
-    });
   }
   // ---- presenter (HO) ----
   function pPresenter() {

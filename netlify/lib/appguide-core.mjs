@@ -19,8 +19,106 @@ function vcfg(c) {   // presenter-video settings HO switches between
   return { provider: PROVIDERS.includes(V.provider) ? V.provider : "did", show: { slide: S.slide !== false, ai: S.ai !== false, tp: S.tp !== false, clip: S.clip !== false },
     hfSpace: str(V.hfSpace, 120), hfApi: str(V.hfApi, 60), motion: str(V.motion, 200) || "standing and gesturing naturally with both hands while presenting, pointing to the side as if showing a screen", expr: ["low", "medium", "high"].includes(V.expr) ? V.expr : "high", hgVoices: V.hgVoices || {} };
 }
+// ---------- free presenter: a Gradio app on a Hugging Face Space, driven from the server ----------
+const HFAPI = "https://huggingface.co/api/spaces/";
+const lc = (s) => String(s || "").toLowerCase();
+async function hfSpace(space, token, f) {   // where the Space lives and whether it is awake
+  const H = token ? { authorization: "Bearer " + token } : {};
+  let stage = "", host = "";
+  try { const r = await f(HFAPI + space, { headers: H }), d = await r.json().catch(() => ({})); if (r.status === 404) throw new Error("No Space called “" + space + "” — check the name (owner/space-name)."); if (r.status === 401 || r.status === 403) throw new Error("Hugging Face refused the token for this Space — check the token."); stage = (d.runtime && d.runtime.stage) || ""; host = d.host || ""; } catch (e) { if (/No Space|refused/.test(e.message)) throw e; }
+  if (!host) { try { const r = await f(HFAPI + space + "/host", { headers: H }), d = await r.json().catch(() => ({})); host = d.host || (d.subdomain ? "https://" + d.subdomain + ".hf.space" : ""); } catch (e) { } }
+  if (!host) host = "https://" + lc(space).replace(/[^a-z0-9]+/g, "-") + ".hf.space";
+  let jwt = "";
+  if (token) { try { const r = await f(HFAPI + space + "/jwt", { headers: H }), d = await r.json().catch(() => ({})); jwt = d.token || ""; } catch (e) { } }
+  return { host: host.replace(/\/+$/, ""), stage, headers: Object.assign({}, H, jwt ? { "x-zerogpu-token": jwt } : {}) };
+}
+async function hfApi(S, f) {   // the Space's API description (Gradio 4: /info, Gradio 5: /gradio_api/info)
+  for (const pre of ["/gradio_api", ""]) {
+    try { const r = await f(S.host + pre + "/info", { headers: S.headers }); if (!r.ok) continue; const d = await r.json(); if (d && d.named_endpoints) return { pre, info: d }; } catch (e) { }
+  }
+  throw new Error(S.stage && S.stage !== "RUNNING" ? "The Space is " + lc(S.stage).replace(/_/g, " ") + (S.stage === "SLEEPING" ? " — it is waking up now, try again in 1–2 minutes." : " — try again later or use another Space.") : "Couldn't read the Space’s API — it may be busy, building or not a Gradio app.");
+}
+export function hfMap(info, want) {   // choose the endpoint that takes a photo + text and find where each input goes
+  const eps = info.named_endpoints || {}; let best = null, bestScore = -1;
+  for (const name of Object.keys(eps)) {
+    if (want && name !== want && name !== "/" + String(want).replace(/^\//, "")) continue;
+    const e = eps[name], ps = e.parameters || [], comp = (p) => lc(p.component), lab = (p) => lc((p.label || "") + " " + (p.parameter_name || ""));
+    const img = ps.find((p) => comp(p) === "image") || ps.find((p) => /image|photo|portrait|face|source|avatar/.test(lab(p)) && /file|image/.test(comp(p)));
+    const tbs = ps.filter((p) => comp(p) === "textbox"), rank = (p) => { const l = lab(p); return /speech|script|say|tts|speak|words|narrat|transcript/.test(l) ? 4 : /text|sentence|content/.test(l) && !/prompt|negative/.test(l) ? 3 : /input/.test(l) ? 2 : /prompt/.test(l) && !/negative/.test(l) ? 1 : 0; };
+    const txt = tbs.slice().sort((a, b) => rank(b) - rank(a))[0];
+    const vidOut = (e.returns || []).some((r) => /video/.test(lc(r.component) + " " + lc(r.label)));
+    const sc = (img ? 3 : 0) + (txt ? 3 : 0) + (vidOut ? 2 : 0);
+    if (img && txt && sc > bestScore) { best = { name, e, img, txt }; bestScore = sc; }
+  }
+  if (!best) return null;
+  const ps = best.e.parameters || [];
+  const lang = ps.find((p) => /lang/.test(lc((p.label || "") + (p.parameter_name || ""))));
+  const prm = ps.find((p) => p !== best.txt && lc(p.component) === "textbox" && /prompt|motion|action|describe|scene/.test(lc((p.label || "") + " " + (p.parameter_name || ""))) && !/negative/.test(lc(p.label)));
+  const nm = (p) => (p ? p.label || p.parameter_name || "" : "");
+  return { name: best.name, params: ps, img: best.img, txt: best.txt, lang, prm, summary: { endpoint: best.name, image: nm(best.img), text: nm(best.txt), lang: nm(lang), prompt: nm(prm), needsAudio: ps.some((p) => lc(p.component) === "audio" && !p.parameter_has_default) } };
+}
+function langChoice(p, lang) {
+  const en = (p.type && p.type.enum) || (String((p.python_type && p.python_type.type) || "").match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
+  const want = lc(lang === "Hinglish" ? "Hindi" : lang), code = lc((AG_LANGS[lang] || "").slice(0, 2));
+  return en.find((o) => lc(o).includes(want)) || en.find((o) => lc(o) === code || lc(o).startsWith(code + "-") || lc(o).startsWith(code + "_")) || null;
+}
+// Background job: run the Space and save the video link on the record (called by agvideo-background).
+export async function runHfJob(store, env, jobId, { fetchImpl = fetch, now = () => Date.now() } = {}) {
+  const f = fetchImpl, job = await store.get(`aghfjob:${String(jobId || "").replace(/[^a-z0-9]/gi, "")}`); if (!job) return;
+  await store.delete(`aghfjob:${jobId}`);
+  const update = async (patch) => { const c = (await store.get("config:appguide")) || { videos: [] }, v = (c.videos || []).find((x) => x.id === job.vid); if (!v) return false; Object.assign(v, patch); await store.set("config:appguide", c); return true; };
+  try {
+    const c = (await store.get("config:appguide")) || {}, V = vcfg(c), keys = (await store.get("config:agkey")) || {}, ph = await store.get("agphoto");
+    if (!ph) throw new Error("Upload the presenter photo again.");
+    await update({ stage: "Connecting to the free model…" });
+    const S = await hfSpace(V.hfSpace, keys.hf, f);
+    if (S.stage === "SLEEPING") { await update({ stage: "Waking up the free model (1–2 minutes)…" }); try { await f(S.host + "/", { headers: S.headers }); } catch (e) { } await new Promise((r) => setTimeout(r, 60000)); }
+    let api = null; for (let i = 0; i < 4 && !api; i++) { try { api = await hfApi(S, f); } catch (e) { if (i === 3) throw e; await new Promise((r) => setTimeout(r, 25000)); } }
+    const M = hfMap(api.info, V.hfApi); if (!M) throw new Error("This Space has no endpoint that takes a photo and text.");
+    const base = S.host + api.pre;
+    // upload the photo
+    const fd = new FormData(); fd.append("files", new Blob([Buffer.from(ph.b64, "base64")], { type: ph.mime }), ph.mime === "image/png" ? "presenter.png" : "presenter.jpg");
+    const ru = await f(base + "/upload", { method: "POST", headers: S.headers, body: fd }), up = await ru.json().catch(() => null);
+    const path = Array.isArray(up) ? up[0] : up && up.files ? up.files[0] : null; if (!ru.ok || !path) throw new Error("The Space didn’t accept the photo (" + ru.status + ").");
+    const data = M.params.map((p) => {
+      if (p === M.img) return { path, meta: { _type: "gradio.FileData" }, orig_name: "presenter.jpg" };
+      if (p === M.txt) return job.text;
+      if (p === M.prm) return "A friendly person presenting to the camera, talking naturally, " + V.motion + ", steady camera, realistic";
+      if (p === M.lang) { const ch = langChoice(p, job.lang); if (ch) return ch; }
+      return p.parameter_has_default ? p.parameter_default : p.example_input != null ? p.example_input : null;
+    });
+    await update({ stage: "Waiting in the free GPU queue…" });
+    const ep = M.name.replace(/^\//, ""), rc = await f(base + "/call/" + ep, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, S.headers), body: JSON.stringify({ data }) }), dc = await rc.json().catch(() => ({}));
+    if (!rc.ok || !dc.event_id) throw new Error("The Space refused the request: " + str(dc.detail || dc.error || rc.status, 160));
+    const rs = await f(base + "/call/" + ep + "/" + dc.event_id, { headers: Object.assign({ accept: "text/event-stream" }, S.headers) });
+    if (!rs.ok || !rs.body) throw new Error("Lost the connection to the Space (" + rs.status + ").");
+    const reader = rs.body.getReader(), dec = new TextDecoder(); let buf = "", ev = "", result = null, failure = null, lastStage = 0;
+    const deadline = now() + 13 * 60000;
+    while (!result && !failure) {
+      if (now() > deadline) throw new Error("The free model took too long (over 13 minutes) — try a shorter script or another time.");
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i; while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).replace(/\r$/, ""); buf = buf.slice(i + 1);
+        if (line.startsWith("event:")) ev = line.slice(6).trim();
+        else if (line.startsWith("data:")) {
+          const raw = line.slice(5).trim();
+          if (ev === "complete") { try { result = JSON.parse(raw); } catch (e) { result = raw; } }
+          else if (ev === "error") failure = raw && raw !== "null" ? raw : "The model reported an error.";
+          else if (ev === "generating" && now() - lastStage > 20000) { lastStage = now(); await update({ stage: "The model is making the video…" }); }
+        }
+      }
+    }
+    try { reader.cancel(); } catch (e) { }
+    if (failure) { let m = failure; try { const j = JSON.parse(failure); m = j && (j.message || j.error || j.detail) || failure; } catch (e) { } throw new Error(/quota|exceeded|ZeroGPU|GPU task aborted/i.test(m) ? "The free daily GPU time is used up for this Hugging Face account — try tomorrow, or switch method." : "The model said: " + str(m, 200)); }
+    let url = null; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/\.(mp4|webm|mov)(\?|$)/i.test(x)) url = /^https?:/.test(x) ? x : base + "/file=" + x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { const u = x.url || (x.path ? base + "/file=" + x.path : ""); if (u && /video|mp4|webm|mov/i.test((x.mime_type || "") + u + (x.orig_name || ""))) { url = u; return; } if (x.video) walk(x.video); Object.keys(x).forEach((k) => { if (k !== "video") walk(x[k]); }); } })(result);
+    if (!url) throw new Error("The model finished but returned no video.");
+    await update({ status: "done", hfUrl: url, stage: "", error: "" });
+  } catch (e) { await update({ status: "error", error: str(e.message || e, 220), stage: "" }); }
+}
 // fresh status / download link for a presenter video, whichever service made it
 async function freshVideo(v, keys, f) {
+  if (v.provider === "hf") return v.status === "done" ? { status: "done", url: v.hfUrl, headers: keys.hf ? { authorization: "Bearer " + keys.hf } : {} } : { status: v.status, error: v.error };
   if (v.provider === "heygen") {
     if (!keys.heygen) return { status: "error", error: "The HeyGen key was removed." };
     const r = await f(`${HG}/v3/videos/${encodeURIComponent(v.hgId)}`, { headers: { "x-api-key": keys.heygen, accept: "application/json" } }), d = await r.json().catch(() => ({})), x = d.data || d;
@@ -38,7 +136,7 @@ async function freshVideo(v, keys, f) {
 function pubCfg(c, isAdmin, keys) {
   const p = c.presenter || {}, V = vcfg(c);
   return { kb: c.kb || "", video: isAdmin ? { provider: V.provider, show: V.show, hfSpace: V.hfSpace, hfApi: V.hfApi, motion: V.motion, expr: V.expr, keys: keys ? { did: !!keys.did, heygen: !!keys.heygen, hf: !!keys.hf } : undefined } : { provider: V.provider, show: V.show }, presenter: { name: p.name || "", voice: p.voice === "m" ? "m" : "f", hasPhoto: !!p.hasPhoto, consentBy: p.consentBy || "", consentAt: p.consentAt || 0 },
-    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, provider: v.provider || "did" })) };
+    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did" })) };
 }
 
 // GET /api/auth?agvid=<videoId> — stream the finished D-ID video from the same origin, so the page can draw it onto a
@@ -51,7 +149,8 @@ export async function serveAgVideo(id, store, env = {}, fetchImpl = fetch) {
   try {
     const fr = await freshVideo(v, keys, fetchImpl);
     if (!fr.url) return new Response("Not ready", { status: 404 });
-    const up = await fetchImpl(fr.url);
+    const up = await fetchImpl(fr.url, fr.headers ? { headers: fr.headers } : undefined);
+    if (!up.ok && v.provider === "hf") return new Response("This free video has expired on Hugging Face — make it again.", { status: 410 });
     if (!up.ok || !up.body) return new Response("Unavailable", { status: 502 });
     return new Response(up.body, { status: 200, headers: { "content-type": up.headers.get("content-type") || "video/mp4", "cache-control": "private, max-age=600", "access-control-allow-origin": "*" } });
   } catch (e) { return new Response("Error", { status: 502 }); }
@@ -136,10 +235,17 @@ ${feat}`;
     if (val) k[which] = str(val, 400); else delete k[which];
     await store.set("config:agkey", k); return json(200, { ok: true, hasKey: !!k[which], keys: { did: !!k.did, heygen: !!k.heygen, hf: !!k.hf } });
   }
-  if (b.action === "ag-hf-cred") {   // free Hugging Face presenter runs from the admin's own device
+  if (b.action === "ag-hf-check") {   // is the free Space usable? (runs on the server, so office networks / browsers don't matter)
     const c = await cfg(), V = vcfg(c), k = await keysOf();
-    if (!V.hfSpace) return json(200, { ok: false, error: "Set the Hugging Face Space in Presenter settings first." });
-    return json(200, { ok: true, token: k.hf || "", space: V.hfSpace, api: V.hfApi });
+    if (!/^[\w.-]+\/[\w.-]+$/.test(V.hfSpace)) return json(200, { ok: false, error: V.hfSpace ? "“" + V.hfSpace + "” isn’t a Space name. Enter it as owner/space-name — e.g. alexnasa/OmniAvatar." : "Enter the Hugging Face Space first." });
+    try {
+      const S = await hfSpace(V.hfSpace, k.hf, f);
+      if (S.stage === "SLEEPING" || S.stage === "PAUSED") { if (S.stage === "SLEEPING") { try { await f(S.host + "/", { headers: S.headers }); } catch (e) { } } return json(200, { ok: false, error: S.stage === "SLEEPING" ? "The Space is asleep — I’ve woken it; press Check again in 1–2 minutes." : "This Space is paused by its owner — pick another Space." }); }
+      if (/ERROR/.test(S.stage)) return json(200, { ok: false, error: "This Space is broken right now (" + lc(S.stage).replace(/_/g, " ") + ") — pick another Space." });
+      const api = await hfApi(S, f), M = hfMap(api.info, V.hfApi);
+      if (!M) return json(200, { ok: false, error: "This Space has no endpoint that takes a photo and text" + (Object.keys(api.info.named_endpoints || {}).length ? " (it has: " + Object.keys(api.info.named_endpoints).slice(0, 6).join(", ") + ")" : "") + ". Pick a Space with a portrait input and a text box that gives a video." });
+      return json(200, { ok: true, space: V.hfSpace, stage: S.stage || "RUNNING", token: !!k.hf, map: M.summary });
+    } catch (e) { return json(200, { ok: false, error: str(e.message || e, 240) }); }
   }
   if (b.action === "ag-photo") {   // presenter photo — only with the person's consent
     const c = await cfg(); c.presenter = c.presenter || {};
@@ -155,13 +261,24 @@ ${feat}`;
 
   if (b.action === "ag-avatar") {   // start a presenter video at the paid service HO selected (D-ID or HeyGen)
     const c = await cfg(), P = c.presenter || {}, V = vcfg(c), keys = await keysOf(), prov = b.provider === "heygen" || b.provider === "did" ? b.provider : V.provider;
-    if (prov === "hf") return json(200, { ok: false, error: "The free Hugging Face presenter runs on this device — use the 🤗 button." });
-    if (!keys[prov]) return json(200, { ok: false, error: "Add the " + (prov === "heygen" ? "HeyGen" : "D-ID") + " API key first (Presenter settings)." });
+    if (prov === "hf" && !V.hfSpace) return json(200, { ok: false, error: "Set the free Hugging Face Space in Presenter settings first." });
+    if (prov !== "hf" && !keys[prov]) return json(200, { ok: false, error: "Add the " + (prov === "heygen" ? "HeyGen" : "D-ID") + " API key first (Presenter settings)." });
     if (!P.hasPhoto) return json(200, { ok: false, error: "Upload the presenter photo first." });
     const text = String(b.text || "").replace(/\s+/g, " ").trim().slice(0, 1800); if (text.length < 10) return json(400, { ok: false, error: "Write the script first." });
     const lang = langOf(b.lang), loc = AG_LANGS[lang];
     const scenes = (Array.isArray(b.scenes) ? b.scenes : []).slice(0, 10).map((s) => ({ say: str(s && s.say, 500), caption: str(s && s.caption, 80), shot: str(s && s.shot, 40) }));
     const v = { id: t.toString(36) + randomBytes(3).toString("hex"), provider: prov, title: str(b.title, 100) || "App guide video", tag: str(b.tag, 120), lang, k: str(b.k, 30), scenes, status: "making", at: t, by: rec.fullName || rec.username };
+    if (prov === "hf") {   // free model: runs in a background job (it can take several minutes)
+      const jid = t.toString(36) + randomBytes(5).toString("hex");
+      v.stage = "Starting…"; c.videos = [v].concat(c.videos || []).slice(0, 60); await store.set("config:appguide", c);
+      await store.set(`aghfjob:${jid}`, { vid: v.id, text, lang, at: t });
+      try {
+        const ac = new AbortController(), tm = setTimeout(() => ac.abort(), 5000);
+        try { const r = await (ctx.jobFetch || fetch)((env.SITE_URL || "") + "/.netlify/functions/agvideo-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: jid }), signal: ac.signal }); if (r && r.status >= 400) throw new Error("status " + r.status); }
+        catch (e) { if (!(e && e.name === "AbortError")) throw e; } finally { clearTimeout(tm); }
+      } catch (e) { v.status = "error"; v.error = "Couldn't start the free model job (" + e.message + ")."; await store.set("config:appguide", c); return json(200, { ok: false, error: v.error }); }
+      return json(200, { ok: true, video: { id: v.id, title: v.title, tag: v.tag, lang, k: v.k, scenes, status: v.status, stage: v.stage, at: t, by: v.by, provider: prov } });
+    }
     try {
       const ph = (!P.didImg && prov === "did") || (!P.hgAvatar && prov === "heygen") ? await store.get("agphoto") : null;
       if (prov === "heygen") {
@@ -214,7 +331,7 @@ ${feat}`;
   if (b.action === "ag-avatar-status") {
     const c = await cfg(), v = (c.videos || []).find((x) => x.id === str(b.id, 30));
     if (!v) return json(404, { ok: false, error: "Video not found." });
-    if (v.status !== "making") return json(200, { ok: true, status: v.status, error: v.error });
+    if (v.status !== "making" || v.provider === "hf") return json(200, { ok: true, status: v.status, error: v.error, stage: v.stage || "" });
     try {
       const fr = await freshVideo(v, await keysOf(), f);
       if (fr.status === "making") return json(200, { ok: true, status: "making" });
