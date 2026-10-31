@@ -21,6 +21,10 @@ import { accessAction } from "./access-core.mjs";
 import { deckAction } from "./deck-core.mjs";
 import { pmailAction } from "./pmail-core.mjs";
 import { portalAction } from "./portal-core.mjs";
+import { rewardsAction } from "./rewards-core.mjs";
+import { newsletterAction } from "./newsletter-core.mjs";
+import { appguideAction } from "./appguide-core.mjs";
+import { geoAction } from "./geo-core.mjs";
 const THEME_ID = /^[a-z0-9-]{2,24}$/;
 const pick = (v, list) => (list.includes(String(v || "")) ? String(v) : "");
 export function cleanTheme(c) {
@@ -870,7 +874,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -965,10 +969,12 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         notices = ns.filter((n) => !nseen.includes(n.id)).length; pinned = ns.filter((n) => n.pin).sort((x, y) => y.at - x.at).slice(0, 3).map((n) => ({ id: n.id, title: n.title, body: n.body, level: n.level }));
         calSoon = (await pool(await store.list("calev:"), 30, (k) => store.get(k))).filter((e) => e && (app === "admin" || !e.states || !e.states.length || e.states.includes(rec.state)) && e.date >= td && e.date <= soon).length;
       } catch (e) { }
+      let geoReq = 0;
+      try { geoReq = (await pool(await store.list("geoq:"), 40, (k) => store.get(k))).filter((q) => q && q.to.app === app && q.to.key === key && q.status === "pending" && q.exp > t).length; } catch (e) { }
       let insAlerts = 0;
       try { const cs = await cachedSnapshot(store); if (cs) { const al = await alertsFor(store, pool, cs.snap, app, rec), seen = ((await store.get(`insseen:${app}:${key}`)) || { ids: [] }).ids; insAlerts = al.filter((x) => !seen.includes(x.id) && (app !== "admin" || x.sev === "high")).length; } } catch (e) { }
       return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
-        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, hoReports: ml.fresh || 0, insAlerts, notices, calSoon, pinned });
+        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, hoReports: ml.fresh || 0, insAlerts, notices, calSoon, pinned, geoReq });
     }
     if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, role: roleOf(app, rec), master: !!rec.master, state: rec.state || "", name: rec.fullName });
     {
@@ -989,6 +995,10 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^acc-/.test(b.action)) return accessAction(b, surveyCtx());
     if (/^ds-/.test(b.action)) return deckAction(b, surveyCtx());
     if (/^pt-/.test(b.action)) return portalAction(b, surveyCtx());
+    if (/^nl-/.test(b.action)) return newsletterAction(b, Object.assign(surveyCtx(), { mailFetch }));
+    if (/^ag-/.test(b.action)) return appguideAction(b, surveyCtx());
+    if (/^geo-/.test(b.action)) return geoAction(b, surveyCtx());
+    if (/^rw-/.test(b.action)) return rewardsAction(b, Object.assign(surveyCtx(), { siteFetch }));
     if (/^pm-/.test(b.action)) return pmailAction(b, Object.assign(surveyCtx(), { mailFetch }));
     if (/^(ins|board|cal|fest|launch|mkt|tr|my)-/.test(b.action)) { const r = await insightsAction(b, Object.assign(surveyCtx(), { siteFetch })); if (r) return r; return json(400, { ok: false, error: "Unknown action." }); }
     if (b.action === "theme-set") {

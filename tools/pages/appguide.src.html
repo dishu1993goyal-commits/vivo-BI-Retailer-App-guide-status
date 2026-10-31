@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>App guide assistant</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.chat{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.bub{max-width:88%;padding:10px 12px;border-radius:16px;font-size:14px;line-height:1.5;white-space:pre-wrap}
+.bub.me{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
+.bub.ai{align-self:flex-start;background:var(--card);box-shadow:0 2px 8px rgba(20,24,51,.07);border-bottom-left-radius:4px}
+.bub ol{margin:6px 0 0;padding-left:20px}.bub .sp{border:0;background:none;font-size:16px;cursor:pointer;padding:2px 4px}
+.bub img{max-width:100%;border-radius:10px;margin-top:6px;max-height:280px;object-fit:contain;background:#F2F3F8}
+.mic{width:76px;height:76px;border-radius:50%;border:0;background:linear-gradient(135deg,#415FFF,#7B5CFF);color:#fff;font-size:32px;box-shadow:0 10px 26px rgba(65,95,255,.35);cursor:pointer;display:block;margin:12px auto 4px}
+.mic.on{background:linear-gradient(135deg,#E5484D,#FF7A59);animation:pl 1.2s infinite}@keyframes pl{50%{transform:scale(1.07)}}
+.ask{display:flex;gap:8px;margin-top:10px}.ask .tx{flex:1}
+.sug{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.sug span{background:#EEF0FF;color:#3346C9;border-radius:99px;padding:6px 11px;font-size:12.5px;cursor:pointer}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}@media(min-width:620px){.fg{grid-template-columns:1fr 1fr 1fr}}
+.fc{background:var(--card);border-radius:14px;padding:10px;box-shadow:0 2px 8px rgba(20,24,51,.06);cursor:pointer;border:2px solid transparent}.fc.on{border-color:var(--brand)}
+.fc img{width:34px;height:34px;border-radius:9px;object-fit:cover;float:left;margin-right:8px}.fc b{font-size:13px;display:block}.fc small{font-size:11.5px;color:var(--ink2)}
+.vid{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.vbox{position:relative;margin-top:8px}.vbox video{width:100%;border-radius:12px;background:#000;display:block}
+.aitag{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.65);color:#fff;font-size:11px;font-weight:700;border-radius:99px;padding:3px 9px}
+.ph{width:110px;height:110px;border-radius:50%;object-fit:cover;background:#EEF0F6;display:block}
+textarea.tx{min-height:120px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🗣️</span></div>
+  <h1>App guide assistant</h1><p>Ask by voice in English, Hindi or your language · manuals and videos for every Retailer app feature</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), FEATS = [], MEDIA = {}, ICON = {}, CFG = null, TAB = "ask", CHAT = [], MAN = null, SCR = null, VURL = {};
+  var O = Object.assign({ lang: "English", feat: "", speak: true, rate: 1 }, ls("ag-opt") || {});
+  function sv() { ls("ag-opt", O); }
+  var LANGS = [["English", "en-IN", "English"], ["Hindi", "hi-IN", "हिन्दी"], ["Hinglish", "en-IN", "Hinglish"], ["Tamil", "ta-IN", "தமிழ்"], ["Telugu", "te-IN", "తెలుగు"], ["Kannada", "kn-IN", "ಕನ್ನಡ"], ["Malayalam", "ml-IN", "മലയാളം"], ["Marathi", "mr-IN", "मराठी"], ["Bengali", "bn-IN", "বাংলা"], ["Gujarati", "gu-IN", "ગુજરાતી"], ["Punjabi", "pa-IN", "ਪੰਜਾਬੀ"], ["Odia", "or-IN", "ଓଡ଼ିଆ"]];
+  var LC = {}; LANGS.forEach(function (l) { LC[l[0]] = l[1]; });
+  var SUG = { English: ["How do I check scheme payout?", "How to scan an IMEI?", "How do I place a new order?", "Where do I raise a support ticket?"], Hindi: ["स्कीम पेआउट कैसे देखें?", "IMEI कैसे स्कैन करें?", "नया ऑर्डर कैसे करें?", "सपोर्ट टिकट कहाँ डालें?"], Hinglish: ["Scheme payout kaise check karein?", "IMEI scan kaise karein?", "New order kaise place karein?", "Support ticket kahan raise karein?"] };
+  var LIBS = { pdf: "/vendor/jspdf/jspdf.umd.min.js" }, LOADED = {};
+  function lib(k) { return LOADED[k] || (LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIBS[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load the PDF maker.")); }; document.head.appendChild(s); })); }
+
+  // ---------- the guide content: the dashboard's own Retailer-app feature pages ----------
+  function loadGuide() {
+    return fetch("/index.html", { cache: "force-cache" }).then(function (r) { if (!r.ok) throw new Error("Couldn't open the dashboard guide."); return r.text(); }).then(function (t) {
+      var i = t.indexOf("const AFEATS = ["), j = t.indexOf("\n  ];", i);
+      if (i < 0 || j < 0) throw new Error("The dashboard has no Retailer app feature pages yet.");
+      FEATS = Function('"use strict";return ' + t.slice(i + 15, j + 4))();
+      var ic = /const ICON = (\{[^}]*\})/.exec(t); if (ic) try { ICON = Function('"use strict";return ' + ic[1])(); } catch (e) { }
+      var a = t.indexOf('id="dd">'), b = a >= 0 ? t.indexOf("<\/script>", a) : -1;
+      if (a >= 0 && b > a) try { (JSON.parse(t.slice(a + 8, b)).media || []).forEach(function (m) { MEDIA[m.id] = m.src; }); } catch (e) { }
+    });
+  }
+  var icon = function (k) { return MEDIA[ICON[k] || "ic_" + k] || ""; };
+  function featText(f) { return "[" + f.k + "] " + f.name + " — " + f.tag + "\nHow to open and use: " + f.nav.map(function (s, i) { return (i + 1) + ". " + s; }).join(" ") + "\nWhat it does: " + f.items.map(function (x) { return x[0] + ": " + x[1]; }).join("; ") + "\nBenefits: " + f.ben.map(function (x) { return x[0] + ": " + x[1]; }).join("; ") + "\nScreenshots: " + f.shots.map(function (s) { return s[0] + " (" + s[1] + ")"; }).join(", "); }
+  function guideText() { return FEATS.map(featText).join("\n\n"); }
+  function fk(k) { return FEATS.filter(function (f) { return f.k === k; })[0]; }
+
+  // ---------- voice: speech-to-text and read-aloud (app bridges first, then the browser) ----------
+  var REC = null, LISTEN = false;
+  function listen(onText) {
+    if (LISTEN) { try { REC && REC.stop(); } catch (e) { } return; }
+    var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!R && window.BISpeech) {   // in the app: Android speech recogniser
+      window.__bisp = function (type, a) { if (type === "start") mic(true); else if (type === "partial") $("q").value = a; else if (type === "final") { $("q").value = a; onText(a); } else if (type === "error") { toast(a === "not-allowed" ? "Allow the microphone for the app" : a === "no-speech" ? "Didn't catch that — try again" : "Voice input error (" + a + ")"); } else if (type === "end") mic(false); };
+      REC = { stop: function () { window.BISpeech.stop(); } }; window.BISpeech.start(LC[O.lang] || "en-IN", true); mic(true); return;
+    }
+    if (!R) { toast("Voice input isn't available here — type your question"); return; }
+    REC = new R(); REC.lang = LC[O.lang] || "en-IN"; REC.interimResults = true; REC.maxAlternatives = 1;
+    REC.onstart = function () { mic(true); }; REC.onend = function () { mic(false); };
+    REC.onerror = function (e) { mic(false); toast(e.error === "not-allowed" ? "Allow the microphone to talk to the assistant" : e.error === "no-speech" ? "Didn't catch that — try again" : "Voice input error (" + e.error + ")"); };
+    REC.onresult = function (e) { var r = e.results[e.results.length - 1], s = r[0].transcript; $("q").value = s; if (r.isFinal) onText(s); };
+    try { REC.start(); } catch (e) { toast("Voice input is busy — try again"); }
+  }
+  function mic(on) { LISTEN = on; var b = $("mic"); if (b) { b.classList.toggle("on", on); b.textContent = on ? "■" : "🎙️"; } if ($("mh")) $("mh").textContent = on ? "Listening… speak now" : "Tap the mic and ask"; }
+  function speak(text) {
+    stopSpeak(); if (!text) return;
+    var lc = LC[O.lang] || "en-IN";
+    if (window.BITTS) { window.__bitts = function (type, a) { if (type === "nolang") toast("This phone has no voice for " + O.lang + " — install it in Settings → Text-to-speech"); }; window.BITTS.speak(text, lc, +O.rate || 1); return; }
+    if (!window.speechSynthesis) return;
+    var u = new SpeechSynthesisUtterance(text), vs = speechSynthesis.getVoices(), v = vs.filter(function (x) { return x.lang && x.lang.replace("_", "-").toLowerCase() === lc.toLowerCase(); })[0] || vs.filter(function (x) { return x.lang && x.lang.slice(0, 2) === lc.slice(0, 2); })[0];
+    if (v) u.voice = v; else if (lc.slice(0, 2) !== "en") toast("This browser has no " + O.lang + " voice — the answer is on screen");
+    u.lang = lc; u.rate = +O.rate || 1; speechSynthesis.speak(u);
+  }
+  function stopSpeak() { try { if (window.BITTS) window.BITTS.stop(); else if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { } }
+
+  // ---------- page ----------
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    Promise.all([loadGuide(), api({ action: "ag-config" })]).then(function (r) { CFG = r[1].ok ? r[1] : { videos: [], presenter: {} }; var h = (location.hash || "").slice(1); if (/^(ask|manual|videos|presenter)$/.test(h)) TAB = h; draw(); })
+      .catch(function (e) { VIEW.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+  }
+  function draw() {
+    stopSpeak();
+    var tabs = [["ask", "🗣️ Ask"], ["manual", "📘 Manual"], ["videos", "🎬 Videos"]].concat(ADMIN ? [["presenter", "🧑‍💼 Presenter"]] : []);
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div class="card" style="padding:10px 12px"><label class="lb" style="margin-top:0">Language</label><div class="fx" id="lg">' + LANGS.map(function (l) { return '<span data-l="' + l[0] + '" class="' + (l[0] === O.lang ? "on" : "") + '">' + l[2] + "</span>"; }).join("") + '</div></div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-l]"), function (b) { b.onclick = function () { O.lang = b.dataset.l; sv(); MAN = null; SCR = null; draw(); }; });
+    ({ ask: pAsk, manual: pManual, videos: pVideos, presenter: pPresenter })[TAB]();
+  }
+  // ---- ask ----
+  function pAsk() {
+    var sug = SUG[O.lang] || SUG.English;
+    $("pane").innerHTML = '<div class="card"><button class="mic" id="mic" aria-label="Talk">🎙️</button><div class="muted" id="mh" style="text-align:center;font-size:13px">Tap the mic and ask</div>' +
+      '<div class="ask"><input class="tx" id="q" placeholder="…or type: how do I check scheme payout?" autocomplete="off"><button class="btn pri" id="go">Ask</button></div>' +
+      '<div class="sug">' + sug.map(function (s) { return "<span>" + esc(s) + "</span>"; }).join("") + '</div><div class="row" style="margin-top:8px;font-size:12.5px"><label><input type="checkbox" id="spk"' + (O.speak ? " checked" : "") + '> 🔊 Read answers aloud</label><span class="sp"></span><select class="tx" id="rt" style="width:auto;padding:4px 8px;font-size:12.5px"><option value="0.85">Slow</option><option value="1">Normal</option><option value="1.2">Fast</option></select>' + (CHAT.length ? '<button class="btn ghost sm" id="clr">Clear</button>' : "") + '</div></div><div class="chat" id="chat"></div>';
+    $("rt").value = String(O.rate || 1); $("rt").onchange = function () { O.rate = +this.value; sv(); };
+    $("spk").onchange = function () { O.speak = this.checked; sv(); if (!O.speak) stopSpeak(); };
+    if ($("clr")) $("clr").onclick = function () { CHAT = []; pAsk(); };
+    $("mic").onclick = function () { stopSpeak(); listen(ask); };
+    $("go").onclick = function () { ask($("q").value); };
+    $("q").onkeydown = function (e) { if (e.key === "Enter") ask($("q").value); };
+    [].forEach.call($("pane").querySelectorAll(".sug span"), function (s) { s.onclick = function () { ask(s.textContent); }; });
+    drawChat();
+  }
+  function drawChat() {
+    var c = $("chat"); if (!c) return;
+    c.innerHTML = CHAT.map(function (m, i) {
+      if (m.me) return '<div class="bub me">' + esc(m.text) + "</div>";
+      if (m.wait) return '<div class="bub ai"><span class="spin" style="display:inline-block;width:16px;height:16px;vertical-align:middle"></span> Thinking…</div>';
+      var f = m.feature && fk(m.feature), shot = f && f.shots[0] && MEDIA[f.shots[0][0]];
+      return '<div class="bub ai">' + esc(m.text) + (m.steps && m.steps.length ? "<ol>" + m.steps.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ol>" : "") + (shot ? '<img src="' + shot + '" alt="' + esc(f.shots[0][1]) + '">' : "") +
+        '<div style="margin-top:4px"><button class="sp" data-say="' + i + '" title="Read aloud">🔊</button>' + (f ? ' <button class="btn ghost sm" data-man="' + f.k + '">📘 ' + esc(f.name) + "</button>" : "") + "</div>" + (m.followups && m.followups.length ? '<div class="sug">' + m.followups.map(function (s) { return '<span data-fu="1">' + esc(s) + "</span>"; }).join("") + "</div>" : "") + "</div>";
+    }).join("");
+    [].forEach.call(c.querySelectorAll("[data-say]"), function (b) { b.onclick = function () { var m = CHAT[+b.dataset.say]; speak(m.text + " " + (m.steps || []).join(". ")); }; });
+    [].forEach.call(c.querySelectorAll("[data-man]"), function (b) { b.onclick = function () { O.feat = b.dataset.man; sv(); TAB = "manual"; draw(); }; });
+    [].forEach.call(c.querySelectorAll("[data-fu]"), function (s) { s.onclick = function () { ask(s.textContent); }; });
+    if (CHAT.length) c.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+  function ask(q) {
+    q = String(q || "").trim(); if (q.length < 2) return; if ($("q")) $("q").value = "";
+    var hist = CHAT.filter(function (m) { return !m.wait; }).slice(-6).map(function (m) { return { me: !!m.me, text: m.text }; });
+    CHAT.push({ me: true, text: q }); CHAT.push({ wait: true }); drawChat();
+    api({ action: "ag-ask", q: q, lang: O.lang, guide: guideText(), history: hist }).then(function (r) {
+      CHAT.pop(); CHAT.push(r.ok ? { text: r.answer, steps: r.steps, feature: r.feature, followups: r.followups } : { text: "⚠️ " + r.error }); drawChat();
+      if (r.ok && O.speak) speak(r.answer + (r.steps.length ? " " + r.steps.join(". ") : ""));
+    });
+  }
+  // ---- manual ----
+  function pManual() {
+    $("pane").innerHTML = '<div class="card"><div class="row"><b style="flex:1">Retailer app manual · ' + esc(O.lang) + '</b></div><div class="muted" style="font-size:12.5px">Built from the dashboard’s Retailer app pages: ' + FEATS.length + " features, their steps, screenshots and benefits." + (O.lang !== "English" ? " AI translates it." : "") + '</div><div class="acts3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:10px"><button class="btn pri" id="mk">' + (MAN ? "↻ Rebuild" : "📘 Build manual") + '</button><button class="btn sec" id="pdf"' + (MAN ? "" : " disabled") + '>📄 PDF</button><button class="btn sec" id="htm"' + (MAN ? "" : " disabled") + '>⬇ HTML</button></div><div id="prog"></div></div><div id="man"></div>';
+    $("mk").onclick = buildManual; $("pdf").onclick = function () { pdf(manualHtml(), "Retailer_app_manual_" + O.lang + ".pdf"); };
+    $("htm").onclick = function () { download(new Blob(['<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Retailer app manual</title></head><body style="margin:0">' + manualHtml() + "</body></html>"], { type: "text/html" }), "Retailer_app_manual_" + O.lang + ".html"); };
+    if (MAN) showManual(); else if (O.lang === "English") buildManual();
+  }
+  function buildManual() {
+    if (O.lang === "English") { MAN = { title: "vivo Retailer app — user manual", intro: "Everything a retailer needs to use the vivo Retailer app: where each feature is, how to use it step by step, and why it helps.", sections: FEATS.map(function (f) { return { k: f.k, name: f.name, purpose: f.tag, steps: f.nav, tips: f.items.map(function (x) { return x[0] + " — " + x[1]; }), benefits: f.ben.map(function (x) { return x[0] + " — " + x[1]; }) }; }), faq: [], help: "Need help? Raise a ticket in Retailer Support Desk or call your vivo BI team." }; pManual(); return; }
+    $("prog").innerHTML = '<div class="loading"><div class="spin"></div>AI is writing the manual in ' + esc(O.lang) + "… (about a minute)</div>"; $("mk").disabled = true;
+    api({ action: "ag-manual", lang: O.lang, feats: guideText() }).then(function (r) { if (!r.ok) { $("prog").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; $("mk").disabled = false; return; } MAN = r.manual; pManual(); });
+  }
+  function manualHtml() {
+    var M = MAN, e = function (s) { return esc(s == null ? "" : String(s)); }, li = function (L, num) { return L && L.length ? "<" + (num ? "ol" : "ul") + ' style="margin:4px 0 8px;padding-left:22px;font:14px/1.55 Arial,sans-serif;color:#2A2F45">' + L.map(function (x) { return "<li>" + e(x) + "</li>"; }).join("") + "</" + (num ? "ol" : "ul") + ">" : ""; };
+    return '<div style="background:#F2F5FF;padding:14px 10px;font-family:Arial,sans-serif"><div style="max-width:680px;margin:0 auto"><div style="background:#0A1C5C;color:#fff;border-radius:18px;padding:22px"><div style="font:700 11px Arial;letter-spacing:3px;color:#8FA2FF">VIVO RETAILER APP</div><div style="font:800 26px Arial;margin-top:6px">' + e(M.title) + '</div><div style="font:14px/1.5 Arial;opacity:.9;margin-top:8px">' + e(M.intro) + "</div></div>" +
+      '<div style="background:#fff;border-radius:14px;padding:14px 18px;margin:12px 0;font:14px Arial;color:#2A2F45"><b>Contents</b>' + li(M.sections.map(function (s) { return s.name; }), true) + "</div>" +
+      M.sections.map(function (s, i) { var f = fk(s.k) || {}, shots = (f.shots || []).filter(function (x) { return MEDIA[x[0]]; }); return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin:12px 0;border:1px solid #E6E8F2;page-break-inside:avoid"><div style="font:800 18px Arial;color:#0A1C5C">' + (icon(s.k) ? '<img src="' + icon(s.k) + '" alt="" style="width:30px;height:30px;border-radius:8px;vertical-align:middle;margin-right:8px">' : "") + (i + 1) + ". " + e(s.name) + '</div><div style="font:italic 14px Arial;color:#415FFF;margin:6px 0">' + e(s.purpose) + '</div><div style="font:700 13px Arial;color:#0A1C5C;margin-top:8px">How to use it</div>' + li(s.steps, true) + (shots.length ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0">' + shots.map(function (x) { return '<figure style="margin:0;flex:1;min-width:140px;max-width:220px;text-align:center"><img src="' + MEDIA[x[0]] + '" alt="" style="width:100%;border-radius:10px;border:1px solid #E6E8F2"><figcaption style="font:11.5px Arial;color:#5E6484;margin-top:3px">' + e(x[1]) + "</figcaption></figure>"; }).join("") + "</div>" : "") + (s.tips && s.tips.length ? '<div style="font:700 13px Arial;color:#0A1C5C;margin-top:8px">What you can do</div>' + li(s.tips) : "") + (s.benefits && s.benefits.length ? '<div style="font:700 13px Arial;color:#0A1C5C;margin-top:8px">Why it helps</div>' + li(s.benefits) : "") + "</div>"; }).join("") +
+      (M.faq && M.faq.length ? '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin:12px 0"><div style="font:800 17px Arial;color:#0A1C5C">FAQ</div>' + M.faq.map(function (x) { return '<div style="margin-top:8px;font:14px/1.5 Arial;color:#2A2F45"><b>' + e(x.q) + "</b><br>" + e(x.a) + "</div>"; }).join("") + "</div>" : "") +
+      '<div style="text-align:center;font:12px Arial;color:#5E6484;margin:14px 0">' + e(M.help || "") + "<br>vivo Business Innovation · " + e(O.lang) + "</div></div></div>";
+  }
+  function showManual() { var fr = document.createElement("iframe"); fr.className = "nlf"; fr.style.cssText = "width:100%;border:0;border-radius:14px;min-height:600px;margin-top:10px;background:#fff"; $("man").appendChild(fr); fr.srcdoc = '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0">' + manualHtml() + "</body></html>"; fr.onload = function () { try { fr.style.height = fr.contentDocument.body.scrollHeight + 20 + "px"; var t = O.feat && fr.contentDocument.body.querySelectorAll("div[style*='page-break']")[FEATS.indexOf(fk(O.feat))]; if (t) { window.scrollTo(0, fr.offsetTop + t.offsetTop - 10); O.feat = ""; } } catch (x) { } }; }
+  function pdf(html, name) {
+    toast("Making the PDF…");
+    var w = 700, box = document.createElement("div"); box.style.cssText = "position:fixed;left:-9999px;top:0;width:" + w + "px"; box.innerHTML = html; document.body.appendChild(box);
+    Promise.resolve().then(function () {
+      var hgt = box.scrollHeight, xml = new XMLSerializer().serializeToString(box.firstChild || box); box.remove();
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + hgt + '"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:' + w + 'px">' + xml + "</div></foreignObject></svg>";
+      return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { var c = document.createElement("canvas"), k = 2; c.width = w * k; c.height = hgt * k; var g = c.getContext("2d"); g.scale(k, k); g.fillStyle = "#fff"; g.fillRect(0, 0, w, hgt); g.drawImage(im, 0, 0); res(c); }; im.onerror = function () { rej(new Error("Couldn't draw the manual.")); }; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+    }).then(function (c) { return lib("pdf").then(function () { return c; }); }).then(function (c) {
+      var doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" }), pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight(), sliceH = Math.floor(c.width * ph / pw), y = 0, first = true;
+      while (y < c.height) { var s = document.createElement("canvas"); s.width = c.width; s.height = Math.min(sliceH, c.height - y); s.getContext("2d").drawImage(c, 0, -y); if (!first) doc.addPage(); doc.addImage(s.toDataURL("image/jpeg", 0.88), "JPEG", 0, 0, pw, pw * s.height / s.width); first = false; y += sliceH; }
+      download(doc.output("blob"), name);
+    }).catch(function (e) { toast(e.message); });
+  }
+  // ---- videos ----
+  function pVideos() {
+    if (!O.feat || !fk(O.feat)) O.feat = FEATS[0] ? FEATS[0].k : "";
+    var P = CFG.presenter || {}, vids = CFG.videos || [];
+    $("pane").innerHTML = (vids.length ? '<div class="card"><b>🎬 Presenter videos</b>' + vids.map(function (v) { return '<div class="vid" data-v="' + v.id + '"><div class="row"><b style="flex:1;font-size:14px">' + esc(v.title) + '</b><span class="muted" style="font-size:12px">' + esc(v.lang) + " · " + dOnly(v.at) + "</span></div>" + (v.status === "done" ? '<div class="row" style="margin-top:6px"><button class="btn pri sm" data-play="' + v.id + '">▶ Play</button>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '" style="color:var(--bad)">🗑</button>' : "") + '</div><div class="vbox" id="vb-' + v.id + '"></div>' : v.status === "error" ? '<div class="err" style="margin-top:6px">Failed: ' + esc(v.error || "") + '</div>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '">Remove</button>' : "") : '<div class="muted" style="margin-top:6px"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Making the video… (1–3 minutes)</div>') + "</div>"; }).join("") + "</div>" : "") +
+      (ADMIN ? '<div class="card"><b>✨ Make a video</b><div class="muted" style="font-size:12.5px">Pick a feature: AI writes the narration in ' + esc(O.lang) + '; then make a captioned slideshow from the app screenshots' + (P.hasPhoto ? ", or a video of " + esc(P.name || "the presenter") + " speaking it" : "") + '.</div><div class="fg">' + FEATS.map(function (f) { return '<div class="fc' + (f.k === O.feat ? " on" : "") + '" data-f="' + f.k + '">' + (icon(f.k) ? '<img src="' + icon(f.k) + '" alt="">' : "") + "<b>" + esc(f.name) + "</b><small>" + esc(f.tag.slice(0, 60)) + "</small></div>"; }).join("") + '</div><button class="btn sec block" id="ws" style="margin-top:10px">✍️ Write the narration</button><div id="scr"></div></div>' : (vids.length ? "" : '<div class="card empty"><div class="big">🎬</div>No videos yet. HO will add feature videos here.</div>'));
+    [].forEach.call($("pane").querySelectorAll("[data-f]"), function (c) { c.onclick = function () { O.feat = c.dataset.f; sv(); SCR = null; pVideos(); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-play]"), function (b) { b.onclick = function () { play(b.dataset.play); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-del]"), function (b) { b.onclick = function () { api({ action: "ag-video-delete", id: b.dataset.del }).then(function () { CFG.videos = CFG.videos.filter(function (v) { return v.id !== b.dataset.del; }); pVideos(); }); }; });
+    if ($("ws")) $("ws").onclick = writeScript;
+    if (SCR && SCR.k === O.feat && SCR.lang === O.lang) showScript();
+    vids.filter(function (v) { return v.status === "making"; }).forEach(function (v) { poll(v.id); });
+  }
+  function play(id) {
+    var box = $("vb-" + id); if (!box) return;
+    (VURL[id] ? Promise.resolve({ ok: true, url: VURL[id] }) : api({ action: "ag-video-url", id: id })).then(function (r) {
+      if (!r.ok) return toast(r.error); VURL[id] = r.url;
+      box.innerHTML = '<video controls autoplay playsinline src="' + esc(r.url) + '"></video><span class="aitag">AI-generated video</span><div class="row" style="margin-top:6px"><a class="btn ghost sm" href="' + esc(r.url) + '" target="_blank" rel="noopener" download>⬇ Download</a></div>';
+    });
+  }
+  var POLLING = {};
+  function poll(id) {
+    if (POLLING[id]) return; POLLING[id] = 1;
+    var tick = function () { api({ action: "ag-avatar-status", id: id }).then(function (r) { var v = CFG.videos.filter(function (x) { return x.id === id; })[0]; if (!v) { delete POLLING[id]; return; } if (r.ok && r.status !== "making") { v.status = r.status; v.error = r.error; delete POLLING[id]; if (r.url) VURL[id] = r.url; if (TAB === "videos") pVideos(); toast(r.status === "done" ? "Video ready ✓" : "Video failed"); } else setTimeout(tick, 8000); }); };
+    setTimeout(tick, 6000);
+  }
+  function writeScript() {
+    var f = fk(O.feat); if (!f) return;
+    $("scr").innerHTML = '<div class="loading"><div class="spin"></div>Writing the narration in ' + esc(O.lang) + "…</div>";
+    api({ action: "ag-script", lang: O.lang, feat: featText(f) }).then(function (r) { if (!r.ok) { $("scr").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } SCR = { k: f.k, lang: O.lang, title: r.title || f.name, script: r.script, scenes: r.scenes }; showScript(); });
+  }
+  function showScript() {
+    var P = CFG.presenter || {}, f = fk(SCR.k);
+    $("scr").innerHTML = '<label class="lb">Title</label><input class="tx" id="st" value="' + esc(SCR.title) + '"><label class="lb">Narration (edit freely)</label><textarea class="tx" id="sx">' + esc(SCR.script) + '</textarea><div class="row" style="margin-top:6px"><button class="btn ghost sm" id="lis">🔊 Listen</button><span class="muted" style="font-size:12px">' + SCR.script.split(/\s+/).length + " words</span></div>" +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn sec" id="sl">🎞️ Captioned slideshow</button><button class="btn pri" id="av"' + (P.hasPhoto && CFG.hasKey ? "" : " disabled") + '>🧑‍💼 Presenter video</button></div>' + (P.hasPhoto && CFG.hasKey ? "" : '<div class="muted" style="font-size:12px;margin-top:6px">Presenter video: add the photo and the D-ID key in 🧑‍💼 Presenter first.</div>') + '<div id="vo"></div>';
+    var keep = function () { SCR.title = $("st").value; SCR.script = $("sx").value; };
+    $("st").oninput = keep; $("sx").oninput = keep;
+    $("lis").onclick = function () { speak($("sx").value); };
+    $("sl").onclick = function () { keep(); slideshow(f, SCR); };
+    $("av").onclick = function () { keep(); this.disabled = true; api({ action: "ag-avatar", text: SCR.script, lang: SCR.lang, title: SCR.title, k: SCR.k }).then(function (r) { if (!r.ok) { toast(r.error); $("av").disabled = false; return; } CFG.videos.unshift(r.video); toast("Making the video — it appears at the top in 1–3 minutes"); pVideos(); window.scrollTo(0, 0); }); };
+  }
+  // captioned slideshow: screenshots + captions + narration text, recorded from a canvas
+  function slideshow(f, S) {
+    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast("This device can't record videos — try Chrome");
+    var W = 720, H = 1280, c = document.createElement("canvas"); c.width = W; c.height = H; var g = c.getContext("2d");
+    var shots = f.shots.filter(function (s) { return MEDIA[s[0]]; }), scenes = S.scenes.length ? S.scenes : [{ say: S.script, caption: f.name }];
+    var frames = [{ kind: "title" }].concat(scenes.map(function (s, i) { return { kind: "scene", s: s, img: MEDIA[s.shot] || (shots[i % Math.max(1, shots.length)] || [])[0] && MEDIA[(shots[i % shots.length])[0]] }; })).concat([{ kind: "end" }]);
+    var imgs = {}; $("vo").innerHTML = '<div class="loading"><div class="spin"></div>Recording the slideshow… <span id="vp">0%</span></div>';
+    Promise.all(frames.filter(function (x) { return x.img; }).map(function (x) { return new Promise(function (res) { var im = new Image(); im.onload = function () { imgs[x.img] = im; res(); }; im.onerror = res; im.src = x.img; }); })).then(function () {
+      var ic = new Image(); ic.src = icon(f.k) || "";
+      var wrap = function (txt, x, y, maxW, lh, maxL) { var words = String(txt || "").split(/\s+/), line = "", n = 0; for (var i = 0; i < words.length; i++) { var t = line ? line + " " + words[i] : words[i]; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = words[i]; if (++n >= maxL - 1) { line = words.slice(i).join(" "); if (g.measureText(line).width > maxW) { while (line.length && g.measureText(line + "…").width > maxW) line = line.slice(0, -1); line += "…"; } break; } } else line = t; } g.fillText(line, x, y); return y + lh; };
+      var bg = function () { var gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "#0A1C5C"); gr.addColorStop(1, "#2C3FBF"); g.fillStyle = gr; g.fillRect(0, 0, W, H); };
+      var drawF = function (fr, p) {
+        bg(); g.textAlign = "center"; g.fillStyle = "#8FA2FF"; g.font = "700 22px Arial"; g.fillText("VIVO RETAILER APP · " + O.lang.toUpperCase(), W / 2, 70);
+        if (fr.kind === "title") { if (ic.complete && ic.naturalWidth) g.drawImage(ic, W / 2 - 70, 330, 140, 140); g.fillStyle = "#fff"; g.font = "800 54px Arial"; wrap(S.title, W / 2, 560, W - 100, 64, 3); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap(f.tag, W / 2, 780, W - 120, 36, 3); }
+        else if (fr.kind === "end") { g.fillStyle = "#fff"; g.font = "800 46px Arial"; g.fillText("Try it today in the app", W / 2, 560); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap("Questions? Ask the App guide assistant or raise a ticket in Retailer Support Desk.", W / 2, 630, W - 120, 36, 3); }
+        else { var im = fr.img && imgs[fr.img]; if (im) { var mh = 720, mw = W - 120, k = Math.min(mw / im.width, mh / im.height), iw = im.width * k, ih = im.height * k; g.fillStyle = "#fff"; g.fillRect((W - iw) / 2 - 8, 130 - 8, iw + 16, ih + 16); g.drawImage(im, (W - iw) / 2, 130, iw, ih); }
+          g.fillStyle = "#FFD15C"; g.font = "800 40px Arial"; wrap(fr.s.caption, W / 2, 920, W - 80, 48, 2); g.fillStyle = "#fff"; g.font = "26px Arial"; wrap(fr.s.say, W / 2, 1030, W - 90, 36, 5); }
+        g.fillStyle = "rgba(255,255,255,.25)"; g.fillRect(0, H - 8, W, 8); g.fillStyle = "#FFD15C"; g.fillRect(0, H - 8, W * p, 8);
+      };
+      var per = 4200, total = frames.length * per, st = c.captureStream(25), rec, chunks = [];
+      var mt = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"].filter(function (m) { return MediaRecorder.isTypeSupported(m); })[0];
+      rec = new MediaRecorder(st, mt ? { mimeType: mt, videoBitsPerSecond: 2500000 } : undefined); rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function () { var blob = new Blob(chunks, { type: (mt || "video/webm").split(";")[0] }), url = URL.createObjectURL(blob), ext = /mp4/.test(mt || "") ? "mp4" : "webm"; $("vo").innerHTML = '<div class="vbox"><video controls playsinline src="' + url + '"></video></div><button class="btn pri block" id="dlv" style="margin-top:8px">⬇ Download video</button><div class="muted" style="font-size:12px;margin-top:4px">Silent captioned video — narration is in the captions. For a spoken video use 🧑‍💼 Presenter video.</div>'; $("dlv").onclick = function () { download(blob, (S.title || f.name).replace(/[^\w]+/g, "_") + "." + ext); }; };
+      var t0 = performance.now(); rec.start(500);
+      (function loop() { var e = performance.now() - t0, i = Math.min(frames.length - 1, Math.floor(e / per)); drawF(frames[i], Math.min(1, e / total)); if ($("vp")) $("vp").textContent = Math.round(Math.min(1, e / total) * 100) + "%"; if (e < total) requestAnimationFrame(loop); else setTimeout(function () { rec.stop(); }, 300); })();
+    });
+  }
+  // ---- presenter (HO) ----
+  function pPresenter() {
+    var P = CFG.presenter || {};
+    $("pane").innerHTML = '<div class="card"><b>🧑‍💼 AI presenter</b><div class="muted" style="font-size:12.5px;margin-top:2px">Upload a clear, front-facing photo of the person who will present (for example at a vivo store). Videos are made by D-ID and always carry an “AI-generated” label.</div>' +
+      '<div class="row" style="margin-top:10px;align-items:center"><img class="ph" id="php" alt="">' + '<div style="flex:1"><label class="lb" style="margin-top:0">Presenter name</label><input class="tx" id="pn" value="' + esc(P.name || "") + '" placeholder="e.g. Priya"><label class="lb">Voice</label><select class="tx" id="pv"><option value="f">Female</option><option value="m">Male</option></select></div></div>' +
+      (P.hasPhoto ? '<div class="muted" style="font-size:12px;margin-top:6px">Consent confirmed by ' + esc(P.consentBy) + " on " + dOnly(P.consentAt) + '</div><button class="btn ghost sm" id="rm" style="color:var(--bad);margin-top:6px">Remove photo</button>' : "") +
+      '<label class="lb">' + (P.hasPhoto ? "Replace photo" : "Photo") + '</label><input type="file" accept="image/jpeg,image/png" id="pf" class="tx"><label style="display:flex;gap:8px;font-size:13px;margin-top:8px;align-items:flex-start"><input type="checkbox" id="cs" style="margin-top:3px"> <span>The person in this photo has agreed in writing to AI videos of them speaking for vivo’s retailer training, and knows they will be labelled AI-generated.</span></label>' +
+      '<button class="btn pri block" id="sv" style="margin-top:10px">Save presenter</button></div>' +
+      '<div class="card"><b>🔑 D-ID API key</b><div class="muted" style="font-size:12.5px">Create an account at d-id.com → API → copy the key and paste it here. It is stored on the server and never shown again. Each video uses D-ID credits.</div><div class="row" style="margin-top:8px"><input class="tx" id="dk" type="password" placeholder="' + (CFG.hasKey ? "Key saved ✓ — paste to replace" : "Paste the D-ID key") + '" autocomplete="off" style="flex:1"><button class="btn sec" id="dks">Save</button>' + (CFG.hasKey ? '<button class="btn ghost" id="dkr">Remove</button>' : "") + "</div></div>" +
+      '<div class="card"><b>📝 Extra notes for the assistant</b><div class="muted" style="font-size:12.5px">Anything the assistant should know beyond the dashboard pages — helpline numbers, rules, new features.</div><textarea class="tx" id="kb" placeholder="e.g. Scheme payout is credited by the 10th of next month.">' + esc(CFG.kb || "") + '</textarea><button class="btn sec block" id="kbs" style="margin-top:8px">Save notes</button></div>';
+    $("pv").value = P.voice === "m" ? "m" : "f";
+    if (P.hasPhoto) api({ action: "ag-photo-get" }).then(function (r) { if (r.ok && r.data) $("php").src = r.data; });
+    var photo = "";
+    $("pf").onchange = function () { var fl = this.files[0]; if (!fl) return; var rd = new FileReader(); rd.onload = function () { var im = new Image(); im.onload = function () { var k = Math.min(1, 1024 / Math.max(im.width, im.height)), cv = document.createElement("canvas"); cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); photo = cv.toDataURL("image/jpeg", 0.9); $("php").src = photo; }; im.src = rd.result; }; rd.readAsDataURL(fl); };
+    var done = function (r) { if (!r.ok) return toast(r.error); CFG.presenter = r.presenter; CFG.kb = r.kb; toast("Saved"); pPresenter(); };
+    $("sv").onclick = function () {
+      var info = { action: "ag-save", presenter: { name: $("pn").value, voice: $("pv").value } };
+      if (!photo) return api(info).then(done);
+      if (!$("cs").checked) return toast("Tick the consent box first");
+      api({ action: "ag-photo", data: photo, consent: true, name: $("pn").value }).then(function (r) { if (!r.ok) return toast(r.error); api(info).then(done); });
+    };
+    if ($("rm")) $("rm").onclick = function () { api({ action: "ag-photo", remove: true }).then(done); };
+    $("dks").onclick = function () { var k = $("dk").value.trim(); if (!k) return; api({ action: "ag-key", did: k }).then(function (r) { CFG.hasKey = r.hasKey; toast(r.ok ? "Key saved" : r.error); pPresenter(); }); };
+    if ($("dkr")) $("dkr").onclick = function () { api({ action: "ag-key", did: "" }).then(function (r) { CFG.hasKey = false; pPresenter(); }); };
+    $("kbs").onclick = function () { api({ action: "ag-save", kb: $("kb").value }).then(done); };
+  }
+  load();
+})();
+</script>
+</body>
+</html>

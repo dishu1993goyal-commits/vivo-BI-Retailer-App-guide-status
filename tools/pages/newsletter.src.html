@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>BI newsletter</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}@media(max-width:560px){.g3{grid-template-columns:1fr 1fr}}
+.fx{display:flex;flex-wrap:wrap;gap:6px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.nlf{width:100%;border:0;border-radius:14px;background:#fff;box-shadow:0 8px 24px rgba(20,24,51,.12);min-height:600px;margin-top:10px}
+.acts3{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.acts3 .btn{margin:0}
+.li{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer}.li b{font-size:15px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📰</span></div>
+  <h1>BI newsletter</h1><p>Every month or quarter — scores, KPIs, achievements, projects and the field, written by AI from the dashboard</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), W = null, DA = null, PERIODS = [], CACHE = {}, TAB = ADMIN ? "make" : "read", HTML = "", HTML_IMG = "", CUR = null, BANNER = "", AIERR = "";
+  var O = Object.assign({ scope: "PAN India", per: "", lang: "English", tone: "professional", theme: "blue", banner: true, extra: "" }, ls("nl-opt") || {});
+  function sv() { ls("nl-opt", O); }
+  var KPIS = [["app", "Retailer App"], ["sales", "Sales"], ["visit", "Visit efficiency"], ["comp", "Competition / SD"], ["vnotice", "v-Notice"], ["new", "New implementation"]];
+  var KN = {}; KPIS.forEach(function (k) { KN[k[0]] = k[1]; });
+  var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var pc = function (v) { return v == null || isNaN(v) ? "—" : Math.round(v * 1000) / 10 + "%"; }, r1 = function (v) { return Math.round((+v || 0) * 10) / 10; };
+  var TH = { blue: ["#0A1C5C", "#415FFF", "#F2F5FF", "vivo Blue"], gold: ["#141414", "#C9A227", "#FBF8EE", "Black & Gold"], emerald: ["#0B3B3C", "#0E9F8E", "#EEF8F6", "Emerald"], royal: ["#12153A", "#5146C9", "#F5F5FB", "Royal Indigo"], sunrise: ["#5B1A2E", "#F2711C", "#FFF5EC", "Sunrise"] };
+  var LANGS = ["English", "Hindi", "Hinglish", "Tamil", "Telugu", "Kannada", "Marathi", "Bengali", "Gujarati"];
+  var LIBS = { pdf: "/vendor/jspdf/jspdf.umd.min.js" }, LOADED = {};
+  function lib(k) { return LOADED[k] || (LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIBS[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load the PDF maker.")); }; document.head.appendChild(s); })); }
+  // ================= load the dashboard (hidden) — exactly the data and content the dashboard shows =================
+  var DASH = null;
+  function dash() {
+    if (DASH) return DASH;
+    DASH = new Promise(function (res, rej) {
+      var f = document.createElement("iframe"); f.id = "dsf"; f.setAttribute("aria-hidden", "true"); f.tabIndex = -1;
+      f.style.cssText = "position:fixed;left:-20000px;top:0;width:1200px;height:900px;border:0;visibility:hidden";
+      f.src = "/index.html?studio=" + Date.now();
+      var t0 = Date.now(), poll = setInterval(function () {
+        var w = null; try { w = f.contentWindow; } catch (e) { }
+        if (w && w.__DASHAPI && w.KE && w.__DASHAPI.RAW) { clearInterval(poll); W = w; DA = w.__DASHAPI; res(); }
+        else if (Date.now() - t0 > 90000) { clearInterval(poll); DASH = null; rej(new Error("The dashboard took too long to open — check the connection and try again.")); }
+      }, 300);
+      document.body.appendChild(f);
+    });
+    return DASH;
+  }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  // set the hidden dashboard's own filters to the chosen state, so tab text matches the deck
+  function dashScope() {
+    try {
+      var d = W.document, s = d.getElementById("scope-sel"); if (!s) return;
+      var want = O.scope === "PAN India" ? "" : O.scope, opt = [].filter.call(s.options, function (o) { return want ? (o.value === want || o.text.trim() === want) : /pan india|all states/i.test(o.text) || o.value === "" || o.value === "PAN"; })[0];
+      if (opt && s.value !== opt.value) { s.value = opt.value; s.dispatchEvent(new W.Event("change", { bubbles: true })); }
+    } catch (e) { }
+  }
+  function scrape(page, isTab) {   // render one dashboard page and read its headings, flows, chips and text
+    var k = page + "|" + O.scope; if (CACHE[k]) return Promise.resolve(CACHE[k]);
+    try { if (isTab) DA.showTab(page); else DA.go(page, ""); } catch (e) { return Promise.resolve(null); }
+    return wait(700).then(function () {
+      var d = W.document, el = isTab ? d.getElementById("pane-" + page) : null;
+      if (!el) { var pd = d.getElementById("pane-detail"); el = pd && pd.offsetParent ? pd : d.querySelector(".pane.on") || d.body; }
+      var heads = [].map.call(el.querySelectorAll("h1,h2,h3"), function (h) { return h.innerText.trim(); }).filter(Boolean).slice(0, 20);
+      var flows = [].map.call(el.querySelectorAll(".rm-flow"), function (f) {
+        var steps = [].map.call(f.querySelectorAll(".rm-step"), function (s) { var b = s.querySelector("b"), m = s.querySelector("small"); return { t: b ? b.innerText.trim() : "", s: m ? m.innerText.trim() : "" }; }).filter(function (x) { return x.t; });
+        var title = "", all = [].slice.call(el.querySelectorAll("h2,h3,.rm-sec h4,.sec-h"));
+        all.forEach(function (h) { if (h.compareDocumentPosition(f) & 4) title = h.innerText.trim(); });
+        return { title: title, steps: steps };
+      }).filter(function (x) { return x.steps.length >= 2; });
+      var chips = [].map.call(el.querySelectorAll(".rm-chip b, .m-chips span"), function (c) { return c.innerText.trim(); }).filter(Boolean).slice(0, 20);
+      var text = el.innerText.replace(/\n{2,}/g, "\n").replace(/[›‹←→]/g, " ").slice(0, 6000);
+      var out = { page: page, heads: heads, flows: flows, chips: chips, text: text };
+      CACHE[k] = out; return out;
+    });
+  }
+  function projects() { try { return (W.HOX && W.HOX.state().projects) || []; } catch (e) { return []; } }
+  function news() { try { return (W.HOX && W.HOX.state().news) || []; } catch (e) { return []; } }
+  function RMd() { return (DA && DA.RM) || {}; }
+
+  // ================= numbers =================
+  function periods() {
+    var sp = W.KE.span(DA.RAW); if (!sp) return [];
+    var ms = {}; DA.RAW.days.forEach(function (d) { if (d >= sp.f && d <= sp.t) ms[d.slice(0, 7)] = 1; });
+    var M = Object.keys(ms).sort(), out = [], q = {};
+    var last = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, "0"); };
+    M.forEach(function (m) { var qq = m.slice(0, 4) + "-Q" + (Math.floor((+m.slice(5, 7) - 1) / 3) + 1); (q[qq] = q[qq] || []).push(m); });
+    Object.keys(q).sort().reverse().forEach(function (k) { var ms2 = q[k], f = ms2[0] + "-01", t = last(ms2[ms2.length - 1]); out.push({ id: "q:" + k, label: k.slice(5) + " " + k.slice(0, 4), f: f < sp.f ? sp.f : f, t: t > sp.t ? sp.t : t, months: ms2 }); });
+    M.slice().reverse().forEach(function (m) { var f = m + "-01", t = last(m); out.push({ id: "m:" + m, label: MN[+m.slice(5, 7) - 1] + " " + m.slice(0, 4), f: f < sp.f ? sp.f : f, t: t > sp.t ? sp.t : t, months: [m] }); });
+    return out;
+  }
+  function P() { return PERIODS.filter(function (p) { return p.id === O.per; })[0] || PERIODS[0]; }
+  var SC = {};
+  function score(f, t) {
+    var k = f + "|" + t; if (SC[k]) return SC[k];
+    var sp = W.KE.scorePeriod(DA.RAW, DA.SETUP, f, t, "Total"), rows = {}, pan = {};
+    (sp.kpi_state || []).forEach(function (r) { if (r.code === "PAN" || r.state === "Total") pan = r; else if (r.state) rows[r.state] = r; });
+    var st = Object.keys(rows).sort(function (a, b) { return (rows[b].score || 0) - (rows[a].score || 0); });
+    st.forEach(function (s, i) { if (rows[s].rank == null) rows[s].rank = i + 1; });
+    return (SC[k] = { rows: rows, pan: pan, order: st, of: st.length });
+  }
+  function prevPeriod(p) { var i = PERIODS.indexOf(p), same = PERIODS.filter(function (x) { return x.id.slice(0, 2) === p.id.slice(0, 2) && x.f < p.f; }); return same[0] || null; }
+  function me(S) { return O.scope === "PAN India" ? S.pan : S.rows[O.scope] || {}; }
+  function kpiList(r, S) { return KPIS.filter(function (k) { return r[k[0]] != null && !(k[0] === "new" && !r[k[0]] && !(S.pan || {})[k[0]]); }).map(function (k) { return { k: k[0], name: k[1], me: r[k[0]], pan: (S.pan || {})[k[0]], rank: r["rank_" + k[0]] || null, w: (DA.SETUP.weights || {})[k[0]] }; }); }
+  function monthly(n) { var p = P(), ms = PERIODS.filter(function (x) { return x.id.slice(0, 2) === "m:" && x.f <= p.t; }).slice(0, n || 6).reverse(); return ms.map(function (m) { var S = score(m.f, m.t), r = me(S); return { label: m.label, score: r1(r.score), pan: r1(S.pan.score), rank: O.scope === "PAN India" ? null : r.rank, row: r, pr: S.pan }; }); }
+
+  function say(t) { if ($("prog")) $("prog").innerHTML = t; }
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    draw();
+  }
+  function draw() {
+    VIEW.innerHTML = (ADMIN ? '<div class="seg"><button data-tb="make" class="' + (TAB === "make" ? "on" : "") + '">✍️ Create</button><button data-tb="read" class="' + (TAB === "read" ? "on" : "") + '">📰 Newsletters</button></div>' : "") + '<div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    if (TAB === "read") return pRead();
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div>Reading the dashboard…</div>';
+    dash().then(function () { PERIODS = periods(); if (!PERIODS.some(function (p) { return p.id === O.per; })) O.per = PERIODS[0] ? PERIODS[0].id : ""; pMake(); }).catch(function (e) { $("pane").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+  }
+  function pMake() {
+    $("pane").innerHTML = '<div class="card"><div class="g3"><div><label class="lb">Period</label><select class="tx" id="pe">' + PERIODS.map(function (p) { return '<option value="' + p.id + '"' + (p.id === O.per ? " selected" : "") + ">" + esc(p.label) + (p.id[0] === "q" ? " (quarter)" : "") + "</option>"; }).join("") + '</select></div><div><label class="lb">Language</label><select class="tx" id="la">' + LANGS.map(function (l) { return "<option" + (l === O.lang ? " selected" : "") + ">" + l + "</option>"; }).join("") + '</select></div><div><label class="lb">Tone</label><select class="tx" id="to">' + [["professional", "Professional"], ["energetic", "Energetic"], ["crisp", "Crisp"]].map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === O.tone ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="lb">Design</label><div class="fx">' + Object.keys(TH).map(function (k) { return '<span data-th="' + k + '" class="' + (k === O.theme ? "on" : "") + '"><i style="display:inline-block;width:10px;height:10px;border-radius:99px;background:' + TH[k][1] + '"></i> ' + TH[k][3] + "</span>"; }).join("") + '<span data-bn="1" class="' + (O.banner ? "on" : "") + '">' + (O.banner ? "✓ " : "") + "Cover banner</span></div>" +
+      '<label class="lb">Anything AI should stress? (optional)</label><input class="tx" id="ex" value="' + esc(O.extra) + '" placeholder="e.g. congratulate Punjab, push Retailer App usage">' +
+      '<button class="btn pri block" id="go" style="margin-top:12px;font-size:15px;padding:13px">✨ Write the newsletter</button><div id="prog" style="margin-top:8px"></div></div><div id="out"></div>';
+    var on = function (id, k) { $(id).onchange = function () { O[k] = $(id).value; sv(); }; };
+    on("pe", "per"); on("la", "lang"); on("to", "tone"); on("ex", "extra");
+    [].forEach.call($("pane").querySelectorAll("[data-th]"), function (b) { b.onclick = function () { O.theme = b.dataset.th; sv(); pMake(); if (CUR) render(); }; });
+    $("pane").querySelector("[data-bn]").onclick = function () { O.banner = !O.banner; sv(); pMake(); if (CUR) render(); };
+    $("go").onclick = build;
+    if (CUR) render();
+  }
+  // ---------- gather ----------
+  function stats(text) { var L = String(text || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean), out = []; for (var i = 0; i < L.length - 1 && out.length < 5; i++) if (/^[\d.,]+%?$|^[+-]?\d[\d.,]*$/.test(L[i]) && /[a-z]{3}/i.test(L[i + 1]) && L[i + 1].length < 40) { out.push({ v: L[i], l: L[i + 1] }); i++; } return out; }
+  function build() {
+    say('<div class="loading"><div class="spin"></div>Reading scores, KPIs and projects…</div>'); AIERR = "";
+    var p = P(), S = score(p.f, p.t), pv = prevPeriod(p), SP = pv ? score(pv.f, pv.t) : null, D = { period: p, S: S, SP: SP };
+    D.movers = SP ? S.order.map(function (s) { var a = S.rows[s], b = SP.rows[s]; return b && b.rank && a.rank ? { state: s, from: b.rank, to: a.rank, ch: b.rank - a.rank } : null; }).filter(Boolean).sort(function (a, b) { return b.ch - a.ch; }) : [];
+    D.kpis = KPIS.map(function (k) { var ord = S.order.filter(function (s) { return S.rows[s][k[0]] != null; }).sort(function (a, b) { return (S.rows[b][k[0]] || 0) - (S.rows[a][k[0]] || 0); }); return { k: k[0], name: k[1], pan: S.pan[k[0]], best: ord[0], bestV: ord[0] && S.rows[ord[0]][k[0]], low: ord[ord.length - 1], lowV: ord.length && S.rows[ord[ord.length - 1]][k[0]], prev: SP && SP.pan[k[0]] }; }).filter(function (x) { return x.pan != null && !(x.k === "new" && !x.pan && !x.bestV); });
+    D.feat = [["sa", "Scheme announcement"], ["sp", "Scheme payout"], ["an", "Announcements"], ["av", "App visits"]].map(function (f) { return { n: f[1], v: S.pan[f[0]] }; }).filter(function (x) { return x.v != null; });
+    D.proj = projects(); D.news = news(); D.gant = (RMd().GANT || []).map(function (g) { return g[0]; });
+    dashScope();
+    Promise.all([scrape("sd", true), api({ action: "nl-data", f: p.f, t: p.t }), api({ action: "bnr-get" })]).then(function (r) {
+      D.sd = r[0] ? { stats: stats(r[0].text), text: r[0].text.slice(0, 1500) } : null; D.tools = r[1] && r[1].ok ? r[1].data : {};
+      var bn = r[2] && r[2].ok ? (r[2].banners.items || []).filter(function (x) { return x.img; })[0] : null; BANNER = bn ? (/^https?:/.test(bn.img) ? bn.img : location.origin + bn.img) : "";
+      say('<div class="loading"><div class="spin"></div>✨ AI is writing the stories in ' + esc(O.lang) + "…</div>");
+      var pack = { period: p.label, pan_score: r1(S.pan.score), prev_pan_score: SP ? r1(SP.pan.score) : null, top5: S.order.slice(0, 5).map(function (s, i) { return { rank: i + 1, state: s, score: r1(S.rows[s].score) }; }), bottom3: S.order.slice(-3).map(function (s) { return { state: s, score: r1(S.rows[s].score) }; }), rank_gainers: D.movers.filter(function (m) { return m.ch > 0; }).slice(0, 4),
+        kpis: D.kpis.map(function (k) { return { kpi: k.name, pan: pc(k.pan), previous: pc(k.prev), best: k.best + " " + pc(k.bestV), lowest: k.low + " " + pc(k.lowV) }; }), app_features: D.feat.map(function (f) { return { feature: f.n, pan: pc(f.v) }; }), support_desk: D.sd ? D.sd.stats : null, tools: D.tools,
+        projects: D.proj.map(function (x) { return { name: x.name, stage: x.stage, progress: x.progress, states: x.states, update: x.update, start: x.start, end: x.end }; }), roadmap_2027: D.gant, newsletter_items: D.news.slice(0, 5) };
+      return api({ action: "nl-ai", period: p.label, lang: O.lang, tone: O.tone, extra: O.extra, data: JSON.stringify(pack) }).then(function (x) { if (!x.ok) AIERR = x.error; D.ai = x.ok ? x.ai : null; CUR = D; say(AIERR ? '<div class="warnb">AI not used: ' + esc(AIERR) + " — numbers and tables are included; add your own words with ✏️ Edit.</div>" : ""); render(); api({ action: "tl-use", tool: "newsletter", kind: "acts" }); });
+    }).catch(function (e) { say('<div class="err">' + esc(e.message || String(e)) + "</div>"); });
+  }
+  // ---------- render (email-safe HTML) ----------
+  function render() {
+    var D = CUR, S = D.S, A = D.ai || { sections: {}, spotlight: [] }, T = TH[O.theme], dk = T[0], ac = T[1], tint = T[2], e = function (s) { return esc(s == null ? "" : String(s)); };
+    var box = function (title, icon, inner) { return '<div style="background:#fff;border-radius:14px;padding:16px 18px;margin:14px 0;border:1px solid #E6E8F2"><div style="font:800 17px Arial,sans-serif;color:' + dk + ';margin-bottom:8px">' + icon + " " + e(title) + "</div>" + inner + "</div>"; };
+    var p = function (t) { return t ? '<p style="margin:0 0 8px;font:14px/1.55 Arial,sans-serif;color:#2A2F45">' + e(t) + "</p>" : ""; };
+    var ul = function (L) { return L && L.length ? '<ul style="margin:4px 0 6px;padding-left:20px;font:14px/1.55 Arial,sans-serif;color:#2A2F45">' + L.map(function (x) { return "<li>" + e(x) + "</li>"; }).join("") + "</ul>" : ""; };
+    var stat = function (v, l, c) { return '<td style="padding:4px"><div style="background:' + tint + ';border-radius:12px;padding:10px;text-align:center"><div style="font:800 22px Arial,sans-serif;color:' + (c || dk) + '">' + e(v) + '</div><div style="font:11.5px Arial,sans-serif;color:#5E6484">' + e(l) + "</div></div></td>"; };
+    var bar = function (l, v, max) { var w = Math.max(2, Math.round((v || 0) / (max || 1) * 100)); return '<tr><td style="font:13px Arial,sans-serif;color:#2A2F45;padding:4px 8px 4px 0;white-space:nowrap">' + e(l) + '</td><td style="width:60%;padding:4px 0"><div style="background:#EEF0F6;border-radius:99px;height:10px"><div style="width:' + w + '%;background:' + ac + ';border-radius:99px;height:10px"></div></div></td><td style="font:700 13px Arial,sans-serif;color:' + dk + ';padding-left:8px;text-align:right">' + pc(v) + "</td></tr>"; };
+    var top = S.order.slice(0, 5), movers = D.movers.filter(function (m) { return m.ch > 0; }).slice(0, 3), tl = D.tools || {}, run = D.proj.filter(function (x) { return /live|pilot|risk/.test(x.stage); }), up = D.proj.filter(function (x) { return /upcoming/.test(x.stage); }), done = D.proj.filter(function (x) { return /done/.test(x.stage); });
+    var stg = { live: "Live", pilot: "Pilot", risk: "At risk", upcoming: "Upcoming", done: "Done" };
+    var h = '<div style="background:' + tint + ';padding:16px 10px;font-family:Arial,sans-serif"><div style="max-width:660px;margin:0 auto">' +
+      '<div style="background:' + dk + ';border-radius:18px;overflow:hidden;color:#fff">' + (O.banner && BANNER ? '<img src="' + e(BANNER) + '" alt="" style="width:100%;display:block;max-height:240px;object-fit:cover">' : "") + '<div style="padding:20px 22px"><div style="font:700 11px Arial,sans-serif;letter-spacing:3px;color:' + ac + '">VIVO BUSINESS INNOVATION · BI PULSE</div><div style="font:800 28px Arial,sans-serif;margin-top:6px">' + e(A.title || "BI Pulse — " + D.period.label) + '</div><div style="font:15px Arial,sans-serif;opacity:.9;margin-top:6px">' + e(A.headline || D.period.label + " in numbers") + '</div><div style="font:12px Arial,sans-serif;opacity:.7;margin-top:10px">' + e(D.period.label) + " · " + e(D.period.f) + " to " + e(D.period.t) + "</div></div></div>" +
+      (A.editorial ? box("From the HO desk", "✍️", p(A.editorial)) : "") +
+      box("Scorecard", "🏆", '<table style="width:100%;border-collapse:collapse"><tr>' + stat(r1(S.pan.score), "PAN India score") + stat(D.SP ? (r1(S.pan.score - D.SP.pan.score) >= 0 ? "+" : "") + r1(S.pan.score - D.SP.pan.score) : "—", "vs previous", !D.SP ? null : S.pan.score >= D.SP.pan.score ? "#13693F" : "#A12727") + stat(top[0] || "—", "No. 1 state") + "</tr></table>" + p(A.sections.scorecard) +
+        '<table style="width:100%;border-collapse:collapse;font:13.5px Arial,sans-serif;margin-top:6px">' + top.map(function (s, i) { return '<tr style="background:' + (i % 2 ? "#fff" : tint) + '"><td style="padding:7px 10px;font-weight:800;color:' + ac + '">#' + (i + 1) + '</td><td style="padding:7px 10px;color:#2A2F45">' + e(s) + '</td><td style="padding:7px 10px;text-align:right;font-weight:700;color:' + dk + '">' + r1(S.rows[s].score) + "</td></tr>"; }).join("") + "</table>" +
+        (movers.length ? '<div style="font:13px Arial,sans-serif;color:#13693F;margin-top:8px">📈 Biggest climbers: ' + movers.map(function (m) { return e(m.state) + " (#" + m.from + " → #" + m.to + ")"; }).join(" · ") + "</div>" : "")) +
+      box("KPI corner", "🎯", '<table style="width:100%;border-collapse:collapse">' + D.kpis.map(function (k) { var t = (A.sections.kpis || []).filter(function (x) { return x.kpi && k.name.toLowerCase().indexOf(String(x.kpi).toLowerCase().slice(0, 5)) >= 0; })[0]; return '<tr><td style="padding:8px 0;border-bottom:1px solid #EEF0F6"><div style="font:700 14px Arial,sans-serif;color:' + dk + '">' + e(k.name) + ' <span style="color:' + ac + '">' + pc(k.pan) + "</span>" + (k.prev != null ? ' <span style="font-size:12px;color:' + (k.pan >= k.prev ? "#13693F" : "#A12727") + '">' + (k.pan >= k.prev ? "▲" : "▼") + " " + Math.abs(r1((k.pan - k.prev) * 100)) + " pts</span>" : "") + '</div><div style="font:12.5px Arial,sans-serif;color:#5E6484">Best: ' + e(k.best) + " " + pc(k.bestV) + " · Lowest: " + e(k.low) + " " + pc(k.lowV) + "</div>" + (t ? '<div style="font:13px Arial,sans-serif;color:#2A2F45;margin-top:3px">' + e(t.text) + "</div>" : "") + "</td></tr>"; }).join("") + "</table>") +
+      (D.feat.length ? box("Retailer App usage", "📱", p(A.sections.app) + '<table style="width:100%;border-collapse:collapse">' + D.feat.map(function (f) { return bar(f.n, f.v, Math.max.apply(null, D.feat.map(function (x) { return x.v || 0; })) * 1.15); }).join("") + "</table>") : "") +
+      (D.sd && D.sd.stats.length ? box("Support desk", "🎧", '<table style="width:100%;border-collapse:collapse"><tr>' + D.sd.stats.slice(0, 4).map(function (s) { return stat(s.v, s.l); }).join("") + "</tr></table>" + p(A.sections.support) + (tl.support && tl.support.raised ? p("In-app support: " + tl.support.raised + " queries raised, " + tl.support.closed + " closed.") : "")) : "") +
+      box("From the field", "📍", '<table style="width:100%;border-collapse:collapse"><tr>' + stat((tl.visits || {}).total || 0, "market visits") + stat((tl.visits || {}).valid || 0, "valid visits") + stat((tl.ideas || {}).total || 0, "ideas & requirements") + "</tr></table>" + p(A.sections.field) + ((tl.ideas || {}).top && tl.ideas.top.length ? '<div style="font:700 13px Arial,sans-serif;color:' + dk + ';margin-top:6px">What retailers and teams are asking for</div>' + ul(tl.ideas.top.slice(0, 5).map(function (x) { return x.title + (x.state ? " (" + x.state + ")" : "") + (x.votes ? " · " + x.votes + " votes" : ""); })) : "") + ((tl.wall || {}).top && tl.wall.top.length ? '<div style="font:700 13px Arial,sans-serif;color:' + dk + ';margin-top:6px">Best practices</div>' + ul(tl.wall.top.map(function (x) { return x.title + " — " + x.state + (x.result ? ": " + x.result : ""); })) : "")) +
+      ((A.sections.achievements || []).length || done.length ? box("Key achievements", "🌟", ul((A.sections.achievements || []).concat(done.map(function (x) { return x.name + " — completed"; })))) : "") +
+      (run.length ? box("Running & pilot projects", "🚀", p(A.sections.projects) + '<table style="width:100%;border-collapse:collapse;font:13px Arial,sans-serif">' + run.map(function (x) { return '<tr><td style="padding:7px 0;border-bottom:1px solid #EEF0F6"><b style="color:' + dk + '">' + e(x.name) + '</b> <span style="font-size:11px;background:' + tint + ';border-radius:99px;padding:2px 8px;color:' + ac + '">' + e(stg[x.stage] || x.stage) + '</span><div style="color:#5E6484;font-size:12.5px">' + e(x.update || "") + '</div><div style="background:#EEF0F6;border-radius:99px;height:8px;margin-top:5px"><div style="width:' + Math.max(3, x.progress || 0) + "%;background:" + ac + ';border-radius:99px;height:8px"></div></div><div style="font-size:11px;color:#5E6484;margin-top:2px">' + (x.progress || 0) + "% · " + e(x.states || "") + (x.end ? " · target " + e(x.end) : "") + "</div></td></tr>"; }).join("") + "</table>") : "") +
+      (up.length || (A.sections.upcoming || []).length ? box("Coming next", "🗓️", ul((A.sections.upcoming || []).length ? A.sections.upcoming : up.map(function (x) { return x.name + (x.start ? " — from " + x.start : ""); }))) : "") +
+      (A.sections.newimpl ? box("New implementation", "🧩", p(A.sections.newimpl)) : "") +
+      box("People & learning", "🎓", '<table style="width:100%;border-collapse:collapse"><tr>' + stat((tl.quizzes || {}).passed || 0, "quizzes passed") + stat((tl.wall || {}).total || 0, "best practices") + stat(((tl.rewards || {}).top || []).length ? tl.rewards.top[0].name.split(" ")[0] : "—", "top reward earner") + "</tr></table>" + p(A.sections.people)) +
+      ((A.spotlight || []).length ? box("State spotlight", "🔦", A.spotlight.map(function (x) { return '<div style="margin:6px 0"><b style="color:' + ac + '">' + e(x.state) + '</b><div style="font:13.5px Arial,sans-serif;color:#2A2F45">' + e(x.why) + "</div></div>"; }).join("")) : "") +
+      (A.tip ? '<div style="background:' + ac + ';color:#fff;border-radius:14px;padding:14px 18px;margin:14px 0;font:14px/1.5 Arial,sans-serif">💡 <b>Tip of the ' + (D.period.id[0] === "q" ? "quarter" : "month") + ":</b> " + e(A.tip) + "</div>" : "") +
+      '<div style="text-align:center;font:italic 15px Arial,sans-serif;color:' + dk + ';margin:18px 0 6px">' + e(A.quote || "Innovate · Collaborate · Grow") + '</div><div style="text-align:center;font:11px Arial,sans-serif;color:#8A8FA8;margin-bottom:6px">vivo Business Innovation · data from the BI KPI dashboard and BI tools · ' + e(D.period.label) + "</div></div></div>";
+    HTML = h;
+    $("out").innerHTML = '<div class="card"><div class="acts3"><button class="btn sec" id="ed">✏️ Edit text</button><button class="btn sec" id="pdf">📄 PDF</button><button class="btn sec" id="htm">⬇ HTML</button><button class="btn ghost" id="sd">💾 Save draft</button><button class="btn ok" id="pub">📢 Publish in apps & web</button><button class="btn pri" id="em">📧 Email to states</button></div><div class="muted" style="font-size:12px;margin-top:8px">Publish puts it in 📰 Newsletters for every user. Email sends it to all state users’ registered emails (send a test first).</div></div><iframe class="nlf" id="pv" title="Newsletter"></iframe>';
+    var fr = $("pv"); fr.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">' + HTML + "</body></html>";
+    fr.onload = function () { try { fr.style.height = (fr.contentDocument.body.scrollHeight + 20) + "px"; } catch (x) { } };
+    var grab = function () { try { var b = fr.contentDocument.body; if (b) HTML = b.innerHTML; } catch (x) { } return HTML; };
+    $("ed").onclick = function () { try { var d = fr.contentDocument; d.designMode = d.designMode === "on" ? "off" : "on"; this.textContent = d.designMode === "on" ? "✅ Done editing" : "✏️ Edit text"; if (d.designMode === "on") toast("Tap any text in the newsletter to change it"); else grab(); } catch (x) { } };
+    $("htm").onclick = function () { download(new Blob(['<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(title()) + "</title></head><body style=\"margin:0\">" + grab() + "</body></html>"], { type: "text/html" }), fname("html")); };
+    $("pdf").onclick = function () { pdf(grab()); };
+    var save = function (pub) { return api({ action: "nl-save", id: CUR.id || "", title: title(), period: CUR.period.label, html: grab(), summary: (CUR.ai && CUR.ai.headline) || "", published: pub }).then(function (r) { if (!r.ok) { toast(r.error); return null; } CUR.id = r.id; return r; }); };
+    $("sd").onclick = function () { save(false).then(function (r) { if (r) toast("Draft saved"); }); };
+    $("pub").onclick = function () { save(true).then(function (r) { if (r) toast("Published — everyone sees it in 📰 Newsletters"); }); };
+    $("em").onclick = function () { save(!!CUR.published).then(function (r) { if (!r) return; sheet("Email the newsletter", "To every state user’s registered email", [["🧪", "Send a test to me", function () { api({ action: "nl-email", id: r.id, test: true }).then(function (x) { toast(x.ok ? "Test sent" : x.error); }); }], ["📧", "Send to all state users", function () { api({ action: "nl-email", id: r.id }).then(function (x) { toast(x.ok ? "Sent to " + x.sent + " people" : x.error); }); }], ["📧", "Send to state users + HO admins", function () { api({ action: "nl-email", id: r.id, admins: true }).then(function (x) { toast(x.ok ? "Sent to " + x.sent + " people" : x.error); }); }]]); }); };
+  }
+  function title() { return (CUR && CUR.ai && CUR.ai.title) || "BI Pulse — " + (CUR ? CUR.period.label : ""); }
+  function fname(ext) { return (title()).replace(/[^\w]+/g, "_").slice(0, 60) + "." + ext; }
+  function pdf(html, name) {   // draws the newsletter to an image (same-origin pictures only) and splits it into A4 pages
+    toast("Making the PDF…");
+    var w = 700, box = document.createElement("div"); box.style.cssText = "position:fixed;left:-9999px;top:0;width:" + w + "px"; box.innerHTML = html; document.body.appendChild(box);
+    [].forEach.call(box.querySelectorAll("img"), function (im) { if (!/^data:|^\//.test(im.getAttribute("src") || "") && (im.src || "").indexOf(location.origin) !== 0) im.remove(); });
+    var imgs = [].map.call(box.querySelectorAll("img"), function (im) { return fetch(im.src).then(function (r) { return r.blob(); }).then(function (b) { return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { im.src = fr.result; res(); }; fr.readAsDataURL(b); }); }).catch(function () { im.remove(); }); });
+    Promise.all(imgs).then(function () {
+      var hgt = box.scrollHeight, xml = new XMLSerializer().serializeToString(box.firstChild || box); box.remove();
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + hgt + '"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:' + w + 'px">' + xml + "</div></foreignObject></svg>";
+      return new Promise(function (res, rej) { var im = new Image(); im.onload = function () { var c = document.createElement("canvas"), k = 2; c.width = w * k; c.height = hgt * k; var g = c.getContext("2d"); g.scale(k, k); g.fillStyle = "#fff"; g.fillRect(0, 0, w, hgt); g.drawImage(im, 0, 0); res(c); }; im.onerror = function () { rej(new Error("Couldn't draw the newsletter.")); }; im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+    }).then(function (c) { return lib("pdf").then(function () { return c; }); }).then(function (c) {
+      var doc = new window.jspdf.jsPDF({ unit: "pt", format: "a4" }), pw = doc.internal.pageSize.getWidth(), ph = doc.internal.pageSize.getHeight(), sliceH = Math.floor(c.width * ph / pw), y = 0, first = true;
+      while (y < c.height) { var s = document.createElement("canvas"); s.width = c.width; s.height = Math.min(sliceH, c.height - y); s.getContext("2d").drawImage(c, 0, -y); if (!first) doc.addPage(); doc.addImage(s.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, pw, pw * s.height / s.width); first = false; y += sliceH; }
+      download(doc.output("blob"), name || fname("pdf"));
+    }).catch(function (e) { toast(e.message); });
+  }
+  function pRead() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "nl-list" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("pane").innerHTML = r.items.length ? r.items.map(function (x) { return '<div class="li" data-id="' + x.id + '"><b>📰 ' + esc(x.title) + '</b><div class="muted" style="font-size:12.5px">' + esc(x.period || "") + " · " + dOnly(x.at) + (ADMIN ? " · " + (x.published ? "published" : "draft") + (x.sent ? " · emailed to " + x.sent : "") : "") + "</div>" + (x.summary ? '<div style="font-size:13px;margin-top:4px">' + esc(x.summary) + "</div>" : "") + "</div>"; }).join("") : '<div class="card empty"><div class="big">📰</div>No newsletters yet.</div>';
+      [].forEach.call($("pane").querySelectorAll("[data-id]"), function (c) { c.onclick = function () { api({ action: "nl-get", id: c.dataset.id }).then(function (x) { if (!x.ok) return toast(x.error); var it = x.item; $("pane").innerHTML = '<div class="row" style="margin-top:6px"><button class="btn ghost sm" id="bk">← All newsletters</button><button class="btn sec sm" id="dp">📄 PDF</button>' + (ADMIN ? '<button class="btn ghost sm" id="dl" style="color:var(--bad)">🗑 Delete</button>' : "") + '</div><iframe class="nlf" id="rv" title="Newsletter"></iframe>'; var fr = $("rv"); fr.srcdoc = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">' + it.html + "</body></html>"; fr.onload = function () { try { fr.style.height = (fr.contentDocument.body.scrollHeight + 20) + "px"; } catch (y) { } }; $("bk").onclick = pRead; $("dp").onclick = function () { pdf(it.html, it.title.replace(/[^\w]+/g, "_") + ".pdf"); }; if ($("dl")) $("dl").onclick = function () { api({ action: "nl-delete", id: it.id }).then(function () { pRead(); }); }; }); }; });
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

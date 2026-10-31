@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Email geo-locator</title>
+<style>
+/*@@CSS@@*/
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 10px;font-size:14px;margin-top:8px}.kv b{color:var(--ink2);font-weight:600}
+.pill{display:inline-block;border-radius:99px;padding:3px 10px;font-size:12.5px;font-weight:700}
+.pill.ok{background:#E7F7EF;color:#13693F}.pill.no{background:#FDECEC;color:#A12727}.pill.wait{background:#FFF4E5;color:#8A5300}
+#map{height:300px;border-radius:14px;margin-top:10px;z-index:0}
+.lg{font-size:12.5px;padding:8px 0;border-bottom:1px solid #EEF0F6}
+.req{background:var(--card);border-radius:16px;padding:16px;margin-top:10px;box-shadow:0 4px 14px rgba(20,24,51,.08)}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📡</span></div>
+  <h1 id="ht">Email geo-locator</h1><p id="hp">Find a registered user's latest shared location — only with their consent</p>
+</div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "find", RES = null, WAIT = null, MAP = null;
+  var leaflet = null;
+  function L() {
+    if (!leaflet) leaflet = new Promise(function (res, rej) {
+      var c = document.createElement("link"); c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c);
+      var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = res; s.onerror = function () { leaflet = null; rej(); }; document.head.appendChild(s);
+    });
+    return leaflet;
+  }
+  var dt = function (ts) { return new Date(ts).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }); };
+  var ago = function (ts) { var m = Math.round((Date.now() - ts) / 60000); return m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " days ago"; };
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    if (!ADMIN || location.hash === "#respond") { TAB = "respond"; }
+    draw();
+  }
+  function draw() {
+    if (!ADMIN) { $("ht").textContent = "Location requests"; $("hp").textContent = "HO can see your location only when you approve a request"; }
+    VIEW.innerHTML = (ADMIN ? '<div class="seg"><button data-tb="find" class="' + (TAB === "find" ? "on" : "") + '">🔎 Find</button><button data-tb="log" class="' + (TAB === "log" ? "on" : "") + '">🧾 Audit log</button><button data-tb="respond" class="' + (TAB === "respond" ? "on" : "") + '">📥 My requests</button></div>' : "") + '<div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    ({ find: pFind, log: pLog, respond: pRespond })[TAB]();
+  }
+  // ---------- HO: find ----------
+  function pFind() {
+    $("pane").innerHTML = '<div class="card"><label class="lb" style="display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:4px">Registered email ID</label><div class="row"><input class="tx" id="em" type="email" placeholder="name@vivo.com" autocomplete="off" style="flex:1" value="' + esc(RES ? RES.email : "") + '"><button class="btn pri" id="go">Search</button></div><div class="muted" style="font-size:12px;margin-top:6px">🔒 Every search and request is recorded in the audit log. A user’s location is shown only if they shared it — on request, or at their own market-visit check-in.</div></div><div id="res"></div>';
+    $("go").onclick = search; $("em").onkeydown = function (e) { if (e.key === "Enter") search(); };
+    if (RES) show();
+  }
+  function search() {
+    var em = $("em").value.trim(); if (!em) return;
+    $("res").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "geo-search", email: em }).then(function (r) { if (!r.ok) { $("res").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } RES = r; show(); });
+  }
+  function show() {
+    var r = RES, u = r.user || {}, last = r.last, pend = (r.requests || []).filter(function (q) { return q.status === "pending"; })[0];
+    var h = '<div class="card"><div class="kv"><b>Email ID</b><span>' + esc(r.email) + '</span><b>User status</b><span>' + (r.registered ? '<span class="pill ok">Registered</span>' + (r.active === false ? ' <span class="pill no">Disabled</span>' : "") : '<span class="pill no">Not registered</span>') + "</span>" +
+      (r.registered ? "<b>Name</b><span>" + esc(u.name) + "</span><b>App</b><span>" + esc(u.app) + (u.state ? " · " + esc(u.state) : "") + "</span>" : "") + "</div>";
+    if (!r.registered) { $("res").innerHTML = h + '<div class="muted" style="margin-top:8px">This email is not linked to any registered app user, so no location can be requested.</div></div>'; return; }
+    if (last) h += '<div class="kv" style="margin-top:12px"><b>Latest location</b><span>' + (r.fresh ? "" : '<span class="pill wait">Older than 7 days</span> ') + esc(last.label) + "</span><b>Captured</b><span>" + dt(last.at) + " (" + ago(last.at) + ")</span>" + (last.acc != null ? "<b>Accuracy</b><span>± " + last.acc + " m</span>" : "") + '<b>Coordinates</b><span>' + last.lat.toFixed(5) + ", " + last.lng.toFixed(5) + '</span><b>Place</b><span id="pl" class="muted">finding…</span></div><div id="map"></div><div class="row" style="margin-top:8px"><a class="btn ghost sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + last.lat + "," + last.lng + '">🗺️ Open in Google Maps</a></div>';
+    else h += '<div class="muted" style="margin-top:10px">No location shared by this user yet.</div>';
+    h += pend ? '<div class="req"><span class="pill wait">⏳ Request sent ' + ago(pend.at) + '</span><div class="muted" style="font-size:12.5px;margin-top:6px">Waiting for the user to approve in their app. This page updates by itself.</div><button class="btn ghost sm" id="cn" style="margin-top:6px">Cancel request</button></div>'
+      : r.active === false ? "" : '<div class="req"><b>' + (last ? "Need a fresh location?" : "Ask for the location") + '</b><div class="muted" style="font-size:12.5px;margin:4px 0 8px">The user gets an in-app request and decides. Requests expire in 24 hours.</div><input class="tx" id="nt" placeholder="Reason shown to the user (e.g. market-visit audit)" maxlength="160"><button class="btn pri block" id="rq" style="margin-top:8px">📡 Send location request</button></div>';
+    var past = (r.requests || []).filter(function (q) { return q.status !== "pending"; });
+    if (past.length) h += '<div style="margin-top:10px"><b style="font-size:13px">Earlier requests</b>' + past.map(function (q) { return '<div class="lg">' + dt(q.at) + " · by " + esc(q.by) + ' · <span class="pill ' + (q.status === "approved" ? "ok" : q.status === "declined" ? "no" : "wait") + '">' + esc(q.status) + "</span></div>"; }).join("") + "</div>";
+    $("res").innerHTML = h + "</div>";
+    if (last) { drawMap(last); place(last); }
+    if ($("rq")) $("rq").onclick = function () { this.disabled = true; api({ action: "geo-request", email: r.email, note: $("nt").value }).then(function (x) { if (!x.ok) { toast(x.error); $("rq").disabled = false; return; } toast(x.already ? "A request is already waiting" : "Request sent to the user"); RES.requests = [{ id: x.id, status: "pending", at: Date.now(), by: "you" }].concat(RES.requests || []); show(); watch(x.id); }); };
+    if ($("cn")) $("cn").onclick = function () { api({ action: "geo-cancel", id: pend.id }).then(function () { pend.status = "cancelled"; WAIT = null; show(); }); };
+    if (pend) watch(pend.id);
+  }
+  function watch(id) {
+    if (WAIT === id) return; WAIT = id;
+    var tick = function () { if (WAIT !== id || TAB !== "find") return; api({ action: "geo-status", id: id }).then(function (s) {
+      if (!s.ok || WAIT !== id) return;
+      if (s.status === "pending") return setTimeout(tick, 6000);
+      WAIT = null; (RES.requests || []).forEach(function (q) { if (q.id === id) { q.status = s.status; q.answeredAt = s.answeredAt; } });
+      if (s.status === "approved" && s.loc) { RES.last = s.loc; RES.fresh = true; toast("✅ The user shared their location"); } else toast(s.status === "declined" ? "The user declined" : "Request " + s.status);
+      show();
+    }); };
+    setTimeout(tick, 5000);
+  }
+  function drawMap(p) {
+    L().then(function () { var el = $("map"); if (!el) return; if (MAP) { try { MAP.remove(); } catch (e) { } } MAP = window.L.map(el).setView([p.lat, p.lng], 15); window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(MAP); window.L.marker([p.lat, p.lng]).addTo(MAP).bindPopup(esc(p.label) + "<br>" + dt(p.at)).openPopup(); if (p.acc) window.L.circle([p.lat, p.lng], { radius: Math.min(p.acc, 3000), color: "#415FFF", weight: 1, fillOpacity: .12 }).addTo(MAP); })
+      .catch(function () { var el = $("map"); if (el) el.innerHTML = '<iframe title="Map" style="width:100%;height:100%;border:0;border-radius:14px" src="https://www.openstreetmap.org/export/embed.html?bbox=' + (p.lng - .01) + "," + (p.lat - .006) + "," + (p.lng + .01) + "," + (p.lat + .006) + "&layer=mapnik&marker=" + p.lat + "," + p.lng + '"></iframe>'; });
+  }
+  function place(p) {
+    fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&lat=" + p.lat + "&lon=" + p.lng, { headers: { accept: "application/json" } }).then(function (r) { return r.json(); })
+      .then(function (d) { if ($("pl")) { $("pl").classList.remove("muted"); $("pl").textContent = d.display_name || "—"; } }).catch(function () { if ($("pl")) $("pl").textContent = "—"; });
+  }
+  // ---------- HO: audit ----------
+  function pLog() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "geo-log" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var N = { search: "🔎 searched", request: "📡 requested location of", approved: "✅ approved — shared with HO:", declined: "🚫 declined —", cancel: "↩️ cancelled request for", "user-cleared": "🧹 cleared own shared location" };
+      $("pane").innerHTML = '<div class="card"><div class="row"><b style="flex:1">Audit log</b><button class="btn ghost sm" id="x">⬇ Excel</button></div>' + (r.items.length ? r.items.map(function (x) { return '<div class="lg"><b>' + esc(x.by) + "</b> " + (N[x.act] || esc(x.act)) + " " + esc(x.email) + (x.status ? ' <span class="muted">(' + esc(x.status) + ")</span>" : "") + '<div class="muted">' + dt(x.at) + "</div></div>"; }).join("") : '<div class="muted">Nothing yet.</div>') + "</div>";
+      $("x").onclick = function () { var rows = [["Time", "By", "Action", "Email", "Result"]].concat(r.items.map(function (x) { return [dt(x.at), x.by, x.act, x.email, x.status]; })); download(new Blob(["﻿" + rows.map(function (rw) { return rw.map(function (c) { return '"' + String(c == null ? "" : c).replace(/"/g, '""') + '"'; }).join(","); }).join("\n")], { type: "text/csv" }), "geo_locator_audit.csv"); };
+    });
+  }
+  // ---------- user: approve / decline ----------
+  function pRespond() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "geo-pending" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var h = r.items.length ? r.items.map(function (q) { return '<div class="req" data-q="' + q.id + '"><b>📡 ' + esc(q.from) + " (HO) asked to see your current location</b>" + (q.note ? '<div style="margin-top:4px;font-size:13.5px">Reason: ' + esc(q.note) + "</div>" : "") + '<div class="muted" style="font-size:12px;margin-top:4px">Asked ' + ago(q.at) + " · expires " + dt(q.exp) + '</div><div class="muted" style="font-size:12.5px;margin-top:8px">If you allow, your phone’s GPS location is taken once, now, and shared with HO admins with the date and time. Nothing is tracked in the background.</div><div class="row" style="margin-top:10px"><button class="btn ok" data-ok="' + q.id + '" style="flex:1">✅ Share my location</button><button class="btn ghost" data-no="' + q.id + '" style="flex:1">Decline</button></div></div>'; }).join("")
+        : '<div class="card empty"><div class="big">📡</div>No location requests waiting.</div>';
+      if (r.lastShared) h += '<div class="card" style="font-size:13px">You last shared your location on ' + dt(r.lastShared.at) + '. <button class="btn ghost sm" id="fg">Remove it</button></div>';
+      $("pane").innerHTML = h;
+      [].forEach.call($("pane").querySelectorAll("[data-no]"), function (b) { b.onclick = function () { api({ action: "geo-respond", id: b.dataset.no, allow: false }).then(function (x) { toast(x.ok ? "Declined — nothing was shared" : x.error); pRespond(); }); }; });
+      [].forEach.call($("pane").querySelectorAll("[data-ok]"), function (b) { b.onclick = function () {
+        if (!navigator.geolocation) return toast("This device can't share location.");
+        b.disabled = true; b.textContent = "Getting your location…";
+        navigator.geolocation.getCurrentPosition(function (p) {
+          api({ action: "geo-respond", id: b.dataset.ok, allow: true, lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }).then(function (x) { toast(x.ok ? "Location shared with HO ✓" : x.error); pRespond(); });
+        }, function (e) { b.disabled = false; b.textContent = "✅ Share my location"; toast(e.code === 1 ? "Location permission is off — allow it for the app and try again" : "Couldn't get your location — switch on GPS and try again"); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      }; });
+      if ($("fg")) $("fg").onclick = function () { api({ action: "geo-forget" }).then(function () { toast("Removed"); pRespond(); }); };
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

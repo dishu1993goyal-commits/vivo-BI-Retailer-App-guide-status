@@ -421,9 +421,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
       ["myday", "☀️", "My Day", null, "t:myday.html"], ["notices", "📌", "Notice board", null, "t:calendar.html#board", function () { return N.notices; }], ["bical", "📅", "BI calendar", null, "t:calendar.html#cal", function () { return N.calSoon; }]] },
     { id: "engage", icon: "💬", name: "Engage", sub: "Team", col: "#F4EEFF", items: [
       ["quiz", "🎓", "Quizzes", "quiz", "t:engage.html#quiz", function () { return N.quizNew; }], ["polls", "🗳️", "Polls", "polls", "t:engage.html#polls", function () { return N.pollNew; }],
-      ["wall", "💡", "Best practices", "wall", "t:engage.html#wall"], ["surveys", "📋", "Surveys", "surveys", "t:survey.html", function () { return N.surveys; }], ["chat", "✉️", "Messages", "chat", "t:chat.html", function () { return N.chat; }]] },
+      ["wall", "💡", "Best practices", "wall", "t:engage.html#wall"], ["surveys", "📋", "Surveys", "surveys", "t:survey.html", function () { return N.surveys; }], ["chat", "✉️", "Messages", "chat", "t:chat.html", function () { return N.chat; }], ["rewards", "🎁", "Rewards & recognition", null, "t:rewards.html"], ["newsletter", "📰", "BI newsletter", null, "t:newsletter.html"]] },
     { id: "learn", icon: "📚", name: "Learn & help", sub: "Answers", col: "#FFF4E5", items: [
-      ["guide", "📘", "Guide & manual", null, "t:guide.html"], ["help", "❓", "FAQ & Ask AI", "help", "t:help.html#faq"], ["flows", "🔀", "Processes", "flows", "t:help.html#flows"], ["contacts", "☎️", "Escalation contacts", "contacts", "t:help.html#contacts"],
+      ["guide", "📘", "Guide & manual", null, "t:guide.html"], ["appguide", "🗣️", "App guide assistant", null, "t:appguide.html"], ["help", "❓", "FAQ & Ask AI", "help", "t:help.html#faq"], ["flows", "🔀", "Processes", "flows", "t:help.html#flows"], ["contacts", "☎️", "Escalation contacts", "contacts", "t:help.html#contacts"],
       ["knowledge", "📖", "Knowledge", "knowledge", "t:knowledge.html"], ["schemes", "🧾", "Schemes & calculator", "schemes", "t:schemes.html"], ["schemecalc", "🧮", "Scheme payout calculator", null, "t:schemecalc.html"]] },
     { id: "support", icon: "🎧", name: "Support", sub: "Get help", col: "#FDECEC", items: [
       ["disputes", "⚖️", "Disputes", "disputes", "t:disputes.html", function () { return (N.disputes || {}).unread + (N.disputes || {}).assigned; }], ["support", "🎧", "Support desk", "support", "n:support", function () { return N.supportUnread; }],
@@ -431,7 +431,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     { id: "admin", icon: "🛡️", name: "Admin", sub: "HO only", col: "#E8F6FB", admin: true, items: [
       ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
       ["directory", "🪪", "vChat directory", null, "t:directory.html"], ["security", "🛡️", "Account security", null, "t:security.html", function () { return N.pwreq; }], ["insights", "📈", "Access insights", null, "n:logs"],
-      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["config", "⚙️", "Configuration centre", null, "t:config.html"], ["access", "🔐", "Access control", null, "t:access.html", null, "master"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
+      ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["config", "⚙️", "Configuration centre", null, "t:config.html"], ["access", "🔐", "Access control", null, "t:access.html", null, "master"], ["geolocate", "📡", "Email geo-locator", null, "t:geolocate.html"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
     { id: "smart", icon: "✨", name: "Smart tools", sub: "Less manual work", col: "#FFF1E6", items: [
       ["tlv", "🎙️", "Voice notes", null, "n:dash:tool-voice-notes"], ["tlp", "📸", "Photo audit", null, "n:dash:tool-photo-audit"], ["tlb", "🧭", "Smart beat planner", null, "n:dash:tool-beat-planner"],
       ["tls", "📤", "Share a KPI card", null, "n:dash:tool-share-card"], ["tlr", "🔀", "Auto-reconciliation", null, "n:dash:tool-reconciliation"], ["tli", "📈", "Excel to insight", null, "n:dash:tool-excel-insight"],
@@ -477,6 +477,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     var q = Q.trim().toLowerCase();
     var html = '<div class="hsearch"><input class="tx" id="q" placeholder="Find a tool — e.g. visits, quiz, dispute" value="' + esc(Q) + '" autocomplete="off"></div>';
     if (!q && PINS.length) html += PINS.slice(0, 3).map(function (p) { return '<div data-pin="1" style="background:' + (p.level === "urgent" ? "#FDECEC" : p.level === "important" ? "#FFF4E5" : "#EEF0FF") + ';border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;cursor:pointer"><b>' + (p.level === "urgent" ? "🚨 " : p.level === "important" ? "⚠️ " : "📌 ") + esc(p.title) + "</b>" + (p.body ? '<div style="color:var(--ink2);margin-top:2px">' + esc(p.body.slice(0, 140)) + (p.body.length > 140 ? "…" : "") + "</div>" : "") + "</div>"; }).join("");
+    if (!q && N.geoReq) html += '<div data-geo="1" style="background:#E7F7EF;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;cursor:pointer"><b>📡 HO asked to see your location</b><div style="color:var(--ink2);margin-top:2px">Tap to approve or decline — nothing is shared unless you allow it.</div></div>';
     var qOff = function (x) { if (!window.BIACCESS) return false; var hit = null; CATS.forEach(function (c) { c.items.forEach(function (it) { if (it[4] === x[3]) hit = it; }); }); return hit && !BIACCESS.ok("tool:" + hit[0]); };
     if (!q) html += '<div class="quick">' + QUICK.map(function (x, i) { if (qOff(x)) return ""; return '<button data-q="' + i + '"><i style="background:' + x[2] + '">' + x[0] + "</i>" + esc(x[1]) + bd(x[4]) + "</button>"; }).join("") + "</div>";
     var any = false;
@@ -491,6 +492,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     VIEW.innerHTML = html;
     var qi = $("q"); qi.oninput = function () { Q = qi.value; var p = qi.selectionStart; draw(); var n = $("q"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
     [].forEach.call(VIEW.querySelectorAll(".it"), function (b) { b.onclick = function () { open(b.dataset.t, b.dataset.l); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-geo]"), function (b) { b.onclick = function () { open("t:geolocate.html#respond", "Location request"); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-pin]"), function (b) { b.onclick = function () { open("t:calendar.html#board", "Notice board"); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var x = QUICK[+b.dataset.q]; open(x[3], x[1]); }; });
   }
@@ -504,7 +506,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       if (r.ok) {
         MODS = r.modules || null;
         N = { hygiene: r.hygiene, autorep: r.autorep, quizNew: r.quizNew, pollNew: r.pollNew, disputes: r.disputes || {}, supportUnread: r.supportUnread, pwreq: r.pwreq,
-          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports, insAlerts: r.insAlerts, notices: r.notices, calSoon: r.calSoon };
+          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports, insAlerts: r.insAlerts, notices: r.notices, calSoon: r.calSoon, geoReq: r.geoReq };
         PINS = r.pinned || [];
       }
       api({ action: "me" }).then(function (m) {
@@ -517,7 +519,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   window.__custChanged = function () { if (!Q) draw(); };
   window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
-  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; N.hoReports = r.hoReports; N.insAlerts = r.insAlerts; N.notices = r.notices; N.calSoon = r.calSoon; PINS = r.pinned || PINS; if (!Q) draw(); } }); });
+  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; N.hoReports = r.hoReports; N.insAlerts = r.insAlerts; N.notices = r.notices; N.calSoon = r.calSoon; N.geoReq = r.geoReq; PINS = r.pinned || PINS; if (!Q) draw(); } }); });
   load();
 })();
 </script>
