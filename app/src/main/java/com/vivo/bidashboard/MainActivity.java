@@ -111,7 +111,8 @@ public class MainActivity extends FragmentActivity {
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     // Market visits: GPS punch in/out and camera photos inside the shared tool pages.
-    private static final int GEO_REQUEST = 2101, CAM_PERM_REQUEST = 2102, MIC_PERM_REQUEST = 2103;
+    private static final int GEO_REQUEST = 2101, CAM_PERM_REQUEST = 2102, MIC_PERM_REQUEST = 2103, MEDIA_PERM_REQUEST = 2104;
+    private android.webkit.PermissionRequest pendingMediaReq;
     private String geoOrigin;
     private android.webkit.GeolocationPermissions.Callback geoCallback;
     private Uri cameraPhotoUri;
@@ -477,10 +478,37 @@ public class MainActivity extends FragmentActivity {
             boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
             if (ok) startSpeech(ps[0], "1".equals(ps[1])); else { speechJs("error", "not-allowed"); speechJs("end", ""); }
         }
+        if (requestCode == MEDIA_PERM_REQUEST && pendingMediaReq != null) {
+            android.webkit.PermissionRequest r = pendingMediaReq; pendingMediaReq = null;
+            grantMedia(r);
+        }
         if (requestCode == CAM_PERM_REQUEST && pendingImageChooser) {
             pendingImageChooser = false;
             if (filePathCallback != null) launchFileChooser(true);
         }
+    }
+
+    private void handleMediaRequest(android.webkit.PermissionRequest req) {
+        try {
+            String host = req.getOrigin() == null ? "" : String.valueOf(req.getOrigin().getHost());
+            if (!APP_HOST.equals(host)) { req.deny(); return; }
+            java.util.ArrayList<String> need = new java.util.ArrayList<>();
+            for (String r : req.getResources()) {
+                if (android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) need.add(Manifest.permission.CAMERA);
+                if (android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) need.add(Manifest.permission.RECORD_AUDIO);
+            }
+            if (need.isEmpty()) { grantMedia(req); return; }
+            pendingMediaReq = req;
+            requestPermissions(need.toArray(new String[0]), MEDIA_PERM_REQUEST);
+        } catch (Throwable e) { try { req.deny(); } catch (Throwable ignored) { } }
+    }
+    private void grantMedia(android.webkit.PermissionRequest req) {
+        java.util.ArrayList<String> ok = new java.util.ArrayList<>();
+        for (String r : req.getResources()) {
+            if (android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(r) && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) ok.add(r);
+            if (android.webkit.PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(r) && checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) ok.add(r);
+        }
+        try { if (ok.isEmpty()) req.deny(); else req.grant(ok.toArray(new String[0])); } catch (Throwable ignored) { }
     }
 
     private void doRequestVerification() {
@@ -3116,6 +3144,11 @@ public class MainActivity extends FragmentActivity {
                     geoOrigin = origin;
                     geoCallback = cb;
                     requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, GEO_REQUEST);
+                }
+                // Camera + microphone for the in-app recorder (App guide teleprompter), only for our own site.
+                @Override
+                public void onPermissionRequest(final android.webkit.PermissionRequest req) {
+                    ui.post(() -> handleMediaRequest(req));
                 }
             });
         }
