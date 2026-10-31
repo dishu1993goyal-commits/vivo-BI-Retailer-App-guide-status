@@ -38,24 +38,44 @@ async function hfApi(S, f) {   // the Space's API description (Gradio 4: /info, 
   }
   throw new Error(S.stage && S.stage !== "RUNNING" ? "The Space is " + lc(S.stage).replace(/_/g, " ") + (S.stage === "SLEEPING" ? " — it is waking up now, try again in 1–2 minutes." : " — try again later or use another Space.") : "Couldn't read the Space’s API — it may be busy, building or not a Gradio app.");
 }
-export function hfMap(info, want) {   // choose the endpoint that takes a photo + text and find where each input goes
-  const eps = info.named_endpoints || {}; let best = null, bestScore = -1;
-  for (const name of Object.keys(eps)) {
-    if (want && name !== want && name !== "/" + String(want).replace(/^\//, "")) continue;
-    const e = eps[name], ps = e.parameters || [], comp = (p) => lc(p.component), lab = (p) => lc((p.label || "") + " " + (p.parameter_name || ""));
-    const img = ps.find((p) => comp(p) === "image") || ps.find((p) => /image|photo|portrait|face|source|avatar/.test(lab(p)) && /file|image/.test(comp(p)));
-    const tbs = ps.filter((p) => comp(p) === "textbox"), rank = (p) => { const l = lab(p); return /speech|script|say|tts|speak|words|narrat|transcript/.test(l) ? 4 : /text|sentence|content/.test(l) && !/prompt|negative/.test(l) ? 3 : /input/.test(l) ? 2 : /prompt/.test(l) && !/negative/.test(l) ? 1 : 0; };
-    const txt = tbs.slice().sort((a, b) => rank(b) - rank(a))[0];
-    const vidOut = (e.returns || []).some((r) => /video/.test(lc(r.component) + " " + lc(r.label)));
-    const sc = (img ? 3 : 0) + (txt ? 3 : 0) + (vidOut ? 2 : 0);
-    if (img && txt && sc > bestScore) { best = { name, e, img, txt }; bestScore = sc; }
+const ENDPOINT_OK = (w) => /^\/?[A-Za-z0-9_]+$/.test(String(w || "").trim());
+// Choose how to drive the Space: a video endpoint that takes the photo + (text or a voice clip), and — when it needs a
+// voice clip — a text-to-speech endpoint in the same Space to make that clip from the script.
+export function hfMap(info, want) {
+  const eps = info.named_endpoints || {}, names = Object.keys(eps), comp = (p) => lc(p.component), lab = (p) => lc((p.label || "") + " " + (p.parameter_name || ""));
+  const outs = (e) => (e.returns || []).map((r) => comp(r) + " " + lc(r.label)).join(" ");
+  const pick = want && ENDPOINT_OK(want) ? names.filter((n) => n === want || n === "/" + String(want).replace(/^\//, "")) : [];
+  let best = null, bestScore = -1;
+  for (const name of pick.length ? pick : names) {
+    const e = eps[name], ps = e.parameters || [];
+    const img = ps.find((p) => comp(p) === "image" || /extendedimage|imageeditor/.test(comp(p))) || ps.find((p) => /image|photo|portrait|face|source|avatar|reference/.test(lab(p)) && /file|image/.test(comp(p)));
+    const aud = ps.find((p) => comp(p) === "audio" || (/audio|voice|speech|wav/.test(lab(p)) && /file/.test(comp(p))));
+    const tbs = ps.filter((p) => comp(p) === "textbox");
+    const speech = tbs.find((p) => /speech|script|say|tts|speak|words|narrat|transcript/.test(lab(p))) || (!aud ? tbs.find((p) => /text|sentence|content|input/.test(lab(p)) && !/prompt|negative/.test(lab(p))) || tbs.filter((p) => !/negative/.test(lab(p)))[0] : null);
+    const vidOut = /video/.test(outs(e)), sc = (img ? 4 : 0) + (vidOut ? 4 : 0) + (speech ? 3 : 0) + (aud ? 2 : 0) - (/preprocess|clear|session|orientation/.test(name) ? 5 : 0);
+    if (img && (speech || aud) && vidOut && sc > bestScore) { best = { name, e, img, aud, speech }; bestScore = sc; }
   }
   if (!best) return null;
   const ps = best.e.parameters || [];
-  const lang = ps.find((p) => /lang/.test(lc((p.label || "") + (p.parameter_name || ""))));
-  const prm = ps.find((p) => p !== best.txt && lc(p.component) === "textbox" && /prompt|motion|action|describe|scene/.test(lc((p.label || "") + " " + (p.parameter_name || ""))) && !/negative/.test(lc(p.label)));
+  const lang = ps.find((p) => /lang/.test(lab(p)));
+  const prm = ps.find((p) => p !== best.speech && comp(p) === "textbox" && !/negative/.test(lab(p)));
+  // a voice clip is needed and the script has nowhere else to go → find a text-to-speech endpoint in the Space
+  let tts = null;
+  if (best.aud && !best.speech) {
+    for (const name of names) {
+      if (name === best.name) continue;
+      const e = eps[name], tp = e.parameters || [], tb = tp.filter((p) => comp(p) === "textbox");
+      if (!tb.length || !/audio/.test(outs(e)) || tp.some((p) => /image|video/.test(comp(p)))) continue;
+      const sc = (/speak|tts|voice|say|speech/.test(lc(name)) ? 3 : 0) + (tp.length <= 4 ? 1 : 0);
+      if (!tts || sc > tts.sc) tts = { name, params: tp, text: tb.find((p) => /text|speech|script|say|prompt|input/.test(lab(p))) || tb[0], lang: tp.find((p) => /lang/.test(lab(p))), sc };
+    }
+  }
   const nm = (p) => (p ? p.label || p.parameter_name || "" : "");
-  return { name: best.name, params: ps, img: best.img, txt: best.txt, lang, prm, summary: { endpoint: best.name, image: nm(best.img), text: nm(best.txt), lang: nm(lang), prompt: nm(prm), needsAudio: ps.some((p) => lc(p.component) === "audio" && !p.parameter_has_default) } };
+  return { name: best.name, params: ps, img: best.img, aud: best.aud, txt: best.speech, lang, prm, tts,
+    summary: { endpoint: best.name, image: nm(best.img), text: best.speech ? nm(best.speech) : best.aud && tts ? "voice made by " + tts.name : "", audio: best.aud ? nm(best.aud) : "", lang: nm(lang), prompt: nm(prm), needsVoice: !!(best.aud && !best.speech && !tts), ignoredEndpoint: want && !pick.length ? String(want) : "" } };
+}
+export function hfDescribe(info) {   // one line per endpoint, for the error message
+  return Object.keys(info.named_endpoints || {}).slice(0, 8).map((n) => n + "(" + (info.named_endpoints[n].parameters || []).map((p) => (p.label || p.parameter_name || "?") + ":" + lc(p.component)).join(", ") + " → " + (info.named_endpoints[n].returns || []).map((r) => lc(r.component)).join("+") + ")").join("; ");
 }
 function langChoice(p, lang) {
   const en = (p.type && p.type.enum) || (String((p.python_type && p.python_type.type) || "").match(/'([^']+)'/g) || []).map((s) => s.slice(1, -1));
@@ -74,43 +94,59 @@ export async function runHfJob(store, env, jobId, { fetchImpl = fetch, now = () 
     const S = await hfSpace(V.hfSpace, keys.hf, f);
     if (S.stage === "SLEEPING") { await update({ stage: "Waking up the free model (1–2 minutes)…" }); try { await f(S.host + "/", { headers: S.headers }); } catch (e) { } await new Promise((r) => setTimeout(r, 60000)); }
     let api = null; for (let i = 0; i < 4 && !api; i++) { try { api = await hfApi(S, f); } catch (e) { if (i === 3) throw e; await new Promise((r) => setTimeout(r, 25000)); } }
-    const M = hfMap(api.info, V.hfApi); if (!M) throw new Error("This Space has no endpoint that takes a photo and text.");
+    const M = hfMap(api.info, V.hfApi); if (!M) throw new Error("This Space has no endpoint that makes a video from a photo plus text or voice.");
+    if (M.summary.needsVoice) throw new Error("This Space needs a voice recording and has no text-to-speech step — pick another Space.");
     const base = S.host + api.pre;
+    const call = async (name, data, label) => {   // one Gradio API call: start it, then read its result stream
+      const ep = name.replace(/^\//, ""), rc = await f(base + "/call/" + ep, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, S.headers), body: JSON.stringify({ data }) }), dc = await rc.json().catch(() => ({}));
+      if (!rc.ok || !dc.event_id) throw new Error("The Space refused the " + label + " request: " + str(dc.detail || dc.error || rc.status, 160));
+      const rs = await f(base + "/call/" + ep + "/" + dc.event_id, { headers: Object.assign({ accept: "text/event-stream" }, S.headers) });
+      if (!rs.ok || !rs.body) throw new Error("Lost the connection to the Space (" + rs.status + ").");
+      const reader = rs.body.getReader(), dec = new TextDecoder(); let buf = "", ev = "", result, failure = null, lastStage = 0, got = false;
+      const deadline = now() + 12 * 60000;
+      while (!got && !failure) {
+        if (now() > deadline) throw new Error("The free model took too long — try a shorter script or another time.");
+        const { value, done } = await reader.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let k; while ((k = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, k).replace(/\r$/, ""); buf = buf.slice(k + 1);
+          if (line.startsWith("event:")) ev = line.slice(6).trim();
+          else if (line.startsWith("data:")) {
+            const raw = line.slice(5).trim();
+            if (ev === "complete") { try { result = JSON.parse(raw); } catch (e) { result = raw; } got = true; }
+            else if (ev === "error") failure = raw && raw !== "null" ? raw : "The model reported an error.";
+            else if (ev === "generating" && now() - lastStage > 20000) { lastStage = now(); await update({ stage: label === "voice" ? "Making the voice…" : "The model is making the video…" }); }
+          }
+        }
+      }
+      try { reader.cancel(); } catch (e) { }
+      if (failure) { let m = failure; try { const j2 = JSON.parse(failure); m = j2 && (j2.message || j2.error || j2.detail) || failure; } catch (e) { } throw new Error(/quota|exceeded|ZeroGPU|GPU task aborted/i.test(m) ? "The free daily GPU time is used up for this Hugging Face account — try tomorrow, or switch method." : "The model said: " + str(m, 200)); }
+      if (!got) throw new Error("The Space closed the connection before finishing — it may be overloaded; try again.");
+      return result;
+    };
+    const fileOf = (x) => { let r = null; (function walk(y) { if (r || !y) return; if (typeof y === "string") { if (/^\/|^https?:/.test(y) && /\.\w{2,4}$/.test(y)) r = y; return; } if (Array.isArray(y)) return y.forEach(walk); if (typeof y === "object") { if (y.path || y.url) { r = y.path || y.url; return; } Object.keys(y).forEach((k) => walk(y[k])); } })(x); return r; };
+    const fill = (p, lang) => { if (p && lang) { const ch = langChoice(p, lang); if (ch) return ch; } return p.parameter_has_default ? p.parameter_default : p.example_input != null && !(typeof p.example_input === "object") ? p.example_input : null; };
     // upload the photo
     const fd = new FormData(); fd.append("files", new Blob([Buffer.from(ph.b64, "base64")], { type: ph.mime }), ph.mime === "image/png" ? "presenter.png" : "presenter.jpg");
     const ru = await f(base + "/upload", { method: "POST", headers: S.headers, body: fd }), up = await ru.json().catch(() => null);
     const path = Array.isArray(up) ? up[0] : up && up.files ? up.files[0] : null; if (!ru.ok || !path) throw new Error("The Space didn’t accept the photo (" + ru.status + ").");
+    // voice clip from the script, when the video step needs one
+    let voice = null;
+    if (M.aud && !M.txt) {
+      await update({ stage: "Making the voice…" });
+      const vd = await call(M.tts.name, M.tts.params.map((p) => p === M.tts.text ? job.text : fill(p, p === M.tts.lang ? job.lang : null)), "voice");
+      const vp = fileOf(vd); if (!vp) throw new Error("The Space’s voice step returned no audio.");
+      voice = { path: /^https?:/.test(vp) ? undefined : vp, url: /^https?:/.test(vp) ? vp : undefined, meta: { _type: "gradio.FileData" }, orig_name: "voice.wav" };
+    }
     const data = M.params.map((p) => {
       if (p === M.img) return { path, meta: { _type: "gradio.FileData" }, orig_name: "presenter.jpg" };
+      if (p === M.aud && voice) return voice;
       if (p === M.txt) return job.text;
-      if (p === M.prm) return "A friendly person presenting to the camera, talking naturally, " + V.motion + ", steady camera, realistic";
-      if (p === M.lang) { const ch = langChoice(p, job.lang); if (ch) return ch; }
-      return p.parameter_has_default ? p.parameter_default : p.example_input != null ? p.example_input : null;
+      if (p === M.prm) return "A friendly person presenting to the camera at a vivo store, talking naturally, " + V.motion + ", steady camera, realistic";
+      return fill(p, p === M.lang ? job.lang : null);
     });
     await update({ stage: "Waiting in the free GPU queue…" });
-    const ep = M.name.replace(/^\//, ""), rc = await f(base + "/call/" + ep, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, S.headers), body: JSON.stringify({ data }) }), dc = await rc.json().catch(() => ({}));
-    if (!rc.ok || !dc.event_id) throw new Error("The Space refused the request: " + str(dc.detail || dc.error || rc.status, 160));
-    const rs = await f(base + "/call/" + ep + "/" + dc.event_id, { headers: Object.assign({ accept: "text/event-stream" }, S.headers) });
-    if (!rs.ok || !rs.body) throw new Error("Lost the connection to the Space (" + rs.status + ").");
-    const reader = rs.body.getReader(), dec = new TextDecoder(); let buf = "", ev = "", result = null, failure = null, lastStage = 0;
-    const deadline = now() + 13 * 60000;
-    while (!result && !failure) {
-      if (now() > deadline) throw new Error("The free model took too long (over 13 minutes) — try a shorter script or another time.");
-      const { value, done } = await reader.read(); if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i; while ((i = buf.indexOf("\n")) >= 0) {
-        const line = buf.slice(0, i).replace(/\r$/, ""); buf = buf.slice(i + 1);
-        if (line.startsWith("event:")) ev = line.slice(6).trim();
-        else if (line.startsWith("data:")) {
-          const raw = line.slice(5).trim();
-          if (ev === "complete") { try { result = JSON.parse(raw); } catch (e) { result = raw; } }
-          else if (ev === "error") failure = raw && raw !== "null" ? raw : "The model reported an error.";
-          else if (ev === "generating" && now() - lastStage > 20000) { lastStage = now(); await update({ stage: "The model is making the video…" }); }
-        }
-      }
-    }
-    try { reader.cancel(); } catch (e) { }
-    if (failure) { let m = failure; try { const j = JSON.parse(failure); m = j && (j.message || j.error || j.detail) || failure; } catch (e) { } throw new Error(/quota|exceeded|ZeroGPU|GPU task aborted/i.test(m) ? "The free daily GPU time is used up for this Hugging Face account — try tomorrow, or switch method." : "The model said: " + str(m, 200)); }
+    const result = await call(M.name, data, "video");
     let url = null; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/\.(mp4|webm|mov)(\?|$)/i.test(x)) url = /^https?:/.test(x) ? x : base + "/file=" + x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { const u = x.url || (x.path ? base + "/file=" + x.path : ""); if (u && /video|mp4|webm|mov/i.test((x.mime_type || "") + u + (x.orig_name || ""))) { url = u; return; } if (x.video) walk(x.video); Object.keys(x).forEach((k) => { if (k !== "video") walk(x[k]); }); } })(result);
     if (!url) throw new Error("The model finished but returned no video.");
     await update({ status: "done", hfUrl: url, stage: "", error: "" });
@@ -227,7 +263,7 @@ ${feat}`;
   if (b.action === "ag-save") {
     const c = await cfg(); c.kb = String(b.kb == null ? c.kb || "" : b.kb).slice(0, 6000);
     if (b.presenter) { c.presenter = Object.assign(c.presenter || {}, { name: str(b.presenter.name, 40), voice: b.presenter.voice === "m" ? "m" : "f" }); }
-    if (b.video && typeof b.video === "object") { const V = vcfg(c), x = b.video; c.video = Object.assign({}, c.video || {}, { provider: PROVIDERS.includes(x.provider) ? x.provider : V.provider, show: x.show ? { slide: x.show.slide !== false, ai: x.show.ai !== false, tp: x.show.tp !== false, clip: x.show.clip !== false } : V.show, hfSpace: x.hfSpace != null ? str(x.hfSpace, 120).replace(/^https?:\/\/(huggingface\.co\/spaces\/|([\w-]+)\.hf\.space).*$/, (m, a1, sub) => sub ? sub : m).replace(/^https?:\/\/huggingface\.co\/spaces\//, "").replace(/[?#].*$/, "").replace(/\/+$/, "") : V.hfSpace, hfApi: x.hfApi != null ? str(x.hfApi, 60) : V.hfApi, motion: x.motion != null ? str(x.motion, 200) : V.motion, expr: ["low", "medium", "high"].includes(x.expr) ? x.expr : V.expr }); }
+    if (b.video && typeof b.video === "object") { const V = vcfg(c), x = b.video; c.video = Object.assign({}, c.video || {}, { provider: PROVIDERS.includes(x.provider) ? x.provider : V.provider, show: x.show ? { slide: x.show.slide !== false, ai: x.show.ai !== false, tp: x.show.tp !== false, clip: x.show.clip !== false } : V.show, hfSpace: x.hfSpace != null ? str(x.hfSpace, 120).replace(/^https?:\/\/(huggingface\.co\/spaces\/|([\w-]+)\.hf\.space).*$/, (m, a1, sub) => sub ? sub : m).replace(/^https?:\/\/huggingface\.co\/spaces\//, "").replace(/[?#].*$/, "").replace(/\/+$/, "") : V.hfSpace, hfApi: x.hfApi != null ? (ENDPOINT_OK(x.hfApi) ? str(x.hfApi, 60) : "") : V.hfApi, motion: x.motion != null ? str(x.motion, 200) : V.motion, expr: ["low", "medium", "high"].includes(x.expr) ? x.expr : V.expr }); }
     c.by = rec.fullName || rec.username; c.at = t; await store.set("config:appguide", c); return json(200, Object.assign({ ok: true }, pubCfg(c, true, await keysOf())));
   }
   if (b.action === "ag-key") {   // write-only service keys: did / heygen / hf
@@ -243,7 +279,8 @@ ${feat}`;
       if (S.stage === "SLEEPING" || S.stage === "PAUSED") { if (S.stage === "SLEEPING") { try { await f(S.host + "/", { headers: S.headers }); } catch (e) { } } return json(200, { ok: false, error: S.stage === "SLEEPING" ? "The Space is asleep — I’ve woken it; press Check again in 1–2 minutes." : "This Space is paused by its owner — pick another Space." }); }
       if (/ERROR/.test(S.stage)) return json(200, { ok: false, error: "This Space is broken right now (" + lc(S.stage).replace(/_/g, " ") + ") — pick another Space." });
       const api = await hfApi(S, f), M = hfMap(api.info, V.hfApi);
-      if (!M) return json(200, { ok: false, error: "This Space has no endpoint that takes a photo and text" + (Object.keys(api.info.named_endpoints || {}).length ? " (it has: " + Object.keys(api.info.named_endpoints).slice(0, 6).join(", ") + ")" : "") + ". Pick a Space with a portrait input and a text box that gives a video." });
+      if (!M) return json(200, { ok: false, error: "This Space has no step that makes a video from a photo plus text or voice. What it offers: " + str(hfDescribe(api.info), 700) });
+      if (M.summary.needsVoice) return json(200, { ok: false, error: "This Space makes the video from a voice recording and has no text-to-speech step, so it can’t speak your script. Pick another Space. (" + str(hfDescribe(api.info), 500) + ")" });
       return json(200, { ok: true, space: V.hfSpace, stage: S.stage || "RUNNING", token: !!k.hf, map: M.summary });
     } catch (e) { return json(200, { ok: false, error: str(e.message || e, 240) }); }
   }
