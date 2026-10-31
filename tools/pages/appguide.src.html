@@ -366,7 +366,7 @@ textarea.tx{min-height:120px}
       '<div id="pv-did" style="display:' + (V.provider === "did" ? "block" : "none") + '">' + key("did", "D-ID API key", "Paste the key from d-id.com → API") + "</div>" +
       '<div id="pv-heygen" style="display:' + (V.provider === "heygen" ? "block" : "none") + '">' + key("heygen", "HeyGen API key", "Paste the key from HeyGen → Settings → API") +
         '<label class="lb">Body motion & gestures</label><input class="tx" id="hgm" value="' + esc(V.motion || "") + '"><label class="lb">Expressiveness</label><select class="tx" id="hge"><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></div>' +
-      '<div id="pv-hf" style="display:' + (V.provider === "hf" ? "block" : "none") + '"><label class="lb">Hugging Face Space (model)</label><input class="tx" id="hfs" value="' + esc(V.hfSpace || "") + '" placeholder="owner/space-name — a photo + text → talking video Space"><label class="lb">Endpoint (optional)</label><input class="tx" id="hfa" value="' + esc(V.hfApi || "") + '" placeholder="auto-detect, or e.g. /generate">' + key("hf", "Hugging Face token (free account → Settings → Access Tokens, “Read”)", "hf_… — gives your daily free GPU time") +
+      '<div id="pv-hf" style="display:' + (V.provider === "hf" ? "block" : "none") + '"><label class="lb">Hugging Face Space (model)</label><input class="tx" id="hfs" value="' + esc(V.hfSpace || "") + '" placeholder="owner/space-name, e.g. alexnasa/OmniAvatar"><label class="lb">Endpoint (optional)</label><input class="tx" id="hfa" value="' + esc(V.hfApi || "") + '" placeholder="auto-detect, or e.g. /generate">' + key("hf", "Hugging Face token (free account → Settings → Access Tokens, “Read”)", "hf_… — gives your daily free GPU time") +
         '<button class="btn ghost sm" id="hfc" style="margin-top:8px">🧪 Check this model</button><div id="hfr" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>' +
       '<label class="lb" style="margin-top:14px">Buttons shown when making videos</label><div class="fx" id="shw">' + [["slide", "🎞️ Captioned slideshow"], ["ai", "🧑‍💼 AI presenter"], ["tp", "🎬 Teleprompter"], ["clip", "🎥 Upload clip"]].map(function (x) { return '<span data-sh="' + x[0] + '" class="' + (S[x[0]] !== false ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>" +
       '<button class="btn pri block" id="vsv" style="margin-top:12px">Save video settings</button></div>';
@@ -382,7 +382,7 @@ textarea.tx{min-height:120px}
     $("hfc").onclick = function () {
       var out = $("hfr"); out.innerHTML = '<span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Connecting…';
       api({ action: "ag-save", video: { provider: prov, show: show, hfSpace: $("hfs").value, hfApi: $("hfa").value, motion: $("hgm").value, expr: $("hge").value } }).then(function (r) { if (r.ok) CFG.video = r.video; return hfPlan(); })
-        .then(function (pl) { out.innerHTML = "✅ Ready: <b>" + esc(pl.space) + " " + esc(pl.ep) + "</b> — photo → “" + esc(pl.map.image) + "”, script → “" + esc(pl.map.text) + "”" + (pl.map.lang ? ", language → “" + esc(pl.map.lang) + "”" : "") + "."; })
+        .then(function (pl) { out.innerHTML = "✅ Ready: <b>" + esc(pl.space) + " " + esc(pl.ep) + "</b> — photo → “" + esc(pl.map.image) + "”, script → “" + esc(pl.map.text) + "”" + (pl.map.lang ? ", language → “" + esc(pl.map.lang) + "”" : "") + (pl.map.prompt ? ", gestures → “" + esc(pl.map.prompt) + "”" : "") + "."; })
         .catch(function (e) { out.innerHTML = '<span style="color:var(--bad)">' + esc(e.message || String(e)) + "</span>"; });
     };
   }
@@ -392,6 +392,7 @@ textarea.tx{min-height:120px}
   function hfPlan() {   // connect, read the model's inputs, and work out where the photo / text / language go
     return api({ action: "ag-hf-cred" }).then(function (cr) {
       if (!cr.ok) throw new Error(cr.error);
+      if (!/^[\w.-]+\/[\w.-]+$/.test(cr.space)) throw new Error("“" + cr.space + "” isn’t a Space name. Enter it as owner/space-name — for example alexnasa/OmniAvatar (copy it from the Space’s web address after huggingface.co/spaces/).");
       return gradio().then(function (G) {
         return G.Client.connect(cr.space, cr.token ? { hf_token: cr.token } : {}).catch(function (e) { throw new Error("Couldn't open the Space “" + cr.space + "”: " + (e && e.message || e) + " — it may be sleeping, private or broken; try another."); }).then(function (client) {
           return client.view_api().then(function (info) {
@@ -400,14 +401,16 @@ textarea.tx{min-height:120px}
               if (cr.api && name !== cr.api && "/" + cr.api.replace(/^\//, "") !== name) return;
               var e = eps[name], ps = e.parameters || [], comp = function (p) { return String(p.component || "").toLowerCase(); }, lab = function (p) { return String((p.label || "") + " " + (p.parameter_name || "")).toLowerCase(); };
               var img = ps.filter(function (p) { return comp(p) === "image" || (/image|photo|portrait|face|source|avatar/.test(lab(p)) && /file|image/.test(comp(p))); })[0];
-              var txt = ps.filter(function (p) { return comp(p) === "textbox" && /text|script|speech|say|prompt|input|content|sentence/.test(lab(p)); })[0] || ps.filter(function (p) { return comp(p) === "textbox"; })[0];
+              var tbs = ps.filter(function (p) { return comp(p) === "textbox"; }), rank = function (p) { var l = lab(p); return /speech|script|say|tts|speak|words|narrat|transcript/.test(l) ? 4 : /text|sentence|content/.test(l) && !/prompt|negative/.test(l) ? 3 : /input/.test(l) ? 2 : /prompt/.test(l) && !/negative/.test(l) ? 1 : 0; };
+              var txt = tbs.slice().sort(function (a, b) { return rank(b) - rank(a); })[0];
               var vidOut = (e.returns || []).some(function (r) { return /video/.test(String(r.component || "").toLowerCase()) || /video/.test(String(r.label || "").toLowerCase()); });
               var sc = (img ? 3 : 0) + (txt ? 3 : 0) + (vidOut ? 2 : 0) - (ps.some(function (p) { return comp(p) === "audio" && !p.parameter_has_default; }) && !txt ? 3 : 0);
               if (img && txt && sc > bestScore) { best = { name: name, e: e, img: img, txt: txt }; bestScore = sc; }
             });
             if (!best) throw new Error("This Space has no endpoint that takes a photo and text. Pick a Space whose demo has a portrait/photo input and a text box, and gives a video.");
             var lang = (best.e.parameters || []).filter(function (p) { return /lang/.test(String((p.label || "") + (p.parameter_name || "")).toLowerCase()); })[0];
-            return { G: G, client: client, space: cr.space, ep: best.name, e: best.e, map: { image: best.img.label || best.img.parameter_name, text: best.txt.label || best.txt.parameter_name, lang: lang ? lang.label || lang.parameter_name : "" }, P: { img: best.img, txt: best.txt, lang: lang } };
+            var prm = (best.e.parameters || []).filter(function (p) { var l = String((p.label || "") + " " + (p.parameter_name || "")).toLowerCase(); return p !== best.txt && String(p.component || "").toLowerCase() === "textbox" && /prompt|motion|action|describe|scene/.test(l) && !/negative/.test(l); })[0];
+            return { G: G, client: client, space: cr.space, ep: best.name, e: best.e, map: { image: best.img.label || best.img.parameter_name, text: best.txt.label || best.txt.parameter_name, lang: lang ? lang.label || lang.parameter_name : "", prompt: prm ? prm.label || prm.parameter_name : "" }, P: { img: best.img, txt: best.txt, lang: lang, prm: prm } };
           });
         });
       });
@@ -423,6 +426,7 @@ textarea.tx{min-height:120px}
         var ps = pl.e.parameters || [], data = ps.map(function (p) {
           if (p === pl.P.img) return pl.G.handle_file(blob);
           if (p === pl.P.txt) return script;
+          if (p === pl.P.prm) return "A friendly person presenting to the camera, talking naturally, " + ((VC().motion) || "gesturing with both hands") + ", steady camera, realistic";
           if (p === pl.P.lang) { var en = (p.type && p.type.enum) || (p.python_type && p.python_type.type && (String(p.python_type.type).match(/'([^']+)'/g) || []).map(function (s) { return s.slice(1, -1); })) || []; var want = O.lang === "Hinglish" ? "Hindi" : O.lang; var m = en.filter(function (o) { return String(o).toLowerCase().indexOf(want.toLowerCase()) >= 0 || String(o).toLowerCase() === (LC[O.lang] || "").slice(0, 2); })[0]; if (m) return m; }
           return p.parameter_has_default ? p.parameter_default : (p.example_input != null ? p.example_input : null);
         });
