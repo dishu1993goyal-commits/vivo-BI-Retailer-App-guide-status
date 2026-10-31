@@ -20,12 +20,20 @@
   }
   function readPdf(buf) {
     return lib("pdfjs").then(function () { var pj = window.pdfjsLib; pj.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.js"; return pj.getDocument({ data: buf }).promise; }).then(function (doc) {
-      var n = Math.min(doc.numPages, 30), chain = Promise.resolve(), lines = [];
+      var n = Math.min(doc.numPages, 60), chain = Promise.resolve(), out = [];
       for (var i = 1; i <= n; i++) (function (i) { chain = chain.then(function () { return doc.getPage(i).then(function (pg) { return pg.getTextContent().then(function (tc) {
-        var rows = {}; tc.items.forEach(function (it) { var y = Math.round(it.transform[5] / 3) * 3; (rows[y] = rows[y] || []).push([it.transform[4], it.str]); });
-        Object.keys(rows).map(Number).sort(function (a, b) { return b - a; }).forEach(function (y) { var t = rows[y].sort(function (a, b) { return a[0] - b[0]; }).map(function (x) { return x[1]; }).join(" ").replace(/\s+/g, " ").trim(); if (t) lines.push(t); });
+        // group items into rows by y, then into columns by the horizontal gap between items (keeps table columns apart with " | ")
+        var rows = {};
+        tc.items.forEach(function (it) { if (!it.str || !it.str.trim()) return; var y = Math.round(it.transform[5] / 2) * 2, w = it.width || (it.str.length * (it.transform[0] || 5) * 0.5); (rows[y] = rows[y] || []).push({ x: it.transform[4], end: it.transform[4] + w, s: it.str }); });
+        var lines = Object.keys(rows).map(Number).sort(function (a, b) { return b - a; }).map(function (y) {
+          var items = rows[y].sort(function (a, b) { return a.x - b.x; }), parts = [], cur = "", prevEnd = null;
+          items.forEach(function (it) { if (prevEnd != null && it.x - prevEnd > 14) { parts.push(cur.trim()); cur = ""; } cur += (cur && it.x - prevEnd > 1 ? " " : "") + it.s; prevEnd = it.end; });
+          if (cur.trim()) parts.push(cur.trim());
+          return parts.join(" | ").replace(/\s+\|\s+/g, " | ").trim();
+        }).filter(Boolean);
+        if (lines.length) out.push("## Page " + i + "\n" + lines.join("\n"));
       }); }); }); })(i);
-      return chain.then(function () { return lines.join("\n"); });
+      return chain.then(function () { return out.join("\n\n"); });
     });
   }
   function readSheet(buf) {

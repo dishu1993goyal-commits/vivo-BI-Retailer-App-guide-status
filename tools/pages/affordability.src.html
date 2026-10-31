@@ -547,6 +547,15 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     };
   }
 
+  function chunkText(text, size) {   // split on page / file boundaries, keeping each batch near `size` chars
+    var blocks = text.split(/\n(?=## |### )/), out = [], cur = "";
+    blocks.forEach(function (b) {
+      if (b.length > size * 1.6) { for (var i = 0; i < b.length; i += size) { if (cur) { out.push(cur); cur = ""; } out.push(b.slice(i, i + size)); } return; }
+      if ((cur + "\n" + b).length > size && cur) { out.push(cur); cur = b; } else cur = cur ? cur + "\n" + b : b;
+    });
+    if (cur.trim()) out.push(cur);
+    return out.length ? out : [text];
+  }
   var FTLOAD = null;
   function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
   function fileImport(p, after) {
@@ -557,9 +566,18 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
       loadFiles().then(function () {
         return files.reduce(function (acc, f) { return acc.then(function (parts) { p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>"; return window.BIFILES.extract(f).then(function (r) { parts.push("### " + r.name + "\n" + r.text); return parts; }).catch(function (e) { toast(e.message || String(e)); return parts; }); }); }, Promise.resolve([]));
       }).then(function (parts) {
-        var text = parts.join("\n\n").slice(0, 14000); if (!text.trim()) { p.innerHTML = '<div class="err" style="margin-top:10px">Nothing readable was found in those files.</div>'; return; }
-        p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>✨ AI is pulling out the offers…</div>';
-        api({ action: "aff-report-ai", text: text }).then(function (r) { if (!r.ok) { p.innerHTML = '<div class="err" style="margin-top:10px">' + esc(r.error) + "</div>"; return; } previewFileRows(p, r.rows || [], after); });
+        var text = parts.join("\n\n").slice(0, 160000); if (!text.trim()) { p.innerHTML = '<div class="err" style="margin-top:10px">Nothing readable was found in those files.</div>'; return; }
+        var chunks = chunkText(text, 6500);   // long sheets (many pages) are read in batches so no offers are missed
+        var all = [], seen = {}, err = "";
+        var run = function (i) {
+          if (i >= chunks.length) { if (!all.length && err) { p.innerHTML = '<div class="err" style="margin-top:10px">' + esc(err) + "</div>"; return; } previewFileRows(p, all, after); return; }
+          p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>✨ AI is reading the offers… ' + (chunks.length > 1 ? "batch " + (i + 1) + " of " + chunks.length + " · " : "") + all.length + " found</div>";
+          api({ action: "aff-report-ai", text: chunks[i] }).then(function (r) {
+            if (!r.ok) err = r.error; else (r.rows || []).forEach(function (x) { var key = (x.model + "|" + x.kind + "|" + x.partner + "|" + x.scheme + "|" + x.details).toLowerCase().replace(/\s+/g, " ").slice(0, 80); if (!seen[key]) { seen[key] = 1; all.push(x); } });
+            run(i + 1);
+          });
+        };
+        run(0);
       }).catch(function (e) { p.innerHTML = '<div class="err" style="margin-top:10px">' + esc(e.message || String(e)) + "</div>"; });
     };
     i.click();
@@ -575,7 +593,12 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
       var out = rows.map(function (r, k) { var g = function (c) { var el = p.querySelector("." + c + '[data-i="' + k + '"]'); return el ? el.value.trim() : ""; }; return { model: g("af-m"), kind: g("af-k"), details: g("af-d"), partner: g("af-p"), scheme: g("af-s"), validTill: g("af-v"), benefit: r.benefit, variant: r.variant }; }).filter(function (x) { return x.model && x.details; });
       if (!out.length) return toast("Nothing to add.");
       this.disabled = true; this.textContent = "Adding…";
-      api({ action: "aff-report-bulk", rows: out }).then(function (r) { if (!r.ok) { toast(r.error); p.querySelector("#afg").disabled = false; return; } p.innerHTML = '<div class="notice info" style="margin-top:10px">✅ ' + r.added + " offer(s) added" + (r.errors && r.errors.length ? " · " + r.errors.length + " skipped (model not found)" : "") + ". They now show when you pick that model in Find offers.</div>"; ALLR = null; if (after) after(); }); };
+      var batches = [], B = 250; for (var bi = 0; bi < out.length; bi += B) batches.push(out.slice(bi, bi + B));
+      var added = 0, skipped = 0;
+      var go = function (k) {
+        if (k >= batches.length) { p.innerHTML = '<div class="notice info" style="margin-top:10px">✅ ' + added + " offer(s) added" + (skipped ? " · " + skipped + " skipped (model not found)" : "") + ". They now show when you pick that model in Find offers.</div>"; ALLR = null; if (after) after(); return; }
+        api({ action: "aff-report-bulk", rows: batches[k] }).then(function (r) { if (!r.ok) { toast(r.error); p.querySelector("#afg") && (p.querySelector("#afg").disabled = false); return; } added += r.added; skipped += (r.errors ? r.errors.length : 0); go(k + 1); }); };
+      go(0); };
   }
 
   function hoEdit(C, vs, cols) {

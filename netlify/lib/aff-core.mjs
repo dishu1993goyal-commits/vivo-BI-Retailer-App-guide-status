@@ -591,15 +591,17 @@ ${JSON.stringify(offers)}`;
     await store.set("config:afftpl", tpl); return json(200, { ok: true, template: tpl });
   }
   if (b.action === "aff-report-ai") {   // read offers out of an uploaded file (text extracted on the page) → rows for preview, then aff-report-bulk saves
-    const text = str(b.text, 14000); if (text.length < 20) return json(400, { ok: false, error: "No readable offer text was found in the file." });
+    const text = str(b.text, 16000); if (text.length < 20) return json(400, { ok: false, error: "No readable offer text was found in the file." });
     const cat = (await store.get("affcat")) || { models: [] };
     const names = cat.models.map((m) => m.name).slice(0, 400);
     const keys = await aiKeys(store, ctx.env || {}); if (!keys.groq) return json(200, { ok: false, error: "AI key not set (Affordability → Data)." });
-    const prompt = `You read vivo India offer sheets and turn them into structured rows for the sales team. From the OFFER TEXT below, list EVERY distinct phone offer.
-Match each to the closest model from MODELS (use that exact name); if a line names no clear vivo model but the sheet has one overall model, use it; skip anything that is not a phone offer.
-"kind" is one of: emi, exchange, upgrade, vshield, abb, cashback, other.
-Write numbers in whole rupees; copy schemes in "tenure/advance" form (e.g. 10/0, 24/0) when present. Never invent offers — only what the text supports.
-Return JSON only: {"offers":[{"model":"exact model name","kind":"emi","partner":"bank/NBFC or brand","scheme":"10/0 or empty","benefit":"short headline e.g. ₹2000 instant discount","details":"what the customer gets, one line","variant":"e.g. 8GB+256GB or empty","validTill":"YYYY-MM-DD or empty"}]}
+    const prompt = `You read vivo India affordability / offer sheets (often tables) and turn EVERY offer into a structured row for the sales team.
+The text comes from a PDF/Excel; table cells on one row are separated by " | ". A single model row usually lists SEVERAL offers across columns — one per bank or finance partner. Output a SEPARATE row for EACH partner/scheme/benefit you can see, not just one per model. Be exhaustive: it is better to include an offer with an empty field than to drop it.
+Read these common short forms: MOP = model price; NCE = No Cost EMI; CCEMI = credit-card EMI; LCE/FS = full swipe; CB = cashback; "24|0" or "24/0" = tenure|advance EMIs; EW = extended warranty / V-Shield; SDP/CDP = standard/discounted plan; ABB = assured buy-back. Partner/bank names include Bajaj Finance, HDFC, HDB, ICICI, SBI, Axis, Kotak, IDFC, TVS, Home Credit, OneCard, Pine Labs, Benow, and "Paper Cards"/"Bank Schemes" (use that as the partner when no specific bank is named).
+Match each to the closest model from MODELS (use that exact name); if a cell names no model, use the model named at the start of that table row/section. Skip page headers, totals and terms-and-conditions text.
+"kind" is one of: emi (any finance/EMI/NCE/cashback-on-EMI), exchange, upgrade, vshield (EW/protection), abb, cashback (instant cashback/discount), other.
+Whole rupees; copy schemes in "tenure/advance" form. Never invent — only what the text supports.
+Return JSON only: {"offers":[{"model":"exact model name","kind":"emi","partner":"bank/NBFC or brand","scheme":"24/0 or empty","benefit":"short headline e.g. ₹2000 cashback or No Cost EMI 24m","details":"what the customer gets incl. partner and price if shown, one line","variant":"e.g. 16+512G or empty","validTill":"YYYY-MM-DD or empty"}]}
 MODELS: ${JSON.stringify(names)}
 OFFER TEXT:
 ${text}`;
