@@ -152,6 +152,7 @@ public class MainActivity extends FragmentActivity {
     protected void onDestroy() {
         super.onDestroy();
         try { if (speech != null) speech.destroy(); } catch (Throwable ignored) { }
+        try { if (tts != null) tts.shutdown(); } catch (Throwable ignored) { }
         try { TcSdk.clear(); } catch (Throwable ignored) { }
     }
 
@@ -3077,6 +3078,8 @@ public class MainActivity extends FragmentActivity {
             ws.setGeolocationEnabled(true);
             surveyWeb.addJavascriptInterface(new SurveyBridge(), "BIApp");
             surveyWeb.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+            surveyWeb.addJavascriptInterface(new SpeechBridge(), "BISpeech");
+            surveyWeb.addJavascriptInterface(new TtsBridge(), "BITTS");
             surveyWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -4213,6 +4216,7 @@ public class MainActivity extends FragmentActivity {
         webView.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
         webView.addJavascriptInterface(new AIBridge(), "BIAI");
         webView.addJavascriptInterface(new SpeechBridge(), "BISpeech");
+        webView.addJavascriptInterface(new TtsBridge(), "BITTS");
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             if (STATE_APP) {
@@ -4403,7 +4407,49 @@ public class MainActivity extends FragmentActivity {
     private String[] pendingSpeech;
     private void speechJs(String type, String a) {
         final String js = "window.__bisp&&window.__bisp(" + JSONObject.quote(type) + "," + JSONObject.quote(a == null ? "" : a) + ")";
-        ui.post(() -> { if (webView != null) webView.evaluateJavascript(js, null); });
+        ui.post(() -> { if (webView != null) webView.evaluateJavascript(js, null); if (surveyWeb != null) surveyWeb.evaluateJavascript(js, null); });
+    }
+    // ---- spoken answers (App guide voice assistant): Android text-to-speech, for pages in the app ----
+    private android.speech.tts.TextToSpeech tts;
+    private boolean ttsReady = false;
+    private String[] pendingTts;
+    private void ttsJs(String type, String a) {
+        final String js = "window.__bitts&&window.__bitts(" + JSONObject.quote(type) + "," + JSONObject.quote(a == null ? "" : a) + ")";
+        ui.post(() -> { if (surveyWeb != null) surveyWeb.evaluateJavascript(js, null); if (webView != null) webView.evaluateJavascript(js, null); });
+    }
+    private void ttsSpeak(String text, String lang, float rate) {
+        if (tts == null) {
+            pendingTts = new String[]{text, lang, String.valueOf(rate)};
+            tts = new android.speech.tts.TextToSpeech(this, status -> {
+                ttsReady = status == android.speech.tts.TextToSpeech.SUCCESS;
+                if (!ttsReady) { ttsJs("error", "unavailable"); return; }
+                tts.setOnUtteranceProgressListener(new android.speech.tts.UtteranceProgressListener() {
+                    @Override public void onStart(String id) { ttsJs("start", id); }
+                    @Override public void onDone(String id) { ttsJs("end", id); }
+                    @Override public void onError(String id) { ttsJs("error", id); }
+                });
+                String[] p = pendingTts; pendingTts = null;
+                if (p != null) ui.post(() -> ttsSpeak(p[0], p[1], Float.parseFloat(p[2])));
+            });
+            return;
+        }
+        if (!ttsReady) { pendingTts = new String[]{text, lang, String.valueOf(rate)}; return; }
+        try {
+            java.util.Locale loc = java.util.Locale.forLanguageTag(lang == null || lang.isEmpty() ? "en-IN" : lang);
+            int r = tts.setLanguage(loc);
+            if (r == android.speech.tts.TextToSpeech.LANG_MISSING_DATA || r == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED) { ttsJs("nolang", lang); tts.setLanguage(java.util.Locale.forLanguageTag("en-IN")); }
+            tts.setSpeechRate(rate > 0.3f && rate < 3f ? rate : 1f);
+            String s = text == null ? "" : text;
+            int max = android.speech.tts.TextToSpeech.getMaxSpeechInputLength() - 10, n = 0;
+            for (int i = 0; i < s.length(); i += max) {
+                tts.speak(s.substring(i, Math.min(s.length(), i + max)), n == 0 ? android.speech.tts.TextToSpeech.QUEUE_FLUSH : android.speech.tts.TextToSpeech.QUEUE_ADD, null, "u" + (n++));
+            }
+        } catch (Throwable e) { ttsJs("error", "failed"); }
+    }
+    private class TtsBridge {
+        @JavascriptInterface public String version() { return "1"; }
+        @JavascriptInterface public void speak(String text, String lang, float rate) { ui.post(() -> ttsSpeak(text, lang, rate)); }
+        @JavascriptInterface public void stop() { ui.post(() -> { try { if (tts != null) tts.stop(); } catch (Throwable ignored) { } ttsJs("end", "stop"); }); }
     }
     private void startSpeech(String lang, boolean partial) {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
