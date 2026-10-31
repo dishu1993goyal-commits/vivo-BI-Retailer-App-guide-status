@@ -590,6 +590,25 @@ ${JSON.stringify(offers)}`;
     tpl.by = rec.fullName || rec.username; tpl.at = t;
     await store.set("config:afftpl", tpl); return json(200, { ok: true, template: tpl });
   }
+  if (b.action === "aff-report-ai") {   // read offers out of an uploaded file (text extracted on the page) → rows for preview, then aff-report-bulk saves
+    const text = str(b.text, 14000); if (text.length < 20) return json(400, { ok: false, error: "No readable offer text was found in the file." });
+    const cat = (await store.get("affcat")) || { models: [] };
+    const names = cat.models.map((m) => m.name).slice(0, 400);
+    const keys = await aiKeys(store, ctx.env || {}); if (!keys.groq) return json(200, { ok: false, error: "AI key not set (Affordability → Data)." });
+    const prompt = `You read vivo India offer sheets and turn them into structured rows for the sales team. From the OFFER TEXT below, list EVERY distinct phone offer.
+Match each to the closest model from MODELS (use that exact name); if a line names no clear vivo model but the sheet has one overall model, use it; skip anything that is not a phone offer.
+"kind" is one of: emi, exchange, upgrade, vshield, abb, cashback, other.
+Write numbers in whole rupees; copy schemes in "tenure/advance" form (e.g. 10/0, 24/0) when present. Never invent offers — only what the text supports.
+Return JSON only: {"offers":[{"model":"exact model name","kind":"emi","partner":"bank/NBFC or brand","scheme":"10/0 or empty","benefit":"short headline e.g. ₹2000 instant discount","details":"what the customer gets, one line","variant":"e.g. 8GB+256GB or empty","validTill":"YYYY-MM-DD or empty"}]}
+MODELS: ${JSON.stringify(names)}
+OFFER TEXT:
+${text}`;
+    const r = await groqJSON(keys.groq, prompt, ctx.aiFetch || fetch, { validate: (d) => d && Array.isArray(d.offers) });
+    if (!r.ok) return json(200, { ok: false, error: r.error });
+    const find = (n) => { const k = nameKey(n), sl = slugify(n); return cat.models.find((m) => m.slug === sl || nameKey(m.name) === k) || cat.models.find((m) => k && (nameKey(m.name).startsWith(k) || k.startsWith(nameKey(m.name)))); };
+    const rows = r.data.offers.slice(0, 200).map((o) => { const base = find(o && o.model); return { model: base ? base.name : str(o && o.model, 60), matched: !!base, kind: KINDS.includes(o && o.kind) ? o.kind : "other", partner: str(o && o.partner, 60), scheme: str(o && o.scheme, 20), benefit: str(o && o.benefit, 80), details: str(o && o.details, 400) || [str(o && o.partner, 60), str(o && o.scheme, 20), str(o && o.benefit, 80)].filter(Boolean).join(" · "), variant: str(o && o.variant, 30), validTill: /^\d{4}-\d{2}-\d{2}$/.test(String(o && o.validTill || "")) ? o.validTill : "" }; }).filter((x) => x.details && x.details.length >= 5);
+    return json(200, { ok: true, rows, models: names.length });
+  }
   if (b.action === "aff-report-bulk") {   // CSV import: many reports at once
     const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 300);
     if (!rows.length) return json(400, { ok: false, error: "No rows to import." });

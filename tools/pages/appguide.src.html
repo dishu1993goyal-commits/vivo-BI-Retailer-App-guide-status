@@ -181,10 +181,11 @@ textarea.tx{min-height:120px}
   function pVideos() {
     if (!O.feat || !fk(O.feat)) O.feat = FEATS[0] ? FEATS[0].k : "";
     var P = CFG.presenter || {}, vids = CFG.videos || [];
-    $("pane").innerHTML = (vids.length ? '<div class="card"><b>🎬 Presenter videos</b>' + vids.map(function (v) { return '<div class="vid" data-v="' + v.id + '"><div class="row"><b style="flex:1;font-size:14px">' + esc(v.title) + '</b><span class="muted" style="font-size:12px">' + esc(v.lang) + " · " + dOnly(v.at) + "</span></div>" + (v.status === "done" ? '<div class="row" style="margin-top:6px"><button class="btn pri sm" data-play="' + v.id + '">▶ Play</button>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '" style="color:var(--bad)">🗑</button>' : "") + '</div><div class="vbox" id="vb-' + v.id + '"></div>' : v.status === "error" ? '<div class="err" style="margin-top:6px">Failed: ' + esc(v.error || "") + '</div>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '">Remove</button>' : "") : '<div class="muted" style="margin-top:6px"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Making the video… (1–3 minutes)</div>') + "</div>"; }).join("") + "</div>" : "") +
-      (ADMIN ? '<div class="card"><b>✨ Make a video</b><div class="muted" style="font-size:12.5px">Pick a feature: AI writes the narration in ' + esc(O.lang) + '; then make a captioned slideshow from the app screenshots' + (P.hasPhoto ? ", or a video of " + esc(P.name || "the presenter") + " speaking it" : "") + '.</div><div class="fg">' + FEATS.map(function (f) { return '<div class="fc' + (f.k === O.feat ? " on" : "") + '" data-f="' + f.k + '">' + (icon(f.k) ? '<img src="' + icon(f.k) + '" alt="">' : "") + "<b>" + esc(f.name) + "</b><small>" + esc(f.tag.slice(0, 60)) + "</small></div>"; }).join("") + '</div><button class="btn sec block" id="ws" style="margin-top:10px">✍️ Write the narration</button><div id="scr"></div></div>' : (vids.length ? "" : '<div class="card empty"><div class="big">🎬</div>No videos yet. HO will add feature videos here.</div>'));
+    $("pane").innerHTML = (vids.length ? '<div class="card"><b>🎬 Presenter videos</b>' + vids.map(function (v) { return '<div class="vid" data-v="' + v.id + '"><div class="row"><b style="flex:1;font-size:14px">' + esc(v.title) + '</b><span class="muted" style="font-size:12px">' + esc(v.lang) + " · " + dOnly(v.at) + "</span></div>" + (v.status === "done" ? '<div class="row" style="margin-top:6px"><button class="btn pri sm" data-exp="' + v.id + '">🎬 Explainer (slides + voice)</button><button class="btn sec sm" data-play="' + v.id + '">▶ Presenter only</button>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '" style="color:var(--bad)">🗑</button>' : "") + '</div><div class="vbox" id="vb-' + v.id + '"></div>' : v.status === "error" ? '<div class="err" style="margin-top:6px">Failed: ' + esc(v.error || "") + '</div>' + (ADMIN ? '<button class="btn ghost sm" data-del="' + v.id + '">Remove</button>' : "") : '<div class="muted" style="margin-top:6px"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:middle"></span> Making the video… (1–3 minutes)</div>') + "</div>"; }).join("") + "</div>" : "") +
+      (ADMIN ? '<div class="card"><b>✨ Make a video</b><div class="muted" style="font-size:12.5px">Pick a feature: AI writes the narration in ' + esc(O.lang) + '; then make a free captioned slideshow' + (P.hasPhoto ? ", or a presenter explainer where " + esc(P.name || "the presenter") + " explains it over the app screenshots with voice" : "") + '.</div><div class="fg">' + FEATS.map(function (f) { return '<div class="fc' + (f.k === O.feat ? " on" : "") + '" data-f="' + f.k + '">' + (icon(f.k) ? '<img src="' + icon(f.k) + '" alt="">' : "") + "<b>" + esc(f.name) + "</b><small>" + esc(f.tag.slice(0, 60)) + "</small></div>"; }).join("") + '</div><button class="btn sec block" id="ws" style="margin-top:10px">✍️ Write the narration</button><div id="scr"></div></div>' : (vids.length ? "" : '<div class="card empty"><div class="big">🎬</div>No videos yet. HO will add feature videos here.</div>'));
     [].forEach.call($("pane").querySelectorAll("[data-f]"), function (c) { c.onclick = function () { O.feat = c.dataset.f; sv(); SCR = null; pVideos(); }; });
     [].forEach.call($("pane").querySelectorAll("[data-play]"), function (b) { b.onclick = function () { play(b.dataset.play); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-exp]"), function (b) { b.onclick = function () { var v = vids.filter(function (x) { return x.id === b.dataset.exp; })[0]; if (v) explainer(v); }; });
     [].forEach.call($("pane").querySelectorAll("[data-del]"), function (b) { b.onclick = function () { api({ action: "ag-video-delete", id: b.dataset.del }).then(function () { CFG.videos = CFG.videos.filter(function (v) { return v.id !== b.dataset.del; }); pVideos(); }); }; });
     if ($("ws")) $("ws").onclick = writeScript;
     if (SCR && SCR.k === O.feat && SCR.lang === O.lang) showScript();
@@ -216,33 +217,69 @@ textarea.tx{min-height:120px}
     $("st").oninput = keep; $("sx").oninput = keep;
     $("lis").onclick = function () { speak($("sx").value); };
     $("sl").onclick = function () { keep(); slideshow(f, SCR); };
-    $("av").onclick = function () { keep(); this.disabled = true; api({ action: "ag-avatar", text: SCR.script, lang: SCR.lang, title: SCR.title, k: SCR.k }).then(function (r) { if (!r.ok) { toast(r.error); $("av").disabled = false; return; } CFG.videos.unshift(r.video); toast("Making the video — it appears at the top in 1–3 minutes"); pVideos(); window.scrollTo(0, 0); }); };
+    $("av").onclick = function () { keep(); this.disabled = true; api({ action: "ag-avatar", text: SCR.script, lang: SCR.lang, title: SCR.title, tag: f.tag, k: SCR.k, scenes: SCR.scenes }).then(function (r) { if (!r.ok) { toast(r.error); $("av").disabled = false; return; } CFG.videos.unshift(r.video); toast("Making the presenter — it appears at the top in 1–3 minutes, then tap 🎬 Explainer"); pVideos(); window.scrollTo(0, 0); }); };
   }
-  // captioned slideshow: screenshots + captions + narration text, recorded from a canvas
-  function slideshow(f, S) {
+  // Presenter explainer: load the finished D-ID talking head (same-origin proxy so the canvas isn't tainted) and
+  // draw it as a moving presenter bubble over the captioned slideshow, with the presenter's voice as the soundtrack.
+  function explainer(v, mount) {
+    var f = fk(v.k) || { k: v.k, shots: [], tag: v.tag || "", name: v.title };
+    var S = { title: v.title, tag: v.tag || f.tag, pname: (CFG.presenter || {}).name || "", scenes: (v.scenes && v.scenes.length ? v.scenes : [{ say: "", caption: f.name }]) };
+    var box = mount || $("vb-" + v.id); if (!box) return;
+    box.innerHTML = '<div class="loading"><div class="spin"></div>Loading the presenter…</div>';
+    var pv = document.createElement("video"); pv.crossOrigin = "anonymous"; pv.playsInline = true; pv.preload = "auto"; pv.muted = false;
+    pv.onloadedmetadata = function () { slideshow(f, S, pv, box, v.title + " — presenter"); };
+    pv.onerror = function () { box.innerHTML = '<div class="err">Couldn’t load the presenter video. Open it with ▶ Play, then try again.</div>'; };
+    pv.src = "/api/auth?agvid=" + encodeURIComponent(v.id);
+  }
+  // captioned slideshow; with a presenter video (pv) it composites the presenter bubble + voice, else a silent captioned clip
+  function slideshow(f, S, pv, mount, dlname) {
+    mount = mount || $("vo");
     if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast("This device can't record videos — try Chrome");
     var W = 720, H = 1280, c = document.createElement("canvas"); c.width = W; c.height = H; var g = c.getContext("2d");
-    var shots = f.shots.filter(function (s) { return MEDIA[s[0]]; }), scenes = S.scenes.length ? S.scenes : [{ say: S.script, caption: f.name }];
-    var frames = [{ kind: "title" }].concat(scenes.map(function (s, i) { return { kind: "scene", s: s, img: MEDIA[s.shot] || (shots[i % Math.max(1, shots.length)] || [])[0] && MEDIA[(shots[i % shots.length])[0]] }; })).concat([{ kind: "end" }]);
-    var imgs = {}; $("vo").innerHTML = '<div class="loading"><div class="spin"></div>Recording the slideshow… <span id="vp">0%</span></div>';
+    var shots = (f.shots || []).filter(function (s) { return MEDIA[s[0]]; }), scenes = S.scenes.length ? S.scenes : [{ say: S.script, caption: f.name }];
+    var frames = [{ kind: "title" }].concat(scenes.map(function (s, i) { return { kind: "scene", s: s, img: MEDIA[s.shot] || ((shots[i % Math.max(1, shots.length)] || [])[0] && MEDIA[(shots[i % shots.length])[0]]) }; })).concat([{ kind: "end" }]);
+    var imgs = {}; mount.innerHTML = '<div class="loading"><div class="spin"></div>' + (pv ? "Recording the presenter video" : "Recording the slideshow") + '… <span id="vp">0%</span></div>';
     Promise.all(frames.filter(function (x) { return x.img; }).map(function (x) { return new Promise(function (res) { var im = new Image(); im.onload = function () { imgs[x.img] = im; res(); }; im.onerror = res; im.src = x.img; }); })).then(function () {
       var ic = new Image(); ic.src = icon(f.k) || "";
       var wrap = function (txt, x, y, maxW, lh, maxL) { var words = String(txt || "").split(/\s+/), line = "", n = 0; for (var i = 0; i < words.length; i++) { var t = line ? line + " " + words[i] : words[i]; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = words[i]; if (++n >= maxL - 1) { line = words.slice(i).join(" "); if (g.measureText(line).width > maxW) { while (line.length && g.measureText(line + "…").width > maxW) line = line.slice(0, -1); line += "…"; } break; } } else line = t; } g.fillText(line, x, y); return y + lh; };
       var bg = function () { var gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "#0A1C5C"); gr.addColorStop(1, "#2C3FBF"); g.fillStyle = gr; g.fillRect(0, 0, W, H); };
+      var bubble = function () {   // the presenter, drawn as a round talking-head in the corner
+        if (!pv || pv.readyState < 2 || !pv.videoWidth) return; var r = 150, cx = W - r - 24, cy = H - r - 70;
+        g.save(); g.beginPath(); g.arc(cx, cy, r, 0, 7); g.closePath(); g.clip();
+        var vw = pv.videoWidth, vh = pv.videoHeight, k = Math.max((r * 2) / vw, (r * 2) / vh), iw = vw * k, ih = vh * k; g.drawImage(pv, cx - iw / 2, cy - ih / 2, iw, ih); g.restore();
+        g.beginPath(); g.arc(cx, cy, r, 0, 7); g.lineWidth = 6; g.strokeStyle = "#FFD15C"; g.stroke();
+        if (S.pname) { g.fillStyle = "rgba(10,28,92,.85)"; var tw = g.measureText(S.pname).width + 24; g.fillRect(cx - tw / 2, cy + r - 14, tw, 30); g.fillStyle = "#fff"; g.font = "700 18px Arial"; g.textAlign = "center"; g.fillText(S.pname, cx, cy + r + 7); }
+      };
       var drawF = function (fr, p) {
         bg(); g.textAlign = "center"; g.fillStyle = "#8FA2FF"; g.font = "700 22px Arial"; g.fillText("VIVO RETAILER APP · " + O.lang.toUpperCase(), W / 2, 70);
-        if (fr.kind === "title") { if (ic.complete && ic.naturalWidth) g.drawImage(ic, W / 2 - 70, 330, 140, 140); g.fillStyle = "#fff"; g.font = "800 54px Arial"; wrap(S.title, W / 2, 560, W - 100, 64, 3); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap(f.tag, W / 2, 780, W - 120, 36, 3); }
-        else if (fr.kind === "end") { g.fillStyle = "#fff"; g.font = "800 46px Arial"; g.fillText("Try it today in the app", W / 2, 560); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap("Questions? Ask the App guide assistant or raise a ticket in Retailer Support Desk.", W / 2, 630, W - 120, 36, 3); }
-        else { var im = fr.img && imgs[fr.img]; if (im) { var mh = 720, mw = W - 120, k = Math.min(mw / im.width, mh / im.height), iw = im.width * k, ih = im.height * k; g.fillStyle = "#fff"; g.fillRect((W - iw) / 2 - 8, 130 - 8, iw + 16, ih + 16); g.drawImage(im, (W - iw) / 2, 130, iw, ih); }
-          g.fillStyle = "#FFD15C"; g.font = "800 40px Arial"; wrap(fr.s.caption, W / 2, 920, W - 80, 48, 2); g.fillStyle = "#fff"; g.font = "26px Arial"; wrap(fr.s.say, W / 2, 1030, W - 90, 36, 5); }
+        if (fr.kind === "title") { if (ic.complete && ic.naturalWidth) g.drawImage(ic, W / 2 - 70, 300, 140, 140); g.fillStyle = "#fff"; g.font = "800 54px Arial"; wrap(S.title, W / 2, 540, W - 100, 64, 3); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap(S.tag || f.tag, W / 2, 760, W - 120, 36, 3); }
+        else if (fr.kind === "end") { g.fillStyle = "#fff"; g.font = "800 46px Arial"; g.fillText("Try it today in the app", W / 2, 540); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap("Questions? Ask the App guide assistant or raise a ticket in Retailer Support Desk.", W / 2, 620, W - 120, 36, 3); }
+        else { var im = fr.img && imgs[fr.img]; if (im) { var mh = pv ? 600 : 720, mw = W - 150, k = Math.min(mw / im.width, mh / im.height), iw = im.width * k, ih = im.height * k; g.fillStyle = "#fff"; g.fillRect((W - iw) / 2 - 8, 122, iw + 16, ih + 16); g.drawImage(im, (W - iw) / 2, 130, iw, ih); }
+          g.textAlign = "center"; g.fillStyle = "#FFD15C"; g.font = "800 40px Arial"; wrap(fr.s.caption, W / 2, pv ? 820 : 920, pv ? W - 330 : W - 80, 46, 2);
+          g.fillStyle = "#fff"; g.font = "26px Arial"; wrap(fr.s.say, pv ? 40 : W / 2, pv ? 920 : 1030, pv ? W - 330 : W - 90, 34, 6); if (pv) g.textAlign = "center"; }
+        bubble();
         g.fillStyle = "rgba(255,255,255,.25)"; g.fillRect(0, H - 8, W, 8); g.fillStyle = "#FFD15C"; g.fillRect(0, H - 8, W * p, 8);
       };
-      var per = 4200, total = frames.length * per, st = c.captureStream(25), rec, chunks = [];
-      var mt = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"].filter(function (m) { return MediaRecorder.isTypeSupported(m); })[0];
-      rec = new MediaRecorder(st, mt ? { mimeType: mt, videoBitsPerSecond: 2500000 } : undefined); rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onstop = function () { var blob = new Blob(chunks, { type: (mt || "video/webm").split(";")[0] }), url = URL.createObjectURL(blob), ext = /mp4/.test(mt || "") ? "mp4" : "webm"; $("vo").innerHTML = '<div class="vbox"><video controls playsinline src="' + url + '"></video></div><button class="btn pri block" id="dlv" style="margin-top:8px">⬇ Download video</button><div class="muted" style="font-size:12px;margin-top:4px">Silent captioned video — narration is in the captions. For a spoken video use 🧑‍💼 Presenter video.</div>'; $("dlv").onclick = function () { download(blob, (S.title || f.name).replace(/[^\w]+/g, "_") + "." + ext); }; };
-      var t0 = performance.now(); rec.start(500);
-      (function loop() { var e = performance.now() - t0, i = Math.min(frames.length - 1, Math.floor(e / per)); drawF(frames[i], Math.min(1, e / total)); if ($("vp")) $("vp").textContent = Math.round(Math.min(1, e / total) * 100) + "%"; if (e < total) requestAnimationFrame(loop); else setTimeout(function () { rec.stop(); }, 300); })();
+      // timing: with a presenter, follow the narration audio and split scenes by how much text each one speaks
+      var dur = pv && isFinite(pv.duration) && pv.duration > 1 ? pv.duration : 0, bounds = null;
+      if (dur) { var lens = scenes.map(function (s) { return Math.max(4, (s.say || "").length); }), tot = lens.reduce(function (a, b) { return a + b; }, 0), head = Math.min(2.4, dur * 0.12), tail = Math.min(2.4, dur * 0.12), body = Math.max(1, dur - head - tail), acc = head; bounds = [head]; lens.forEach(function (l) { acc += body * l / tot; bounds.push(acc); }); }
+      var frameAt = function (sec) { if (!bounds) return 0; if (sec < bounds[0]) return 0; for (var i = 0; i < scenes.length; i++) if (sec < bounds[i + 1]) return i + 1; return frames.length - 1; };
+      var st = c.captureStream(25), tracks = st.getVideoTracks(), chunks = [];
+      if (pv) { var as = pv.captureStream ? pv.captureStream() : (pv.mozCaptureStream ? pv.mozCaptureStream() : null); if (as && as.getAudioTracks) tracks = tracks.concat(as.getAudioTracks()); }
+      var mix = new MediaStream(tracks);
+      var mt = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].filter(function (m) { return MediaRecorder.isTypeSupported(m); })[0];
+      var rec = new MediaRecorder(mix, mt ? { mimeType: mt, videoBitsPerSecond: 2500000 } : undefined); rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function () { try { if (pv) pv.pause(); } catch (e) { } var blob = new Blob(chunks, { type: (mt || "video/webm").split(";")[0] }), url = URL.createObjectURL(blob), ext = /mp4/.test(mt || "") ? "mp4" : "webm";
+        mount.innerHTML = '<div class="vbox"><video controls playsinline src="' + url + '"></video>' + (pv ? '<span class="aitag">AI-generated video</span>' : "") + '</div><button class="btn pri block" id="dlv" style="margin-top:8px">⬇ Download video</button><div class="muted" style="font-size:12px;margin-top:4px">' + (pv ? "Presenter explains the features over the app screenshots, in " + esc(O.lang) + ". Labelled AI-generated." : "Silent captioned video — the narration is in the captions.") + '</div>';
+        $("dlv").onclick = function () { download(blob, String(dlname || S.title || f.name).replace(/[^\w]+/g, "_") + "." + ext); }; };
+      rec.start(500);
+      if (pv) {
+        var t0 = performance.now(); var play = pv.play(); if (play && play.catch) play.catch(function () { });
+        (function loop() { var sec = pv.currentTime, p = dur ? Math.min(1, sec / dur) : Math.min(1, (performance.now() - t0) / 20000); drawF(frames[dur ? frameAt(sec) : Math.min(frames.length - 1, Math.floor((performance.now() - t0) / 3500))], p); if ($("vp")) $("vp").textContent = Math.round(p * 100) + "%"; if (!pv.ended && (dur ? sec < dur + 0.3 : p < 1)) requestAnimationFrame(loop); else setTimeout(function () { try { rec.stop(); } catch (e) { } }, 250); })();
+      } else {
+        var per = 4200, total = frames.length * per, t0b = performance.now();
+        (function loop() { var e = performance.now() - t0b, i = Math.min(frames.length - 1, Math.floor(e / per)); drawF(frames[i], Math.min(1, e / total)); if ($("vp")) $("vp").textContent = Math.round(Math.min(1, e / total) * 100) + "%"; if (e < total) requestAnimationFrame(loop); else setTimeout(function () { rec.stop(); }, 300); })();
+      }
     });
   }
   // ---- presenter (HO) ----

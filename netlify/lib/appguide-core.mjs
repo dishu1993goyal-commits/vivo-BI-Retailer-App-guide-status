@@ -16,7 +16,23 @@ const DID = "https://api.d-id.com";
 function pubCfg(c, isAdmin) {
   const p = c.presenter || {};
   return { kb: c.kb || "", presenter: { name: p.name || "", voice: p.voice === "m" ? "m" : "f", hasPhoto: !!p.hasPhoto, consentBy: p.consentBy || "", consentAt: p.consentAt || 0 },
-    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, lang: v.lang, k: v.k, status: v.status, at: v.at, by: v.by, error: v.error })) };
+    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error })) };
+}
+
+// GET /api/auth?agvid=<videoId> — stream the finished D-ID video from the same origin, so the page can draw it onto a
+// canvas (compositing the presenter into the slideshow) without the browser tainting the canvas.
+export async function serveAgVideo(id, store, env = {}, fetchImpl = fetch) {
+  const vid = String(id || "").replace(/[^a-z0-9]/gi, "").slice(0, 40);
+  const c = (await store.get("config:appguide")) || { videos: [] }, v = (c.videos || []).find((x) => x.id === vid);
+  if (!v || v.status !== "done") return new Response("Not found", { status: 404 });
+  const key = ((await store.get("config:agkey")) || {}).did; if (!key) return new Response("No key", { status: 404 });
+  try {
+    const r = await fetchImpl(`${DID}/talks/${encodeURIComponent(v.talkId)}`, { headers: { authorization: "Basic " + key, accept: "application/json" } }), d = await r.json().catch(() => ({}));
+    if (!d.result_url) return new Response("Not ready", { status: 404 });
+    const up = await fetchImpl(d.result_url);
+    if (!up.ok || !up.body) return new Response("Unavailable", { status: 502 });
+    return new Response(up.body, { status: 200, headers: { "content-type": up.headers.get("content-type") || "video/mp4", "cache-control": "private, max-age=600", "access-control-allow-origin": "*" } });
+  } catch (e) { return new Response("Error", { status: 502 }); }
 }
 
 export async function appguideAction(b, ctx) {
@@ -123,9 +139,10 @@ ${feat}`;
       const body = { source_url: P.didImg, script: { type: "text", input: text, provider: { type: "microsoft", voice_id: voice } }, config: { stitch: true, fluent: true } };
       const r = await f(`${DID}/talks`, { method: "POST", headers: Object.assign({ "content-type": "application/json" }, H), body: JSON.stringify(body) }), d = await r.json().catch(() => ({}));
       if (!r.ok || !d.id) return json(200, { ok: false, error: "The video service said no" + (d.description || d.message ? ": " + str(d.description || d.message, 160) : " (" + r.status + ")") });
-      const v = { id: t.toString(36) + randomBytes(3).toString("hex"), talkId: str(d.id, 80), title: str(b.title, 100) || "App guide video", lang, k: str(b.k, 30), status: "making", at: t, by: rec.fullName || rec.username };
+      const scenes = (Array.isArray(b.scenes) ? b.scenes : []).slice(0, 10).map((s) => ({ say: str(s && s.say, 500), caption: str(s && s.caption, 80), shot: str(s && s.shot, 40) }));
+      const v = { id: t.toString(36) + randomBytes(3).toString("hex"), talkId: str(d.id, 80), title: str(b.title, 100) || "App guide video", tag: str(b.tag, 120), lang, k: str(b.k, 30), scenes, status: "making", at: t, by: rec.fullName || rec.username };
       c.videos = [v].concat(c.videos || []).slice(0, 60); await store.set("config:appguide", c);
-      return json(200, { ok: true, video: { id: v.id, title: v.title, lang, k: v.k, status: v.status, at: t, by: v.by } });
+      return json(200, { ok: true, video: { id: v.id, title: v.title, tag: v.tag, lang, k: v.k, scenes, status: v.status, at: t, by: v.by } });
     } catch (e) { return json(502, { ok: false, error: "Couldn't reach the video service: " + String(e.message || e).slice(0, 100) }); }
   }
   if (b.action === "ag-avatar-status") {

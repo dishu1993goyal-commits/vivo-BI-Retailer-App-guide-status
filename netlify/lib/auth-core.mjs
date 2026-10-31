@@ -23,7 +23,7 @@ import { pmailAction } from "./pmail-core.mjs";
 import { portalAction } from "./portal-core.mjs";
 import { rewardsAction } from "./rewards-core.mjs";
 import { newsletterAction } from "./newsletter-core.mjs";
-import { appguideAction } from "./appguide-core.mjs";
+import { appguideAction, serveAgVideo } from "./appguide-core.mjs";
 import { geoAction } from "./geo-core.mjs";
 const THEME_ID = /^[a-z0-9-]{2,24}$/;
 const pick = (v, list) => (list.includes(String(v || "")) ? String(v) : "");
@@ -480,7 +480,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
         body: JSON.stringify({ app: u.searchParams.get("a"), username: u.searchParams.get("u"), token: u.searchParams.get("k"), action: "tl-ideas", op: body.action || "list", idea: body.idea, id: body.id, up: body.up, status: body.status }) });
     }
   } catch (e) { }
-  if (req.method === "GET") { try { const im = new URL(req.url).searchParams.get("img"); if (im) return await servePublicImage(im, store); } catch (e) { } }
+  if (req.method === "GET") { try { const sp = new URL(req.url).searchParams, im = sp.get("img"); if (im) return await servePublicImage(im, store); const av = sp.get("agvid"); if (av) return await serveAgVideo(av, store, env, aiFetch); } catch (e) { } }
   if (req.method !== "POST") return json(405, { ok: false, error: "Use POST" });
   if (!env.GROQ_API_KEY) {   // key saved by an admin in Affordability Corner → Data → AI keys
     if (Date.now() - KEYCACHE.at > 60000) { try { KEYCACHE = { at: Date.now(), groq: ((await store.get("config:aikeys")) || {}).groq || "" }; } catch (e) { } }
@@ -872,7 +872,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "matrix-get", "matrix-arch", "matrix-import", "matrix-set", "matrix-freeze", "matrix-remind",
     "visit-config", "visit-stores", "visit-start", "visit-save", "visit-end", "visit-cancel", "visit-get", "visit-list", "visit-live", "visit-stats", "visit-ai-one", "visit-ai-states",
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
-    "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-amounts",
+    "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-report-ai", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
   const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {

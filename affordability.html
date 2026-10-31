@@ -892,8 +892,9 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
   function csvCols() { var F = tpl().fields.filter(function (f) { return f.on !== false && f.type !== "photo"; }); return [{ id: "model", label: "Model", req: true }].concat(ADMIN ? [{ id: "state", label: "State" }] : []).concat(F); }
   function csvImport(after) {
     var cols = csvCols();
-    var ov = sheet("Bulk import reports (CSV)", "One offer per row · first row = column names", [], '<div class="muted" style="font-size:12.5px;margin-top:8px">Columns: <b>' + cols.map(function (c) { return esc(c.label) + (c.req ? "*" : ""); }).join(", ") + '</b>. Offer type can be EMI, Exchange, Upgrade, V-Shield, ABB, Cashback or Other. Dates as YYYY-MM-DD. Up to 300 rows at a time.' + (ADMIN ? " Rows without a State are saved as All India." : " Reports are saved for your state.") + '</div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="csd">⬇ Download blank CSV</button><button class="btn pri sm" id="csf">📁 Choose CSV file</button></div><div id="csp"></div>');
+    var ov = sheet("Bulk import reports (CSV)", "One offer per row · first row = column names", [], '<div class="muted" style="font-size:12.5px;margin-top:8px">Columns: <b>' + cols.map(function (c) { return esc(c.label) + (c.req ? "*" : ""); }).join(", ") + '</b>. Offer type can be EMI, Exchange, Upgrade, V-Shield, ABB, Cashback or Other. Dates as YYYY-MM-DD. Up to 300 rows at a time.' + (ADMIN ? " Rows without a State are saved as All India." : " Reports are saved for your state.") + '</div><div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="csd">⬇ Download blank CSV</button><button class="btn pri sm" id="csf">📁 Choose CSV file</button></div><div class="muted" style="font-size:12.5px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line, #E6E8F2)">📎 <b>Or upload any offer sheet</b> — a PDF, photo, Excel or Word file of offers. AI reads it and adds every offer for you.</div><div class="row" style="margin-top:8px"><button class="btn ok sm" id="csu">📎 Upload offer file (PDF / image / Excel / Word)</button></div><div id="csp"></div>');
     ov.querySelector(".sheet").style.maxWidth = "560px";
+    ov.querySelector("#csu").onclick = function () { fileImport(ov.querySelector("#csp"), after); };
     ov.querySelector("#csd").onclick = function () { var line = function (a) { return a.map(function (x) { return /[",\n]/.test(x) ? '"' + String(x).replace(/"/g, '""') + '"' : x; }).join(","); }; var ex = cols.map(function (c) { return { model: "vivo V60", state: "Punjab", kind: "EMI", partner: "Bajaj Finserv", scheme: "10/0", benefit: "₹2,000 instant discount", variant: "8GB + 256GB", validTill: "2026-12-31", details: "No Cost EMI on Bajaj EMI card, zero down payment" }[c.id] || ""; }); download(new Blob(["﻿" + line(cols.map(function (c) { return c.label; })) + "\n" + line(ex) + "\n"], { type: "text/csv" }), "offer_reports_template.csv"); };
     ov.querySelector("#csf").onclick = function () {
       var i = document.createElement("input"); i.type = "file"; i.accept = ".csv,text/csv,text/plain"; i.onchange = function () {
@@ -908,6 +909,37 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
         }; fr.readAsText(f);
       }; i.click();
     };
+  }
+
+  var FTLOAD = null;
+  function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
+  function fileImport(p, after) {
+    var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.xlsx,.xls,.csv,.docx,.txt,image/*,application/pdf";
+    i.onchange = function () {
+      var files = [].slice.call(i.files || []).slice(0, 5); if (!files.length) return;
+      p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>Reading ' + files.length + " file(s)…</div>";
+      loadFiles().then(function () {
+        return files.reduce(function (acc, f) { return acc.then(function (parts) { p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>"; return window.BIFILES.extract(f).then(function (r) { parts.push("### " + r.name + "\n" + r.text); return parts; }).catch(function (e) { toast(e.message || String(e)); return parts; }); }); }, Promise.resolve([]));
+      }).then(function (parts) {
+        var text = parts.join("\n\n").slice(0, 14000); if (!text.trim()) { p.innerHTML = '<div class="err" style="margin-top:10px">Nothing readable was found in those files.</div>'; return; }
+        p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>✨ AI is pulling out the offers…</div>';
+        api({ action: "aff-report-ai", text: text }).then(function (r) { if (!r.ok) { p.innerHTML = '<div class="err" style="margin-top:10px">' + esc(r.error) + "</div>"; return; } previewFileRows(p, r.rows || [], after); });
+      }).catch(function (e) { p.innerHTML = '<div class="err" style="margin-top:10px">' + esc(e.message || String(e)) + "</div>"; });
+    };
+    i.click();
+  }
+  function previewFileRows(p, rows, after) {
+    if (!rows.length) { p.innerHTML = '<div class="notice info" style="margin-top:10px">No offers were found in the file. Try a clearer sheet, or add them with ＋ Report an offer.</div>'; return; }
+    var unmatched = rows.filter(function (r) { return !r.matched; }).length;
+    var KL = { emi: "EMI", exchange: "Exchange", upgrade: "Upgrade", vshield: "V-Shield", abb: "ABB", cashback: "Cashback", other: "Other" };
+    p.innerHTML = '<div class="notice info" style="margin-top:10px">Found <b>' + rows.length + "</b> offer(s)" + (unmatched ? " · " + unmatched + " with no matching model (shown in red — fix the model name or they’ll be skipped)" : "") + '. Edit anything, then add.</div>' +
+      '<div style="max-height:320px;overflow:auto;margin-top:8px">' + rows.map(function (r, k) { return '<div class="card" data-i="' + k + '" style="padding:8px;margin:6px 0;' + (r.matched ? "" : "border:1px solid var(--bad,#E05757)") + '"><div class="row" style="gap:6px"><input class="tx af-m" data-i="' + k + '" value="' + esc(r.model) + '" placeholder="Model" style="flex:2' + (r.matched ? "" : ";color:var(--bad,#E05757)") + '"><select class="tx af-k" data-i="' + k + '" style="flex:1">' + Object.keys(KL).map(function (x) { return '<option value="' + x + '"' + (x === r.kind ? " selected" : "") + ">" + KL[x] + "</option>"; }).join("") + '</select></div><input class="tx af-d" data-i="' + k + '" value="' + esc(r.details) + '" placeholder="Offer details" style="margin-top:4px"><div class="row" style="gap:6px;margin-top:4px"><input class="tx af-p" data-i="' + k + '" value="' + esc(r.partner) + '" placeholder="Partner" style="flex:1"><input class="tx af-s" data-i="' + k + '" value="' + esc(r.scheme) + '" placeholder="Scheme" style="flex:1"><input class="tx af-v" data-i="' + k + '" value="' + esc(r.validTill) + '" placeholder="Valid till" style="flex:1"></div></div>'; }).join("") + "</div>" +
+      '<button class="btn pri block" id="afg" style="margin-top:8px">Add these offers</button>';
+    p.querySelector("#afg").onclick = function () {
+      var out = rows.map(function (r, k) { var g = function (c) { var el = p.querySelector("." + c + '[data-i="' + k + '"]'); return el ? el.value.trim() : ""; }; return { model: g("af-m"), kind: g("af-k"), details: g("af-d"), partner: g("af-p"), scheme: g("af-s"), validTill: g("af-v"), benefit: r.benefit, variant: r.variant }; }).filter(function (x) { return x.model && x.details; });
+      if (!out.length) return toast("Nothing to add.");
+      this.disabled = true; this.textContent = "Adding…";
+      api({ action: "aff-report-bulk", rows: out }).then(function (r) { if (!r.ok) { toast(r.error); p.querySelector("#afg").disabled = false; return; } p.innerHTML = '<div class="notice info" style="margin-top:10px">✅ ' + r.added + " offer(s) added" + (r.errors && r.errors.length ? " · " + r.errors.length + " skipped (model not found)" : "") + ". They now show when you pick that model in Find offers.</div>"; ALLR = null; if (after) after(); }); };
   }
 
   function hoEdit(C, vs, cols) {
