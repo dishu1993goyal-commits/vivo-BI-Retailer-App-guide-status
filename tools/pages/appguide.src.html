@@ -212,12 +212,15 @@ textarea.tx{min-height:120px}
   function showScript() {
     var P = CFG.presenter || {}, f = fk(SCR.k);
     $("scr").innerHTML = '<label class="lb">Title</label><input class="tx" id="st" value="' + esc(SCR.title) + '"><label class="lb">Narration (edit freely)</label><textarea class="tx" id="sx">' + esc(SCR.script) + '</textarea><div class="row" style="margin-top:6px"><button class="btn ghost sm" id="lis">🔊 Listen</button><span class="muted" style="font-size:12px">' + SCR.script.split(/\s+/).length + " words</span></div>" +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn sec" id="sl">🎞️ Captioned slideshow</button><button class="btn pri" id="av"' + (P.hasPhoto && CFG.hasKey ? "" : " disabled") + '>🧑‍💼 Presenter video</button></div>' + (P.hasPhoto && CFG.hasKey ? "" : '<div class="muted" style="font-size:12px;margin-top:6px">Presenter video: add the photo and the D-ID key in 🧑‍💼 Presenter first.</div>') + '<div id="vo"></div>';
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px"><button class="btn sec" id="sl">🎞️ Captioned slideshow</button><button class="btn pri" id="av"' + (P.hasPhoto && CFG.hasKey ? "" : " disabled") + '>🧑‍💼 AI presenter explainer</button></div>' + (P.hasPhoto && CFG.hasKey ? "" : '<div class="muted" style="font-size:12px;margin-top:6px">AI presenter: add the photo and the D-ID key in 🧑‍💼 Presenter first.</div>') +
+      '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #E6E8F2"><button class="btn ok block" id="clip">🎥 Use my own recorded clip (most realistic)</button><div class="muted" style="font-size:12px;margin-top:4px">Shoot a short selfie video of the presenter talking and pointing (portrait, good light, plain wall). The app removes the background and places them — moving and gesturing — over the screenshots. Real footage, so it looks shot on camera.</div><input type="file" accept="video/*" id="clipf" style="display:none"></div><div id="vo"></div>';
     var keep = function () { SCR.title = $("st").value; SCR.script = $("sx").value; };
     $("st").oninput = keep; $("sx").oninput = keep;
     $("lis").onclick = function () { speak($("sx").value); };
     $("sl").onclick = function () { keep(); slideshow(f, SCR); };
     $("av").onclick = function () { keep(); this.disabled = true; api({ action: "ag-avatar", text: SCR.script, lang: SCR.lang, title: SCR.title, tag: f.tag, k: SCR.k, scenes: SCR.scenes }).then(function (r) { if (!r.ok) { toast(r.error); $("av").disabled = false; return; } CFG.videos.unshift(r.video); toast("Making the presenter — it appears at the top in 1–3 minutes, then tap 🎬 Explainer"); pVideos(); window.scrollTo(0, 0); }); };
+    $("clip").onclick = function () { $("clipf").click(); };
+    $("clipf").onchange = function () { var fl = this.files[0]; if (!fl) return; keep(); var S2 = { title: SCR.title, tag: f.tag, pname: (CFG.presenter || {}).name || "", scenes: SCR.scenes }; var pvc = document.createElement("video"); pvc.playsInline = true; pvc.muted = false; pvc.preload = "auto"; pvc.src = URL.createObjectURL(fl); $("vo").innerHTML = '<div class="loading"><div class="spin"></div>Preparing your clip…</div>'; pvc.onloadedmetadata = function () { if (pvc.duration > 180) { $("vo").innerHTML = '<div class="err">Please use a clip under 3 minutes.</div>'; return; } slideshow(f, S2, pvc, $("vo"), SCR.title + " — presenter clip", { real: true }); }; pvc.onerror = function () { $("vo").innerHTML = '<div class="err">Couldn’t open that video — try an MP4 recorded on the phone.</div>'; }; };
   }
   // Presenter explainer: load the finished D-ID talking head (same-origin proxy so the canvas isn't tainted) and
   // draw it as a moving presenter bubble over the captioned slideshow, with the presenter's voice as the soundtrack.
@@ -231,8 +234,22 @@ textarea.tx{min-height:120px}
     pv.onerror = function () { box.innerHTML = '<div class="err">Couldn’t load the presenter video. Open it with ▶ Play, then try again.</div>'; };
     pv.src = "/api/auth?agvid=" + encodeURIComponent(v.id);
   }
-  // captioned slideshow; with a presenter video (pv) it composites the presenter bubble + voice, else a silent captioned clip
-  function slideshow(f, S, pv, mount, dlname) {
+  // Background removal (MediaPipe Selfie Segmentation) — cuts the presenter out of their photo/clip background so they
+  // stand cleanly on the slide. Loads on demand; if it can't load, the presenter falls back to a framed bubble.
+  var SEGLOAD = null;
+  function loadSeg() {
+    if (SEGLOAD) return SEGLOAD;
+    SEGLOAD = new Promise(function (res) {
+      var base = "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1.1675465747/", s = document.createElement("script"); s.src = base + "selfie_segmentation.js";
+      s.onload = function () { try { var seg = new window.SelfieSegmentation({ locateFile: function (p) { return base + p; } }); seg.setOptions({ modelSelection: 1 }); res(seg); } catch (e) { res(null); } };
+      s.onerror = function () { SEGLOAD = null; res(null); };
+      document.head.appendChild(s);
+    });
+    return SEGLOAD;
+  }
+  // captioned slideshow; with a presenter video (pv) it composites the cut-out presenter + voice, else a silent captioned clip
+  function slideshow(f, S, pv, mount, dlname, opts) {
+    opts = opts || {}; var real = !!opts.real;
     mount = mount || $("vo");
     if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast("This device can't record videos — try Chrome");
     var W = 720, H = 1280, c = document.createElement("canvas"); c.width = W; c.height = H; var g = c.getContext("2d");
@@ -241,22 +258,36 @@ textarea.tx{min-height:120px}
     var imgs = {}; mount.innerHTML = '<div class="loading"><div class="spin"></div>' + (pv ? "Recording the presenter video" : "Recording the slideshow") + '… <span id="vp">0%</span></div>';
     Promise.all(frames.filter(function (x) { return x.img; }).map(function (x) { return new Promise(function (res) { var im = new Image(); im.onload = function () { imgs[x.img] = im; res(); }; im.onerror = res; im.src = x.img; }); })).then(function () {
       var ic = new Image(); ic.src = icon(f.k) || "";
+      // presenter cut-out state (filled by the segmentation model when ready)
+      var personC = document.createElement("canvas"), pcx = personC.getContext("2d"), havePerson = false, seg = null, segBusy = false;
+      if (pv) loadSeg().then(function (s) { if (!s) return; seg = s; seg.onResults(function (res) { try { var iw = res.image.width, ih = res.image.height; if (!iw) return; personC.width = iw; personC.height = ih; pcx.save(); pcx.clearRect(0, 0, iw, ih); pcx.drawImage(res.segmentationMask, 0, 0, iw, ih); pcx.globalCompositeOperation = "source-in"; pcx.drawImage(res.image, 0, 0, iw, ih); pcx.restore(); havePerson = true; } catch (e) { } segBusy = false; }); });
+      var feedSeg = function () { if (seg && pv && !segBusy && pv.readyState >= 2 && pv.videoWidth) { segBusy = true; try { var r = seg.send({ image: pv }); if (r && r.catch) r.catch(function () { segBusy = false; }); } catch (e) { segBusy = false; } } };
       var wrap = function (txt, x, y, maxW, lh, maxL) { var words = String(txt || "").split(/\s+/), line = "", n = 0; for (var i = 0; i < words.length; i++) { var t = line ? line + " " + words[i] : words[i]; if (g.measureText(t).width > maxW && line) { g.fillText(line, x, y); y += lh; line = words[i]; if (++n >= maxL - 1) { line = words.slice(i).join(" "); if (g.measureText(line).width > maxW) { while (line.length && g.measureText(line + "…").width > maxW) line = line.slice(0, -1); line += "…"; } break; } } else line = t; } g.fillText(line, x, y); return y + lh; };
       var bg = function () { var gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, "#0A1C5C"); gr.addColorStop(1, "#2C3FBF"); g.fillStyle = gr; g.fillRect(0, 0, W, H); };
-      var bubble = function () {   // the presenter, drawn as a round talking-head in the corner
-        if (!pv || pv.readyState < 2 || !pv.videoWidth) return; var r = 150, cx = W - r - 24, cy = H - r - 70;
+      var bubble = function () {   // the presenter: a background-removed cut-out standing on the slide, or a framed bubble if segmentation isn't available
+        if (!pv || pv.readyState < 2 || !pv.videoWidth) return;
+        if (havePerson && personC.width) {   // cut-out, no photo background
+          var vw = personC.width, vh = personC.height, th = H * 0.56, k = th / vh, pw = vw * k, px = W - pw + Math.min(0, (pw - W * 0.46) / 2), py = H - th - 26;
+          px = Math.max(W - pw - 6, W * 0.5); g.save();
+          g.beginPath(); g.ellipse(px + pw / 2, H - 30, pw * 0.34, 16, 0, 0, 7); g.fillStyle = "rgba(0,0,0,.28)"; g.fill();   // soft ground shadow
+          g.shadowColor = "rgba(0,0,0,.35)"; g.shadowBlur = 24; g.drawImage(personC, px, py, pw, th); g.restore();
+          if (S.pname) { g.textAlign = "center"; g.fillStyle = "rgba(10,28,92,.82)"; var tw = g.measureText(S.pname).width + 26; g.fillRect(px + pw / 2 - tw / 2, H - 58, tw, 30); g.fillStyle = "#fff"; g.font = "700 18px Arial"; g.fillText(S.pname, px + pw / 2, H - 37); }
+          return;
+        }
+        var r = 150, cx = W - r - 24, cy = H - r - 70;   // fallback framed bubble
         g.save(); g.beginPath(); g.arc(cx, cy, r, 0, 7); g.closePath(); g.clip();
-        var vw = pv.videoWidth, vh = pv.videoHeight, k = Math.max((r * 2) / vw, (r * 2) / vh), iw = vw * k, ih = vh * k; g.drawImage(pv, cx - iw / 2, cy - ih / 2, iw, ih); g.restore();
+        var bw = pv.videoWidth, bh = pv.videoHeight, bk = Math.max((r * 2) / bw, (r * 2) / bh), biw = bw * bk, bih = bh * bk; g.drawImage(pv, cx - biw / 2, cy - bih / 2, biw, bih); g.restore();
         g.beginPath(); g.arc(cx, cy, r, 0, 7); g.lineWidth = 6; g.strokeStyle = "#FFD15C"; g.stroke();
-        if (S.pname) { g.fillStyle = "rgba(10,28,92,.85)"; var tw = g.measureText(S.pname).width + 24; g.fillRect(cx - tw / 2, cy + r - 14, tw, 30); g.fillStyle = "#fff"; g.font = "700 18px Arial"; g.textAlign = "center"; g.fillText(S.pname, cx, cy + r + 7); }
+        if (S.pname) { g.fillStyle = "rgba(10,28,92,.85)"; var tw2 = g.measureText(S.pname).width + 24; g.fillRect(cx - tw2 / 2, cy + r - 14, tw2, 30); g.fillStyle = "#fff"; g.font = "700 18px Arial"; g.textAlign = "center"; g.fillText(S.pname, cx, cy + r + 7); }
       };
       var drawF = function (fr, p) {
+        feedSeg();
         bg(); g.textAlign = "center"; g.fillStyle = "#8FA2FF"; g.font = "700 22px Arial"; g.fillText("VIVO RETAILER APP · " + O.lang.toUpperCase(), W / 2, 70);
         if (fr.kind === "title") { if (ic.complete && ic.naturalWidth) g.drawImage(ic, W / 2 - 70, 300, 140, 140); g.fillStyle = "#fff"; g.font = "800 54px Arial"; wrap(S.title, W / 2, 540, W - 100, 64, 3); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap(S.tag || f.tag, W / 2, 760, W - 120, 36, 3); }
         else if (fr.kind === "end") { g.fillStyle = "#fff"; g.font = "800 46px Arial"; g.fillText("Try it today in the app", W / 2, 540); g.font = "26px Arial"; g.fillStyle = "#DDE3FF"; wrap("Questions? Ask the App guide assistant or raise a ticket in Retailer Support Desk.", W / 2, 620, W - 120, 36, 3); }
-        else { var im = fr.img && imgs[fr.img]; if (im) { var mh = pv ? 600 : 720, mw = W - 150, k = Math.min(mw / im.width, mh / im.height), iw = im.width * k, ih = im.height * k; g.fillStyle = "#fff"; g.fillRect((W - iw) / 2 - 8, 122, iw + 16, ih + 16); g.drawImage(im, (W - iw) / 2, 130, iw, ih); }
-          g.textAlign = "center"; g.fillStyle = "#FFD15C"; g.font = "800 40px Arial"; wrap(fr.s.caption, W / 2, pv ? 820 : 920, pv ? W - 330 : W - 80, 46, 2);
-          g.fillStyle = "#fff"; g.font = "26px Arial"; wrap(fr.s.say, pv ? 40 : W / 2, pv ? 920 : 1030, pv ? W - 330 : W - 90, 34, 6); if (pv) g.textAlign = "center"; }
+        else { var im = fr.img && imgs[fr.img]; if (im) { var mh = pv ? 560 : 720, mw = pv ? W - 70 : W - 150, k = Math.min(mw / im.width, mh / im.height), iw = im.width * k, ih = im.height * k, ix = pv ? 30 : (W - iw) / 2; g.fillStyle = "#fff"; g.fillRect(ix - 8, 114, iw + 16, ih + 16); g.drawImage(im, ix, 122, iw, ih); }
+          g.textAlign = "left"; g.fillStyle = "#FFD15C"; g.font = "800 38px Arial"; wrap(fr.s.caption, pv ? 34 : W / 2, pv ? 760 : 920, pv ? W - 300 : W - 80, 44, 2);
+          g.fillStyle = "#fff"; g.font = "25px Arial"; wrap(fr.s.say, pv ? 34 : W / 2, pv ? 850 : 1030, pv ? W - 300 : W - 90, 33, 6); g.textAlign = "center"; if (!pv) { g.textAlign = "center"; } }
         bubble();
         g.fillStyle = "rgba(255,255,255,.25)"; g.fillRect(0, H - 8, W, 8); g.fillStyle = "#FFD15C"; g.fillRect(0, H - 8, W * p, 8);
       };
@@ -270,7 +301,7 @@ textarea.tx{min-height:120px}
       var mt = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].filter(function (m) { return MediaRecorder.isTypeSupported(m); })[0];
       var rec = new MediaRecorder(mix, mt ? { mimeType: mt, videoBitsPerSecond: 2500000 } : undefined); rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
       rec.onstop = function () { try { if (pv) pv.pause(); } catch (e) { } var blob = new Blob(chunks, { type: (mt || "video/webm").split(";")[0] }), url = URL.createObjectURL(blob), ext = /mp4/.test(mt || "") ? "mp4" : "webm";
-        mount.innerHTML = '<div class="vbox"><video controls playsinline src="' + url + '"></video>' + (pv ? '<span class="aitag">AI-generated video</span>' : "") + '</div><button class="btn pri block" id="dlv" style="margin-top:8px">⬇ Download video</button><div class="muted" style="font-size:12px;margin-top:4px">' + (pv ? "Presenter explains the features over the app screenshots, in " + esc(O.lang) + ". Labelled AI-generated." : "Silent captioned video — the narration is in the captions.") + '</div>';
+        mount.innerHTML = '<div class="vbox"><video controls playsinline src="' + url + '"></video>' + (pv && !real ? '<span class="aitag">AI-generated video</span>' : "") + '</div><button class="btn pri block" id="dlv" style="margin-top:8px">⬇ Download video</button><div class="muted" style="font-size:12px;margin-top:4px">' + (real ? "Your presenter clip over the app screenshots, in their own voice." : pv ? "Presenter explains the features over the app screenshots, in " + esc(O.lang) + ". Labelled AI-generated." : "Silent captioned video — the narration is in the captions.") + '</div>';
         $("dlv").onclick = function () { download(blob, String(dlname || S.title || f.name).replace(/[^\w]+/g, "_") + "." + ext); }; };
       rec.start(500);
       if (pv) {
