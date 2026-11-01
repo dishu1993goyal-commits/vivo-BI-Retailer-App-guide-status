@@ -88,15 +88,19 @@ export async function readImages(keys, env, images, fetchImpl) {
   if (keys.groq) {
     let ids = [];
     try { const r = await fetchImpl("https://api.groq.com/openai/v1/models", { headers: { authorization: "Bearer " + keys.groq } }); const j = await r.json().catch(() => ({})); ids = (j.data || []).filter((m) => m.active !== false).map((m) => m.id).filter(Boolean); } catch (e) { }
-    const vis = ids.filter((id) => /(llama-4|scout|maverick|vision|[-_/]vl|vl[-_]|llava|gemma-?3|pixtral|qwen.*(vl|omni)|kimi.*vl|glm.*v)/i.test(id) && !/guard|whisper|tts|embed|playai|orpheus/i.test(id)).slice(0, 4);
+    // Image-capable models change often (Llama-4 Scout was retired Jul 2026; Qwen 3.x and Muse read images now).
+    const isVis = (id) => /(llama-4|scout|maverick|vision|[-_/]vl|vl[-_]|llava|gemma-?3|pixtral|qwen.*(vl|omni)|qwen\/?qwen3\.\d|muse|kimi.*vl|glm.*v)/i.test(id) && !/guard|whisper|tts|embed|playai|orpheus|safeguard/i.test(id);
+    const rank = (id) => (/qwen3\.\d/i.test(id) ? 0 : /muse/i.test(id) ? 1 : 2);
+    let vis = ids.filter(isVis).sort((a, b) => rank(a) - rank(b)).slice(0, 4);
+    if (!ids.length) vis = ["qwen/qwen3.8-27b", "qwen/qwen3.6-27b"];   // model list unreachable: try the known image models
     if (!vis.length) errs.push("Groq: no picture-reading model available right now");
     for (const m of vis) {
       const t = await ask("Groq " + m.split("/").pop(), async () => {
-        const content = [{ type: "text", text: OCR_ASK }].concat(images.slice(0, 5).map((u) => ({ type: "image_url", image_url: { url: u } })));
+        const content = [{ type: "text", text: OCR_ASK }].concat(images.slice(0, 3).map((u) => ({ type: "image_url", image_url: { url: u } })));
         const r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + keys.groq }, body: JSON.stringify({ model: m, messages: [{ role: "user", content }], temperature: 0, max_completion_tokens: 6000 }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
-        return (((j.choices || [])[0] || {}).message || {}).content || "";
+        return String((((j.choices || [])[0] || {}).message || {}).content || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
       });
       if (t) return { ok: true, text: t, model: "groq/" + m };
     }

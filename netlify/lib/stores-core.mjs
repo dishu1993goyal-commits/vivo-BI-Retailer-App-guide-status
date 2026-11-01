@@ -21,6 +21,46 @@ function cleanStore(x, t, by) {
 const dist = (a, b, c, d) => { const R = 6371, r = Math.PI / 180, dLat = (c - a) * r, dLng = (d - b) * r, h = Math.sin(dLat / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.min(1, Math.sqrt(h))); };
 const pub = (s) => ({ id: s.id, name: s.name, type: s.type, address: s.address, city: s.city, state: s.state, pincode: s.pincode, lat: s.lat, lng: s.lng, phone: s.phone, hours: s.hours });
 
+// Free OpenStreetMap search, run here on the server (phones' WebViews can't always reach the map servers directly):
+// Nominatim (name search) and Overpass (map features) in parallel, each with a short time limit; cached 7 days.
+const OSMRX = { "": "vivo", exclusive: "vivo", authorized: "vivo", service: "vivo", reliance: "Reliance Digital|Reliance Smart|JioMart Digital|My Jio", croma: "Croma", vijaysales: "Vijay Sales" };
+const NOMQ = { "": "vivo", exclusive: "vivo", authorized: "vivo", service: "vivo service", general: "mobile phone shop", reliance: "Reliance Digital", croma: "Croma", vijaysales: "Vijay Sales" };
+const UA = "vivoBI-StoreLocator/1.0 (vivo Business Innovation dashboard)";
+async function osmLive(o, ctx) {
+  const { store, t } = ctx, f = ctx.aiFetch || fetch, { ty, city, state, q } = o; let { lat, lng } = o;
+  const ck = "storeosm:" + createHash("sha1").update([ty, lat != null ? lat.toFixed(2) + "," + lng.toFixed(2) : "", city, state, q].join("|")).digest("hex").slice(0, 20), hit = await store.get(ck);
+  if (hit && t - hit.at < 7 * 864e5 && hit.items.length) return json(200, { ok: true, provider: "osm", items: hit.items, cached: true, googleError: o.googleError });
+  const timed = async (url, opt, ms) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms); try { const r = await f(url, Object.assign({ signal: ac.signal }, opt)); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); } finally { clearTimeout(tm); } };
+  const nom = (params) => timed("https://nominatim.openstreetmap.org/search?" + new URLSearchParams(Object.assign({ format: "jsonv2", countrycodes: "in", addressdetails: "1", extratags: "1", limit: "40" }, params)), { headers: { "user-agent": UA, accept: "application/json" } }, params.limit === "1" ? 3000 : 5000);
+  const errs = [];
+  if (lat == null && city) { try { const g = await nom({ q: [city, state, "India"].filter(Boolean).join(", "), limit: "1" }); if (g[0]) { lat = +g[0].lat; lng = +g[0].lon; } } catch (e) { errs.push("place lookup: " + e.message); } }
+  const near = lat != null, d = near ? 0.25 : 0;
+  // 1) Nominatim name search
+  const pNom = nom(Object.assign({ q: NOMQ[ty] + (!near && state ? ", " + state : "") }, near ? { viewbox: [lng - d, lat + d, lng + d, lat - d].join(","), bounded: "1" } : {}))
+    .then((L) => L.filter((x) => ["shop", "office", "craft", "amenity"].includes(x.category) || /mobile_phone|electronics/.test(x.type || "")).map((x) => { const a = x.address || {}; return { name: str(x.name || (x.display_name || "").split(",")[0], 80), lat: +x.lat, lng: +x.lon,
+      address: str([a.house_number, a.road, a.neighbourhood || a.suburb].filter(Boolean).join(", ") || (x.display_name || "").split(",").slice(1, 4).join(","), 300), city: str(a.city || a.town || a.village || a.county || a.state_district, 60), state: str(a.state, 60), pincode: str(a.postcode, 12), phone: str((x.extratags || {}).phone || (x.extratags || {})["contact:phone"], 40) }; }))
+    .catch((e) => { errs.push("Nominatim " + e.message); return []; });
+  // 2) Overpass map features (two mirrors)
+  const sel = ty === "general" ? '["shop"="mobile_phone"]' : '["name"~"' + OSMRX[ty] + '",i]';
+  const area = !near && state ? '(area["name"="' + state.replace(/"/g, "") + '"]["admin_level"="4"];area["name:en"="' + state.replace(/"/g, "") + '"]["admin_level"="4"];)->.s;' : "";
+  const oq = "[out:json][timeout:5];" + area + "(nwr" + sel + (near ? "(around:20000," + lat + "," + lng + ")" : "(area.s)") + ";);out center tags 80;";
+  const pOv = (near || area) ? Promise.any(["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter"].map((u) => timed(u, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": UA }, body: "data=" + encodeURIComponent(oq) }, 5500)))
+    .then((j) => (j.elements || []).map((e) => { const g = e.tags || {}, la = e.lat != null ? e.lat : e.center && e.center.lat, lo = e.lon != null ? e.lon : e.center && e.center.lon; if (la == null || !(g.name || g.brand)) return null; if (ty !== "general" && !(g.shop || g.craft || g.office || g.amenity)) return null;
+      return { name: str(g.name || g.brand, 80), lat: +la, lng: +lo, address: str([g["addr:housenumber"], g["addr:street"], g["addr:suburb"] || g["addr:place"]].filter(Boolean).join(", "), 300), city: str(g["addr:city"] || g["addr:district"], 60), state: str(g["addr:state"] || (!near ? state : ""), 60), pincode: str(g["addr:postcode"], 12), phone: str(g.phone || g["contact:phone"], 40) }; }).filter(Boolean))
+    .catch((e) => { errs.push("Overpass " + ((e.errors || [e]).map((x) => x.message).join("/"))); return []; }) : Promise.resolve([]);
+  const [a1, a2] = await Promise.all([pNom, pOv]);
+  const rx = ty && ty !== "general" ? new RegExp(OSMRX[ty], "i") : ty === "" ? /vivo/i : null, seen = {}, items = [];
+  for (const x of a2.concat(a1)) {
+    if (!x.name || !isFinite(x.lat) || !isFinite(x.lng)) continue; if (rx && !rx.test(x.name)) continue;
+    const k = low(x.name).replace(/[^a-z]/g, "").slice(0, 14) + (Math.round(x.lat * 500) + "," + Math.round(x.lng * 500)); if (seen[k]) { const y = seen[k]; ["address", "city", "state", "pincode", "phone"].forEach((f2) => { if (!y[f2] && x[f2]) y[f2] = x[f2]; }); continue; } seen[k] = x;
+    const type = ty || (/care|service/i.test(x.name) ? "service" : /exclusive|brand store/i.test(x.name) ? "exclusive" : "authorized");
+    items.push(Object.assign(x, { type, lat: Math.round(x.lat * 1e6) / 1e6, lng: Math.round(x.lng * 1e6) / 1e6, src: "OpenStreetMap" }));
+  }
+  if (!items.length && errs.length === (near || area ? 2 : 1)) return json(200, { ok: false, error: "Map search isn't reachable right now — try again in a minute. (" + errs.join("; ").slice(0, 160) + ")" });
+  if (items.length) await store.set(ck, { at: t, items: items.slice(0, 80) });
+  return json(200, { ok: true, provider: "osm", items: items.slice(0, 80), googleError: o.googleError, center: near ? { lat, lng } : null });
+}
+
 export async function storesAction(b, ctx) {
   const { store, t, app, rec, pool } = ctx, isAdmin = app === "admin";
   const all = async () => (await pool((await store.list("store:")).slice(0, 5000), 60, (k) => store.get(k))).filter(Boolean);
@@ -45,7 +85,7 @@ export async function storesAction(b, ctx) {
     const ty = STORE_TYPES[b.type] ? b.type : "", lat = num(b.lat, -90, 90), lng = num(b.lng, -180, 180), city = str(b.city, 60), state = str(b.state, 60), q = str(b.q, 80);
     if (lat == null && !city && !state && !q) return json(400, { ok: false, error: "Choose a state / city or use your location." });
     const cfg = (await store.get("config:gmaps")) || {};
-    if (!cfg.key) return json(200, { ok: true, provider: "osm" });   // free OpenStreetMap search runs on the device
+    if (!cfg.key) return osmLive({ ty, lat, lng, city, state, q }, ctx);
     const text = (q ? q + " " : "") + GQ[ty] + (city || state ? " in " + [city, state].filter(Boolean).join(", ") : "") + ", India";
     const ck = "storelive:" + createHash("sha1").update(text + "|" + (lat != null ? lat.toFixed(2) + "," + lng.toFixed(2) : "")).digest("hex").slice(0, 20), hit = await store.get(ck);
     if (hit && t - hit.at < 7 * 864e5) return json(200, { ok: true, provider: "google", items: hit.items, cached: true });
@@ -55,8 +95,8 @@ export async function storesAction(b, ctx) {
     try {
       const r = await (ctx.aiFetch || fetch)("https://places.googleapis.com/v1/places:searchText", { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": cfg.key, "x-goog-fieldmask": "places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.googleMapsUri,places.rating,places.businessStatus,places.addressComponents" }, body: JSON.stringify(body) });
       j = await r.json().catch(() => ({}));
-      if (!r.ok) return json(200, { ok: true, provider: "osm", googleError: str((j.error && j.error.message) || "Google Maps error " + r.status, 160) });
-    } catch (e) { return json(200, { ok: true, provider: "osm", googleError: "Google Maps not reachable" }); }
+      if (!r.ok) return osmLive({ ty, lat, lng, city, state, q, googleError: str((j.error && j.error.message) || "Google Maps error " + r.status, 160) }, ctx);
+    } catch (e) { return osmLive({ ty, lat, lng, city, state, q, googleError: "Google Maps not reachable" }, ctx); }
     const comp = (p, kind) => ((p.addressComponents || []).find((c) => (c.types || []).includes(kind)) || {}).longText || "";
     let items = (j.places || []).filter((p) => p.location && p.businessStatus !== "CLOSED_PERMANENTLY").map((p) => ({ name: str(p.displayName && p.displayName.text, 80), type: ty || (/vivo/i.test((p.displayName || {}).text || "") ? "authorized" : "general"), address: str(p.formattedAddress, 300),
       city: str(comp(p, "locality") || comp(p, "administrative_area_level_3"), 60), state: str(comp(p, "administrative_area_level_1"), 60), pincode: str(comp(p, "postal_code"), 12), lat: num(p.location.latitude, -90, 90), lng: num(p.location.longitude, -180, 180), phone: str(p.nationalPhoneNumber, 40), rating: Number(p.rating) || 0, maps: str(p.googleMapsUri, 300) }));

@@ -78,9 +78,11 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     var box = $("lres"); if (!box) return; box.innerHTML = '<div class="loading"><div class="spin"></div>Searching the map…</div>';
     var req = { action: "store-live", type: TY, q: near ? "" : LQ }; if (near) { req.lat = YOU.lat; req.lng = YOU.lng; } else { req.state = LST; req.city = LCITY; }
     api(req).then(function (r) {
+      if (!r.ok && r.error && !navigator.onLine) r.error = "You're offline.";
       if (!r.ok) { box.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       if (r.provider === "google") return done(r.items.map(function (x) { x.src = "Google Maps"; return x; }), "Google Maps");
-      return osm(near).then(function (items) { done(items, "OpenStreetMap" + (r.googleError ? " (Google: " + r.googleError + ")" : "")); }).catch(function (e) { box.innerHTML = '<div class="err">Map search isn’t reachable right now (' + esc(e.message || e) + "). Try again in a minute.</div>"; });
+      if (r.items) return done(r.items, "OpenStreetMap" + (r.googleError ? " (Google: " + r.googleError + ")" : ""));
+      return osm(near).then(function (items) { done(items, "OpenStreetMap"); }).catch(function (e) { box.innerHTML = '<div class="err">Map search isn’t reachable right now (' + esc(e.message || e) + "). Try again in a minute.</div>"; });
     });
     function done(items, via) {
       if (near && YOU) items.forEach(function (x) { x.km = Math.round(km(YOU.lat, YOU.lng, x.lat, x.lng) * 10) / 10; }), items.sort(function (a, b) { return a.km - b.km; });

@@ -68,13 +68,14 @@ export async function schemeaiAction(b, ctx) {
   };
 
   if (b.action === "scha-parse") {   // scheme text (extracted on the page) or photos → structured brief + exact payout plan
-    let text = str(b.text, 20000), via = "";
+    let text = String(b.text == null ? "" : b.text).slice(0, 20000), via = "", visionError = "";
     const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 3000000).slice(0, 4);
     if (imgs.length) {   // read the picture with a vision model — keeps table rows and columns far better than phone OCR
       const keys = await aiKeys(store, env);
-      if (keys.groq) { const v = await readImages(keys, env, imgs, f); if (v.ok) { text = str(v.text, 20000) + (text ? "\n\n(Phone OCR of the same picture, for cross-checking:)\n" + text.slice(0, 6000) : ""); via = v.model; } }
+      if (keys.groq) { const v = await readImages(keys, env, imgs, f); if (v.ok) { text = String(v.text).slice(0, 20000) + (text ? "\n\n(Phone OCR of the same picture, for cross-checking:)\n" + text.slice(0, 6000) : ""); via = v.model; } else visionError = str(v.error, 300); }
+      else visionError = "AI key not set";
     }
-    if (text.length < 30) return json(400, { ok: false, error: "The file had no readable scheme text." });
+    if (text.length < 30) return json(400, { ok: false, visionError, error: "The file had no readable scheme text." + (visionError ? " (AI picture reading: " + visionError + ")" : "") });
     const prompt = `You explain vivo India sales-scheme / incentive policies to retailers and turn the payout tables into exact data. Read the SCHEME TEXT (it may come from a PDF/photo, so table cells may be separated by | or spaces).
 Return JSON only:
 {"title":"short name","period":"the scheme period/dates if stated","summary":"3-4 plain sentences: who it is for and how the incentive works",
@@ -103,7 +104,22 @@ SCHEME TEXT:
 ${text}`;
     const r = await ai(prompt, (d) => d && (d.summary || (d.slabs && d.slabs.length) || (d.plan && Array.isArray(d.plan.components))), "parse2|" + text.slice(0, 6000));
     if (!r.ok) return json(200, { ok: false, error: r.error });
-    return json(200, { ok: true, scheme: cleanScheme(r.data), via });
+    const scheme = cleanScheme(r.data);
+    if (!scheme.plan && /\d\s*(%|units?|u\b|pcs|nos|rs|₹|\/-)|slab|payout|incentive|₹/i.test(text)) {   // second look, tables only
+      const p2 = `Extract ONLY the payout tables from this vivo India scheme as exact data. Read every row; table cells may be separated by | or spaces, and lines may be out of order.
+Return JSON only: {"plan":{"achLabel":"","components":[ ... ],"conditions":[{"label":"","factor":0.7}]}}
+Component shapes:
+{"kind":"matrix","name":"","tiers":[{"label":"≥100%","min":100},{"label":"≥90%","min":90},{"label":"Basic","min":0}],"rows":[{"name":"model or series","basis":"pct" or "perUnit","values":[one number per tier]}]}
+{"kind":"slab","name":"","models":"model names","basis":"pct" (% of sale value) or "perUnit" (₹ per unit) or "flat" (₹ once),"slabs":[{"label":"","min":units,"max":units or null,"value":number}]}
+{"kind":"band","name":"","bands":[{"label":"e.g. MOP below ₹15K","value":₹ per unit}]}
+{"kind":"perUnit","name":"","models":"","value":₹ per unit}
+Examples: "2-5 units 1%, 6-9 units 1.5%, 10+ units 2%" → slab basis pct, slabs min 2 max 5 value 1 / min 6 max 9 value 1.5 / min 10 max null value 2. "70% payout if target not achieved" → conditions factor 0.7. Plain numbers only.
+SCHEME TEXT:
+${text}`;
+      const r2 = await ai(p2, (d) => d && d.plan && Array.isArray(d.plan.components) && d.plan.components.length, "plan2|" + text.slice(0, 6000));
+      if (r2.ok) scheme.plan = cleanPlan(r2.data.plan);
+    }
+    return json(200, { ok: true, scheme, via, visionError, read: text.slice(0, 5000) });
   }
   if (b.action === "scha-calc") {   // user's numbers + the scheme → progress, what's left, projected payout
     const scheme = cleanScheme(b.scheme), inputs = b.inputs && typeof b.inputs === "object" ? b.inputs : {};

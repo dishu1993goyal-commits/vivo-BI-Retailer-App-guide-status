@@ -391,7 +391,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
     return ov;
   }
-  var VIEW = $("view"), TAB = "new", SCHEME = null, INPUTS = {}, SID = "";
+  var VIEW = $("view"), TAB = "new", SCHEME = null, INPUTS = {}, SID = "", READ = null, VERR = "";
   var FTLOAD = null;
   function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
   function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); }
@@ -407,17 +407,17 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   }
   function pickFile() {
     var i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,.xlsx,.xls,.csv,.docx,.txt,image/*"; i.onchange = function () {
-      var fl = i.files[0]; if (!fl) return; $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading ' + esc(fl.name) + "…</div>";
+      var fl = i.files[0]; if (!fl) return; VERR = ""; $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading ' + esc(fl.name) + "…</div>";
       var fail = function (e) { $("pp").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; };
       var ocr = function () { return loadFiles().then(function () { return window.BIFILES.extract(fl); }).then(function (r) { parse(r.text, $("pp")); }); };
       if (/^image\//.test(fl.type)) {   // photos: AI looks at the picture itself (keeps the table columns); phone OCR is the fallback
         shrink(fl).then(function (u) { $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>✨ AI is reading the scheme picture and its tables…</div>'; return api({ action: "scha-parse", images: [u] }); })
-          .then(function (r) { if (r.ok) return done(r); $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading the text on the picture…</div>'; return ocr(); }).catch(function () { return ocr().catch(fail); });
+          .then(function (r) { if (r.ok) return done(r); VERR = r.visionError || r.error || ""; $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading the text on the picture…</div>'; return ocr(); }).catch(function () { return ocr().catch(fail); });
       } else ocr().catch(fail);
     }; i.click();
   }
   function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
-  function done(r) { SCHEME = r.scheme; INPUTS = {}; SID = ""; pNew(); window.scrollTo(0, 0); }
+  function done(r) { SCHEME = r.scheme; INPUTS = {}; SID = ""; READ = { text: r.read || "", via: r.via ? "AI picture reading (" + r.via.split("/").pop() + ")" : "text from the file", verr: r.visionError || VERR }; pNew(); window.scrollTo(0, 0); }
   function parse(text, box) {
     box.innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>✨ AI is reading the scheme…</div>';
     api({ action: "scha-parse", text: String(text).slice(0, 15000) }).then(function (r) { if (!r.ok) { box.innerHTML = '<div class="err" style="margin-top:8px">' + esc(r.error) + "</div>"; return; } box.innerHTML = ""; done(r); });
@@ -432,14 +432,38 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       (s.actions && s.actions.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">✅ What to do</div><ul style="margin:4px 0;padding-left:18px;font-size:13.5px">' + s.actions.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "") +
       (s.terms && s.terms.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">📌 Conditions</div><ul style="margin:4px 0;padding-left:18px;font-size:13px">' + s.terms.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "") +
       (s.incentiveNote ? '<div class="muted" style="font-size:12px;margin-top:6px">ℹ️ ' + esc(s.incentiveNote) + "</div>" : "") +
-      (ADMIN ? '<button class="btn sec sm" id="pub" style="margin-top:10px">📢 Publish for all retailers</button>' : "") + "</div>" +
+      (!s.plan ? '<div class="notice" style="margin-top:10px">⚠️ No payout table (slabs / model-wise %) could be read from this file' + (READ && READ.verr ? " — AI picture reading wasn’t available (" + esc(READ.verr.slice(0, 140)) + "), so only the phone’s text scan was used" : "") + '. Upload a clearer screenshot / the PDF, or enter the slabs yourself below.</div>' : "") +
+      (READ && READ.text ? '<details style="margin-top:8px;font-size:12.5px"><summary class="muted">🔍 What AI read (' + esc(READ.via) + ")</summary><pre style=\"white-space:pre-wrap;font-size:11.5px;max-height:240px;overflow:auto;background:#F5F6FA;border-radius:10px;padding:8px\">" + esc(READ.text) + "</pre></details>" : "") +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn ghost sm" id="edslab">✏️ ' + (s.plan ? "Add / fix a slab table" : "Enter the payout slabs") + "</button>" + (ADMIN ? '<button class="btn sec sm" id="pub">📢 Publish for all retailers</button>' : "") + '</div><div id="ed"></div></div>' +
       (s.plan ? planCard(s.plan) : '<div class="card"><b>🧮 Your numbers</b><div class="muted" style="font-size:12.5px">Enter where you are now — AI works out your payout and what’s left.</div>' +
       (s.inputs && s.inputs.length ? s.inputs.map(function (inp) { return '<label class="lb">' + esc(inp.label) + (inp.unit ? " (" + esc(inp.unit) + ")" : "") + '</label><input class="tx" type="number" data-in="' + esc(inp.key) + '" value="' + esc(INPUTS[inp.key] || "") + '">'; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:6px">This scheme didn’t list specific numbers to track — type your current sales below.</div><label class="lb">Current sales / units</label><input class="tx" type="number" data-in="current">') +
       '<button class="btn pri block" id="calc" style="margin-top:10px">🧮 Calculate my payout</button><div id="res"></div></div>');
     [].forEach.call($("out").querySelectorAll("[data-in]"), function (el) { el.oninput = el.onchange = function () { INPUTS[el.dataset.in] = el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value; if (s.plan) live(); }; });
     if ($("pub")) $("pub").onclick = function () { api({ action: "scha-save", id: SID, title: s.title, scheme: s, published: true }).then(function (r) { if (!r.ok) return toast(r.error); SID = r.id; toast("Published — retailers see it in 📑 Schemes"); }); };
     if ($("calc")) $("calc").onclick = calc;
+    $("edslab").onclick = editor;
     if (s.plan) live();
+  }
+  // ---------- manual slab table (when AI missed it, or to fix it) ----------
+  function editor() {
+    var rows = [{ min: "", max: "", value: "" }, { min: "", max: "", value: "" }, { min: "", max: "", value: "" }];
+    var paint = function () {
+      $("ed").innerHTML = '<div class="comp"><h3>✏️ Payout slabs</h3><label class="lb">Name</label><input class="tx" id="edn" placeholder="e.g. S2FE unit slab" value="' + esc((SCHEME.focusModels || [])[0] ? (SCHEME.focusModels[0] + " slab") : "Unit slab") + '">' +
+        '<label class="lb">Models it applies to</label><input class="tx" id="edm" value="' + esc((SCHEME.focusModels || []).join(", ")) + '"><label class="lb">Each slab pays</label><select class="tx" id="edb"><option value="pct">% of sale value</option><option value="perUnit">₹ per unit</option><option value="flat">₹ lump sum</option></select>' +
+        '<table class="mx"><tr><th>From units</th><th>To units (blank = and above)</th><th>Payout</th></tr>' + rows.map(function (r, i) { return '<tr><td><input data-r="' + i + '" data-f="min" value="' + esc(r.min) + '" type="number"></td><td><input data-r="' + i + '" data-f="max" value="' + esc(r.max) + '" type="number"></td><td><input data-r="' + i + '" data-f="value" value="' + esc(r.value) + '" type="number" step="any"></td></tr>'; }).join("") + "</table>" +
+        '<button class="btn ghost sm" id="edadd" style="margin-top:6px">+ Row</button><label class="lb">If the overall target is NOT achieved, % of payout still given (blank = no cut)</label><input class="tx" id="edc" type="number" placeholder="e.g. 70"><button class="btn pri block" id="edok" style="margin-top:10px">Use these slabs</button></div>';
+      [].forEach.call($("ed").querySelectorAll("[data-r]"), function (el) { el.oninput = function () { rows[+el.dataset.r][el.dataset.f] = el.value; }; });
+      $("edadd").onclick = function () { rows.push({ min: "", max: "", value: "" }); paint(); };
+      $("edok").onclick = function () {
+        var sl = rows.filter(function (r) { return r.min !== "" && r.value !== ""; }).map(function (r, i) { return { label: "Slab " + (i + 1), min: +r.min, max: r.max === "" ? null : +r.max, value: +r.value }; }).sort(function (a, b) { return a.min - b.min; });
+        if (!sl.length) return toast("Fill at least one slab (from units + payout)");
+        var p = SCHEME.plan || { components: [], conditions: [], achLabel: "Overall achievement vs your target" };
+        p.components.push({ kind: "slab", name: $("edn").value || "Unit slab", models: $("edm").value, note: "", basis: $("edb").value, slabs: sl });
+        var c = parseFloat($("edc").value); if (isFinite(c) && c >= 0 && c < 100) p.conditions.push({ label: "Overall target achieved", factor: c / 100 });
+        SCHEME.plan = p; showScheme(); toast("Slabs added — enter your numbers below");
+      };
+    };
+    paint();
   }
   // ---------- exact payout from the plan (no AI, works offline) ----------
   var rs = function (n) { return "₹" + Math.round(n).toLocaleString("en-IN"); };
