@@ -278,10 +278,11 @@ ${feat}`;
   }
   if (b.action === "ag-hf-check") {   // is the free Space usable? (runs on the server, so office networks / browsers don't matter)
     const c = await cfg(), V = vcfg(c), k = await keysOf();
-    if (!/^[\w.-]+\/[\w.-]+$/.test(V.hfSpace)) return json(200, { ok: false, error: V.hfSpace ? "“" + V.hfSpace + "” isn’t a Space name. Enter it as owner/space-name — e.g. alexnasa/OmniAvatar." : "Enter the Hugging Face Space first." });
+    if (!/^[\w.-]+\/[\w.-]+$/.test(V.hfSpace)) return json(200, { ok: false, error: V.hfSpace ? "“" + V.hfSpace + "” isn’t a Space name. Enter it as owner/space-name — e.g. pragnakalp/Wav2lip-ZeroGPU." : "Enter the Hugging Face Space first." });
     try {
       const S = await hfSpace(V.hfSpace, k.hf, f);
       if (S.stage === "SLEEPING" || S.stage === "PAUSED") { if (S.stage === "SLEEPING") { try { await f(S.host + "/", { headers: S.headers }); } catch (e) { } } return json(200, { ok: false, error: S.stage === "SLEEPING" ? "The Space is asleep — I’ve woken it; press Check again in 1–2 minutes." : "This Space is paused by its owner — pick another Space." }); }
+      if (/omniavatar/i.test(V.hfSpace)) return json(200, { ok: false, error: "OmniAvatar can’t be used from the app — its steps only work inside its own web page, so every video fails. Use pragnakalp/Wav2lip-ZeroGPU instead." });
       if (/ERROR/.test(S.stage)) return json(200, { ok: false, error: "This Space is broken right now (" + lc(S.stage).replace(/_/g, " ") + ") — pick another Space." });
       const api = await hfApi(S, f), M = hfMap(api.info, V.hfApi);
       if (!M) return json(200, { ok: false, error: "This Space has no step that makes a video from a photo plus text or voice. What it offers: " + str(hfDescribe(api.info), 700) });
