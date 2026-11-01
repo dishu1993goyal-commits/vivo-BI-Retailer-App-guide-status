@@ -10,6 +10,12 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
 .slab{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;font-size:13.5px;padding:6px 0;border-bottom:1px solid #EEF0F6}
 .li{background:var(--card);border-radius:12px;padding:10px 12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer}
 .big2{font-size:22px;font-weight:800;color:#13693F}
+.mx{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.mx th{font-size:11px;color:var(--ink2);text-align:right;padding:4px;font-weight:700}.mx th:first-child{text-align:left}
+.mx td{padding:5px 4px;border-top:1px solid #EEF0F6;text-align:right;white-space:nowrap}.mx td:first-child{text-align:left;white-space:normal;font-weight:600}.mx td.on{background:#E7F6EC;color:#13693F;font-weight:800;border-radius:6px}
+.mx input{width:92px;padding:7px 8px;border:1px solid #D8DAE5;border-radius:9px;font-size:14px;text-align:right;background:#fff}
+.comp{border:1px solid #E6E8F2;border-radius:14px;padding:10px 12px;margin-top:10px}.comp h3{margin:0;font-size:14.5px}
+.tot{position:sticky;bottom:8px;background:#13693F;color:#fff;border-radius:14px;padding:12px 14px;margin-top:12px;box-shadow:0 6px 18px rgba(19,105,63,.3)}.tot b{font-size:24px}
+.ln{display:flex;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid #EEF0F6}.ln span{flex:1}
 .chip{display:inline-block;background:#EEF0FF;color:#3346C9;border-radius:99px;padding:2px 9px;font-size:12px;font-weight:600;margin:2px 4px 2px 0}
 </style>
 </head>
@@ -38,12 +44,19 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   function pickFile() {
     var i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,.xlsx,.xls,.csv,.docx,.txt,image/*"; i.onchange = function () {
       var fl = i.files[0]; if (!fl) return; $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading ' + esc(fl.name) + "…</div>";
-      loadFiles().then(function () { return window.BIFILES.extract(fl); }).then(function (r) { parse(r.text, $("pp")); }).catch(function (e) { $("pp").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
+      var fail = function (e) { $("pp").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; };
+      var ocr = function () { return loadFiles().then(function () { return window.BIFILES.extract(fl); }).then(function (r) { parse(r.text, $("pp")); }); };
+      if (/^image\//.test(fl.type)) {   // photos: AI looks at the picture itself (keeps the table columns); phone OCR is the fallback
+        shrink(fl).then(function (u) { $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>✨ AI is reading the scheme picture and its tables…</div>'; return api({ action: "scha-parse", images: [u] }); })
+          .then(function (r) { if (r.ok) return done(r); $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading the text on the picture…</div>'; return ocr(); }).catch(function () { return ocr().catch(fail); });
+      } else ocr().catch(fail);
     }; i.click();
   }
+  function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
+  function done(r) { SCHEME = r.scheme; INPUTS = {}; SID = ""; pNew(); window.scrollTo(0, 0); }
   function parse(text, box) {
     box.innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>✨ AI is reading the scheme…</div>';
-    api({ action: "scha-parse", text: String(text).slice(0, 15000) }).then(function (r) { if (!r.ok) { box.innerHTML = '<div class="err" style="margin-top:8px">' + esc(r.error) + "</div>"; return; } SCHEME = r.scheme; INPUTS = {}; SID = ""; box.innerHTML = ""; pNew(); window.scrollTo(0, 0); });
+    api({ action: "scha-parse", text: String(text).slice(0, 15000) }).then(function (r) { if (!r.ok) { box.innerHTML = '<div class="err" style="margin-top:8px">' + esc(r.error) + "</div>"; return; } box.innerHTML = ""; done(r); });
   }
   function showScheme() {
     var s = SCHEME;
@@ -51,16 +64,92 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       (s.summary ? '<p style="font-size:14px;margin:8px 0 0">' + esc(s.summary) + "</p>" : "") +
       (s.focusModels && s.focusModels.length ? '<div style="margin-top:8px">' + s.focusModels.map(function (m) { return '<span class="chip">' + esc(m) + "</span>"; }).join("") + "</div>" : "") +
       (s.targets && s.targets.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">🎯 Targets</div>' + s.targets.map(function (x) { return '<div style="font-size:13.5px">• ' + esc(x.metric) + (x.value ? ": <b>" + esc(x.value) + " " + esc(x.unit || "") + "</b>" : "") + "</div>"; }).join("") : "") +
-      (s.slabs && s.slabs.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">💰 Payout slabs</div>' + s.slabs.map(function (x) { return '<div class="slab"><span>' + esc(x.label || "") + '</span><span>' + esc(x.condition || "") + '</span><b>' + esc(x.payout || "") + "</b></div>"; }).join("") : "") +
+      (!s.plan && s.slabs && s.slabs.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">💰 Payout slabs</div>' + s.slabs.map(function (x) { return '<div class="slab"><span>' + esc(x.label || "") + '</span><span>' + esc(x.condition || "") + '</span><b>' + esc(x.payout || "") + "</b></div>"; }).join("") : "") +
       (s.actions && s.actions.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">✅ What to do</div><ul style="margin:4px 0;padding-left:18px;font-size:13.5px">' + s.actions.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "") +
+      (s.terms && s.terms.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">📌 Conditions</div><ul style="margin:4px 0;padding-left:18px;font-size:13px">' + s.terms.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "") +
       (s.incentiveNote ? '<div class="muted" style="font-size:12px;margin-top:6px">ℹ️ ' + esc(s.incentiveNote) + "</div>" : "") +
       (ADMIN ? '<button class="btn sec sm" id="pub" style="margin-top:10px">📢 Publish for all retailers</button>' : "") + "</div>" +
-      '<div class="card"><b>🧮 Your numbers</b><div class="muted" style="font-size:12.5px">Enter where you are now — AI works out your payout and what’s left.</div>' +
+      (s.plan ? planCard(s.plan) : '<div class="card"><b>🧮 Your numbers</b><div class="muted" style="font-size:12.5px">Enter where you are now — AI works out your payout and what’s left.</div>' +
       (s.inputs && s.inputs.length ? s.inputs.map(function (inp) { return '<label class="lb">' + esc(inp.label) + (inp.unit ? " (" + esc(inp.unit) + ")" : "") + '</label><input class="tx" type="number" data-in="' + esc(inp.key) + '" value="' + esc(INPUTS[inp.key] || "") + '">'; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:6px">This scheme didn’t list specific numbers to track — type your current sales below.</div><label class="lb">Current sales / units</label><input class="tx" type="number" data-in="current">') +
-      '<button class="btn pri block" id="calc" style="margin-top:10px">🧮 Calculate my payout</button><div id="res"></div></div>';
-    [].forEach.call($("out").querySelectorAll("[data-in]"), function (el) { el.oninput = function () { INPUTS[el.dataset.in] = el.value; }; });
+      '<button class="btn pri block" id="calc" style="margin-top:10px">🧮 Calculate my payout</button><div id="res"></div></div>');
+    [].forEach.call($("out").querySelectorAll("[data-in]"), function (el) { el.oninput = el.onchange = function () { INPUTS[el.dataset.in] = el.type === "checkbox" ? (el.checked ? "1" : "0") : el.value; if (s.plan) live(); }; });
     if ($("pub")) $("pub").onclick = function () { api({ action: "scha-save", id: SID, title: s.title, scheme: s, published: true }).then(function (r) { if (!r.ok) return toast(r.error); SID = r.id; toast("Published — retailers see it in 📑 Schemes"); }); };
-    $("calc").onclick = calc;
+    if ($("calc")) $("calc").onclick = calc;
+    if (s.plan) live();
+  }
+  // ---------- exact payout from the plan (no AI, works offline) ----------
+  var rs = function (n) { return "₹" + Math.round(n).toLocaleString("en-IN"); };
+  var fx = function (n) { return (Math.round(n * 100) / 100).toString(); };
+  function inp(k, ph, w) { return '<input type="number" inputmode="decimal" min="0" data-in="' + k + '" placeholder="' + ph + '" value="' + esc(INPUTS[k] || "") + '"' + (w ? ' style="width:' + w + '"' : "") + ">"; }
+  function cellTxt(basis, v) { return v == null ? "–" : basis === "pct" ? fx(v) + "%" : basis === "flat" ? rs(v) : rs(v); }
+  function hasMatrix(p) { return p.components.some(function (c) { return c.kind === "matrix"; }); }
+  function planCard(p) {
+    var h = '<div class="card"><b>🧮 Your numbers → your payout</b><div class="muted" style="font-size:12.5px">Fill in what you have sold so far. The payout is worked out exactly from the scheme’s tables as you type.</div>';
+    if (hasMatrix(p)) h += '<div class="comp"><h3>🎯 ' + esc(p.achLabel) + '</h3><div class="muted" style="font-size:12px">Decides which column of the model-wise table you are paid at. Enter the % or your target and sales.</div><table class="mx"><tr><td>Achievement %</td><td>' + inp("ach", "e.g. 95") + '</td></tr><tr><td>or Target</td><td>' + inp("tgt", "target") + '</td></tr><tr><td>Achieved so far</td><td>' + inp("done", "achieved") + "</td></tr></table></div>";
+    p.components.forEach(function (c, ci) {
+      h += '<div class="comp"><h3>' + esc(c.name) + "</h3>" + (c.models ? '<div class="muted" style="font-size:12px">Models: ' + esc(c.models) + "</div>" : "") + (c.note ? '<div class="muted" style="font-size:12px">' + esc(c.note) + "</div>" : "");
+      if (c.kind === "matrix") {
+        var anyPct = c.rows.some(function (r) { return r.basis === "pct"; });
+        h += '<div style="overflow-x:auto"><table class="mx"><tr><th>Model</th>' + c.tiers.map(function (t, i) { return '<th data-tier="' + ci + "_" + i + '">' + esc(t.label) + "</th>"; }).join("") + "<th>You sold</th></tr>" +
+          c.rows.map(function (r, ri) { return "<tr><td>" + esc(r.name) + "</td>" + r.values.map(function (v, i) { return '<td data-cell="' + ci + "_" + i + '">' + cellTxt(r.basis, v) + "</td>"; }).join("") + "<td>" + inp("m" + ci + "_" + ri, r.basis === "pct" ? "₹ value" : "units") + "</td></tr>"; }).join("") + "</table></div>" +
+          (anyPct ? '<div class="muted" style="font-size:11.5px;margin-top:4px">% rows: enter your sell-out value in ₹ (as the scheme counts it, e.g. without GST). ₹ rows: enter units.</div>' : "");
+      }
+      if (c.kind === "slab") {
+        h += '<table class="mx"><tr><th>Slab</th><th>Units</th><th>Payout</th></tr>' + c.slabs.map(function (z, i) { return '<tr><td>' + esc(z.label || "Slab " + (i + 1)) + "</td><td>" + z.min + (z.max != null ? "–" + z.max : "+") + '</td><td data-slab="' + ci + "_" + i + '">' + cellTxt(c.basis, z.value) + (c.basis === "perUnit" ? "/unit" : "") + "</td></tr>"; }).join("") + "</table>" +
+          '<table class="mx"><tr><td>Units sold</td><td>' + inp("s" + ci + "_u", "units") + "</td></tr>" + (c.basis === "pct" ? "<tr><td>Sale value of those units (₹)</td><td>" + inp("s" + ci + "_v", "₹ value") + "</td></tr>" : "") + "</table>";
+      }
+      if (c.kind === "band") h += '<table class="mx"><tr><th>Band</th><th>Per unit</th><th>Units</th></tr>' + c.bands.map(function (z, i) { return "<tr><td>" + esc(z.label) + "</td><td>" + rs(z.value) + "</td><td>" + inp("b" + ci + "_" + i, "units") + "</td></tr>"; }).join("") + "</table>";
+      if (c.kind === "perUnit") h += '<table class="mx"><tr><td>' + rs(c.value) + ' per unit · units sold</td><td>' + inp("p" + ci, "units") + "</td></tr></table>";
+      h += "</div>";
+    });
+    if (p.conditions.length) h += '<div class="comp"><h3>✅ Conditions</h3>' + p.conditions.map(function (x, i) { return '<label class="tg" style="margin-top:8px;font-size:13.5px"><input type="checkbox" data-in="c' + i + '"' + (INPUTS["c" + i] === "0" ? "" : " checked") + "><i></i><span>" + esc(x.label) + ' <span class="muted">(if not: ' + Math.round(x.factor * 100) + "% payout)</span></span></label>"; }).join("") + "</div>";
+    h += '<div class="comp"><h3>📅 Projection (optional)</h3><table class="mx"><tr><td>Days gone in the scheme</td><td>' + inp("dd", "days") + "</td></tr><tr><td>Total days in the scheme</td><td>" + inp("dt", "days") + "</td></tr></table></div>";
+    return h + '<div id="res"></div></div>';
+  }
+  function achOf(I) { var a = parseFloat(I.ach); if (isFinite(a)) return a; var t = parseFloat(I.tgt), d = parseFloat(I.done); return t > 0 && isFinite(d) ? d / t * 100 : null; }
+  function compute(p, I, F) {
+    F = F || 1; var ach0 = achOf(I), ach = ach0 == null ? null : ach0 * F, total = 0, lines = [], next = [], warn = [], tiersOn = {};
+    var q = function (k) { var v = parseFloat(I[k]); return isFinite(v) && v > 0 ? v * F : 0; };
+    p.components.forEach(function (c, ci) {
+      var sub = 0;
+      if (c.kind === "matrix") {
+        var ord = c.tiers.map(function (t, i) { return { t: t, i: i }; }).sort(function (a, b) { return b.t.min - a.t.min; });
+        var used = c.rows.some(function (r, ri) { return q("m" + ci + "_" + ri); });
+        var cur = ach == null ? null : ord.filter(function (x) { return ach >= x.t.min; })[0];
+        var pay = function (tier) { var s2 = 0; c.rows.forEach(function (r, ri) { var x = q("m" + ci + "_" + ri), v = r.values[tier.i]; if (x && v != null) s2 += r.basis === "pct" ? x * v / 100 : x * v; }); return s2; };
+        if (used && ach == null) warn.push("Enter your achievement % so the model-wise table can be applied.");
+        else if (used && !cur) { var low = ord[ord.length - 1]; warn.push(c.name + ": below " + low.t.label + " — no model-wise payout yet."); next.push({ t: "Reach " + low.t.label + " achievement (" + fx(low.t.min - ach) + "% more) to unlock " + c.name, extra: pay(low) }); }
+        else if (used) {
+          tiersOn[ci] = cur.i;
+          c.rows.forEach(function (r, ri) { var x = q("m" + ci + "_" + ri), v = r.values[cur.i]; if (!x || v == null) return; var amt = r.basis === "pct" ? x * v / 100 : x * v; sub += amt; lines.push({ l: r.name + " · " + (r.basis === "pct" ? fx(v) + "% of " + rs(x) : Math.round(x) + " × " + rs(v)), a: amt }); });
+          var up = ord.filter(function (x) { return x.t.min > cur.t.min; }).pop();
+          if (up) { var alt = pay(up); if (alt > sub) next.push({ t: "Reach " + up.t.label + " achievement (" + fx(up.t.min - ach) + "% more) — whole " + c.name + " table moves up", extra: alt - sub }); }
+        }
+      }
+      if (c.kind === "slab") {
+        var u = q("s" + ci + "_u"), v = q("s" + ci + "_v"), sl = c.slabs.filter(function (z) { return u >= z.min; }).pop(), nx = c.slabs.filter(function (z) { return z.min > u; })[0];
+        var val = function (z, units) { return c.basis === "pct" ? (u ? v / u : 0) * units * z.value / 100 : c.basis === "flat" ? z.value : units * z.value; };
+        if (u && c.basis === "pct" && !v) warn.push(c.name + ": enter the sale value (₹) — this slab pays a % of value.");
+        if (sl) { sub = val(sl, u); lines.push({ l: c.name + " · " + (sl.label || "slab") + " (" + Math.round(u) + " units) @ " + cellTxt(c.basis, sl.value) + (c.basis === "pct" ? " of " + rs(v) : c.basis === "perUnit" ? "/unit" : ""), a: sub }); }
+        if (nx && F === 1) { var need = nx.min - u, ex = val(nx, nx.min) - sub; next.push({ t: "Sell " + Math.ceil(need) + " more" + (c.models ? " " + c.models : "") + " to reach " + (nx.label || "the next slab") + " (" + cellTxt(c.basis, nx.value) + ")", extra: ex > 0 ? ex : 0 }); }
+        if (sl) tiersOn["s" + ci] = c.slabs.indexOf(sl);
+      }
+      if (c.kind === "band") c.bands.forEach(function (z, i) { var x = q("b" + ci + "_" + i); if (x) { sub += x * z.value; lines.push({ l: c.name + " · " + z.label + " · " + Math.round(x) + " × " + rs(z.value), a: x * z.value }); } });
+      if (c.kind === "perUnit") { var x = q("p" + ci); if (x) { sub = x * c.value; lines.push({ l: c.name + " · " + Math.round(x) + " × " + rs(c.value), a: sub }); } }
+      total += sub;
+    });
+    var gross = total;
+    p.conditions.forEach(function (x, i) { if (I["c" + i] === "0") { lines.push({ l: "Condition not met: " + x.label + " → " + Math.round(x.factor * 100) + "% payout", a: total * x.factor - total }); total *= x.factor; } });
+    return { total: total, gross: gross, lines: lines, next: next.filter(function (n) { return n.extra > 0 || /unlock/.test(n.t); }).sort(function (a, b) { return b.extra - a.extra; }), warn: warn, ach: ach, tiersOn: tiersOn };
+  }
+  function live() {
+    var p = SCHEME.plan, r = compute(p, INPUTS), dd = parseFloat(INPUTS.dd), dt = parseFloat(INPUTS.dt), proj = dd > 0 && dt > dd ? compute(p, INPUTS, dt / dd) : null;
+    [].forEach.call($("out").querySelectorAll("td.on"), function (td) { td.classList.remove("on"); });
+    Object.keys(r.tiersOn).forEach(function (k) { if (k[0] === "s") { var td = $("out").querySelector('[data-slab="' + k.slice(1) + "_" + r.tiersOn[k] + '"]'); if (td) td.classList.add("on"); } else [].forEach.call($("out").querySelectorAll('[data-cell="' + k + "_" + r.tiersOn[k] + '"]'), function (td) { td.classList.add("on"); }); });
+    $("res").innerHTML = '<div class="tot"><div style="font-size:12px;opacity:.85">Your payout so far' + (r.ach != null ? " · achievement " + fx(r.ach) + "%" : "") + "</div><b>" + rs(r.total) + "</b>" + (proj ? '<div style="font-size:12.5px;margin-top:2px">📈 At this pace by the end: <b style="font-size:14px">' + rs(proj.total) + "</b></div>" : "") + "</div>" +
+      (r.warn.length ? r.warn.map(function (w) { return '<div class="notice warn" style="margin-top:8px">⚠️ ' + esc(w) + "</div>"; }).join("") : "") +
+      (r.lines.length ? '<div style="margin-top:10px">' + r.lines.map(function (x) { return '<div class="ln"><span>' + esc(x.l) + "</span><b>" + (x.a < 0 ? "−" + rs(-x.a) : rs(x.a)) + "</b></div>"; }).join("") + "</div>" : '<div class="muted" style="font-size:12.5px;margin-top:8px">Enter your units / values above to see the payout.</div>') +
+      (r.next.length ? '<div style="font-weight:700;font-size:13px;margin-top:12px">⬆️ How to earn more</div>' + r.next.slice(0, 5).map(function (n) { return '<div class="notice info" style="margin-top:6px">' + esc(n.t) + (n.extra > 0 ? " → <b>+" + rs(n.extra) + "</b>" : "") + "</div>"; }).join("") : "");
   }
   function calc() {
     $("res").innerHTML = '<div class="loading"><div class="spin"></div>Working out your payout…</div>';

@@ -1,14 +1,17 @@
 // Store locator: HO maintains a directory of vivo outlets (exclusive stores, authorized / general-trade dealers,
-// service centres) with GPS; users find the nearest on a map, or browse PAN India state-wise. Geocoding is done on
+// service centres, national key accounts — Reliance Digital, Croma, Vijay Sales) with GPS; users find the nearest on a map, or browse PAN India state-wise. Geocoding is done on
 // the admin's device (Nominatim) when a store is added, so only lat/lng reach the server.
 // Storage:  store:<id> { id, name, type, address, city, state, pincode, lat, lng, phone, hours, by, at }
 import { allowedFor } from "./access-core.mjs";
-import { randomBytes } from "node:crypto";
+import { randomBytes, createHash } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 const low = (x) => String(x || "").trim().toLowerCase();
-export const STORE_TYPES = { exclusive: "vivo Exclusive Store", authorized: "Authorized dealer", general: "General trade", service: "Service centre" };
-const typeOf = (x) => (STORE_TYPES[x] ? x : "authorized");
+export const STORE_TYPES = { exclusive: "vivo Exclusive Store", authorized: "Authorized dealer", general: "General trade", service: "Service centre", reliance: "Reliance Digital", croma: "Croma", vijaysales: "Vijay Sales" };
+const typeOf = (x) => { const k = low(x).replace(/[^a-z]/g, ""); if (STORE_TYPES[k]) return k; if (/reliance|jio/.test(k)) return "reliance"; if (/croma/.test(k)) return "croma"; if (/vijay/.test(k)) return "vijaysales"; if (/exclusive|ves|brandstore/.test(k)) return "exclusive"; if (/service|care/.test(k)) return "service"; if (/general|gt/.test(k)) return "general"; return "authorized"; };
+// Live map search (Google Places when HO has added a key; otherwise the page searches OpenStreetMap itself).
+const GQ = { "": "vivo mobile store", exclusive: "vivo exclusive store", authorized: "vivo authorised mobile store", general: "mobile phone shop", service: "vivo service center", reliance: "Reliance Digital", croma: "Croma store", vijaysales: "Vijay Sales store" };
+const GNAME = { exclusive: /vivo/i, service: /vivo/i, reliance: /reliance|jio/i, croma: /croma/i, vijaysales: /vijay\s*sales/i };
 const num = (v, lo, hi) => { const n = Number(v); return isFinite(n) && n >= lo && n <= hi ? Math.round(n * 1e6) / 1e6 : null; };
 const nid = (t) => t.toString(36) + randomBytes(3).toString("hex");
 function cleanStore(x, t, by) {
@@ -38,11 +41,39 @@ export async function storesAction(b, ctx) {
     L = L.map((s) => Object.assign(pub(s), { km: Math.round(dist(lat, lng, s.lat, s.lng) * 10) / 10 })).sort((a, c) => a.km - c.km).slice(0, 60);
     return json(200, { ok: true, items: L, you: { lat, lng } });
   }
+  if (b.action === "store-live") {   // find stores anywhere on the map — real places with address + GPS (never AI-invented)
+    const ty = STORE_TYPES[b.type] ? b.type : "", lat = num(b.lat, -90, 90), lng = num(b.lng, -180, 180), city = str(b.city, 60), state = str(b.state, 60), q = str(b.q, 80);
+    if (lat == null && !city && !state && !q) return json(400, { ok: false, error: "Choose a state / city or use your location." });
+    const cfg = (await store.get("config:gmaps")) || {};
+    if (!cfg.key) return json(200, { ok: true, provider: "osm" });   // free OpenStreetMap search runs on the device
+    const text = (q ? q + " " : "") + GQ[ty] + (city || state ? " in " + [city, state].filter(Boolean).join(", ") : "") + ", India";
+    const ck = "storelive:" + createHash("sha1").update(text + "|" + (lat != null ? lat.toFixed(2) + "," + lng.toFixed(2) : "")).digest("hex").slice(0, 20), hit = await store.get(ck);
+    if (hit && t - hit.at < 7 * 864e5) return json(200, { ok: true, provider: "google", items: hit.items, cached: true });
+    const body = { textQuery: text, regionCode: "IN", languageCode: "en", maxResultCount: 20 };
+    if (lat != null && !city && !state) body.locationBias = { circle: { center: { latitude: lat, longitude: lng }, radius: 20000 } };
+    let j = {};
+    try {
+      const r = await (ctx.aiFetch || fetch)("https://places.googleapis.com/v1/places:searchText", { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": cfg.key, "x-goog-fieldmask": "places.id,places.displayName,places.formattedAddress,places.location,places.nationalPhoneNumber,places.googleMapsUri,places.rating,places.businessStatus,places.addressComponents" }, body: JSON.stringify(body) });
+      j = await r.json().catch(() => ({}));
+      if (!r.ok) return json(200, { ok: true, provider: "osm", googleError: str((j.error && j.error.message) || "Google Maps error " + r.status, 160) });
+    } catch (e) { return json(200, { ok: true, provider: "osm", googleError: "Google Maps not reachable" }); }
+    const comp = (p, kind) => ((p.addressComponents || []).find((c) => (c.types || []).includes(kind)) || {}).longText || "";
+    let items = (j.places || []).filter((p) => p.location && p.businessStatus !== "CLOSED_PERMANENTLY").map((p) => ({ name: str(p.displayName && p.displayName.text, 80), type: ty || (/vivo/i.test((p.displayName || {}).text || "") ? "authorized" : "general"), address: str(p.formattedAddress, 300),
+      city: str(comp(p, "locality") || comp(p, "administrative_area_level_3"), 60), state: str(comp(p, "administrative_area_level_1"), 60), pincode: str(comp(p, "postal_code"), 12), lat: num(p.location.latitude, -90, 90), lng: num(p.location.longitude, -180, 180), phone: str(p.nationalPhoneNumber, 40), rating: Number(p.rating) || 0, maps: str(p.googleMapsUri, 300) }));
+    if (GNAME[ty]) items = items.filter((x) => GNAME[ty].test(x.name));
+    await store.set(ck, { at: t, items });
+    return json(200, { ok: true, provider: "google", items });
+  }
   if (!isAdmin) return json(403, { ok: false, error: "Only HO admins can edit the store directory." });
   const rule = ((await store.get("config:access")) || { r: {} }).r || {};
   if (!allowedFor(rule["tool:stores"], app, rec)) return json(403, { ok: false, error: "You are not authorised to edit stores (Access control)." });
   const by = rec.fullName || rec.username;
 
+  if (b.action === "store-gkey") {   // Google Maps (Places API) key — write-only, never sent back to any device
+    if (b.clear) { await store.delete("config:gmaps"); return json(200, { ok: true, set: false }); }
+    if (b.key !== undefined) { const k = str(b.key, 120); if (!/^[A-Za-z0-9_\-]{20,120}$/.test(k)) return json(400, { ok: false, error: "That doesn't look like a Google API key." }); await store.set("config:gmaps", { key: k, by, at: t }); }
+    const c = await store.get("config:gmaps"); return json(200, { ok: true, set: !!(c && c.key), by: c ? c.by : "", at: c ? c.at : 0 });
+  }
   if (b.action === "store-save") {
     const s = cleanStore(b.store || {}, t, by); if (!s.name || (!s.address && s.lat == null)) return json(400, { ok: false, error: "Add a name and an address or GPS." });
     await store.set(`store:${s.id}`, s); return json(200, { ok: true, store: pub(s) });

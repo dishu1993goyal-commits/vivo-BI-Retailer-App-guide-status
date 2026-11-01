@@ -44,8 +44,8 @@
     });
   }
   function css() {
-    var st = document.getElementById("bia-css");
-    if (!st) { st = document.createElement("style"); st.id = "bia-css"; st.setAttribute("data-bt-skip", "1"); (document.head || document.documentElement).appendChild(st); }
+    var st = document.getElementById("bacc-css");
+    if (!st) { st = document.createElement("style"); st.id = "bacc-css"; st.setAttribute("data-bt-skip", "1"); (document.head || document.documentElement).appendChild(st); }
     st.textContent = DENY.length ? DENY.map(function (id) { return '[data-acc="' + id + '"]'; }).join(",") + "{display:none!important}" : "";
   }
   function fixTab() {   // the tab on screen was switched off: go back to the first allowed one

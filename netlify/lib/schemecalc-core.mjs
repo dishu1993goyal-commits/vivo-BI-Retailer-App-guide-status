@@ -81,7 +81,7 @@ Use numbers only (no ₹ or % signs). Percent values like 100 mean 100%. If a va
 
 const OCR_ASK = "This is a vivo India scheme circular / poster (it may be a phone screenshot or photo). Transcribe ALL the text exactly: headings, dates, every table row (cells separated by |, keep merged cells by repeating them), examples, terms & conditions, and amounts with ₹. If a table is cut off at the edge, write what is visible. No commentary.";
 // Image → text. Groq's vision models change over time, so the list is read from Groq; Gemini is the fallback.
-async function readImages(keys, env, images, fetchImpl) {
+export async function readImages(keys, env, images, fetchImpl) {
   const errs = [];
   const ask = async (label, fn) => { try { const t = await fn(); if (t && t.trim().length > 20) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
   // 1) Groq: only models it lists right now that can see images

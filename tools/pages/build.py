@@ -10,7 +10,7 @@ for src, dst in [('chat.src.html', 'chat.html'), ('matrix.src.html', 'matrix.htm
     t = t.replace('/*@@CSS@@*/', css).replace('  /*@@CORE@@*/', core)
     if 'theme.js' not in t: t = t.replace('</head>', '<script src="theme.js?v=6"></script>\n</head>', 1)
     if 'lang.js' not in t: t = t.replace('</head>', '<script src="lang.js?v=3" defer></script>\n</head>', 1)
-    if 'access.js' not in t and dst != 'invite.html': t = t.replace('</head>', '<script src="access.js?v=1"></script>\n</head>', 1)
+    if 'access.js' not in t and dst != 'invite.html': t = t.replace('</head>', '<script src="access.js?v=2"></script>\n</head>', 1)
     if 'cust.js' not in t and dst != 'invite.html': t = t.replace('</head>', '<script src="cust.js?v=64"></script>\n</head>', 1)
     open('/home/claude/site-branch/' + dst, 'w').write(t)
     print('built', dst, len(t))

@@ -195,18 +195,20 @@ td.n,th.n{text-align:right;white-space:nowrap}
 #smap{height:300px;border-radius:14px;margin-top:10px;z-index:0}
 .sc{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
 .sc .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:2px 8px;margin-bottom:4px}
+.t-reliance{background:#E6F0FF;color:#0B4DA2}.t-croma{background:#E3F7F4;color:#00695C}.t-vijaysales{background:#FFEDEE;color:#B0182B}
+.src{font-size:10.5px;font-weight:700;color:var(--ink2);float:right;margin-left:6px}.gps{font-size:11.5px;color:var(--ink2);margin-top:3px;font-variant-numeric:tabular-nums}
 .t-exclusive{background:#EEF0FF;color:#3346C9}.t-authorized{background:#E7F7EF;color:#13693F}.t-general{background:#FFF4E5;color:#8A5300}.t-service{background:#FDECEC;color:#A12727}
 .km{float:right;font-weight:700;color:var(--brand);font-size:13px}
 label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
 </style>
 <script src="theme.js?v=6"></script>
 <script src="lang.js?v=3" defer></script>
-<script src="access.js?v=1"></script>
+<script src="access.js?v=2"></script>
 <script src="cust.js?v=64"></script>
 </head>
 <body>
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📍</span></div>
-  <h1>Store locator</h1><p>Find vivo exclusive stores, dealers and service centres — near you or anywhere in India</p></div>
+  <h1>Store locator</h1><p>Find vivo stores, dealers, service centres, Reliance Digital, Croma and Vijay Sales — near you or anywhere in India</p></div>
 <div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
 <script>
 (function () {
@@ -388,19 +390,21 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     return ov;
   }
   var VIEW = $("view"), TAB = "near", MAP = null, TY = "", ST = "", Q = "", NEAR = null, YOU = null;
-  var TYPES = [["", "All"], ["exclusive", "🏬 Exclusive store"], ["authorized", "🏪 Authorized dealer"], ["general", "🛒 General trade"], ["service", "🛠️ Service centre"]];
-  var TN = { exclusive: "vivo Exclusive Store", authorized: "Authorized dealer", general: "General trade", service: "Service centre" };
+  var TYPES = [["", "All"], ["exclusive", "🏬 Exclusive store"], ["authorized", "🏪 Authorized dealer"], ["general", "🛒 General trade"], ["service", "🛠️ Service centre"], ["reliance", "🔵 Reliance Digital"], ["croma", "🟢 Croma"], ["vijaysales", "🔴 Vijay Sales"]];
+  var TN = { exclusive: "vivo Exclusive Store", authorized: "Authorized dealer", general: "General trade", service: "Service centre", reliance: "Reliance Digital", croma: "Croma", vijaysales: "Vijay Sales" };
+  var STATES = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"];
+  var LST = "", LCITY = "", LQ = "", LIVE = null;
   var leaflet = null;
   function L() { if (!leaflet) leaflet = new Promise(function (res, rej) { var c = document.createElement("link"); c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c); var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = res; s.onerror = function () { leaflet = null; rej(); }; document.head.appendChild(s); }); return leaflet; }
   function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); }
   function draw() {
-    var tabs = [["near", "📍 Near me"], ["browse", "🗺️ Browse (PAN India)"]].concat(ADMIN ? [["manage", "⚙️ Manage"]] : []);
+    var tabs = [["near", "📍 Near me"], ["live", "🔎 Search"], ["browse", "🗺️ Directory"]].concat(ADMIN ? [["manage", "⚙️ Manage"]] : []);
     VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
-    ({ near: pNear, browse: pBrowse, manage: pManage })[TAB]();
+    ({ near: pNear, live: pLive, browse: pBrowse, manage: pManage })[TAB]();
   }
   var typeChips = function (cb) { return '<div class="fx" id="ty">' + TYPES.map(function (x) { return '<span data-ty="' + x[0] + '" class="' + (x[0] === TY ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>"; };
-  function card(s, near) { return '<div class="sc">' + (near && s.km != null ? '<span class="km">' + s.km + ' km</span>' : "") + '<span class="tag t-' + s.type + '">' + (TN[s.type] || s.type) + '</span><b style="display:block">' + esc(s.name) + '</b>' + (s.address || s.city ? '<div class="muted" style="font-size:12.5px;margin-top:2px">' + esc([s.address, s.city, s.state, s.pincode].filter(Boolean).join(", ")) + '</div>' : "") + '<div class="row" style="gap:8px;margin-top:6px">' + (s.lat != null ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + "," + s.lng + '">🧭 Directions</a>' : "") + (s.phone ? '<a class="btn ghost sm" href="tel:' + esc(s.phone.replace(/[^0-9+]/g, "")) + '">📞 ' + esc(s.phone) + "</a>" : "") + "</div>" + (s.hours ? '<div class="muted" style="font-size:11.5px;margin-top:4px">🕑 ' + esc(s.hours) + "</div>" : "") + "</div>"; }
+  function card(s, near, i) { var addr = s.address && s.city && s.address.indexOf(s.city) >= 0 ? [s.address] : [s.address, s.city, s.state, s.pincode]; return '<div class="sc">' + (s.src ? '<span class="src">' + esc(s.src) + "</span>" : "") + (near && s.km != null ? '<span class="km">' + s.km + ' km</span>' : "") + '<span class="tag t-' + s.type + '">' + (TN[s.type] || s.type) + '</span><b style="display:block">' + esc(s.name) + (s.rating ? ' <span class="muted" style="font-weight:600;font-size:12px">★ ' + s.rating + "</span>" : "") + '</b>' + (s.address || s.city ? '<div class="muted" style="font-size:12.5px;margin-top:2px">' + esc(addr.filter(Boolean).join(", ")) + '</div>' : "") + (s.lat != null ? '<div class="gps">📍 ' + (+s.lat).toFixed(6) + ", " + (+s.lng).toFixed(6) + "</div>" : "") + '<div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap">' + (s.lat != null ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(s.maps || "https://www.google.com/maps/dir/?api=1&destination=" + s.lat + "," + s.lng) + '">🧭 Directions</a>' : "") + (i != null && ADMIN ? '<button class="btn ghost sm" data-add="' + i + '">➕ Add to directory</button>' : "") + (s.phone ? '<a class="btn ghost sm" href="tel:' + esc(s.phone.replace(/[^0-9+]/g, "")) + '">📞 ' + esc(s.phone) + "</a>" : "") + "</div>" + (s.hours ? '<div class="muted" style="font-size:11.5px;margin-top:4px">🕑 ' + esc(s.hours) + "</div>" : "") + "</div>"; }
   // ---- near me ----
   function pNear() {
     $("pane").innerHTML = '<div class="card">' + typeChips() + '<button class="btn pri block" id="loc" style="margin-top:8px">📍 Find stores near me</button><div class="muted" style="font-size:12px;margin-top:6px">Uses your phone’s location to list the closest outlets. Nothing is stored.</div></div><div id="nres">' + (NEAR ? "" : "") + "</div>";
@@ -410,8 +414,9 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   }
   function runNear() { $("nres").innerHTML = '<div class="loading"><div class="spin"></div>Finding the nearest stores…</div>'; api({ action: "store-near", lat: YOU.lat, lng: YOU.lng, type: TY }).then(function (r) { if (!r.ok) { $("nres").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } NEAR = r.items; pNear(); }); }
   function showNear() {
-    if (!NEAR.length) { $("nres").innerHTML = '<div class="card empty"><div class="big">📍</div>No stores found nearby. Try “Browse” to see all stores, or HO can add stores in Manage.</div>'; return; }
-    $("nres").innerHTML = '<div id="smap"></div>' + NEAR.slice(0, 40).map(function (s) { return card(s, true); }).join("");
+    var more = '<button class="btn sec block" id="golive" style="margin-top:10px">🔎 Search Google / OpenStreetMap near me too</button>';
+    if (!NEAR.length) { $("nres").innerHTML = '<div class="card empty"><div class="big">📍</div>No stores in the HO directory nearby.' + more + "</div>"; $("golive").onclick = liveNearMe; return; }
+    $("nres").innerHTML = '<div id="smap"></div>' + NEAR.slice(0, 40).map(function (s) { return card(s, true); }).join("") + more; $("golive").onclick = liveNearMe;
     drawMap(NEAR.slice(0, 40), YOU);
   }
   function drawMap(items, you) {
@@ -420,6 +425,59 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       items.forEach(function (s) { if (s.lat == null) return; window.L.marker([s.lat, s.lng]).addTo(MAP).bindPopup("<b>" + esc(s.name) + "</b><br>" + (TN[s.type] || "") + (s.km != null ? "<br>" + s.km + " km" : "")); pts.push([s.lat, s.lng]); });
       if (pts.length === 1) MAP.setView(pts[0], 13); else if (pts.length) MAP.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
     }).catch(function () { var el = $("smap"); if (el) el.style.display = "none"; });
+  }
+  // ---- live map search: real places with address + GPS (Google Maps if HO set a key, else OpenStreetMap) ----
+  function liveNearMe() { TAB = "live"; LST = ""; LCITY = ""; draw(); runLive(true); }
+  function pLive() {
+    $("pane").innerHTML = '<div class="card"><b>🔎 Find any store on the map</b><div class="muted" style="font-size:12.5px">Searches live maps for vivo stores, service centres and national key accounts anywhere in India — with address and GPS.</div>' + typeChips() +
+      '<button class="btn pri block" id="lnear" style="margin-top:10px">📍 Near my location</button><div class="muted" style="font-size:12px;text-align:center;margin:8px 0 2px">— or —</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="lb">State</label><select class="tx" id="lst"><option value="">Choose state</option>' + STATES.map(function (x) { return '<option' + (x === LST ? " selected" : "") + ">" + x + "</option>"; }).join("") + '</select></div><div><label class="lb">City / area (optional)</label><input class="tx" id="lcity" value="' + esc(LCITY) + '" placeholder="e.g. Patna"></div></div>' +
+      '<input class="tx" id="lq" value="' + esc(LQ) + '" placeholder="Extra words (optional) e.g. mall name, pincode" style="margin-top:8px"><button class="btn sec block" id="lgo" style="margin-top:8px">🔎 Search</button></div><div id="lres"></div>';
+    [].forEach.call($("pane").querySelectorAll("[data-ty]"), function (b) { b.onclick = function () { TY = b.dataset.ty; [].forEach.call($("ty").children, function (c) { c.classList.toggle("on", c.dataset.ty === TY); }); }; });
+    $("lnear").onclick = function () { var b = this; if (YOU) return runLive(true); b.textContent = "Getting your location…"; navigator.geolocation.getCurrentPosition(function (p) { YOU = { lat: p.coords.latitude, lng: p.coords.longitude }; b.textContent = "📍 Near my location"; runLive(true); }, function (e) { b.textContent = "📍 Near my location"; toast(e.code === 1 ? "Allow location to search near you" : "Couldn't get your location — switch on GPS"); }, { enableHighAccuracy: true, timeout: 20000 }); };
+    $("lgo").onclick = function () { LST = $("lst").value; LCITY = $("lcity").value.trim(); LQ = $("lq").value.trim(); if (!LST && !LCITY) return toast("Choose a state or type a city"); runLive(false); };
+    if (LIVE) showLive();
+  }
+  function runLive(near) {
+    var box = $("lres"); if (!box) return; box.innerHTML = '<div class="loading"><div class="spin"></div>Searching the map…</div>';
+    var req = { action: "store-live", type: TY, q: near ? "" : LQ }; if (near) { req.lat = YOU.lat; req.lng = YOU.lng; } else { req.state = LST; req.city = LCITY; }
+    api(req).then(function (r) {
+      if (!r.ok) { box.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      if (r.provider === "google") return done(r.items.map(function (x) { x.src = "Google Maps"; return x; }), "Google Maps");
+      return osm(near).then(function (items) { done(items, "OpenStreetMap" + (r.googleError ? " (Google: " + r.googleError + ")" : "")); }).catch(function (e) { box.innerHTML = '<div class="err">Map search isn’t reachable right now (' + esc(e.message || e) + "). Try again in a minute.</div>"; });
+    });
+    function done(items, via) {
+      if (near && YOU) items.forEach(function (x) { x.km = Math.round(km(YOU.lat, YOU.lng, x.lat, x.lng) * 10) / 10; }), items.sort(function (a, b) { return a.km - b.km; });
+      LIVE = { items: items.slice(0, 60), via: via, near: near }; showLive();
+    }
+  }
+  function showLive() {
+    var box = $("lres"); if (!box) return; var it = LIVE.items;
+    if (!it.length) { box.innerHTML = '<div class="card empty"><div class="big">🔎</div>No ' + (TN[TY] || "stores") + " found on " + esc(LIVE.via) + " for this search. Try a nearby city, the whole state, or “All” types.</div>"; return; }
+    box.innerHTML = '<div class="muted" style="font-size:12px;margin:8px 0">' + it.length + " place(s) · from " + esc(LIVE.via) + '</div><div id="smap"></div>' + it.map(function (s, i) { return card(s, LIVE.near, i); }).join("") +
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">Live map listings can be incomplete or out of date — call ahead before visiting.</div>';
+    drawMap(it, LIVE.near ? YOU : null);
+    [].forEach.call(box.querySelectorAll("[data-add]"), function (b) { b.onclick = function () { var s = it[+b.dataset.add]; api({ action: "store-save", store: { name: s.name, type: s.type, address: s.address, city: s.city, state: s.state, pincode: s.pincode, phone: s.phone, lat: s.lat, lng: s.lng } }).then(function (r) { if (!r.ok) return toast(r.error); b.disabled = true; b.textContent = "✓ Added"; }); }; });
+  }
+  function km(a, b, c, d) { var r = Math.PI / 180, x = Math.sin((c - a) * r / 2), y = Math.sin((d - b) * r / 2), h = x * x + Math.cos(a * r) * Math.cos(c * r) * y * y; return 12742 * Math.asin(Math.min(1, Math.sqrt(h))); }
+  // OpenStreetMap (Overpass) — free, runs on this device
+  var OSMRX = { "": "vivo", exclusive: "vivo", authorized: "vivo", service: "vivo", reliance: "Reliance Digital|Reliance Smart|JioMart Digital|My Jio", croma: "Croma", vijaysales: "Vijay Sales" };
+  function osm(near) {
+    var where = near ? Promise.resolve({ around: "(around:20000," + YOU.lat + "," + YOU.lng + ")" }) : LCITY ? geocode([LCITY, LST, "India"].filter(Boolean).join(", ")).then(function (g) { if (!g) throw new Error("couldn't find " + LCITY); return { around: "(around:15000," + g.lat + "," + g.lng + ")" }; }) : Promise.resolve({ area: LST });
+    return where.then(function (w) {
+      var sel = TY === "general" ? '["shop"="mobile_phone"]' : '["name"~"' + OSMRX[TY] + '",i]', tail = w.around ? w.around : "(area.s)";
+      var q = "[out:json][timeout:25];" + (w.area ? '(area["name"="' + w.area.replace(/"/g, "") + '"]["admin_level"="4"];area["name:en"="' + w.area.replace(/"/g, "") + '"]["admin_level"="4"];)->.s;' : "") + "(nwr" + sel + tail + ";);out center tags 120;";
+      return fetch("https://overpass-api.de/api/interpreter", { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "content-type": "application/x-www-form-urlencoded" } }).then(function (r) { if (!r.ok) throw new Error("map server " + r.status); return r.json(); });
+    }).then(function (d) {
+      return (d.elements || []).map(function (e) {
+        var g = e.tags || {}, lat = e.lat != null ? e.lat : e.center && e.center.lat, lng = e.lon != null ? e.lon : e.center && e.center.lon, nm = g.name || g.brand || "";
+        if (lat == null || !nm) return null;
+        if (TY !== "general" && !(g.shop || g.craft || g.office || g.amenity)) return null;
+        var t = TY || (/vivo/i.test(nm) ? (/care|service/i.test(nm) ? "service" : "authorized") : "general");
+        if (!TY && /vivo/i.test(nm) && /exclusive|brand store/i.test(nm)) t = "exclusive";
+        return { name: nm, type: t, address: [g["addr:housenumber"], g["addr:street"], g["addr:suburb"] || g["addr:place"]].filter(Boolean).join(", "), city: g["addr:city"] || g["addr:district"] || "", state: g["addr:state"] || (near ? "" : LST), pincode: g["addr:postcode"] || "", lat: +(+lat).toFixed(6), lng: +(+lng).toFixed(6), phone: g.phone || g["contact:phone"] || "", src: "OpenStreetMap" };
+      }).filter(function (x) { return x && (near || !LQ || (x.name + " " + x.address + " " + x.city + " " + x.pincode).toLowerCase().indexOf(LQ.toLowerCase()) >= 0); });
+    });
   }
   // ---- browse PAN India ----
   function pBrowse() {
@@ -439,7 +497,8 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   // ---- admin manage ----
   function pManage() {
     $("pane").innerHTML = '<div class="card"><b>➕ Add / edit a store</b><div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="lb">Name</label><input class="tx" id="mn"></div><div><label class="lb">Type</label><select class="tx" id="mt">' + Object.keys(TN).map(function (k) { return '<option value="' + k + '">' + TN[k] + "</option>"; }).join("") + '</select></div></div><label class="lb">Address</label><input class="tx" id="ma" placeholder="Shop, street, area"><div class="g2" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label class="lb">City</label><input class="tx" id="mc"></div><div><label class="lb">State</label><input class="tx" id="ms"></div><div><label class="lb">Pincode</label><input class="tx" id="mpin"></div></div><div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="lb">Phone</label><input class="tx" id="mph"></div><div><label class="lb">Hours</label><input class="tx" id="mh" placeholder="10am–8pm"></div></div><div id="mgeo" class="muted" style="font-size:12px;margin-top:6px"></div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="mlocate">📍 Find on map (from address)</button><button class="btn ghost sm" id="mhere">Use my current GPS</button></div><button class="btn pri block" id="msave" style="margin-top:8px" disabled>Save store</button></div>' +
-      '<div class="card"><b>⬆ Bulk import (Excel / CSV)</b><div class="muted" style="font-size:12.5px">Columns: Name, Type (exclusive/authorized/general/service), Address, City, State, Pincode, Phone, Hours, Lat, Lng. Rows with an address but no Lat/Lng are placed on the map on your device before saving.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="bdl">⬇ Blank CSV</button><button class="btn pri sm" id="bfile">📁 Choose file</button></div><div id="bimp"></div></div>' +
+      '<div class="card"><b>⬆ Bulk import (Excel / CSV)</b><div class="muted" style="font-size:12.5px">Columns: Name, Type (exclusive / authorized / general / service / reliance / croma / vijaysales), Address, City, State, Pincode, Phone, Hours, Lat, Lng. Rows with an address but no Lat/Lng are placed on the map on your device before saving.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="bdl">⬇ Blank CSV</button><button class="btn pri sm" id="bfile">📁 Choose file</button></div><div id="bimp"></div></div>' +
+      '<div class="card"><b>🗺️ Google Maps for 🔎 Search (optional)</b><div class="muted" style="font-size:12.5px">Without a key, 🔎 Search uses free OpenStreetMap data (good in big cities, thinner in small towns). For the most complete results, paste a Google Maps <b>Places API (New)</b> key from Google Cloud Console. It is kept on the server only and never shown again. Results are cached for 7 days to keep Google costs low.</div><div id="gks" class="muted" style="font-size:12.5px;margin-top:6px"></div><div class="row" style="gap:6px;margin-top:6px"><input class="tx" id="gk" placeholder="Paste key (AIza…)" autocomplete="off" style="flex:1"><button class="btn pri sm" id="gksave">Save</button><button class="btn ghost sm" id="gkclr">Remove</button></div></div>' +
       '<div class="card"><div class="row"><b style="flex:1">Stores</b><button class="btn ghost sm" id="mexp">⬇ Export</button></div><div id="mlist"><div class="loading"><div class="spin"></div></div></div></div>';
     var coord = { lat: null, lng: null };
     var setGeo = function (lat, lng, label) { coord.lat = lat; coord.lng = lng; $("mgeo").innerHTML = lat != null ? "📍 Placed at " + lat.toFixed(5) + ", " + lng.toFixed(5) + (label ? " — " + esc(label) : "") : ""; $("msave").disabled = !($("mn").value.trim() && (coord.lat != null || $("ma").value.trim())); };
@@ -449,6 +508,10 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     $("msave").onclick = function () { var s = { name: $("mn").value, type: $("mt").value, address: $("ma").value, city: $("mc").value, state: $("ms").value, pincode: $("mpin").value, phone: $("mph").value, hours: $("mh").value, lat: coord.lat, lng: coord.lng }; api({ action: "store-save", store: s }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); ["mn", "ma", "mc", "mpin", "mph", "mh"].forEach(function (id) { $(id).value = ""; }); coord.lat = coord.lng = null; $("mgeo").textContent = ""; $("msave").disabled = true; mlist(); }); };
     $("bdl").onclick = function () { download(new Blob(["﻿Name,Type,Address,City,State,Pincode,Phone,Hours,Lat,Lng\nvivo Exclusive Store MG Road,exclusive,12 MG Road,Patna,Bihar,800001,9999999999,10am-8pm,,\n"], { type: "text/csv" }), "stores_template.csv"); };
     $("bfile").onclick = bulkImport;
+    var gks = function (r) { if (r && r.ok && $("gks")) $("gks").innerHTML = r.set ? "✅ Google Maps key is set" + (r.by ? " (by " + esc(r.by) + ")" : "") + " — 🔎 Search uses Google." : "Using free OpenStreetMap."; };
+    api({ action: "store-gkey" }).then(gks);
+    $("gksave").onclick = function () { var k = $("gk").value.trim(); if (!k) return toast("Paste the key first"); api({ action: "store-gkey", key: k }).then(function (r) { if (!r.ok) return toast(r.error); $("gk").value = ""; toast("Saved"); gks(r); }); };
+    $("gkclr").onclick = function () { api({ action: "store-gkey", clear: true }).then(gks); };
     $("mexp").onclick = function () { api({ action: "store-list" }).then(function (r) { if (!r.ok) return toast(r.error); download(xlsx([{ name: "Stores", rows: [["Name", "Type", "Address", "City", "State", "Pincode", "Phone", "Hours", "Lat", "Lng"]].concat(r.items.map(function (s) { return [s.name, s.type, s.address, s.city, s.state, s.pincode, s.phone, s.hours, s.lat, s.lng]; })) }]), "vivo_stores.xlsx"); }); };
     mlist();
   }

@@ -232,7 +232,7 @@
     ".bia-find{position:fixed;left:10px;right:10px;bottom:14px;z-index:2147483001;background:#1a1a2e;color:#fff;border-radius:14px;padding:8px 10px;display:flex;align-items:center;gap:8px;font:14px system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.3)}" +
     ".bia-find span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bia-find button{background:rgba(255,255,255,.15);border:0;color:#fff;border-radius:8px;padding:7px 11px;font-size:14px}" +
     "mark.bia-hit{background:#FFE066;color:inherit;border-radius:3px}mark.bia-hit.cur{background:#FF9F1C}";
-  function ensureCss() { if (!D.getElementById("bia-css")) { var s = el("style"); s.id = "bia-css"; s.textContent = css; D.head.appendChild(s); } }
+  function ensureCss() { var s = D.getElementById("bia-ui-css"); if (!s) { s = el("style"); s.id = "bia-ui-css"; D.head.appendChild(s); } if (s.textContent !== css) s.textContent = css; }
 
   function overlay(title, sub) {
     ensureCss(); closeAll();
