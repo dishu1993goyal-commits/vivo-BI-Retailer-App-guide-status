@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Retailer payouts</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.dt{border-collapse:collapse;font-size:12.5px;min-width:100%}
+.dt th{background:#F3F4FA;text-align:left;padding:7px 8px;font-size:11px;color:var(--mut);white-space:nowrap}
+.dt td{padding:6px 8px;border-top:1px solid #EEF0F6;white-space:nowrap}.dt td.n,.dt th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tbw{overflow-x:auto;margin-top:8px;border-radius:12px;background:var(--card);box-shadow:0 1px 8px rgba(20,24,51,.06)}
+.li{background:var(--card);border-radius:14px;padding:11px 13px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer;display:flex;gap:10px;align-items:center}
+.li .amt{font-weight:800;font-variant-numeric:tabular-nums}.pos{color:#13693F}.neg{color:#B42318}
+.bdg{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px}.b-pub{background:#E6F4EA;color:#13693F}.b-dr{background:#FFF4E5;color:#8A5300}.b-q{background:#FDECEC;color:#B42318}
+.bars{display:flex;align-items:flex-end;gap:6px;height:130px;margin-top:10px;padding-bottom:18px;position:relative}
+.bars .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;min-width:0}
+.bars .c i{display:block;width:100%;max-width:34px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#5B6CFF,#8A5CF0)}.bars .c i.dr{background:repeating-linear-gradient(45deg,#C9CDF7,#C9CDF7 4px,#E6E8FB 4px,#E6E8FB 8px)}
+.bars .c span{position:absolute;bottom:-17px;font-size:10px;color:var(--mut);white-space:nowrap}.bars .c em{font-style:normal;font-size:9.5px;color:var(--ink2);margin-bottom:2px;white-space:nowrap}
+.hb{display:grid;grid-template-columns:minmax(80px,38%) 1fr auto;gap:6px 8px;align-items:center;font-size:12.5px;margin-top:8px}
+.hb .t{height:12px;background:#EEF0F6;border-radius:99px;overflow:hidden}.hb .t i{display:block;height:100%;border-radius:99px}
+.prog{height:8px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:4px}.prog i{display:block;height:100%;border-radius:99px}
+.sch{border:1px solid #E6E8F2;border-radius:14px;padding:12px;margin-top:10px;background:var(--card)}
+.sch .hd{display:flex;gap:8px;align-items:flex-start}.sch .hd b{flex:1;font-size:14.5px}
+.pl{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:5px 0;border-bottom:1px dashed #E6E8F2}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}.kv div{background:#F5F6FA;border-radius:10px;padding:7px 8px;font-size:11.5px;color:var(--mut)}.kv b{display:block;font-size:14px;color:var(--ink)}
+.ok2{color:#13693F;font-weight:700}.bad2{color:#B42318;font-weight:700}
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.vc{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);display:flex;gap:10px;align-items:center}
+.vc .ic{width:42px;height:42px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;font-size:20px;flex:none}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:800;background:#F5F6FA;border:1px dashed #9AA1F5;border-radius:10px;padding:10px;text-align:center;margin-top:8px;word-break:break-all}
+</style>
+<script src="theme.js?v=6"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=2"></script>
+<script src="cust.js?v=64"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">💼</span></div>
+  <h1>Retailer payouts</h1><p>Scheme-wise payouts, balance, credits &amp; debits for every retailer — verify, share the payout letter and use the balance for vouchers</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), TAB = "ret", Q = "", FST = "", RET = null, MON = "", VCH = null;
+  var rs = function (v) { var n = Math.round((Number(v) || 0) * 100) / 100; return (n < 0 ? "−₹" : "₹") + Math.abs(n).toLocaleString("en-IN", { maximumFractionDigits: 2 }); };
+  var pc = function (v) { return v == null || v === "" ? "—" : (Math.round(v * 10) / 10) + "%"; };
+  var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var mlabel = function (m) { return m ? MN[+m.slice(5, 7) - 1] + " " + m.slice(0, 4) : ""; };
+  var NOWM = new Date(Date.now() + 19800000).toISOString().slice(0, 7);
+  var KIND = { payout: "Scheme payout", voucher: "Voucher / service", bank: "Paid by bank / UPI", creditnote: "Credit note", adjust: "Adjustment" };
+  var VCI = { travel: "✈️", hotel: "🏨", grocery: "🛒", shopping: "🛍️", fuel: "⛽", food: "🍽️", mobile: "📱", other: "🎁" };
+  function libX() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); }); }
+  function libEng() { return window.SCENG ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/scheme-engine.js?v=" + Date.now(); s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the payout engine.")); }; document.head.appendChild(s); }); }
+  function readSheet(file) { return libX().then(function () { return file.arrayBuffer(); }).then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); return window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); }); }
+  function pickFile(acc, cb) { var i = document.createElement("input"); i.type = "file"; i.accept = acc; i.onchange = function () { if (i.files[0]) cb(i.files[0]); }; i.click(); }
+  function col(H, re) { for (var i = 0; i < H.length; i++) if (re.test(String(H[i]).toLowerCase())) return i; return -1; }
+  function xdate(v) { if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10); var s = String(v || "").trim(), m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(s); if (m) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ""; }
+  function xmonth(v) { if (typeof v === "number" && v > 20000) return xdate(v).slice(0, 7); var s = String(v || "").trim(); if (/^\d{4}-\d{2}/.test(s)) return s.slice(0, 7); var m = /^([A-Za-z]{3})[a-z]*[\s\-']*(\d{2,4})$/.exec(s); if (m) { var k = MN.map(function (x) { return x.toLowerCase(); }).indexOf(m[1].toLowerCase()); if (k >= 0) return (m[2].length === 2 ? "20" + m[2] : m[2]) + "-" + ("0" + (k + 1)).slice(-2); } return ""; }
+  var numv = function (v) { if (v == null || String(v).trim() === "") return null; var n = Number(String(v).replace(/[₹,%\s]/g, "")); return isFinite(n) ? n : null; };
+
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } route(); }
+  function route() {
+    var h = location.hash.slice(1), m;
+    if ((m = /^r=(.+)$/.exec(h))) return openRetailer(decodeURIComponent(m[1]));
+    if ((m = /^batch=(.+)$/.exec(h))) { TAB = "bat"; return openBatch(m[1]); }
+    draw();
+  }
+  window.addEventListener("hashchange", route);
+  window.__pageBack = function () { if (location.hash.length > 1) { history.back(); return true; } return false; };
+  function draw() {
+    var tabs = [["ret", "👥 Retailers"], ["calc", "🧮 Calculate"], ["bat", "📦 Batches"], ["vch", "🎁 Vouchers"]].concat(ADMIN ? [["pay", "🏦 Payments"]] : []);
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    ({ ret: pRetailers, calc: pCalc, bat: pBatches, vch: pVouchers, pay: pPayments })[TAB]();
+  }
+  function tile(ic, bg, v, l, sm) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + ic + "</div><b>" + v + "</b><span>" + l + "</span>" + (sm ? "<small>" + sm + "</small>" : "") + "</div>"; }
+  function bars(list, opt) {   // list: [label, value, isDraft]
+    opt = opt || {}; var mx = Math.max.apply(null, list.map(function (x) { return x[1]; }).concat([1]));
+    return '<div class="bars">' + list.map(function (x) { return '<div class="c"><em>' + (x[1] ? (opt.fmt || rs)(x[1]).replace("₹", "") : "") + '</em><i class="' + (x[2] ? "dr" : "") + '" style="height:' + Math.max(2, x[1] / mx * 100) + '%"></i><span>' + esc(x[0]) + "</span></div>"; }).join("") + "</div>";
+  }
+  function hbars(list, color) { var mx = Math.max.apply(null, list.map(function (x) { return Math.abs(x[1]); }).concat([1])); return '<div class="hb">' + list.map(function (x) { return "<span>" + esc(x[0]) + '</span><div class="t"><i style="width:' + Math.abs(x[1]) / mx * 100 + "%;background:" + (x[2] || color || "#4D5BF9") + '"></i></div><b style="font-size:12px">' + (x[3] || rs(x[1])) + "</b>"; }).join("") + "</div>"; }
+
+  // ================= Retailers =================
+  function pRetailers() {
+    $("pane").innerHTML = '<div id="tot"></div><div class="card"><input class="tx" id="q" placeholder="Search retailer ID, name or city" value="' + esc(Q) + '"><select class="tx" id="fst" style="margin-top:6px"></select></div><div id="rl"><div class="loading"><div class="spin"></div></div></div>';
+    $("q").oninput = function () { Q = this.value; clearTimeout(window.__qt); window.__qt = setTimeout(runList, 300); };
+    $("fst").onchange = function () { FST = this.value; runList(); };
+    runList(true);
+  }
+  function runList(first) {
+    api({ action: "rp-retailers", q: Q, state: FST }).then(function (r) {
+      if (!$("rl")) return; if (!r.ok) { $("rl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      if (first || !$("fst").options.length) $("fst").innerHTML = '<option value="">' + (ADMIN ? "All states" : "My state") + "</option>" + r.states.map(function (s) { return "<option" + (s === FST ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("");
+      $("tot").innerHTML = '<div class="tiles" style="margin-top:12px">' + tile("👥", "#EEF0FF", r.count.toLocaleString("en-IN"), "Retailers") + tile("💰", "#E6F4EA", rs(r.totals.cr), "Total payouts") + tile("🏦", "#FFF4E5", rs(r.totals.dr), "Paid / used") + tile("👛", "#F4EEFF", rs(r.totals.bal), "Balance due") + "</div>";
+      $("rl").innerHTML = r.items.length ? r.items.map(function (x) { return '<div class="li" data-r="' + esc(x.rid) + '"><div style="flex:1;min-width:0"><b>' + esc(x.n || x.rid) + '</b><div class="muted" style="font-size:12px">' + esc(x.rid) + (x.c ? " · " + esc(x.c) : "") + (x.s ? " · " + esc(x.s) : "") + (x.last ? " · last " + mlabel(x.last) : "") + '</div></div><div style="text-align:right"><div class="amt ' + (x.bal > 0 ? "pos" : "") + '">' + rs(x.bal) + '</div><div class="muted" style="font-size:11px">balance</div></div></div>'; }).join("") + (r.count > r.items.length ? '<div class="muted" style="font-size:12px;margin-top:8px">Showing ' + r.items.length + " of " + r.count + " — search to narrow.</div>" : "")
+        : '<div class="card empty"><div class="big">💼</div>No retailers with published payouts yet.<div class="muted" style="font-size:12.5px;margin-top:6px">Calculate them in 🧮 Calculate from several scheme letters, or upload a manual-payout Excel in 📦 Payout batches. HO publishes them to retailer balances.</div><div class="row" style="justify-content:center;gap:6px;margin-top:10px"><input class="tx" id="ridq" placeholder="Open by Retailer ID" style="max-width:200px"><button class="btn sec sm" id="ridgo">Open</button></div></div>';
+      [].forEach.call($("rl").querySelectorAll("[data-r]"), function (d) { d.onclick = function () { location.hash = "r=" + encodeURIComponent(d.dataset.r); }; });
+      if ($("ridgo")) $("ridgo").onclick = function () { var v = $("ridq").value.trim(); if (v) location.hash = "r=" + encodeURIComponent(v.toUpperCase()); };
+    });
+  }
+
+  // ================= Retailer dashboard =================
+  function openRetailer(rid) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading retailer…</div>';
+    api({ action: "rp-retailer", rid: rid }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Back</button><div class="err" style="margin-top:10px">' + esc(r.error) + "</div>"; $("bk").onclick = function () { location.hash = ""; }; return; }
+      RET = r; var months = monthsOf(r), withPay = r.lines.map(function (l) { return l.month; }).sort().reverse(); if (!MON || months.indexOf(MON) < 0) MON = withPay[0] || months[0] || NOWM; dash();
+    });
+  }
+  function monthsOf(r) { var m = {}; r.lines.forEach(function (l) { m[l.month] = 1; }); r.entries.forEach(function (e) { m[e.month] = 1; }); return Object.keys(m).filter(Boolean).sort().reverse(); }
+  function dash() {
+    var R = RET, me = R.retailer, S = R.summary, months = monthsOf(R);
+    var mLines = R.lines.filter(function (l) { return l.month === MON; }), pubM = mLines.filter(function (l) { return l.status === "published"; });
+    var paid = R.entries.filter(function (e) { return e.type === "dr" && (e.kind === "bank" || e.kind === "creditnote"); }).reduce(function (a, e) { return a + e.amount; }, 0);
+    var used = R.entries.filter(function (e) { return e.kind === "voucher"; }).reduce(function (a, e) { return a + e.amount; }, 0);
+    // last 12 months: published credits (solid) and drafts (hatched)
+    var last = []; for (var i = 11; i >= 0; i--) { var d = new Date(Date.now() + 19800000); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - i); last.push(d.toISOString().slice(0, 7)); }
+    var mb = last.map(function (m) { var p = R.lines.filter(function (l) { return l.month === m && l.status === "published"; }).reduce(function (a, l) { return a + l.net; }, 0), dr = R.lines.filter(function (l) { return l.month === m && l.status !== "published"; }).reduce(function (a, l) { return a + l.net; }, 0); return [MN[+m.slice(5) - 1], p || dr, !p && dr > 0]; });
+    var ach = last.map(function (m) { var a = R.lines.filter(function (l) { return l.month === m && l.info && l.info.ach != null; }).map(function (l) { return l.info.ach; }); return [MN[+m.slice(5) - 1], a.length ? Math.max.apply(null, a) : 0]; });
+    var schemeShare = {}; mLines.forEach(function (l) { schemeShare[l.scheme] = (schemeShare[l.scheme] || 0) + l.net; });
+    var mNet = mLines.reduce(function (a, l) { return a + l.net; }, 0), mPub = pubM.reduce(function (a, l) { return a + l.net; }, 0);
+    var nexts = mLines.filter(function (l) { return l.next && l.next.gain > 0; });
+    var qs = R.lines.filter(function (l) { return l.query; });
+    VIEW.innerHTML = '<div class="row" style="gap:6px"><button class="btn ghost sm" id="bk">← Retailers</button><span style="flex:1"></span><button class="btn sec sm" id="pdf">📄 Payout letter (PDF)</button><button class="btn sec sm" id="wa">💬 Share</button></div>' +
+      '<div class="card"><div class="row" style="gap:10px;align-items:center"><div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#4D5BF9,#9152E0);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:none">' + esc((me.name || me.rid).slice(0, 1).toUpperCase()) + '</div><div style="flex:1;min-width:0"><b style="font-size:16px">' + esc(me.name || me.rid) + '</b><div class="muted" style="font-size:12.5px">' + esc(me.rid) + (me.city ? " · " + esc(me.city) : "") + (me.state ? " · " + esc(me.state) : "") + (me.mobile ? " · 📞 " + esc(me.mobile) : "") + "</div></div></div></div>" +
+      '<div class="tiles" style="margin-top:12px">' + tile("👛", "#F4EEFF", rs(S.bal), "Balance due", "credits − paid − vouchers") + tile("💰", "#E6F4EA", rs(S.cr), "Total earned", "all published payouts") + tile("🏦", "#FFF4E5", rs(paid), "Paid to retailer", "bank / UPI / credit note") + tile("🎁", "#EEF0FF", rs(used), "Used for vouchers") + "</div>" +
+      '<div class="card"><div class="row"><b style="flex:1">📅 Month</b><select class="tx" id="mon" style="max-width:170px">' + (months.length ? months : [NOWM]).map(function (m) { return '<option value="' + m + '"' + (m === MON ? " selected" : "") + ">" + mlabel(m) + "</option>"; }).join("") + "</select></div>" +
+      '<div class="kv"><div>This month<b>' + rs(mNet) + "</b></div><div>Published<b>" + rs(mPub) + "</b></div><div>Schemes<b>" + Object.keys(schemeShare).length + "</b></div></div>" +
+      (mNet !== mPub ? '<div class="muted" style="font-size:11.5px;margin-top:6px">⏳ ' + rs(mNet - mPub) + " is still a draft — it adds to the balance once HO publishes it.</div>" : "") + "</div>" +
+      '<div class="card"><b>📈 Payout trend — last 12 months</b><div class="muted" style="font-size:11.5px">Hatched = draft (not yet published)</div>' + bars(mb) + "</div>" +
+      (Object.keys(schemeShare).length ? '<div class="card"><b>🧩 Scheme-wise payout · ' + mlabel(MON) + "</b>" + hbars(Object.keys(schemeShare).map(function (k) { return [k, schemeShare[k]]; }).sort(function (a, b) { return b[1] - a[1]; }), "#1E9E61") + "</div>" : "") +
+      (ach.some(function (x) { return x[1]; }) ? '<div class="card"><b>🎯 Best achievement % by month</b>' + bars(ach, { fmt: function (v) { return Math.round(v) + "%"; } }) + "</div>" : "") +
+      (nexts.length ? '<div class="card"><b>🚀 How to earn more this month</b>' + nexts.map(function (l) { return '<div class="notice info" style="margin-top:6px"><b>' + esc(l.scheme) + ":</b> sell " + l.next.need + " more" + (l.next.model ? " " + esc(l.next.model) : "") + " → <b>+" + rs(l.next.gain) + "</b></div>"; }).join("") + "</div>" : "") +
+      (qs.length ? '<div class="notice" style="margin-top:12px">🚩 ' + qs.length + " payout line(s) flagged for checking.</div>" : "") +
+      '<h3 style="margin:16px 2px 0">🧾 Scheme-wise payout details · ' + mlabel(MON) + "</h3>" + (mLines.length ? mLines.map(lineCard).join("") : '<div class="card empty">No scheme payouts for ' + mlabel(MON) + ".</div>") +
+      '<div class="card"><div class="row"><b style="flex:1">🎁 Use balance</b><span class="pos" style="font-weight:800">' + rs(S.bal) + '</span></div><div class="muted" style="font-size:12.5px">Buy vouchers or services (travel, hotel, grocery, shopping…) instantly from this retailer’s balance — no approval needed. The code / link appears straight away to share with the retailer.</div><button class="btn pri block" id="buy" style="margin-top:8px"' + (S.bal > 0 ? "" : " disabled") + ">🎁 Choose a voucher / service</button></div>" +
+      '<div class="card"><div class="row"><b style="flex:1">📒 Credit / debit ledger</b>' + (ADMIN ? '<button class="btn ghost sm" id="adj">± Adjust</button>' : "") + "</div>" + ledger() + "</div>";
+    $("bk").onclick = function () { location.hash = ""; };
+    $("mon").onchange = function () { MON = this.value; dash(); };
+    $("pdf").onclick = letterPdf; $("wa").onclick = shareText; $("buy").onclick = buyFlow;
+    if ($("adj")) $("adj").onclick = adjust;
+    [].forEach.call(VIEW.querySelectorAll("[data-ver]"), function (b) { b.onclick = function () { verify(mLines[+b.dataset.ver], b.parentNode.parentNode.querySelector(".vres")); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { query(mLines[+b.dataset.q]); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { sheet("Remove this ledger line?", "", [["🗑️", "Remove", function () { api({ action: "rp-entry-delete", rid: me.rid, entry: b.dataset.del }).then(function (x) { if (!x.ok) return toast(x.error); openRetailer(me.rid); }); }, "danger"]]); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-code]"), function (b) { b.onclick = function () { var e = RET.entries.find(function (x) { return x.id === b.dataset.code; }); if (e) showVoucher(e); }; });
+  }
+  function lineCard(l, i) {
+    var inf = l.info || {}, achv = inf.ach != null ? inf.ach : inf.target && inf.achieved != null ? inf.achieved / inf.target * 100 : null;
+    return '<div class="sch"><div class="hd"><b>' + esc(l.scheme) + '</b><span class="bdg ' + (l.status === "published" ? "b-pub" : "b-dr") + '">' + (l.status === "published" ? "Published" : "Draft") + "</span>" + (l.query ? '<span class="bdg b-q">Query</span>' : "") + "</div>" +
+      '<div class="muted" style="font-size:11.5px">' + esc(l.title) + " · " + (l.source === "calc" ? "calculated by the payout engine" : "manual payout") + "</div>" +
+      (inf.target != null || inf.units != null || achv != null ? '<div class="kv">' + (inf.target != null ? "<div>Target<b>" + inf.target.toLocaleString("en-IN") + "</b></div>" : "") + (inf.achieved != null || inf.units != null ? "<div>Achieved<b>" + (inf.achieved != null ? inf.achieved : inf.units).toLocaleString("en-IN") + "</b></div>" : "") + (achv != null ? "<div>Achievement<b>" + pc(achv) + "</b></div>" : "") + (inf.value ? "<div>Sale value<b>" + rs(inf.value) + "</b></div>" : "") + (inf.slab ? "<div>Slab<b style=\"font-size:12px\">" + esc(inf.slab) + "</b></div>" : "") + (inf.vsTarget ? "<div>V-Shield<b>" + (inf.vsSold || 0) + " / " + inf.vsTarget + "</b></div>" : "") + "</div>" : "") +
+      (achv != null ? '<div class="prog"><i style="width:' + Math.min(100, achv) + "%;background:" + (achv >= 100 ? "#1E9E61" : achv >= 80 ? "#F5A524" : "#E5484D") + '"></i></div>' : "") +
+      (inf.models && inf.models.length ? '<div class="tbw"><table class="dt"><tr><th>Model</th><th class="n">Target</th><th class="n">Sold</th></tr>' + inf.models.map(function (m) { return "<tr><td>" + esc(m.name) + '</td><td class="n">' + (m.target == null ? "—" : m.target) + '</td><td class="n">' + (m.sold == null ? "—" : m.sold) + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      '<div style="margin-top:8px">' + (l.parts || []).map(function (p) { return '<div class="pl"><span>' + esc(p.label) + (p.slab ? ' <span class="muted">' + esc(p.slab) + "</span>" : "") + '</span><b class="' + (p.amount < 0 ? "neg" : "") + '">' + rs(p.amount) + "</b></div>"; }).join("") +
+      '<div class="pl"><span>Gross payout</span><b>' + rs(l.gross) + "</b></div>" + (l.ded ? '<div class="pl"><span>Deductions' + (inf.dedReason ? " (" + esc(inf.dedReason) + ")" : "") + '</span><b class="neg">−' + rs(l.ded) + "</b></div>" : "") + (l.tds ? '<div class="pl"><span>TDS</span><b class="neg">−' + rs(l.tds) + "</b></div>" : "") +
+      '<div class="pl" style="border:0;font-size:15px"><b>Net payout</b><b class="pos">' + rs(l.net) + "</b></div></div>" +
+      (l.remarks ? '<div class="muted" style="font-size:12px">ℹ️ ' + esc(l.remarks) + "</div>" : "") + (l.query ? '<div class="notice" style="margin-top:6px">🚩 ' + esc(l.query.note) + ' <span class="muted">— ' + esc(l.query.by) + "</span></div>" : "") +
+      '<div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" data-ver="' + i + '">✔ Verify this payout</button><button class="btn ghost sm" data-q="' + i + '">' + (l.query ? "Clear query" : "🚩 Raise query") + '</button></div><div class="vres"></div></div>';
+  }
+  function ledger() {
+    var E = RET.entries; if (!E.length) return '<div class="muted" style="font-size:13px;margin-top:6px">No published credits or debits yet.</div>';
+    var bal = 0, rows = E.map(function (e) { bal += e.type === "cr" ? e.amount : -e.amount; return [e, bal]; }).reverse();
+    return '<div class="tbw"><table class="dt"><tr><th>Date</th><th>Details</th><th class="n">Credit</th><th class="n">Debit</th><th class="n">Balance</th>' + (ADMIN ? "<th></th>" : "") + "</tr>" + rows.map(function (x) { var e = x[0]; return "<tr><td>" + esc(e.date || "") + "</td><td>" + esc(KIND[e.kind] || e.kind) + (e.scheme ? " · " + esc(e.scheme) : "") + (e.item ? " · " + esc(e.item) + (e.qty > 1 ? " ×" + e.qty : "") : "") + (e.ref ? ' <span class="muted">' + esc(e.ref) + "</span>" : "") + (e.kind === "voucher" ? ' <button class="btn ghost sm" data-code="' + e.id + '" style="padding:2px 8px">view</button>' : "") + '</td><td class="n pos">' + (e.type === "cr" ? rs(e.amount) : "") + '</td><td class="n neg">' + (e.type === "dr" ? rs(e.amount) : "") + '</td><td class="n"><b>' + rs(x[1]) + "</b></td>" + (ADMIN ? "<td>" + (e.kind === "bank" || e.kind === "creditnote" || e.kind === "adjust" ? '<button class="btn ghost sm" data-del="' + e.id + '" style="padding:2px 8px;color:var(--bad)">✕</button>' : "") + "</td>" : "") + "</tr>"; }).join("") + "</table></div>";
+  }
+  // ---- verify: re-run the payout engine on the stored rules + numbers, and check the arithmetic ----
+  function verify(l, box) {
+    box.innerHTML = '<div class="loading"><div class="spin"></div>Checking…</div>';
+    var checks = [], inf = l.info || {};
+    var posSum = (l.parts || []).filter(function (p) { return p.amount > 0 && p.type !== "tds"; }).reduce(function (a, p) { return a + p.amount; }, 0);
+    var arith = Math.abs(l.gross - l.ded - l.tds - l.net) < 1.01;
+    checks.push([arith, "Gross " + rs(l.gross) + " − deductions " + rs(l.ded) + " − TDS " + rs(l.tds) + " = " + rs(l.gross - l.ded - l.tds) + (arith ? " ✓ matches the net payout" : " ✗ but the net payout says " + rs(l.net))]);
+    if ((l.parts || []).length > 1 && posSum) { var ok1 = Math.abs(posSum - l.gross) < 1.01; checks.push([ok1, "Payout lines add up to " + rs(posSum) + (ok1 ? " ✓ = gross" : " ✗ but gross is " + rs(l.gross))]); }
+    if (inf.target && inf.achieved != null && inf.ach != null) { var a2 = inf.achieved / inf.target * 100, ok2 = Math.abs(a2 - inf.ach) < 0.6; checks.push([ok2, "Achievement " + inf.achieved + " / " + inf.target + " = " + pc(a2) + (ok2 ? " ✓" : " ✗ but " + pc(inf.ach) + " was used")]); }
+    var dup = RET.lines.filter(function (x) { return x !== l && x.month === l.month && x.scheme === l.scheme; });
+    checks.push([!dup.length, dup.length ? "✗ The same scheme appears " + (dup.length + 1) + " times this month (" + dup.map(function (d) { return d.title; }).join(", ") + ") — check it isn't paid twice" : "Not duplicated in another batch this month ✓"]);
+    var show = function (extra) { box.innerHTML = '<div class="card" style="background:#F7F8FC;margin-top:8px">' + (extra || "") + checks.map(function (c) { return '<div style="font-size:12.5px;margin-top:4px" class="' + (c[0] ? "ok2" : "bad2") + '">' + (c[0] ? "✅ " : "⚠️ ") + '<span style="color:var(--ink);font-weight:500">' + esc(c[1]) + "</span></div>"; }).join("") + '<div class="muted" style="font-size:11.5px;margin-top:6px">' + (checks.every(function (c) { return c[0]; }) ? "All checks passed." : "Something doesn't add up — raise a query so the team can recheck.") + "</div></div>"; };
+    if (!l.verifiable) return show('<div style="font-size:12.5px"><b>Manual payout</b> — checked against its own figures (rules weren’t attached).</div>');
+    Promise.all([libEng(), api({ action: "rp-verify", id: l.batch, row: l.row })]).then(function (x) {
+      var v = x[1]; if (!v.ok || !v.scheme || !v.input) return show("");
+      var re = window.SCENG.computeRow(v.scheme, v.input), ok = Math.abs(re.total - l.net) < 1.01;
+      checks.unshift([ok, "Recalculated with the scheme rules (" + (v.scheme.rules || []).length + " rules, " + (v.scheme.period || "") + "): " + rs(re.total) + (ok ? " ✓ same as the payout" : " ✗ differs from " + rs(l.net))]);
+      show('<div style="font-size:12.5px;font-weight:700">🔁 Re-run of the payout engine</div><div style="margin:4px 0 6px">' + re.parts.map(function (p) { return '<div class="pl" style="font-size:12px"><span>' + esc(p.label) + "</span><b>" + rs(p.amount) + "</b></div>"; }).join("") + "</div>");
+    }).catch(function (e) { show('<div class="muted" style="font-size:12px">' + esc(e.message) + "</div>"); });
+  }
+  function query(l) {
+    if (l.query) return api({ action: "rp-query", id: l.batch, row: l.row, clear: true }).then(function () { openRetailer(RET.retailer.rid); });
+    var ov = sheet("Raise a query", l.scheme + " · " + mlabel(l.month), [], '<textarea class="tx" id="qn" placeholder="What looks wrong? e.g. 3 units missing, slab should be 2" style="min-height:80px;margin-top:8px"></textarea><button class="btn pri block" id="qgo" style="margin-top:8px">🚩 Flag for checking</button>');
+    ov.querySelector("#qgo").onclick = function () { api({ action: "rp-query", id: l.batch, row: l.row, note: ov.querySelector("#qn").value }).then(function (r) { if (!r.ok) return toast(r.error); ov.remove(); toast("Flagged — it shows in the batch for the team"); openRetailer(RET.retailer.rid); }); };
+  }
+  function adjust() {
+    var me = RET.retailer, ov = sheet("Adjust balance", me.name + " · " + me.rid, [], '<label class="lb">Amount (₹) — minus for a debit</label><input class="tx" id="aa" type="number" placeholder="e.g. 500 or -200"><label class="lb">Reason</label><input class="tx" id="an" placeholder="e.g. Short-paid in Sep scheme"><button class="btn pri block" id="ago" style="margin-top:10px">Save</button>');
+    ov.querySelector("#ago").onclick = function () { api({ action: "rp-adjust", rid: me.rid, name: me.name, state: me.state, amount: ov.querySelector("#aa").value, note: ov.querySelector("#an").value }).then(function (r) { if (!r.ok) return toast(r.error); ov.remove(); openRetailer(me.rid); }); };
+  }
+  function shareText() {
+    var R = RET, me = R.retailer, L = R.lines.filter(function (l) { return l.month === MON; });
+    var t = "*vivo scheme payout — " + mlabel(MON) + "*\n" + (me.name || "") + " (" + me.rid + ")\n\n" + L.map(function (l) { return "• " + l.scheme + ": " + rs(l.net) + (l.status !== "published" ? " (provisional)" : "") + (l.info && l.info.ach != null ? " · achievement " + pc(l.info.ach) : ""); }).join("\n") + "\n\nTotal this month: " + rs(L.reduce(function (a, l) { return a + l.net; }, 0)) + "\nBalance due: " + rs(R.summary.bal);
+    if (navigator.share) navigator.share({ text: t }).catch(function () { }); else window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank");
+  }
+  // ---- monthly payout letter (PDF made on the device) ----
+  function pdfDoc(pages) {
+    var esc2 = function (s) { return String(s).replace(/₹/g, "Rs ").replace(/−/g, "-").replace(/[–—]/g, "-").replace(/≥/g, ">=").replace(/≤/g, "<=").replace(/[^\x20-\x7E]/g, "").replace(/([\\()])/g, "\\$1"); };
+    var objs = [], add = function (s) { objs.push(s); return objs.length; };
+    var font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"), bold = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"), kids = [];
+    pages.forEach(function (ops) {
+      var s = ops.map(function (o) { return o.rect ? (o.fill || "0.94 0.95 0.98") + " rg " + o.rect.join(" ") + " re f 0 0 0 rg" : o.line ? "0.8 0.82 0.9 RG 0.6 w " + o.line[0] + " " + o.line[1] + " m " + o.line[2] + " " + o.line[3] + " l S 0 0 0 RG" : "BT /" + (o.b ? "F2" : "F1") + " " + (o.size || 9) + " Tf " + (o.c || "0 0 0") + " rg " + o.x + " " + o.y + " Td (" + esc2(o.t) + ") Tj ET"; }).join("\n");
+      var cs = add("<< /Length " + s.length + " >>\nstream\n" + s + "\nendstream");
+      kids.push(add("<< /Type /Page /Parent PAGES 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " + font + " 0 R /F2 " + bold + " 0 R >> >> /Contents " + cs + " 0 R >>"));
+    });
+    var pid = add("<< /Type /Pages /Kids [" + kids.map(function (k) { return k + " 0 R"; }).join(" ") + "] /Count " + kids.length + " >>");
+    objs = objs.map(function (o) { return o.replace("PAGES 0 R", pid + " 0 R"); });
+    var cat = add("<< /Type /Catalog /Pages " + pid + " 0 R >>"), out = "%PDF-1.4\n", offs = [];
+    objs.forEach(function (o, i) { offs.push(out.length); out += (i + 1) + " 0 obj\n" + o + "\nendobj\n"; });
+    var xr = out.length; out += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n" + offs.map(function (o) { return ("0000000000" + o).slice(-10) + " 00000 n \n"; }).join("") + "trailer\n<< /Size " + (objs.length + 1) + " /Root " + cat + " 0 R >>\nstartxref\n" + xr + "\n%%EOF";
+    var bytes = new Uint8Array(out.length); for (var i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+  function letterPdf() {
+    var R = RET, me = R.retailer, L = R.lines.filter(function (l) { return l.month === MON; }), pages = [], ops = [], y = 800;
+    var brk = function (need) { if (y < (need || 60)) { pages.push(ops); ops = []; y = 800; } };
+    var line = function (t, o) { o = o || {}; brk(); ops.push({ x: o.x || 40, y: y, t: t, b: o.b, size: o.size, c: o.c }); if (!o.keep) y -= (o.gap || ((o.size || 9) + 5)); };
+    var row = function (cells, o) { o = o || {}; brk(); if (o.shade) ops.push({ rect: [36, y - 4, 523, 14] }); cells.forEach(function (c) { ops.push({ x: c[0], y: y, t: c[1], b: o.b || c[2], size: o.size || 8.5 }); }); y -= o.gap || 14; };
+    var rule = function () { ops.push({ line: [40, y + 4, 555, y + 4] }); y -= 6; };
+    ops.push({ rect: [0, 792, 595, 50], fill: "0.30 0.36 0.98" });
+    ops.push({ x: 40, y: 812, t: "vivo Business Innovation", b: true, size: 15, c: "1 1 1" }); ops.push({ x: 40, y: 798, t: "Scheme payout letter - " + mlabel(MON), size: 10, c: "1 1 1" }); y = 770;
+    line("To: " + (me.name || "") + "   |   Retailer ID: " + me.rid, { b: true, size: 11 });
+    line([me.city, me.state].filter(Boolean).join(", ") + (me.mobile ? "   |   Mobile: " + me.mobile : ""), { size: 9.5, c: "0.35 0.37 0.5", gap: 18 });
+    line("Dear Partner, thank you for your business. Below is your scheme-wise payout for " + mlabel(MON) + " with the full breakup.", { size: 9.5, gap: 20 });
+    line("1. Summary", { b: true, size: 11.5 });
+    var C = [[40, "Scheme"], [220, "Target"], [268, "Achieved"], [322, "Ach %"], [365, "Gross"], [425, "Deduct."], [480, "TDS"], [520, "Net"]];
+    row(C, { b: true, shade: true });
+    var tot = { g: 0, d: 0, t: 0, n: 0 };
+    L.forEach(function (l) { var inf = l.info || {}; tot.g += l.gross; tot.d += l.ded; tot.t += l.tds; tot.n += l.net; row([[40, (l.scheme + (l.status !== "published" ? " *" : "")).slice(0, 34)], [220, inf.target != null ? String(inf.target) : "-"], [268, inf.achieved != null ? String(inf.achieved) : inf.units != null ? String(inf.units) : "-"], [322, inf.ach != null ? pc(inf.ach) : "-"], [365, rs(l.gross)], [425, l.ded ? "-" + rs(l.ded) : "-"], [480, l.tds ? "-" + rs(l.tds) : "-"], [520, rs(l.net)]]); });
+    rule(); row([[40, "Total"], [365, rs(tot.g)], [425, tot.d ? "-" + rs(tot.d) : "-"], [480, tot.t ? "-" + rs(tot.t) : "-"], [520, rs(tot.n)]], { b: true, gap: 20 });
+    if (L.some(function (l) { return l.status !== "published"; })) line("* provisional - not yet published by HO", { size: 8, c: "0.55 0.35 0", gap: 14 });
+    line("2. Scheme-wise breakup", { b: true, size: 11.5 });
+    L.forEach(function (l) {
+      brk(120); var inf = l.info || {};
+      line(l.scheme + "  (" + (l.source === "calc" ? "calculated" : "manual") + ")", { b: true, size: 10 });
+      var facts = []; if (inf.target != null) facts.push("Target " + inf.target); if (inf.achieved != null || inf.units != null) facts.push("Achieved " + (inf.achieved != null ? inf.achieved : inf.units)); if (inf.ach != null) facts.push("Achievement " + pc(inf.ach)); if (inf.value) facts.push("Sale value " + rs(inf.value)); if (inf.slab) facts.push("Slab: " + inf.slab); if (inf.vsTarget) facts.push("V-Shield " + (inf.vsSold || 0) + "/" + inf.vsTarget);
+      if (facts.length) line(facts.join("   |   "), { size: 8.5, c: "0.35 0.37 0.5" });
+      (inf.models || []).forEach(function (m) { line("  " + m.name + ": sold " + (m.sold == null ? "-" : m.sold) + (m.target != null ? " of " + m.target : ""), { size: 8.5 }); });
+      (l.parts || []).forEach(function (p) { row([[52, (p.label + (p.slab ? " (" + p.slab + ")" : "")).slice(0, 80)], [480, rs(p.amount)]], { size: 8.5, gap: 12 }); });
+      row([[52, "Net payout"], [480, rs(l.net)]], { b: true, size: 9, gap: 12 });
+      if (l.remarks) line("Note: " + l.remarks.slice(0, 120), { size: 8, c: "0.45 0.47 0.6" });
+      y -= 6;
+    });
+    brk(140); line("3. Account statement", { b: true, size: 11.5 });
+    var E = R.entries, open = 0, inCr = 0, inDr = 0;
+    E.forEach(function (e) { var v = e.type === "cr" ? e.amount : -e.amount; if ((e.month || "") < MON) open += v; else if (e.month === MON) { if (e.type === "cr") inCr += e.amount; else inDr += e.amount; } });
+    row([[52, "Opening balance (before " + mlabel(MON) + ")"], [480, rs(open)]]); row([[52, "Credits in " + mlabel(MON)], [480, rs(inCr)]]); row([[52, "Debits in " + mlabel(MON) + " (paid / vouchers)"], [480, inDr ? "-" + rs(inDr) : rs(0)]]);
+    rule(); row([[52, "Closing balance"], [480, rs(open + inCr - inDr)]], { b: true, gap: 16 });
+    E.filter(function (e) { return e.month === MON && e.type === "dr"; }).forEach(function (e) { line("  " + (e.date || "") + "  " + (KIND[e.kind] || e.kind) + (e.item ? " - " + e.item : "") + (e.ref ? " - ref " + e.ref : "") + "  " + rs(e.amount), { size: 8.5 }); });
+    y -= 14; line("Generated " + new Date().toLocaleString("en-IN") + " by " + ((AUTH && AUTH.username) || "") + " from the vivo BI payout records. Keep this letter for reconciliation.", { size: 7.5, c: "0.45 0.47 0.6" });
+    line("Payouts are subject to the scheme terms; queries can be raised with your vivo state team.", { size: 7.5, c: "0.45 0.47 0.6" });
+    pages.push(ops);
+    download(pdfDoc(pages), "Payout_letter_" + me.rid + "_" + MON + ".pdf");
+  }
+  // ---- vouchers from balance ----
+  function loadV() { return VCH ? Promise.resolve(VCH) : api({ action: "rp-vouchers" }).then(function (r) { if (r.ok) VCH = r; return r; }); }
+  function buyFlow() {
+    var me = RET.retailer, bal = RET.summary.bal;
+    loadV().then(function (r) {
+      if (!r.ok) return toast(r.error);
+      var items = r.items.filter(function (x) { return x.active !== false; });
+      var ov = sheet("Use balance — " + rs(bal), me.name + " · " + me.rid, [], items.length ? '<div style="max-height:60vh;overflow:auto">' + items.map(function (x, i) { var can = x.price <= bal && (x.mode !== "code" || x.left > 0); return '<div class="vc"><div class="ic">' + (VCI[x.cat] || "🎁") + '</div><div style="flex:1;min-width:0"><b>' + esc(x.name) + '</b><div class="muted" style="font-size:12px">' + esc(x.provider || "") + (x.value && x.value !== x.price ? " · worth " + rs(x.value) : "") + (x.mode === "code" ? " · " + x.left + " left" : " · online link") + "</div></div><button class=\"btn " + (can ? "pri" : "ghost") + ' sm" data-b="' + i + '"' + (can ? "" : " disabled") + ">" + rs(x.price) + "</button></div>"; }).join("") + "</div>" : '<div class="card empty">HO hasn’t added vouchers yet.</div>');
+      [].forEach.call(ov.querySelectorAll("[data-b]"), function (b) { b.onclick = function () {
+        var it = items[+b.dataset.b];
+        sheet("Buy " + it.name + "?", rs(it.price) + " from " + me.name + "’s balance · balance after: " + rs(bal - it.price), [["✅", "Buy now", function () { api({ action: "rp-buy", rid: me.rid, item: it.id, qty: 1 }).then(function (x) { if (!x.ok) return toast(x.error); ov.remove(); VCH = null; showVoucher(x.entry, true); }); }]]);
+      }; });
+    });
+  }
+  function showVoucher(e, fresh) {
+    var ov = sheet((fresh ? "✅ Bought: " : "") + e.item, rs(e.amount) + " · " + e.date, [],
+      (e.code ? '<div class="code">' + esc(e.code) + "</div>" : "") + (e.link ? '<a class="btn pri block" style="margin-top:8px" target="_blank" rel="noopener" href="' + esc(e.link) + '">Open ' + esc(e.item) + " →</a>" : "") +
+      (e.howTo ? '<div class="muted" style="font-size:12.5px;margin-top:8px">ℹ️ ' + esc(e.howTo) + "</div>" : "") + (e.validity ? '<div class="muted" style="font-size:12px">Valid: ' + esc(e.validity) + "</div>" : "") +
+      '<div class="row" style="gap:6px;margin-top:10px">' + (e.code ? '<button class="btn sec sm" id="cp">📋 Copy code</button>' : "") + '<button class="btn sec sm" id="sh">💬 Send to retailer</button></div>');
+    if (ov.querySelector("#cp")) ov.querySelector("#cp").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(e.code) : Promise.reject()).then(function () { toast("Copied"); }).catch(function () { toast(e.code); }); };
+    ov.querySelector("#sh").onclick = function () { var t = "Your " + e.item + " from vivo scheme balance" + (e.code ? "\nCode: " + e.code : "") + (e.link ? "\nLink: " + e.link : "") + (e.howTo ? "\nHow to use: " + e.howTo : "") + (e.validity ? "\nValid: " + e.validity : ""); if (navigator.share) navigator.share({ text: t }).catch(function () { }); else window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank"); };
+    if (fresh) setTimeout(function () { if (RET) openRetailer(RET.retailer.rid); }, 50);
+  }
+
+
+  // ================= Calculate: several scheme letters → rules → payouts for the same retailers =================
+  // Uses the same payout engine file as the scheme payout calculator (read-only); its own saved rules and retailer data.
+  var SCH = null, SEL = {}, CROWS = null;
+  try { var cr = JSON.parse(localStorage.getItem("rp-calc-rows") || "null"); if (cr && cr.rows) CROWS = cr; } catch (e) { }
+  function loadFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s2 = document.createElement("script"); s2.src = "/filetext.js?v=1"; s2.onload = res; s2.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s2); }); }
+  function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
+  function ruleText(r) {
+    var m = r.models && r.models.length ? " (models: " + r.models.join(", ") + ")" : "", w = { always: "", achieved: " if target achieved", notAchieved: " if target NOT achieved" };
+    if (r.type === "ach_slab") return (r.label || "Achievement slab") + ": " + (r.slabs || []).map(function (z) { return "≥" + z.from + "% → " + rs(z.amount) + (r.pay === "fixed" ? "" : "/unit"); }).join(", ") + m;
+    if (r.type === "unit_slab") return (r.label || "Unit slab") + " (" + (r.mode === "incremental" ? "each band own rate" : "all units at the band's rate") + "): " + (r.slabs || []).map(function (z) { return z.from + (z.to != null ? "–" + z.to : "+") + " units → " + rs(z.rate) + "/unit"; }).join(", ") + m;
+    if (r.type === "flat_unit") return (r.label || "Flat") + ": " + rs(r.rate) + "/unit" + (w[r.when] || "") + m;
+    if (r.type === "value_pct") return (r.label || "% of value") + ": " + r.pct + "% of sale value" + (w[r.when] || "");
+    if (r.type === "kicker") return (r.label || "Kicker") + ": " + rs(r.rate) + " per unit above target" + m;
+    if (r.type === "price_band") return (r.label || "Price-band payout") + ": " + (r.bands || []).map(function (z) { return window.SCENG.bandLabel(z) + " " + rs(z.rate); }).join(", ") + "/unit";
+    if (r.type === "reward") return (r.label || "Gift") + ": " + (r.slabs || []).map(function (z) { return z.from + " units → " + z.qty + " × " + z.item; }).join(", ");
+    if (r.type === "model_rate") return (r.label || "Payout by model") + ": " + (r.rates || []).map(function (x) { return x.model + " " + rs(x.rate) + "/unit"; }).join(", ");
+    if (r.type === "penalty") return (r.label || "Negative incentive") + ": −" + rs(r.amount) + (r.per === "shortUnit" ? " per unit short" : r.per === "vsShortUnit" ? " per V-Shield plan short" : "");
+    if (r.type === "multiplier") return (r.label || "Multiplier") + ": ×" + r.factor + " when achievement ≥" + r.minAch + "%";
+    if (r.type === "gate") return "Eligibility: " + [r.minUnits ? "≥" + r.minUnits + " units" : "", r.active ? "active retailer" : "", r.appDays ? "app used ≥" + r.appDays + " days" : "", r.mvisits ? "≥" + r.mvisits + " market visits" : ""].filter(Boolean).join(", ");
+    return r.label || r.type;
+  }
+  function schemeLines(sc) { var o = []; o.push("Sales counted: " + ({ upload: "uploaded", activation: "activated", both: "uploaded AND activated", either: "uploaded OR activated" }[sc.basis] || sc.basis) + " · target on " + ({ units: "units", value: "₹ value", both: "units AND value", either: "units OR value" }[sc.targetType] || "units")); if ((sc.models || []).length) o.push("Models: " + sc.models.map(function (m) { return m.name + (m.target ? " (target " + m.target + ")" : ""); }).join(", ")); if (sc.minAch) o.push("Minimum achievement " + sc.minAch + "%"); if (sc.cap) o.push("Maximum payout " + rs(sc.cap)); if (sc.tdsPct) o.push("TDS " + sc.tdsPct + "%"); (sc.rules || []).forEach(function (r) { o.push(ruleText(r)); }); return o; }
+  function pCalc() {
+    $("pane").innerHTML = '<div class="card"><b>1 · 📚 Scheme letters</b><div class="muted" style="font-size:12.5px">Upload one or several scheme letters / policies at once (PDF, photo, Excel, Word). AI turns each into its own payout rules — check them, then calculate them all together on the same retailers. (This is separate from the Scheme payout calculator, which is unchanged.)</div><button class="btn pri block" id="cup" style="margin-top:8px">📚 Upload scheme letters</button><div id="cupres"></div><div id="schl"><div class="loading"><div class="spin"></div></div></div></div>' +
+      '<div class="card"><b>2 · 👥 Retailer numbers</b><div class="muted" style="font-size:12.5px">Download the template (it has columns for the models and price bands of the ticked schemes), fill targets and achievements, and upload.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="ctpl">⬇ Template</button><button class="btn pri sm" id="cimp">📁 Upload retailer Excel</button></div><div id="crows" style="margin-top:6px"></div></div>' +
+      '<div class="card"><b>3 · ▶ Calculate</b><div class="muted" style="font-size:12.5px">Runs every ticked scheme on every retailer, adds them up per retailer, and keeps each rule’s breakup for the dashboard, Verify and the PDF letter.</div><button class="btn ok block" id="crun" style="margin-top:8px">▶ Calculate payouts</button><div id="cres"></div></div>';
+    $("cup").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.docx,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { readLetters([].slice.call(i.files || [], 0, 12)); }; i.click(); };
+    $("ctpl").onclick = calcTemplate; $("cimp").onclick = function () { pickFile(".xlsx,.xls,.csv", calcImport); }; $("crun").onclick = calcRun;
+    paintRows(); libEng().then(loadSchemes).catch(function (e) { $("schl").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
+  }
+  function loadSchemes() {
+    return api({ action: "rp-scheme-list" }).then(function (r) {
+      if (!$("schl")) return; if (!r.ok) { $("schl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      SCH = r.items; SCH.forEach(function (x) { if (SEL[x.id] == null) SEL[x.id] = true; });
+      $("schl").innerHTML = SCH.length ? SCH.map(function (x) { var sc = x.scheme; return '<div class="sch"><div class="hd"><label style="display:flex;gap:8px;align-items:flex-start;flex:1;cursor:pointer"><input type="checkbox" data-sel="' + x.id + '"' + (SEL[x.id] ? " checked" : "") + ' style="width:20px;height:20px;margin-top:2px"><b>' + esc(sc.name) + (sc.period ? ' <span class="muted" style="font-weight:500">· ' + mlabel(sc.period) + "</span>" : "") + '</b></label><button class="btn ghost sm" data-ed="' + x.id + '">✏️</button><button class="btn ghost sm" data-dl="' + x.id + '" style="color:var(--bad)">✕</button></div><ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px">' + schemeLines(sc).map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" + ((sc.notes || []).length ? '<div class="muted" style="font-size:11.5px;margin-top:4px">AI notes: ' + sc.notes.map(esc).join(" · ") + "</div>" : "") + "</div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:8px">No scheme rules yet — upload the letters above.</div>';
+      [].forEach.call($("schl").querySelectorAll("[data-sel]"), function (c) { c.onchange = function () { SEL[c.dataset.sel] = c.checked; }; });
+      [].forEach.call($("schl").querySelectorAll("[data-dl]"), function (b) { b.onclick = function () { sheet("Delete these rules?", "", [["🗑️", "Delete", function () { api({ action: "rp-scheme-delete", id: b.dataset.dl }).then(loadSchemes); }, "danger"]]); }; });
+      [].forEach.call($("schl").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { editScheme(SCH.find(function (y) { return y.id === b.dataset.ed; })); }; });
+    });
+  }
+  function readLetters(files) {
+    if (!files.length) return; var out = [], box = $("cupres"), chain = Promise.resolve();
+    var paint = function (msg) { box.innerHTML = (msg ? '<div class="loading" style="margin-top:8px"><div class="spin"></div><span>' + esc(msg) + "</span></div>" : "") + out.map(function (o) { return '<div style="font-size:12.5px;margin-top:4px">' + (o.ok ? "✅ " + esc(o.file) + " → <b>" + esc(o.name) + "</b> (" + o.rules + " rule" + (o.rules === 1 ? "" : "s") + ")" : '⚠️ <b>' + esc(o.file) + "</b>: " + esc(o.error)) + "</div>"; }).join(""); };
+    files.forEach(function (f, i) {
+      chain = chain.then(function () {
+        var tag = "(" + (i + 1) + "/" + files.length + ") ";
+        paint(tag + "AI is reading " + f.name + "…");
+        var viaText = function () { return loadFT().then(function () { return window.BIFILES.extract(f); }).then(function (x) { if (!String(x.text || "").trim()) throw new Error("No readable text in the file."); paint(tag + "AI is turning " + f.name + " into rules…"); return api({ action: "sc-parse", text: x.text, fileName: f.name }); }); };
+        var p = /^image\//.test(f.type) ? shrink(f).then(function (u) { return api({ action: "sc-parse", images: [u], fileName: f.name }); }).then(function (r) { return r.ok ? r : viaText(); }) : viaText();
+        return p.then(function (r) {
+          if (!r.ok) throw new Error(r.error || "AI couldn't read the rules.");
+          var sc = r.scheme; if (!sc.period) sc.period = NOWM; if (!sc.name || /untitled/i.test(sc.name)) sc.name = f.name.replace(/\.[a-z0-9]+$/i, "");
+          return api({ action: "rp-scheme-save", scheme: sc }).then(function (sv) { if (!sv.ok) throw new Error(sv.error); SEL[sv.id] = true; out.push({ ok: true, file: f.name, name: sc.name, rules: (sc.rules || []).length }); });
+        }).catch(function (e) { out.push({ ok: false, file: f.name, error: e.message || String(e) }); });
+      });
+    });
+    chain.then(function () { paint(""); loadSchemes(); toast(out.filter(function (o) { return o.ok; }).length + " of " + files.length + " letters turned into rules — check them below"); });
+  }
+  // simple editor: every number in the rules (slabs, rates, %), plus the scheme basics
+  function editScheme(x) {
+    var sc = JSON.parse(JSON.stringify(x.scheme)), F = [];
+    var fld = function (label, get, set) { F.push([label, get, set]); return F.length - 1; };
+    var inp = function (k, v, type) { return '<input class="tx" data-f="' + k + '" value="' + esc(v == null ? "" : v) + '"' + (type ? ' type="' + type + '"' : "") + ' style="padding:7px 9px">'; };
+    var h = '<div style="max-height:62vh;overflow:auto"><label class="lb">Scheme name</label>' + inp(fld("name", function () { return sc.name; }, function (v) { sc.name = v; }), sc.name) +
+      '<div class="g2"><div><label class="lb">Month</label>' + inp(fld("period", function () { return sc.period; }, function (v) { sc.period = v; }), sc.period, "month") + '</div><div><label class="lb">Minimum achievement %</label>' + inp(fld("minAch", 0, function (v) { sc.minAch = +v || 0; }), sc.minAch, "number") + "</div></div>" +
+      '<div class="g2"><div><label class="lb">Maximum payout ₹ (0 = none)</label>' + inp(fld("cap", 0, function (v) { sc.cap = +v || 0; }), sc.cap, "number") + '</div><div><label class="lb">TDS %</label>' + inp(fld("tds", 0, function (v) { sc.tdsPct = +v || 0; }), sc.tdsPct, "number") + "</div></div>";
+    (sc.rules || []).forEach(function (r, ri) {
+      h += '<div class="sch"><div class="hd"><b>' + esc(r.label || r.type) + '</b><button class="btn ghost sm" data-rm="' + ri + '" style="color:var(--bad)">Remove rule</button></div><div class="muted" style="font-size:11.5px">' + esc(ruleText(r)) + "</div>";
+      ["rate", "pct", "amount", "factor", "minAch", "minUnits"].forEach(function (k) { if (r[k] != null && typeof r[k] === "number") h += '<label class="lb">' + k + "</label>" + inp(fld("r", 0, (function (rr, kk) { return function (v) { rr[kk] = +v || 0; }; })(r, k)), r[k], "number"); });
+      var arr = r.slabs || r.bands || r.rates; if (arr && arr.length) {
+        var keys = Object.keys(arr[0]).filter(function (k) { return typeof arr[0][k] === "number" || arr[0][k] === null; });
+        h += '<div class="tbw"><table class="dt"><tr>' + keys.map(function (k) { return "<th>" + esc(k) + "</th>"; }).join("") + "</tr>" + arr.map(function (z) { return "<tr>" + keys.map(function (k) { return '<td><input data-f="' + fld("z", 0, (function (zz, kk) { return function (v) { zz[kk] = v === "" ? null : +v; }; })(z, k)) + '" value="' + (z[k] == null ? "" : z[k]) + '" type="number" style="width:80px;padding:6px;border:1px solid #E1E3EE;border-radius:7px"></td>'; }).join("") + "</tr>"; }).join("") + "</table></div>";
+      }
+      h += "</div>";
+    });
+    h += '</div><button class="btn pri block" id="esave" style="margin-top:10px">Save rules</button>';
+    var ov = sheet("Check / edit rules", "AI can misread a letter — compare with the original", [], h);
+    [].forEach.call(ov.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { sc.rules.splice(+b.dataset.rm, 1); b.closest(".sch").remove(); toast("Rule removed — save to keep"); }; });
+    ov.querySelector("#esave").onclick = function () { [].forEach.call(ov.querySelectorAll("[data-f]"), function (el) { var f2 = F[+el.dataset.f]; if (f2) f2[2](el.value); }); api({ action: "rp-scheme-save", id: x.id, scheme: sc }).then(function (r) { if (!r.ok) return toast(r.error); ov.remove(); toast("Saved"); loadSchemes(); }); };
+  }
+  function picked() { return (SCH || []).filter(function (x) { return SEL[x.id]; }); }
+  function calcCols() {   // template columns for the ticked schemes
+    var models = {}, bands = {};
+    picked().forEach(function (x) { (window.SCENG.modelNames(x.scheme) || []).forEach(function (m) { models[m] = 1; }); (x.scheme.rules || []).forEach(function (r) { if (r.type === "price_band") (r.bands || []).forEach(function (z) { bands[window.SCENG.bandLabel(z)] = 1; }); if (r.models) r.models.forEach(function (m) { models[m] = 1; }); }); });
+    return { models: Object.keys(models), bands: Object.keys(bands) };
+  }
+  function calcTemplate() {
+    if (!SCH) return toast("Loading…"); var c = calcCols();
+    var head = ["Retailer ID", "Retailer name", "Mobile", "State", "City", "Target units", "Target value (Rs)", "Sales uploaded", "Activated", "Sale value (Rs)", "V-Shield sold", "V-Shield target", "Active retailer (Y/N)", "App days", "Market visits"].concat([].concat.apply([], c.models.map(function (m) { return ["Target " + m, "Sold " + m]; }))).concat(c.bands.map(function (z) { return "Units " + z; }));
+    download(xlsx([{ name: "Retailers", rows: [head, ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", 50, 1500000, 46, 44, 1380000, 20, 25, "Y", 22, 4]] }, { name: "How to fill", rows: [["One row per retailer. Use the same Retailer ID everywhere."], ["Sales uploaded / Activated: units in the scheme period (schemes count uploaded, activated, both or either as their letter says)."], ["Model and price-band columns come from the schemes ticked when you downloaded this template."], ["Active retailer / App days / Market visits are only needed for schemes with eligibility rules."]] }]), "Retailer_numbers_template.xlsx");
+  }
+  function calcImport(file) {
+    $("crows").innerHTML = '<div class="loading"><div class="spin"></div>Reading…</div>';
+    readSheet(file).then(function (A) {
+      var H = A[0].map(function (h) { return String(h).trim(); }), L = H.map(function (h) { return h.toLowerCase(); });
+      var c = function (re) { for (var i = 0; i < L.length; i++) if (re.test(L[i])) return i; return -1; };
+      var k = { rid: c(/retailer\s*id|^rid|code/), name: c(/name/), mobile: c(/mobile|phone/), state: c(/^state/), city: c(/city/), target: c(/^target units|^target$|^target qty/), targetValue: c(/target value/), upload: c(/upload/), activation: c(/activat/), value: c(/sale value/), vsSold: c(/v-?shield sold/), vsTarget: c(/v-?shield target/), active: c(/active/), appDays: c(/app days/), mvisits: c(/market visits/) };
+      if (k.rid < 0) throw new Error("No “Retailer ID” column — use the template.");
+      var rows = A.slice(1).map(function (r) {
+        var g = function (i) { return i < 0 ? "" : r[i]; }, n = function (i) { var v = numv(g(i)); return v == null ? 0 : v; };
+        var o = { rid: String(g(k.rid)).trim().toUpperCase(), name: String(g(k.name)).trim(), mobile: String(g(k.mobile)).trim(), state: String(g(k.state)).trim(), city: String(g(k.city)).trim(), target: n(k.target), targetValue: n(k.targetValue), upload: n(k.upload), activation: n(k.activation), value: n(k.value), vsSold: n(k.vsSold), vsTarget: n(k.vsTarget), ms: {}, mt: {}, pb: {},
+          dash: { active: /^(y|yes|1|true)$/i.test(String(g(k.active)).trim()), appDays: n(k.appDays), mvisits: n(k.mvisits) } };
+        H.forEach(function (h, i) { var m; if ((m = /^sold\s+(.+)$/i.exec(h))) o.ms[m[1]] = numv(r[i]) || 0; else if ((m = /^target\s+(.+)$/i.exec(h)) && !/^target (units|value)/i.test(h)) o.mt[m[1]] = numv(r[i]) || 0; else if ((m = /^units\s+(.+)$/i.exec(h))) o.pb[m[1]] = numv(r[i]) || 0; });
+        return o;
+      }).filter(function (o) { return o.rid; });
+      if (!rows.length) throw new Error("No retailer rows found.");
+      CROWS = { rows: rows, file: file.name, at: Date.now() }; try { localStorage.setItem("rp-calc-rows", JSON.stringify(CROWS)); } catch (e) { }
+      paintRows();
+    }).catch(function (e) { $("crows").innerHTML = '<div class="err">' + esc(e.message || e) + "</div>"; });
+  }
+  function paintRows() { if ($("crows")) $("crows").innerHTML = CROWS ? '<div class="notice info">📋 ' + CROWS.rows.length + " retailers loaded from " + esc(CROWS.file || "Excel") + " · " + new Date(CROWS.at).toLocaleString("en-IN") + "</div>" : '<div class="muted" style="font-size:12.5px">No retailer numbers loaded yet.</div>'; }
+  function calcRun() {
+    var S2 = picked(); if (!S2.length) return toast("Tick at least one scheme in step 1"); if (!CROWS || !CROWS.rows.length) return toast("Upload the retailer numbers in step 2");
+    libEng().then(function () {
+      var runs = S2.map(function (x) { var rows = JSON.parse(JSON.stringify(CROWS.rows)); return { x: x, rows: rows, res: window.SCENG.compute(x.scheme, rows) }; });
+      var by = {}; runs.forEach(function (u, k) { u.res.rows.forEach(function (r) { var o = by[r.rid] || (by[r.rid] = { rid: r.rid, name: r.name, t: [], sum: 0 }); o.t[k] = r.total; o.sum += r.total; }); });
+      var list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.sum - a.sum; }), tot = list.reduce(function (a, r) { return a + r.sum; }, 0);
+      $("cres").innerHTML = '<div class="tiles" style="margin-top:10px">' + tile("💰", "#E6F4EA", rs(tot), "Total payout") + tile("👥", "#EEF0FF", list.length, "Retailers") + tile("✅", "#F4EEFF", list.filter(function (r) { return r.sum > 0; }).length, "Getting a payout") + tile("🧩", "#FFF4E5", runs.length, "Schemes") + "</div>" +
+        hbars(runs.map(function (u) { return [u.x.scheme.name, u.res.summary.total]; }), "#1E9E61") +
+        '<div class="tbw"><table class="dt"><tr><th>Retailer</th>' + runs.map(function (u) { return '<th class="n">' + esc(u.x.scheme.name.slice(0, 18)) + "</th>"; }).join("") + '<th class="n">Total</th></tr>' + list.slice(0, 300).map(function (r) { return "<tr><td><b>" + esc(r.rid) + "</b>" + (r.name ? '<br><span class="muted">' + esc(r.name) + "</span>" : "") + "</td>" + runs.map(function (u, k) { return '<td class="n">' + rs(r.t[k] || 0) + "</td>"; }).join("") + '<td class="n"><b>' + rs(r.sum) + "</b></td></tr>"; }).join("") + "</table></div>" +
+        '<label class="lb">Payout month</label><input class="tx" type="month" id="cmon" value="' + esc(S2[0].scheme.period || NOWM) + '"><label class="lb">Batch title</label><input class="tx" id="ctit" value="' + esc(S2.map(function (x) { return x.scheme.name; }).join(" + ").slice(0, 110)) + '"><button class="btn ok block" id="csend" style="margin-top:10px">💾 Save as draft batch (HO publishes)</button><div id="csent"></div>';
+      $("csend").onclick = function () {
+        var rows = [], schemes = {};
+        runs.forEach(function (u) { schemes[u.x.id] = u.x.scheme; var byRid = {}; u.rows.forEach(function (x) { byRid[x.rid] = x; });
+          u.res.rows.forEach(function (r) { var inp = byRid[r.rid] || {}; rows.push({ rid: r.rid, name: r.name || inp.name, state: inp.state, city: inp.city, mobile: inp.mobile, scheme: u.x.scheme.name, skey: u.x.id, parts: r.parts, gross: r.positive, ded: r.penalty, tds: r.tds, net: r.total,
+            info: { target: r.target, ach: r.ach == null ? null : Math.round(r.ach * 10) / 10, units: r.units, value: r.value, upload: r.upload, activation: r.activation, vsSold: r.vsSold, vsTarget: r.vsTarget, targetValue: r.targetValue, slab: r.slab, models: r.models },
+            next: r.next ? { need: r.next.need, model: r.next.model, gain: r.next.gain } : null, input: inp, remarks: (r.reasons || []).join("; ") }); }); });
+        var bt = this; bt.disabled = true; bt.textContent = "Saving…";
+        api({ action: "rp-batch-save", month: $("cmon").value, title: $("ctit").value, source: "calc", schemes: schemes, rows: rows }).then(function (r) {
+          if (!r.ok) { bt.disabled = false; bt.textContent = "💾 Save as draft batch (HO publishes)"; return toast(r.error); }
+          bt.remove(); $("csent").innerHTML = '<div class="notice info" style="margin-top:10px">✅ Draft saved: ' + r.batch.count + " lines, " + rs(r.batch.total) + '. <a href="#batch=' + r.batch.id + '">Open the batch →</a></div>';
+        });
+      };
+    }).catch(function (e) { toast(e.message); });
+  }
+
+  // ================= Batches =================
+  function pBatches() {
+    $("pane").innerHTML = '<div class="card"><b>📥 Manual payouts (Excel)</b><div class="muted" style="font-size:12.5px">For retailers whose payout is worked out outside the calculator. One row per retailer per scheme (several rows for the same scheme become its breakup lines). Uploads go in as a draft; HO publishes.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="tpl">⬇ Template</button><button class="btn pri sm" id="imp">📁 Upload filled template</button><button class="btn ghost sm" id="tocalc">🧮 Calculate from scheme letters →</button></div><div id="impres"></div></div><div id="bl"><div class="loading"><div class="spin"></div></div></div>';
+    $("tpl").onclick = function () {
+      download(xlsx([{ name: "Payouts", rows: [["Retailer ID", "Retailer name", "Mobile", "State", "City", "Month (YYYY-MM)", "Scheme", "Payout line / slab", "Target", "Achieved", "Achievement %", "Units", "Sale value (Rs)", "Gross payout (Rs)", "Deduction (Rs)", "Deduction reason", "TDS (Rs)", "Net payout (Rs)", "Remarks"],
+        ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "S2FE Double Bonanza", "Slab 2: 6-9 units @ 1.5%", 10, 7, 70, 7, 140000, 2100, 630, "70% payout - monthly target missed", 0, 1470, "Uploaded on V-Work"],
+        ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "Sellout payout", "X/V/S series 5.5% (>=90%)", 200000, 190000, 95, "", 150000, 8250, "", "", 0, "", ""],
+        ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "Sellout payout", "Y51 Pro 4 x Rs1550", "", "", "", 4, "", 6200, "", "", 0, "", ""]] },
+        { name: "How to fill", rows: [["Column", "What to enter"], ["Retailer ID", "Required — the same ID used everywhere (vChat / DMS)"], ["Month", "Payout month, e.g. " + NOWM + " (one batch is made per month)"], ["Scheme", "Scheme name. Several rows with the same retailer + scheme are added up as breakup lines"], ["Payout line / slab", "What this amount is for — shown to the retailer and in the PDF letter"], ["Target / Achieved / Achievement %", "Optional but recommended — used in the dashboard, letter and the Verify check"], ["Gross / Deduction / TDS / Net", "Gross payout before cuts; Net = Gross − Deduction − TDS (left blank = calculated). Verify flags rows where they don't add up"]] }]), "Manual_payout_template.xlsx");
+    };
+    $("imp").onclick = function () { pickFile(".xlsx,.xls,.csv", importManual); };
+    $("tocalc").onclick = function () { TAB = "calc"; draw(); };
+    api({ action: "rp-batches" }).then(function (r) {
+      if (!$("bl")) return; if (!r.ok) { $("bl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("bl").innerHTML = r.items.length ? r.items.map(function (b) { return '<div class="li" data-b="' + b.id + '"><div style="flex:1;min-width:0"><b>' + esc(b.title) + '</b> <span class="bdg ' + (b.status === "published" ? "b-pub" : "b-dr") + '">' + (b.status === "published" ? "Published" : "Draft") + "</span>" + (b.queries ? ' <span class="bdg b-q">' + b.queries + " query</span>" : "") + '<div class="muted" style="font-size:12px">' + mlabel(b.month) + " · " + b.count + " lines · " + (b.source === "calc" ? "calculator" : "manual") + " · " + esc(b.state || "") + " · " + esc(b.by || "") + '</div></div><div class="amt">' + rs(b.total) + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">📦</div>No payout batches yet.</div>';
+      [].forEach.call($("bl").querySelectorAll("[data-b]"), function (d) { d.onclick = function () { location.hash = "batch=" + d.dataset.b; }; });
+    });
+  }
+  function importManual(file) {
+    $("impres").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading…</div>';
+    readSheet(file).then(function (A) {
+      var H = A[0].map(function (h) { return String(h); }), c = {
+        rid: col(H, /retailer\s*id|^rid|dealer\s*code|retailer\s*code/), name: col(H, /retailer\s*name|^name/), mobile: col(H, /mobile|phone/), state: col(H, /state/), city: col(H, /city|town/), month: col(H, /month/), scheme: col(H, /scheme/), line: col(H, /payout\s*line|slab|basis|component/),
+        target: col(H, /^target/), achieved: col(H, /^achieved|achievement\s*\(?units|actual/), ach: col(H, /achievement\s*%|ach\s*%/), units: col(H, /^units/), value: col(H, /sale\s*value|value/), gross: col(H, /gross/), ded: col(H, /^deduction\s*\(|deduction \(rs|^deduction$/), dedr: col(H, /deduction\s*reason|reason/), tds: col(H, /tds/), net: col(H, /net/), remarks: col(H, /remark|note/) };
+      if (c.rid < 0) throw new Error("No “Retailer ID” column found — use the template.");
+      var g = (function (r, k) { return k < 0 ? "" : r[k]; }), groups = {}, months = {}, bad = 0;
+      A.slice(1).forEach(function (r) {
+        var rid = String(g(r, c.rid)).trim().toUpperCase(); if (!rid) return;
+        var m = xmonth(g(r, c.month)) || "", sch = String(g(r, c.scheme) || "Scheme").trim(), k = m + "|" + rid + "|" + sch;
+        var gross = numv(g(r, c.gross)), ded = numv(g(r, c.ded)), tds = numv(g(r, c.tds)), net = numv(g(r, c.net));
+        if (gross == null && net == null) { bad++; return; }
+        var o = groups[k] || (groups[k] = { month: m, rid: rid, name: "", mobile: "", state: "", city: "", scheme: sch, parts: [], ded: 0, tds: 0, net: null, info: {}, remarks: [] });
+        ["name", "mobile", "state", "city"].forEach(function (f) { if (!o[f] && c[f] >= 0) o[f] = String(g(r, c[f])).trim(); });
+        o.parts.push({ label: String(g(r, c.line) || "Payout").trim(), amount: gross != null ? gross : net });
+        o.ded += ded || 0; o.tds += tds || 0; if (net != null) o.net = (o.net || 0) + net;
+        [["target", c.target], ["achieved", c.achieved], ["ach", c.ach], ["units", c.units], ["value", c.value]].forEach(function (z) { var v = numv(g(r, z[1])); if (v != null && o.info[z[0]] == null) o.info[z[0]] = v; });
+        var dr = String(g(r, c.dedr) || "").trim(); if (dr) o.info.dedReason = dr;
+        var rm = String(g(r, c.remarks) || "").trim(); if (rm) o.remarks.push(rm);
+        months[m] = (months[m] || 0) + 1;
+      });
+      var list = Object.keys(groups).map(function (k) { var o = groups[k]; o.gross = o.parts.reduce(function (a, p) { return a + (Number(p.amount) || 0); }, 0); if (o.net == null) o.net = o.gross - o.ded - o.tds; o.remarks = o.remarks.join("; "); if (o.info.ach == null && o.info.target && o.info.achieved != null) o.info.ach = Math.round(o.info.achieved / o.info.target * 1000) / 10; return o; });
+      if (!list.length) throw new Error("No payout rows found (each row needs a Retailer ID and a Gross or Net payout).");
+      var noMonth = list.filter(function (o) { return !o.month; }).length;
+      var mm = Object.keys(months).filter(Boolean).sort();
+      var bal = list.filter(function (o) { return Math.abs(o.gross - o.ded - o.tds - o.net) > 1; }).length;
+      $("impres").innerHTML = '<div class="card" style="background:#F7F8FC"><b>Preview</b><div style="font-size:13px;margin-top:4px">' + list.length + " retailer × scheme lines · " + new Set(list.map(function (o) { return o.rid; })).size + " retailers · total " + rs(list.reduce(function (a, o) { return a + o.net; }, 0)) + "</div>" +
+        (bad ? '<div class="muted" style="font-size:12px">' + bad + " row(s) skipped — no payout amount.</div>" : "") + (bal ? '<div class="notice" style="margin-top:6px">⚠️ ' + bal + " line(s) where Gross − Deduction − TDS ≠ Net. They’ll show as failed in Verify — fix the file or continue.</div>" : "") +
+        (noMonth ? '<label class="lb">Month for rows without one</label><input class="tx" type="month" id="dm" value="' + NOWM + '">' : "") +
+        '<label class="lb">Batch title</label><input class="tx" id="bt" value="Manual payouts ' + esc(file.name.replace(/\.[a-z]+$/i, "")).slice(0, 80) + '">' +
+        '<div class="muted" style="font-size:12px;margin-top:6px">Months: ' + (mm.length ? mm.map(mlabel).join(", ") : "—") + " · one draft batch per month.</div>" +
+        '<button class="btn ok block" id="isave" style="margin-top:10px">💾 Save as draft</button></div>';
+      $("isave").onclick = function () {
+        var dm = $("dm") ? $("dm").value : "", byM = {}; list.forEach(function (o) { var m = o.month || dm; if (!m) return; (byM[m] = byM[m] || []).push(o); });
+        var ms = Object.keys(byM); if (!ms.length) return toast("Choose the month");
+        var bt = this; bt.disabled = true; bt.textContent = "Saving…"; var chain = Promise.resolve(), done = [];
+        ms.forEach(function (m) { chain = chain.then(function () { return api({ action: "rp-batch-save", month: m, title: $("bt").value + (ms.length > 1 ? " · " + mlabel(m) : ""), source: "manual", rows: byM[m] }).then(function (r) { if (!r.ok) throw new Error(r.error); done.push(r.batch); }); }); });
+        chain.then(function () { toast(done.length + " draft batch(es) saved"); pBatches(); }).catch(function (e) { bt.disabled = false; bt.textContent = "💾 Save as draft"; toast(e.message); });
+      };
+    }).catch(function (e) { $("impres").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
+  }
+  function openBatch(id) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "rp-batch-get", id: id }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Back</button><div class="err" style="margin-top:10px">' + esc(r.error) + "</div>"; $("bk").onclick = function () { location.hash = ""; }; return; }
+      var b = r.batch, pub = b.status === "published", bys = {}; b.rows.forEach(function (x) { bys[x.scheme] = (bys[x.scheme] || 0) + x.net; });
+      var bad = b.rows.filter(function (x) { return Math.abs(x.gross - x.ded - x.tds - x.net) > 1; }).length;
+      VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Batches</button><div class="card"><div class="row"><b style="flex:1;font-size:16px">' + esc(b.title) + '</b><span class="bdg ' + (pub ? "b-pub" : "b-dr") + '">' + (pub ? "Published" : "Draft") + '</span></div><div class="muted" style="font-size:12.5px">' + mlabel(b.month) + " · " + b.count + " lines · " + (b.source === "calc" ? "from the payout calculator" : "manual Excel") + " · by " + esc(b.by || "") + (pub ? " · published" : "") + "</div>" +
+        '<div class="tiles" style="margin-top:10px">' + tile("💰", "#E6F4EA", rs(b.total), "Total net payout") + tile("👥", "#EEF0FF", new Set(b.rows.map(function (x) { return x.rid; })).size, "Retailers") + tile("🧩", "#F4EEFF", Object.keys(bys).length, "Schemes") + tile(bad ? "⚠️" : "✅", bad ? "#FDECEC" : "#E6F4EA", bad, "Lines that don’t add up") + "</div>" +
+        hbars(Object.keys(bys).map(function (k) { return [k, bys[k]]; }), "#1E9E61") +
+        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">' + (ADMIN ? (pub ? '<button class="btn sec" id="unp">↩ Unpublish</button>' : '<button class="btn ok" id="pubb">🚀 Publish to retailer balances</button>') : '<span class="muted" style="font-size:12.5px">' + (pub ? "Published by HO." : "Waiting for HO to publish.") + "</span>") + (!pub ? '<button class="btn ghost" id="del" style="color:var(--bad)">🗑️ Delete draft</button>' : "") + '<button class="btn ghost" id="bx">⬇ Excel</button></div></div>' +
+        '<div class="tbw"><table class="dt"><tr><th>Retailer</th><th>Scheme</th><th class="n">Ach %</th><th class="n">Gross</th><th class="n">Deduct.</th><th class="n">TDS</th><th class="n">Net</th><th>Check</th></tr>' + b.rows.map(function (x) { var okA = Math.abs(x.gross - x.ded - x.tds - x.net) <= 1; return '<tr data-r="' + esc(x.rid) + '" style="cursor:pointer"><td><b>' + esc(x.rid) + "</b>" + (x.name ? '<br><span class="muted">' + esc(x.name) + "</span>" : "") + "</td><td>" + esc(x.scheme) + (x.query ? ' <span class="bdg b-q">🚩</span>' : "") + '</td><td class="n">' + pc(x.info && x.info.ach) + '</td><td class="n">' + rs(x.gross) + '</td><td class="n">' + (x.ded ? rs(x.ded) : "") + '</td><td class="n">' + (x.tds ? rs(x.tds) : "") + '</td><td class="n"><b>' + rs(x.net) + "</b></td><td>" + (okA ? "✅" : "⚠️") + "</td></tr>"; }).join("") + "</table></div>";
+      $("bk").onclick = function () { location.hash = ""; };
+      [].forEach.call(VIEW.querySelectorAll("tr[data-r]"), function (tr) { tr.onclick = function () { MON = b.month; location.hash = "r=" + encodeURIComponent(tr.dataset.r); }; });
+      if ($("pubb")) $("pubb").onclick = function () { sheet("Publish " + rs(b.total) + "?", b.count + " payout lines go into retailer balances for " + mlabel(b.month) + (bad ? ". ⚠️ " + bad + " line(s) don't add up." : "."), [["🚀", "Publish", function () { api({ action: "rp-publish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); toast("Published"); openBatch(b.id); }); }]]); };
+      if ($("unp")) $("unp").onclick = function () { sheet("Unpublish this batch?", "Its payouts are taken out of retailer balances (vouchers already bought stay).", [["↩", "Unpublish", function () { api({ action: "rp-unpublish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); openBatch(b.id); }); }, "danger"]]); };
+      if ($("del")) $("del").onclick = function () { sheet("Delete this draft?", b.title, [["🗑️", "Delete", function () { api({ action: "rp-batch-delete", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); location.hash = ""; }); }, "danger"]]); };
+      $("bx").onclick = function () { download(xlsx([{ name: "Payouts", rows: [["Retailer ID", "Retailer name", "State", "City", "Month", "Scheme", "Target", "Achieved", "Achievement %", "Gross", "Deduction", "TDS", "Net", "Breakup", "Remarks", "Query"]].concat(b.rows.map(function (x) { var i = x.info || {}; return [x.rid, x.name, x.state, x.city, b.month, x.scheme, i.target, i.achieved != null ? i.achieved : i.units, i.ach, x.gross, x.ded, x.tds, x.net, (x.parts || []).map(function (p) { return p.label + " " + p.amount; }).join("; "), x.remarks, x.query ? x.query.note : ""]; })) }]), "Payouts_" + b.month + "_" + b.id + ".xlsx"); };
+    });
+  }
+
+  // ================= Vouchers =================
+  function pVouchers() {
+    $("pane").innerHTML = (ADMIN ? '<div class="card"><b>➕ Add a voucher / service</b><div class="muted" style="font-size:12.5px">Retailers’ teams buy these instantly from the retailer’s balance — no approval. Upload codes (one is handed out per purchase) or give a link (e.g. a travel / hotel / grocery partner page where the purchase is completed).</div>' +
+      '<div class="g2"><div><label class="lb">Name</label><input class="tx" id="vn" placeholder="e.g. MakeMyTrip ₹1000 voucher"></div><div><label class="lb">Category</label><select class="tx" id="vc"></select></div></div>' +
+      '<div class="g2"><div><label class="lb">Provider</label><input class="tx" id="vp" placeholder="e.g. MakeMyTrip"></div><div><label class="lb">Validity</label><input class="tx" id="vv" placeholder="e.g. 12 months"></div></div>' +
+      '<div class="g2"><div><label class="lb">Face value (₹)</label><input class="tx" id="vf" type="number"></div><div><label class="lb">Price from balance (₹)</label><input class="tx" id="vpr" type="number"></div></div>' +
+      '<label class="lb">How it is delivered</label><select class="tx" id="vm"><option value="code">Codes I upload (one per purchase)</option><option value="link">A link (no code)</option></select>' +
+      '<div id="vmc"><label class="lb">Codes — one per line (or upload Excel/CSV with codes in the first column)</label><textarea class="tx" id="vcodes" style="min-height:70px" placeholder="ABCD-1234-EFGH"></textarea><button class="btn ghost sm" id="vcf" style="margin-top:4px">📁 Codes from file</button></div>' +
+      '<div id="vml" style="display:none"><label class="lb">Link (https://)</label><input class="tx" id="vl" placeholder="https://…"></div>' +
+      '<label class="lb">How to use (shown with the code)</label><input class="tx" id="vh" placeholder="e.g. Apply the code at checkout on makemytrip.com"><button class="btn pri block" id="vs" style="margin-top:10px">Save voucher</button></div>' : "") + '<div id="vl2"><div class="loading"><div class="spin"></div></div></div>';
+    var editId = "";
+    loadV().then(function (r) {
+      if (!$("vl2")) return; if (!r.ok) { $("vl2").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      if (ADMIN) {
+        $("vc").innerHTML = Object.keys(r.cats).map(function (k) { return '<option value="' + k + '">' + esc(r.cats[k]) + "</option>"; }).join("");
+        $("vm").onchange = function () { $("vmc").style.display = this.value === "code" ? "" : "none"; $("vml").style.display = this.value === "link" ? "" : "none"; };
+        $("vf").oninput = function () { if (!$("vpr").value) $("vpr").placeholder = this.value; };
+        $("vcf").onclick = function () { pickFile(".xlsx,.xls,.csv,.txt", function (f) { readSheet(f).then(function (A) { var codes = A.map(function (r) { return String(r[0] || "").trim(); }).filter(function (c2, i) { return c2 && !(i === 0 && /code/i.test(c2)); }); $("vcodes").value = ($("vcodes").value ? $("vcodes").value + "\n" : "") + codes.join("\n"); toast(codes.length + " codes added"); }).catch(function (e) { toast(e.message); }); }); };
+        $("vs").onclick = function () { var codes = $("vcodes").value.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean); api({ action: "rp-voucher-save", item: { id: editId, name: $("vn").value, cat: $("vc").value, provider: $("vp").value, validity: $("vv").value, value: $("vf").value, price: $("vpr").value || $("vf").value, mode: $("vm").value, link: $("vl").value, howTo: $("vh").value }, codes: codes }).then(function (x) { if (!x.ok) return toast(x.error); toast("Saved"); VCH = null; pVouchers(); }); };
+      }
+      $("vl2").innerHTML = r.items.length ? Object.keys(r.cats).map(function (k) { var L = r.items.filter(function (x) { return x.cat === k; }); return L.length ? '<div style="font-weight:800;margin:14px 2px 0">' + esc(r.cats[k]) + "</div>" + L.map(function (x) { return '<div class="vc"><div class="ic">' + (VCI[x.cat] || "🎁") + '</div><div style="flex:1;min-width:0"><b>' + esc(x.name) + "</b>" + (x.active === false ? ' <span class="bdg b-dr">hidden</span>' : "") + '<div class="muted" style="font-size:12px">' + esc(x.provider || "") + " · " + rs(x.price) + (x.value && x.value !== x.price ? " (worth " + rs(x.value) + ")" : "") + (x.mode === "code" ? " · " + x.left + " codes left" : " · link") + (x.validity ? " · " + esc(x.validity) : "") + "</div></div>" + (ADMIN ? '<button class="btn ghost sm" data-ed="' + x.id + '">✏️</button><button class="btn ghost sm" data-vd="' + x.id + '" style="color:var(--bad)">✕</button>' : "") + "</div>"; }).join("") : ""; }).join("") +
+        '<div class="muted" style="font-size:12px;margin-top:10px">To buy one for a retailer: open the retailer in 👥 Retailers → 🎁 Use balance.</div>' : '<div class="card empty"><div class="big">🎁</div>No vouchers or services yet.' + (ADMIN ? "" : " HO will add them.") + "</div>";
+      [].forEach.call($("vl2").querySelectorAll("[data-vd]"), function (b) { b.onclick = function () { sheet("Delete this voucher?", "Unused codes are deleted too.", [["🗑️", "Delete", function () { api({ action: "rp-voucher-delete", id: b.dataset.vd }).then(function () { VCH = null; pVouchers(); }); }, "danger"]]); }; });
+      [].forEach.call($("vl2").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { var x = r.items.find(function (y) { return y.id === b.dataset.ed; }); editId = x.id; $("vn").value = x.name; $("vc").value = x.cat; $("vp").value = x.provider || ""; $("vv").value = x.validity || ""; $("vf").value = x.value || ""; $("vpr").value = x.price; $("vm").value = x.mode; $("vm").onchange(); $("vl").value = x.link || ""; $("vh").value = x.howTo || ""; $("vs").textContent = "Save changes (new codes are added to the stock)"; window.scrollTo(0, 0); }; });
+    });
+  }
+
+  // ================= Payments (HO) =================
+  function pPayments() {
+    $("pane").innerHTML = '<div class="card"><b>🏦 Amounts already paid to retailers</b><div class="muted" style="font-size:12.5px">Upload bank / UPI transfers and credit notes. Each row is a debit in the retailer’s ledger, so their balance shows what is still due. Rows with a reference number already loaded are skipped.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="ptpl">⬇ Template</button><button class="btn pri sm" id="pimp">📁 Upload payments</button></div><div id="pres"></div></div>';
+    $("ptpl").onclick = function () { download(xlsx([{ name: "Payments", rows: [["Retailer ID", "Retailer name", "State", "Date (YYYY-MM-DD)", "Amount (Rs)", "Mode (Bank / UPI / Credit note)", "Reference no.", "Remarks"], ["BRE010294", "Shree Mobiles", "Bihar", new Date().toISOString().slice(0, 10), 5000, "Bank", "UTR12345678", "Sep 2026 schemes"]] }]), "Retailer_payments_template.xlsx"); };
+    $("pimp").onclick = function () {
+      pickFile(".xlsx,.xls,.csv", function (f) {
+        $("pres").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading…</div>';
+        readSheet(f).then(function (A) {
+          var H = A[0].map(String), c = { rid: col(H, /retailer\s*id|^rid|code/), name: col(H, /name/), state: col(H, /state/), date: col(H, /date/), amt: col(H, /amount/), mode: col(H, /mode/), ref: col(H, /ref|utr/), rem: col(H, /remark|note/) };
+          if (c.rid < 0 || c.amt < 0) throw new Error("Need “Retailer ID” and “Amount” columns — use the template.");
+          var rows = A.slice(1).map(function (r) { return { rid: String(r[c.rid] || "").trim(), name: c.name >= 0 ? r[c.name] : "", state: c.state >= 0 ? r[c.state] : "", date: c.date >= 0 ? xdate(r[c.date]) : "", amount: r[c.amt], mode: c.mode >= 0 ? String(r[c.mode] || "Bank") : "Bank", ref: c.ref >= 0 ? String(r[c.ref] || "") : "", remarks: c.rem >= 0 ? r[c.rem] : "" }; }).filter(function (r) { return r.rid && numv(r.amount); });
+          if (!rows.length) throw new Error("No rows with a Retailer ID and amount.");
+          var tot = rows.reduce(function (a, r) { return a + Math.abs(numv(r.amount)); }, 0);
+          $("pres").innerHTML = '<div class="card" style="background:#F7F8FC">' + rows.length + " payments · " + rs(tot) + '<button class="btn ok block" id="psave" style="margin-top:8px">💾 Add to retailer ledgers</button></div>';
+          $("psave").onclick = function () { this.disabled = true; api({ action: "rp-payments", rows: rows }).then(function (x) { $("pres").innerHTML = x.ok ? '<div class="notice info" style="margin-top:8px">✅ ' + x.added + " payment(s) added" + (x.skipped ? " · " + x.skipped + " skipped (duplicate reference or no amount)" : "") + ".</div>" : '<div class="err">' + esc(x.error) + "</div>"; }); };
+        }).catch(function (e) { $("pres").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
+      });
+    };
+  }
+  load();
+})();
+</script>
+</body>
+</html>
