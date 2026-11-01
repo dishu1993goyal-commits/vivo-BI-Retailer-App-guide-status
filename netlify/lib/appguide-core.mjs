@@ -49,7 +49,8 @@ export function hfMap(info, want) {
   for (const name of pick.length ? pick : names) {
     const e = eps[name], ps = e.parameters || [];
     const img = ps.find((p) => comp(p) === "image" || /extendedimage|imageeditor/.test(comp(p))) || ps.find((p) => /image|photo|portrait|face|source|avatar|reference/.test(lab(p)) && /file|image/.test(comp(p)));
-    const aud = ps.find((p) => comp(p) === "audio" || (/audio|voice|speech|wav/.test(lab(p)) && /file/.test(comp(p))));
+    const NOTFILE = /^(textbox|text|slider|dropdown|number|checkbox|radio|checkboxgroup|state|markdown|html|button|json)$/;
+    const aud = ps.find((p) => /audio/.test(comp(p))) || ps.find((p) => /audio|voice|speech|wav|sound|mp3/.test(lab(p)) && !NOTFILE.test(comp(p)) && !/image|video/.test(comp(p)));
     const tbs = ps.filter((p) => comp(p) === "textbox");
     const speech = tbs.find((p) => /speech|script|say|tts|speak|words|narrat|transcript/.test(lab(p))) || (!aud ? tbs.find((p) => /text|sentence|content|input/.test(lab(p)) && !/prompt|negative/.test(lab(p))) || tbs.filter((p) => !/negative/.test(lab(p)))[0] : null);
     const vidOut = /video/.test(outs(e)), sc = (img ? 4 : 0) + (vidOut ? 4 : 0) + (speech ? 3 : 0) + (aud ? 2 : 0) - (/preprocess|clear|session|orientation/.test(name) ? 5 : 0);
@@ -63,6 +64,7 @@ export function hfMap(info, want) {
   return { name: best.name, params: ps, img: best.img, aud: best.aud, txt: best.speech, lang, prm,
     summary: { endpoint: best.name, image: nm(best.img), text: best.speech ? nm(best.speech) : "", audio: best.aud ? nm(best.aud) : "", lang: nm(lang), prompt: nm(prm), needsVoice: !!(best.aud && !best.speech), ignoredEndpoint: want && !pick.length ? String(want) : "" } };
 }
+export function hfEndpointLine(info, name) { const e = (info.named_endpoints || {})[name] || {}; return name + "(" + (e.parameters || []).map((p) => (p.label || p.parameter_name || "?") + ":" + lc(p.component)).join(", ") + " → " + (e.returns || []).map((r) => lc(r.component)).join("+") + ")"; }
 export function hfDescribe(info) {   // one line per endpoint, for the error message
   return Object.keys(info.named_endpoints || {}).slice(0, 8).map((n) => n + "(" + (info.named_endpoints[n].parameters || []).map((p) => (p.label || p.parameter_name || "?") + ":" + lc(p.component)).join(", ") + " → " + (info.named_endpoints[n].returns || []).map((r) => lc(r.component)).join("+") + ")").join("; ");
 }
@@ -273,7 +275,7 @@ ${feat}`;
       const api = await hfApi(S, f), M = hfMap(api.info, V.hfApi);
       if (!M) return json(200, { ok: false, error: "This Space has no step that makes a video from a photo plus text or voice. What it offers: " + str(hfDescribe(api.info), 700) });
       if (!c.video || !!c.video.hfNeedsVoice !== M.summary.needsVoice) { c.video = Object.assign({}, c.video || {}, { hfNeedsVoice: M.summary.needsVoice }); await store.set("config:appguide", c); }
-      return json(200, { ok: true, space: V.hfSpace, stage: S.stage || "RUNNING", token: !!k.hf, map: M.summary });
+      return json(200, { ok: true, space: V.hfSpace, stage: S.stage || "RUNNING", token: !!k.hf, map: M.summary, detail: str(hfEndpointLine(api.info, M.name), 400) });
     } catch (e) { return json(200, { ok: false, error: str(e.message || e, 240) }); }
   }
   if (b.action === "ag-photo") {   // presenter photo — only with the person's consent
@@ -304,7 +306,11 @@ ${feat}`;
         if (!ma) return json(400, { ok: false, error: "The voice recording couldn’t be read — record it again." });
         if (ma[2].length > 4200000) return json(413, { ok: false, error: "The voice recording is too long — keep it under about 60 seconds." });
         await store.set(`aghfaud:${jid}`, { mime: ma[1].toLowerCase(), b64: ma[2], at: t });
-      } else if (V.hfNeedsVoice) return json(200, { ok: false, error: "This free model speaks from a voice recording — tap 🎙️ Record the voice first." });
+      } else {
+        let need = V.hfNeedsVoice;
+        try { const S = await hfSpace(V.hfSpace, keys.hf, f), api = await hfApi(S, f), M = hfMap(api.info, V.hfApi); if (M) { need = M.summary.needsVoice; if (!!(c.video || {}).hfNeedsVoice !== need) c.video = Object.assign({}, c.video || {}, { hfNeedsVoice: need }); } } catch (e) { }
+        if (need) { await store.set("config:appguide", c); return json(200, { ok: false, needVoice: true, error: "This free model speaks from a voice recording — record the voice in “🎙️ Step 1 — your voice” first." }); }
+      }
       v.stage = "Starting…"; c.videos = [v].concat(c.videos || []).slice(0, 60); await store.set("config:appguide", c);
       await store.set(`aghfjob:${jid}`, { vid: v.id, text, lang, at: t });
       try {
