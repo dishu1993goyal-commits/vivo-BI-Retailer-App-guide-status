@@ -50,7 +50,9 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   var VCI = { travel: "✈️", hotel: "🏨", grocery: "🛒", shopping: "🛍️", fuel: "⛽", food: "🍽️", mobile: "📱", other: "🎁" };
   function libX() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s); }); }
   function libEng() { return window.SCENG ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/scheme-engine.js?v=" + Date.now(); s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the payout engine.")); }; document.head.appendChild(s); }); }
-  function readSheet(file) { return libX().then(function () { return file.arrayBuffer(); }).then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); return window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); }); }
+  function readSheet(file) { return libX().then(function () { return file.arrayBuffer(); }).then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }), all = wb.SheetNames.map(function (n) { return window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); });
+    // use the sheet whose header row has a Retailer ID (templates may have a "How to fill" sheet first)
+    return all.find(function (A) { return A.length > 1 && A[0].some(function (h) { return /retailer\s*id|^rid$/i.test(String(h).trim()); }); }) || all.find(function (A) { return A.length > 1; }) || []; }); }
   function pickFile(acc, cb) { var i = document.createElement("input"); i.type = "file"; i.accept = acc; i.onchange = function () { if (i.files[0]) cb(i.files[0]); }; i.click(); }
   function col(H, re) { for (var i = 0; i < H.length; i++) if (re.test(String(H[i]).toLowerCase())) return i; return -1; }
   function xdate(v) { if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10); var s = String(v || "").trim(), m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(s); if (m) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ""; }
@@ -390,10 +392,14 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     }).catch(function (e) { $("crows").innerHTML = '<div class="err">' + esc(e.message || e) + "</div>"; });
   }
   function paintRows() { if ($("crows")) $("crows").innerHTML = CROWS ? '<div class="notice info">📋 ' + CROWS.rows.length + " retailers loaded from " + esc(CROWS.file || "Excel") + " · " + new Date(CROWS.at).toLocaleString("en-IN") + "</div>" : '<div class="muted" style="font-size:12.5px">No retailer numbers loaded yet.</div>'; }
+  // "vivo V60 Pro" in a letter and "V60 Pro" in the Excel are the same model: drop the brand word on both sides
+  var nb = function (m) { return String(m == null ? "" : m).replace(/^\s*vivo\s+/i, "").trim(); };
+  function normSc(sc0) { var sc = JSON.parse(JSON.stringify(sc0)); (sc.models || []).forEach(function (m) { m.name = nb(m.name); }); (sc.rules || []).forEach(function (r) { if (r.models) r.models = r.models.map(nb); if (r.excludeModels) r.excludeModels = r.excludeModels.map(nb); (r.rates || []).forEach(function (x) { x.model = nb(x.model); }); }); return sc; }
+  function normRow(r) { ["ms", "mt"].forEach(function (k) { var o = {}; Object.keys(r[k] || {}).forEach(function (m) { o[nb(m)] = r[k][m]; }); r[k] = o; }); return r; }
   function calcRun() {
     var S2 = picked(); if (!S2.length) return toast("Tick at least one scheme in step 1"); if (!CROWS || !CROWS.rows.length) return toast("Upload the retailer numbers in step 2");
     libEng().then(function () {
-      var runs = S2.map(function (x) { var rows = JSON.parse(JSON.stringify(CROWS.rows)); return { x: x, rows: rows, res: window.SCENG.compute(x.scheme, rows) }; });
+      var runs = S2.map(function (x) { var sc = normSc(x.scheme), rows = JSON.parse(JSON.stringify(CROWS.rows)).map(normRow); return { x: { id: x.id, scheme: sc }, rows: rows, res: window.SCENG.compute(sc, rows) }; });
       var by = {}; runs.forEach(function (u, k) { u.res.rows.forEach(function (r) { var o = by[r.rid] || (by[r.rid] = { rid: r.rid, name: r.name, t: [], sum: 0 }); o.t[k] = r.total; o.sum += r.total; }); });
       var list = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return b.sum - a.sum; }), tot = list.reduce(function (a, r) { return a + r.sum; }, 0);
       $("cres").innerHTML = '<div class="tiles" style="margin-top:10px">' + tile("💰", "#E6F4EA", rs(tot), "Total payout") + tile("👥", "#EEF0FF", list.length, "Retailers") + tile("✅", "#F4EEFF", list.filter(function (r) { return r.sum > 0; }).length, "Getting a payout") + tile("🧩", "#FFF4E5", runs.length, "Schemes") + "</div>" +
