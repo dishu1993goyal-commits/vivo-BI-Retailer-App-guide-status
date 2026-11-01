@@ -2,10 +2,9 @@
   "versionCode": 33,
   "versionName": "6.7",
   "notes": [
-    "New: Partner portals — open EMI, Upgrade, V-Shield and other partner websites inside the app (All tools → Partner portals)",
-    "Save your partner login once on this phone — the app signs you in automatically next time",
-    "Your partner passwords stay only on your phone, encrypted",
-    "New tools: One-Page Studio, Personal mailer, App usability lab, Access control"
+    "Fix: the microphone now works inside the app for App guide voice recording and the teleprompter",
+    "Presenter videos: D-ID, HeyGen (hand gestures) or a free AI model, chosen by HO in App guide → Presenter",
+    "Affordability: upload a PDF, photo, Excel or Word offer sheet and every offer is added automatically"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
