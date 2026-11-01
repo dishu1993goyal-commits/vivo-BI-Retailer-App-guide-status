@@ -142,7 +142,16 @@ export async function runHfJob(store, env, jobId, { fetchImpl = fetch, now = () 
     const result = await call(M.name, data, "video");
     let url = null; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/\.(mp4|webm|mov)(\?|$)/i.test(x)) url = /^https?:/.test(x) ? x : base + "/file=" + x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { const u = x.url || (x.path ? base + "/file=" + x.path : ""); if (u && /video|mp4|webm|mov/i.test((x.mime_type || "") + u + (x.orig_name || ""))) { url = u; return; } if (x.video) walk(x.video); Object.keys(x).forEach((k) => { if (k !== "video") walk(x[k]); }); } })(result);
     if (!url) throw new Error("The model finished but returned no video.");
-    await update({ status: "done", hfUrl: url, stage: "", error: "" });
+    // free Spaces delete their results after a while — keep our own copy so the video never expires
+    let stored = false, mime = "video/mp4";
+    if (store.setBinary) {
+      try {
+        await update({ stage: "Saving the video…" });
+        const rv = await f(url, { headers: S.headers });
+        if (rv.ok) { const ab = await rv.arrayBuffer(); mime = (rv.headers.get("content-type") || "").split(";")[0] || (/\.webm/i.test(url) ? "video/webm" : "video/mp4"); if (ab.byteLength > 1000 && ab.byteLength < 60e6) { await store.setBinary(`agvidbin:${job.vid}`, ab); stored = true; } }
+      } catch (e) { }
+    }
+    await update({ status: "done", hfUrl: url, stored, mime, stage: "", error: "" });
   } catch (e) { await update({ status: "error", error: str(e.message || e, 260), stage: "" }); }
   try { await store.delete(`aghfaud:${jobId}`); } catch (e) { }
 }
@@ -175,6 +184,7 @@ export async function serveAgVideo(id, store, env = {}, fetchImpl = fetch) {
   const vid = String(id || "").replace(/[^a-z0-9]/gi, "").slice(0, 40);
   const c = (await store.get("config:appguide")) || { videos: [] }, v = (c.videos || []).find((x) => x.id === vid);
   if (!v || v.status !== "done") return new Response("Not found", { status: 404 });
+  if (v.stored && store.getStream) { try { const s = await store.getStream(`agvidbin:${v.id}`); if (s) return new Response(s, { status: 200, headers: { "content-type": v.mime || "video/mp4", "cache-control": "private, max-age=3600", "access-control-allow-origin": "*" } }); } catch (e) { } }
   const keys = (await store.get("config:agkey")) || {};
   try {
     const fr = await freshVideo(v, keys, fetchImpl);
@@ -248,6 +258,7 @@ ${feat}`;
 
   if (b.action === "ag-video-url") {   // a fresh link for a finished presenter video
     const c = await cfg(), v = (c.videos || []).find((x) => x.id === str(b.id, 30)); if (!v || v.status !== "done") return json(404, { ok: false, error: "Video not ready." });
+    if (v.stored) return json(200, { ok: true, url: "/api/auth?agvid=" + v.id, title: v.title });
     try { const fr = await freshVideo(v, await keysOf(), f); if (!fr.url) return json(200, { ok: false, error: fr.error || "The video is no longer available at the video service." }); return json(200, { ok: true, url: fr.url, title: v.title }); }
     catch (e) { return json(502, { ok: false, error: "Couldn't reach the video service." }); }
   }
@@ -380,6 +391,6 @@ ${feat}`;
       return json(200, { ok: true, status: fr.status, url: fr.url, error: fr.error });
     } catch (e) { return json(200, { ok: true, status: "making" }); }
   }
-  if (b.action === "ag-video-delete") { const c = await cfg(); c.videos = (c.videos || []).filter((x) => x.id !== str(b.id, 30)); await store.set("config:appguide", c); return json(200, { ok: true }); }
+  if (b.action === "ag-video-delete") { try { await store.delete(`agvidbin:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); } catch (e) { } const c = await cfg(); c.videos = (c.videos || []).filter((x) => x.id !== str(b.id, 30)); await store.set("config:appguide", c); return json(200, { ok: true }); }
   return json(400, { ok: false, error: "Unknown action." });
 }

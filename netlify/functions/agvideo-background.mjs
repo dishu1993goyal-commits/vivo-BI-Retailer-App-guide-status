@@ -5,7 +5,7 @@ import { runHfJob } from "../lib/appguide-core.mjs";
 
 export default async (req) => {
   const blobs = getStore({ name: "bi-users", consistency: "strong" });
-  const store = { get: (k) => blobs.get(k, { type: "json" }), set: (k, v) => blobs.setJSON(k, v), delete: (k) => blobs.delete(k) };
+  const store = { get: (k) => blobs.get(k, { type: "json" }), set: (k, v) => blobs.setJSON(k, v), delete: (k) => blobs.delete(k), setBinary: (k, data, meta) => blobs.set(k, data, meta ? { metadata: meta } : undefined), getStream: (k) => blobs.get(k, { type: "stream" }) };
   let job = ""; try { job = (await req.json()).job; } catch (e) { return; }
   await runHfJob(store, {}, job);
 };

@@ -686,7 +686,7 @@ textarea.tx{min-height:120px}
     box.innerHTML = '<div class="loading"><div class="spin"></div>Loading the presenter…</div>';
     var pv = document.createElement("video"); pv.crossOrigin = "anonymous"; pv.playsInline = true; pv.preload = "auto"; pv.muted = false;
     pv.onloadedmetadata = function () { slideshow(f, S, pv, box, v.title + " — presenter"); };
-    pv.onerror = function () { box.innerHTML = '<div class="err">Couldn’t load the presenter video. Open it with ▶ Play, then try again.</div>'; };
+    pv.onerror = function () { box.innerHTML = '<div class="err">' + (v.provider === "hf" ? "This free video is no longer on Hugging Face (free models delete results after a while). Remove it and make it again — new free videos are now saved on the site, so this won’t happen again." : "Couldn’t load the presenter video. Open it with ▶ Presenter only, then try again.") + "</div>"; };
     pv.src = "/api/auth?agvid=" + encodeURIComponent(v.id);
   }
   // Background removal (MediaPipe Selfie Segmentation) — cuts the presenter out of their photo/clip background so they

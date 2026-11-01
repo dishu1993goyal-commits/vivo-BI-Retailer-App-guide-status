@@ -9,6 +9,8 @@ export default async (req) => {
     get: (k) => blobs.get(k, { type: "json" }),
     set: (k, v) => blobs.setJSON(k, v),
     delete: (k) => blobs.delete(k),
+    setBinary: (k, data, meta) => blobs.set(k, data, meta ? { metadata: meta } : undefined),
+    getStream: (k) => blobs.get(k, { type: "stream" }),
     list: async (prefix) => {
       const keys = [];
       for await (const page of blobs.list({ prefix, paginate: true })) {
