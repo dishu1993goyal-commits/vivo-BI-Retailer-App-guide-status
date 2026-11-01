@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Product hub</title>
+<style>
+/*@@CSS@@*/
+.fx{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}@media(min-width:620px){.pg{grid-template-columns:1fr 1fr 1fr}}
+.pc{background:var(--card);border-radius:14px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.07);cursor:pointer}
+.pc .im{height:130px;background:#F2F3F8;display:flex;align-items:center;justify-content:center;font-size:40px}.pc .im img{width:100%;height:100%;object-fit:contain}
+.pc .bd{padding:8px 10px}.pc b{font-size:13.5px;display:block}.pc .pr{color:var(--brand);font-weight:700;font-size:13px;margin-top:2px}
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+.sp{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13.5px}.sp dt{color:var(--ink2);font-weight:600}.sp dd{margin:0}
+.cmp{background:var(--card);border-radius:12px;padding:10px;margin-top:6px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.gal{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.gal img{height:150px;border-radius:10px;border:1px solid #E6E8F2}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📱</span></div>
+  <h1>Product hub</h1><p>vivo launches, prices, specs, catalogue and how we compare with the competition</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), DATA = null, SER = "", Q = "", CUR = null;
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } list(); }
+  function list() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading the catalogue…</div>';
+    api({ action: "phub-list" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } DATA = r; draw(); });
+  }
+  function draw() {
+    var sers = DATA.series, L = DATA.models.filter(function (m) { return (!SER || m.series === SER) && (!Q || m.name.toLowerCase().indexOf(Q.toLowerCase()) >= 0); });
+    VIEW.innerHTML = '<div class="card" style="padding:10px 12px"><input class="tx" id="q" placeholder="Search a vivo model" value="' + esc(Q) + '">' + (sers.length ? '<div class="fx" id="sf"><span data-s="" class="' + (SER ? "" : "on") + '">All</span>' + sers.map(function (s) { return '<span data-s="' + esc(s) + '" class="' + (s === SER ? "on" : "") + '">' + esc(s) + "</span>"; }).join("") + "</div>" : "") + '</div><div class="pg" id="grid"></div>';
+    $("q").oninput = function () { Q = this.value; grid(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-s]"), function (b) { b.onclick = function () { SER = b.dataset.s; draw(); }; });
+    grid();
+  }
+  function grid() {
+    var L = DATA.models.filter(function (m) { return (!SER || m.series === SER) && (!Q || m.name.toLowerCase().indexOf(Q.toLowerCase()) >= 0); });
+    $("grid").innerHTML = L.length ? L.map(function (m) { return '<div class="pc" data-slug="' + esc(m.slug) + '"><div class="im">' + (m.img ? '<img src="' + esc(m.img) + '" alt="">' : "📱") + '</div><div class="bd"><b>' + esc(m.name) + "</b>" + (m.price ? '<div class="pr">₹' + m.price.toLocaleString("en-IN") + "+</div>" : "") + (m.launch ? '<div class="muted" style="font-size:11px">' + esc(m.launch) + "</div>" : "") + "</div></div>"; }).join("") : '<div class="card empty" style="grid-column:1/-1"><div class="big">📱</div>No models. Open Affordability once to load the catalogue.</div>';
+    [].forEach.call($("grid").querySelectorAll("[data-slug]"), function (c) { c.onclick = function () { detail(c.dataset.slug); }; });
+  }
+  function detail(slug) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "phub-get", slug: slug }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } CUR = r.product; render(); });
+  }
+  function render() {
+    var p = CUR;
+    VIEW.innerHTML = '<div class="row" style="margin-bottom:6px"><button class="btn ghost sm" id="bk">← Catalogue</button>' + (ADMIN ? '<button class="btn sec sm" id="ed">✏️ Edit</button>' : "") + '</div>' +
+      '<div class="card"><h2 style="margin:0">' + esc(p.name) + "</h2>" + (p.series ? '<div class="muted" style="font-size:12.5px">' + esc(p.series) + " series" + (p.launch ? " · launched " + esc(p.launch) : "") + "</div>" : "") +
+      (p.images && p.images.length ? '<div class="gal" style="margin-top:8px">' + p.images.map(function (i) { return '<img src="' + esc(i) + '" alt="">'; }).join("") + "</div>" : "") +
+      (p.price ? '<div style="font-size:18px;font-weight:800;color:var(--brand);margin-top:8px">From ₹' + p.price.toLocaleString("en-IN") + "</div>" : "") +
+      (p.variants && p.variants.length ? '<div class="muted" style="font-size:12.5px;margin-top:4px">Variants: ' + p.variants.map(function (v) { return (v.ram ? v.ram + "/" : "") + v.storage + (v.price ? " — ₹" + v.price.toLocaleString("en-IN") : ""); }).join(" · ") + "</div>" : "") +
+      (p.colours && p.colours.length ? '<div class="muted" style="font-size:12.5px;margin-top:2px">Colours: ' + p.colours.map(esc).join(", ") + "</div>" : "") +
+      (p.highlights && p.highlights.length ? '<ul style="margin:8px 0 0;padding-left:18px;font-size:13.5px">' + p.highlights.map(function (h) { return "<li>" + esc(h) + "</li>"; }).join("") + "</ul>" : "") + "</div>" +
+      (p.videos && p.videos.length ? '<div class="card"><b>🎬 Videos</b>' + p.videos.map(function (v) { return '<a class="btn ghost sm block" href="' + esc(v) + '" target="_blank" rel="noopener" style="margin-top:6px">▶ ' + esc(v.replace(/^https?:\/\/(www\.)?/, "").slice(0, 50)) + "</a>"; }).join("") + "</div>" : "") +
+      '<div class="card"><div class="row"><b style="flex:1">📋 Specifications & competition</b></div><div id="spec">' + (p.spec ? "" : '<button class="btn pri block" id="aispec" style="margin-top:6px">✨ Get specs & competitor comparison</button>') + "</div></div>";
+    $("bk").onclick = draw;
+    if ($("ed")) $("ed").onclick = editProduct;
+    if (p.spec) showSpec(p.spec); else $("aispec").onclick = loadSpec;
+  }
+  function loadSpec() { $("spec").innerHTML = '<div class="loading"><div class="spin"></div>AI is gathering the specs and comparison…</div>'; api({ action: "phub-ai", slug: CUR.slug }).then(function (r) { if (!r.ok) { $("spec").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } CUR.spec = r.spec; showSpec(r.spec); }); }
+  function showSpec(s) {
+    $("spec").innerHTML = (s.tagline ? '<div style="font-style:italic;color:var(--ink2);margin-bottom:6px">' + esc(s.tagline) + "</div>" : "") +
+      '<dl class="sp">' + (s.specs || []).map(function (x) { return "<dt>" + esc(x.label) + "</dt><dd>" + esc(x.value) + "</dd>"; }).join("") + "</dl>" +
+      (s.strengths && s.strengths.length ? '<div style="font-weight:700;font-size:13px;margin-top:8px">💪 Strengths</div><ul style="margin:4px 0;padding-left:18px;font-size:13.5px">' + s.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
+      (s.bestFor ? '<div class="muted" style="font-size:12.5px">👤 Best for: ' + esc(s.bestFor) + "</div>" : "") +
+      (s.competitors && s.competitors.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">⚔️ vs the competition</div>' + s.competitors.map(function (c) { return '<div class="cmp"><b>' + esc(c.brand + " " + c.model) + '</b>' + (c.price ? ' <span class="muted">· ' + esc(c.price) + "</span>" : "") + '<div style="font-size:13px;margin-top:2px">' + esc(c.vs) + "</div></div>"; }).join("") : "") +
+      (s.pitch ? '<div class="notice info" style="margin-top:10px"><b>🗣️ Sales pitch:</b> ' + esc(s.pitch) + "</div>" : "") +
+      (s.note ? '<div class="muted" style="font-size:11.5px;margin-top:6px">ℹ️ ' + esc(s.note) + " · Verify exact figures against the official spec sheet.</div>" : "");
+  }
+  function editProduct() {
+    var p = CUR;
+    sheet("Edit " + p.name, "Shown to all users", [["💾", "Save", function (ov) {
+      var g = function (id) { return ov.querySelector(id).value; };
+      api({ action: "phub-save", slug: p.slug, data: { launch: g("#el"), mrp: +g("#em") || 0, note: g("#en"), highlights: g("#eh").split("\n").map(function (x) { return x.trim(); }).filter(Boolean), videos: g("#ev").split(/\s+/).filter(Boolean), images: (p.images || []).concat(NEWIMG) } }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); detail(p.slug); });
+    }]], '<label class="lb">Launch date / status</label><input class="tx" id="el" value="' + esc(p.launch || "") + '" placeholder="e.g. Oct 2026"><label class="lb">Official MRP (₹)</label><input class="tx" id="em" type="number" value="' + (p.mrp || "") + '"><label class="lb">Highlights (one per line)</label><textarea class="tx" id="eh" style="min-height:70px">' + esc((p.highlights || []).join("\n")) + '</textarea><label class="lb">Video links (space separated)</label><textarea class="tx" id="ev" style="min-height:50px">' + esc((p.videos || []).join(" ")) + '</textarea><label class="lb">Note</label><input class="tx" id="en" value="' + esc(p.note || "") + '"><label class="lb">Images</label><div id="imgs"><div class="gal">' + (p.images || []).map(function (i) { return '<img src="' + esc(i) + '">'; }).join("") + '</div></div><button class="btn sec sm" id="addimg" style="margin-top:6px">➕ Upload image</button>');
+    window.NEWIMG = [];
+    setTimeout(function () { var ai = document.getElementById("addimg"); if (ai) ai.onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = function () { var fl = i.files[0]; if (!fl) return; var rd = new FileReader(); rd.onload = function () { var im = new Image(); im.onload = function () { var k = Math.min(1, 1000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = im.width * k; c.height = im.height * k; c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); api({ action: "bnr-upload", data: c.toDataURL("image/jpeg", 0.85) }).then(function (r) { if (!r.ok) return toast(r.error); NEWIMG.push(r.url); var g = document.querySelector("#imgs .gal"); var nm = document.createElement("img"); nm.src = r.url; g.appendChild(nm); }); }; im.src = rd.result; }; rd.readAsDataURL(fl); }; i.click(); }; }, 60);
+  }
+  load();
+})();
+</script>
+</body>
+</html>

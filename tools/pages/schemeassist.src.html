@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Scheme assistant</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+.slab{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;font-size:13.5px;padding:6px 0;border-bottom:1px solid #EEF0F6}
+.li{background:var(--card);border-radius:12px;padding:10px 12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer}
+.big2{font-size:22px;font-weight:800;color:#13693F}
+.chip{display:inline-block;background:#EEF0FF;color:#3346C9;border-radius:99px;padding:2px 9px;font-size:12px;font-weight:600;margin:2px 4px 2px 0}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎯</span></div>
+  <h1>Scheme assistant</h1><p>Upload a scheme letter and AI explains the targets, actions and payout — then plug in your numbers</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "new", SCHEME = null, INPUTS = {}, SID = "";
+  var FTLOAD = null;
+  function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); }
+  function draw() {
+    VIEW.innerHTML = '<div class="seg"><button data-tb="new" class="' + (TAB === "new" ? "on" : "") + '">📂 New / upload</button><button data-tb="saved" class="' + (TAB === "saved" ? "on" : "") + '">📑 Schemes</button></div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    (TAB === "saved" ? pSaved : pNew)();
+  }
+  function pNew() {
+    $("pane").innerHTML = '<div class="card"><b>📂 Upload the scheme</b><div class="muted" style="font-size:12.5px">A scheme letter or policy as PDF, photo, Excel or Word. AI reads it and explains what you need to do and earn.</div><button class="btn pri block" id="up" style="margin-top:8px">📎 Choose scheme file</button><div class="muted" style="font-size:12px;margin-top:6px">Or paste the scheme text:</div><textarea class="tx" id="pt" placeholder="Paste the scheme wording here…" style="min-height:70px;margin-top:4px"></textarea><button class="btn sec sm" id="ptgo" style="margin-top:6px">Explain pasted text</button><div id="pp"></div></div><div id="out"></div>';
+    $("up").onclick = pickFile; $("ptgo").onclick = function () { if ($("pt").value.trim().length < 30) return toast("Paste the scheme text first"); parse($("pt").value, $("pp")); };
+    if (SCHEME) showScheme();
+  }
+  function pickFile() {
+    var i = document.createElement("input"); i.type = "file"; i.accept = ".pdf,.xlsx,.xls,.csv,.docx,.txt,image/*"; i.onchange = function () {
+      var fl = i.files[0]; if (!fl) return; $("pp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading ' + esc(fl.name) + "…</div>";
+      loadFiles().then(function () { return window.BIFILES.extract(fl); }).then(function (r) { parse(r.text, $("pp")); }).catch(function (e) { $("pp").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
+    }; i.click();
+  }
+  function parse(text, box) {
+    box.innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>✨ AI is reading the scheme…</div>';
+    api({ action: "scha-parse", text: String(text).slice(0, 15000) }).then(function (r) { if (!r.ok) { box.innerHTML = '<div class="err" style="margin-top:8px">' + esc(r.error) + "</div>"; return; } SCHEME = r.scheme; INPUTS = {}; SID = ""; box.innerHTML = ""; pNew(); window.scrollTo(0, 0); });
+  }
+  function showScheme() {
+    var s = SCHEME;
+    $("out").innerHTML = '<div class="card"><h2 style="margin:0 0 2px">' + esc(s.title) + "</h2>" + (s.period ? '<div class="muted" style="font-size:12.5px">' + esc(s.period) + "</div>" : "") +
+      (s.summary ? '<p style="font-size:14px;margin:8px 0 0">' + esc(s.summary) + "</p>" : "") +
+      (s.focusModels && s.focusModels.length ? '<div style="margin-top:8px">' + s.focusModels.map(function (m) { return '<span class="chip">' + esc(m) + "</span>"; }).join("") + "</div>" : "") +
+      (s.targets && s.targets.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">🎯 Targets</div>' + s.targets.map(function (x) { return '<div style="font-size:13.5px">• ' + esc(x.metric) + (x.value ? ": <b>" + esc(x.value) + " " + esc(x.unit || "") + "</b>" : "") + "</div>"; }).join("") : "") +
+      (s.slabs && s.slabs.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">💰 Payout slabs</div>' + s.slabs.map(function (x) { return '<div class="slab"><span>' + esc(x.label || "") + '</span><span>' + esc(x.condition || "") + '</span><b>' + esc(x.payout || "") + "</b></div>"; }).join("") : "") +
+      (s.actions && s.actions.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">✅ What to do</div><ul style="margin:4px 0;padding-left:18px;font-size:13.5px">' + s.actions.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "") +
+      (s.incentiveNote ? '<div class="muted" style="font-size:12px;margin-top:6px">ℹ️ ' + esc(s.incentiveNote) + "</div>" : "") +
+      (ADMIN ? '<button class="btn sec sm" id="pub" style="margin-top:10px">📢 Publish for all retailers</button>' : "") + "</div>" +
+      '<div class="card"><b>🧮 Your numbers</b><div class="muted" style="font-size:12.5px">Enter where you are now — AI works out your payout and what’s left.</div>' +
+      (s.inputs && s.inputs.length ? s.inputs.map(function (inp) { return '<label class="lb">' + esc(inp.label) + (inp.unit ? " (" + esc(inp.unit) + ")" : "") + '</label><input class="tx" type="number" data-in="' + esc(inp.key) + '" value="' + esc(INPUTS[inp.key] || "") + '">'; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:6px">This scheme didn’t list specific numbers to track — type your current sales below.</div><label class="lb">Current sales / units</label><input class="tx" type="number" data-in="current">') +
+      '<button class="btn pri block" id="calc" style="margin-top:10px">🧮 Calculate my payout</button><div id="res"></div></div>';
+    [].forEach.call($("out").querySelectorAll("[data-in]"), function (el) { el.oninput = function () { INPUTS[el.dataset.in] = el.value; }; });
+    if ($("pub")) $("pub").onclick = function () { api({ action: "scha-save", id: SID, title: s.title, scheme: s, published: true }).then(function (r) { if (!r.ok) return toast(r.error); SID = r.id; toast("Published — retailers see it in 📑 Schemes"); }); };
+    $("calc").onclick = calc;
+  }
+  function calc() {
+    $("res").innerHTML = '<div class="loading"><div class="spin"></div>Working out your payout…</div>';
+    api({ action: "scha-calc", scheme: SCHEME, inputs: INPUTS }).then(function (r) {
+      if (!r.ok) { $("res").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var d = r.result;
+      $("res").innerHTML = '<div class="card" style="margin-top:10px;background:#F2F8F4">' + (d.currentPayout ? '<div class="big2">' + esc(d.currentPayout) + '</div><div class="muted" style="font-size:12px">you qualify for now</div>' : "") +
+        '<div style="font-size:14px;margin-top:6px">' + esc(d.status) + "</div>" +
+        (d.nextSlab && d.nextSlab.needMore ? '<div class="notice info" style="margin-top:8px">⬆️ <b>To reach ' + esc(d.nextSlab.label || "the next slab") + ':</b> ' + esc(d.nextSlab.needMore) + (d.nextSlab.extraPayout ? " → +" + esc(d.nextSlab.extraPayout) : "") + "</div>" : "") +
+        (d.projection ? '<div class="muted" style="font-size:12.5px;margin-top:6px">📈 ' + esc(d.projection) + "</div>" : "") +
+        (d.breakdown && d.breakdown.length ? '<div style="margin-top:8px">' + d.breakdown.map(function (x) { return '<div class="slab" style="grid-template-columns:1fr auto"><span>' + esc(x.label) + "</span><b>" + esc(x.value) + "</b></div>"; }).join("") + "</div>" : "") +
+        (d.advice && d.advice.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">💡 How to maximise it</div><ul style="margin:4px 0;padding-left:18px;font-size:13.5px">' + d.advice.map(function (a) { return "<li>" + esc(a) + "</li>"; }).join("") + "</ul>" : "") + "</div>";
+    });
+  }
+  function pSaved() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "scha-list" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("pane").innerHTML = r.items.length ? r.items.map(function (x) { return '<div class="li" data-id="' + x.id + '"><b>🎯 ' + esc(x.title) + "</b>" + (x.period ? '<div class="muted" style="font-size:12px">' + esc(x.period) + "</div>" : "") + (ADMIN ? '<div class="muted" style="font-size:11px">' + (x.published ? "published" : "draft") + " · " + esc(x.by || "") + "</div>" : "") + "</div>"; }).join("") : '<div class="card empty"><div class="big">📑</div>No published schemes yet. Upload one in “New”.</div>';
+      [].forEach.call($("pane").querySelectorAll("[data-id]"), function (c) { c.onclick = function () { api({ action: "scha-get", id: c.dataset.id }).then(function (x) { if (!x.ok) return toast(x.error); SCHEME = x.item.scheme; SID = x.item.id; INPUTS = {}; TAB = "new"; draw(); window.scrollTo(0, 0); }); }; });
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

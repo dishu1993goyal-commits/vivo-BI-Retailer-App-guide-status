@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Store locator</title>
+<style>
+/*@@CSS@@*/
+.fx{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.fx span{border:1.5px solid #DDE0EF;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.fx span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+#smap{height:300px;border-radius:14px;margin-top:10px;z-index:0}
+.sc{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.sc .tag{display:inline-block;font-size:11px;font-weight:700;border-radius:99px;padding:2px 8px;margin-bottom:4px}
+.t-exclusive{background:#EEF0FF;color:#3346C9}.t-authorized{background:#E7F7EF;color:#13693F}.t-general{background:#FFF4E5;color:#8A5300}.t-service{background:#FDECEC;color:#A12727}
+.km{float:right;font-weight:700;color:var(--brand);font-size:13px}
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📍</span></div>
+  <h1>Store locator</h1><p>Find vivo exclusive stores, dealers and service centres — near you or anywhere in India</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "near", MAP = null, TY = "", ST = "", Q = "", NEAR = null, YOU = null;
+  var TYPES = [["", "All"], ["exclusive", "🏬 Exclusive store"], ["authorized", "🏪 Authorized dealer"], ["general", "🛒 General trade"], ["service", "🛠️ Service centre"]];
+  var TN = { exclusive: "vivo Exclusive Store", authorized: "Authorized dealer", general: "General trade", service: "Service centre" };
+  var leaflet = null;
+  function L() { if (!leaflet) leaflet = new Promise(function (res, rej) { var c = document.createElement("link"); c.rel = "stylesheet"; c.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"; document.head.appendChild(c); var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"; s.onload = res; s.onerror = function () { leaflet = null; rej(); }; document.head.appendChild(s); }); return leaflet; }
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); }
+  function draw() {
+    var tabs = [["near", "📍 Near me"], ["browse", "🗺️ Browse (PAN India)"]].concat(ADMIN ? [["manage", "⚙️ Manage"]] : []);
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    ({ near: pNear, browse: pBrowse, manage: pManage })[TAB]();
+  }
+  var typeChips = function (cb) { return '<div class="fx" id="ty">' + TYPES.map(function (x) { return '<span data-ty="' + x[0] + '" class="' + (x[0] === TY ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>"; };
+  function card(s, near) { return '<div class="sc">' + (near && s.km != null ? '<span class="km">' + s.km + ' km</span>' : "") + '<span class="tag t-' + s.type + '">' + (TN[s.type] || s.type) + '</span><b style="display:block">' + esc(s.name) + '</b>' + (s.address || s.city ? '<div class="muted" style="font-size:12.5px;margin-top:2px">' + esc([s.address, s.city, s.state, s.pincode].filter(Boolean).join(", ")) + '</div>' : "") + '<div class="row" style="gap:8px;margin-top:6px">' + (s.lat != null ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=' + s.lat + "," + s.lng + '">🧭 Directions</a>' : "") + (s.phone ? '<a class="btn ghost sm" href="tel:' + esc(s.phone.replace(/[^0-9+]/g, "")) + '">📞 ' + esc(s.phone) + "</a>" : "") + "</div>" + (s.hours ? '<div class="muted" style="font-size:11.5px;margin-top:4px">🕑 ' + esc(s.hours) + "</div>" : "") + "</div>"; }
+  // ---- near me ----
+  function pNear() {
+    $("pane").innerHTML = '<div class="card">' + typeChips() + '<button class="btn pri block" id="loc" style="margin-top:8px">📍 Find stores near me</button><div class="muted" style="font-size:12px;margin-top:6px">Uses your phone’s location to list the closest outlets. Nothing is stored.</div></div><div id="nres">' + (NEAR ? "" : "") + "</div>";
+    [].forEach.call($("pane").querySelectorAll("[data-ty]"), function (b) { b.onclick = function () { TY = b.dataset.ty; if (YOU) runNear(); else pNear(); }; });
+    $("loc").onclick = function () { var b = this; b.disabled = true; b.textContent = "Getting your location…"; if (!navigator.geolocation) { b.disabled = false; return toast("This device can't share location."); } navigator.geolocation.getCurrentPosition(function (p) { YOU = { lat: p.coords.latitude, lng: p.coords.longitude }; runNear(); }, function (e) { b.disabled = false; b.textContent = "📍 Find stores near me"; toast(e.code === 1 ? "Allow location to find nearby stores" : "Couldn't get your location — switch on GPS"); }, { enableHighAccuracy: true, timeout: 20000 }); };
+    if (NEAR && YOU) showNear();
+  }
+  function runNear() { $("nres").innerHTML = '<div class="loading"><div class="spin"></div>Finding the nearest stores…</div>'; api({ action: "store-near", lat: YOU.lat, lng: YOU.lng, type: TY }).then(function (r) { if (!r.ok) { $("nres").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } NEAR = r.items; pNear(); }); }
+  function showNear() {
+    if (!NEAR.length) { $("nres").innerHTML = '<div class="card empty"><div class="big">📍</div>No stores found nearby. Try “Browse” to see all stores, or HO can add stores in Manage.</div>'; return; }
+    $("nres").innerHTML = '<div id="smap"></div>' + NEAR.slice(0, 40).map(function (s) { return card(s, true); }).join("");
+    drawMap(NEAR.slice(0, 40), YOU);
+  }
+  function drawMap(items, you) {
+    L().then(function () { var el = $("smap"); if (!el) return; if (MAP) { try { MAP.remove(); } catch (e) { } } MAP = window.L.map(el); window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(MAP);
+      var pts = []; if (you) { window.L.circleMarker([you.lat, you.lng], { radius: 7, color: "#415FFF", fillOpacity: 1 }).addTo(MAP).bindPopup("You"); pts.push([you.lat, you.lng]); }
+      items.forEach(function (s) { if (s.lat == null) return; window.L.marker([s.lat, s.lng]).addTo(MAP).bindPopup("<b>" + esc(s.name) + "</b><br>" + (TN[s.type] || "") + (s.km != null ? "<br>" + s.km + " km" : "")); pts.push([s.lat, s.lng]); });
+      if (pts.length === 1) MAP.setView(pts[0], 13); else if (pts.length) MAP.fitBounds(pts, { padding: [30, 30], maxZoom: 15 });
+    }).catch(function () { var el = $("smap"); if (el) el.style.display = "none"; });
+  }
+  // ---- browse PAN India ----
+  function pBrowse() {
+    $("pane").innerHTML = '<div class="card">' + typeChips() + '<label class="lb">State</label><select class="tx" id="st"></select><input class="tx" id="q" placeholder="Search name, city or pincode" value="' + esc(Q) + '" style="margin-top:6px"></div><div id="bres"><div class="loading"><div class="spin"></div></div></div>';
+    [].forEach.call($("pane").querySelectorAll("[data-ty]"), function (b) { b.onclick = function () { TY = b.dataset.ty; runBrowse(); }; });
+    $("q").oninput = function () { Q = this.value; clearTimeout(window.__bt); window.__bt = setTimeout(runBrowse, 350); };
+    $("st").onchange = function () { ST = this.value; runBrowse(); };
+    runBrowse(true);
+  }
+  function runBrowse(fillStates) {
+    api({ action: "store-list", state: ST, type: TY, q: Q }).then(function (r) {
+      if (!r.ok) { $("bres").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      if (fillStates && $("st")) { $("st").innerHTML = '<option value="">All states (' + r.total + ')</option>' + r.states.map(function (s) { return '<option value="' + esc(s.state) + '"' + (s.state === ST ? " selected" : "") + ">" + esc(s.state) + " (" + s.n + ")</option>"; }).join(""); }
+      $("bres").innerHTML = r.items.length ? '<div class="muted" style="font-size:12px;margin:8px 0">' + r.items.length + " store(s)</div>" + r.items.map(function (s) { return card(s); }).join("") : '<div class="card empty"><div class="big">🗺️</div>No stores match. ' + (ADMIN ? "Add stores in Manage." : "HO is adding stores.") + "</div>";
+    });
+  }
+  // ---- admin manage ----
+  function pManage() {
+    $("pane").innerHTML = '<div class="card"><b>➕ Add / edit a store</b><div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="lb">Name</label><input class="tx" id="mn"></div><div><label class="lb">Type</label><select class="tx" id="mt">' + Object.keys(TN).map(function (k) { return '<option value="' + k + '">' + TN[k] + "</option>"; }).join("") + '</select></div></div><label class="lb">Address</label><input class="tx" id="ma" placeholder="Shop, street, area"><div class="g2" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><label class="lb">City</label><input class="tx" id="mc"></div><div><label class="lb">State</label><input class="tx" id="ms"></div><div><label class="lb">Pincode</label><input class="tx" id="mpin"></div></div><div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="lb">Phone</label><input class="tx" id="mph"></div><div><label class="lb">Hours</label><input class="tx" id="mh" placeholder="10am–8pm"></div></div><div id="mgeo" class="muted" style="font-size:12px;margin-top:6px"></div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="mlocate">📍 Find on map (from address)</button><button class="btn ghost sm" id="mhere">Use my current GPS</button></div><button class="btn pri block" id="msave" style="margin-top:8px" disabled>Save store</button></div>' +
+      '<div class="card"><b>⬆ Bulk import (Excel / CSV)</b><div class="muted" style="font-size:12.5px">Columns: Name, Type (exclusive/authorized/general/service), Address, City, State, Pincode, Phone, Hours, Lat, Lng. Rows with an address but no Lat/Lng are placed on the map on your device before saving.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="bdl">⬇ Blank CSV</button><button class="btn pri sm" id="bfile">📁 Choose file</button></div><div id="bimp"></div></div>' +
+      '<div class="card"><div class="row"><b style="flex:1">Stores</b><button class="btn ghost sm" id="mexp">⬇ Export</button></div><div id="mlist"><div class="loading"><div class="spin"></div></div></div></div>';
+    var coord = { lat: null, lng: null };
+    var setGeo = function (lat, lng, label) { coord.lat = lat; coord.lng = lng; $("mgeo").innerHTML = lat != null ? "📍 Placed at " + lat.toFixed(5) + ", " + lng.toFixed(5) + (label ? " — " + esc(label) : "") : ""; $("msave").disabled = !($("mn").value.trim() && (coord.lat != null || $("ma").value.trim())); };
+    $("mn").oninput = $("ma").oninput = function () { $("msave").disabled = !($("mn").value.trim() && (coord.lat != null || $("ma").value.trim())); };
+    $("mlocate").onclick = function () { var q = [$("ma").value, $("mc").value, $("ms").value, $("mpin").value, "India"].filter(Boolean).join(", "); if (!q) return toast("Enter an address first"); $("mgeo").textContent = "Looking up the address…"; geocode(q).then(function (g) { if (!g) { $("mgeo").textContent = "Couldn't place that address — try adding city/pincode, or use GPS at the store."; return; } setGeo(g.lat, g.lng, g.name); }); };
+    $("mhere").onclick = function () { if (!navigator.geolocation) return toast("No GPS"); $("mgeo").textContent = "Getting GPS…"; navigator.geolocation.getCurrentPosition(function (p) { setGeo(p.coords.latitude, p.coords.longitude, "your location"); }, function () { $("mgeo").textContent = "Couldn't get GPS."; }, { enableHighAccuracy: true }); };
+    $("msave").onclick = function () { var s = { name: $("mn").value, type: $("mt").value, address: $("ma").value, city: $("mc").value, state: $("ms").value, pincode: $("mpin").value, phone: $("mph").value, hours: $("mh").value, lat: coord.lat, lng: coord.lng }; api({ action: "store-save", store: s }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); ["mn", "ma", "mc", "mpin", "mph", "mh"].forEach(function (id) { $(id).value = ""; }); coord.lat = coord.lng = null; $("mgeo").textContent = ""; $("msave").disabled = true; mlist(); }); };
+    $("bdl").onclick = function () { download(new Blob(["﻿Name,Type,Address,City,State,Pincode,Phone,Hours,Lat,Lng\nvivo Exclusive Store MG Road,exclusive,12 MG Road,Patna,Bihar,800001,9999999999,10am-8pm,,\n"], { type: "text/csv" }), "stores_template.csv"); };
+    $("bfile").onclick = bulkImport;
+    $("mexp").onclick = function () { api({ action: "store-list" }).then(function (r) { if (!r.ok) return toast(r.error); download(xlsx([{ name: "Stores", rows: [["Name", "Type", "Address", "City", "State", "Pincode", "Phone", "Hours", "Lat", "Lng"]].concat(r.items.map(function (s) { return [s.name, s.type, s.address, s.city, s.state, s.pincode, s.phone, s.hours, s.lat, s.lng]; })) }]), "vivo_stores.xlsx"); }); };
+    mlist();
+  }
+  function mlist() {
+    api({ action: "store-list" }).then(function (r) { if (!$("mlist")) return; if (!r.ok) { $("mlist").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("mlist").innerHTML = r.items.length ? '<div class="muted" style="font-size:12px;margin:6px 0">' + r.total + " stores</div>" + r.items.slice(0, 300).map(function (s) { return '<div class="hl" style="display:flex;gap:8px;align-items:center"><span style="flex:1"><b>' + esc(s.name) + '</b> <span class="muted">· ' + (TN[s.type] || "") + (s.city ? " · " + esc(s.city) : "") + '</span>' + (s.lat == null ? ' <span style="color:var(--bad);font-size:11px">⚠ no map</span>' : "") + '</span><button class="btn ghost sm" data-del="' + s.id + '" style="color:var(--bad)">✕</button></div>'; }).join("") : '<div class="muted" style="font-size:13px">No stores yet.</div>';
+      [].forEach.call($("mlist").querySelectorAll("[data-del]"), function (b) { b.onclick = function () { api({ action: "store-delete", id: b.dataset.del }).then(function () { mlist(); }); }; });
+    });
+  }
+  function geocode(q) { return fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&q=" + encodeURIComponent(q), { headers: { accept: "application/json" } }).then(function (r) { return r.json(); }).then(function (d) { return d && d[0] ? { lat: +(+d[0].lat).toFixed(6), lng: +(+d[0].lon).toFixed(6), name: (d[0].display_name || "").slice(0, 50) } : null; }).catch(function () { return null; }); }
+  function bulkImport() {
+    var i = document.createElement("input"); i.type = "file"; i.accept = ".csv,.xlsx,.xls"; i.onchange = function () {
+      var fl = i.files[0]; if (!fl) return; $("bimp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading…</div>';
+      fl.arrayBuffer().then(function (buf) { return (window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); })).then(function () {
+        var wb = window.XLSX.read(buf, { type: "array" }), A = window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); });
+        if (A.length < 2) return $("bimp").innerHTML = '<div class="err">No rows found.</div>';
+        var H = A[0].map(function (h) { return String(h).trim().toLowerCase(); }), col = function (n) { return H.indexOf(n); };
+        var rows = A.slice(1, 3001).map(function (r) { return { name: r[col("name")], type: String(r[col("type")] || "").toLowerCase(), address: r[col("address")], city: r[col("city")], state: r[col("state")], pincode: r[col("pincode")], phone: r[col("phone")], hours: r[col("hours")], lat: r[col("lat")], lng: r[col("lng")] }; }).filter(function (r) { return String(r.name || "").trim(); });
+        runImport(rows);
+      }); }).catch(function (e) { $("bimp").innerHTML = '<div class="err">' + esc(e.message || "Couldn't read the file") + "</div>"; });
+    }; i.click();
+  }
+  function runImport(rows) {
+    var need = rows.filter(function (r) { return (!r.lat || !r.lng) && (r.address || r.city); }), done = 0;
+    $("bimp").innerHTML = '<div class="notice info" style="margin-top:8px">' + rows.length + " store(s). " + (need.length ? "Placing " + need.length + " on the map (geocoding)… this runs on your device and is slow (about 1/sec)." : "") + '<div id="gp" style="margin-top:4px"></div></div>';
+    var geoNext = function (k) {
+      if (k >= need.length) return save();
+      if ($("gp")) $("gp").textContent = "Placed " + k + " of " + need.length + "…";
+      geocode([need[k].address, need[k].city, need[k].state, need[k].pincode, "India"].filter(Boolean).join(", ")).then(function (g) { if (g) { need[k].lat = g.lat; need[k].lng = g.lng; done++; } setTimeout(function () { geoNext(k + 1); }, 1100); });
+    };
+    var save = function () { api({ action: "store-import", rows: rows }).then(function (r) { if (!r.ok) { $("bimp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } $("bimp").innerHTML = '<div class="notice info" style="margin-top:8px">✅ ' + r.added + " store(s) added" + (need.length ? " · " + done + " placed on the map" : "") + ".</div>"; mlist(); }); };
+    if (need.length) geoNext(0); else save();
+  }
+  load();
+})();
+</script>
+</body>
+</html>
