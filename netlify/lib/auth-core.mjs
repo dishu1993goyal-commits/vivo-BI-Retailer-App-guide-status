@@ -1001,7 +1001,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^nl-/.test(b.action)) return newsletterAction(b, Object.assign(surveyCtx(), { mailFetch }));
     if (/^ag-/.test(b.action)) return appguideAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^geo-/.test(b.action)) return geoAction(b, surveyCtx());
-    if (/^store-/.test(b.action)) return storesAction(b, surveyCtx());
+    if (/^store-/.test(b.action)) return storesAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^(phub|advis)-/.test(b.action)) return productsAction(b, surveyCtx());
     if (/^scha-/.test(b.action)) return schemeaiAction(b, surveyCtx());
     if (/^rw-/.test(b.action)) return rewardsAction(b, Object.assign(surveyCtx(), { siteFetch }));

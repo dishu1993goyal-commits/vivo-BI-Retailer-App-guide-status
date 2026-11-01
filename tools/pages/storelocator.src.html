@@ -40,7 +40,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     ({ near: pNear, live: pLive, browse: pBrowse, manage: pManage })[TAB]();
   }
   var typeChips = function (cb) { return '<div class="fx" id="ty">' + TYPES.map(function (x) { return '<span data-ty="' + x[0] + '" class="' + (x[0] === TY ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>"; };
-  function card(s, near, i) { var addr = s.address && s.city && s.address.indexOf(s.city) >= 0 ? [s.address] : [s.address, s.city, s.state, s.pincode]; return '<div class="sc">' + (s.src ? '<span class="src">' + esc(s.src) + "</span>" : "") + (near && s.km != null ? '<span class="km">' + s.km + ' km</span>' : "") + '<span class="tag t-' + s.type + '">' + (TN[s.type] || s.type) + '</span><b style="display:block">' + esc(s.name) + (s.rating ? ' <span class="muted" style="font-weight:600;font-size:12px">★ ' + s.rating + "</span>" : "") + '</b>' + (s.address || s.city ? '<div class="muted" style="font-size:12.5px;margin-top:2px">' + esc(addr.filter(Boolean).join(", ")) + '</div>' : "") + (s.lat != null ? '<div class="gps">📍 ' + (+s.lat).toFixed(6) + ", " + (+s.lng).toFixed(6) + "</div>" : "") + '<div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap">' + (s.lat != null ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(s.maps || "https://www.google.com/maps/dir/?api=1&destination=" + s.lat + "," + s.lng) + '">🧭 Directions</a>' : "") + (i != null && ADMIN ? '<button class="btn ghost sm" data-add="' + i + '">➕ Add to directory</button>' : "") + (s.phone ? '<a class="btn ghost sm" href="tel:' + esc(s.phone.replace(/[^0-9+]/g, "")) + '">📞 ' + esc(s.phone) + "</a>" : "") + "</div>" + (s.hours ? '<div class="muted" style="font-size:11.5px;margin-top:4px">🕑 ' + esc(s.hours) + "</div>" : "") + "</div>"; }
+  function card(s, near, i) { var addr = s.address && s.city && s.address.indexOf(s.city) >= 0 ? [s.address] : [s.address, s.city, s.state, s.pincode]; return '<div class="sc">' + (s.src ? '<span class="src">' + esc(s.src) + "</span>" : "") + (near && s.km != null ? '<span class="km">' + s.km + ' km</span>' : "") + '<span class="tag t-' + s.type + '">' + (TN[s.type] || s.type) + '</span><b style="display:block">' + esc(s.name) + (s.rating ? ' <span class="muted" style="font-weight:600;font-size:12px">★ ' + s.rating + "</span>" : "") + '</b>' + (s.address || s.city ? '<div class="muted" style="font-size:12.5px;margin-top:2px">' + esc(addr.filter(Boolean).join(", ")) + '</div>' : "") + (s.lat != null ? '<div class="gps">📍 ' + (+s.lat).toFixed(6) + ", " + (+s.lng).toFixed(6) + (s.approx ? " · approx. (" + esc(s.approx) + " centre)" : "") + "</div>" : "") + (s.source ? '<div class="gps">🔗 <a href="' + esc(s.source) + '" target="_blank" rel="noopener">source</a></div>' : "") + '<div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap">' + (s.lat != null ? '<a class="btn ghost sm" target="_blank" rel="noopener" href="' + esc(s.maps || "https://www.google.com/maps/dir/?api=1&destination=" + s.lat + "," + s.lng) + '">🧭 Directions</a>' : "") + (i != null && ADMIN ? '<button class="btn ghost sm" data-add="' + i + '">➕ Add to directory</button>' : "") + (s.phone ? '<a class="btn ghost sm" href="tel:' + esc(s.phone.replace(/[^0-9+]/g, "")) + '">📞 ' + esc(s.phone) + "</a>" : "") + "</div>" + (s.hours ? '<div class="muted" style="font-size:11.5px;margin-top:4px">🕑 ' + esc(s.hours) + "</div>" : "") + "</div>"; }
   // ---- near me ----
   function pNear() {
     $("pane").innerHTML = '<div class="card">' + typeChips() + '<button class="btn pri block" id="loc" style="margin-top:8px">📍 Find stores near me</button><div class="muted" style="font-size:12px;margin-top:6px">Uses your phone’s location to list the closest outlets. Nothing is stored.</div></div><div id="nres">' + (NEAR ? "" : "") + "</div>";
@@ -81,18 +81,38 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       if (!r.ok && r.error && !navigator.onLine) r.error = "You're offline.";
       if (!r.ok) { box.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       if (r.provider === "google") return done(r.items.map(function (x) { x.src = "Google Maps"; return x; }), "Google Maps");
-      if (r.items) return done(r.items, "OpenStreetMap" + (r.googleError ? " (Google: " + r.googleError + ")" : ""));
+      if (r.items) { done(r.items, "OpenStreetMap" + (r.googleError ? " (Google: " + r.googleError + ")" : ""), r.job); return; }
       return osm(near).then(function (items) { done(items, "OpenStreetMap"); }).catch(function (e) { box.innerHTML = '<div class="err">Map search isn’t reachable right now (' + esc(e.message || e) + "). Try again in a minute.</div>"; });
     });
-    function done(items, via) {
+    function done(items, via, job) {
       if (near && YOU) items.forEach(function (x) { x.km = Math.round(km(YOU.lat, YOU.lng, x.lat, x.lng) * 10) / 10; }), items.sort(function (a, b) { return a.km - b.km; });
-      LIVE = { items: items.slice(0, 60), via: via, near: near }; showLive();
+      LIVE = { items: items.slice(0, 60), via: via, near: near, ai: job ? "running" : "" }; showLive();
+      if (job) pollAI(job, near, LIVE);
     }
+  }
+  function pollAI(id, near, mine) {
+    var n = 0, tick = function () {
+      if (LIVE !== mine) return;   // a newer search replaced this one
+      api({ action: "store-job", id: id }).then(function (r) {
+        if (LIVE !== mine) return;
+        if (!r.ok || r.status === "error") { mine.ai = "error"; mine.aiErr = (r && r.error) || ""; return showLive(); }
+        if (r.status === "running") { if (++n < 60) setTimeout(tick, 4000); else { mine.ai = "error"; mine.aiErr = "The AI search took too long."; showLive(); } return; }
+        var have = {}; mine.items.forEach(function (x) { have[x.name.toLowerCase().replace(/[^a-z0-9]/g, "")] = 1; });
+        r.items.forEach(function (x) { var k = x.name.toLowerCase().replace(/[^a-z0-9]/g, ""); if (have[k]) return; have[k] = 1; if (near && YOU) x.km = Math.round(km(YOU.lat, YOU.lng, x.lat, x.lng) * 10) / 10; mine.items.push(x); });
+        if (near) mine.items.sort(function (a, b) { return a.km - b.km; });
+        mine.ai = "done"; mine.aiN = r.items.length; mine.aiFound = r.found; showLive();
+      });
+    };
+    setTimeout(tick, 3000);
   }
   function showLive() {
     var box = $("lres"); if (!box) return; var it = LIVE.items;
-    if (!it.length) { box.innerHTML = '<div class="card empty"><div class="big">🔎</div>No ' + (TN[TY] || "stores") + " found on " + esc(LIVE.via) + " for this search. Try a nearby city, the whole state, or “All” types.</div>"; return; }
-    box.innerHTML = '<div class="muted" style="font-size:12px;margin:8px 0">' + it.length + " place(s) · from " + esc(LIVE.via) + '</div><div id="smap"></div>' + it.map(function (s, i) { return card(s, LIVE.near, i); }).join("") +
+    var aiNote = LIVE.ai === "running" ? '<div class="notice info" style="margin-top:8px"><div class="spin" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:6px"></div>🤖 AI is also searching the web (Google Maps listings, vivo / Reliance / Croma / Vijay Sales store pages) and placing each address on the map — about 1 minute…</div>'
+      : LIVE.ai === "done" ? '<div class="notice info" style="margin-top:8px">🤖 AI web search added ' + (LIVE.aiN || 0) + " store(s)" + (LIVE.aiFound > LIVE.aiN ? " (" + (LIVE.aiFound - LIVE.aiN) + " more found but couldn’t be placed on the map)" : "") + ". AI results come from web listings — call ahead to confirm.</div>"
+      : LIVE.ai === "error" ? '<div class="notice" style="margin-top:8px">🤖 ' + esc(LIVE.aiErr || "AI web search didn’t work this time.") + "</div>" : "";
+    if (!it.length && LIVE.ai === "running") { box.innerHTML = aiNote; return; }
+    if (!it.length) { box.innerHTML = aiNote + '<div class="card empty"><div class="big">🔎</div>No ' + (TN[TY] || "stores") + " found on " + esc(LIVE.via) + " for this search. Try a nearby city, the whole state, or “All” types.</div>"; return; }
+    box.innerHTML = aiNote + '<div class="muted" style="font-size:12px;margin:8px 0">' + it.length + " place(s) · " + esc(LIVE.via) + (LIVE.ai === "done" ? " + AI web search" : "") + '</div><div id="smap"></div>' + it.map(function (s, i) { return card(s, LIVE.near, i); }).join("") +
       '<div class="muted" style="font-size:11.5px;margin-top:8px">Live map listings can be incomplete or out of date — call ahead before visiting.</div>';
     drawMap(it, LIVE.near ? YOU : null);
     [].forEach.call(box.querySelectorAll("[data-add]"), function (b) { b.onclick = function () { var s = it[+b.dataset.add]; api({ action: "store-save", store: { name: s.name, type: s.type, address: s.address, city: s.city, state: s.state, pincode: s.pincode, phone: s.phone, lat: s.lat, lng: s.lng } }).then(function (r) { if (!r.ok) return toast(r.error); b.disabled = true; b.textContent = "✓ Added"; }); }; });

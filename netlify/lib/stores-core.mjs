@@ -3,6 +3,7 @@
 // the admin's device (Nominatim) when a store is added, so only lat/lng reach the server.
 // Storage:  store:<id> { id, name, type, address, city, state, pincode, lat, lng, phone, hours, by, at }
 import { allowedFor } from "./access-core.mjs";
+import { research } from "./aff-core.mjs";
 import { randomBytes, createHash } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
@@ -33,7 +34,8 @@ async function osmLive(o, ctx) {
   const timed = async (url, opt, ms) => { const ac = new AbortController(), tm = setTimeout(() => ac.abort(), ms); try { const r = await f(url, Object.assign({ signal: ac.signal }, opt)); if (!r.ok) throw new Error("HTTP " + r.status); return await r.json(); } finally { clearTimeout(tm); } };
   const nom = (params) => timed("https://nominatim.openstreetmap.org/search?" + new URLSearchParams(Object.assign({ format: "jsonv2", countrycodes: "in", addressdetails: "1", extratags: "1", limit: "40" }, params)), { headers: { "user-agent": UA, accept: "application/json" } }, params.limit === "1" ? 3000 : 5000);
   const errs = [];
-  if (lat == null && city) { try { const g = await nom({ q: [city, state, "India"].filter(Boolean).join(", "), limit: "1" }); if (g[0]) { lat = +g[0].lat; lng = +g[0].lon; } } catch (e) { errs.push("place lookup: " + e.message); } }
+  const pin = (/\b\d{6}\b/.exec(q || "") || [])[0] || "";
+  if (lat == null && (city || pin)) { try { const g = await nom(pin ? { postalcode: pin, country: "India", limit: "1" } : { q: [city, state, "India"].filter(Boolean).join(", "), limit: "1" }); if (g[0]) { lat = +g[0].lat; lng = +g[0].lon; } else if (pin && city) { const g2 = await nom({ q: [city, state, "India"].filter(Boolean).join(", "), limit: "1" }); if (g2[0]) { lat = +g2[0].lat; lng = +g2[0].lon; } } } catch (e) { errs.push("place lookup: " + e.message); } }
   const near = lat != null, d = near ? 0.25 : 0;
   // 1) Nominatim name search
   const pNom = nom(Object.assign({ q: NOMQ[ty] + (!near && state ? ", " + state : "") }, near ? { viewbox: [lng - d, lat + d, lng + d, lat - d].join(","), bounded: "1" } : {}))
@@ -56,9 +58,62 @@ async function osmLive(o, ctx) {
     const type = ty || (/care|service/i.test(x.name) ? "service" : /exclusive|brand store/i.test(x.name) ? "exclusive" : "authorized");
     items.push(Object.assign(x, { type, lat: Math.round(x.lat * 1e6) / 1e6, lng: Math.round(x.lng * 1e6) / 1e6, src: "OpenStreetMap" }));
   }
-  if (!items.length && errs.length === (near || area ? 2 : 1)) return json(200, { ok: false, error: "Map search isn't reachable right now — try again in a minute. (" + errs.join("; ").slice(0, 160) + ")" });
   if (items.length) await store.set(ck, { at: t, items: items.slice(0, 80) });
-  return json(200, { ok: true, provider: "osm", items: items.slice(0, 80), googleError: o.googleError, center: near ? { lat, lng } : null });
+  // few map results: AI searches the web for real listings in the background (addresses are then placed on the map)
+  let job = "";
+  if (items.length < 6) job = await startStoreJob({ ty, city, state, pin, q, lat, lng }, ctx);
+  return json(200, { ok: true, provider: "osm", items: items.slice(0, 80), googleError: o.googleError, center: near ? { lat, lng } : null, job, mapErrors: items.length ? "" : errs.join("; ").slice(0, 200) });
+}
+
+// ---------- AI web search (background job) ----------
+const TLABEL = { "": "vivo mobile stores (vivo exclusive stores, vivo authorised dealers, vivo service centres)", exclusive: "vivo exclusive stores", authorized: "vivo authorised mobile dealers / retailers", general: "mobile phone shops", service: "vivo service centres", reliance: "Reliance Digital stores", croma: "Croma stores", vijaysales: "Vijay Sales stores" };
+async function startStoreJob(p, ctx) {
+  const { store, t, env = {} } = ctx;
+  const where = [p.city, p.state].filter(Boolean).join(", ") || (p.lat != null ? "" : "");
+  const ck = "storeai:" + createHash("sha1").update([p.ty, p.city, p.state, p.pin, p.lat != null ? p.lat.toFixed(1) + "," + p.lng.toFixed(1) : ""].join("|")).digest("hex").slice(0, 20);
+  const hit = await store.get(ck);
+  if (hit && hit.status === "done" && t - hit.at < 7 * 864e5) return ck.slice(8);
+  if (hit && hit.status === "running" && t - hit.at < 5 * 60e3) return ck.slice(8);
+  await store.set(ck, { status: "running", at: t, p: Object.assign({}, p, { where }) });
+  try { await (ctx.jobFetch || fetch)((env.SITE_URL || "") + "/.netlify/functions/storefind-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: ck.slice(8) }) }); }
+  catch (e) { await store.set(ck, { status: "error", at: t, error: "Couldn't start the AI search." }); return ""; }
+  return ck.slice(8);
+}
+export async function runStoreJob(store, env, id, { fetchImpl = fetch, now = () => Date.now() } = {}) {
+  const k = "storeai:" + String(id).replace(/[^a-f0-9]/g, ""), job = await store.get(k); if (!job || job.status !== "running") return;
+  const p = job.p, ty = p.ty || "", f = fetchImpl;
+  try {
+    let place = [p.city, p.state].filter(Boolean).join(", ") + (p.pin ? " " + p.pin : "");
+    if (!place && p.lat != null) {   // near me: name the area first
+      try { const r = await f(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&lat=${p.lat}&lon=${p.lng}`, { headers: { "user-agent": UA } }); const j = await r.json(); const a = j.address || {}; place = [a.suburb || a.neighbourhood, a.city || a.town || a.county, a.state].filter(Boolean).join(", ") + (a.postcode ? " " + a.postcode : ""); } catch (e) { }
+    }
+    if (!place) throw new Error("Couldn't tell which area to search.");
+    const label = TLABEL[ty];
+    const prompt = `Find real ${label} in or near ${place}, India, using web search (Google Maps listings, store-locator pages of vivo.com/in, reliancedigital.in, croma.com, vijaysales.com, Justdial and similar).
+List ONLY stores that appear in your search results, with the full street address as written there. Never invent a store, address or phone number; leave a field "" if not shown.
+Return JSON only: {"stores":[{"name":"store name as listed","address":"full address","area":"locality","city":"","state":"","pincode":"6 digits or empty","phone":"","source":"URL where you found it"}]}
+Up to 15 stores, nearest to ${place} first.`;
+    const queries = { "": [`vivo store ${place} address`, `vivo service center ${place}`], general: [`mobile phone shop ${place}`] }[ty] || [`${label.replace(/ stores?$/, "")} ${place} address`];
+    const r = await research(store, env, { prompt, queries, validate: (d) => d && Array.isArray(d.stores) }, { fetchImpl: f, now });
+    if (!r.ok) throw new Error("AI web search didn't work: " + String(r.error).slice(0, 160));
+    const rx = ty && OSMRX[ty] ? new RegExp(OSMRX[ty], "i") : /vivo/i;
+    const list = r.data.stores.slice(0, 15).map((x) => ({ name: str(x && x.name, 80), address: str(x && x.address, 300), area: str(x && x.area, 60), city: str(x && x.city, 60) || p.city || "", state: str(x && x.state, 60) || p.state || "", pincode: (/\b\d{6}\b/.exec(String(x && (x.pincode || x.address) || "")) || [""])[0], phone: str(x && x.phone, 40), source: /^https?:\/\//.test(String(x && x.source)) ? str(x.source, 300) : "" }))
+      .filter((x) => x.name && x.address && (ty === "general" || rx.test(x.name + " " + (x.source || ""))));
+    // place each address on the map (OpenStreetMap allows ~1 lookup a second)
+    const geo = async (params) => { try { const r2 = await f("https://nominatim.openstreetmap.org/search?" + new URLSearchParams(Object.assign({ format: "jsonv2", countrycodes: "in", limit: "1" }, params)), { headers: { "user-agent": UA } }); const j = await r2.json(); return j && j[0] ? { lat: +j[0].lat, lng: +j[0].lon } : null; } catch (e) { return null; } };
+    const wait = () => new Promise((res) => setTimeout(res, env.FAST ? 0 : 1100));
+    const items = [];
+    for (const x of list) {
+      let g = await geo({ q: x.address + ", India" }), approx = "";
+      if (!g && x.area) { await wait(); g = await geo({ q: [x.area, x.city, x.state, "India"].filter(Boolean).join(", ") }); approx = "area"; }
+      if (!g && x.pincode) { await wait(); g = await geo({ postalcode: x.pincode, country: "India" }); approx = "pincode"; }
+      await wait();
+      if (!g) continue;
+      const type = ty || (/care|service/i.test(x.name) ? "service" : /exclusive|brand store/i.test(x.name) ? "exclusive" : "authorized");
+      items.push({ name: x.name, type, address: x.address, city: x.city, state: x.state, pincode: x.pincode, phone: x.phone, lat: Math.round(g.lat * 1e6) / 1e6, lng: Math.round(g.lng * 1e6) / 1e6, approx, maps: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(x.name + " " + x.address), source: x.source, src: "AI web search" });
+    }
+    await store.set(k, { status: "done", at: now(), p, items, model: r.model || "", found: list.length });
+  } catch (e) { await store.set(k, { status: "error", at: now(), p, error: str(e.message, 240) }); }
 }
 
 export async function storesAction(b, ctx) {
@@ -80,6 +135,11 @@ export async function storesAction(b, ctx) {
     let L = (await all()).filter((s) => s.lat != null && s.lng != null && (!STORE_TYPES[ty] || s.type === ty));
     L = L.map((s) => Object.assign(pub(s), { km: Math.round(dist(lat, lng, s.lat, s.lng) * 10) / 10 })).sort((a, c) => a.km - c.km).slice(0, 60);
     return json(200, { ok: true, items: L, you: { lat, lng } });
+  }
+  if (b.action === "store-job") {   // poll the AI web search
+    const j = await store.get("storeai:" + str(b.id, 40).replace(/[^a-f0-9]/g, "")); if (!j) return json(404, { ok: false, error: "Search expired — search again." });
+    if (j.status === "running" && t - j.at > 6 * 60e3) return json(200, { ok: true, status: "error", error: "The AI search took too long — try again." });
+    return json(200, { ok: true, status: j.status, items: j.items || [], error: j.error || "", found: j.found || 0 });
   }
   if (b.action === "store-live") {   // find stores anywhere on the map — real places with address + GPS (never AI-invented)
     const ty = STORE_TYPES[b.type] ? b.type : "", lat = num(b.lat, -90, 90), lng = num(b.lng, -180, 180), city = str(b.city, 60), state = str(b.state, 60), q = str(b.q, 80);
