@@ -323,7 +323,7 @@ textarea.tx{min-height:120px}
       var s = ""; for (var i = 0; i < Math.min(x.b.length, 65536); i++) s += String.fromCharCode(x.b[i]);
       var codec = v.codec || (/avc1|avc3/.test(s) ? "avc1" : /mp4v/.test(s) ? "mp4v" : /hvc1|hev1/.test(s) ? "hevc" : "");
       var msg;
-      if (st >= 400) msg = st === 410 || /expired/i.test(txt) ? "This free video is no longer on Hugging Face and wasn’t saved on the site (it was made before saving was added). Remove it and make it again." : "The site couldn’t fetch the video (" + st + (txt && txt.length < 120 ? ": " + txt : "") + ").";
+      if (st >= 400) msg = st === 410 || /expired/i.test(txt) ? "This free video expired on Hugging Face before the site could keep a copy" + (v.saveErr ? " (saving failed: " + v.saveErr + ")" : "") + ". Remove it and make it again — new videos are now saved with several retries, and again on first play." : "The site couldn’t fetch the video (" + st + (txt && txt.length < 120 ? ": " + txt : "") + ").";
       else if (/mp4v|hevc/.test(codec)) msg = "The model made the video in a format phones and browsers can’t play inside a page (" + codec + "). Tap ⬇ to download it — it plays in the phone’s video player — or make it with another method.";
       else msg = "The video is saved (" + Math.round((v.bytes || x.b.length) / 1024) + " KB" + (codec ? ", " + codec : "") + ") but this device couldn’t play it here. Tap ⬇ to download it and check it in the phone’s player.";
       box.innerHTML = '<div class="err">' + esc(msg) + '</div>' + (st < 400 ? '<a class="btn ghost sm" href="' + src + '" download="' + esc((v.title || "presenter").replace(/[^\w]+/g, "_")) + '.mp4" style="margin-top:6px">⬇ Download the presenter video</a>' : "");

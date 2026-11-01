@@ -145,15 +145,35 @@ export async function runHfJob(store, env, jobId, { fetchImpl = fetch, now = () 
     // free Spaces delete their results after a while — keep our own copy so the video never expires
     let stored = false, mime = "video/mp4", bytes = 0, codec = "", saveErr = "";
     if (store.setBinary) {
-      try {
-        await update({ stage: "Saving the video…" });
-        const rv = await f(url, { headers: S.headers });
-        if (rv.ok) { const ab = await rv.arrayBuffer(); mime = (rv.headers.get("content-type") || "").split(";")[0] || (/\.webm/i.test(url) ? "video/webm" : "video/mp4"); if (ab.byteLength > 1000 && ab.byteLength < 60e6) { await store.setBinary(`agvidbin:${job.vid}`, ab); stored = true; bytes = ab.byteLength; codec = videoCodec(new Uint8Array(ab)); } else saveErr = "size " + ab.byteLength; } else saveErr = "HTTP " + rv.status;
-      } catch (e) { saveErr = String(e.message || e).slice(0, 80); }
+      await update({ stage: "Saving the video…" });
+      const alt = /\/gradio_api\/file=/.test(url) ? url.replace("/gradio_api/file=", "/file=") : url.replace(/\/file=/, "/gradio_api/file=");
+      const tries = [[url, S.headers], [url, {}], [alt, S.headers], [alt, {}]], errs = [];
+      for (let round = 0; round < 3 && !stored; round++) {
+        if (round) await new Promise((r) => setTimeout(r, 4000));
+        for (const [u, h] of tries) {
+          try {
+            const r = await saveVideoCopy(store, job.vid, u, h, f);
+            if (r.ok) { stored = true; mime = r.mime; bytes = r.bytes; codec = r.codec; break; }
+            errs.push(r.error);
+          } catch (e) { errs.push(String(e.message || e).slice(0, 60)); }
+        }
+      }
+      if (!stored) saveErr = [...new Set(errs)].join("; ").slice(0, 160);
     }
     await update({ status: "done", hfUrl: url, stored, mime, bytes, codec, saveErr, stage: "", error: "" });
   } catch (e) { await update({ status: "error", error: str(e.message || e, 260), stage: "" }); }
   try { await store.delete(`aghfaud:${jobId}`); } catch (e) { }
+}
+// download a finished free video and keep our own copy (Hugging Face deletes results after a while)
+async function saveVideoCopy(store, vid, url, headers, f) {
+  const rv = await f(url, { headers: headers || {} });
+  if (!rv.ok) return { ok: false, error: "HTTP " + rv.status };
+  const ct = (rv.headers.get("content-type") || "").split(";")[0];
+  if (/text\/html|application\/json/.test(ct)) return { ok: false, error: "got " + ct + " not a video" };
+  const ab = await rv.arrayBuffer();
+  if (ab.byteLength < 1000 || ab.byteLength > 60e6) return { ok: false, error: "size " + ab.byteLength };
+  await store.setBinary(`agvidbin:${vid}`, ab);
+  return { ok: true, mime: ct && /video/.test(ct) ? ct : /\.webm/i.test(url) ? "video/webm" : "video/mp4", bytes: ab.byteLength, codec: videoCodec(new Uint8Array(ab)) };
 }
 export function videoCodec(u8) {   // which video codec is inside (browsers play avc1/h264, vp8/vp9/av1; not mp4v/mpeg-4 part 2)
   const s = Buffer.from(u8.subarray(0, Math.min(u8.length, 4e6))).toString("latin1");
@@ -181,7 +201,7 @@ async function freshVideo(v, keys, f) {
 function pubCfg(c, isAdmin, keys) {
   const p = c.presenter || {}, V = vcfg(c);
   return { kb: c.kb || "", video: isAdmin ? { provider: V.provider, show: V.show, hfSpace: V.hfSpace, hfApi: V.hfApi, hfNeedsVoice: V.hfNeedsVoice, motion: V.motion, expr: V.expr, keys: keys ? { did: !!keys.did, heygen: !!keys.heygen, hf: !!keys.hf } : undefined } : { provider: V.provider, show: V.show }, presenter: { name: p.name || "", voice: p.voice === "m" ? "m" : "f", hasPhoto: !!p.hasPhoto, consentBy: p.consentBy || "", consentAt: p.consentAt || 0 },
-    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did", stored: !!v.stored, bytes: v.bytes || 0, codec: v.codec || "" })) };
+    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did", stored: !!v.stored, saveErr: isAdmin ? v.saveErr || "" : "", bytes: v.bytes || 0, codec: v.codec || "" })) };
 }
 
 // GET /api/auth?agvid=<videoId> — stream the finished D-ID video from the same origin, so the page can draw it onto a
@@ -196,7 +216,18 @@ export async function serveAgVideo(id, store, env = {}, fetchImpl = fetch) {
     const fr = await freshVideo(v, keys, fetchImpl);
     if (!fr.url) return new Response("Not ready", { status: 404 });
     const up = await fetchImpl(fr.url, fr.headers ? { headers: fr.headers } : undefined);
-    if (!up.ok && v.provider === "hf") return new Response("This free video has expired on Hugging Face — make it again.", { status: 410 });
+    if (!up.ok && v.provider === "hf") return new Response("This free video has expired on Hugging Face" + (v.saveErr ? " (saving it had failed: " + v.saveErr + ")" : "") + " — make it again.", { status: 410 });
+    if (v.provider === "hf" && store.setBinary) {   // not saved yet: keep a copy now, while Hugging Face still has it
+      try {
+        const ab = await up.arrayBuffer(), ct = (up.headers.get("content-type") || "").split(";")[0];
+        if (ab.byteLength > 1000 && ab.byteLength < 60e6 && !/text\/html|json/.test(ct)) {
+          await store.setBinary(`agvidbin:${v.id}`, ab);
+          const c2 = (await store.get("config:appguide")) || { videos: [] }, v2 = (c2.videos || []).find((x) => x.id === v.id);
+          if (v2) { Object.assign(v2, { stored: true, bytes: ab.byteLength, codec: videoCodec(new Uint8Array(ab)), mime: /video/.test(ct) ? ct : v2.mime, saveErr: "" }); await store.set("config:appguide", c2); }
+        }
+        return new Response(ab, { status: 200, headers: { "content-type": ct || "video/mp4", "cache-control": "private, max-age=600", "access-control-allow-origin": "*" } });
+      } catch (e) { return new Response("Error", { status: 502 }); }
+    }
     if (!up.ok || !up.body) return new Response("Unavailable", { status: 502 });
     return new Response(up.body, { status: 200, headers: { "content-type": up.headers.get("content-type") || "video/mp4", "cache-control": "private, max-age=600", "access-control-allow-origin": "*" } });
   } catch (e) { return new Response("Error", { status: 502 }); }
