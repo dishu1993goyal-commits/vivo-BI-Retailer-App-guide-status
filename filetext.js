@@ -22,11 +22,25 @@
     return lib("pdfjs").then(function () { var pj = window.pdfjsLib; pj.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.js"; return pj.getDocument({ data: buf }).promise; }).then(function (doc) {
       var n = Math.min(doc.numPages, 60), chain = Promise.resolve(), out = [];
       for (var i = 1; i <= n; i++) (function (i) { chain = chain.then(function () { return doc.getPage(i).then(function (pg) { return pg.getTextContent().then(function (tc) {
-        // group items into rows by y, then into columns by the horizontal gap between items (keeps table columns apart with " | ")
-        var rows = {};
-        tc.items.forEach(function (it) { if (!it.str || !it.str.trim()) return; var y = Math.round(it.transform[5] / 2) * 2, w = it.width || (it.str.length * (it.transform[0] || 5) * 0.5); (rows[y] = rows[y] || []).push({ x: it.transform[4], end: it.transform[4] + w, s: it.str }); });
-        var lines = Object.keys(rows).map(Number).sort(function (a, b) { return b - a; }).map(function (y) {
-          var items = rows[y].sort(function (a, b) { return a.x - b.x; }), parts = [], cur = "", prevEnd = null;
+        // group items into rows by y
+        var rows = {}, allX = [];
+        tc.items.forEach(function (it) { if (!it.str || !it.str.trim()) return; var y = Math.round(it.transform[5] / 2) * 2, w = it.width || (it.str.length * (it.transform[0] || 5) * 0.5); var x = it.transform[4]; (rows[y] = rows[y] || []).push({ x: x, end: x + w, s: it.str }); allX.push(x); });
+        // column anchors: the left-edge positions that recur down the page (a real table grid), so cells line up even when the gap is small
+        allX.sort(function (a, b) { return a - b; });
+        var freq = [], tol = 10;
+        allX.forEach(function (x) { var g = freq[freq.length - 1]; if (g && x - g.x <= tol) { g.sum += x; g.n++; g.x = g.sum / g.n; } else freq.push({ x: x, sum: x, n: 1 }); });
+        var anchors = freq.filter(function (g) { return g.n >= 3; }).map(function (g) { return g.x; }).sort(function (a, b) { return a - b; });
+        var ys = Object.keys(rows).map(Number).sort(function (a, b) { return b - a; });
+        var useGrid = anchors.length >= 3 && ys.length >= 4;
+        var lines = ys.map(function (y) {
+          var items = rows[y].sort(function (a, b) { return a.x - b.x; });
+          if (useGrid) {
+            var cells = anchors.map(function () { return ""; });
+            items.forEach(function (it) { var best = 0, bd = 1e9; for (var c = 0; c < anchors.length; c++) { var d = Math.abs(it.x - anchors[c]); if (it.x >= anchors[c] - tol && d < bd) { bd = d; best = c; } } cells[best] = (cells[best] ? cells[best] + " " : "") + it.s; });
+            var nonEmpty = cells.filter(function (c) { return c.trim(); });
+            if (nonEmpty.length > 1) return cells.map(function (c) { return c.trim(); }).join(" | ").replace(/\s*\|(?:\s*\|)+\s*/g, " | ").replace(/^\s*\|\s*/, "").replace(/\s*\|\s*$/, "");
+          }
+          var parts = [], cur = "", prevEnd = null;   // fallback: split by gaps
           items.forEach(function (it) { if (prevEnd != null && it.x - prevEnd > 14) { parts.push(cur.trim()); cur = ""; } cur += (cur && it.x - prevEnd > 1 ? " " : "") + it.s; prevEnd = it.end; });
           if (cur.trim()) parts.push(cur.trim());
           return parts.join(" | ").replace(/\s+\|\s+/g, " | ").trim();

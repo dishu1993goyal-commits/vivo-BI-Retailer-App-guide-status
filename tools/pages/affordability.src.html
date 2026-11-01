@@ -567,13 +567,13 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
         return files.reduce(function (acc, f) { return acc.then(function (parts) { p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>Reading ' + esc(f.name) + "…</div>"; return window.BIFILES.extract(f).then(function (r) { parts.push("### " + r.name + "\n" + r.text); return parts; }).catch(function (e) { toast(e.message || String(e)); return parts; }); }); }, Promise.resolve([]));
       }).then(function (parts) {
         var text = parts.join("\n\n").slice(0, 160000); if (!text.trim()) { p.innerHTML = '<div class="err" style="margin-top:10px">Nothing readable was found in those files.</div>'; return; }
-        var chunks = chunkText(text, 6500);   // long sheets (many pages) are read in batches so no offers are missed
+        var chunks = chunkText(text, 7500);   // long sheets (many pages) are read in batches so no offers are missed
         var all = [], seen = {}, err = "";
         var run = function (i) {
           if (i >= chunks.length) { if (!all.length && err) { p.innerHTML = '<div class="err" style="margin-top:10px">' + esc(err) + "</div>"; return; } previewFileRows(p, all, after); return; }
           p.innerHTML = '<div class="loading" style="margin-top:10px"><div class="spin"></div>✨ AI is reading the offers… ' + (chunks.length > 1 ? "batch " + (i + 1) + " of " + chunks.length + " · " : "") + all.length + " found</div>";
           api({ action: "aff-report-ai", text: chunks[i] }).then(function (r) {
-            if (!r.ok) err = r.error; else (r.rows || []).forEach(function (x) { var key = (x.model + "|" + x.kind + "|" + x.partner + "|" + x.scheme + "|" + x.details).toLowerCase().replace(/\s+/g, " ").slice(0, 80); if (!seen[key]) { seen[key] = 1; all.push(x); } });
+            if (!r.ok) err = r.error; else (r.rows || []).forEach(function (x) { var key = (x.model + "|" + x.kind + "|" + x.partner + "|" + x.scheme + "|" + x.benefit + "|" + x.details).toLowerCase().replace(/\s+/g, " "); if (!seen[key]) { seen[key] = 1; all.push(x); } });
             run(i + 1);
           });
         };

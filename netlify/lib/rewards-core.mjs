@@ -13,6 +13,7 @@ const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const num = (v, d, lo, hi) => { const x = Number(v); return Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : d; };
 const low = (x) => String(x || "").trim().toLowerCase();
 const nid = (t) => t.toString(36) + randomBytes(3).toString("hex");
+const okUrl = (u) => /^https:\/\/[^\s"'<>]{4,600}$/i.test(String(u || "")) ? String(u) : "";
 export const RULE_TYPES = {
   rank_top: { scope: "state", label: "State in the top N ranks", p: ["n"] },
   rank_up: { scope: "state", label: "State rank improved by N or more", p: ["n"] },
@@ -46,7 +47,7 @@ export const DEF_CATALOG = [
 export function cleanCfg(c) {
   c = c && typeof c === "object" ? c : {};
   const rules = (Array.isArray(c.rules) ? c.rules : DEF_RULES).slice(0, 40).map((r, i) => ({ id: str(r.id, 20).replace(/[^a-z0-9_-]/gi, "") || "r" + i, type: RULE_TYPES[r.type] ? r.type : "rank_top", title: str(r.title, 60) || "Reward", n: num(r.n, 5, 0, 1000), x: num(r.x, 0, 0, 1000), kpi: KPIS.includes(r.kpi) ? r.kpi : "app", pts: num(r.pts, 100, 0, 100000), badge: str(r.badge, 40), on: r.on !== false }));
-  const catalog = (Array.isArray(c.catalog) ? c.catalog : DEF_CATALOG).slice(0, 100).map((x, i) => ({ id: str(x.id, 20).replace(/[^a-z0-9_-]/gi, "") || "o" + i, name: str(x.name, 80) || "Offer", cat: str(x.cat, 30) || "Other", brand: str(x.brand, 30), points: num(x.points, 100, 1, 1000000), desc: str(x.desc, 200), img: /^(https:\/\/|\/api\/auth\?img=)[^\s"'<>]{4,500}$/.test(String(x.img || "")) ? str(x.img, 500) : "", stock: x.stock === null || x.stock === "" || x.stock === undefined ? null : num(x.stock, 0, 0, 100000), on: x.on !== false }));
+  const catalog = (Array.isArray(c.catalog) ? c.catalog : DEF_CATALOG).slice(0, 100).map((x, i) => ({ id: str(x.id, 20).replace(/[^a-z0-9_-]/gi, "") || "o" + i, name: str(x.name, 80) || "Offer", cat: str(x.cat, 30) || "Other", brand: str(x.brand, 30), points: num(x.points, 100, 1, 1000000), desc: str(x.desc, 200), img: /^(https:\/\/|\/api\/auth\?img=)[^\s"'<>]{4,500}$/.test(String(x.img || "")) ? str(x.img, 500) : "", stock: x.stock === null || x.stock === "" || x.stock === undefined ? null : num(x.stock, 0, 0, 100000), auto: ["code", "link"].includes(x.auto) ? x.auto : "none", url: okUrl(x.url), on: x.on !== false }));
   return { period: c.period === "quarter" ? "quarter" : "month", rules, catalog, pointValue: num(c.pointValue, 1, 0, 1000), autoRun: c.autoRun !== false, terms: str(c.terms, 1500), minRedeem: num(c.minRedeem, 0, 0, 100000), by: c.by || "", at: c.at || 0 };
 }
 // period id: "2026-10" (month) or "2026-Q4"
@@ -140,6 +141,16 @@ export async function runRewardsAuto(store, env, { siteFetch = fetch, now = () =
   return runPeriod(store, pool, p, { siteFetch, env, t, by: "auto" });
 }
 
+async function pubCatalog(store, pool, items) {   // hide the codes, but tell users which offers are instant and any redirect link
+  const out = [];
+  for (const x of items) {
+    const o = { id: x.id, name: x.name, cat: x.cat, brand: x.brand, points: x.points, desc: x.desc, img: x.img, stock: x.stock, auto: x.auto, url: x.auto === "link" ? x.url : "" };
+    if (x.auto === "code") { const cp = await store.get(`rwcodes:${x.id}`); o.instant = !!(cp && cp.codes && cp.codes.length); o.soldOut = !o.instant; }
+    else if (x.auto === "link") o.instant = !!x.url;
+    out.push(o);
+  }
+  return out;
+}
 export async function rewardsAction(b, ctx) {
   const { store, t, app, rec, pool, env = {} } = ctx, isAdmin = app === "admin";
   const cfgRaw = await store.get("config:rewards"), cfg = cleanCfg(cfgRaw);
@@ -149,7 +160,7 @@ export async function rewardsAction(b, ctx) {
     const w = (await store.get(myK)) || { earned: [] }, reds = (await pool(await store.list("rwr:"), 40, (k) => store.get(k))).filter((r) => r && r.user.app === app && low(r.user.username) === low(rec.username)).sort((a, c) => c.at - a.at);
     const badges = {}; (w.earned || []).forEach((e) => { if (e.badge) badges[e.badge] = (badges[e.badge] || 0) + 1; });
     const lb = (await pool(await store.list("rww:state:"), 40, (k) => store.get(k))).filter(Boolean).map((x) => ({ name: x.name || x.username, state: x.state, pts: (x.earned || []).filter((e) => e.period === currentPeriod(cfg.period, t) || e.period === prevPeriod(currentPeriod(cfg.period, t))).reduce((a, e) => a + e.pts, 0), all: (x.earned || []).reduce((a, e) => a + e.pts, 0) })).sort((a, c) => c.all - a.all).slice(0, 10);
-    return json(200, { ok: true, wallet: Object.assign(bal(w), { earnedList: (w.earned || []).slice().sort((a, c) => c.at - a.at).slice(0, 200), badges }), redemptions: reds.slice(0, 100), catalog: cfg.catalog.filter((x) => x.on), rules: cfg.rules.filter((r) => r.on).map((r) => ({ title: r.title, type: r.type, label: RULE_TYPES[r.type].label, n: r.n, x: r.x, kpi: r.kpi, pts: r.pts, badge: r.badge })), period: cfg.period, current: currentPeriod(cfg.period, t), pointValue: cfg.pointValue, terms: cfg.terms, minRedeem: cfg.minRedeem, leaderboard: lb, configured: !!cfgRaw });
+    return json(200, { ok: true, wallet: Object.assign(bal(w), { earnedList: (w.earned || []).slice().sort((a, c) => c.at - a.at).slice(0, 200), badges }), redemptions: reds.slice(0, 100), catalog: await pubCatalog(store, pool, cfg.catalog.filter((x) => x.on)), rules: cfg.rules.filter((r) => r.on).map((r) => ({ title: r.title, type: r.type, label: RULE_TYPES[r.type].label, n: r.n, x: r.x, kpi: r.kpi, pts: r.pts, badge: r.badge })), period: cfg.period, current: currentPeriod(cfg.period, t), pointValue: cfg.pointValue, terms: cfg.terms, minRedeem: cfg.minRedeem, leaderboard: lb, configured: !!cfgRaw });
   }
   if (b.action === "rw-redeem") {
     const item = cfg.catalog.find((x) => x.id === b.item && x.on); if (!item) return json(404, { ok: false, error: "Offer not available." });
@@ -157,17 +168,36 @@ export async function rewardsAction(b, ctx) {
     if (B.balance < item.points) return json(400, { ok: false, error: "Not enough points — you need " + (item.points - B.balance) + " more." });
     if (cfg.minRedeem && B.earned < cfg.minRedeem) return json(400, { ok: false, error: "Redemption opens after you earn " + cfg.minRedeem + " points." });
     if (item.stock !== null) { const used = (await pool(await store.list("rwr:"), 40, (k) => store.get(k))).filter((r) => r && r.item.id === item.id && r.status !== "rejected").length; if (used >= item.stock) return json(400, { ok: false, error: "This offer is out of stock." }); }
-    const id = nid(t), r = { id, user: { app, username: rec.username, name: rec.fullName || rec.username, state: rec.state || "", email: rec.email || "" }, item: { id: item.id, name: item.name, points: item.points, cat: item.cat }, pts: item.points, status: "pending", code: "", note: str(b.note, 300), at: t };
-    w.held = (w.held || 0) + item.points; w.name = w.name || rec.fullName; w.state = w.state || rec.state || "";
+    const id = nid(t), r = { id, user: { app, username: rec.username, name: rec.fullName || rec.username, state: rec.state || "", email: rec.email || "" }, item: { id: item.id, name: item.name, points: item.points, cat: item.cat }, pts: item.points, status: "pending", code: "", url: "", note: str(b.note, 300), at: t };
+    // auto-redemption: hand over a pre-loaded code, or a redirect link, with no HO approval
+    let auto = false;
+    if (item.auto === "code") {
+      const ck = `rwcodes:${item.id}`, cp = (await store.get(ck)) || { codes: [] };
+      if ((cp.codes || []).length) { r.code = str(cp.codes.shift(), 120); cp.used = (cp.used || 0) + 1; await store.set(ck, cp); r.status = "fulfilled"; r.doneAt = t; r.by = "auto"; auto = true; }
+    } else if (item.auto === "link" && item.url) { r.url = item.url; r.status = "fulfilled"; r.doneAt = t; r.by = "auto"; auto = true; }
+    if (auto) { w.spent = (w.spent || 0) + item.points; } else { w.held = (w.held || 0) + item.points; }
+    w.name = w.name || rec.fullName; w.state = w.state || rec.state || "";
     await store.set(myK, w); await store.set(`rwr:${id}`, r);
-    await ctx.logEvent(store, t, app, rec, "reward-redeem", { device: item.name.slice(0, 50), ver: "" });
-    return json(200, { ok: true, redemption: r, wallet: bal(w) });
+    await ctx.logEvent(store, t, app, rec, (auto ? "reward-auto" : "reward-redeem"), { device: item.name.slice(0, 50), ver: "" });
+    return json(200, { ok: true, redemption: r, auto, wallet: bal(w) });
+  }
+  if (b.action === "rw-codes") {   // admin pre-loads coupon codes for an auto-redeem offer (codes are never sent back)
+    if (!isAdmin) return json(403, { ok: false, error: "Only HO admins manage rewards." });
+    const iid = str(b.item, 20).replace(/[^a-z0-9_-]/gi, ""); if (!iid) return json(400, { ok: false, error: "Choose an offer." });
+    const ck = `rwcodes:${iid}`, cur = (await store.get(ck)) || { codes: [], used: 0 };
+    if (b.op === "clear") { await store.delete(ck); return json(200, { ok: true, left: 0, used: cur.used || 0 }); }
+    const incoming = (Array.isArray(b.codes) ? b.codes : String(b.codes || "").split(/[\r\n,;\t]+/)).map((x) => str(x, 120)).filter(Boolean);
+    const codes = b.op === "add" ? (cur.codes || []).concat(incoming) : incoming;
+    const seen = {}, uniq = codes.filter((c) => (seen[c] ? false : (seen[c] = 1))).slice(0, 20000);
+    await store.set(ck, { codes: uniq, used: cur.used || 0, by: rec.fullName || rec.username, at: t });
+    return json(200, { ok: true, left: uniq.length, used: cur.used || 0 });
   }
   if (!isAdmin) return json(403, { ok: false, error: "Only HO admins manage rewards." });
   if (b.action === "rw-config") {
     if (b.save) { const c = cleanCfg(b.save); c.by = rec.fullName || rec.username; c.at = t; await store.set("config:rewards", c); return json(200, { ok: true, config: c }); }
     const runs = (await pool(await store.list("rwrun:"), 20, async (k) => Object.assign({ period: k.slice(6) }, await store.get(k)))).sort((a, c) => c.at - a.at).slice(0, 12);
-    return json(200, { ok: true, config: cfg, types: RULE_TYPES, runs, current: currentPeriod(cfg.period, t), configured: !!cfgRaw });
+    const codeStat = {}; for (const it of cfg.catalog) if (it.auto === "code") { const cp = await store.get(`rwcodes:${it.id}`); codeStat[it.id] = { left: cp && cp.codes ? cp.codes.length : 0, used: cp ? cp.used || 0 : 0 }; }
+    return json(200, { ok: true, config: cfg, types: RULE_TYPES, runs, codes: codeStat, current: currentPeriod(cfg.period, t), configured: !!cfgRaw });
   }
   if (b.action === "rw-run") {
     const p = str(b.period, 10); if (!periodRange(p)) return json(400, { ok: false, error: "Choose a month (2026-10) or quarter (2026-Q4)." });

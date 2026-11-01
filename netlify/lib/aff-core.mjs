@@ -595,20 +595,26 @@ ${JSON.stringify(offers)}`;
     const cat = (await store.get("affcat")) || { models: [] };
     const names = cat.models.map((m) => m.name).slice(0, 400);
     const keys = await aiKeys(store, ctx.env || {}); if (!keys.groq) return json(200, { ok: false, error: "AI key not set (Affordability → Data)." });
-    const prompt = `You read vivo India affordability / offer sheets (often tables) and turn EVERY offer into a structured row for the sales team.
-The text comes from a PDF/Excel; table cells on one row are separated by " | ". A single model row usually lists SEVERAL offers across columns — one per bank or finance partner. Output a SEPARATE row for EACH partner/scheme/benefit you can see, not just one per model. Be exhaustive: it is better to include an offer with an empty field than to drop it.
-Read these common short forms: MOP = model price; NCE = No Cost EMI; CCEMI = credit-card EMI; LCE/FS = full swipe; CB = cashback; "24|0" or "24/0" = tenure|advance EMIs; EW = extended warranty / V-Shield; SDP/CDP = standard/discounted plan; ABB = assured buy-back. Partner/bank names include Bajaj Finance, HDFC, HDB, ICICI, SBI, Axis, Kotak, IDFC, TVS, Home Credit, OneCard, Pine Labs, Benow, and "Paper Cards"/"Bank Schemes" (use that as the partner when no specific bank is named).
-Match each to the closest model from MODELS (use that exact name); if a cell names no model, use the model named at the start of that table row/section. Skip page headers, totals and terms-and-conditions text.
-"kind" is one of: emi (any finance/EMI/NCE/cashback-on-EMI), exchange, upgrade, vshield (EW/protection), abb, cashback (instant cashback/discount), other.
-Whole rupees; copy schemes in "tenure/advance" form. Never invent — only what the text supports.
-Return JSON only: {"offers":[{"model":"exact model name","kind":"emi","partner":"bank/NBFC or brand","scheme":"24/0 or empty","benefit":"short headline e.g. ₹2000 cashback or No Cost EMI 24m","details":"what the customer gets incl. partner and price if shown, one line","variant":"e.g. 16+512G or empty","validTill":"YYYY-MM-DD or empty"}]}
+    const prompt = `You read vivo India affordability / bank-scheme / offer tables and turn EVERY offer line into a structured row for the sales team. BE EXHAUSTIVE — list every row; never summarise, sample, or stop early.
+The text is extracted from a PDF; columns on a row are separated by " | ". A typical "Bank Schemes" table has columns like: Model Name (often with a variant suffix such as _NCE Only, _NCE+CB, _CB Only), MOP (price), Min Swipe, NCE (No Cost EMI months), LCE (low-cost EMI), CCEMI Cashback (%/₹ on credit-card EMI), CC Fullswipe Cashback, and "Cashback Eligible Banks" (a list like IDFC, DBS, SBI, Yes, Amex, HDFC, HSBC, Kotak, Axis, OneCard, UPI).
+Make ONE offer row for EACH model-variant line in the table (one per Model Name cell). In that row:
+- "model": the model WITHOUT the _suffix (e.g. "X Fold6(12+512G)_NCE+CB" → "X Fold6").
+- "variant": the RAM+storage in brackets if present (e.g. "12+512G").
+- "kind": emi for NCE/LCE/CCEMI/No Cost EMI lines; cashback for cashback/instant-discount; vshield for EW/V-Shield/protection; abb for assured buy-back; exchange/upgrade for those.
+- "partner": the eligible banks/partners for that line — copy the Cashback Eligible Banks list, or the bank/NBFC named (Bajaj Finance, DMI, HDB, IDFC, HDFC, ICICI, SBI, Axis, Kotak, OneCard, Amex, HSBC, DBS, Yes, TVS, Home Credit); use "Paper Cards" / "Bank Schemes" only when no bank is named.
+- "scheme": the EMI tenure/advance or month list (e.g. "3m,6m,9m", "24|0").
+- "benefit": a short headline (e.g. "12% CCEMI cashback", "No Cost EMI up to 24m", "Up to 12% CB on FS/UPI").
+- "details": one line with the price (MOP), the scheme, the cashback %/₹ and the eligible banks, as written.
+Also read the "Key Models Offer Highlight" / Paper Cards / Bajaj Finance highlight tables, V-Shield (EW) plan prices, exchange/upgrade bonus tables and assured buy-back tables — one row each.
+Ignore "NA" cells (a line with all-NA finance columns is still a No Cost EMI offer). Skip page titles, dates and terms-and-conditions text. Whole rupees; never invent.
+Return JSON only: {"offers":[{"model":"","kind":"emi","partner":"","scheme":"","benefit":"","details":"","variant":"","validTill":"YYYY-MM-DD or empty"}]}
 MODELS: ${JSON.stringify(names)}
 OFFER TEXT:
 ${text}`;
     const r = await groqJSON(keys.groq, prompt, ctx.aiFetch || fetch, { validate: (d) => d && Array.isArray(d.offers) });
     if (!r.ok) return json(200, { ok: false, error: r.error });
     const find = (n) => { const k = nameKey(n), sl = slugify(n); return cat.models.find((m) => m.slug === sl || nameKey(m.name) === k) || cat.models.find((m) => k && (nameKey(m.name).startsWith(k) || k.startsWith(nameKey(m.name)))); };
-    const rows = r.data.offers.slice(0, 200).map((o) => { const base = find(o && o.model); return { model: base ? base.name : str(o && o.model, 60), matched: !!base, kind: KINDS.includes(o && o.kind) ? o.kind : "other", partner: str(o && o.partner, 60), scheme: str(o && o.scheme, 20), benefit: str(o && o.benefit, 80), details: str(o && o.details, 400) || [str(o && o.partner, 60), str(o && o.scheme, 20), str(o && o.benefit, 80)].filter(Boolean).join(" · "), variant: str(o && o.variant, 30), validTill: /^\d{4}-\d{2}-\d{2}$/.test(String(o && o.validTill || "")) ? o.validTill : "" }; }).filter((x) => x.details && x.details.length >= 5);
+    const rows = r.data.offers.slice(0, 400).map((o) => { const base = find(o && o.model); return { model: base ? base.name : str(o && o.model, 60), matched: !!base, kind: KINDS.includes(o && o.kind) ? o.kind : "other", partner: str(o && o.partner, 60), scheme: str(o && o.scheme, 20), benefit: str(o && o.benefit, 80), details: str(o && o.details, 400) || [str(o && o.partner, 60), str(o && o.scheme, 20), str(o && o.benefit, 80)].filter(Boolean).join(" · "), variant: str(o && o.variant, 30), validTill: /^\d{4}-\d{2}-\d{2}$/.test(String(o && o.validTill || "")) ? o.validTill : "" }; }).filter((x) => x.details && x.details.length >= 5);
     return json(200, { ok: true, rows, models: names.length });
   }
   if (b.action === "aff-report-bulk") {   // CSV import: many reports at once
