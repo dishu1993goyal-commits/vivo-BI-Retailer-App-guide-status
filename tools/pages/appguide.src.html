@@ -247,6 +247,14 @@ textarea.tx{min-height:120px}
         });
       });
   }
+  function micFail(e, box, cam) {   // explain why the mic/camera didn't open, and offer the upload route
+    var n = String(e && e.name || e || ""), app = !!window.BIApp, ver = (function () { try { return window.BIApp && BIApp.appVersion ? String(BIApp.appVersion()) : ""; } catch (x) { return ""; } })();
+    var why = /NotAllowed|Security|denied/i.test(n) ? (app ? "The app isn’t allowed to use the " + (cam ? "camera/microphone" : "microphone") + ". Update to app version 6.7, then allow it when asked (or Phone Settings → Apps → vivo BI → Permissions)." : "Allow the " + (cam ? "camera and microphone" : "microphone") + " for this site (tap the lock icon in the address bar).")
+      : /NotReadable|TrackStart|Abort/i.test(n) ? (app ? "Android couldn’t start the " + (cam ? "camera/microphone" : "microphone") + " for the app — update to app version 6.7. Also close any call or other recording app." : "Another app is using the " + (cam ? "camera/microphone" : "microphone") + " — close it and try again.")
+      : /NotFound|Overconstrained/i.test(n) ? "No " + (cam ? "camera/microphone" : "microphone") + " was found on this device." : "Couldn’t open the " + (cam ? "camera/microphone" : "microphone") + " (" + n + ").";
+    var tip = cam ? " Meanwhile, record a selfie video with the phone’s camera and use 🎥 Upload a clip." : " Meanwhile, record your voice with the phone’s voice recorder and tap ⬆ Upload audio.";
+    if ($(box)) $(box).innerHTML = '<div style="color:var(--bad);font-size:12.5px;margin-top:6px">' + esc(why + tip) + "</div>"; else toast(why);
+  }
   function voiceRecorder(script, done) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return toast(window.BIApp ? "Update the app to version 6.6 to record here — or upload an audio file" : "This browser can't record — upload an audio file instead");
     var ov = document.createElement("div"); ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:#0A1C5C;display:flex;flex-direction:column";
@@ -257,7 +265,7 @@ textarea.tx{min-height:120px}
     var stop = function () { cancelAnimationFrame(raf); try { stream && stream.getTracks().forEach(function (x) { x.stop(); }); } catch (e) { } };
     $("vrx").onclick = function () { try { rec && rec.state !== "inactive" && (rec.onstop = null, rec.stop()); } catch (e) { } stop(); ov.remove(); };
     navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }).then(function (s) { stream = s; $("vrs").textContent = "Mic ready"; })
-      .catch(function (e) { stop(); ov.remove(); toast(/denied|NotAllowed/i.test(String(e && e.name || e)) ? "Allow the microphone to record the voice" : "Couldn't open the microphone"); });
+      .catch(function (e) { stop(); ov.remove(); micFail(e, "vstat"); });
     $("vrgo").onclick = function () {
       if (!stream) return;
       if (rec && rec.state === "recording") { rec.stop(); return; }
@@ -281,7 +289,7 @@ textarea.tx{min-height:120px}
     var stream = null, rec = null, chunks = [], raf = 0, t0 = 0, scroll = 0, stopAll = function () { cancelAnimationFrame(raf); try { stream && stream.getTracks().forEach(function (tr) { tr.stop(); }); } catch (e) { } };
     $("tpx").onclick = function () { try { rec && rec.state !== "inactive" && rec.stop(); } catch (e) { } chunks = []; stopAll(); ov.remove(); };
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 1280 } }, audio: { echoCancellation: true, noiseSuppression: true } }).then(function (s) { stream = s; $("tpv").srcObject = s; })
-      .catch(function (e) { stopAll(); ov.remove(); toast(/denied|NotAllowed/i.test(String(e && e.name || e)) ? "Allow camera and microphone to record" : "Couldn't open the camera"); });
+      .catch(function (e) { stopAll(); ov.remove(); micFail(e, "vo", true); });
     $("tpgo").onclick = function () {
       if (!stream) return;
       if (rec && rec.state === "recording") { rec.stop(); return; }
