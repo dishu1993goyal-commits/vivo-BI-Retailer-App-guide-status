@@ -140,29 +140,39 @@ export async function runHfJob(store, env, jobId, { fetchImpl = fetch, now = () 
     });
     await update({ stage: "Waiting in the free GPU queue…" });
     const result = await call(M.name, data, "video");
-    let url = null; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/\.(mp4|webm|mov)(\?|$)/i.test(x)) url = /^https?:/.test(x) ? x : base + "/file=" + x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { const u = x.url || (x.path ? base + "/file=" + x.path : ""); if (u && /video|mp4|webm|mov/i.test((x.mime_type || "") + u + (x.orig_name || ""))) { url = u; return; } if (x.video) walk(x.video); Object.keys(x).forEach((k) => { if (k !== "video") walk(x[k]); }); } })(result);
+    let url = null, vpath = ""; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/\.(mp4|webm|mov)(\?|$)/i.test(x)) url = /^https?:/.test(x) ? x : base + "/file=" + x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { const u = x.url || (x.path ? base + "/file=" + x.path : ""); if (u && /video|mp4|webm|mov/i.test((x.mime_type || "") + u + (x.orig_name || ""))) { url = u; vpath = x.path || ""; return; } if (x.video) walk(x.video); Object.keys(x).forEach((k) => { if (k !== "video") walk(x[k]); }); } })(result);
     if (!url) throw new Error("The model finished but returned no video.");
     // free Spaces delete their results after a while — keep our own copy so the video never expires
     let stored = false, mime = "video/mp4", bytes = 0, codec = "", saveErr = "";
     if (store.setBinary) {
       await update({ stage: "Saving the video…" });
-      const alt = /\/gradio_api\/file=/.test(url) ? url.replace("/gradio_api/file=", "/file=") : url.replace(/\/file=/, "/gradio_api/file=");
-      const tries = [[url, S.headers], [url, {}], [alt, S.headers], [alt, {}]], errs = [];
+      const urls = videoUrls(url, vpath, S.host), errs = [];
+      const tries = []; urls.forEach((u) => { tries.push([u, {}]); tries.push([u, S.headers]); });
       for (let round = 0; round < 3 && !stored; round++) {
         if (round) await new Promise((r) => setTimeout(r, 4000));
         for (const [u, h] of tries) {
           try {
             const r = await saveVideoCopy(store, job.vid, u, h, f);
             if (r.ok) { stored = true; mime = r.mime; bytes = r.bytes; codec = r.codec; break; }
-            errs.push(r.error);
+            errs.push(r.error + " " + u.replace(/^https?:\/\/[^/]+/, "").replace(/=.*\//, "=…/").slice(0, 40) + (h && h.authorization ? " +token" : ""));
           } catch (e) { errs.push(String(e.message || e).slice(0, 60)); }
         }
       }
-      if (!stored) saveErr = [...new Set(errs)].join("; ").slice(0, 160);
+      if (!stored) saveErr = [...new Set(errs)].slice(0, 6).join("; ").slice(0, 300);
     }
-    await update({ status: "done", hfUrl: url, stored, mime, bytes, codec, saveErr, stage: "", error: "" });
+    await update({ status: "done", hfUrl: url, hfPath: vpath, stored, mime, bytes, codec, saveErr, stage: "", error: "" });
   } catch (e) { await update({ status: "error", error: str(e.message || e, 260), stage: "" }); }
   try { await store.delete(`aghfaud:${jobId}`); } catch (e) { }
+}
+// every way the finished file might be reachable on the Space (Gradio 4 / 5 routes, http→https, rebuilt from its path)
+export function videoUrls(url, path, host) {
+  const L = [], add = (u) => { if (u && !L.includes(u)) L.push(u); };
+  const fix = (u) => String(u || "").replace(/^http:\/\//, "https://");
+  add(fix(url));
+  if (/\/gradio_api\/file=/.test(url)) add(fix(url).replace("/gradio_api/file=", "/file=")); else if (/\/file=/.test(url)) add(fix(url).replace("/file=", "/gradio_api/file="));
+  if (path && host) { add(host + "/gradio_api/file=" + path); add(host + "/file=" + path); }
+  if (url && host && !String(url).startsWith(host)) { const m = /\/(gradio_api\/)?file=.*/.exec(url); if (m) add(host + m[0]); }
+  return L.slice(0, 6);
 }
 // download a finished free video and keep our own copy (Hugging Face deletes results after a while)
 async function saveVideoCopy(store, vid, url, headers, f) {
@@ -215,7 +225,12 @@ export async function serveAgVideo(id, store, env = {}, fetchImpl = fetch) {
   try {
     const fr = await freshVideo(v, keys, fetchImpl);
     if (!fr.url) return new Response("Not ready", { status: 404 });
-    const up = await fetchImpl(fr.url, fr.headers ? { headers: fr.headers } : undefined);
+    let up = null;
+    if (v.provider === "hf") {   // try every form of the Space's file link, without and with the token
+      const host = (/^https?:\/\/[^/]+/.exec(fr.url) || [""])[0].replace(/^http:/, "https:");
+      for (const u of videoUrls(fr.url, v.hfPath, /hf\.space$/.test(host) ? host : "")) { for (const h of [{}, fr.headers || {}]) { try { const r = await fetchImpl(u, { headers: h }); if (r.ok && !/text\/html|json/.test(r.headers.get("content-type") || "")) { up = r; break; } up = up || r; } catch (e) { } } if (up && up.ok) break; }
+      if (!up) return new Response("Unavailable", { status: 502 });
+    } else up = await fetchImpl(fr.url, fr.headers ? { headers: fr.headers } : undefined);
     if (!up.ok && v.provider === "hf") return new Response("This free video has expired on Hugging Face" + (v.saveErr ? " (saving it had failed: " + v.saveErr + ")" : "") + " — make it again.", { status: 410 });
     if (v.provider === "hf" && store.setBinary) {   // not saved yet: keep a copy now, while Hugging Face still has it
       try {
