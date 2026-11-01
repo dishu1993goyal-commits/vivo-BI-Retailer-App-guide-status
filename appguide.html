@@ -679,6 +679,20 @@ textarea.tx{min-height:120px}
   }
   // Presenter explainer: load the finished D-ID talking head (same-origin proxy so the canvas isn't tainted) and
   // draw it as a moving presenter bubble over the captioned slideshow, with the presenter's voice as the soundtrack.
+  function videoProblem(v, box) {   // find out exactly why the video won't load, and say so
+    var src = "/api/auth?agvid=" + encodeURIComponent(v.id);
+    box.innerHTML = '<div class="loading"><div class="spin"></div>Checking the video…</div>';
+    fetch(src, { headers: { Range: "bytes=0-65535" } }).then(function (r) { return r.arrayBuffer().then(function (b) { return { r: r, b: new Uint8Array(b) }; }); }).then(function (x) {
+      var st = x.r.status, txt = ""; try { txt = new TextDecoder().decode(x.b.slice(0, 200)); } catch (e) { }
+      var s = ""; for (var i = 0; i < Math.min(x.b.length, 65536); i++) s += String.fromCharCode(x.b[i]);
+      var codec = v.codec || (/avc1|avc3/.test(s) ? "avc1" : /mp4v/.test(s) ? "mp4v" : /hvc1|hev1/.test(s) ? "hevc" : "");
+      var msg;
+      if (st >= 400) msg = st === 410 || /expired/i.test(txt) ? "This free video is no longer on Hugging Face and wasn’t saved on the site (it was made before saving was added). Remove it and make it again." : "The site couldn’t fetch the video (" + st + (txt && txt.length < 120 ? ": " + txt : "") + ").";
+      else if (/mp4v|hevc/.test(codec)) msg = "The model made the video in a format phones and browsers can’t play inside a page (" + codec + "). Tap ⬇ to download it — it plays in the phone’s video player — or make it with another method.";
+      else msg = "The video is saved (" + Math.round((v.bytes || x.b.length) / 1024) + " KB" + (codec ? ", " + codec : "") + ") but this device couldn’t play it here. Tap ⬇ to download it and check it in the phone’s player.";
+      box.innerHTML = '<div class="err">' + esc(msg) + '</div>' + (st < 400 ? '<a class="btn ghost sm" href="' + src + '" download="' + esc((v.title || "presenter").replace(/[^\w]+/g, "_")) + '.mp4" style="margin-top:6px">⬇ Download the presenter video</a>' : "");
+    }).catch(function (e) { box.innerHTML = '<div class="err">Couldn’t reach the site to load the video (' + esc(e.message || e) + ").</div>"; });
+  }
   function explainer(v, mount) {
     var f = fk(v.k) || { k: v.k, shots: [], tag: v.tag || "", name: v.title };
     var S = { title: v.title, tag: v.tag || f.tag, pname: (CFG.presenter || {}).name || "", scenes: (v.scenes && v.scenes.length ? v.scenes : [{ say: "", caption: f.name }]) };
@@ -686,7 +700,7 @@ textarea.tx{min-height:120px}
     box.innerHTML = '<div class="loading"><div class="spin"></div>Loading the presenter…</div>';
     var pv = document.createElement("video"); pv.crossOrigin = "anonymous"; pv.playsInline = true; pv.preload = "auto"; pv.muted = false;
     pv.onloadedmetadata = function () { slideshow(f, S, pv, box, v.title + " — presenter"); };
-    pv.onerror = function () { box.innerHTML = '<div class="err">' + (v.provider === "hf" ? "This free video is no longer on Hugging Face (free models delete results after a while). Remove it and make it again — new free videos are now saved on the site, so this won’t happen again." : "Couldn’t load the presenter video. Open it with ▶ Presenter only, then try again.") + "</div>"; };
+    pv.onerror = function () { videoProblem(v, box); };
     pv.src = "/api/auth?agvid=" + encodeURIComponent(v.id);
   }
   // Background removal (MediaPipe Selfie Segmentation) — cuts the presenter out of their photo/clip background so they

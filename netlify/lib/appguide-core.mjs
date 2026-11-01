@@ -143,17 +143,23 @@ export async function runHfJob(store, env, jobId, { fetchImpl = fetch, now = () 
     let url = null; (function walk(x) { if (url || !x) return; if (typeof x === "string") { if (/\.(mp4|webm|mov)(\?|$)/i.test(x)) url = /^https?:/.test(x) ? x : base + "/file=" + x; return; } if (Array.isArray(x)) return x.forEach(walk); if (typeof x === "object") { const u = x.url || (x.path ? base + "/file=" + x.path : ""); if (u && /video|mp4|webm|mov/i.test((x.mime_type || "") + u + (x.orig_name || ""))) { url = u; return; } if (x.video) walk(x.video); Object.keys(x).forEach((k) => { if (k !== "video") walk(x[k]); }); } })(result);
     if (!url) throw new Error("The model finished but returned no video.");
     // free Spaces delete their results after a while — keep our own copy so the video never expires
-    let stored = false, mime = "video/mp4";
+    let stored = false, mime = "video/mp4", bytes = 0, codec = "", saveErr = "";
     if (store.setBinary) {
       try {
         await update({ stage: "Saving the video…" });
         const rv = await f(url, { headers: S.headers });
-        if (rv.ok) { const ab = await rv.arrayBuffer(); mime = (rv.headers.get("content-type") || "").split(";")[0] || (/\.webm/i.test(url) ? "video/webm" : "video/mp4"); if (ab.byteLength > 1000 && ab.byteLength < 60e6) { await store.setBinary(`agvidbin:${job.vid}`, ab); stored = true; } }
-      } catch (e) { }
+        if (rv.ok) { const ab = await rv.arrayBuffer(); mime = (rv.headers.get("content-type") || "").split(";")[0] || (/\.webm/i.test(url) ? "video/webm" : "video/mp4"); if (ab.byteLength > 1000 && ab.byteLength < 60e6) { await store.setBinary(`agvidbin:${job.vid}`, ab); stored = true; bytes = ab.byteLength; codec = videoCodec(new Uint8Array(ab)); } else saveErr = "size " + ab.byteLength; } else saveErr = "HTTP " + rv.status;
+      } catch (e) { saveErr = String(e.message || e).slice(0, 80); }
     }
-    await update({ status: "done", hfUrl: url, stored, mime, stage: "", error: "" });
+    await update({ status: "done", hfUrl: url, stored, mime, bytes, codec, saveErr, stage: "", error: "" });
   } catch (e) { await update({ status: "error", error: str(e.message || e, 260), stage: "" }); }
   try { await store.delete(`aghfaud:${jobId}`); } catch (e) { }
+}
+export function videoCodec(u8) {   // which video codec is inside (browsers play avc1/h264, vp8/vp9/av1; not mp4v/mpeg-4 part 2)
+  const s = Buffer.from(u8.subarray(0, Math.min(u8.length, 4e6))).toString("latin1");
+  for (const c of ["avc1", "avc3", "hvc1", "hev1", "mp4v", "av01", "vp09"]) if (s.includes(c)) return c;
+  if (/V_VP9/.test(s)) return "vp9"; if (/V_VP8/.test(s)) return "vp8"; if (/V_AV1/.test(s)) return "av1"; if (/V_MPEG4/.test(s)) return "mpeg4";
+  return "";
 }
 // fresh status / download link for a presenter video, whichever service made it
 async function freshVideo(v, keys, f) {
@@ -175,7 +181,7 @@ async function freshVideo(v, keys, f) {
 function pubCfg(c, isAdmin, keys) {
   const p = c.presenter || {}, V = vcfg(c);
   return { kb: c.kb || "", video: isAdmin ? { provider: V.provider, show: V.show, hfSpace: V.hfSpace, hfApi: V.hfApi, hfNeedsVoice: V.hfNeedsVoice, motion: V.motion, expr: V.expr, keys: keys ? { did: !!keys.did, heygen: !!keys.heygen, hf: !!keys.hf } : undefined } : { provider: V.provider, show: V.show }, presenter: { name: p.name || "", voice: p.voice === "m" ? "m" : "f", hasPhoto: !!p.hasPhoto, consentBy: p.consentBy || "", consentAt: p.consentAt || 0 },
-    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did" })) };
+    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did", stored: !!v.stored, bytes: v.bytes || 0, codec: v.codec || "" })) };
 }
 
 // GET /api/auth?agvid=<videoId> — stream the finished D-ID video from the same origin, so the page can draw it onto a
