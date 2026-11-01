@@ -48,6 +48,29 @@ export async function geoAction(b, ctx) {
     await store.delete(`geoloc:${app}:${key}`); await log("user-cleared", low(rec.email)); return json(200, { ok: true });
   }
 
+  // ---- on-duty location sharing (consent-based): the user turns it on for their shift; it shares location only while on ----
+  const dutyK = `geoduty:${app}:${key}`;
+  if (b.action === "geo-duty-status") {
+    const d = (await store.get(dutyK)) || null;
+    return json(200, { ok: true, on: !!(d && d.on), since: d ? d.since : 0, at: d ? d.at : 0 });
+  }
+  if (b.action === "geo-duty-start" || b.action === "geo-duty-ping") {
+    const lat = num(b.lat, -90, 90), lng = num(b.lng, -180, 180), acc = num(b.acc, 0, 100000);
+    if (lat == null || lng == null) return json(400, { ok: false, error: "Couldn't read your location — switch on GPS and try again." });
+    const prev = (await store.get(dutyK)) || {};
+    const starting = b.action === "geo-duty-start" || !prev.on;
+    const d = { on: true, since: prev.on ? prev.since || t : t, lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, acc: acc == null ? null : Math.round(acc), at: t, name: rec.fullName || rec.username, username: rec.username, state: rec.state || "", email: low(rec.email) };
+    await store.set(dutyK, d);
+    await store.set(`geoloc:${app}:${key}`, { lat: d.lat, lng: d.lng, acc: d.acc, at: t, src: "duty" });
+    if (starting) await log("duty-on", low(rec.email), { status: "on duty" });
+    return json(200, { ok: true, on: true, since: d.since });
+  }
+  if (b.action === "geo-duty-stop") {
+    const d = (await store.get(dutyK)) || {};
+    if (d.on) { d.on = false; d.offAt = t; await store.set(dutyK, d); await log("duty-off", low(rec.email), { status: "off duty" }); }
+    return json(200, { ok: true, on: false });
+  }
+
   // ---- HO side ----
   if (app !== "admin") return json(403, { ok: false, error: "Only authorised HO admins can use the geo-locator." });
   const rule = ((await store.get("config:access")) || { r: {} }).r || {};
@@ -59,7 +82,9 @@ export async function geoAction(b, ctx) {
     if (!u) { await log("search", email, { status: "not-registered" }); return json(200, { ok: true, email, registered: false }); }
     const user = { name: u.u.fullName || u.u.username, username: u.u.username, app: u.app === "admin" ? "Admin app" : "State app", state: u.u.state || "", disabled: !!u.u.disabled };
     let last = null; const shared = await store.get(`geoloc:${u.app}:${u.key}`);
-    if (shared && t - shared.at < 90 * 864e5) last = Object.assign({}, shared, { label: "Shared by the user on request" });
+    if (shared && t - shared.at < 90 * 864e5) last = Object.assign({}, shared, { label: shared.src === "duty" ? "Shared while on duty" : "Shared by the user on request" });
+    const duty = await store.get(`geoduty:${u.app}:${u.key}`);
+    if (duty && duty.on) last = { lat: duty.lat, lng: duty.lng, acc: duty.acc, at: duty.at, src: "duty", label: "🟢 On duty — sharing live" };
     // their own market-visit check-in is location they already shared with HO for that visit
     const mo = (d) => new Date(d + 19800000).toISOString().slice(0, 7).replace("-", "");
     for (const m of [...new Set([mo(t), mo(t - 31 * 864e5)])]) {
@@ -92,6 +117,13 @@ export async function geoAction(b, ctx) {
   if (b.action === "geo-cancel") {
     const q = await store.get(`geoq:${str(b.id, 40).replace(/[^a-z0-9]/gi, "")}`); if (!q || q.status !== "pending") return json(200, { ok: true });
     q.status = "cancelled"; await store.set(`geoq:${q.id}`, q); await log("cancel", q.email, { req: q.id }); return json(200, { ok: true });
+  }
+  if (b.action === "geo-onduty") {   // field team currently on duty, with their latest shared location
+    const ks = await store.list("geoduty:"), rows = (await pool(ks, 40, (k) => store.get(k))).filter((d) => d && d.on);
+    const states = Array.isArray(b.states) ? b.states.map(low).filter(Boolean) : [];
+    const items = rows.filter((d) => !states.length || states.includes(low(d.state))).map((d) => ({ name: d.name, username: d.username, state: d.state, email: d.email, lat: d.lat, lng: d.lng, acc: d.acc, at: d.at, since: d.since, stale: t - d.at > 20 * 60000 }))
+      .sort((a, c) => c.at - a.at);
+    return json(200, { ok: true, items, at: t });
   }
   if (b.action === "geo-log") {
     const ks = (await store.list("geolog:")).sort().reverse().slice(0, 200);

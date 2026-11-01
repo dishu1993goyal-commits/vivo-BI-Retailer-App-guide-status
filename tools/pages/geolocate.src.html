@@ -37,18 +37,20 @@
   var ago = function (ts) { var m = Math.round((Date.now() - ts) / 60000); return m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " days ago"; };
   function load() {
     if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
-    if (!ADMIN || location.hash === "#respond") { TAB = "respond"; }
+    if (location.hash === "#respond") TAB = "respond"; else if (!ADMIN) TAB = "duty";
     draw();
   }
   function draw() {
-    if (!ADMIN) { $("ht").textContent = "Location requests"; $("hp").textContent = "HO can see your location only when you approve a request"; }
-    VIEW.innerHTML = (ADMIN ? '<div class="seg"><button data-tb="find" class="' + (TAB === "find" ? "on" : "") + '">🔎 Find</button><button data-tb="log" class="' + (TAB === "log" ? "on" : "") + '">🧾 Audit log</button><button data-tb="respond" class="' + (TAB === "respond" ? "on" : "") + '">📥 My requests</button></div>' : "") + '<div id="pane"></div>';
+    stopDutyUI();
+    if (!ADMIN) { $("ht").textContent = "My location"; $("hp").textContent = "Share your location only while you're on duty — turn it off any time"; if (TAB !== "respond" && TAB !== "duty") TAB = "duty"; }
+    VIEW.innerHTML = (ADMIN ? '<div class="seg" style="overflow-x:auto"><button data-tb="find" class="' + (TAB === "find" ? "on" : "") + '">🔎 Find</button><button data-tb="team" class="' + (TAB === "team" ? "on" : "") + '">🧭 Field team</button><button data-tb="log" class="' + (TAB === "log" ? "on" : "") + '">🧾 Audit log</button><button data-tb="respond" class="' + (TAB === "respond" ? "on" : "") + '">📥 Requests</button></div>'
+      : '<div class="seg"><button data-tb="duty" class="' + (TAB === "duty" ? "on" : "") + '">🟢 On-duty sharing</button><button data-tb="respond" class="' + (TAB === "respond" ? "on" : "") + '">📥 Requests</button></div>') + '<div id="pane"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
-    ({ find: pFind, log: pLog, respond: pRespond })[TAB]();
+    ({ find: pFind, team: pTeam, log: pLog, respond: pRespond, duty: pDuty })[TAB]();
   }
   // ---------- HO: find ----------
   function pFind() {
-    $("pane").innerHTML = '<div class="card"><label class="lb" style="display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:4px">Registered email ID</label><div class="row"><input class="tx" id="em" type="email" placeholder="name@vivo.com" autocomplete="off" style="flex:1" value="' + esc(RES ? RES.email : "") + '"><button class="btn pri" id="go">Search</button></div><div class="muted" style="font-size:12px;margin-top:6px">🔒 Every search and request is recorded in the audit log. A user’s location is shown only if they shared it — on request, or at their own market-visit check-in.</div></div><div id="res"></div>';
+    $("pane").innerHTML = '<div class="card"><label class="lb" style="display:block;font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:4px">Registered email ID</label><div class="row"><input class="tx" id="em" type="email" placeholder="name@vivo.com" autocomplete="off" style="flex:1" value="' + esc(RES ? RES.email : "") + '"><button class="btn pri" id="go">Search</button></div><div class="muted" style="font-size:12px;margin-top:6px">🔒 Every search and request is recorded in the audit log. A user’s location is shown only if they shared it — on request, while on duty, or at their own market-visit check-in.</div></div><div id="res"></div>';
     $("go").onclick = search; $("em").onkeydown = function (e) { if (e.key === "Enter") search(); };
     if (RES) show();
   }
@@ -98,7 +100,7 @@
     $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
     api({ action: "geo-log" }).then(function (r) {
       if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
-      var N = { search: "🔎 searched", request: "📡 requested location of", approved: "✅ approved — shared with HO:", declined: "🚫 declined —", cancel: "↩️ cancelled request for", "user-cleared": "🧹 cleared own shared location" };
+      var N = { search: "🔎 searched", request: "📡 requested location of", approved: "✅ approved — shared with HO:", declined: "🚫 declined —", cancel: "↩️ cancelled request for", "user-cleared": "🧹 cleared own shared location", "duty-on": "🟢 went on duty", "duty-off": "⚪ went off duty" };
       $("pane").innerHTML = '<div class="card"><div class="row"><b style="flex:1">Audit log</b><button class="btn ghost sm" id="x">⬇ Excel</button></div>' + (r.items.length ? r.items.map(function (x) { return '<div class="lg"><b>' + esc(x.by) + "</b> " + (N[x.act] || esc(x.act)) + " " + esc(x.email) + (x.status ? ' <span class="muted">(' + esc(x.status) + ")</span>" : "") + '<div class="muted">' + dt(x.at) + "</div></div>"; }).join("") : '<div class="muted">Nothing yet.</div>') + "</div>";
       $("x").onclick = function () { var rows = [["Time", "By", "Action", "Email", "Result"]].concat(r.items.map(function (x) { return [dt(x.at), x.by, x.act, x.email, x.status]; })); download(new Blob(["﻿" + rows.map(function (rw) { return rw.map(function (c) { return '"' + String(c == null ? "" : c).replace(/"/g, '""') + '"'; }).join(","); }).join("\n")], { type: "text/csv" }), "geo_locator_audit.csv"); };
     });
@@ -122,6 +124,57 @@
       }; });
       if ($("fg")) $("fg").onclick = function () { api({ action: "geo-forget" }).then(function () { toast("Removed"); pRespond(); }); };
     });
+  }
+  // ---------- user: on-duty location sharing (consent-based, only while on) ----------
+  var DUTY = { on: false, timer: 0 };
+  function stopDutyUI() { if (DUTY.timer) { clearInterval(DUTY.timer); DUTY.timer = 0; } }
+  function getPos() { return new Promise(function (res, rej) { if (!navigator.geolocation) return rej(new Error("This device can't share location.")); navigator.geolocation.getCurrentPosition(function (p) { res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }); }, function (e) { rej(e); }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }); }); }
+  function pDuty() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "geo-duty-status" }).then(function (r) {
+      DUTY.on = !!(r.ok && r.on);
+      $("pane").innerHTML = '<div class="req" style="text-align:center"><div style="font-size:40px">' + (DUTY.on ? "🟢" : "⚪") + '</div><b style="font-size:16px">' + (DUTY.on ? "You are on duty — sharing location" : "You are off duty") + "</b>" +
+        (DUTY.on ? '<div class="muted" style="font-size:12.5px;margin-top:4px">On since ' + dt(r.since) + '. Your HO team can see your location on the field-team map while this is on. Keep the app open; it updates every few minutes.</div>' : '<div class="muted" style="font-size:12.5px;margin-top:4px">When you go on duty, your location is shared with HO admins <b>only while on duty and the app is open</b>. Turn it off any time and sharing stops at once.</div>') +
+        '<button class="btn ' + (DUTY.on ? "" : "ok") + ' block" id="dt" style="margin-top:12px' + (DUTY.on ? ";background:#E05757;color:#fff" : "") + '">' + (DUTY.on ? "■ Go off duty" : "🟢 Go on duty & share location") + '</button>' +
+        '<div id="dmsg" class="muted" style="font-size:12px;margin-top:8px">' + (DUTY.on ? "Last updated " + ago(r.at) : "") + '</div></div>' +
+        '<div class="card" style="font-size:12px;color:var(--ink2)">🔒 This is consent-based. Location is taken only while you are on duty with the app open, never in the background after you go off duty. You can also remove your last shared location from 📥 Requests.</div>';
+      $("dt").onclick = toggleDuty;
+      if (DUTY.on) startPinging();
+    });
+  }
+  function toggleDuty() {
+    var btn = $("dt");
+    if (DUTY.on) { stopDutyUI(); api({ action: "geo-duty-stop" }).then(function () { DUTY.on = false; toast("You're off duty — location sharing stopped"); pDuty(); }); return; }
+    btn.disabled = true; btn.textContent = "Getting your location…";
+    getPos().then(function (p) { return api(Object.assign({ action: "geo-duty-start" }, p)); }).then(function (r) { if (!r.ok) { btn.disabled = false; toast(r.error); return; } DUTY.on = true; toast("You're on duty — HO can see your location now"); pDuty(); })
+      .catch(function (e) { btn.disabled = false; btn.textContent = "🟢 Go on duty & share location"; toast(e && e.code === 1 ? "Allow location to go on duty" : "Couldn't get your location — switch on GPS"); });
+  }
+  function startPinging() {
+    stopDutyUI();
+    var ping = function () { if (!DUTY.on) return; getPos().then(function (p) { return api(Object.assign({ action: "geo-duty-ping" }, p)); }).then(function (r) { if (r && r.ok && $("dmsg")) $("dmsg").textContent = "Last updated just now"; }).catch(function () { }); };
+    DUTY.timer = setInterval(ping, 180000);   // every 3 minutes while the page is open
+    window.addEventListener("focus", ping);
+  }
+  // ---------- HO: field team on duty (live map) ----------
+  var TEAMMAP = null, TEAMT = 0;
+  function pTeam() {
+    $("pane").innerHTML = '<div class="card"><div class="row"><b style="flex:1">🧭 Field team on duty</b><button class="btn ghost sm" id="trf">↻ Refresh</button></div><div class="muted" style="font-size:12px;margin-top:2px">Team members who have turned on duty sharing. Their location updates while they are on duty with the app open.</div></div><div id="tmap" style="height:300px;border-radius:14px;margin-top:8px;z-index:0;display:none"></div><div id="tlist"><div class="loading"><div class="spin"></div></div></div>';
+    $("trf").onclick = loadTeam; loadTeam();
+    TEAMT = setInterval(function () { if (TAB === "team") loadTeam(); else clearInterval(TEAMT); }, 60000);
+  }
+  function loadTeam() {
+    api({ action: "geo-onduty" }).then(function (r) {
+      if (!r.ok) { $("tlist").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      if (!r.items.length) { if ($("tmap")) $("tmap").style.display = "none"; $("tlist").innerHTML = '<div class="card empty"><div class="big">🧭</div>No one is on duty right now.</div>'; return; }
+      $("tlist").innerHTML = r.items.map(function (u) { return '<div class="lg" style="display:flex;gap:8px;align-items:center"><span style="font-size:18px">' + (u.stale ? "🟡" : "🟢") + '</span><span style="flex:1"><b>' + esc(u.name) + '</b> <span class="muted">· ' + esc(u.state || "") + '</span><div class="muted" style="font-size:11.5px">' + (u.stale ? "last seen " : "updated ") + ago(u.at) + (u.acc != null ? " · ± " + u.acc + " m" : "") + '</div></span><a class="btn ghost sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' + u.lat + "," + u.lng + '">🗺️</a></div>'; }).join("");
+      drawTeamMap(r.items);
+    });
+  }
+  function drawTeamMap(items) {
+    L().then(function () { var el = $("tmap"); if (!el) return; el.style.display = "block"; if (TEAMMAP) { try { TEAMMAP.remove(); } catch (e) { } } TEAMMAP = window.L.map(el); window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(TEAMMAP);
+      var pts = items.map(function (u) { window.L.marker([u.lat, u.lng]).addTo(TEAMMAP).bindPopup("<b>" + esc(u.name) + "</b><br>" + esc(u.state || "") + "<br>" + dt(u.at)); return [u.lat, u.lng]; });
+      if (pts.length === 1) TEAMMAP.setView(pts[0], 14); else TEAMMAP.fitBounds(pts, { padding: [30, 30] });
+    }).catch(function () { });
   }
   load();
 })();
