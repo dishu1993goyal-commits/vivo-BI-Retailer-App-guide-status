@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Payout target planner</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sc{border:1px solid #E6E8F2;border-radius:14px;padding:10px 12px;margin-top:8px;background:var(--card)}
+.sc .hd{display:flex;gap:8px;align-items:flex-start}.sc .hd b{flex:1}
+.chip{display:inline-block;background:#EEF0FF;color:#3346C9;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:600;margin:3px 4px 0 0}
+.dt{border-collapse:collapse;font-size:12.5px;min-width:100%}
+.dt th{background:#F3F4FA;text-align:left;padding:7px 6px;font-size:11px;color:var(--mut);white-space:nowrap}
+.dt td{padding:5px 6px;border-top:1px solid #EEF0F6;white-space:nowrap;vertical-align:middle}.dt td.n,.dt th.n{text-align:right;font-variant-numeric:tabular-nums}
+.dt td.w{white-space:normal;min-width:120px}
+.dt input[type=number]{width:72px;padding:6px;border:1px solid #D8DAE5;border-radius:8px;font:inherit;text-align:right}
+.dt input.pr{width:84px}
+.tbw{overflow-x:auto;margin-top:8px;border-radius:12px;background:var(--card);box-shadow:0 1px 8px rgba(20,24,51,.06)}
+.big{font-size:30px;font-weight:800;letter-spacing:-.5px}
+.hit{background:linear-gradient(135deg,#13693F,#1E9E61);color:#fff;border-radius:16px;padding:14px;margin-top:12px}
+.miss{background:linear-gradient(135deg,#8A5300,#C77C02)}
+.wk{border-left:4px solid var(--brand);background:#F7F8FC;border-radius:10px;padding:9px 11px;margin-top:8px}
+.li{background:var(--card);border-radius:14px;padding:11px 13px;margin-top:8px;box-shadow:0 2px 8px rgba(20,24,51,.05);cursor:pointer;display:flex;gap:10px;align-items:center}
+.pv{font-size:10.5px;color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎯</span></div>
+  <h1>Payout target planner</h1><p>Set the payout you want — see exactly what to sell (volume, value, model-wise) under your schemes, with an AI action plan</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "plan", SCHEMES = [], CAT = null, U = {}, PR = {}, INCL = {}, COND = {}, AI = null, PID = "", SOLVED = false;
+  var F = { target: 20000, ach: 100, days: 0, mt: "", retailer: "", attach: 30 };
+  var rs = function (v) { var n = Math.round(Number(v) || 0); return (n < 0 ? "−₹" : "₹") + Math.abs(n).toLocaleString("en-IN"); };
+  var fx = function (n) { return (Math.round(n * 100) / 100).toString(); };
+  var NOW = new Date(Date.now() + 19800000), MONTH = NOW.toISOString().slice(0, 7);
+  var daysLeft = function () { var y = NOW.getUTCFullYear(), m = NOW.getUTCMonth(), last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); return last - NOW.getUTCDate() + 1; };
+  F.days = daysLeft();
+  function libFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); }); }
+  function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
+
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } api({ action: "phub-list" }).then(function (r) { CAT = (r && r.ok && r.models) || []; draw(); }); }
+  function draw() {
+    VIEW.innerHTML = '<div class="seg"><button data-tb="plan" class="' + (TAB === "plan" ? "on" : "") + '">🎯 Plan</button><button data-tb="saved" class="' + (TAB === "saved" ? "on" : "") + '">📁 My plans</button></div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    (TAB === "saved" ? pSaved : pPlan)();
+  }
+
+  // ---------- price lookup from the Affordability catalogue ----------
+  var nk = function (s) { return String(s || "").toLowerCase().replace(/\bvivo\b/g, "").replace(/\(.*?\)/g, "").replace(/\d+\s*gb\s*\+\s*\d+\s*(gb|tb)/g, "").replace(/[^a-z0-9+]/g, ""); };
+  function priceFor(label) {
+    if (!CAT || !CAT.length) return null;
+    var L = String(label || ""), priced = CAT.filter(function (m) { return m.price; });
+    if (/series/i.test(L)) {   // "X / V / S Series" → average of those series
+      var ser = L.replace(/series.*$/i, "").split(/[\/,&]|\band\b/i).map(function (x) { return x.replace(/vivo/i, "").trim().toUpperCase(); }).filter(Boolean);
+      var hit = priced.filter(function (m) { return ser.indexOf(String(m.series || "").toUpperCase()) >= 0; });
+      if (hit.length) return { price: Math.round(hit.reduce(function (a, m) { return a + m.price; }, 0) / hit.length), how: "average of " + hit.length + " " + ser.join("/") + "-series models", models: hit.map(function (m) { return m.name; }) };
+    }
+    var toks = L.split(/[\/,]|\s\+\s/).map(function (x) { return x.trim(); }).filter(Boolean), found = [];
+    toks.forEach(function (tk) { var k = nk(tk); if (!k) return; var ex = priced.filter(function (m) { return nk(m.name) === k; }); if (!ex.length) ex = priced.filter(function (m) { return nk(m.name).indexOf(k) === 0; }).sort(function (a, b) { return a.name.length - b.name.length; }).slice(0, 1); if (ex[0]) found.push(ex[0]); });
+    if (!found.length) return null;
+    return { price: Math.round(found.reduce(function (a, m) { return a + m.price; }, 0) / found.length), how: found.length > 1 ? "average of " + found.map(function (m) { return m.name; }).join(", ") : found[0].name + " (from Affordability)", models: found.map(function (m) { return m.name; }) };
+  }
+
+  // ---------- payout items from the schemes ----------
+  function items() {
+    var out = [];
+    SCHEMES.forEach(function (s, si) {
+      var p = s.plan; if (!p) return;
+      p.components.forEach(function (c, ci) {
+        if (c.kind === "matrix") c.rows.forEach(function (r, ri) { out.push({ k: si + "|m" + ci + "_" + ri, si: si, ci: ci, kind: "matrix", label: r.name, comp: c.name, basis: r.basis, values: r.values, tiers: c.tiers, phone: true }); });
+        if (c.kind === "slab") out.push({ k: si + "|s" + ci, si: si, ci: ci, kind: "slab", label: c.models || c.name, comp: c.name, basis: c.basis, slabs: c.slabs, phone: true });
+        if (c.kind === "band") c.bands.forEach(function (z, bi) { var addon = /shield|plan|insur|care|protect|warranty/i.test(c.name + " " + z.label); out.push({ k: si + "|b" + ci + "_" + bi, si: si, ci: ci, kind: "band", label: c.name + " – " + z.label, comp: c.name, rate: z.value, phone: !addon }); });
+        if (c.kind === "perUnit") out.push({ k: si + "|p" + ci, si: si, ci: ci, kind: "perUnit", label: c.models || c.name, comp: c.name, rate: c.value, phone: true });
+      });
+    });
+    out.forEach(function (it) {
+      it.scheme = SCHEMES[it.si].title;
+      it.needPrice = (it.kind === "matrix" || it.kind === "slab") && it.basis === "pct";
+      if (PR[it.k] == null && it.phone) { var pf = priceFor(it.kind === "band" ? "" : it.label); if (pf) { PR[it.k] = pf.price; it.priceHow = pf.how; } } else if (it.phone) { var pf2 = priceFor(it.label); it.priceHow = pf2 ? pf2.how : ""; }
+      if (INCL[it.k] == null) INCL[it.k] = true;
+    });
+    return out;
+  }
+  function tierIdx(it, ach) { var ord = it.tiers.map(function (t, i) { return { m: t.min, i: i }; }).sort(function (a, b) { return b.m - a.m; }); var x = ord.filter(function (o) { return ach >= o.m; })[0]; return x ? x.i : null; }
+  function pay(it, u, ach) {
+    var price = Number(PR[it.k]) || 0; if (!(u > 0)) return 0;
+    if (it.kind === "matrix") { var ti = tierIdx(it, ach); if (ti == null) return 0; var v = it.values[ti]; if (v == null) return 0; return it.basis === "pct" ? u * price * v / 100 : u * v; }
+    if (it.kind === "slab") { var sl = it.slabs.filter(function (z) { return u >= z.min; }).pop(); if (!sl) return 0; return it.basis === "pct" ? u * price * sl.value / 100 : it.basis === "flat" ? sl.value : u * sl.value; }
+    return u * it.rate;
+  }
+  function rateText(it, ach) {
+    var c = function (b, v) { return v == null ? "–" : b === "pct" ? fx(v) + "%" : b === "flat" ? rs(v) + " once" : rs(v) + "/unit"; };
+    if (it.kind === "matrix") { var ti = tierIdx(it, ach); return ti == null ? "below " + it.tiers[it.tiers.length - 1].label : c(it.basis, it.values[ti]) + " (" + it.tiers[ti].label + ")"; }
+    if (it.kind === "slab") return it.slabs.map(function (z) { return z.min + (z.max != null ? "–" + z.max : "+") + ": " + c(it.basis, z.value); }).join(", ");
+    return rs(it.rate) + "/unit";
+  }
+  function factor(si) { var p = SCHEMES[si].plan, f = 1; (p.conditions || []).forEach(function (x, i) { if (COND[si + "_" + i] === false) f *= x.factor; }); return f; }
+  function totals(IT) {
+    var t = { payout: 0, units: 0, addon: 0, value: 0, bySch: {}, byModel: {}, lines: [] };
+    var gross = {}; IT.forEach(function (it) { var u = Number(U[it.k]) || 0; if (!INCL[it.k] || !u) return; var p = pay(it, u, F.ach); gross[it.si] = (gross[it.si] || 0) + p; var val = it.phone ? u * (Number(PR[it.k]) || 0) : 0; if (it.phone) t.units += u; else t.addon += u; t.value += val; t.lines.push({ it: it, u: u, val: val, pay: p }); var mk = it.label; var m = t.byModel[mk] || (t.byModel[mk] = { units: 0, value: 0, phone: it.phone }); m.units += u; m.value += val; });
+    Object.keys(gross).forEach(function (si) { var v = gross[si] * factor(+si); t.bySch[si] = v; t.payout += v; });
+    t.lines.forEach(function (l) { l.pay = l.pay * factor(l.it.si); });
+    return t;
+  }
+  // ---------- the solver: spread the target over the schemes' payout parts, then top up to cover rounding ----------
+  // add-ons (V-Shield, protection plans) follow phone sales at the attach rate — they aren't a route on their own
+  function setAddons(IT) { var ph = IT.filter(function (it) { return it.phone && INCL[it.k]; }).reduce(function (a, it) { return a + (Number(U[it.k]) || 0); }, 0), ad = IT.filter(function (it) { return !it.phone && INCL[it.k]; }); ad.forEach(function (it) { U[it.k] = ad.length ? Math.round(ph * (Number(F.attach) || 0) / 100 / ad.length) : 0; }); }
+  function solve() {
+    var IT = items().filter(function (it) { return INCL[it.k]; }), T = Number(F.target) || 0; U = {};
+    var usable = IT.filter(function (it) { return it.phone && !(it.needPrice && !(Number(PR[it.k]) > 0)) && pay(it, 1000, F.ach) > 0; });
+    if (!usable.length) return toast(IT.length ? "None of the phone payout lines can pay at this achievement % — check the prices (needed for % payouts) and the achievement %" : "Add a scheme with a payout table first");
+    var comps = {}; usable.forEach(function (it) { (comps[it.si + "_" + it.ci] = comps[it.si + "_" + it.ci] || []).push(it); });
+    var keys = Object.keys(comps), goal = T;
+    for (var round = 0; round < 4; round++) {   // phones carry the target; add-on payout (at the attach rate) reduces what phones must earn
+      U = {}; var share = Math.max(0, goal) / keys.length;
+      keys.forEach(function (ck) {
+        var L = comps[ck], gross = share / Math.max(0.01, factor(L[0].si));
+        if (L[0].kind === "slab") { var it = L[0], u = 0; while (u < 5000 && pay(it, u, F.ach) < gross) u++; U[it.k] = u; return; }
+        var each = gross / L.length; L.forEach(function (it) { var per = pay(it, 1, F.ach); U[it.k] = per > 0 ? Math.ceil(each / per) : 0; });
+      });
+      setAddons(IT); var addPay = totals(IT.filter(function (it) { return !it.phone; })).payout; goal = T - addPay;
+    }
+    // overall achievement: the model-wise rates assume ≥ ach% of the monthly target in total units
+    var bestOf = function () { var best = null, bg = 0; usable.forEach(function (it) { var u = U[it.k] || 0, g = pay(it, u + 1, F.ach) - pay(it, u, F.ach); if (g > bg) { bg = g; best = it; } }); return best; };
+    var needU = F.mt && F.ach ? Math.ceil(+F.mt * F.ach / 100) : 0, phones = function () { return usable.reduce(function (a, it) { return a + (U[it.k] || 0); }, 0); };
+    var guard = 0, rr = 0; while (needU && phones() < needU && guard++ < 5000) { var it1 = usable[rr++ % usable.length]; U[it1.k] = (U[it1.k] || 0) + 1; }   // spread across all models
+    guard = 0; while (totals(IT).payout < T && guard++ < 3000) { var b2 = bestOf(); if (!b2) break; U[b2.k] = (U[b2.k] || 0) + 1; setAddons(IT); }
+    setAddons(IT); SOLVED = true; AI = null; renderPlan();
+  }
+  function alone(it) { var T = Number(F.target) || 0, f = factor(it.si); for (var u = 1; u <= 5000; u++) if (pay(it, u, F.ach) * f >= T) return u; return null; }
+
+  // ================= Plan tab =================
+  function pPlan() {
+    var anyM = SCHEMES.some(function (s) { return s.plan && s.plan.components.some(function (c) { return c.kind === "matrix"; }); });
+    $("pane").innerHTML = '<div class="card"><b>1 · 📚 Schemes</b><div class="muted" style="font-size:12.5px">Upload one or more scheme letters (PDF, photo, Excel, Word) — AI reads the payout tables and slabs. Or add a scheme HO has published in the Scheme assistant.</div>' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="up">📚 Upload scheme letters</button><button class="btn sec sm" id="pubs">📑 Add a published scheme</button></div><div id="upres"></div>' +
+      (SCHEMES.length ? SCHEMES.map(function (s, si) { var p = s.plan; return '<div class="sc"><div class="hd"><b>' + esc(s.title) + (s.period ? ' <span class="muted" style="font-weight:500;font-size:12px">· ' + esc(s.period) + "</span>" : "") + '</b><button class="btn ghost sm" data-rm="' + si + '" style="color:var(--bad)">✕</button></div>' +
+        (p ? '<div>' + p.components.map(function (c) { return '<span class="chip">' + esc(c.name) + " · " + (c.kind === "matrix" ? c.rows.length + " models × " + c.tiers.length + " levels" : c.kind === "slab" ? c.slabs.length + " slabs" : c.kind === "band" ? c.bands.length + " bands" : rs(c.value) + "/unit") + "</span>"; }).join("") + "</div>" : '<div class="notice" style="margin-top:6px">⚠️ No payout table could be read from this letter — upload a clearer copy (or the PDF). It is left out of the plan.</div>') +
+        ((s.terms || []).length ? '<div class="muted" style="font-size:11.5px;margin-top:4px">📌 ' + s.terms.slice(0, 3).map(esc).join(" · ") + "</div>" : "") + "</div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:8px">No schemes added yet.</div>') + "</div>" +
+      '<div class="card"><b>2 · 💰 Target payout</b><div class="g2"><div><label class="lb">Payout I want to earn (₹)</label><input class="tx" id="ft" type="number" value="' + esc(F.target) + '"></div><div><label class="lb">Days left to sell</label><input class="tx" id="fd" type="number" value="' + esc(F.days) + '"></div></div>' +
+      (anyM ? '<div class="g2"><div><label class="lb">Overall achievement I expect (%)</label><input class="tx" id="fa" type="number" value="' + esc(F.ach) + '"></div><div><label class="lb">My monthly target (units, optional)</label><input class="tx" id="fm" type="number" value="' + esc(F.mt) + '"></div></div><div class="muted" style="font-size:11.5px">Model-wise tables pay more at higher achievement — this decides which column is used.</div>' : "") +
+      '<label class="lb">Retailer / store name (for the plan & export)</label><input class="tx" id="fr" value="' + esc(F.retailer) + '" placeholder="optional">' +
+      SCHEMES.map(function (s, si) { return (s.plan && s.plan.conditions || []).map(function (x, i) { return '<label class="tg" style="margin-top:8px"><input type="checkbox" data-cond="' + si + "_" + i + '"' + (COND[si + "_" + i] === false ? "" : " checked") + "><i></i><span>I will meet: " + esc(x.label) + (SCHEMES.length > 1 ? ' <span class="muted">— ' + esc(s.title) + "</span>" : "") + ' <span class="muted">(else ' + Math.round(x.factor * 100) + "% payout)</span></span></label>"; }).join(""); }).join("") +
+      (SCHEMES.some(function (s) { return s.plan && s.plan.components.some(function (c) { return c.kind === "band" && /shield|plan|insur|care|protect|warranty/i.test(c.name); }); }) ? '<label class="lb">V-Shield / protection attach rate (% of phones)</label><input class="tx" id="fx" type="number" value="' + esc(F.attach) + '">' : "") +
+      '<button class="btn ok block" id="go" style="margin-top:12px">🎯 Work out what to sell</button></div><div id="planout"></div>';
+    $("up").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.docx,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { readLetters([].slice.call(i.files || [], 0, 8)); }; i.click(); };
+    $("pubs").onclick = addPublished;
+    [].forEach.call($("pane").querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { SCHEMES.splice(+b.dataset.rm, 1); U = {}; PR = {}; INCL = {}; COND = {}; SOLVED = false; AI = null; pPlan(); }; });
+    var rd = function () { F.target = +$("ft").value || 0; F.days = +$("fd").value || 1; F.retailer = $("fr").value; if ($("fa")) F.ach = +$("fa").value || 0; if ($("fm")) F.mt = $("fm").value; if ($("fx")) F.attach = +$("fx").value || 0; };
+    ["ft", "fd", "fa", "fm", "fr", "fx"].forEach(function (id) { if ($(id)) $(id).oninput = function () { rd(); if (SOLVED) renderPlan(); }; });
+    [].forEach.call($("pane").querySelectorAll("[data-cond]"), function (c) { c.onchange = function () { COND[c.dataset.cond] = c.checked; if (SOLVED) renderPlan(); }; });
+    $("go").onclick = function () { rd(); if (!(F.target > 0)) return toast("Enter the payout you want"); solve(); };
+    if (SOLVED) renderPlan();
+  }
+  function readLetters(files) {
+    if (!files.length) return; var box = $("upres"), out = [], chain = Promise.resolve();
+    var say = function (m) { box.innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div><span>' + esc(m) + "</span></div>" + out.map(function (o) { return '<div style="font-size:12.5px;margin-top:4px">' + o + "</div>"; }).join(""); };
+    files.forEach(function (f, i) {
+      chain = chain.then(function () {
+        var tag = "(" + (i + 1) + "/" + files.length + ") "; say(tag + "AI is reading " + f.name + "…");
+        var viaText = function () { return libFT().then(function () { return window.BIFILES.extract(f); }).then(function (x) { if (!String(x.text || "").trim()) throw new Error("no readable text"); say(tag + "AI is reading the payout tables in " + f.name + "…"); return api({ action: "scha-parse", text: String(x.text).slice(0, 20000) }); }); };
+        var p = /^image\//.test(f.type) ? shrink(f).then(function (u) { return api({ action: "scha-parse", images: [u] }); }).then(function (r) { return r.ok ? r : viaText(); }) : viaText();
+        return p.then(function (r) { if (!r.ok) throw new Error(r.error || "AI couldn't read it"); SCHEMES.push(r.scheme); out.push("✅ " + esc(f.name) + " → <b>" + esc(r.scheme.title) + "</b>" + (r.scheme.plan ? "" : " — ⚠️ no payout table found")); })
+          .catch(function (e) { out.push("⚠️ " + esc(f.name) + ": " + esc(e.message || e)); });
+      });
+    });
+    chain.then(function () { SOLVED = false; AI = null; pPlan(); $("upres").innerHTML = out.map(function (o) { return '<div style="font-size:12.5px;margin-top:4px">' + o + "</div>"; }).join(""); });
+  }
+  function addPublished() {
+    api({ action: "scha-list" }).then(function (r) {
+      if (!r.ok) return toast(r.error); var L = r.items.filter(function (x) { return x.published !== false; });
+      if (!L.length) return toast("No published schemes yet");
+      sheet("Add a published scheme", "From the Scheme assistant", L.map(function (x) { return ["🎯", x.title + (x.period ? " · " + x.period : ""), function () { api({ action: "scha-get", id: x.id }).then(function (g) { if (!g.ok) return toast(g.error); var sc = g.item.scheme; sc.title = sc.title || x.title; SCHEMES.push(sc); SOLVED = false; AI = null; pPlan(); }); }]; }));
+    });
+  }
+  function renderPlan() {
+    var box = $("planout"); if (!box) return;
+    var IT = items(), T = totals(IT), hit = T.payout >= (Number(F.target) || 0) - 0.5, days = Math.max(1, F.days || 1);
+    var needU = F.mt && F.ach ? Math.ceil(+F.mt * F.ach / 100) : 0;
+    var models = Object.keys(T.byModel).map(function (k) { return [k, T.byModel[k]]; }).filter(function (x) { return x[1].units; }).sort(function (a, b) { return b[1].value - a[1].value || b[1].units - a[1].units; });
+    var missingPrice = IT.filter(function (it) { return INCL[it.k] && it.phone && !(Number(PR[it.k]) > 0); });
+    box.innerHTML = '<div class="hit' + (hit ? "" : " miss") + '"><div style="font-size:12px;opacity:.9">' + (hit ? "This plan earns" : "This plan earns only") + '</div><div class="big">' + rs(T.payout) + '</div><div style="font-size:12.5px">target ' + rs(F.target) + (F.retailer ? " · " + esc(F.retailer) : "") + (hit ? " ✓" : " — add units below") + "</div>" + (hit && needU && T.payout > F.target * 1.15 ? '<div style="font-size:12px;margin-top:4px;opacity:.95">It is above the target because the model-wise rates need ≥' + F.ach + "% of your monthly target (" + needU + " units in total).</div>" : "") + "</div>" +
+      '<div class="tiles" style="margin-top:12px">' + tile("📦", "#EEF0FF", T.units.toLocaleString("en-IN"), "Phones to sell", Math.ceil(T.units / days) + " per day") + tile("💵", "#E6F4EA", rs(T.value), "Sale value", rs(T.value / days) + " per day") + tile("📅", "#FFF4E5", days, "Days left") + tile("🛡️", "#F4EEFF", T.addon, "Add-ons (V-Shield etc.)") + "</div>" +
+      (needU ? '<div class="notice' + (T.units >= needU ? " info" : "") + '" style="margin-top:10px">🎯 To be at ' + F.ach + "% of your monthly target of " + F.mt + " units you need <b>" + needU + " units</b> in total" + (T.units >= needU ? " — this plan covers it ✓" : " — the plan has " + T.units + ", so sell <b>" + (needU - T.units) + " more</b> of any model (the model-wise rates assume this level).") + "</div>" : "") +
+      (missingPrice.length ? '<div class="notice" style="margin-top:10px">⚠️ No Affordability price found for: ' + missingPrice.map(function (it) { return esc(it.label); }).join(", ") + ". Type the price in the table" + (missingPrice.some(function (it) { return it.needPrice; }) ? " — % payouts can’t be worked out without it." : " to see the sale value.") + "</div>" : "") +
+      '<div class="card"><b>🧾 What to sell — edit any number</b><div class="muted" style="font-size:12px">Prices come from the Affordability catalogue (lowest variant); change them if your mix differs. Untick a line to leave it out, then tap Re-plan.</div><div class="tbw"><table class="dt"><tr><th></th><th>Scheme · item</th><th>Rate</th><th class="n">Price ₹</th><th class="n">Units</th><th class="n">Sale value</th><th class="n">Payout</th></tr>' +
+      IT.map(function (it) { var u = Number(U[it.k]) || 0, p = INCL[it.k] && u ? pay(it, u, F.ach) * factor(it.si) : 0; return '<tr><td><input type="checkbox" data-in="' + it.k + '"' + (INCL[it.k] ? " checked" : "") + '></td><td class="w"><b>' + esc(it.label) + '</b><div class="pv">' + esc(it.scheme) + " · " + esc(it.comp) + (it.priceHow ? " · " + esc(it.priceHow) : "") + '</div></td><td class="w" style="font-size:11.5px;min-width:90px">' + esc(rateText(it, F.ach)) + '</td><td class="n">' + (it.phone ? '<input class="pr" type="number" data-pr="' + it.k + '" value="' + (PR[it.k] || "") + '">' : "–") + '</td><td class="n"><input type="number" min="0" data-u="' + it.k + '" value="' + (u || "") + '"></td><td class="n">' + (it.phone && u ? rs(u * (Number(PR[it.k]) || 0)) : "–") + '</td><td class="n"><b>' + rs(p) + "</b></td></tr>"; }).join("") + "</table></div>" +
+      '<div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="replan">↻ Re-plan to the target</button></div></div>' +
+      (models.length ? '<div class="card"><b>📱 Model-wise target</b><div class="tbw"><table class="dt"><tr><th>Model / item</th><th class="n">Units</th><th class="n">Sale value</th><th class="n">Per day</th></tr>' + models.map(function (x) { return "<tr><td>" + esc(x[0]) + '</td><td class="n">' + x[1].units + '</td><td class="n">' + (x[1].phone ? rs(x[1].value) : "–") + '</td><td class="n">' + fx(Math.round(x[1].units / days * 10) / 10) + "</td></tr>"; }).join("") + "</table></div></div>" : "") +
+      '<div class="card"><b>🛣️ Single-item routes</b><div class="muted" style="font-size:12px">If you sold only one item, how many you would need for ' + rs(F.target) + ":</div>" + IT.filter(function (it) { return INCL[it.k]; }).map(function (it) { var a = alone(it); return '<div class="row" style="justify-content:space-between;font-size:12.5px;padding:5px 0;border-bottom:1px dashed #E6E8F2"><span>' + esc(it.label) + ' <span class="pv">' + esc(it.scheme) + "</span></span><b>" + (a ? a + " units" + (it.phone && PR[it.k] ? " · " + rs(a * PR[it.k]) : "") : "not possible") + "</b></div>"; }).join("") + "</div>" +
+      '<div class="card"><b>🧩 Payout by scheme</b>' + Object.keys(T.bySch).map(function (si) { return '<div class="row" style="justify-content:space-between;font-size:13px;padding:4px 0"><span>' + esc(SCHEMES[si].title) + (factor(+si) < 1 ? ' <span class="pv">(× ' + Math.round(factor(+si) * 100) + "%)</span>" : "") + "</span><b>" + rs(T.bySch[si]) + "</b></div>"; }).join("") + "</div>" +
+      '<div class="card"><b>✨ AI action plan</b><div class="muted" style="font-size:12.5px">AI turns these numbers and the scheme conditions into a week-by-week plan with model pitches, store tactics and watch-outs.</div><button class="btn pri block" id="aigo" style="margin-top:8px">' + (AI ? "↻ Make it again" : "✨ Make the action plan") + '</button><div id="aiout">' + (AI ? aiHtml(AI) : "") + "</div></div>" +
+      '<div class="row" style="gap:6px;margin-top:12px;flex-wrap:wrap"><button class="btn sec" id="xl">⬇ Excel</button><button class="btn sec" id="pdf">⬇ PDF</button><button class="btn sec" id="sv">💾 Save plan</button><button class="btn ghost" id="wa">💬 Share</button></div>';
+    [].forEach.call(box.querySelectorAll("[data-u]"), function (el) { el.onchange = function () { U[el.dataset.u] = Math.max(0, Math.round(+el.value || 0)); renderPlan(); }; });
+    [].forEach.call(box.querySelectorAll("[data-pr]"), function (el) { el.onchange = function () { PR[el.dataset.pr] = +el.value || 0; renderPlan(); }; });
+    [].forEach.call(box.querySelectorAll("[data-in]"), function (el) { el.onchange = function () { INCL[el.dataset.in] = el.checked; renderPlan(); }; });
+    $("replan").onclick = solve; $("aigo").onclick = makeAI; $("xl").onclick = exportXlsx; $("pdf").onclick = exportPdf; $("sv").onclick = savePlan; $("wa").onclick = share;
+  }
+  function tile(ic, bg, v, l, sm) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + ic + "</div><b>" + v + "</b><span>" + l + "</span>" + (sm ? "<small>" + sm + "</small>" : "") + "</div>"; }
+  function planData() { var IT = items(), T = totals(IT); return { target: F.target, payout: Math.round(T.payout), ach: F.ach, units: T.units, value: Math.round(T.value), daysLeft: F.days, month: MONTH, retailer: F.retailer, items: T.lines.map(function (l) { return { label: l.it.label, scheme: l.it.scheme, units: l.u, price: Number(PR[l.it.k]) || 0, value: Math.round(l.val), payout: Math.round(l.pay) }; }) }; }
+  function makeAI() {
+    var d = planData(); if (!d.items.length) return toast("Work out the plan first");
+    $("aiout").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>AI is writing the action plan…</div>';
+    api({ action: "pln-ai", plan: d, schemes: SCHEMES.map(function (s) { return { title: s.title, period: s.period, summary: s.summary, terms: s.terms, actions: s.actions, focusModels: s.focusModels }; }) }).then(function (r) {
+      if (!r.ok) { $("aiout").innerHTML = '<div class="err" style="margin-top:8px">' + esc(r.error) + "</div>"; return; }
+      AI = r.plan; $("aiout").innerHTML = aiHtml(AI); $("aigo").textContent = "↻ Make it again";
+    });
+  }
+  function aiHtml(a) {
+    var ul = function (L) { return L && L.length ? '<ul style="margin:4px 0;padding-left:18px;font-size:13px">' + L.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : ""; };
+    return '<div style="margin-top:10px">' + (a.headline ? '<b style="font-size:15px">🏁 ' + esc(a.headline) + "</b>" : "") + (a.summary ? '<p style="font-size:13.5px;margin:6px 0">' + esc(a.summary) + "</p>" : "") +
+      (a.daily ? '<div class="notice info">📅 Every day: <b>' + fx(a.daily.units) + " units</b>" + (a.daily.value ? " · <b>" + rs(a.daily.value) + "</b>" : "") + (a.daily.note ? " — " + esc(a.daily.note) : "") + "</div>" : "") +
+      (a.weeks || []).map(function (w) { return '<div class="wk"><b>' + esc(w.label) + "</b>" + (w.units ? ' <span class="muted">· ' + fx(w.units) + " units" + (w.value ? " · " + rs(w.value) : "") + "</span>" : "") + (w.focus.length ? '<div style="font-size:12.5px;margin-top:2px">🎯 ' + w.focus.map(esc).join(", ") + "</div>" : "") + ul(w.actions) + "</div>"; }).join("") +
+      ((a.modelPlan || []).length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">📱 How to sell each model</div>' + a.modelPlan.map(function (m) { return '<div style="font-size:13px;margin-top:6px"><b>' + esc(m.model) + "</b>" + (m.units ? " × " + fx(m.units) : "") + " — " + esc(m.pitch) + (m.addOn ? '<div class="muted" style="font-size:12px">➕ ' + esc(m.addOn) + "</div>" : "") + "</div>"; }).join("") : "") +
+      (a.tactics.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">🏪 Store tactics</div>' + ul(a.tactics) : "") +
+      (a.watchouts.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">⚠️ Don’t lose the payout</div>' + ul(a.watchouts) : "") +
+      (a.checklist.length ? '<div style="font-weight:700;font-size:13px;margin-top:10px">✅ Daily checklist</div>' + ul(a.checklist) : "") + "</div>";
+  }
+  // ---------- exports ----------
+  function exportXlsx() {
+    var d = planData(), IT = items(), T = totals(IT), a = AI, sheets = [];
+    sheets.push({ name: "Summary", rows: [["Payout target planner"], ["Retailer", F.retailer || ""], ["Month", MONTH], ["Target payout (Rs)", F.target], ["Planned payout (Rs)", d.payout], ["Phones to sell", d.units], ["Sale value (Rs)", d.value], ["Days left", F.days], ["Per day units", Math.ceil(d.units / Math.max(1, F.days))], ["Per day value (Rs)", Math.round(d.value / Math.max(1, F.days))], ["Achievement assumed (%)", F.ach], ["Schemes", SCHEMES.map(function (s) { return s.title; }).join(" + ")]] });
+    sheets.push({ name: "What to sell", rows: [["Scheme", "Payout part", "Item / model", "Rate", "Price (Rs)", "Units", "Sale value (Rs)", "Payout (Rs)"]].concat(T.lines.map(function (l) { return [l.it.scheme, l.it.comp, l.it.label, rateText(l.it, F.ach), Number(PR[l.it.k]) || "", l.u, Math.round(l.val), Math.round(l.pay)]; })).concat([["", "", "Total", "", "", d.units, d.value, d.payout]]) });
+    sheets.push({ name: "Model-wise", rows: [["Model / item", "Units", "Sale value (Rs)", "Per day"]].concat(Object.keys(T.byModel).filter(function (k) { return T.byModel[k].units; }).map(function (k) { var m = T.byModel[k]; return [k, m.units, Math.round(m.value), Math.round(m.units / Math.max(1, F.days) * 10) / 10]; })) });
+    if (a) { var R = [["AI action plan"], [a.headline || ""], [a.summary || ""], [""]]; if (a.daily) R.push(["Every day", a.daily.units + " units", a.daily.value ? "Rs " + Math.round(a.daily.value) : "", a.daily.note || ""]); (a.weeks || []).forEach(function (w) { R.push([""]); R.push([w.label, w.units ? w.units + " units" : "", w.value ? "Rs " + Math.round(w.value) : "", "Focus: " + w.focus.join(", ")]); w.actions.forEach(function (x) { R.push(["", "• " + x]); }); }); R.push([""]); R.push(["How to sell each model"]); (a.modelPlan || []).forEach(function (m) { R.push([m.model, m.units || "", m.pitch, m.addOn]); }); [["Store tactics", a.tactics], ["Don't lose the payout", a.watchouts], ["Daily checklist", a.checklist]].forEach(function (g) { R.push([""]); R.push([g[0]]); g[1].forEach(function (x) { R.push(["", "• " + x]); }); }); sheets.push({ name: "Action plan", rows: R }); }
+    sheets.push({ name: "Scheme rules", rows: [["Scheme", "Payout part", "Details"]].concat([].concat.apply([], SCHEMES.map(function (s) { return (s.plan ? s.plan.components : []).map(function (c) { return [s.title, c.name, c.kind === "matrix" ? c.rows.map(function (r) { return r.name + ": " + r.values.map(function (v, i) { return c.tiers[i].label + " " + (v == null ? "-" : v) + (r.basis === "pct" ? "%" : ""); }).join(" / "); }).join("; ") : c.kind === "slab" ? c.slabs.map(function (z) { return z.min + (z.max != null ? "-" + z.max : "+") + " units: " + z.value + (c.basis === "pct" ? "%" : " Rs"); }).join("; ") : c.kind === "band" ? c.bands.map(function (z) { return z.label + ": Rs " + z.value; }).join("; ") : "Rs " + c.value + " per unit"]; }).concat((s.terms || []).map(function (x) { return [s.title, "Condition", x]; })); }))) });
+    download(xlsx(sheets), "Payout_plan_" + (F.retailer || "retailer").replace(/[^A-Za-z0-9]+/g, "_") + "_" + MONTH + ".xlsx");
+  }
+  function pdfDoc(pages) {
+    var esc2 = function (s) { return String(s).replace(/₹/g, "Rs ").replace(/[−–—]/g, "-").replace(/≥/g, ">=").replace(/≤/g, "<=").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/•/g, "-").replace(/×/g, "x").replace(/[^\x20-\x7E]/g, "").replace(/([\\()])/g, "\\$1"); };
+    var objs = [], add = function (s) { objs.push(s); return objs.length; }, kids = [];
+    var font = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"), bold = add("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    pages.forEach(function (ops) {
+      var s = ops.map(function (o) { return o.rect ? (o.fill || "0.94 0.95 0.98") + " rg " + o.rect.join(" ") + " re f 0 0 0 rg" : "BT /" + (o.b ? "F2" : "F1") + " " + (o.size || 9) + " Tf " + (o.c || "0 0 0") + " rg " + o.x + " " + o.y + " Td (" + esc2(o.t) + ") Tj ET"; }).join("\n");
+      var cs = add("<< /Length " + s.length + " >>\nstream\n" + s + "\nendstream");
+      kids.push(add("<< /Type /Page /Parent PAGES 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " + font + " 0 R /F2 " + bold + " 0 R >> >> /Contents " + cs + " 0 R >>"));
+    });
+    var pid = add("<< /Type /Pages /Kids [" + kids.map(function (k) { return k + " 0 R"; }).join(" ") + "] /Count " + kids.length + " >>");
+    objs = objs.map(function (o) { return o.replace("PAGES 0 R", pid + " 0 R"); });
+    var cat = add("<< /Type /Catalog /Pages " + pid + " 0 R >>"), out = "%PDF-1.4\n", offs = [];
+    objs.forEach(function (o, i) { offs.push(out.length); out += (i + 1) + " 0 obj\n" + o + "\nendobj\n"; });
+    var xr = out.length; out += "xref\n0 " + (objs.length + 1) + "\n0000000000 65535 f \n" + offs.map(function (o) { return ("0000000000" + o).slice(-10) + " 00000 n \n"; }).join("") + "trailer\n<< /Size " + (objs.length + 1) + " /Root " + cat + " 0 R >>\nstartxref\n" + xr + "\n%%EOF";
+    var bytes = new Uint8Array(out.length); for (var i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 255;
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+  function exportPdf() {
+    var d = planData(), IT = items(), T = totals(IT), a = AI, pages = [], ops = [], y = 800;
+    var brk = function (need) { if (y < (need || 50)) { pages.push(ops); ops = []; y = 800; } };
+    var line = function (t, o) { o = o || {}; var s = String(t), max = o.wrap || Math.round(950 / (o.size || 9)); do { brk(); var cut = s.length > max ? s.lastIndexOf(" ", max) : s.length; if (cut < max / 2) cut = Math.min(max, s.length); ops.push({ x: o.x || 40, y: y, t: s.slice(0, cut), b: o.b, size: o.size, c: o.c }); s = s.slice(cut).trim(); if (s) s = "  " + s; y -= (o.size || 9) + 5; } while (s); if (o.gap) y -= o.gap; };
+    var row = function (cells, o) { o = o || {}; brk(); if (o.shade) ops.push({ rect: [36, y - 4, 523, 14] }); cells.forEach(function (c) { ops.push({ x: c[0], y: y, t: String(c[1]), b: o.b, size: o.size || 8.5 }); }); y -= 14; };
+    ops.push({ rect: [0, 792, 595, 50], fill: "0.30 0.36 0.98" }); ops.push({ x: 40, y: 812, t: "Payout target plan" + (F.retailer ? " - " + F.retailer : ""), b: true, size: 15, c: "1 1 1" }); ops.push({ x: 40, y: 798, t: "vivo Business Innovation  |  " + MONTH + "  |  " + SCHEMES.map(function (s) { return s.title; }).join(" + ").slice(0, 70), size: 9, c: "1 1 1" }); y = 770;
+    line("Target payout: " + rs(F.target) + "    Planned payout: " + rs(d.payout) + "    Achievement assumed: " + F.ach + "%", { b: true, size: 11 });
+    line("Sell " + d.units + " phones worth " + rs(d.value) + " in " + F.days + " days  =  " + Math.ceil(d.units / Math.max(1, F.days)) + " phones / " + rs(d.value / Math.max(1, F.days)) + " per day" + (T.addon ? "   + " + T.addon + " add-ons (V-Shield etc.)" : ""), { size: 10, gap: 8 });
+    line("What to sell", { b: true, size: 11.5 });
+    row([[40, "Item / model"], [230, "Scheme"], [360, "Units"], [400, "Price"], [455, "Sale value"], [515, "Payout"]], { b: true, shade: true });
+    T.lines.forEach(function (l) { row([[40, l.it.label.slice(0, 36)], [230, l.it.scheme.slice(0, 30)], [360, l.u], [400, PR[l.it.k] ? rs(PR[l.it.k]) : "-"], [455, l.val ? rs(l.val) : "-"], [515, rs(l.pay)]]); });
+    row([[40, "Total"], [360, d.units], [455, rs(d.value)], [515, rs(d.payout)]], { b: true }); y -= 8;
+    if (a) {
+      brk(120); line("AI action plan", { b: true, size: 11.5 }); if (a.headline) line(a.headline, { b: true, size: 10 }); if (a.summary) line(a.summary, { size: 9 });
+      if (a.daily) line("Every day: " + a.daily.units + " units" + (a.daily.value ? ", " + rs(a.daily.value) : "") + (a.daily.note ? " - " + a.daily.note : ""), { size: 9.5, b: true, gap: 4 });
+      (a.weeks || []).forEach(function (w) { brk(80); line(w.label + (w.units ? " - " + w.units + " units" : "") + (w.value ? ", " + rs(w.value) : "") + (w.focus.length ? "  |  Focus: " + w.focus.join(", ") : ""), { b: true, size: 9.5 }); w.actions.forEach(function (x) { line("- " + x, { x: 50, size: 9 }); }); y -= 4; });
+      if ((a.modelPlan || []).length) { line("How to sell each model", { b: true, size: 10 }); a.modelPlan.forEach(function (m) { line(m.model + (m.units ? " x " + m.units : "") + ": " + m.pitch + (m.addOn ? " (+ " + m.addOn + ")" : ""), { x: 50, size: 9 }); }); y -= 4; }
+      [["Store tactics", a.tactics], ["Don't lose the payout", a.watchouts], ["Daily checklist", a.checklist]].forEach(function (g) { if (!g[1].length) return; brk(60); line(g[0], { b: true, size: 10 }); g[1].forEach(function (x) { line("- " + x, { x: 50, size: 9 }); }); y -= 4; });
+    }
+    y -= 6; line("Planned from the scheme letters with Affordability prices. Actual payout as per the final scheme terms and verification.", { size: 7.5, c: "0.45 0.47 0.6" });
+    pages.push(ops); download(pdfDoc(pages), "Payout_plan_" + (F.retailer || "retailer").replace(/[^A-Za-z0-9]+/g, "_") + "_" + MONTH + ".pdf");
+  }
+  function share() {
+    var d = planData(); var t = "*Payout plan" + (F.retailer ? " — " + F.retailer : "") + "*\nTarget payout: " + rs(F.target) + "\nSell " + d.units + " phones (" + rs(d.value) + ") in " + F.days + " days = " + Math.ceil(d.units / Math.max(1, F.days)) + " per day\n\n" + d.items.map(function (x) { return "• " + x.label + ": " + x.units + " units → " + rs(x.payout); }).join("\n") + (AI && AI.headline ? "\n\n" + AI.headline : "");
+    if (navigator.share) navigator.share({ text: t }).catch(function () { }); else window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank");
+  }
+  function savePlan() {
+    var title = (F.retailer ? F.retailer + " · " : "") + rs(F.target) + " · " + SCHEMES.map(function (s) { return s.title; }).join(" + ").slice(0, 80);
+    api({ action: "pln-save", id: PID, title: title, data: { schemes: SCHEMES, F: F, U: U, PR: PR, INCL: INCL, COND: COND, AI: AI, target: F.target } }).then(function (r) { if (!r.ok) return toast(r.error); PID = r.id; toast("Saved — open it from 📁 My plans on any device"); });
+  }
+  // ================= Saved plans =================
+  function pSaved() {
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pln-list" }).then(function (r) {
+      if (!r.ok) { $("pane").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("pane").innerHTML = '<button class="btn pri block" id="newp">➕ New plan</button>' + (r.items.length ? r.items.map(function (x) { return '<div class="li" data-o="' + x.id + '"><div style="flex:1;min-width:0"><b>' + esc(x.title) + '</b><div class="muted" style="font-size:12px">' + new Date(x.updatedAt).toLocaleString("en-IN") + "</div></div><button class=\"btn ghost sm\" data-d=\"" + x.id + '" style="color:var(--bad)">✕</button></div>'; }).join("") : '<div class="card empty"><div class="big">📁</div>No saved plans yet. Make one in 🎯 Plan and tap 💾 Save plan.</div>');
+      $("newp").onclick = function () { SCHEMES = []; U = {}; PR = {}; INCL = {}; COND = {}; AI = null; PID = ""; SOLVED = false; F = { target: 20000, ach: 100, days: daysLeft(), mt: "", retailer: "" }; TAB = "plan"; draw(); };
+      [].forEach.call($("pane").querySelectorAll("[data-o]"), function (el) { el.onclick = function (e) { if (e.target.dataset.d) return; api({ action: "pln-get", id: el.dataset.o }).then(function (g) { if (!g.ok) return toast(g.error); var d = g.item.data || {}; SCHEMES = d.schemes || []; F = Object.assign({ target: 20000, ach: 100, days: daysLeft(), mt: "", retailer: "" }, d.F || {}); U = d.U || {}; PR = d.PR || {}; INCL = d.INCL || {}; COND = d.COND || {}; AI = d.AI || null; PID = g.item.id; SOLVED = true; TAB = "plan"; draw(); }); }; });
+      [].forEach.call($("pane").querySelectorAll("[data-d]"), function (b) { b.onclick = function (e) { e.stopPropagation(); api({ action: "pln-delete", id: b.dataset.d }).then(pSaved); }; });
+    });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
