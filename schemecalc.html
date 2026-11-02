@@ -541,7 +541,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   function step1() {
     var p = PARSED;
     $("pane").innerHTML = '<div class="card"><h3 style="margin:0 0 4px">📄 Read the scheme circular</h3><div class="muted" style="font-size:13px">PDF, Word (.docx), Excel or a photo of the circular. The AI picks out slabs, minimum %, rates, kicker, maximum payout, period, sales basis, excluded EMI partners and negative incentives.</div>' +
-      '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="up">📄 File (PDF / Word / Excel)</button><button class="btn pri" id="upi">📷 Photo / screenshot</button><button class="btn sec" id="sk">Skip — set rules by hand →</button></div>' +
+      '<div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="up">📄 File (PDF / Word / Excel)</button><button class="btn pri" id="upi">📷 Photo / screenshot</button><button class="btn sec" id="spolp">📜 From Scheme policies</button><button class="btn sec" id="sk">Skip — set rules by hand →</button></div>' +
       '<label class="cbx"><input type="checkbox" id="hin"' + (ls("sc-hindi") ? " checked" : "") + '> The circular has Hindi text</label>' +
       '<div class="muted" style="font-size:12px;margin-top:8px">Photos and scanned PDFs are read by AI online; if that isn\'t available, this device reads them itself. Old .doc files: open in Word and “Save as” .docx.</div></div>' +
       (p ? '<div class="card"><b>Text read from ' + esc(p.file) + "</b>" + (p.ocr === "device" ? ' <span class="chip warn">read on this device — numbers in coloured boxes may be missed, check the slabs</span>' : p.ocr ? ' <span class="chip warn">read by AI from the picture</span>' : "") + '<div class="muted" style="font-size:12px;margin:4px 0 6px">You can correct the text, then read the rules again.</div><textarea class="txtread" id="tx">' + esc(p.text || "") + '</textarea><div class="row" style="margin-top:8px"><button class="btn sec sm" id="ag">🤖 Read rules again</button></div>' +
@@ -550,6 +550,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     $("hin").onchange = function () { ls("sc-hindi", this.checked ? 1 : null); };
     $("upi").onclick = function () { pickFile("image/*"); };
     $("up").onclick = function () { pickFile(".pdf,.docx,.xlsx,.xls,.csv,.txt"); };
+    $("spolp").onclick = function () { fromPolicy(""); };
     function pickFile(acc) {
       var inp = document.createElement("input"); inp.type = "file"; inp.accept = acc;
       inp.onchange = function () {
@@ -998,8 +999,17 @@ td.n,th.n{text-align:right;white-space:nowrap}
     download(pdfDoc(pages), "Payout_" + SC.name.replace(/[^A-Za-z0-9]+/g, "_") + "_" + (SC.period || NOW) + ".pdf");
   }
 
+  // 📜 a letter published in Scheme policies: its text goes through the same "read the circular" step as an upload
+  function fromPolicy(id) {
+    var lp = window.SPOLPICK ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/spolpick.js?v=1"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't open Scheme policies.")); }; document.head.appendChild(s); });
+    lp.then(function () { return id ? api({ action: "spol-pick", ids: [id] }).then(function (r) { return r.ok ? r.items : []; }) : window.SPOLPICK.open({ api: api, multi: false, title: "Read a scheme letter" }); }).then(function (L) {
+      var x = L && L[0]; if (!x) { if (id) toast("That scheme isn't available to you"); return; }
+      if (!x.text) return toast("This letter has no readable text — open it in Scheme policies and upload it here as a file");
+      STEP = 1; DONE[1] = 0; PARSED = { file: x.title, text: x.text }; render(); parse(x.text, null, x.title);
+    }).catch(function (e) { toast(e.message); });
+  }
   window.__pageBack = function () { if (STEP > 1) { go(STEP - 1); return true; } return false; };
-  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else load();
+  if (!AUTH || !AUTH.token) VIEW.innerHTML = '<div class="err">Please log in first.</div>'; else load(function () { render(); var sp = ""; try { sp = new URLSearchParams(location.search).get("spol") || ""; } catch (e) { } if (sp) fromPolicy(sp); });
 })();
 </script>
 </body>

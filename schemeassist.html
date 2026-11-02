@@ -393,16 +393,28 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   }
   var VIEW = $("view"), TAB = "new", SCHEME = null, INPUTS = {}, SID = "", READ = null, VERR = "";
   var FTLOAD = null;
-  function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
-  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); }
+  function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=2"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
+  function loadPick() { return window.SPOLPICK ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/spolpick.js?v=1"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't open Scheme policies.")); }; document.head.appendChild(s); }); }
+  // a letter published in 📜 Scheme policies (already read by AI there; only its payout tables are read again if missing)
+  function fromPolicy(id) {
+    loadPick().then(function () { return id ? api({ action: "spol-pick", ids: [id] }).then(function (r) { return r.ok ? r.items : []; }) : window.SPOLPICK.open({ api: api, multi: false, title: "Use a scheme letter" }); }).then(function (L) {
+      var x = L && L[0]; if (!x) { if (id) toast("That scheme isn't available to you"); return; }
+      var box = $("pp"); if (box) box.innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Loading ' + esc(x.title) + "…</div>";
+      var use = function (sc, via) { done({ scheme: sc, read: x.text, via: via }); };
+      if (x.assistant && x.assistant.plan) return use(x.assistant, "Scheme policies");
+      if (!x.text) return use(x.assistant, "Scheme policies");
+      api({ action: "scha-parse", text: x.text.slice(0, 20000) }).then(function (r) { if (r.ok) { r.scheme.title = x.title; use(r.scheme, "Scheme policies"); } else use(x.assistant, "Scheme policies"); });
+    }).catch(function (e) { toast(e.message); });
+  }
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } draw(); loadPick().then(function () { var id = window.SPOLPICK.fromUrl(); if (id) fromPolicy(id); }).catch(function () { }); }
   function draw() {
     VIEW.innerHTML = '<div class="seg"><button data-tb="new" class="' + (TAB === "new" ? "on" : "") + '">📂 New / upload</button><button data-tb="saved" class="' + (TAB === "saved" ? "on" : "") + '">📑 Schemes</button></div><div id="pane"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
     (TAB === "saved" ? pSaved : pNew)();
   }
   function pNew() {
-    $("pane").innerHTML = '<div class="card"><b>📂 Upload the scheme</b><div class="muted" style="font-size:12.5px">A scheme letter or policy as PDF, photo, Excel or Word. AI reads it and explains what you need to do and earn.</div><button class="btn pri block" id="up" style="margin-top:8px">📎 Choose scheme file</button><div class="muted" style="font-size:12px;margin-top:6px">Or paste the scheme text:</div><textarea class="tx" id="pt" placeholder="Paste the scheme wording here…" style="min-height:70px;margin-top:4px"></textarea><button class="btn sec sm" id="ptgo" style="margin-top:6px">Explain pasted text</button><div id="pp"></div></div><div id="out"></div>';
-    $("up").onclick = pickFile; $("ptgo").onclick = function () { if ($("pt").value.trim().length < 30) return toast("Paste the scheme text first"); parse($("pt").value, $("pp")); };
+    $("pane").innerHTML = '<div class="card"><b>📂 Upload the scheme</b><div class="muted" style="font-size:12.5px">A scheme letter or policy as PDF, photo, Excel or Word. AI reads it and explains what you need to do and earn.</div><button class="btn pri block" id="up" style="margin-top:8px">📎 Choose scheme file</button><button class="btn sec block" id="spol" style="margin-top:6px">📜 From Scheme policies</button><div class="muted" style="font-size:12px;margin-top:6px">Or paste the scheme text:</div><textarea class="tx" id="pt" placeholder="Paste the scheme wording here…" style="min-height:70px;margin-top:4px"></textarea><button class="btn sec sm" id="ptgo" style="margin-top:6px">Explain pasted text</button><div id="pp"></div></div><div id="out"></div>';
+    $("up").onclick = pickFile; $("spol").onclick = function () { fromPolicy(""); }; $("ptgo").onclick = function () { if ($("pt").value.trim().length < 30) return toast("Paste the scheme text first"); parse($("pt").value, $("pp")); };
     if (SCHEME) showScheme();
   }
   function pickFile() {

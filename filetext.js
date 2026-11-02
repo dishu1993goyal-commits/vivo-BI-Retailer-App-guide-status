@@ -1,11 +1,23 @@
 // BIFILES.extract(file) -> Promise<{ name, kind, text }>
-// Reads a pdf, image (OCR), Excel/CSV, Word (.docx) or text file into plain text, entirely in the browser.
+// Reads a pdf, image (OCR), Excel/CSV, Word (.docx), PowerPoint (.pptx) or text file into plain text, entirely in the browser.
 // Shared by Affordability (offer sheets) and any tool that needs offers/lines out of an uploaded file.
 (function () {
   "use strict";
   var V = { xlsx: "/vendor/xlsx.full.min.js", zip: "/vendor/jszip.min.js", pdfjs: "/vendor/pdf.js" }, L = {};
   function lib(k) { return L[k] || (L[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = V[k]; s.onload = res; s.onerror = function () { L[k] = null; rej(new Error("Couldn't load a reader — check the connection.")); }; document.head.appendChild(s); })); }
   function xmlText(x) { return String(x || "").replace(/<[^>]+>/g, function (m) { return /<w:tab|<w:br|<\/w:p>/.test(m) ? " " : ""; }).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#(\d+);/g, function (_, n) { return String.fromCharCode(+n); }).replace(/\s+/g, " ").trim(); }
+  function readPptx(buf) {   // each slide's text in order; table cells joined with " | "
+    return lib("zip").then(function () { return window.JSZip.loadAsync(buf); }).then(function (z) {
+      var names = Object.keys(z.files).filter(function (n) { return /^ppt\/slides\/slide\d+\.xml$/.test(n); }).sort(function (a, b) { return +a.match(/(\d+)\.xml/)[1] - +b.match(/(\d+)\.xml/)[1]; });
+      return Promise.all(names.map(function (n) { return z.file(n).async("string"); })).then(function (xs) {
+        return xs.map(function (x, i) {
+          var out = ["--- slide " + (i + 1) + " ---"], txt = function (frag) { return (frag.match(/<a:t>[^<]*<\/a:t>/g) || []).map(function (q) { return q.replace(/<\/?a:t>/g, ""); }).join("").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim(); };
+          (x.match(/<a:tr[ >][\s\S]*?<\/a:tr>|<a:p>[\s\S]*?<\/a:p>/g) || []).forEach(function (b) { if (/^<a:tr/.test(b)) { var cells = (b.match(/<a:tc[ >][\s\S]*?<\/a:tc>/g) || []).map(txt); if (cells.join("").trim()) out.push(cells.join(" | ")); } else if (!/<a:tc/.test(b)) { var t = txt(b); if (t) out.push(t); } });
+          return out.join("\n");
+        }).join("\n");
+      });
+    });
+  }
   function readDocx(buf) {
     return lib("zip").then(function () { return window.JSZip.loadAsync(buf); }).then(function (z) {
       return z.file("word/document.xml").async("string").then(function (x) {
@@ -73,9 +85,10 @@
     if (/^(png|jpe?g|gif|webp|bmp|heic)$/.test(ext) || /^image\//.test(file.type)) P = imgBuf(file).then(function (b) { return b ? ocr(b) : ""; }).then(function (t) { return { kind: "image", text: t }; });
     else if (ext === "pdf") P = file.arrayBuffer().then(readPdf).then(function (t) { return { kind: "pdf", text: t }; });
     else if (ext === "docx") P = file.arrayBuffer().then(readDocx).then(function (t) { return { kind: "word", text: t }; });
+    else if (ext === "pptx") P = file.arrayBuffer().then(readPptx).then(function (t) { return { kind: "slides", text: t }; });
     else if (/^(xlsx|xls|csv)$/.test(ext)) P = file.arrayBuffer().then(readSheet).then(function (t) { return { kind: "data", text: t }; });
     else if (/^(txt|md|json|text)$/.test(ext) || /^text\//.test(file.type)) P = file.text().then(function (t) { return { kind: "text", text: t }; });
-    else return Promise.reject(new Error(n + ": use a PDF, picture, Excel/CSV, Word (.docx) or text file (old .doc/.ppt: save as the new format first)."));
+    else return Promise.reject(new Error(n + ": use a PDF, picture, Excel/CSV, Word (.docx), PowerPoint (.pptx) or text file (old .doc/.ppt: save as the new format first)."));
     return P.then(function (r) { r.name = n; r.text = (r.text || "").replace(/\u0000/g, "").trim(); if (r.text.length < 3) throw new Error(n + ": nothing readable was found" + (r.kind === "image" ? " in the picture." : ".")); return r; });
   }
   window.BIFILES = { extract: extract };

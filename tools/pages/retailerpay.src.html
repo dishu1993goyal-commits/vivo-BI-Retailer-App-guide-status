@@ -62,6 +62,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } route(); }
   function route() {
     var h = location.hash.slice(1), m;
+    if (!route.sp) { route.sp = 1; try { var sp = new URLSearchParams(location.search).get("spol"); if (sp) { TAB = "calc"; draw(); policiesToRules([sp]); return; } } catch (e) { } }
     if ((m = /^r=(.+)$/.exec(h))) return openRetailer(decodeURIComponent(m[1]));
     if ((m = /^batch=(.+)$/.exec(h))) { TAB = "bat"; return openBatch(m[1]); }
     draw();
@@ -285,7 +286,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   // Uses the same payout engine file as the scheme payout calculator (read-only); its own saved rules and retailer data.
   var SCH = null, SEL = {}, CROWS = null;
   try { var cr = JSON.parse(localStorage.getItem("rp-calc-rows") || "null"); if (cr && cr.rows) CROWS = cr; } catch (e) { }
-  function loadFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s2 = document.createElement("script"); s2.src = "/filetext.js?v=1"; s2.onload = res; s2.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s2); }); }
+  function loadFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s2 = document.createElement("script"); s2.src = "/filetext.js?v=2"; s2.onload = res; s2.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s2); }); }
   function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
   function ruleText(r) {
     var m = r.models && r.models.length ? " (models: " + r.models.join(", ") + ")" : "", w = { always: "", achieved: " if target achieved", notAchieved: " if target NOT achieved" };
@@ -304,10 +305,11 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   }
   function schemeLines(sc) { var o = []; o.push("Sales counted: " + ({ upload: "uploaded", activation: "activated", both: "uploaded AND activated", either: "uploaded OR activated" }[sc.basis] || sc.basis) + " · target on " + ({ units: "units", value: "₹ value", both: "units AND value", either: "units OR value" }[sc.targetType] || "units")); if ((sc.models || []).length) o.push("Models: " + sc.models.map(function (m) { return m.name + (m.target ? " (target " + m.target + ")" : ""); }).join(", ")); if (sc.minAch) o.push("Minimum achievement " + sc.minAch + "%"); if (sc.cap) o.push("Maximum payout " + rs(sc.cap)); if (sc.tdsPct) o.push("TDS " + sc.tdsPct + "%"); (sc.rules || []).forEach(function (r) { o.push(ruleText(r)); }); return o; }
   function pCalc() {
-    $("pane").innerHTML = '<div class="card"><b>1 · 📚 Scheme letters</b><div class="muted" style="font-size:12.5px">Upload one or several scheme letters / policies at once (PDF, photo, Excel, Word). AI turns each into its own payout rules — check them, then calculate them all together on the same retailers. (This is separate from the Scheme payout calculator, which is unchanged.)</div><button class="btn pri block" id="cup" style="margin-top:8px">📚 Upload scheme letters</button><div id="cupres"></div><div id="schl"><div class="loading"><div class="spin"></div></div></div></div>' +
+    $("pane").innerHTML = '<div class="card"><b>1 · 📚 Scheme letters</b><div class="muted" style="font-size:12.5px">Upload one or several scheme letters / policies at once (PDF, photo, Excel, Word). AI turns each into its own payout rules — check them, then calculate them all together on the same retailers. (This is separate from the Scheme payout calculator, which is unchanged.)</div><button class="btn pri block" id="cup" style="margin-top:8px">📚 Upload scheme letters</button><button class="btn sec block" id="cspol" style="margin-top:6px">📜 From Scheme policies</button><div id="cupres"></div><div id="schl"><div class="loading"><div class="spin"></div></div></div></div>' +
       '<div class="card"><b>2 · 👥 Retailer numbers</b><div class="muted" style="font-size:12.5px">Download the template (it has columns for the models and price bands of the ticked schemes), fill targets and achievements, and upload.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="ctpl">⬇ Template</button><button class="btn pri sm" id="cimp">📁 Upload retailer Excel</button></div><div id="crows" style="margin-top:6px"></div></div>' +
       '<div class="card"><b>3 · ▶ Calculate</b><div class="muted" style="font-size:12.5px">Runs every ticked scheme on every retailer, adds them up per retailer, and keeps each rule’s breakup for the dashboard, Verify and the PDF letter.</div><button class="btn ok block" id="crun" style="margin-top:8px">▶ Calculate payouts</button><div id="cres"></div></div>';
     $("cup").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.docx,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { readLetters([].slice.call(i.files || [], 0, 12)); }; i.click(); };
+    $("cspol").onclick = function () { policiesToRules(null); };
     $("ctpl").onclick = calcTemplate; $("cimp").onclick = function () { pickFile(".xlsx,.xls,.csv", calcImport); }; $("crun").onclick = calcRun;
     paintRows(); libEng().then(loadSchemes).catch(function (e) { $("schl").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; });
   }
@@ -320,6 +322,19 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       [].forEach.call($("schl").querySelectorAll("[data-dl]"), function (b) { b.onclick = function () { sheet("Delete these rules?", "", [["🗑️", "Delete", function () { api({ action: "rp-scheme-delete", id: b.dataset.dl }).then(loadSchemes); }, "danger"]]); }; });
       [].forEach.call($("schl").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { editScheme(SCH.find(function (y) { return y.id === b.dataset.ed; })); }; });
     });
+  }
+  function loadPick() { return window.SPOLPICK ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/spolpick.js?v=1"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't open Scheme policies.")); }; document.head.appendChild(s); }); }
+  // letters published in 📜 Scheme policies → payout-calculator rules (the same reading as an upload, from the stored text)
+  function policiesToRules(ids) {
+    loadPick().then(function () { return ids ? api({ action: "spol-pick", ids: ids }).then(function (r) { return r.ok ? r.items : []; }) : window.SPOLPICK.open({ api: api, multi: true, title: "Scheme letters to calculate" }); }).then(function (L) {
+      if (!L || !L.length) return; var box = $("cupres"), out = [], chain = Promise.resolve();
+      L.forEach(function (x, i) { chain = chain.then(function () {
+        if (box) box.innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>(' + (i + 1) + "/" + L.length + ") AI is turning " + esc(x.title) + " into rules…</div>";
+        if (!x.text) { out.push("⚠️ " + esc(x.title) + ": no readable text in this letter"); return; }
+        return api({ action: "sc-parse", text: x.text, fileName: x.title }).then(function (r) { if (!r.ok) throw new Error(r.error); var sc = r.scheme; sc.name = x.title; if (!sc.period) sc.period = NOWM; return api({ action: "rp-scheme-save", scheme: sc }).then(function (sv) { if (!sv.ok) throw new Error(sv.error); SEL[sv.id] = true; out.push("✅ " + esc(x.title) + " (" + (sc.rules || []).length + " rules)"); }); }).catch(function (e) { out.push("⚠️ " + esc(x.title) + ": " + esc(e.message || e)); });
+      }); });
+      chain.then(function () { if ($("cupres")) $("cupres").innerHTML = out.map(function (o) { return '<div style="font-size:12.5px;margin-top:4px">' + o + "</div>"; }).join(""); loadSchemes(); });
+    }).catch(function (e) { toast(e.message); });
   }
   function readLetters(files) {
     if (!files.length) return; var out = [], box = $("cupres"), chain = Promise.resolve();

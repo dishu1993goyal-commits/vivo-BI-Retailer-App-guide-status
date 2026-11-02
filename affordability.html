@@ -921,7 +921,7 @@ function DL(k, d) { return ' data-list="' + k + '" data-list-default="' + esc(JS
     return out.length ? out : [text];
   }
   var FTLOAD = null;
-  function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
+  function loadFiles() { return FTLOAD || (FTLOAD = new Promise(function (res, rej) { if (window.BIFILES) return res(); var s = document.createElement("script"); s.src = "/filetext.js?v=2"; s.onload = res; s.onerror = function () { FTLOAD = null; rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); })); }
   function fileImport(p, after) {
     var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.xlsx,.xls,.csv,.docx,.txt,image/*,application/pdf";
     i.onchange = function () {

@@ -41,10 +41,18 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   var NOW = new Date(Date.now() + 19800000), MONTH = NOW.toISOString().slice(0, 7);
   var daysLeft = function () { var y = NOW.getUTCFullYear(), m = NOW.getUTCMonth(), last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate(); return last - NOW.getUTCDate() + 1; };
   F.days = daysLeft();
-  function libFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/filetext.js?v=1"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); }); }
+  function libFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/filetext.js?v=2"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); }); }
   function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
 
-  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } api({ action: "phub-list" }).then(function (r) { CAT = (r && r.ok && r.models) || []; draw(); }); }
+  function loadPick() { return window.SPOLPICK ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/spolpick.js?v=1"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't open Scheme policies.")); }; document.head.appendChild(s); }); }
+  function fromPolicies(ids) {
+    loadPick().then(function () { return ids ? api({ action: "spol-pick", ids: ids }).then(function (r) { return r.ok ? r.items : []; }) : window.SPOLPICK.open({ api: api, multi: true, title: "Add scheme letters" }); }).then(function (L) {
+      if (!L || !L.length) return; var chain = Promise.resolve(), n = 0;
+      L.forEach(function (x) { chain = chain.then(function () { if (x.assistant && x.assistant.plan) { SCHEMES.push(x.assistant); n++; return; } if (!x.text) { SCHEMES.push(x.assistant); return; } return api({ action: "scha-parse", text: x.text.slice(0, 20000) }).then(function (r) { var sc = r.ok ? r.scheme : x.assistant; sc.title = x.title; SCHEMES.push(sc); if (sc.plan) n++; }); }); });
+      chain.then(function () { SOLVED = false; AI = null; TAB = "plan"; draw(); toast(L.length + " scheme(s) added" + (n < L.length ? " · " + (L.length - n) + " without a payout table" : "")); });
+    }).catch(function (e) { toast(e.message); });
+  }
+  function load() { if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; } api({ action: "phub-list" }).then(function (r) { CAT = (r && r.ok && r.models) || []; draw(); loadPick().then(function () { var id = window.SPOLPICK.fromUrl(); if (id) fromPolicies([id]); }).catch(function () { }); }); }
   function draw() {
     VIEW.innerHTML = '<div class="seg"><button data-tb="plan" class="' + (TAB === "plan" ? "on" : "") + '">🎯 Plan</button><button data-tb="saved" class="' + (TAB === "saved" ? "on" : "") + '">📁 My plans</button></div><div id="pane"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
@@ -139,7 +147,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   function pPlan() {
     var anyM = SCHEMES.some(function (s) { return s.plan && s.plan.components.some(function (c) { return c.kind === "matrix"; }); });
     $("pane").innerHTML = '<div class="card"><b>1 · 📚 Schemes</b><div class="muted" style="font-size:12.5px">Upload one or more scheme letters (PDF, photo, Excel, Word) — AI reads the payout tables and slabs. Or add a scheme HO has published in the Scheme assistant.</div>' +
-      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="up">📚 Upload scheme letters</button><button class="btn sec sm" id="pubs">📑 Add a published scheme</button></div><div id="upres"></div>' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="up">📚 Upload scheme letters</button><button class="btn sec sm" id="spol">📜 From Scheme policies</button><button class="btn sec sm" id="pubs">📑 Add a published scheme</button></div><div id="upres"></div>' +
       (SCHEMES.length ? SCHEMES.map(function (s, si) { var p = s.plan; return '<div class="sc"><div class="hd"><b>' + esc(s.title) + (s.period ? ' <span class="muted" style="font-weight:500;font-size:12px">· ' + esc(s.period) + "</span>" : "") + '</b><button class="btn ghost sm" data-rm="' + si + '" style="color:var(--bad)">✕</button></div>' +
         (p ? '<div>' + p.components.map(function (c) { return '<span class="chip">' + esc(c.name) + " · " + (c.kind === "matrix" ? c.rows.length + " models × " + c.tiers.length + " levels" : c.kind === "slab" ? c.slabs.length + " slabs" : c.kind === "band" ? c.bands.length + " bands" : rs(c.value) + "/unit") + "</span>"; }).join("") + "</div>" : '<div class="notice" style="margin-top:6px">⚠️ No payout table could be read from this letter — upload a clearer copy (or the PDF). It is left out of the plan.</div>') +
         ((s.terms || []).length ? '<div class="muted" style="font-size:11.5px;margin-top:4px">📌 ' + s.terms.slice(0, 3).map(esc).join(" · ") + "</div>" : "") + "</div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:8px">No schemes added yet.</div>') + "</div>" +
@@ -150,7 +158,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       (SCHEMES.some(function (s) { return s.plan && s.plan.components.some(function (c) { return c.kind === "band" && /shield|plan|insur|care|protect|warranty/i.test(c.name); }); }) ? '<label class="lb">V-Shield / protection attach rate (% of phones)</label><input class="tx" id="fx" type="number" value="' + esc(F.attach) + '">' : "") +
       '<button class="btn ok block" id="go" style="margin-top:12px">🎯 Work out what to sell</button></div><div id="planout"></div>';
     $("up").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.docx,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { readLetters([].slice.call(i.files || [], 0, 8)); }; i.click(); };
-    $("pubs").onclick = addPublished;
+    $("pubs").onclick = addPublished; $("spol").onclick = function () { fromPolicies(null); };
     [].forEach.call($("pane").querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { SCHEMES.splice(+b.dataset.rm, 1); U = {}; PR = {}; INCL = {}; COND = {}; SOLVED = false; AI = null; pPlan(); }; });
     var rd = function () { F.target = +$("ft").value || 0; F.days = +$("fd").value || 1; F.retailer = $("fr").value; if ($("fa")) F.ach = +$("fa").value || 0; if ($("fm")) F.mt = $("fm").value; if ($("fx")) F.attach = +$("fx").value || 0; };
     ["ft", "fd", "fa", "fm", "fr", "fx"].forEach(function (id) { if ($(id)) $(id).oninput = function () { rd(); if (SOLVED) renderPlan(); }; });

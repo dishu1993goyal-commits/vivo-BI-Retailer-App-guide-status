@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Scheme policies</title>
+<style>
+/*@@CSS@@*/
+label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:520px){.g3{grid-template-columns:1fr 1fr}}
+.bdg{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;white-space:nowrap}
+.s-ongoing{background:#E6F4EA;color:#13693F}.s-upcoming{background:#EEF0FF;color:#3346C9}.s-expired{background:#F1F2F6;color:#6B7090}.s-disabled{background:#FDECEC;color:#B42318}.s-draft{background:#FFF4E5;color:#8A5300}
+.chip{display:inline-block;background:#F3F4FA;color:#3D47C8;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:600;margin:3px 4px 0 0;cursor:pointer}
+.chip.cat{background:#FFF4E5;color:#8A5300;cursor:default}
+.pc{background:var(--card);border-radius:16px;padding:13px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06);border-left:4px solid #1E9E61}
+.pc.upcoming{border-left-color:#4D5BF9}.pc.expired,.pc.disabled{border-left-color:#B9BCCB;opacity:.85}
+.pc .hd{display:flex;gap:8px;align-items:flex-start}.pc .hd b{flex:1;font-size:15px}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:6px}.prog i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#1E9E61,#5BC489)}
+.kp{font-size:12.5px;margin-top:6px;padding-left:16px}.kp li{margin-top:2px}
+.dg{background:linear-gradient(135deg,#1F2340,#4D5BF9);color:#fff;border-radius:18px;padding:15px;margin-top:12px}
+.dg h2{margin:0;font-size:16px;line-height:1.35}.dg ul{margin:8px 0 0;padding-left:18px;font-size:13px}.dg li{margin-top:4px}
+.dsec{background:var(--card);border-radius:14px;padding:12px;margin-top:10px;box-shadow:0 2px 8px rgba(20,24,51,.05)}
+.dsec b.h{display:block;font-size:13.5px;margin-bottom:4px}
+.tl{position:relative;margin-top:10px}.tl .r{display:grid;grid-template-columns:38% 1fr;gap:8px;align-items:center;font-size:12px;margin-top:6px}
+.tl .bar{position:relative;height:16px;background:#F3F4FA;border-radius:6px}.tl .bar i{position:absolute;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,#4D5BF9,#8A5CF0)}.tl .bar i.on{background:linear-gradient(90deg,#1E9E61,#5BC489)}
+.tl .now{position:absolute;top:-4px;bottom:-4px;width:2px;background:#E5484D}
+.row2{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--card);border-radius:12px;margin-top:6px;box-shadow:0 1px 6px rgba(20,24,51,.05);cursor:pointer}
+.dt{border-collapse:collapse;font-size:12.5px;min-width:100%}.dt th{background:#F3F4FA;text-align:left;padding:6px 8px;font-size:11px;color:var(--mut)}.dt td{padding:6px 8px;border-top:1px solid #EEF0F6}
+.tbw{overflow-x:auto;margin-top:8px;border-radius:12px;background:var(--card)}
+.fl{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid #E6E8F2;border-radius:12px;margin-top:6px}
+.uf{border:1px dashed #C9CDF7;border-radius:14px;padding:11px;margin-top:10px;background:#FAFBFF}
+.rad{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.rad span{border:1.5px solid #DDE0EF;border-radius:99px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;background:var(--card)}.rad span.on{background:var(--brand);border-color:var(--brand);color:#fff}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📜</span></div>
+  <h1>Scheme policies</h1><p>Every scheme letter in one place — an AI summary of all running schemes, filters by month, scheme and model</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "dash", ME = null, LIST = [], DIG = null, FL = { q: "", month: "", model: "", status: "", cat: "", state: "" }, STATES = [];
+  var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var dfmt = function (d) { return d ? +d.slice(8, 10) + " " + MN[+d.slice(5, 7) - 1] + (d.slice(0, 4) !== String(new Date().getFullYear()) ? " " + d.slice(0, 4) : "") : "—"; };
+  var dnum = function (d) { return Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 864e5; };
+  var STL = { ongoing: "Ongoing", upcoming: "Upcoming", expired: "Expired", disabled: "Disabled", draft: "Draft" };
+  var TOOLS = [["schemeassist", "🎯 Scheme assistant"], ["payplanner", "🎯 Payout target planner"], ["schemecalc", "🧮 Payout calculator"], ["retailerpay", "💼 Retailer payouts"]];
+  function libFT() { return window.BIFILES ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/filetext.js?v=2"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the file reader.")); }; document.head.appendChild(s); }); }
+  function shrink(fl) { return new Promise(function (res, rej) { var u = URL.createObjectURL(fl), im = new Image(); im.onload = function () { var k = Math.min(1, 2000 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.88)); }; im.onerror = function () { rej(new Error("Couldn't open the picture.")); }; im.src = u; }); }
+  var fIcon = function (n) { return /\.pdf$/i.test(n) ? "📕" : /\.(png|jpe?g|webp|gif|heic)$/i.test(n) ? "🖼️" : /\.(docx?|rtf)$/i.test(n) ? "📘" : /\.(pptx?)$/i.test(n) ? "📙" : /\.(xlsx?|csv)$/i.test(n) ? "📗" : "📄"; };
+
+  function load() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    Promise.all([api({ action: "spol-me" }), api({ action: "spol-list" }), fetch("/states.json").then(function (r) { return r.json(); }).catch(function () { return {}; })]).then(function (x) {
+      ME = x[0].ok ? x[0] : { canPublish: false }; LIST = x[1].ok ? x[1].items : []; STATES = (x[2] && x[2].states) || [];
+      var h = location.hash.slice(1); if (/^p=/.test(h)) return detail(decodeURIComponent(h.slice(2)));
+      draw();
+    });
+  }
+  window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (/^p=/.test(h)) detail(decodeURIComponent(h.slice(2))); else draw(); });
+  window.__pageBack = function () { if (location.hash.length > 1) { history.back(); return true; } return false; };
+  function refresh(then) { api({ action: "spol-list" }).then(function (r) { if (r.ok) LIST = r.items; (then || draw)(); }); }
+  function draw() {
+    var tabs = [["dash", "📊 Dashboard"], ["all", "📜 All letters"]].concat(ME.canPublish ? [["pub", "📤 Publish"]] : []);
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
+    ({ dash: pDash, all: pAll, pub: pPub })[TAB]();
+  }
+  function tile(ic, bg, v, l, sm) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + ic + "</div><b>" + v + "</b><span>" + l + "</span>" + (sm ? "<small>" + sm + "</small>" : "") + "</div>"; }
+  var daysLeft = function (p) { return p.dateTo ? Math.round(dnum(p.dateTo) - dnum(ME.today)) + 1 : null; };
+
+  // ================= Dashboard =================
+  function pDash() {
+    var on = LIST.filter(function (p) { return p.status === "ongoing"; }), up = LIST.filter(function (p) { return p.status === "upcoming"; });
+    var ending = on.filter(function (p) { var d = daysLeft(p); return d != null && d <= 7; });
+    var mc = {}; on.concat(up).forEach(function (p) { (p.models || []).forEach(function (m) { var k = m.trim(); if (k) (mc[k] = mc[k] || []).push(p.title); }); });
+    var models = Object.keys(mc).sort(function (a, b) { return mc[b].length - mc[a].length || a.localeCompare(b); });
+    var off = LIST.filter(function (p) { return p.status === "expired" || p.status === "disabled"; }).length;
+    $("pane").innerHTML = '<div class="tiles" style="margin-top:12px">' + tile("🟢", "#E6F4EA", on.length, "Ongoing schemes") + tile("⏳", "#FDECEC", ending.length, "Ending in 7 days") + tile("🗓️", "#EEF0FF", up.length, "Upcoming") + tile("📱", "#F4EEFF", models.length, "Models covered") + "</div>" +
+      '<div id="dg"></div>' +
+      (on.length + up.length ? timeline(on.concat(up)) : "") +
+      (models.length ? '<div class="dsec"><b class="h">📱 Models in running schemes</b><div class="muted" style="font-size:11.5px">Tap a model to see its schemes</div>' + models.slice(0, 30).map(function (m) { return '<span class="chip" data-m="' + esc(m) + '">' + esc(m) + (mc[m].length > 1 ? " · " + mc[m].length + " schemes" : "") + "</span>"; }).join("") + "</div>" : "") +
+      '<h3 style="margin:16px 2px 0">🟢 Ongoing schemes</h3>' + (on.length ? on.map(card).join("") : '<div class="card empty">No scheme is running today.' + (ME.canPublish ? " Publish letters in 📤 Publish." : "") + "</div>") +
+      (up.length ? '<h3 style="margin:16px 2px 0">🗓️ Upcoming</h3>' + up.map(card).join("") : "") +
+      (off ? '<div class="muted" style="font-size:12.5px;margin-top:12px;text-align:center">' + off + ' expired / disabled — see 📜 All letters.</div>' : "");
+    bindCards($("pane"));
+    [].forEach.call($("pane").querySelectorAll("[data-m]"), function (c) { c.onclick = function () { FL = { q: "", month: "", model: c.dataset.m, status: "", cat: "", state: "" }; TAB = "all"; draw(); }; });
+    digest(false);
+  }
+  function digest(fresh) {
+    var box = $("dg"); if (!box) return;
+    if (!LIST.some(function (p) { return p.status === "ongoing" || p.status === "upcoming"; })) { box.innerHTML = ""; return; }
+    if (DIG && !fresh) return paintDig();
+    box.innerHTML = '<div class="dg"><div class="loading" style="color:#fff"><div class="spin"></div>✨ AI is summarising all running schemes…</div></div>';
+    api({ action: "spol-digest", fresh: !!fresh }).then(function (r) { if (!$("dg")) return; if (!r.ok) { $("dg").innerHTML = '<div class="notice" style="margin-top:12px">AI summary isn’t available right now (' + esc(r.error || "") + ").</div>"; return; } DIG = r.digest; paintDig(); });
+  }
+  function paintDig() {
+    var d = DIG, box = $("dg"); if (!d || !box) { if (box) box.innerHTML = ""; return; }
+    var ul = function (L) { return '<ul style="margin:4px 0 0;padding-left:18px;font-size:13px">' + L.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>"; };
+    box.innerHTML = '<div class="dg"><div style="font-size:11.5px;opacity:.85">✨ AI summary of ' + d.count + ' running / upcoming scheme' + (d.count === 1 ? "" : "s") + '</div><h2>' + esc(d.headline) + "</h2>" + (d.highlights.length ? '<ul>' + d.highlights.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") + '<button class="btn sm" id="dgr" style="margin-top:10px;background:rgba(255,255,255,.18);color:#fff;border:0">↻ Refresh summary</button></div>' +
+      (d.bestEarning.length ? '<div class="dsec"><b class="h">💰 Best earning opportunities</b>' + d.bestEarning.map(function (x) { var p = LIST.find(function (y) { return y.id === x.id; }) || LIST.find(function (y) { return y.title === x.scheme; }); return '<div style="font-size:13px;margin-top:6px"><b' + (p ? ' class="lk" data-open="' + p.id + '" style="color:var(--brand);cursor:pointer"' : "") + ">" + esc(x.scheme) + "</b> — " + esc(x.why) + "</div>"; }).join("") + "</div>" : "") +
+      (d.focusModels.length ? '<div class="dsec"><b class="h">📱 Focus models across schemes</b>' + d.focusModels.map(function (x) { return '<div style="font-size:13px;margin-top:6px"><b>' + esc(x.model) + '</b> <span class="muted">· ' + x.schemes.map(esc).join(", ") + "</span><br>" + esc(x.tip) + "</div>"; }).join("") + "</div>" : "") +
+      (d.deadlines.length ? '<div class="dsec"><b class="h">⏰ Deadlines</b>' + d.deadlines.map(function (x) { return '<div style="font-size:13px;margin-top:6px"><b>' + dfmt(x.date) + "</b> · " + esc(x.scheme) + (x.note ? " — " + esc(x.note) : "") + "</div>"; }).join("") + "</div>" : "") +
+      (d.actions.length ? '<div class="dsec"><b class="h">✅ This week’s actions</b>' + ul(d.actions) + "</div>" : "") +
+      (d.watchouts.length ? '<div class="dsec"><b class="h">⚠️ Don’t lose payouts</b>' + ul(d.watchouts) + "</div>" : "");
+    $("dgr").onclick = function () { digest(true); };
+    [].forEach.call(box.querySelectorAll("[data-open]"), function (b) { b.onclick = function () { location.hash = "p=" + b.dataset.open; }; });
+  }
+  function timeline(L) {
+    var y = +ME.today.slice(0, 4), m = +ME.today.slice(5, 7), first = ME.today.slice(0, 8) + "01", last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10), a = dnum(first), z = dnum(last) + 1, span = z - a, now = (dnum(ME.today) + 0.5 - a) / span * 100;
+    var rows = L.filter(function (p) { return p.dateFrom && p.dateTo && p.dateFrom <= last && p.dateTo >= first; }).slice(0, 14);
+    if (!rows.length) return "";
+    return '<div class="dsec"><b class="h">🗓️ ' + MN[m - 1] + " " + y + ' — scheme calendar</b><div class="tl">' + rows.map(function (p) { var s = Math.max(0, (dnum(p.dateFrom) - a) / span * 100), e = Math.min(100, (dnum(p.dateTo) + 1 - a) / span * 100); return '<div class="r"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p.title) + '">' + esc(p.title) + '</span><div class="bar"><i class="' + (p.status === "ongoing" ? "on" : "") + '" style="left:' + s + "%;width:" + Math.max(2, e - s) + '%"></i><span class="now" style="left:' + now + '%"></span></div></div>'; }).join("") + '<div class="muted" style="font-size:10.5px;margin-top:6px;text-align:right">1 ' + MN[m - 1] + " · red line = today · " + dfmt(last) + "</div></div></div>";
+  }
+  function card(p) {
+    var b = p.brief || {}, dl = daysLeft(p), total = p.dateFrom && p.dateTo ? dnum(p.dateTo) - dnum(p.dateFrom) + 1 : 0, done = p.dateFrom ? Math.min(total, Math.max(0, dnum(ME.today) - dnum(p.dateFrom) + 1)) : 0;
+    return '<div class="pc ' + p.status + '"><div class="hd"><b>' + esc(p.title) + '</b><span class="bdg s-' + p.status + '">' + STL[p.status] + "</span></div>" +
+      '<div class="muted" style="font-size:12px;margin-top:2px">' + dfmt(p.dateFrom) + " → " + dfmt(p.dateTo) + (p.status === "ongoing" && dl != null ? " · <b style=\"color:" + (dl <= 3 ? "#B42318" : "var(--ink)") + '">' + dl + " day" + (dl === 1 ? "" : "s") + " left</b>" : p.status === "upcoming" ? " · starts in " + Math.round(dnum(p.dateFrom) - dnum(ME.today)) + " days" : "") + (p.category ? ' <span class="chip cat">' + esc(p.category) + "</span>" : "") + "</div>" +
+      (p.status === "ongoing" && total ? '<div class="prog"><i style="width:' + Math.round(done / total * 100) + '%"></i></div>' : "") +
+      (b.summary ? '<div style="font-size:13px;margin-top:6px">' + esc(b.summary.length > 220 ? b.summary.slice(0, 217) + "…" : b.summary) + "</div>" : "") +
+      ((b.slabs || []).length ? '<div class="tbw"><table class="dt">' + b.slabs.slice(0, 4).map(function (s) { return "<tr><td>" + esc(s.label || "") + "</td><td>" + esc(s.condition) + "</td><td><b>" + esc(s.payout) + "</b></td></tr>"; }).join("") + (b.slabs.length > 4 ? '<tr><td colspan="3" class="muted">+' + (b.slabs.length - 4) + " more</td></tr>" : "") + "</table></div>" : "") +
+      (b.maxPayout ? '<div style="font-size:12.5px;margin-top:6px">💰 Max payout: <b>' + esc(b.maxPayout) + "</b></div>" : "") +
+      ((p.models || []).length ? "<div>" + p.models.slice(0, 8).map(function (m) { return '<span class="chip">' + esc(m) + "</span>"; }).join("") + "</div>" : "") +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" data-open="' + p.id + '">🔎 Details</button>' + (p.files[0] ? '<button class="btn sec sm" data-file="' + p.id + '">' + fIcon(p.files[0].name) + " Letter</button>" : "") + '<button class="btn ghost sm" data-use="' + p.id + '">🧮 Use in a tool</button></div></div>';
+  }
+  function bindCards(root) {
+    [].forEach.call(root.querySelectorAll("[data-open]"), function (b) { b.onclick = function () { location.hash = "p=" + b.dataset.open; }; });
+    [].forEach.call(root.querySelectorAll("[data-file]"), function (b) { b.onclick = function () { var p = LIST.find(function (x) { return x.id === b.dataset.file; }); if (p) openFile(p.files[0]); }; });
+    [].forEach.call(root.querySelectorAll("[data-use]"), function (b) { b.onclick = function () { useIn(b.dataset.use); }; });
+  }
+  function useIn(id) { sheet("Use this scheme in…", "The tool opens with this scheme letter already loaded", TOOLS.map(function (t) { return [t[1].split(" ")[0], t[1].replace(/^\S+\s/, ""), function () { location.href = t[0] + ".html?spol=" + encodeURIComponent(id); }]; })); }
+  // ---- open a letter file (downloaded in pieces) ----
+  function openFile(fl) {
+    toast("Opening " + fl.name + "…");
+    var parts = [], get = function (i) { return api({ action: "spol-dl", fid: fl.fid, idx: i }).then(function (r) { if (!r.ok) throw new Error(r.error); var bin = atob(r.data), u8 = new Uint8Array(bin.length); for (var k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k); parts.push(u8); return i + 1 < r.chunks ? get(i + 1) : r; }); };
+    get(0).then(function (r) {
+      var blob = new Blob(parts, { type: r.mime || fl.mime || "application/octet-stream" });
+      if (/^image\//.test(blob.type)) { var u = URL.createObjectURL(blob), ov = sheet(fl.name, "", [["⬇", "Download", function () { download(blob, fl.name); }]], '<img src="' + u + '" alt="" style="width:100%;border-radius:12px;margin-top:8px">'); return; }
+      if (!window.AndroidDL && /pdf/.test(blob.type)) { var w = window.open(URL.createObjectURL(blob), "_blank"); if (w) return; }
+      download(blob, fl.name);
+    }).catch(function (e) { toast(e.message || "Couldn't open the file"); });
+  }
+
+  // ================= All letters =================
+  function months() { var s = {}; LIST.forEach(function (p) { if (!p.dateFrom || !p.dateTo) return; var d = new Date(p.dateFrom + "T00:00:00Z"), e = p.dateTo.slice(0, 7), g = 0; while (d.toISOString().slice(0, 7) <= e && g++ < 24) { s[d.toISOString().slice(0, 7)] = 1; d.setUTCMonth(d.getUTCMonth() + 1, 1); } }); return Object.keys(s).sort().reverse(); }
+  function pAll() {
+    var ms = months(), mods = {}, cats = {}; LIST.forEach(function (p) { (p.models || []).forEach(function (m) { mods[m] = 1; }); if (p.category) cats[p.category] = 1; });
+    var sel = function (id, cur, opts, all) { return '<select class="tx" id="' + id + '"><option value="">' + all + "</option>" + opts.map(function (o) { var v = Array.isArray(o) ? o[0] : o, l = Array.isArray(o) ? o[1] : o; return '<option value="' + esc(v) + '"' + (v === cur ? " selected" : "") + ">" + esc(l) + "</option>"; }).join("") + "</select>"; };
+    $("pane").innerHTML = '<div class="card"><input class="tx" id="fq" placeholder="🔍 Search scheme name, model or text" value="' + esc(FL.q) + '"><div class="g2" style="margin-top:6px">' + sel("fm", FL.month, ms.map(function (m) { return [m, MN[+m.slice(5) - 1] + " " + m.slice(0, 4)]; }), "All months") + sel("fmo", FL.model, Object.keys(mods).sort(), "All models") + "</div>" +
+      '<div class="g2" style="margin-top:6px">' + sel("fs", FL.status, ["ongoing", "upcoming", "expired", "disabled"].concat(ME.canPublish ? ["draft"] : []).map(function (s) { return [s, STL[s]]; }), "Any status") + sel("fc", FL.cat, Object.keys(cats).sort(), "All categories") + "</div>" +
+      (ME.isHO ? '<div style="margin-top:6px">' + sel("fst", FL.state, ["__all"].concat(STATES).map(function (s) { return s === "__all" ? ["__all", "Published to everyone"] : [s, s]; }), "Any audience") + "</div>" : "") + '</div><div id="al"></div>';
+    var go = function () { FL.q = $("fq").value; FL.month = $("fm").value; FL.model = $("fmo").value; FL.status = $("fs").value; FL.cat = $("fc").value; if ($("fst")) FL.state = $("fst").value; list(); };
+    ["fm", "fmo", "fs", "fc", "fst"].forEach(function (id) { if ($(id)) $(id).onchange = go; }); $("fq").oninput = function () { clearTimeout(window.__ft); window.__ft = setTimeout(go, 250); };
+    list();
+  }
+  function list() {
+    var q = FL.q.toLowerCase(), L = LIST.filter(function (p) {
+      if (q && (p.title + " " + (p.models || []).join(" ") + " " + ((p.brief || {}).summary || "")).toLowerCase().indexOf(q) < 0) return false;
+      if (FL.month && !(p.dateFrom && p.dateFrom.slice(0, 7) <= FL.month && p.dateTo.slice(0, 7) >= FL.month)) return false;
+      if (FL.model && !(p.models || []).some(function (m) { return m === FL.model; })) return false;
+      if (FL.status && p.status !== FL.status) return false;
+      if (FL.cat && p.category !== FL.cat) return false;
+      if (FL.state) { var a = p.audience || {}; if (FL.state === "__all" ? a.scope !== "all" : !(a.scope === "all" || (a.states || []).indexOf(FL.state) >= 0)) return false; }
+      return true;
+    });
+    $("al").innerHTML = '<div class="muted" style="font-size:12px;margin:8px 2px">' + L.length + " scheme letter" + (L.length === 1 ? "" : "s") + "</div>" + (L.length ? L.map(function (p) { return '<div class="row2" data-open="' + p.id + '"><span style="font-size:22px">' + fIcon((p.files[0] || {}).name || "") + '</span><div style="flex:1;min-width:0"><b>' + esc(p.title) + '</b><div class="muted" style="font-size:12px">' + dfmt(p.dateFrom) + " → " + dfmt(p.dateTo) + (p.category ? " · " + esc(p.category) : "") + ((p.models || []).length ? " · " + esc(p.models.slice(0, 3).join(", ")) + (p.models.length > 3 ? "…" : "") : "") + (ME.canPublish ? " · " + audText(p) : "") + '</div></div><span class="bdg s-' + p.status + '">' + STL[p.status] + "</span></div>"; }).join("") : '<div class="card empty"><div class="big">📜</div>No scheme letters match.</div>');
+    bindCards($("al"));
+  }
+  var audText = function (p) { var a = p.audience || {}; return a.scope === "users" ? (a.users || []).length + " user(s)" : a.scope === "states" ? (a.states || []).join(", ") : a.scope === "all" ? "everyone" : ""; };
+
+  // ================= Details =================
+  function detail(id) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "spol-get", id: id }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Back</button><div class="err" style="margin-top:10px">' + esc(r.error) + "</div>"; $("bk").onclick = function () { location.hash = ""; }; return; }
+      var p = r.item, b = p.brief || {}, plan = b.plan, ul = function (L) { return '<ul class="kp">' + L.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>"; }, dl = daysLeft(p);
+      VIEW.innerHTML = '<div class="row" style="gap:6px"><button class="btn ghost sm" id="bk">← Back</button><span style="flex:1"></span><button class="btn sec sm" id="use">🧮 Use in a tool</button></div>' +
+        '<div class="card"><div class="row" style="gap:8px;align-items:flex-start"><b style="flex:1;font-size:17px">' + esc(p.title) + '</b><span class="bdg s-' + p.status + '">' + STL[p.status] + '</span></div><div class="muted" style="font-size:12.5px;margin-top:2px">' + dfmt(p.dateFrom) + " → " + dfmt(p.dateTo) + (p.status === "ongoing" && dl != null ? " · " + dl + " days left" : "") + (p.category ? " · " + esc(p.category) : "") + " · by " + esc(p.by || "") + (p.byState ? " (" + esc(p.byState) + ")" : "") + "</div>" +
+        (p.mine ? '<div class="muted" style="font-size:12px;margin-top:4px">👥 Published to: <b>' + esc(audText(p)) + "</b></div>" : "") + (b.audienceText ? '<div style="font-size:12.5px;margin-top:4px">For: ' + esc(b.audienceText) + "</div>" : "") +
+        '<div style="margin-top:8px">' + p.files.map(function (f, i) { return '<div class="fl"><span style="font-size:20px">' + fIcon(f.name) + '</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis">' + esc(f.name) + ' <span class="muted">' + (f.size ? Math.round(f.size / 1024) + " KB" : "") + '</span></span><button class="btn pri sm" data-f="' + i + '">Open</button></div>'; }).join("") + "</div>" +
+        (p.mine ? '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="ed">✏️ Edit</button><button class="btn sec sm" id="dis">' + (p.disabled ? "✅ Enable" : "⏸ Disable") + '</button><button class="btn ghost sm" id="rv" style="color:var(--bad)">🗑️ Revoke</button></div>' : "") + "</div>" +
+        (b.summary ? '<div class="card"><b>📝 Summary</b><p style="font-size:13.5px;margin:6px 0 0">' + esc(b.summary) + "</p>" + ((b.keyPoints || []).length ? ul(b.keyPoints) : "") + "</div>" : '<div class="notice" style="margin-top:12px">AI couldn’t read this letter, so there is no summary — open the file.</div>') +
+        ((b.targets || []).length ? '<div class="card"><b>🎯 Targets</b>' + b.targets.map(function (x) { return '<div style="font-size:13px;margin-top:4px">• ' + esc(x.metric) + (x.value ? ": <b>" + esc(x.value) + " " + esc(x.unit || "") + "</b>" : "") + "</div>"; }).join("") + "</div>" : "") +
+        ((b.slabs || []).length ? '<div class="card"><b>💰 Payout slabs</b><div class="tbw"><table class="dt"><tr><th>Slab</th><th>Condition</th><th>Payout</th></tr>' + b.slabs.map(function (s) { return "<tr><td>" + esc(s.label || "") + "</td><td>" + esc(s.condition) + "</td><td><b>" + esc(s.payout) + "</b></td></tr>"; }).join("") + "</table></div>" + (b.maxPayout ? '<div style="font-size:12.5px;margin-top:6px">Max payout: <b>' + esc(b.maxPayout) + "</b></div>" : "") + "</div>" : "") +
+        (plan ? '<div class="card"><b>📊 Payout tables</b>' + plan.components.map(function (c) { return '<div style="font-weight:700;font-size:13px;margin-top:10px">' + esc(c.name) + (c.models ? ' <span class="muted">· ' + esc(c.models) + "</span>" : "") + "</div>" + (c.kind === "matrix" ? '<div class="tbw"><table class="dt"><tr><th>Model</th>' + c.tiers.map(function (t) { return "<th>" + esc(t.label) + "</th>"; }).join("") + "</tr>" + c.rows.map(function (rw) { return "<tr><td>" + esc(rw.name) + "</td>" + rw.values.map(function (v) { return "<td>" + (v == null ? "–" : rw.basis === "pct" ? v + "%" : "₹" + v) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" : c.kind === "slab" ? '<div class="tbw"><table class="dt"><tr><th>Units</th><th>Payout</th></tr>' + c.slabs.map(function (z) { return "<tr><td>" + z.min + (z.max != null ? "–" + z.max : "+") + "</td><td>" + (c.basis === "pct" ? z.value + "%" : "₹" + z.value + (c.basis === "flat" ? "" : "/unit")) + "</td></tr>"; }).join("") + "</table></div>" : c.kind === "band" ? '<div class="tbw"><table class="dt">' + c.bands.map(function (z) { return "<tr><td>" + esc(z.label) + "</td><td>₹" + z.value + "/unit</td></tr>"; }).join("") + "</table></div>" : '<div style="font-size:13px">₹' + c.value + " per unit</div>"); }).join("") + (plan.conditions || []).map(function (x) { return '<div class="notice" style="margin-top:8px">If “' + esc(x.label) + "” is not met → " + Math.round(x.factor * 100) + "% payout</div>"; }).join("") + "</div>" : "") +
+        ((b.focusModels || []).length ? '<div class="card"><b>📱 Models</b><div>' + b.focusModels.map(function (m) { return '<span class="chip">' + esc(m) + "</span>"; }).join("") + "</div></div>" : "") +
+        ((b.eligibility || []).length ? '<div class="card"><b>✔ Who / what counts</b>' + ul(b.eligibility) + "</div>" : "") +
+        ((b.actions || []).length ? '<div class="card"><b>✅ What to do</b>' + ul(b.actions) + "</div>" : "") +
+        ((b.terms || []).length ? '<div class="card"><b>📌 Conditions</b>' + ul(b.terms) + (b.incentiveNote ? '<div class="muted" style="font-size:12px;margin-top:4px">ℹ️ ' + esc(b.incentiveNote) + "</div>" : "") + "</div>" : "") +
+        '<div class="muted" style="font-size:11.5px;margin-top:10px;text-align:center">Summary made by AI from the letter — the letter itself is the final word.</div>';
+      $("bk").onclick = function () { location.hash = ""; }; $("use").onclick = function () { useIn(p.id); };
+      [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (bt) { bt.onclick = function () { openFile(p.files[+bt.dataset.f]); }; });
+      if ($("dis")) $("dis").onclick = function () { api({ action: "spol-disable", id: p.id, disabled: !p.disabled }).then(function (x) { if (!x.ok) return toast(x.error); toast(p.disabled ? "Enabled" : "Disabled — users see it as disabled"); DIG = null; refresh(function () { detail(p.id); }); }); };
+      if ($("rv")) $("rv").onclick = function () { sheet("Revoke this scheme?", "It disappears from every user’s Scheme policies, with its files. This can’t be undone.", [["🗑️", "Revoke", function () { api({ action: "spol-revoke", id: p.id }).then(function (x) { if (!x.ok) return toast(x.error); toast("Revoked"); DIG = null; refresh(function () { location.hash = ""; draw(); }); }); }, "danger"]]); };
+      if ($("ed")) $("ed").onclick = function () { editPolicy(p); };
+    });
+  }
+  function editPolicy(p) {
+    var A = JSON.parse(JSON.stringify(p.audience || { scope: "all", states: [], users: [] }));
+    var ov = sheet("Edit scheme", p.title, [], '<label class="lb">Title</label><input class="tx" id="et" value="' + esc(p.title) + '"><div class="g2"><div><label class="lb">From</label><input class="tx" type="date" id="ef" value="' + esc(p.dateFrom) + '"></div><div><label class="lb">To</label><input class="tx" type="date" id="eto" value="' + esc(p.dateTo) + '"></div></div><label class="lb">Category</label><select class="tx" id="ec">' + ME.cats.map(function (c) { return "<option" + (c === p.category ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + '</select><label class="lb">Models (comma separated)</label><input class="tx" id="em" value="' + esc((p.models || []).join(", ")) + '"><div id="eaud"></div><button class="btn pri block" id="esv" style="margin-top:12px">Save</button>');
+    audPicker(ov.querySelector("#eaud"), A);
+    ov.querySelector("#esv").onclick = function () { api({ action: "spol-save", id: p.id, policy: { title: ov.querySelector("#et").value, dateFrom: ov.querySelector("#ef").value, dateTo: ov.querySelector("#eto").value, category: ov.querySelector("#ec").value, models: ov.querySelector("#em").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean), audience: A, brief: p.brief, text: p.text, files: p.files } }).then(function (x) { if (!x.ok) return toast(x.error); ov.remove(); toast("Saved"); DIG = null; refresh(function () { detail(p.id); }); }); };
+  }
+  // ---- audience picker (everyone / states / users) ----
+  function audPicker(box, A) {
+    var paint = function () {
+      var ho = ME.isHO;
+      box.innerHTML = '<label class="lb">👥 Who should see it</label><div class="rad">' + [["all", ho ? "Everyone" : "Whole " + (ME.state || "state")], ["states", "Chosen states"], ["users", "Chosen users"]].filter(function (x) { return ho || x[0] !== "states"; }).map(function (x) { return '<span data-sc="' + x[0] + '" class="' + (A.scope === x[0] ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>" +
+        (A.scope === "states" ? '<div style="margin-top:6px;max-height:150px;overflow:auto">' + STATES.map(function (s) { return '<span class="chip" data-st="' + esc(s) + '" style="' + (A.states.indexOf(s) >= 0 ? "background:var(--brand);color:#fff" : "") + '">' + esc(s) + "</span>"; }).join("") + "</div>" : "") +
+        (A.scope === "users" ? '<div style="margin-top:6px">' + (A.users.length ? A.users.map(function (u) { return '<span class="chip" data-ux="' + esc(u) + '">' + esc(u) + " ✕</span>"; }).join("") : '<span class="muted" style="font-size:12px">No users chosen yet.</span>') + '</div><div class="row" style="gap:6px;margin-top:6px"><input class="tx" id="uq" placeholder="Search name / vChat ID"><button class="btn sec sm" id="ugo">Find</button></div><div id="ur"></div>' : "");
+      [].forEach.call(box.querySelectorAll("[data-sc]"), function (s) { s.onclick = function () { A.scope = s.dataset.sc; paint(); }; });
+      [].forEach.call(box.querySelectorAll("[data-st]"), function (s) { s.onclick = function () { var k = A.states.indexOf(s.dataset.st); if (k >= 0) A.states.splice(k, 1); else A.states.push(s.dataset.st); paint(); }; });
+      [].forEach.call(box.querySelectorAll("[data-ux]"), function (s) { s.onclick = function () { A.users = A.users.filter(function (u) { return u !== s.dataset.ux; }); paint(); }; });
+      if (box.querySelector("#ugo")) box.querySelector("#ugo").onclick = function () { api({ action: "spol-users", q: box.querySelector("#uq").value }).then(function (r) { var ur = box.querySelector("#ur"); if (!r.ok) { ur.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ur.innerHTML = r.users.length ? '<div style="max-height:180px;overflow:auto;margin-top:4px">' + r.users.map(function (u) { return '<div class="fl" data-ua="' + esc(u.id) + '" style="cursor:pointer;padding:6px 9px"><span style="flex:1;font-size:12.5px"><b>' + esc(u.name) + '</b> <span class="muted">' + esc(u.vchatId || u.id) + " · " + esc(u.state) + "</span></span>" + (A.users.indexOf(u.id) >= 0 ? "✓" : "＋") + "</div>"; }).join("") + "</div>" : '<div class="muted" style="font-size:12px">No users found.</div>'; [].forEach.call(ur.querySelectorAll("[data-ua]"), function (el) { el.onclick = function () { if (A.users.indexOf(el.dataset.ua) < 0) A.users.push(el.dataset.ua); paint(); }; }); }); };
+    };
+    paint();
+  }
+
+  // ================= Publish =================
+  var UP = [], AUD = { scope: "all", states: [], users: [] };
+  function pPub() {
+    $("pane").innerHTML = '<div class="card"><b>📤 Publish scheme letters</b><div class="muted" style="font-size:12.5px">Add one or several letters at once — PDF, picture, Word, PowerPoint or Excel (up to ~20 MB each). AI reads each one for the dashboard (dates, models, slabs, conditions). Check the details, choose who sees each, then publish.</div><button class="btn pri block" id="pick" style="margin-top:8px">📎 Choose letters</button>' +
+      '<div class="uf"><b style="font-size:13px">Audience for all letters below</b><div id="aud"></div><div class="muted" style="font-size:11.5px;margin-top:4px">A letter can have its own audience — tap “Different audience” on it.</div></div></div><div id="ups"></div>' +
+      '<div id="pubbar"></div>' + (ME.isHO ? '<div class="card"><b>🧑‍💼 State publishers</b><div class="muted" style="font-size:12.5px">State users who may publish letters for their own state (whole state or chosen users). One user name or vChat ID per line.</div><textarea class="tx" id="pubs" style="min-height:70px;margin-top:6px">' + esc((ME.publishers || []).join("\n")) + '</textarea><button class="btn sec sm" id="pubsv" style="margin-top:6px">Save publishers</button></div>' : "");
+    audPicker($("aud"), AUD);
+    $("pick").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { [].slice.call(i.files || [], 0, 10).forEach(addUpload); }; i.click(); };
+    if ($("pubsv")) $("pubsv").onclick = function () { api({ action: "spol-publishers", publishers: $("pubs").value.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean) }).then(function (r) { if (!r.ok) return toast(r.error); ME.publishers = r.publishers; toast("Saved"); }); };
+    paintUps();
+  }
+  function addUpload(file) {
+    if (file.size > 20e6) return toast(file.name + " is over 20 MB");
+    var u = { file: file, name: file.name, stage: "Uploading…", title: file.name.replace(/\.[a-z0-9]+$/i, ""), dateFrom: "", dateTo: "", category: "Other", models: "", brief: null, text: "", fid: "", own: false, aud: { scope: "all", states: [], users: [] }, err: "" };
+    UP.push(u); paintUps();
+    var up = uploadFile(file).then(function (fid) { u.fid = fid; });
+    var rd = readLetter(file).then(function (r) { if (r.ok) { var b = r.brief; u.brief = b; u.text = r.text || ""; u.title = b.title || u.title; u.dateFrom = b.dateFrom || ""; u.dateTo = b.dateTo || ""; u.category = b.category || "Other"; u.models = (b.focusModels || []).join(", "); } else { u.err = r.error || "AI couldn't read it"; u.text = r.text || ""; } });
+    up.then(function () { u.stage = "Reading with AI…"; paintUps(); }).catch(function (e) { u.err = e.message; });
+    Promise.all([up, rd]).then(function () { u.stage = "Ready"; paintUps(); }).catch(function (e) { u.stage = "Error"; u.err = e.message || String(e); paintUps(); });
+  }
+  function uploadFile(file) {
+    var CH = 2600000;
+    return file.arrayBuffer().then(function (buf) {
+      var total = Math.max(1, Math.ceil(buf.byteLength / CH)), fid = "", chain = Promise.resolve();
+      for (var i = 0; i < total; i++) (function (i) { chain = chain.then(function () { var u8 = new Uint8Array(buf, i * CH, Math.min(CH, buf.byteLength - i * CH)), s = ""; for (var k = 0; k < u8.length; k += 32768) s += String.fromCharCode.apply(null, u8.subarray(k, k + 32768)); return api({ action: "spol-up", fid: fid, idx: i, total: total, name: file.name, mime: file.type || "", size: file.size, data: btoa(s) }).then(function (r) { if (!r.ok) throw new Error(r.error); fid = r.fid; }); }); })(i);
+      return chain.then(function () { return fid; });
+    });
+  }
+  function readLetter(file) {
+    var viaText = function () { return libFT().then(function () { return window.BIFILES.extract(file); }).then(function (x) { return api({ action: "spol-parse", text: String(x.text || "").slice(0, 20000) }); }).catch(function (e) { return { ok: false, error: /\.(doc|ppt|xls)$/i.test(file.name) ? "old Office format — AI can't read it; save as .docx / .pptx / .xlsx for a summary" : e.message || String(e) }; }); };
+    if (/^image\//.test(file.type)) return shrink(file).then(function (u) { return api({ action: "spol-parse", images: [u] }); }).then(function (r) { return r.ok ? r : viaText(); });
+    return viaText();
+  }
+  function paintUps() {
+    var box = $("ups"); if (!box) return;
+    box.innerHTML = UP.map(function (u, i) {
+      var b = u.brief;
+      return '<div class="card"><div class="row" style="gap:8px"><span style="font-size:22px">' + fIcon(u.name) + '</span><b style="flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis">' + esc(u.name) + '</b><span class="bdg ' + (u.stage === "Ready" ? "s-ongoing" : u.stage === "Error" ? "s-disabled" : "s-upcoming") + '">' + esc(u.stage) + '</span><button class="btn ghost sm" data-x="' + i + '">✕</button></div>' +
+        (u.err ? '<div class="notice" style="margin-top:6px">⚠️ ' + esc(u.err) + (u.fid ? " — you can still publish the file; fill the details yourself." : "") + "</div>" : "") +
+        (b && b.summary ? '<div class="muted" style="font-size:12px;margin-top:6px">✨ ' + esc(b.summary.slice(0, 240)) + "</div>" : "") +
+        '<label class="lb">Title</label><input class="tx" data-k="title" data-i="' + i + '" value="' + esc(u.title) + '"><div class="g3"><div><label class="lb">From</label><input class="tx" type="date" data-k="dateFrom" data-i="' + i + '" value="' + esc(u.dateFrom) + '"></div><div><label class="lb">To</label><input class="tx" type="date" data-k="dateTo" data-i="' + i + '" value="' + esc(u.dateTo) + '"></div><div><label class="lb">Category</label><select class="tx" data-k="category" data-i="' + i + '">' + ME.cats.map(function (c) { return "<option" + (c === u.category ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select></div></div>" +
+        '<label class="lb">Models (comma separated)</label><input class="tx" data-k="models" data-i="' + i + '" value="' + esc(u.models) + '">' +
+        '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" data-own="' + i + '"' + (u.own ? " checked" : "") + '><i></i><span>Different audience for this letter</span></label><div id="aud' + i + '"></div></div>';
+    }).join("");
+    $("pubbar").innerHTML = UP.length ? '<div class="row" style="gap:6px;margin-top:12px"><button class="btn ok" id="pall" style="flex:1">🚀 Publish ' + UP.length + " letter" + (UP.length === 1 ? "" : "s") + '</button><button class="btn sec" id="pdraft">Save as draft</button></div>' : "";
+    UP.forEach(function (u, i) { if (u.own) audPicker($("aud" + i), u.aud); });
+    [].forEach.call(box.querySelectorAll("[data-k]"), function (el) { el.oninput = el.onchange = function () { UP[+el.dataset.i][el.dataset.k] = el.value; }; });
+    [].forEach.call(box.querySelectorAll("[data-own]"), function (el) { el.onchange = function () { UP[+el.dataset.own].own = el.checked; paintUps(); }; });
+    [].forEach.call(box.querySelectorAll("[data-x]"), function (el) { el.onclick = function () { UP.splice(+el.dataset.x, 1); paintUps(); }; });
+    if ($("pall")) { $("pall").onclick = function () { publishAll("published"); }; $("pdraft").onclick = function () { publishAll("draft"); }; }
+  }
+  function publishAll(status) {
+    if (UP.some(function (u) { return u.stage !== "Ready" && u.stage !== "Error"; })) return toast("Wait until every letter is uploaded and read");
+    var todo = UP.filter(function (u) { return u.fid; }); if (!todo.length) return toast("No uploaded letters");
+    var bad = todo.find(function (u) { return !u.dateFrom || !u.dateTo; }); if (bad) return toast("Add start and end dates for “" + bad.title + "”");
+    var chain = Promise.resolve(), ok = 0, errs = [];
+    todo.forEach(function (u) { chain = chain.then(function () { var models = u.models.split(",").map(function (x) { return x.trim(); }).filter(Boolean); return api({ action: "spol-save", policy: { title: u.title, dateFrom: u.dateFrom, dateTo: u.dateTo, category: u.category, models: models, audience: u.own ? u.aud : AUD, files: [{ fid: u.fid, name: u.name, mime: u.file.type, size: u.file.size }], brief: u.brief || { title: u.title, focusModels: models }, text: u.text, status: status } }).then(function (r) { if (r.ok) { ok++; UP.splice(UP.indexOf(u), 1); } else errs.push(u.title + ": " + r.error); }); }); });
+    chain.then(function () { toast(ok + " letter(s) " + (status === "draft" ? "saved as draft" : "published") + (errs.length ? " · " + errs[0] : "")); DIG = null; refresh(function () { if (!UP.length) { TAB = "dash"; } draw(); }); });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
