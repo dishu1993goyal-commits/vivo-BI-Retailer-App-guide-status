@@ -223,11 +223,111 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   function pPub() {
     $("pane").innerHTML = '<div class="card"><b>📤 Publish scheme letters</b><div class="muted" style="font-size:12.5px">Add one or several letters at once — PDF, picture, Word, PowerPoint or Excel (up to ~20 MB each). AI reads each one for the dashboard (dates, models, slabs, conditions). Check the details, choose who sees each, then publish.</div><button class="btn pri block" id="pick" style="margin-top:8px">📎 Choose letters</button>' +
       '<div class="uf"><b style="font-size:13px">Audience for all letters below</b><div id="aud"></div><div class="muted" style="font-size:11.5px;margin-top:4px">A letter can have its own audience — tap “Different audience” on it.</div></div></div><div id="ups"></div>' +
-      '<div id="pubbar"></div>' + (ME.isHO ? '<div class="card"><b>🧑‍💼 State publishers</b><div class="muted" style="font-size:12.5px">State users who may publish letters for their own state (whole state or chosen users). One user name or vChat ID per line.</div><textarea class="tx" id="pubs" style="min-height:70px;margin-top:6px">' + esc((ME.publishers || []).join("\n")) + '</textarea><button class="btn sec sm" id="pubsv" style="margin-top:6px">Save publishers</button></div>' : "");
+      '<div id="pubbar"></div>' + bulkCard() + (ME.isHO ? '<div class="card"><b>🧑‍💼 State publishers</b><div class="muted" style="font-size:12.5px">State users who may publish letters for their own state (whole state or chosen users). One user name or vChat ID per line.</div><textarea class="tx" id="pubs" style="min-height:70px;margin-top:6px">' + esc((ME.publishers || []).join("\n")) + '</textarea><button class="btn sec sm" id="pubsv" style="margin-top:6px">Save publishers</button></div>' : "");
     audPicker($("aud"), AUD);
     $("pick").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { [].slice.call(i.files || [], 0, 10).forEach(addUpload); }; i.click(); };
     if ($("pubsv")) $("pubsv").onclick = function () { api({ action: "spol-publishers", publishers: $("pubs").value.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean) }).then(function (r) { if (!r.ok) return toast(r.error); ME.publishers = r.publishers; toast("Saved"); }); };
-    paintUps();
+    paintUps(); bindBulk();
+  }
+  // ================= Bulk publish: many letters → many targeted users, from an Excel mapping =================
+  var BK = { files: [], plan: null, ai: true, run: null };
+  var nkey = function (n) { return String(n || "").trim().toLowerCase(); }, stem = function (n) { return nkey(n).replace(/\.[a-z0-9]{2,5}$/, ""); };
+  function libX() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s2 = document.createElement("script"); s2.src = "/vendor/xlsx.full.min.js"; s2.onload = res; s2.onerror = function () { rej(new Error("Couldn't load the Excel reader.")); }; document.head.appendChild(s2); }); }
+  function xdate(v) { if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10); var t = String(v || "").trim(), m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(t); if (m) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2); return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0, 10) : ""; }
+  var splitList = function (v) { return String(v == null ? "" : v).split(/[,;\n\/|]+/).map(function (x) { return x.trim(); }).filter(Boolean); };
+  function bulkCard() {
+    return '<div class="card"><b>📦 Bulk publish — different letters to different users</b><div class="muted" style="font-size:12.5px">For many letters each meant for particular users (e.g. 100 retailer-wise letters). Each user only sees the letters mapped to them. For letters common to everyone or a whole state, use the options above.</div>' +
+      '<div class="uf"><b style="font-size:13px">1 · Choose all the letters</b><button class="btn pri block" id="bkf" style="margin-top:6px">📎 Choose letters (up to 500)</button><div id="bkfs" class="muted" style="font-size:12px;margin-top:4px"></div></div>' +
+      '<div class="uf"><b style="font-size:13px">2 · Who gets which letter</b><div class="muted" style="font-size:12px">Excel with one row per letter (or per letter + user): File name · Users (vChat IDs / user names) · optional title, dates, states, models. The template is pre-filled with your chosen file names.</div><div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sec sm" id="bkt">⬇ Mapping template</button><button class="btn pri sm" id="bkm">📥 Upload mapping</button><button class="btn ghost sm" id="bkn">🔎 Match users from file names</button></div><div class="muted" style="font-size:11.5px;margin-top:4px">“Match from file names” works when each file name contains the user’s vChat ID or user name, e.g. <b>VC1234_Nov_scheme.pdf</b>.</div></div>' +
+      '<div class="uf"><b style="font-size:13px">3 · Check & publish</b><label class="tg" style="margin-top:6px;font-size:13px"><input type="checkbox" id="bkai"' + (BK.ai ? " checked" : "") + '><i></i><span>✨ AI summary for each letter (for the dashboard; slower — about 10 sec a letter)</span></label><div id="bkp"></div></div></div>';
+  }
+  function bindBulk() {
+    if (!$("bkf")) return;
+    $("bkf").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.multiple = true; i.accept = ".pdf,.png,.jpg,.jpeg,.webp,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt,image/*"; i.onchange = function () { BK.files = [].slice.call(i.files || [], 0, 500).filter(function (f) { return f.size <= 20e6; }); BK.plan = null; paintBulk(); }; i.click(); };
+    $("bkai").onchange = function () { BK.ai = this.checked; if (BK.plan) validate(); };
+    $("bkt").onclick = function () { download(xlsx([{ name: "Mapping", rows: [["File name", "Users (vChat ID / user name, comma separated)", "Scheme title", "From (YYYY-MM-DD)", "To (YYYY-MM-DD)", "States (optional)", "Category (optional)", "Models (optional)"]].concat(BK.files.length ? BK.files.map(function (f) { return [f.name, "", f.name.replace(/\.[a-z0-9]+$/i, ""), "", "", "", "", ""]; }) : [["VC1234_Nov_scheme.pdf", "VC1234", "Retailer scheme Nov 2026 - Shree Mobiles", "2026-11-01", "2026-11-30", "", "Sell-out", "Y39, Y29"], ["Common_Bihar_letter.pdf", "VC1234, VC5678", "", "", "", "", "", ""]]) }, { name: "How to fill", rows: [["One row per letter (several users comma separated), or one row per letter + user — rows with the same file name are combined."], ["File name must match a chosen file exactly (the extension may be left out)."], ["Users: vChat ID, user name, email or mobile of state users. Only these users will see that letter."], ["States: instead of users, publish the letter to whole states."], ["Dates: needed when the AI summary is off; with AI on, blank dates are taken from the letter."]] }]), "Scheme_letters_mapping.xlsx"); };
+    $("bkm").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { if (i.files[0]) readMapping(i.files[0]); }; i.click(); };
+    $("bkn").onclick = matchNames;
+    paintBulk();
+  }
+  function paintBulk() {
+    if (!$("bkfs")) return;
+    $("bkfs").textContent = BK.files.length ? BK.files.length + " letters chosen · " + Math.round(BK.files.reduce(function (a, f) { return a + f.size; }, 0) / 1048576 * 10) / 10 + " MB" : "No letters chosen yet.";
+    var P = BK.plan, box = $("bkp"); if (!box) return;
+    if (!P) { box.innerHTML = '<div class="muted" style="font-size:12px;margin-top:6px">Choose letters and upload the mapping (or match from file names) to see the preview.</div>'; return; }
+    var good = P.filter(function (r) { return !r.fatal; }), users = {}; good.forEach(function (r) { r.users.forEach(function (u) { users[u] = 1; }); });
+    var run = BK.run;
+    box.innerHTML = '<div class="kv" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px"><div class="tile" style="padding:8px"><b>' + good.length + '</b><span>letters ready</span></div><div class="tile" style="padding:8px"><b>' + Object.keys(users).length + '</b><span>users targeted</span></div><div class="tile" style="padding:8px"><b style="color:' + (P.length - good.length ? "#B42318" : "inherit") + '">' + (P.length - good.length) + "</b><span>can’t publish</span></div></div>" +
+      '<div class="tbw" style="max-height:360px;overflow:auto"><table class="dt"><tr><th>Letter</th><th>Goes to</th><th>Dates</th><th>Status</th></tr>' + P.map(function (r) { return "<tr><td><b>" + esc(r.title) + '</b><div class="muted" style="font-size:11px">' + esc(r.file ? r.file.name : r.fname) + "</div></td><td>" + (r.users.length ? r.users.length + " user" + (r.users.length > 1 ? "s" : "") + '<div class="muted" style="font-size:11px">' + esc(r.userNames.slice(0, 3).join(", ")) + (r.userNames.length > 3 ? "…" : "") + "</div>" : r.states.length ? esc(r.states.join(", ")) : "—") + '</td><td style="font-size:11.5px">' + (r.from || (BK.ai ? "from letter" : "—")) + "<br>" + (r.to || (BK.ai ? "" : "—")) + '</td><td style="font-size:11.5px;white-space:normal;min-width:120px">' + (r.done ? '<span class="ok2" style="color:#13693F;font-weight:700">✅ Published</span>' : r.err ? '<span style="color:#B42318">⚠️ ' + esc(r.err) + "</span>" : r.fatal ? '<span style="color:#B42318">⛔ ' + esc(r.fatal) + "</span>" : r.warn ? '<span style="color:#8A5300">⚠️ ' + esc(r.warn) + "</span>" : r.busy ? esc(r.busy) : "Ready") + "</td></tr>"; }).join("") + "</table></div>" +
+      (run ? '<div class="prog" style="margin-top:10px"><i style="width:' + Math.round(run.done / Math.max(1, run.total) * 100) + '%"></i></div><div class="muted" style="font-size:12px;margin-top:4px">' + run.done + " / " + run.total + " done" + (run.fail ? " · " + run.fail + " failed" : "") + (run.active ? " — keep this screen open" : "") + "</div>" : "") +
+      (!run || !run.active ? '<div class="row" style="gap:6px;margin-top:10px"><button class="btn ok" id="bkgo" style="flex:1"' + (good.filter(function (r) { return !r.done; }).length ? "" : " disabled") + ">🚀 Publish " + good.filter(function (r) { return !r.done; }).length + " letter(s) to their users</button>" + (P.some(function (r) { return r.err; }) ? '<button class="btn sec" id="bkre">↻ Retry failed</button>' : "") + "</div>" : "");
+    if ($("bkgo")) $("bkgo").onclick = function () { bulkRun(false); };
+    if ($("bkre")) $("bkre").onclick = function () { bulkRun(true); };
+  }
+  function readMapping(file) {
+    if (!BK.files.length) return toast("Choose the letters first (step 1)");
+    $("bkp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading the mapping…</div>';
+    libX().then(function () { return file.arrayBuffer(); }).then(function (buf) {
+      var wb = window.XLSX.read(buf, { type: "array" }), A = null;
+      wb.SheetNames.some(function (n) { var x = window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); if (x.length > 1 && x[0].some(function (h) { return /file/i.test(String(h)); })) { A = x; return true; } return false; });
+      if (!A) throw new Error("No sheet with a “File name” column — use the template.");
+      var H = A[0].map(function (h) { return String(h).toLowerCase(); }), c = function (re) { for (var i = 0; i < H.length; i++) if (re.test(H[i])) return i; return -1; };
+      var k = { f: c(/file/), u: c(/user|vchat|retailer|mobile/), t: c(/title|scheme/), a: c(/^from|start/), z: c(/^to\b|^to |end/), s: c(/state/), g: c(/categor/), m: c(/model/) };
+      var g = function (r, i) { return i < 0 ? "" : r[i]; }, by = {};
+      A.slice(1).forEach(function (r) { var fn = String(g(r, k.f)).trim(); if (!fn) return; var key = stem(fn), o = by[key] || (by[key] = { fname: fn, title: "", from: "", to: "", cat: "", models: [], ids: [], states: [] }); o.title = o.title || String(g(r, k.t)).trim(); o.from = o.from || xdate(g(r, k.a)); o.to = o.to || xdate(g(r, k.z)); o.cat = o.cat || String(g(r, k.g)).trim(); splitList(g(r, k.m)).forEach(function (x) { if (o.models.indexOf(x) < 0) o.models.push(x); }); splitList(g(r, k.u)).forEach(function (x) { if (o.ids.indexOf(x) < 0) o.ids.push(x); }); splitList(g(r, k.s)).forEach(function (x) { if (o.states.indexOf(x) < 0) o.states.push(x); }); });
+      var fm = {}; BK.files.forEach(function (f) { fm[nkey(f.name)] = f; fm[stem(f.name)] = f; });
+      BK.plan = Object.keys(by).map(function (key) { var o = by[key]; return { file: fm[nkey(o.fname)] || fm[key] || null, fname: o.fname, mapTitle: o.title, title: o.title || o.fname.replace(/\.[a-z0-9]+$/i, ""), from: o.from, to: o.to, cat: o.cat, models: o.models, ids: o.ids, states: o.states, users: [], userNames: [] }; });
+      var unmapped = BK.files.filter(function (f) { return !BK.plan.some(function (r) { return r.file === f; }); }).length;
+      if (unmapped) toast(unmapped + " chosen letter(s) aren’t in the mapping and will be skipped");
+      validate();
+    }).catch(function (e) { $("bkp").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
+  }
+  function matchNames() {   // users from IDs written in the file names
+    if (!BK.files.length) return toast("Choose the letters first (step 1)");
+    BK.plan = BK.files.map(function (f) { return { file: f, fname: f.name, title: f.name.replace(/\.[a-z0-9]+$/i, "").replace(/[_]+/g, " "), from: "", to: "", cat: "", models: [], ids: f.name.replace(/\.[a-z0-9]+$/i, "").split(/[^A-Za-z0-9@.]+/).filter(function (x) { return x.length >= 3; }), states: [], users: [], userNames: [], fromName: true }; });
+    validate();
+  }
+  function validate() {
+    var P = BK.plan, all = {}; P.forEach(function (r) { r.ids.forEach(function (x) { all[nkey(x)] = 1; }); });
+    $("bkp").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Checking ' + Object.keys(all).length + " user IDs…</div>";
+    api({ action: "spol-users-check", ids: Object.keys(all) }).then(function (r) {
+      if (!r.ok) { $("bkp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      P.forEach(function (row) {
+        row.fatal = ""; row.warn = ""; row.users = []; row.userNames = []; var miss = [], other = [];
+        row.ids.forEach(function (x) { var u = r.found[nkey(x)]; if (!u) { if (!row.fromName) miss.push(x); return; } if (!u.ok) { other.push(x); return; } if (row.users.indexOf(u.id) < 0) { row.users.push(u.id); row.userNames.push(u.name + (u.state ? " (" + u.state + ")" : "")); } });
+        var stOk = ME.isHO ? row.states.filter(function (s2) { return STATES.indexOf(s2) >= 0; }) : row.states.filter(function (s2) { return s2.toLowerCase() === String(ME.state).toLowerCase(); });
+        row.statesOk = stOk;
+        if (!row.file) row.fatal = "file “" + row.fname + "” wasn’t among the chosen letters";
+        else if (!row.users.length && !stOk.length) row.fatal = row.fromName ? "no user ID found in the file name" : miss.length ? "none of these users exist: " + miss.slice(0, 3).join(", ") : "no users or states given";
+        else if (!BK.ai && (!row.from || !row.to)) row.fatal = "add From / To dates (or switch AI summary on)";
+        else if (row.from && row.to && row.to < row.from) row.fatal = "the end date is before the start date";
+        if (!row.fatal && (miss.length || other.length)) row.warn = (miss.length ? miss.length + " unknown user(s): " + miss.slice(0, 3).join(", ") : "") + (other.length ? (miss.length ? "; " : "") + other.length + " outside your state" : "");
+        row.states = stOk;
+      });
+      paintBulk();
+    });
+  }
+  function bulkRun(retry) {
+    var P = BK.plan, todo = P.filter(function (r) { return !r.fatal && !r.done && (!retry || r.err); }); if (!todo.length) return;
+    todo.forEach(function (r) { r.err = ""; r.busy = "Waiting…"; });
+    var run = BK.run = { total: todo.length, done: 0, fail: 0, active: true }, q = todo.slice(), last = 0;
+    var tick = function () { if (Date.now() - last > 400) { last = Date.now(); paintBulk(); } };
+    var one = function (r) {
+      r.busy = "Uploading…"; tick();
+      return uploadFile(r.file).then(function (fid) {
+        r.fid = fid; if (!BK.ai) return null; r.busy = "AI is reading…"; tick();
+        return readLetter(r.file).then(function (x) { return x && x.ok ? x : null; }).catch(function () { return null; });
+      }).then(function (x) {
+        var b = x ? x.brief : null, from = r.from || (b && b.dateFrom) || "", to = r.to || (b && b.dateTo) || "";
+        if (!from || !to) throw new Error("no dates — add them in the mapping");
+        r.busy = "Publishing…"; tick();
+        return api({ action: "spol-save", policy: { title: r.mapTitle || (b && b.title) || r.title || r.fname, dateFrom: from, dateTo: to, category: r.cat || (b && b.category) || "Other", models: r.models.length ? r.models : (b ? b.focusModels : []), audience: r.users.length ? { scope: "users", users: r.users, states: [] } : { scope: "states", states: r.states, users: [] }, files: [{ fid: r.fid, name: r.file.name, mime: r.file.type, size: r.file.size }], brief: b || { title: r.title, focusModels: r.models }, text: x ? x.text : "", status: "published" } });
+      }).then(function (sv) { if (!sv.ok) throw new Error(sv.error); r.done = true; r.busy = ""; run.done++; tick(); })
+        .catch(function (e) { r.err = e.message || String(e); r.busy = ""; run.done++; run.fail++; tick(); });
+    };
+    var worker = function () { var r = q.shift(); return r ? one(r).then(worker) : Promise.resolve(); };
+    Promise.all([worker(), worker(), worker()]).then(function () { run.active = false; paintBulk(); DIG = null; api({ action: "spol-list" }).then(function (x) { if (x.ok) LIST = x.items; }); toast((run.total - run.fail) + " of " + run.total + " letters published" + (run.fail ? " · " + run.fail + " failed — tap Retry" : "")); });
+    paintBulk();
   }
   function addUpload(file) {
     if (file.size > 20e6) return toast(file.name + " is over 20 MB");

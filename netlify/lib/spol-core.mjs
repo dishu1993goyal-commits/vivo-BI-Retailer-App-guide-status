@@ -183,6 +183,16 @@ ${text}`;
     for (const k of await store.list("user:state:")) { const u = await store.get(k); if (!u || u.disabled) continue; if (!isHO && low(u.state) !== low(myState)) continue; if (b.state && low(u.state) !== low(b.state)) continue; const row = { id: u.username || u.vchatId, name: u.fullName || u.username, state: u.state || "", vchatId: u.vchatId || "" }; if (q && !(row.id + " " + row.name + " " + row.vchatId).toLowerCase().includes(q)) continue; out.push(row); if (out.length >= 300) break; }
     return json(200, { ok: true, users: out.sort((a, c) => a.state.localeCompare(c.state) || a.name.localeCompare(c.name)) });
   }
+  if (b.action === "spol-users-check") {   // bulk import: which of these user names / vChat IDs exist (and may be addressed by me)
+    const want = new Set((Array.isArray(b.ids) ? b.ids : []).slice(0, 20000).map(low).filter(Boolean)), found = {};
+    if (want.size) for (const k of await store.list("user:state:")) {
+      const u = await store.get(k); if (!u || u.disabled) continue;
+      const keys = [u.username, u.vchatId, u.email, u.mobile].filter(Boolean).map(low), hit = keys.find((x) => want.has(x)); if (!hit) continue;
+      const okState = isHO || low(u.state) === low(myState);
+      keys.forEach((x) => { if (want.has(x)) found[x] = { id: u.username || u.vchatId, name: u.fullName || u.username, state: u.state || "", ok: okState }; });
+    }
+    return json(200, { ok: true, found });
+  }
   if (b.action === "spol-publishers") {   // HO names the state publishers
     if (!isHO) return json(403, { ok: false, error: "Only HO can choose state publishers." });
     const c = await cfg(); if (Array.isArray(b.publishers)) { c.publishers = b.publishers.map((u) => str(u, 80)).filter(Boolean).slice(0, 200); await store.set("config:spol", c); }
