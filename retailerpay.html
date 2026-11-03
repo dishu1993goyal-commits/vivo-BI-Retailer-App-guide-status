@@ -432,7 +432,12 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     draw();
   }
   window.addEventListener("hashchange", route);
-  window.__pageBack = function () { if (location.hash.length > 1) { history.back(); return true; } return false; };
+  // web dashboard ← : close an open details screen inside this page (never the browser's own Back, which can leave the site)
+  window.__pageBack = function () {
+    if (!/^#(r|batch)=/.test(location.hash)) return false;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
+    draw(); window.scrollTo(0, 0); return true;
+  };
   function draw() {
     var tabs = [["ret", "👥 Retailers"], ["calc", "🧮 Calculate"], ["bat", "📦 Batches"], ["vch", "🎁 Vouchers"]].concat(ADMIN ? [["pay", "🏦 Payments"]] : []);
     VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';

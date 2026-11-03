@@ -60,7 +60,12 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     });
   }
   window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (/^p=/.test(h)) detail(decodeURIComponent(h.slice(2))); else draw(); });
-  window.__pageBack = function () { if (location.hash.length > 1) { history.back(); return true; } return false; };
+  // web dashboard ← : close an open details screen inside this page (never the browser's own Back, which can leave the site)
+  window.__pageBack = function () {
+    if (!/^#p=/.test(location.hash)) return false;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
+    draw(); window.scrollTo(0, 0); return true;
+  };
   function refresh(then) { api({ action: "spol-list" }).then(function (r) { if (r.ok) LIST = r.items; (then || draw)(); }); }
   function draw() {
     var tabs = [["dash", "📊 Dashboard"], ["all", "📜 All letters"]].concat(ME.canPublish ? [["pub", "📤 Publish"]] : []);
