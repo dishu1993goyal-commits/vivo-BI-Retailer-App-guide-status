@@ -6,6 +6,7 @@
 //   ctsub:<toolId>:<id>    custom-form submission { id, tool, by, state, values, at }
 //   custver                { v }   bumped on every change so apps refresh their cached customizations
 import { randomBytes, createHash } from "node:crypto";
+import { test as fxTest, refs as fxRefs, FUNCTIONS as FX_FUNCS } from "./formula-core.mjs";
 import { cleanProTool, proValues, enterFrom, canActPro, isProApproverAny, actPro, tickTat, lookupRecord, roleDir, LOOKUP_SOURCES, PRO_TYPES } from "./toolpro-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
@@ -190,6 +191,31 @@ export async function masterAction(b, ctx) {
     await store.set(`ctsub:${tl.id}:${r.id}`, r);
     const s0 = r.cur ? tl.tool.flow.steps[r.cur.idx] : null;
     return json(200, { ok: true, id: r.id, status: r.status, next: s0 ? s0.name : "", values: out.vals });
+  }
+  if (b.action === "ct-fx-ai") {   // Tool builder: "describe it in words" → a formula the engine accepts
+    if (!isMaster) return json(403, { ok: false, error: "Master admins only." });
+    const desc = str(b.desc, 600); if (desc.length < 4) return json(400, { ok: false, error: "Describe what the formula should do." });
+    const flds = (Array.isArray(b.fields) ? b.fields : []).slice(0, 80).map((f) => ({ key: str(f.key, 40), label: str(f.label, 80), type: str(f.type, 20), options: (f.options || []).slice(0, 12).map((o) => str(o, 40)), columns: (f.columns || []).slice(0, 12).map((c) => ({ key: str(c.key, 30), label: str(c.label, 40), type: str(c.type, 12) })), lookup: f.lookup ? { source: str(f.lookup.source, 20), show: (f.lookup.show || []).slice(0, 10).map((x) => str(x, 30)) } : undefined }));
+    const cond = b.purpose === "cond", keys = new Set(flds.map((f) => f.key));
+    const sys = `You write formulas for a form-builder's formula engine. Reply with JSON only: {"formula":"…","explain":"one or two simple sentences"}.
+Engine rules: refer to fields by their key exactly as given (table columns as table.column — only inside SUM/AVG/MIN/MAX/COUNT; lookup details as lookupkey.detail; the person filling: user.state, user.role ("state" or "admin"), user.name, user.designation). Text in "double quotes". Numbers plain (no ₹ or commas). Dates are "YYYY-MM-DD" text; use TODAY(), DAYS(later, earlier), ADDDAYS(date, n).
+Operators: + - * / % ^, = != < <= > >=, & joins text, AND OR NOT, parentheses. Functions available ONLY: ${FX_FUNCS.join(", ")}. SLAB(value, "from:result,from:result") gives the result of the highest "from" reached; TIER same but text; PERCENT(a,b)=a/b*100; IF(c,a,b); IFS(c1,v1,c2,v2,TRUE,v); IN(x,"a","b"); CONTAINS(multiChoiceField,"option").
+${cond ? "The result must be a CONDITION that is true or false." : "The result must be a VALUE (number, amount, date or text)."} Use only fields from FIELDS.`;
+    let last = "", out = null;
+    for (let attempt = 0; attempt < 2 && !out; attempt++) {
+      const q = desc + (last ? `\n\nYour previous formula failed: ${last}. Fix it.` : "");
+      const r = await ctx.askAI(ctx.env, q, "FIELDS: " + JSON.stringify(flds), [], ctx.aiFetch, { system: sys, label: "FORMULA" });
+      if (!r.ok) return json(200, { ok: false, error: r.error });
+      let d = null; try { const m = /\{[\s\S]*\}/.exec(r.text || ""); d = m ? JSON.parse(m[0]) : null; } catch (e) { d = null; }
+      const fx = d && str(d.formula, 600).replace(/^=/, "");
+      if (!fx) { last = "no JSON with a formula"; continue; }
+      const tt = fxTest(fx, { vals: {}, user: {} });
+      if (!tt.ok) { last = tt.error; continue; }
+      const unknown = fxRefs(fx).filter((k) => k !== "user" && !keys.has(k));
+      if (unknown.length) { last = "unknown field(s) " + unknown.join(", "); continue; }
+      out = { formula: fx, explain: str(d.explain, 300) };
+    }
+    return json(200, out ? Object.assign({ ok: true }, out) : { ok: false, error: "Couldn't write a working formula (" + last + "). Try describing it differently or pick a recipe." });
   }
   if (b.action === "ct-lookup") {   // live lookup while filling a Studio Pro form
     const tl = await toolFor(b.tool); const f = tl && tl.tool.pro ? (tl.tool.fields || []).find((x) => x.key === str(b.field, 30) && x.type === "lookup") : null;

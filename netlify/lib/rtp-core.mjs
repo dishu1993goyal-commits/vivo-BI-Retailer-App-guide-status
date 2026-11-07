@@ -10,6 +10,10 @@
 //   rtpann:<id>      announcement { id, kind:"news"|"launch"|"scheme"|"alert", title, body, link, model, states:[], rids:[], pin, at, by, byKey, until }
 //   rtpq:<id>        query { id, rid, rname, state, topic, to:"sales"|"ho", text, status:"open"|"answered"|"closed", thread:[{ by, at, text, staff }], at, by, via }
 //   rtplink:<token>  { rid, at, by, exp, asks:{ day, n } }
+//   rtil:<RID>       IMEIs { items:[{ i, m, bd, act, ad, fin, fp, ls, dp }], updatedAt }   (bd billing date, act activated, fin financed, fp finance partner, ls lock / loan status)
+//   rtimei:<IMEI>    { rid }        — which retailer holds an IMEI (for search)
+//   rto:<id>         order { id, rid, rname, state, items:[{ model, qty, price, value }], total, status, note, by, via, at, month, history }
+//   config:rtporder  { on, balance:"credit"|"wallet"|"none", defMax, cover, minValue, note, models:{ <key>:{ max, price, hide } } }
 import { randomBytes } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
@@ -21,6 +25,82 @@ const low = (x) => String(x || "").trim().toLowerCase();
 const r2 = (n) => Math.round(n * 100) / 100;
 export const RTP_TOPICS = ["Payout / scheme", "Stock & supply", "Pricing", "Display & branding", "Service / repair", "New launch", "Other"];
 const ANN_KINDS = ["news", "launch", "scheme", "alert"];
+const nk = (s) => String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\b5g\b/g, "").replace(/[^a-z0-9+]/g, "");
+const dateOf = (v) => {
+  if (v == null || v === "") return "";
+  if (typeof v === "number" && v > 30000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10);
+  const s = String(v).trim(); let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s); if (m) return m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0");
+  m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/.exec(s); if (m) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+  const d = new Date(s); return isNaN(d) ? "" : d.toISOString().slice(0, 10);
+};
+const yes = (v) => /^(y|yes|true|1|financed|activated|active|done)$/i.test(String(v == null ? "" : v).trim());
+const IMEI = (v) => String(v == null ? "" : v).replace(/\D/g, "").slice(0, 15);
+const STATUSES = ["placed", "accepted", "dispatched", "delivered", "rejected", "cancelled"], COMMITTED = ["placed", "accepted", "dispatched"];
+const BUCKETS = [[0, 15, "0–15 days"], [16, 30, "16–30"], [31, 45, "31–45"], [46, 60, "46–60"], [61, 90, "61–90"], [91, 1e9, "90+ days"]];
+function ageing(items, today) {
+  const T = Date.parse(today + "T00:00:00Z"), un = (items || []).filter((x) => !x.act);
+  const age = (x) => (x.bd ? Math.max(0, Math.round((T - Date.parse(x.bd + "T00:00:00Z")) / 864e5)) : null);
+  const buckets = BUCKETS.map((b) => ({ label: b[2], n: 0 })), models = {};
+  un.forEach((x) => { const a = age(x); if (a == null) return; const bi = BUCKETS.findIndex((b) => a >= b[0] && a <= b[1]); buckets[bi].n++; const M = models[x.m] || (models[x.m] = { model: x.m, n: 0, sum: 0, max: 0, old60: 0, b: BUCKETS.map(() => 0) }); M.n++; M.sum += a; M.max = Math.max(M.max, a); if (a > 60) M.old60++; M.b[bi]++; });
+  const all = items || [];
+  return { total: all.length, unsold: un.length, sold: all.length - un.length, financed: all.filter((x) => x.fin).length, buckets, models: Object.values(models).map((M) => ({ model: M.model, n: M.n, avg: Math.round(M.sum / (M.n || 1)), max: M.max, old60: M.old60, b: M.b })).sort((a, c) => c.avg - a.avg),
+    oldest: un.filter((x) => x.bd).map((x) => ({ i: x.i, m: x.m, bd: x.bd, age: age(x), fin: !!x.fin })).sort((a, c) => c.age - a.age).slice(0, 25), updatedAt: 0 };
+}
+// running offers for these models (Affordability Corner: AI-researched + HO / field reports verified for this state)
+async function offersFor(store, pool, modelNames, state, today) {
+  const cat = (await store.get("affcat")) || { models: [] }, want = new Set(modelNames.map(nk)), st = low(state);
+  let L = cat.models.filter((m) => want.has(nk(m.name)));
+  cat.models.slice(0, 40).forEach((m) => { if (L.length < 24 && !L.includes(m)) L.push(m); });
+  const ok = (v) => !v || !/^\d{4}-\d{2}-\d{2}$/.test(v) || v >= today;
+  const out = await pool(L.slice(0, 24), 12, async (c) => {
+    const m = (await store.get(`affm:${c.slug}`)) || {}, hide = (await store.get(`affhide:${c.slug}`)) || {}, offers = [];
+    ["emi", "exchange", "upgrade", "vshield", "abb", "cashback", "other"].forEach((k) => (m[k] || []).forEach((o) => { if (!hide[o.key] && ok(o.validTill)) offers.push({ kind: k, partner: o.partner || "", scheme: o.scheme || "", benefit: o.benefit || o.plan || "", details: o.details || "", validTill: o.validTill || "", src: "AI" }); }));
+    for (const k of (await store.list(`affr:${c.slug}:`)).slice(-60)) { const r = await store.get(k); if (r && r.verified && ok(r.validTill) && (!r.state || /all india/i.test(r.state) || low(r.state) === st)) offers.push({ kind: r.kind, partner: r.partner, scheme: r.scheme, benefit: r.benefit, details: r.details, validTill: r.validTill, src: "HO" }); }
+    const ps = ((m.variants) || []).map((v) => v.price).filter(Boolean);
+    return { model: c.name, slug: c.slug, series: c.series || "", price: ps.length ? Math.min(...ps) : 0, offers: offers.sort((a, b) => (a.src === "HO" ? 0 : 1) - (b.src === "HO" ? 0 : 1)).slice(0, 20), updatedAt: m.updatedAt || 0 };
+  });
+  return out.filter((x) => x.offers.length || want.has(nk(x.model)));
+}
+function imeiOut(x, today) { const age = x.bd ? Math.max(0, Math.round((Date.parse(today + "T00:00:00Z") - Date.parse(x.bd + "T00:00:00Z")) / 864e5)) : null; return { imei: x.i, model: x.m, billed: x.bd, ageDays: x.act ? null : age, activated: !!x.act, activatedOn: x.ad || "", financed: !!x.fin, financier: x.fp || "", lockStatus: x.ls || "", dealerPrice: x.dp || 0 }; }
+async function orderCfg(store) { return Object.assign({ on: true, balance: "credit", defMax: 20, cover: 30, minValue: 0, note: "", models: {} }, (await store.get("config:rtporder")) || {}); }
+// what this retailer can order now: models, prices, limits left this month, suggestions, balance
+async function orderInfo(store, pool, rid, D) {
+  const cfg = await orderCfg(store), cat = (await store.get("affcat")) || { models: [] }, month = D.today.slice(0, 7);
+  const orders = (await pool(await store.list("rto:"), 30, (k) => store.get(k))).filter((o) => o && o.rid === rid).sort((a, c) => c.at - a.at);
+  const used = {}, last = {}; let committed = 0;
+  orders.forEach((o) => { if (!["rejected", "cancelled"].includes(o.status) && o.month === month) o.items.forEach((x) => { used[nk(x.model)] = (used[nk(x.model)] || 0) + x.qty; }); if (COMMITTED.includes(o.status)) committed += o.total; o.items.forEach((x) => { if (last[nk(x.model)] == null) last[nk(x.model)] = { qty: x.qty, at: o.at }; }); });
+  const rows = D.biz.rows, months = [...new Set(rows.map((r) => r.m))].sort(), m3 = months.slice(-3), stockM = [...new Set(rows.filter((r) => r.stk).map((r) => r.m))].sort().pop();
+  const sales = {}, stock = {}; rows.forEach((r) => { const k = nk(r.model); if (m3.includes(r.m)) sales[k] = (sales[k] || 0) + r.su; if (r.m === stockM) stock[k] = (stock[k] || 0) + r.stk; });
+  const models = await pool(cat.models.slice(0, 200), 30, async (c) => {
+    const k = nk(c.name), o = cfg.models[k] || {}; if (o.hide) return null;
+    let price = num(o.price); if (!price) { const m = await store.get(`affm:${c.slug}`); const ps = ((m && m.variants) || []).map((v) => v.price).filter(Boolean); price = ps.length ? Math.min(...ps) : 0; }
+    const max = o.max != null && o.max !== "" ? Math.max(0, Math.round(num(o.max))) : cfg.defMax, avgM = (sales[k] || 0) / (m3.length || 1);
+    return { model: c.name, series: c.series || "", price, max, used: used[k] || 0, left: Math.max(0, max - (used[k] || 0)), stock: stock[k] || 0, avgSales: Math.round(avgM * 10) / 10, suggest: Math.min(Math.max(0, max - (used[k] || 0)), Math.max(0, Math.round(avgM * cfg.cover / 30 - (stock[k] || 0)))), last: last[k] || null };
+  });
+  const inCat = new Set(cat.models.map((c) => nk(c.name))), extra = {};   // models the retailer deals in that aren't in the catalog yet
+  rows.forEach((r) => { const k = nk(r.model); if (!k || inCat.has(k)) return; const x = extra[k] || (extra[k] = { model: r.model, pu: 0, pv: 0 }); x.pu += r.pu; x.pv += r.pv; });
+  Object.keys(extra).forEach((k) => { const o = cfg.models[k] || {}; if (o.hide) return; const x = extra[k], price = num(o.price) || (x.pu ? Math.round(x.pv / x.pu) : 0), max = o.max != null && o.max !== "" ? Math.max(0, Math.round(num(o.max))) : cfg.defMax, avgM = (sales[k] || 0) / (m3.length || 1);
+    models.push({ model: x.model, series: "", price, max, used: used[k] || 0, left: Math.max(0, max - (used[k] || 0)), stock: stock[k] || 0, avgSales: Math.round(avgM * 10) / 10, suggest: Math.min(Math.max(0, max - (used[k] || 0)), Math.max(0, Math.round(avgM * cfg.cover / 30 - (stock[k] || 0)))), last: last[k] || null }); });
+  const L = models.filter(Boolean).sort((a, c) => (c.suggest - a.suggest) || (c.avgSales - a.avgSales) || (c.price - a.price));
+  const base = cfg.balance === "wallet" ? D.wallet.balance : cfg.balance === "credit" ? (num(D.retailer.credit) || D.wallet.balance) : null;
+  return { on: cfg.on !== false, balanceMode: cfg.balance, balance: base, committed: r2(committed), available: base == null ? null : r2(base - committed), minValue: cfg.minValue, note: cfg.note, cover: cfg.cover, models: L, orders: orders.slice(0, 30) };
+}
+async function placeOrder(store, pool, rid, D, b, by, via, t) {
+  const I = await orderInfo(store, pool, rid, D); if (!I.on) return { error: "Ordering is switched off right now." };
+  const want = (Array.isArray(b.items) ? b.items : []).slice(0, 60).map((x) => ({ model: str(x.model, 60), qty: Math.round(num(x.qty)) })).filter((x) => x.model && x.qty > 0);
+  if (!want.length) return { error: "Add at least one model to the cart." };
+  const items = [];
+  for (const w of want) {
+    const M = I.models.find((m) => nk(m.model) === nk(w.model)); if (!M) return { error: w.model + " can't be ordered." };
+    if (w.qty > M.left) return { error: `${M.model}: you can order up to ${M.left} more this month (limit ${M.max}).` };
+    items.push({ model: M.model, qty: w.qty, price: M.price, value: r2(M.price * w.qty) });
+  }
+  const total = r2(items.reduce((a, x) => a + x.value, 0));
+  if (I.minValue && total < I.minValue) return { error: "Minimum order value is ₹" + I.minValue.toLocaleString("en-IN") + "." };
+  if (I.available != null && total > I.available) return { error: "Order ₹" + Math.round(total).toLocaleString("en-IN") + " is more than the available balance ₹" + Math.round(I.available).toLocaleString("en-IN") + "." };
+  const o = { id: nid(t), rid, rname: D.retailer.name, state: D.retailer.state, items, total, status: "placed", note: txt(b.note, 300), by, via, at: t, month: D.today.slice(0, 7), history: [{ status: "placed", by, at: t }] };
+  await store.set(`rto:${o.id}`, o); return { order: o };
+}
 
 function monthOf(v) {
   if (v == null || v === "") return "";
@@ -64,8 +144,10 @@ async function portalData(store, pool, rid, opts) {
   for (const k of (await store.list("prod:")).slice(0, 200)) { const p = await store.get(k); if (p && p.launch && p.launch >= new Date(Date.now() - 60 * 864e5).toISOString().slice(0, 10)) launches.push({ slug: k.slice(5), name: p.name || k.slice(5), launch: p.launch, mrp: p.mrp || 0, highlights: (p.highlights || []).slice(0, 4), img: (p.images || [])[0] || "" }); }
   launches.sort((a, c) => c.launch.localeCompare(a.launch));
   const qs = (await pool(await store.list("rtpq:"), 30, (k) => store.get(k))).filter((q) => q && q.rid === rid).sort((a, c) => c.at - a.at).slice(0, 40);
+  const il = (await store.get(`rtil:${rid}`)) || { items: [] }, age = ageing(il.items, today); age.updatedAt = il.updatedAt || 0;
+  const offers = opts.noOffers ? [] : await offersFor(store, pool, [...new Set(((d && d.rows) || []).map((r) => r.model).concat(il.items.map((x) => x.m)))], master.state, today);
   return { today, retailer: master, biz: d ? { rows: d.rows || [], targets: d.targets || {}, updatedAt: d.updatedAt || 0 } : { rows: [], targets: {}, updatedAt: 0 },
-    wallet: { earned: r2(cr), used: r2(dr), balance: r2(cr - dr), entries: entries.slice(0, 60) }, payouts: lines.slice(0, 40), schemes, anns, launches: launches.slice(0, 12), queries: qs };
+    wallet: { earned: r2(cr), used: r2(dr), balance: r2(cr - dr), entries: entries.slice(0, 60) }, payouts: lines.slice(0, 40), schemes, anns, launches: launches.slice(0, 12), queries: qs, ageing: age, offers };
 }
 // short text the AI reads
 function aiContext(D) {
@@ -75,9 +157,10 @@ function aiContext(D) {
   const models = rows.filter((r) => r.m === last || r.m === stockM).reduce((o, r) => { const x = o[r.model] || (o[r.model] = { model: r.model, sold: 0, stock: 0 }); if (r.m === last) x.sold += r.su; if (r.m === stockM) x.stock += r.stk; return o; }, {});
   return JSON.stringify({ today: D.today, retailer: { id: D.retailer.rid, name: D.retailer.name, city: D.retailer.city, state: D.retailer.state, type: D.retailer.type }, monthly: byM, models: Object.values(models).slice(0, 40), wallet: { earned: D.wallet.earned, used: D.wallet.used, balance: D.wallet.balance },
     recentPayouts: D.payouts.slice(0, 8).map((p) => ({ month: p.month, scheme: p.scheme, net: p.net, next: p.next })), schemes: D.schemes.slice(0, 12).map((s) => ({ title: s.title, from: s.from, to: s.to, models: s.models, summary: s.summary, slabs: s.slabs, maxPayout: s.maxPayout })),
-    announcements: D.anns.slice(0, 8).map((a) => ({ kind: a.kind, title: a.title, body: str(a.body, 300) })), launches: D.launches.slice(0, 5).map((l) => ({ name: l.name, launch: l.launch, mrp: l.mrp })) }).slice(0, 14000);
+    announcements: D.anns.slice(0, 8).map((a) => ({ kind: a.kind, title: a.title, body: str(a.body, 300) })), launches: D.launches.slice(0, 5).map((l) => ({ name: l.name, launch: l.launch, mrp: l.mrp })),
+    stockAgeing: { unsold: D.ageing.unsold, buckets: D.ageing.buckets, models: D.ageing.models.slice(0, 12) }, offers: (D.offers || []).slice(0, 12).map((o) => ({ model: o.model, price: o.price, offers: o.offers.slice(0, 6).map((x) => [x.kind, x.partner, x.scheme, x.benefit, x.details].filter(Boolean).join(" · ").slice(0, 160)) })) }).slice(0, 18000);
 }
-const AI_SYS = "You are the vivo India retailer assistant. Answer the retailer's or vivo staff member's question using ONLY the DATA given (their purchase, sales, stock, targets, payouts, wallet, running schemes, announcements and launches). Be short, friendly and specific with numbers (₹ and units). If something isn't in the DATA, say so and suggest raising a query to the sales team. Never invent scheme amounts. Plain text, at most 8 short lines; use • bullets where useful.";
+const AI_SYS = "You are the vivo India retailer assistant. Answer the retailer's or vivo staff member's question using ONLY the DATA given (their purchase, sales, stock, stock ageing, targets, payouts, wallet, running schemes, consumer offers (EMI / exchange / upgrade etc.), announcements and launches). Be short, friendly and specific with numbers (₹ and units). If something isn't in the DATA, say so and suggest raising a query to the sales team. Never invent scheme amounts. Plain text, at most 8 short lines; use • bullets where useful.";
 const AI_SUMMARY = "Give this retailer a one-glance business summary from DATA: 1) how this month is going vs target, 2) stock health (models with high stock and low sales, models running out), 3) money: payouts earned / wallet balance, 4) the 2-3 best scheme opportunities right now with exactly what to do, 5) one line on new launches. Use • bullets, under 10 lines.";
 
 async function ask(ctx, D, q, history, summary) {
@@ -103,6 +186,10 @@ export async function rtpPublic(b, ctx) {
     const q = { id: nid(t), rid: L.rid, rname: D.retailer.name, state: D.retailer.state, topic: RTP_TOPICS.includes(b.topic) ? b.topic : "Other", to: b.to === "ho" ? "ho" : "sales", text, status: "open", thread: [], at: t, by: str(b.name, 60) || D.retailer.name, via: "link" };
     await store.set(`rtpq:${q.id}`, q); return json(200, { ok: true, id: q.id });
   }
+  if (b.action === "rtp-public-imei") { const i = IMEI(b.imei), il = (await store.get(`rtil:${L.rid}`)) || { items: [] }, x = il.items.find((y) => y.i === i); return json(200, x ? { ok: true, item: imeiOut(x, D.today), retailer: { rid: L.rid, name: D.retailer.name } } : { ok: false, error: "This IMEI isn't in your stock list." }); }
+  if (b.action === "rtp-public-ordercat") return json(200, Object.assign({ ok: true }, await orderInfo(store, pool, L.rid, D)));
+  if (b.action === "rtp-public-order") { const r = await placeOrder(store, pool, L.rid, D, b, str(b.name, 60) || D.retailer.name, "link", t); return json(r.error ? 400 : 200, r.error ? { ok: false, error: r.error } : { ok: true, order: r.order }); }
+  if (b.action === "rtp-public-order-cancel") { const o = await store.get(`rto:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!o || o.rid !== L.rid) return json(404, { ok: false, error: "Not found." }); if (o.status !== "placed") return json(400, { ok: false, error: "Only orders not yet accepted can be cancelled." }); o.status = "cancelled"; o.history.push({ status: "cancelled", by: D.retailer.name, at: t }); await store.set(`rto:${o.id}`, o); return json(200, { ok: true }); }
   if (b.action === "rtp-public-ask") {
     const day = new Date(t + 19800000).toISOString().slice(0, 10); L.asks = L.asks && L.asks.day === day ? L.asks : { day, n: 0 };
     if (L.asks.n >= 30) return json(429, { ok: false, error: "Daily question limit reached — try tomorrow or raise a query." });
@@ -129,7 +216,8 @@ export async function rtpAction(b, ctx) {
     if (st) L = L.filter((x) => low(x.s) === low(st));
     if (q) L = L.filter((x) => (x.rid + " " + (x.n || "") + " " + (x.c || "")).toLowerCase().includes(q));
     const openQ = (await pool(await store.list("rtpq:"), 30, (k) => store.get(k))).filter((x) => x && x.status === "open" && seeState(x.state)).length;
-    return json(200, { ok: true, items: L.sort((a, c) => (c.sv || 0) - (a.sv || 0) || (c.bal || 0) - (a.bal || 0)).slice(0, 600), count: L.length, states, openQ });
+    const newOrders = (await pool(await store.list("rto:"), 30, (k) => store.get(k))).filter((o) => o && o.status === "placed" && seeState(o.state)).length;
+    return json(200, { ok: true, items: L.sort((a, c) => (c.sv || 0) - (a.sv || 0) || (c.bal || 0) - (a.bal || 0)).slice(0, 600), count: L.length, states, openQ, newOrders });
   }
   if (b.action === "rtp-get") {
     const rid = RID(b.rid); const D = await portalData(store, pool, rid, { staffSees }); if (!D) return json(404, { ok: false, error: "No data for this retailer yet." });
@@ -146,10 +234,28 @@ export async function rtpAction(b, ctx) {
         const rid = RID(x.rid); if (!rid) continue; const state = str(x.state, 40) || myState;
         if (!seeState(state)) { skipped++; continue; }
         const old = (await store.get(`rtl:${rid}`)) || {};
-        const m = Object.assign(old, { rid, name: str(x.name, 80) || old.name || rid, owner: str(x.owner, 80) || old.owner || "", mobile: str(x.mobile, 20) || old.mobile || "", state, city: str(x.city, 60) || old.city || "", area: str(x.area, 60) || old.area || "", type: str(x.type, 40) || old.type || "", asm: str(x.asm, 80) || old.asm || "", gst: str(x.gst, 20) || old.gst || "", updatedAt: t, by });
+        const m = Object.assign(old, { rid, name: str(x.name, 80) || old.name || rid, owner: str(x.owner, 80) || old.owner || "", mobile: str(x.mobile, 20) || old.mobile || "", state, city: str(x.city, 60) || old.city || "", area: str(x.area, 60) || old.area || "", type: str(x.type, 40) || old.type || "", asm: str(x.asm, 80) || old.asm || "", gst: str(x.gst, 20) || old.gst || "", credit: x.credit != null && String(x.credit).trim() !== "" ? num(x.credit) : old.credit || 0, updatedAt: t, by });
         await store.set(`rtl:${rid}`, m); I[rid] = Object.assign(I[rid] || {}, { n: m.name, s: m.state, c: m.city, t: m.type }); n++;
       }
       await store.set("rtpidx", I); return json(200, { ok: true, saved: n, skipped });
+    }
+    if (b.kind === "imei") {   // IMEI-level stock: IMEI, model, retailer, billing date, activation, finance
+      const by2 = {}; let bad = 0;
+      rows.forEach((x) => { const rid = RID(x.rid), i = IMEI(x.imei); if (!rid || i.length !== 15) { bad++; return; } (by2[rid] || (by2[rid] = [])).push(Object.assign({}, x, { i })); });
+      for (const rid of Object.keys(by2)) {
+        const st = (await stateOf(rid)) || str(by2[rid][0].state, 40) || myState;
+        if (!seeState(st)) { skipped += by2[rid].length; continue; }
+        const il = (await store.get(`rtil:${rid}`)) || { items: [] }, map = new Map(il.items.map((y) => [y.i, y]));
+        for (const x of by2[rid]) {
+          const old = map.get(x.i) || {}, ad = dateOf(x.ad), act = x.act != null && String(x.act).trim() !== "" ? yes(x.act) || !!ad : !!(old.act || ad);
+          map.set(x.i, { i: x.i, m: str(x.model, 50) || old.m || "", bd: dateOf(x.bd) || old.bd || "", act, ad: ad || old.ad || "", fin: x.fin != null && String(x.fin).trim() !== "" ? yes(x.fin) : !!old.fin, fp: str(x.fp, 40) || old.fp || "", ls: str(x.ls, 40) || old.ls || "", dp: num(x.dp) || old.dp || 0 });
+          const w = await store.get(`rtimei:${x.i}`); if (!w || w.rid !== rid) await store.set(`rtimei:${x.i}`, { rid });
+          n++;
+        }
+        il.items = [...map.values()].slice(-8000); il.updatedAt = t; await store.set(`rtil:${rid}`, il);
+        if (!(await store.get(`rtl:${rid}`))) { await store.set(`rtl:${rid}`, { rid, name: str(by2[rid][0].name, 80) || rid, state: st, updatedAt: t, by }); const I = (await store.get("rtpidx")) || {}; I[rid] = Object.assign(I[rid] || {}, { n: str(by2[rid][0].name, 80) || rid, s: st }); await store.set("rtpidx", I); }
+      }
+      return json(200, { ok: true, saved: n, skipped, bad, retailers: Object.keys(by2).length });
     }
     if (b.kind === "biz") {
       const by2 = {}; let bad = 0;
@@ -174,6 +280,34 @@ export async function rtpAction(b, ctx) {
       await store.set("rtpidx", I); return json(200, { ok: true, saved: n, skipped, bad, retailers: Object.keys(by2).length });
     }
     return json(400, { ok: false, error: "Unknown import." });
+  }
+  if (b.action === "rtp-imei") {   // IMEI search (scan or type)
+    const i = IMEI(b.imei); if (i.length !== 15) return json(400, { ok: false, error: "Enter the 15-digit IMEI." });
+    const w = await store.get(`rtimei:${i}`); if (!w) return json(404, { ok: false, error: "This IMEI isn't in any uploaded retailer stock." });
+    const st = await stateOf(w.rid); if (!seeState(st)) return json(403, { ok: false, error: "This IMEI is with a retailer in another state." });
+    const il = (await store.get(`rtil:${w.rid}`)) || { items: [] }, x = il.items.find((y) => y.i === i); if (!x) return json(404, { ok: false, error: "Not found." });
+    const m = (await store.get(`rtl:${w.rid}`)) || {}; return json(200, { ok: true, item: imeiOut(x, new Date(t + 19800000).toISOString().slice(0, 10)), retailer: { rid: w.rid, name: m.name || w.rid, state: st, city: m.city || "" } });
+  }
+  if (b.action === "rtp-order-cat") { const rid = RID(b.rid), D = await portalData(store, pool, rid, { staffSees, noOffers: true }); if (!D) return json(404, { ok: false, error: "Not found." }); if (!seeState(D.retailer.state)) return json(403, { ok: false, error: "Another state's retailer." }); return json(200, Object.assign({ ok: true }, await orderInfo(store, pool, rid, D))); }
+  if (b.action === "rtp-order") { const rid = RID(b.rid), D = await portalData(store, pool, rid, { staffSees, noOffers: true }); if (!D) return json(404, { ok: false, error: "Not found." }); if (!seeState(D.retailer.state)) return json(403, { ok: false, error: "Another state's retailer." }); const r = await placeOrder(store, pool, rid, D, b, by, "staff", t); return json(r.error ? 400 : 200, r.error ? { ok: false, error: r.error } : { ok: true, order: r.order }); }
+  if (b.action === "rtp-order-list") {
+    let L = (await pool(await store.list("rto:"), 30, (k) => store.get(k))).filter((o) => o && seeState(o.state));
+    if (b.rid) L = L.filter((o) => o.rid === RID(b.rid)); if (b.status) L = L.filter((o) => o.status === b.status);
+    return json(200, { ok: true, items: L.sort((a, c) => (a.status === "placed" ? 0 : 1) - (c.status === "placed" ? 0 : 1) || c.at - a.at).slice(0, 300), statuses: STATUSES });
+  }
+  if (b.action === "rtp-order-status") {
+    const o = await store.get(`rto:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!o || !seeState(o.state)) return json(404, { ok: false, error: "Not found." });
+    if (!STATUSES.includes(b.status)) return json(400, { ok: false, error: "Pick a status." });
+    o.status = b.status; o.history.push({ status: b.status, by, at: t, note: txt(b.note, 300) }); await store.set(`rto:${o.id}`, o); return json(200, { ok: true, item: o });
+  }
+  if (b.action === "rtp-order-cfg") {   // HO: read / save the ordering rules
+    const cfg = await orderCfg(store);
+    if (!b.save) { const cat = (await store.get("affcat")) || { models: [] }; return json(200, { ok: true, cfg, models: cat.models.slice(0, 200).map((m) => ({ name: m.name, key: nk(m.name), series: m.series || "" })), isHO }); }
+    if (!isHO) return json(403, { ok: false, error: "Only HO admins can change ordering rules." });
+    const c = b.cfg || {}, models = {};
+    Object.keys(c.models || {}).slice(0, 300).forEach((k) => { const x = c.models[k] || {}, o = {}; if (x.max !== "" && x.max != null && isFinite(+x.max)) o.max = Math.max(0, Math.round(+x.max)); if (num(x.price)) o.price = num(x.price); if (x.hide) o.hide = true; if (Object.keys(o).length) models[nk(k)] = o; });
+    const out = { on: c.on !== false, balance: ["credit", "wallet", "none"].includes(c.balance) ? c.balance : "credit", defMax: Math.max(0, Math.round(num(c.defMax))) || 20, cover: Math.max(7, Math.min(90, Math.round(num(c.cover)) || 30)), minValue: Math.max(0, num(c.minValue)), note: txt(c.note, 300), models, by, at: t };
+    await store.set("config:rtporder", out); return json(200, { ok: true, cfg: out });
   }
   if (b.action === "rtp-clear") {   // remove a retailer's business data (HO only)
     if (!isHO) return json(403, { ok: false, error: "HO only." });

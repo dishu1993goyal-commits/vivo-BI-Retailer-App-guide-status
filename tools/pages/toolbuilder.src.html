@@ -25,6 +25,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9
 .help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.55}
 .dt{border-collapse:collapse;font-size:12.5px;min-width:100%}.dt th{background:#F3F4FA;text-align:left;padding:6px;font-size:11px;color:var(--mut)}.dt td{padding:4px;border-top:1px solid #EEF0F6}.dt input{width:100%;min-width:90px;border:1px solid #E1E3EE;border-radius:8px;padding:6px;font:inherit}
 .tbw{overflow-x:auto;margin-top:8px;border-radius:12px;background:var(--card)}
+.fxw{display:flex;gap:6px;align-items:center}.fxw>input{flex:1;min-width:0}.fxw>.fxh{flex:none;border:0;background:#F1EEFF;color:#5B3FD6;border-radius:9px;height:34px;padding:0 9px;font-weight:800;cursor:pointer;font-size:12px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -39,7 +40,23 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9
   var TYPES = [["text", "Short text"], ["longtext", "Long text"], ["number", "Number"], ["currency", "Amount (₹)"], ["date", "Date"], ["time", "Time"], ["datetime", "Date & time"], ["select", "Dropdown"], ["multi", "Multiple choice"], ["yesno", "Yes / No"], ["checkbox", "Tick box"], ["rating", "Star rating"], ["scale", "Scale"], ["email", "Email"], ["phone", "Phone"], ["photo", "Photo"], ["location", "GPS location"], ["user", "Person (vChat ID)"], ["calc", "🧮 Calculated (formula)"], ["lookup", "🔗 Lookup from existing tool"], ["table", "📋 Table (rows)"], ["heading", "Heading / section / page break"], ["image", "Image"]];
   var TN = {}; TYPES.forEach(function (x) { TN[x[0]] = x[1]; });
   var CATS = [["field", "Field"], ["reports", "Reports"], ["engage", "Engage"], ["learn", "Learn"], ["support", "Support"], ["admin", "Admin"], ["more", "More"]];
-  function libFX() { return window.BIFX ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/formula.js?v=1"; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
+  function libFX() { var one = function (src, ok) { return ok ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }; return Promise.all([one("/formula.js?v=1", window.BIFX), one("/fxhelp.js?v=1", window.BIFXHELP)]); }
+  // 🪄 next to every formula box: recipes, functions, fields, describe-in-words (AI)
+  var VALUE_IDS = ["ffx", "fdf", "tf"];
+  function addHelpers(root, colFields) {
+    [].forEach.call(root.querySelectorAll("input.fx"), function (el) {
+      if (el.dataset.fxw || el.readOnly || el.id === "fk" || el.dataset.k === "key") return; el.dataset.fxw = "1";
+      var w = document.createElement("span"); w.className = "fxw"; el.parentNode.insertBefore(w, el); w.appendChild(el);
+      var b = document.createElement("button"); b.type = "button"; b.className = "fxh"; b.textContent = "🪄 Help"; b.title = "Formula helper"; w.appendChild(b);
+      b.onclick = function () {
+        var isCol = el.dataset.k === "formula", purpose = isCol || VALUE_IDS.indexOf(el.id) >= 0 ? "value" : "cond";
+        var flds = isCol && colFields ? colFields() : ED.tool.fields;
+        BIFXHELP.open({ esc: esc, sheet: sheet, toast: toast, input: el, fields: flds, purpose: purpose,
+          test: function (src) { var v = isCol ? (colFields() || []).reduce(function (o, c) { o[c.key] = c.type === "number" || c.type === "currency" ? 10 : "x"; return o; }, {}) : sampleVals(); return BIFX.test(src, { vals: v, user: { state: "Bihar", role: "state", name: "Test user" } }); },
+          aiCall: function (d) { return api({ action: "ct-fx-ai", desc: d, purpose: purpose, fields: flds.filter(function (x) { return x.type !== "heading" && x.type !== "image"; }).map(function (x) { return { key: x.key, label: x.label, type: x.type, options: (x.options || []).slice(0, 12), columns: (x.columns || []).map(function (c) { return { key: c.key, label: c.label, type: c.type }; }), lookup: x.lookup ? { source: x.lookup.source, show: x.lookup.show } : undefined }; }) }); } });
+      };
+    });
+  }
   var uid = function (p) { return (p || "f") + Math.random().toString(36).slice(2, 7); };
   var keyFrom = function (s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 24) || uid(); };
 
@@ -112,7 +129,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9
     $("ep").innerHTML = '<div class="row" style="gap:6px;margin-top:10px"><button class="btn pri" id="af" style="flex:1">＋ Add field</button></div>' + (t.fields.length ? t.fields.map(function (f, i) {
       var extra = f.type === "calc" ? '<span class="fx">= ' + esc(f.formula || "") + "</span>" : f.type === "lookup" ? "from " + esc((SRC[f.lookup && f.lookup.source] || "").split(" (")[0]) + (f.lookup && f.lookup.match ? " by " + esc(f.lookup.match) : "") : f.type === "table" ? (f.columns || []).length + " columns" : "";
       return '<div class="it"><div class="ic">' + ({ calc: "🧮", lookup: "🔗", table: "📋", heading: "🔖", user: "👤", currency: "₹", photo: "📷", select: "▾", date: "📅" }[f.type] || "✎") + '</div><div class="m"><b>' + esc(f.label || "(no label)") + (f.required ? '<span class="tag r">required</span>' : "") + (f.showIf ? '<span class="tag">show if</span>' : "") + (f.requiredIf ? '<span class="tag o">required if</span>' : "") + ((f.validations || []).length ? '<span class="tag">' + f.validations.length + " rule</span>" : "") + "</b><span>" + esc(TN[f.type] || f.type) + " · <span class=\"fx\">" + esc(f.key) + "</span> " + extra + '</span></div><button class="ib" data-up="' + i + '">↑</button><button class="ib" data-ef="' + i + '">✏️</button><button class="ib" data-rf="' + i + '" style="color:var(--bad)">✕</button></div>';
-    }).join("") : '<div class="card empty">No fields yet.</div>') + '<div class="help"><b>Using fields in formulas:</b> refer to a field by its key (e.g. <span class="fx">amount * 1.18</span>) or its label in braces (<span class="fx">{Travel mode} = "Air"</span>). Table columns: <span class="fx">SUM(lines.amount)</span>. Lookups: <span class="fx">retailer.balance</span>. Who is filling: <span class="fx">user.state</span>, <span class="fx">user.role</span>.</div>';
+    }).join("") : '<div class="card empty">No fields yet.</div>') + '<details class="help" open><summary><b>📘 How to write formulas</b> — or just tap <b>🪄 Help</b> next to any formula box</summary><div style="margin-top:6px">🪄 Help gives you <b>recipes</b> (choose from a drop-down, pick your fields, done), every <b>function</b> with its format, your <b>fields</b>, and <b>✨ Describe it</b> — write what you want in words and AI writes the formula.</div><table class="dt" style="margin-top:8px;background:#fff"><tr><th>Process</th><th>Formula</th></tr>' + [["Expense total + GST", "ROUND(SUM(lines.amount) * 1.18, 0)"], ["Leave days", "DAYS(to_date, from_date) + 1"], ["Achievement %", "PERCENT(achieved, target)"], ["Slab payout", 'SLAB(units, "0:0,10:1000,25:3000")'], ["Incentive capped at ₹8,000", "MIN(base + bonus, 8000)"], ["Approver level", 'IF(total > 5000, "ZSM", "ASM")'], ["Show field only for outstation", 'trip = "Outstation"'], ["Needed if amount > 5000", "amount > 5000"], ["Mobile check", "LEN(mobile) = 10"], ["Not more than retailer balance", "claim <= NUM(retailer.balance)"], ["Stock ageing days", "DAYS(TODAY(), bill_date)"]].map(function (x) { return "<tr><td>" + esc(x[0]) + '</td><td class="fx">' + esc(x[1]) + "</td></tr>"; }).join("") + '</table></details><div class="help"><b>Using fields in formulas:</b> refer to a field by its key (e.g. <span class="fx">amount * 1.18</span>) or its label in braces (<span class="fx">{Travel mode} = "Air"</span>). Table columns: <span class="fx">SUM(lines.amount)</span>. Lookups: <span class="fx">retailer.balance</span>. Who is filling: <span class="fx">user.state</span>, <span class="fx">user.role</span>.</div>';
     $("af").onclick = function () { fieldSheet(null); };
     [].forEach.call($("ep").querySelectorAll("[data-ef]"), function (b) { b.onclick = function () { fieldSheet(+b.dataset.ef); }; });
     [].forEach.call($("ep").querySelectorAll("[data-rf]"), function (b) { b.onclick = function () { t.fields.splice(+b.dataset.rf, 1); eFields(); }; });
@@ -156,6 +173,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9
       ["ffx", "fsi", "fri", "fdf"].forEach(function (id) { wireFx(ov, id, sampleVals); });
       ov.querySelector("#fl").oninput = function () { if (!f.keyTouched && idx == null) ov.querySelector("#fk").value = keyFrom(this.value); };
       ov.querySelector("#fk").oninput = function () { f.keyTouched = true; };
+      addHelpers(ov.querySelector("#fs"), function () { return (f.columns || []).filter(function (c) { return c.key && !c.formula; }); });
     };
     var rd = function () {
       var g = function (id) { var e = ov.querySelector("#" + id); return e ? (e.type === "checkbox" ? e.checked : e.value) : undefined; };
@@ -189,7 +207,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9
     var paint = function () { $("rl").innerHTML = t.rules.map(function (r, j) { return '<div class="rt" style="grid-template-columns:1fr 1fr auto"><input class="tx fx" data-r="' + j + '" data-k="rule" value="' + esc(r.rule) + '" placeholder="Formula that must be true"><input class="tx" data-r="' + j + '" data-k="msg" value="' + esc(r.msg || "") + '" placeholder="Message if not"><button class="ib" data-x="' + j + '">✕</button></div><div class="fxr" id="rr' + j + '"></div>'; }).join("");
       [].forEach.call($("rl").querySelectorAll("[data-r]"), function (el) { el.oninput = function () { t.rules[+el.dataset.r][el.dataset.k] = el.value; if (el.dataset.k === "rule") { var r = BIFX.test(el.value, { vals: sampleVals() }), o = $("rr" + el.dataset.r); o.className = "fxr " + (r.ok ? "ok" : "bad"); o.textContent = r.ok ? "✓ formula works" : "✗ " + r.error; } }; });
       [].forEach.call($("rl").querySelectorAll("[data-x]"), function (b) { b.onclick = function () { t.rules.splice(+b.dataset.x, 1); paint(); }; }); };
-    paint(); $("ar").onclick = function () { t.rules.push({ rule: "", msg: "" }); paint(); }; $("tf").oninput = function () { t.titleFormula = this.value; };
+    paint(); addHelpers($("ep")); $("ar").onclick = function () { t.rules.push({ rule: "", msg: "" }); paint(); addHelpers($("ep")); }; $("tf").oninput = function () { t.titleFormula = this.value; };
   }
   // ---------- approval flow ----------
   function apText(a) { if (!a) return ""; return a.type === "role" ? "Role " + (a.role || "?") + " (" + ({ submitterState: "submitter's state", fieldState: "state in field " + (a.stateField || "?"), any: "any state" }[a.scope]) + (a.areaField ? ", area from " + a.areaField : "") + ")" : a.type === "users" ? (a.users || []).join(", ") : a.type === "field" ? "Person in field " + (a.field || "?") : a.type === "submitter" ? "The submitter" : { admin: "Any HO admin", master: "Any master admin", state: "Any state user" }[a.group]; }
@@ -229,6 +247,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9
       box.querySelector("[data-sx]").onclick = function () { S.splice(i, 1); eFlow(); };
       box.querySelector("[data-mu]").onclick = function () { if (!i) return; var x = S.splice(i, 1)[0]; S.splice(i - 1, 0, x); eFlow(); };
     });
+    addHelpers($("ep"));
     $("as").onclick = function () { var n = S.length + 1; S.push({ id: "s" + n + Math.random().toString(36).slice(2, 4), name: "Step " + n, when: "", approver: { type: "role", role: DIR.roles[0] || "", scope: "submitterState", users: [] }, mode: "any", tatHours: 24, escalate: null, autoApproveIf: "", routes: [], onReject: "end" }); eFlow(); };
   }
   // ---------- test: live form + where it would go ----------

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>IMEI unblock</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06);cursor:pointer}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:21px;font-weight:800;margin-top:2px}
+.kt.o .v{color:#B26A00}.kt.g .v{color:#13693F}.kt.r .v{color:#B42318}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:7px 6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;vertical-align:top}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#666}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 2px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:16px;padding:13px;margin-top:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.55}
+.fx{font-family:ui-monospace,Menlo,Consolas,monospace}
+.rad{display:flex;gap:4px;flex-wrap:wrap}.rad label{border:1px solid #DADDF0;border-radius:99px;padding:5px 10px;font-size:12px;cursor:pointer;background:#fff}.rad input{display:none}.rad input:checked+span{font-weight:800}.rad label.ok:has(input:checked){background:#E6F4EA;border-color:#9BD3B0}.rad label.no:has(input:checked){background:#FDECEC;border-color:#F2B8B5}
+.steps{display:flex;gap:6px;flex-wrap:wrap;font-size:11.5px;margin-top:8px}.steps span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:4px 9px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔓</span></div>
+  <h1 id="h1">IMEI unblock</h1><p id="hp">Partner-wise finance rollback requests — raised by states, updated by partners, closed by HO</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TOK = "", ME = null, TAB = "dash", LIST = null, F = { status: "open", pid: "", state: "", q: "" }, SEL = {};
+  try { TOK = (new URLSearchParams(location.search).get("p") || "").replace(/[^a-f0-9]/g, ""); } catch (e) { }
+  var ST_C = { with_partner: "o", unblocked: "g", partner_failed: "r", ho_unblocked: "g", ho_failed: "m" };
+  var REASONS = ["Customer closed / cancelled the loan", "Loan not disbursed", "Device returned / replaced", "Wrong IMEI financed", "Duplicate finance on IMEI", "Retailer request — sale cancelled", "Other"];
+  function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", p: TOK }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection." }; }); }
+  function libScan() { return window.BISCAN ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/imeiscan.js?v=1"; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
+  function libXL() { return window.XLSX ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; document.head.appendChild(s); }); }
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; };
+  var hrs = function (ms) { var h = Math.round(ms / 36e5); return h < 48 ? h + "h" : Math.round(h / 24) + "d"; };
+  function readSheet(file) { return libXL().then(function () { return file.arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array", raw: false }); for (var n = 0; n < wb.SheetNames.length; n++) { var A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[n]], { header: 1, defval: "", raw: false }); for (var h = 0; h < Math.min(10, A.length); h++) { var hd = A[h].map(function (c) { return String(c).toLowerCase(); }); if (hd.some(function (c) { return /imei/.test(c); })) return { hd: hd, rows: A.slice(h + 1) }; } } return null; }); }
+
+  // ======================= PARTNER (secure link, no login) =======================
+  var PD = null, PCH = {};
+  function partner() {
+    papi({ action: "iub-p-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      PD = r; $("h1").textContent = "vivo IMEI rollback — " + r.partner; $("hp").textContent = "Update the result for each IMEI. vivo sees your update immediately.";
+      var pend = r.rows.filter(function (x) { return x.status === "with_partner"; }), done = r.rows.filter(function (x) { return x.status !== "with_partner"; });
+      VIEW.innerHTML = '<div class="kp"><div class="kt o"><div class="l">Waiting for you</div><div class="v">' + pend.length + '</div></div><div class="kt r"><div class="l">Past ' + r.tatHours + 'h target</div><div class="v">' + pend.filter(function (x) { return r.now - x.at > r.tatHours * 36e5; }).length + '</div></div><div class="kt g"><div class="l">Updated (45 days)</div><div class="v">' + done.length + "</div></div></div>" +
+        '<div class="card" style="margin-top:10px"><div class="row" style="gap:6px;flex-wrap:wrap"><input class="tx" id="pn" placeholder="Your name" style="flex:1;min-width:140px"><button class="btn sec sm" id="pall">✓ Mark all unblocked</button><button class="btn sec sm" id="pdl">⬇ Excel</button><button class="btn sec sm" id="pul">📥 Upload Excel</button></div><div class="muted" style="font-size:12px;margin-top:6px">Excel: fill “Status” with Unblocked or Not unblocked (and a remark), then upload it here.</div></div>' +
+        (pend.length ? '<div class="tbw"><table class="tb"><tr><th>IMEI / details</th><th>Result</th></tr>' + pend.map(function (x) { var k = x.batch + ":" + x.imei, c = PCH[k] || {}; return '<tr><td><b class="fx">' + x.imei + "</b><br>" + esc([x.model, x.state, x.rname || x.rid].filter(Boolean).join(" · ")) + (x.customer || x.note ? '<br><small style="color:var(--mut)">' + esc([x.customer, x.note].filter(Boolean).join(" · ")) + "</small>" : "") + '<br><small style="color:var(--mut)">' + esc(x.batch) + " · " + when(x.at) + (r.now - x.at > r.tatHours * 36e5 ? ' · <b style="color:#B42318">' + hrs(r.now - x.at) + " waiting</b>" : "") + '</small></td><td><div class="rad"><label class="ok"><input type="radio" name="r' + k + '" data-k="' + k + '" value="unblocked"' + (c.status === "unblocked" ? " checked" : "") + '><span>✅ Unblocked</span></label><label class="no"><input type="radio" name="r' + k + '" data-k="' + k + '" value="partner_failed"' + (c.status === "partner_failed" ? " checked" : "") + '><span>❌ Not unblocked</span></label></div><input class="tx" data-rm="' + k + '" placeholder="Remark (reason if not)" value="' + esc(c.remark || "") + '" style="margin-top:5px;padding:7px;font-size:12.5px"></td></tr>'; }).join("") + "</table></div>" + '<button class="btn pri block" id="psave" style="margin-top:10px">💾 Save updates</button>' : '<div class="card empty"><div class="big">✅</div>Nothing waiting — thank you!</div>') +
+        (done.length ? '<div class="sh"><span>Recently updated</span></div><div class="tbw"><table class="tb"><tr><th>IMEI</th><th>Status</th><th>When</th></tr>' + done.slice(0, 200).map(function (x) { return '<tr><td class="fx">' + x.imei + '<br><small style="font-family:inherit;color:var(--mut)">' + esc(x.model || "") + "</small></td><td>" + '<span class="pill ' + ST_C[x.status] + '">' + esc(r.statuses[x.status]) + "</span>" + (x.pRemark ? "<br><small>" + esc(x.pRemark) + "</small>" : "") + (x.hRemark ? "<br><small>vivo HO: " + esc(x.hRemark) + "</small>" : "") + "</td><td>" + when(x.hAt || x.pAt) + "</td></tr>"; }).join("") + "</table></div>" : "");
+      try { $("pn").value = localStorage.getItem("iub-pn") || ""; } catch (e) { }
+      [].forEach.call(VIEW.querySelectorAll("input[type=radio]"), function (i) { i.onchange = function () { (PCH[i.dataset.k] = PCH[i.dataset.k] || {}).status = i.value; }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (i) { i.oninput = function () { (PCH[i.dataset.rm] = PCH[i.dataset.rm] || {}).remark = i.value; }; });
+      $("pall").onclick = function () { pend.forEach(function (x) { (PCH[x.batch + ":" + x.imei] = PCH[x.batch + ":" + x.imei] || {}).status = "unblocked"; }); partnerRedraw(); };
+      $("pdl").onclick = function () { download(xlsx([{ name: "IMEIs", rows: [["Request", "IMEI", "Model", "State", "Retailer", "Customer / note", "Raised", "Status (Unblocked / Not unblocked)", "Remark"]].concat(pend.map(function (x) { return [x.batch, x.imei, x.model, x.state, x.rname || x.rid, [x.customer, x.note].filter(Boolean).join(" · "), when(x.at), "", ""]; })) }]), "vivo_IMEI_rollback_" + r.partner.replace(/\W+/g, "_") + ".xlsx"); };
+      $("pul").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { if (!i.files[0]) return; readSheet(i.files[0]).then(function (S) { if (!S) return toast("No IMEI column found"); var ci = S.hd.findIndex(function (c) { return /imei/.test(c); }), cs = S.hd.findIndex(function (c) { return /status|result/.test(c); }), cr = S.hd.findIndex(function (c) { return /remark|reason|comment/.test(c); }), n = 0; S.rows.forEach(function (row) { var im = String(row[ci] || "").replace(/\D/g, ""), st = String(row[cs] || "").toLowerCase(), x = pend.find(function (y) { return y.imei === im; }); if (!x || !st) return; var v = /not|fail|unsucc|reject|no\b/.test(st) ? "partner_failed" : /unblock|success|done|yes|rolled|closed/.test(st) ? "unblocked" : ""; if (!v) return; PCH[x.batch + ":" + x.imei] = { status: v, remark: cr >= 0 ? String(row[cr] || "") : "" }; n++; }); toast(n + " rows read — check and Save"); partnerRedraw(); }); }; i.click(); };
+      if ($("psave")) $("psave").onclick = function () { var ups = Object.keys(PCH).filter(function (k) { return PCH[k].status; }).map(function (k) { var p = k.split(":"); return { batch: p[0], imei: p[1], status: PCH[k].status, remark: PCH[k].remark || "" }; }); if (!ups.length) return toast("Choose Unblocked / Not unblocked for at least one IMEI"); var miss = ups.filter(function (u) { return u.status === "partner_failed" && !u.remark.trim(); }); if (miss.length) return toast("Add a remark for each “Not unblocked” IMEI"); try { localStorage.setItem("iub-pn", $("pn").value); } catch (e) { } this.disabled = true; papi({ action: "iub-p-update", updates: ups, name: $("pn").value }).then(function (x) { if (!x.ok) return toast(x.error); PCH = {}; toast("✅ " + x.updated + " IMEIs updated — vivo can see it now"); partner(); }); };
+    });
+  }
+  function partnerRedraw() { var y = window.scrollY; partner(); setTimeout(function () { window.scrollTo(0, y); }, 300); }
+
+  // ======================= STAFF =======================
+  function staff() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "iub-me" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ME = r; draw(); });
+  }
+  window.__pageBack = function () { if (TOK || TAB === "dash") return false; TAB = "dash"; draw(); return true; };
+  function draw() {
+    var tabs = [["dash", "📊 Dashboard"], ["new", "➕ Raise request"], ["list", "📋 Requests"]].concat(ME.isHO ? [["cfg", "⚙️ Partners"]] : []);
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    ({ dash: tDash, "new": tNew, list: tList, cfg: tCfg })[TAB]();
+  }
+  function load(cb) { api(Object.assign({ action: "iub-list" }, F)).then(function (r) { if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } LIST = r; cb(r); }); }
+  // ---------- dashboard ----------
+  function tDash() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "iub-list", status: "x-none" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var S = r.stats, by = S.by, overdue = S.partners.reduce(function (a, p) { return a + p.overdue; }, 0);
+      var tile = function (l, v, c, st) { return '<div class="kt ' + c + '" data-go="' + st + '"><div class="l">' + l + '</div><div class="v">' + (v || 0) + "</div></div>"; };
+      $("tp").innerHTML = '<div class="steps"><span>1 · State raises</span><span>2 · Partner e-mailed + link</span><span>3 · Partner updates</span><span>4 · HO handles not-unblocked</span><span>5 · Final e-mail</span></div>' +
+        '<div class="kp">' + tile("Total IMEIs", S.total, "", "") + tile("With partner", by.with_partner, "o", "with_partner") + tile("Overdue", overdue, "r", "with_partner") + tile("Unblocked by partner", by.unblocked, "g", "unblocked") + tile("Not unblocked — with HO", by.partner_failed, "r", "partner_failed") + tile("Closed by HO", (by.ho_unblocked || 0) + (by.ho_failed || 0), "", "ho_unblocked") + "</div>" +
+        '<div class="sh"><span>🤝 Partner-wise</span><button class="btn sec sm" id="aib">✨ AI insights</button></div><div id="aio"></div>' +
+        (S.partners.length ? '<div class="tbw"><table class="tb"><tr><th>Partner</th><th>Pending</th><th>Overdue</th><th>Unblocked</th><th>Not unbl.</th><th>Success</th><th>Avg reply</th>' + (ME.isHO ? "<th></th>" : "") + "</tr>" + S.partners.sort(function (a, b) { return b.pending - a.pending; }).map(function (p) { return "<tr><td><b>" + esc(p.partner) + "</b></td><td>" + p.pending + "</td><td>" + (p.overdue ? '<span class="pill r">' + p.overdue + "</span>" : "0") + "</td><td>" + (p.ok + p.hoOk) + "</td><td>" + p.failed + "</td><td>" + (p.okRate == null ? "—" : p.okRate + "%") + "</td><td>" + (p.avgTat == null ? "—" : p.avgTat + "h") + "</td>" + (ME.isHO ? '<td>' + (p.pending ? '<button class="btn ghost sm" data-rm="' + p.pid + '">📧 Remind</button>' : "") + "</td>" : "") + "</tr>"; }).join("") + "</table></div>" : '<div class="card empty"><div class="big">🔓</div>No requests yet. Use ➕ Raise request.</div>') +
+        (ME.isHO && S.states.length ? '<div class="sh"><span>🗺️ State-wise</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Total</th><th>Open</th><th>Closed</th></tr>' + S.states.map(function (z) { return "<tr><td>" + esc(z.state) + "</td><td>" + z.total + "</td><td>" + z.open + "</td><td>" + z.done + "</td></tr>"; }).join("") + "</table></div>" : "") +
+        (ME.isHO && by.partner_failed ? '<div class="card" style="margin-top:12px;background:#FFF6F5"><b>⚠️ ' + by.partner_failed + " IMEIs need HO action</b><div class=\"muted\" style=\"font-size:12.5px\">The partner couldn't unblock them. Try from vivo's side and set the final status — the partner SPOC and the state get an e-mail.</div><button class=\"btn pri sm\" id=\"gho\" style=\"margin-top:8px\">Open HO queue</button></div>" : "");
+      [].forEach.call($("tp").querySelectorAll("[data-go]"), function (d) { d.onclick = function () { F.status = d.dataset.go || ""; TAB = "list"; draw(); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { b.disabled = true; api({ action: "iub-remind", pid: b.dataset.rm }).then(function (x) { b.disabled = false; toast(x.ok ? "📧 Reminder sent for " + x.count + " IMEIs" : x.error); }); }; });
+      if ($("gho")) $("gho").onclick = function () { F.status = "partner_failed"; TAB = "list"; draw(); };
+      $("aib").onclick = function () { var b = this; b.disabled = true; b.textContent = "Thinking…"; api({ action: "iub-ai" }).then(function (x) { b.disabled = false; b.textContent = "✨ AI insights"; $("aio").innerHTML = '<div class="ai">' + esc(x.ok ? x.answer : x.error) + "</div>"; }); };
+    });
+  }
+  // ---------- raise ----------
+  var DRAFT = [];
+  function tNew() {
+    $("tp").innerHTML = '<div class="card"><div class="g2"><div><label class="lb">Finance partner</label><select class="tx" id="np"><option value="">— choose —</option><option value="@col">From the Excel “Partner” column</option>' + ME.partners.map(function (p) { return '<option value="' + p.id + '">' + esc(p.name) + (p.hasEmail ? "" : " (no e-mail set)") + "</option>"; }).join("") + "</select></div>" + (ME.isHO ? '<div><label class="lb">State</label><input class="tx" id="ns" placeholder="e.g. Bihar"></div>' : '<div><label class="lb">State</label><input class="tx" value="' + esc(ME.state) + '" readonly></div>') + '</div><label class="lb">Reason</label><select class="tx" id="nr">' + REASONS.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + '</select>' +
+      '<label class="lb">IMEIs — paste (any format), scan or upload Excel</label><textarea class="tx fx" id="nt" style="min-height:90px" placeholder="One per line, or paste a list / message — 15-digit IMEIs are picked out and checked"></textarea><div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sec sm" id="nadd">＋ Add pasted</button><button class="btn sec sm" id="nscan">📷 Scan (continuous)</button><button class="btn sec sm" id="nxl">📥 Excel</button><button class="btn ghost sm" id="ntpl">⬇ Template</button></div></div>' +
+      '<div id="nprev"></div>';
+    $("nadd").onclick = function () { libScan().then(function () { var L = BISCAN.extract($("nt").value), bad = BISCAN.bad($("nt").value); addImeis(L.map(function (i) { return { imei: i }; })); if (bad.length) toast(bad.length + " number(s) aren't valid IMEIs and were skipped"); $("nt").value = ""; }); };
+    $("nscan").onclick = function () { libScan().then(function () { BISCAN.open(function (i) { addImeis([{ imei: i }]); }, { multi: true }); }); };
+    $("ntpl").onclick = function () { download(xlsx([{ name: "IMEIs", rows: [["IMEI", "Partner", "Model", "Retailer ID", "Retailer name", "Customer name", "Note"], ["490154203237518", "Bajaj Finserv", "Y39", "BRE001", "Shree Mobiles", "Rahul Kumar", "Loan cancelled on 2 Nov"]] }]), "IMEI_unblock_template.xlsx"); };
+    $("nxl").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { if (!i.files[0]) return; readSheet(i.files[0]).then(function (S) { if (!S) return toast("No IMEI column found"); var c = function (re) { return S.hd.findIndex(function (h) { return re.test(h); }); }, C = { imei: c(/imei/), partner: c(/partner|financier|nbfc|bank/), model: c(/model/), rid: c(/retailer\s*id|code/), rname: c(/retailer\s*name|shop/), customer: c(/customer/), note: c(/note|remark|reason/) }; addImeis(S.rows.map(function (r) { var o = {}; Object.keys(C).forEach(function (k) { if (C[k] >= 0) o[k] = String(r[C[k]] || "").trim(); }); o.imei = String(o.imei || "").replace(/\D/g, ""); return o; }).filter(function (o) { return o.imei; })); if (C.partner >= 0) $("np").value = "@col"; }); }; i.click(); };
+    prev();
+  }
+  function addImeis(L) {
+    libScan().then(function () {
+      var have = {}; DRAFT.forEach(function (x) { have[x.imei] = 1; });
+      L.forEach(function (x) { if (have[x.imei]) return; have[x.imei] = 1; x.valid = BISCAN.valid(x.imei); DRAFT.push(x); });
+      var ask = DRAFT.filter(function (x) { return x.valid && !x.looked; }).map(function (x) { return x.imei; });
+      if (!ask.length) return prev();
+      api({ action: "iub-lookup", imeis: ask }).then(function (r) { DRAFT.forEach(function (x) { if (ask.indexOf(x.imei) < 0) return; x.looked = 1; var f = r.found && r.found[x.imei]; if (f) { x.model = x.model || f.model; x.rid = x.rid || f.rid; x.rname = x.rname || f.rname; x.fin = f.financier; if (!x.partner && f.financier) x.partner = f.financier; } if (r.open && r.open[x.imei]) x.open = r.open[x.imei]; }); prev(); });
+    });
+  }
+  function partnerId(name) { name = String(name || "").toLowerCase().replace(/[^a-z]/g, ""); if (!name) return ""; var p = ME.partners.find(function (p) { var n = p.name.toLowerCase().replace(/[^a-z]/g, ""); return n === name || n.indexOf(name) === 0 || name.indexOf(n.split(/(finserv|financial|credit|bank)/)[0]) === 0; }); return p ? p.id : ""; }
+  function prev() {
+    var box = $("nprev"); if (!box) return;
+    if (!DRAFT.length) { box.innerHTML = '<div class="help">💡 Model, retailer and financier fill in automatically when the IMEI is in the Retailer portal’s IMEI upload. Invalid numbers (failed IMEI check digit) and IMEIs already open in another request are flagged.</div>'; return; }
+    var good = DRAFT.filter(function (x) { return x.valid && !x.open; });
+    box.innerHTML = '<div class="sh"><span>' + DRAFT.length + " IMEIs · " + good.length + ' ready</span><button class="btn ghost sm" id="nclr">Clear</button></div><div class="tbw"><table class="tb"><tr><th>IMEI</th><th>Model / retailer</th><th>Partner (Excel)</th><th>Check</th><th></th></tr>' + DRAFT.map(function (x, i) { return '<tr><td class="fx">' + x.imei + "</td><td>" + esc([x.model, x.rname || x.rid].filter(Boolean).join(" · ")) + (x.customer ? "<br><small>" + esc(x.customer) + "</small>" : "") + "</td><td>" + esc(x.partner || "") + "</td><td>" + (!x.valid ? '<span class="pill r">invalid</span>' : x.open ? '<span class="pill o">open in ' + esc(x.open) + "</span>" : '<span class="pill g">ok</span>') + '</td><td><button class="ib" data-x="' + i + '">✕</button></td></tr>'; }).join("") + "</table></div>" +
+      '<button class="btn pri block" id="nsend" style="margin-top:10px"' + (good.length ? "" : " disabled") + ">📨 Send to partner" + (good.length ? " · " + good.length + " IMEIs" : "") + '</button><div id="nres"></div>';
+    [].forEach.call(box.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { DRAFT.splice(+b.dataset.x, 1); prev(); }; });
+    $("nclr").onclick = function () { DRAFT = []; prev(); };
+    $("nsend").onclick = function () {
+      var pid = $("np").value, groups = {}, miss = [];
+      if (!pid) return toast("Choose the finance partner");
+      good.forEach(function (x) { var p = pid === "@col" ? partnerId(x.partner) : pid; if (!p) { miss.push(x.imei); return; } (groups[p] = groups[p] || []).push(x); });
+      if (miss.length) return toast(miss.length + " IMEIs have no matching partner in the Partner column — pick one partner or fix the column");
+      if (ME.isHO && !$("ns").value.trim()) return toast("Enter the state");
+      var btn = this; btn.disabled = true; var out = [], ids = Object.keys(groups);
+      var next = function () { var p = ids.shift(); if (!p) { DRAFT = []; prev(); $("nprev").insertAdjacentHTML("beforeend", '<div class="card" style="background:#E6F4EA;margin-top:10px">' + out.join("<br>") + "</div>"); return; }
+        api({ action: "iub-raise", pid: p, state: ME.isHO ? $("ns").value : "", reason: $("nr").value, items: groups[p].map(function (x) { return { imei: x.imei, model: x.model, rid: x.rid, rname: x.rname, customer: x.customer, note: x.note }; }) }).then(function (r) {
+          var pn = (ME.partners.find(function (z) { return z.id === p; }) || {}).name;
+          out.push(r.ok ? "✅ <b>" + esc(pn) + "</b>: request " + esc(r.batch.id) + " · " + r.batch.items.length + " IMEIs · " + (r.mail.ok ? "📧 e-mailed to the partner with their update link" : "⚠️ not e-mailed (" + esc(r.mail.error) + ") — HO can resend") + (r.skipped.length ? " · " + r.skipped.length + " skipped" : "") : "❌ " + esc(pn) + ": " + esc(r.error)); next(); });
+      }; next();
+    };
+  }
+  // ---------- list ----------
+  function tList() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    load(function (r) {
+      var rows = r.rows, canHO = ME.isHO;
+      $("tp").innerHTML = '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px"><select class="tx" id="fs" style="flex:1;min-width:140px"><option value="">All statuses</option><option value="open"' + (F.status === "open" ? " selected" : "") + ">Open (not final)</option>" + Object.keys(r.statuses).map(function (k) { return '<option value="' + k + '"' + (F.status === k ? " selected" : "") + ">" + esc(r.statuses[k]) + "</option>"; }).join("") + '</select><select class="tx" id="fp" style="flex:1;min-width:120px"><option value="">All partners</option>' + ME.partners.map(function (p) { return '<option value="' + p.id + '"' + (F.pid === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select>" + (canHO && r.states.length > 1 ? '<select class="tx" id="fst" style="flex:1;min-width:110px"><option value="">All states</option>' + r.states.map(function (s) { return "<option" + (F.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") + '</div><div class="row" style="gap:6px;margin-top:6px"><input class="tx" id="fq" placeholder="🔍 IMEI, model, retailer, request" value="' + esc(F.q) + '" style="flex:1"><button class="btn sec" id="fsc">📷</button><button class="btn sec" id="fx">⬇</button></div>' +
+        '<div class="muted" style="font-size:12px;margin:8px 2px">' + r.count + " IMEIs" + (r.count > rows.length ? " · showing " + rows.length : "") + "</div>" +
+        (canHO ? '<div id="hob" class="card" style="display:none;background:#F4F2FF"><b id="hon"></b><input class="tx" id="hor" placeholder="HO remark (what was done)" style="margin-top:6px"><div class="row" style="gap:6px;margin-top:6px"><button class="btn ok sm" data-ho="ho_unblocked" style="flex:1">✅ Unblocked by HO</button><button class="btn sec sm" data-ho="ho_failed" style="flex:1;color:var(--bad)">❌ Failed (final)</button></div><div class="muted" style="font-size:11.5px;margin-top:4px">The partner SPOC and the state user get the final-status e-mail.</div></div>' : "") +
+        (rows.length ? '<div class="tbw"><table class="tb"><tr>' + (canHO ? '<th><input type="checkbox" id="sall"></th>' : "") + "<th>IMEI</th><th>Partner · state</th><th>Status</th><th>Age</th></tr>" + rows.map(function (x, i) { var age = (x.pAt || x.hAt || r.now) - x.at; return "<tr>" + (canHO ? '<td>' + (x.status === "with_partner" || x.status === "partner_failed" || x.status === "ho_failed" ? '<input type="checkbox" data-s="' + i + '"' + (SEL[x.batch + ":" + x.imei] ? " checked" : "") + ">" : "") + "</td>" : "") + '<td data-o="' + i + '" style="cursor:pointer"><b class="fx">' + x.imei + "</b><br><small>" + esc([x.model, x.rname || x.rid].filter(Boolean).join(" · ")) + "</small></td><td>" + esc(x.partner) + "<br><small>" + esc(x.state) + " · " + esc(x.batch) + '</small></td><td><span class="pill ' + ST_C[x.status] + '">' + esc(r.statuses[x.status]) + "</span>" + (x.pRemark ? "<br><small>" + esc(x.pRemark) + "</small>" : "") + "</td><td>" + hrs(age) + "</td></tr>"; }).join("") + "</table></div>" : '<div class="card empty">No IMEIs match.</div>');
+      var re = function () { F.status = $("fs").value; F.pid = $("fp").value; F.state = $("fst") ? $("fst").value : ""; tList(); };
+      $("fs").onchange = re; $("fp").onchange = re; if ($("fst")) $("fst").onchange = re;
+      var t0; $("fq").oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { F.q = v; tList(); }, 400); };
+      $("fsc").onclick = function () { libScan().then(function () { BISCAN.open(function (i) { F.q = i; F.status = ""; tList(); }); }); };
+      $("fx").onclick = function () { download(xlsx([{ name: "IMEI unblock", rows: [["Request", "IMEI", "Model", "Retailer ID", "Retailer", "Customer", "Partner", "State", "Raised by", "Raised", "Status", "Partner remark", "Partner updated", "HO remark", "HO updated"]].concat(rows.map(function (x) { return [x.batch, x.imei, x.model, x.rid, x.rname, x.customer, x.partner, x.state, x.by, when(x.at), r.statuses[x.status], x.pRemark || "", when(x.pAt), x.hRemark || "", when(x.hAt)]; })) }]), "IMEI_unblock.xlsx"); };
+      [].forEach.call($("tp").querySelectorAll("[data-o]"), function (d) { d.onclick = function () { detail(rows[+d.dataset.o]); }; });
+      var selN = function () { var n = Object.keys(SEL).length; if ($("hob")) { $("hob").style.display = n ? "" : "none"; $("hon").textContent = n + " IMEI" + (n === 1 ? "" : "s") + " selected — set the HO result"; } };
+      [].forEach.call($("tp").querySelectorAll("[data-s]"), function (c) { c.onchange = function () { var x = rows[+c.dataset.s], k = x.batch + ":" + x.imei; if (c.checked) SEL[k] = 1; else delete SEL[k]; selN(); }; });
+      if ($("sall")) $("sall").onchange = function () { var on = this.checked; [].forEach.call($("tp").querySelectorAll("[data-s]"), function (c) { c.checked = on; c.onchange(); }); };
+      [].forEach.call($("tp").querySelectorAll("[data-ho]"), function (b) { b.onclick = function () { var ups = Object.keys(SEL).map(function (k) { var p = k.split(":"); return { batch: p[0], imei: p[1], status: b.dataset.ho, remark: $("hor").value }; }); if (b.dataset.ho === "ho_failed" && !$("hor").value.trim()) return toast("Add a remark for failed cases"); b.disabled = true; api({ action: "iub-ho-update", updates: ups }).then(function (x) { if (!x.ok) { b.disabled = false; return toast(x.error); } SEL = {}; toast("✅ " + x.updated + " updated · " + x.mailed + " partner e-mail(s) sent"); tList(); }); }; });
+      selN();
+    });
+  }
+  function detail(x) {
+    api({ action: "iub-batch", id: x.batch }).then(function (r) {
+      var b = r.batch || {}, it = (b.items || []).find(function (y) { return y.imei === x.imei; }) || x, S = LIST.statuses;
+      var tl = [["📨 Raised by " + b.by + " (" + b.state + ")" + (b.reason ? " — " + b.reason : ""), b.at]].concat((b.mails || []).filter(function (m) { return m.kind === "new" || m.kind === "resend"; }).map(function (m) { return [(m.ok ? "📧 E-mailed to " : "⚠️ E-mail failed to ") + (m.to || "partner") + (m.error ? " (" + m.error + ")" : ""), m.at]; })).concat(it.pAt ? [[(it.status === "unblocked" ? "✅ " : "❌ ") + b.partner + (it.pBy ? " (" + it.pBy + ")" : "") + ": " + (it.status === "unblocked" ? "unblocked" : "not unblocked") + (it.pRemark ? " — " + it.pRemark : ""), it.pAt]] : []).concat(it.hAt ? [["🏢 vivo HO (" + it.hBy + "): " + S[it.status] + (it.hRemark ? " — " + it.hRemark : ""), it.hAt]] : []);
+      var acts = [];
+      if (it.status === "with_partner" && ME.isHO) acts.push(["📧", "Resend e-mail to " + b.partner, function () { api({ action: "iub-resend", id: b.id }).then(function (z) { toast(z.ok ? "Sent" : z.error); }); }]);
+      if (r.link) acts.push(["🔗", "Copy partner link", function () { try { navigator.clipboard.writeText(r.link); toast("Copied — share only with " + b.partner); } catch (e) { } }]);
+      if (it.status === "with_partner") acts.push(["↩", "Withdraw this IMEI", function () { api({ action: "iub-cancel", id: b.id, imeis: [it.imei] }).then(function (z) { toast(z.ok ? "Withdrawn" : z.error); tList(); }); }, "danger"]);
+      sheet(it.imei, (it.model || "") + (it.rname ? " · " + it.rname : "") + " · " + S[it.status], acts, '<div style="margin-top:8px">' + tl.map(function (e) { return '<div style="display:flex;gap:8px;font-size:12.5px;margin-top:7px"><span style="color:var(--mut);width:92px;flex:none">' + when(e[1]) + "</span><span>" + esc(e[0]) + "</span></div>"; }).join("") + "</div>" + (it.customer || it.note ? '<div class="help">' + esc([it.customer, it.note].filter(Boolean).join(" · ")) + "</div>" : ""));
+    });
+  }
+  // ---------- partners (HO) ----------
+  function tCfg() {
+    api({ action: "iub-cfg" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var C = r.cfg;
+      var paint = function () {
+        $("tp").innerHTML = '<div class="help"><b>How partners update:</b> each partner gets an automatic e-mail for every request — the IMEI list, an Excel/CSV attachment and a secure link. The link opens a page with only that partner’s IMEIs, with no vivo portal login; they mark Unblocked / Not unblocked (or upload the Excel back) and it shows here instantly. Keep the link private; ⟳ makes a new one if it leaks.</div>' +
+          C.partners.map(function (p, i) { return '<div class="card"><div class="row" style="gap:6px"><input class="tx" data-i="' + i + '" data-k="name" value="' + esc(p.name) + '" style="flex:1;font-weight:700"><label class="tg" style="font-size:12px"><input type="checkbox" data-i="' + i + '" data-k="active"' + (p.active !== false ? " checked" : "") + '><i></i><span>Active</span></label></div><div class="g2"><div><label class="lb">SPOC e-mail(s)</label><input class="tx" data-i="' + i + '" data-k="emails" value="' + esc(p.emails.join(", ")) + '" placeholder="spoc@partner.com"></div><div><label class="lb">CC</label><input class="tx" data-i="' + i + '" data-k="cc" value="' + esc(p.cc.join(", ")) + '"></div></div><div class="g2"><div><label class="lb">Target turnaround (hours)</label><input class="tx" type="number" data-i="' + i + '" data-k="tatHours" value="' + esc(p.tatHours) + '"></div><div><label class="lb">Partner link</label><div class="row" style="gap:4px">' + (p.link ? '<button class="btn sec sm" data-cp="' + i + '" style="flex:1">📋 Copy</button><button class="btn ghost sm" data-rt="' + i + '" title="New link">⟳</button>' : '<span class="muted" style="font-size:12px">Save first</span>') + "</div></div></div></div>"; }).join("") +
+          '<button class="btn sec block" id="cadd">＋ Add partner</button><div class="card"><label class="lb">HO e-mails (CC on final-status mails)</label><input class="tx" id="cho" value="' + esc((C.hoEmails || []).join(", ")) + '"><label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="cam"' + (C.autoMail !== false ? " checked" : "") + '><i></i><span>Send e-mails automatically</span></label></div><button class="btn pri block" id="csave">💾 Save partners</button>';
+        [].forEach.call($("tp").querySelectorAll("[data-i]"), function (e) { e.oninput = e.onchange = function () { var p = C.partners[+e.dataset.i], k = e.dataset.k; p[k] = e.type === "checkbox" ? e.checked : k === "emails" || k === "cc" ? e.value.split(/[\s,;]+/).filter(Boolean) : e.value; }; });
+        [].forEach.call($("tp").querySelectorAll("[data-cp]"), function (b) { b.onclick = function () { try { navigator.clipboard.writeText(C.partners[+b.dataset.cp].link); toast("Link copied"); } catch (e) { } }; });
+        [].forEach.call($("tp").querySelectorAll("[data-rt]"), function (b) { b.onclick = function () { var p = C.partners[+b.dataset.rt]; sheet("New link for " + p.name + "?", "The old link stops working at once. Pending IMEIs stay; resend or remind so the partner gets the new link.", [["⟳", "Make a new link", function () { api({ action: "iub-token", pid: p.id }).then(function (x) { if (!x.ok) return toast(x.error); p.link = x.link; toast("New link ready — copied"); try { navigator.clipboard.writeText(x.link); } catch (e) { } }); }, "pri"]]); }; });
+        $("cadd").onclick = function () { C.partners.push({ id: "", name: "", emails: [], cc: [], tatHours: 48, active: true }); paint(); };
+        $("csave").onclick = function () { C.hoEmails = $("cho").value.split(/[\s,;]+/).filter(Boolean); C.autoMail = $("cam").checked; api({ action: "iub-cfg", save: true, cfg: C }).then(function (x) { if (!x.ok) return toast(x.error); C = x.cfg; toast("Saved"); api({ action: "iub-me" }).then(function (m) { if (m.ok) ME = m; }); paint(); }); };
+      };
+      paint();
+    });
+  }
+  if (TOK) partner(); else staff();
+})();
+</script>
+</body>
+</html>
