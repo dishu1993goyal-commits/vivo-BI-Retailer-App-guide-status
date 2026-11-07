@@ -236,19 +236,20 @@ export function cleanAI(t) {
 
 // Groq (free plan, no card, ~1,000 requests/day per model) is tried first; Gemini is the backup.
 export const GROQ_CHAT_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"];
-async function askGroq(key, system, contents, fetchImpl) {
+async function askGroq(key, system, contents, fetchImpl, opts = {}) {
   const messages = [{ role: "system", content: system }].concat(contents.map((c) => ({ role: c.role === "model" ? "assistant" : "user", content: c.parts[0].text })));
   let last = "";
   for (const m of GROQ_CHAT_MODELS) {
-    const body = { model: m, messages, temperature: 0.6, max_completion_tokens: 1800 };
+    const body = { model: m, messages, temperature: opts.json ? 0.3 : 0.6, max_completion_tokens: opts.maxTokens || 1800 };
+    if (opts.json) body.response_format = { type: "json_object" };
     if (/gpt-oss|qwen3/.test(m)) body.reasoning_effort = /qwen/.test(m) ? "none" : "low";
     try {
       let r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) });
-      if (r.status === 400 && body.reasoning_effort) { delete body.reasoning_effort; r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) }); }
+      if (r.status === 400 && (body.reasoning_effort || body.response_format)) { delete body.reasoning_effort; delete body.response_format; r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify(body) }); }
       const j = await r.json().catch(() => ({}));
       if (r.ok) {
         let text = String((((j.choices || [])[0] || {}).message || {}).content || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-        if (text) text = cleanAI(text);
+        if (text && !opts.raw) text = cleanAI(text);
         if (text) return { ok: true, text, model: "groq/" + m };
         last = "empty answer"; continue;
       }
@@ -269,13 +270,13 @@ export async function askAI(env, question, context, history, fetchImpl = fetch, 
   contents.push({ role: "user", parts: [{ text: (opts.label || "DASHBOARD DATA") + ":\n" + String(context || "").slice(0, 14000) + "\n\nQUESTION: " + String(question).slice(0, 800) }] });
   let groqErr = "";
   if (env.GROQ_API_KEY) {
-    const g = await askGroq(env.GROQ_API_KEY, opts.system || AI_SYSTEM, contents, fetchImpl);
+    const g = await askGroq(env.GROQ_API_KEY, opts.system || AI_SYSTEM, contents, fetchImpl, opts);
     if (g.ok) return g;
     groqErr = "Groq " + g.error;
     if (!env.GEMINI_API_KEY) return { ok: false, error: "AI is busy right now (" + groqErr + "). Showing built-in answers." };
   }
   const body = JSON.stringify({ systemInstruction: { parts: [{ text: opts.system || AI_SYSTEM }] }, contents,
-    generationConfig: { temperature: 0.6, maxOutputTokens: 900 } });
+    generationConfig: Object.assign({ temperature: opts.json ? 0.3 : 0.6, maxOutputTokens: opts.maxTokens || 900 }, opts.json ? { responseMimeType: "application/json" } : {}) });
   const models = env.GEMINI_MODEL ? [env.GEMINI_MODEL, ...AI_MODELS] : AI_MODELS;
   let last = "";
   for (const m of models) {
@@ -284,7 +285,7 @@ export async function askAI(env, question, context, history, fetchImpl = fetch, 
     const j = await r.json().catch(() => ({}));
     if (r.ok) {
       let text = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("").trim();
-      if (text) text = cleanAI(text);
+      if (text && !opts.raw) text = cleanAI(text);
       if (text) return { ok: true, text, model: m };
       last = "empty answer"; continue;
     }
@@ -1016,7 +1017,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^store-/.test(b.action)) return storesAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^(phub|advis)-/.test(b.action)) return productsAction(b, surveyCtx());
     if (/^scha-/.test(b.action)) return schemeaiAction(b, surveyCtx());
-    if (/^rp-/.test(b.action)) return rpayAction(b, surveyCtx());
+    if (/^rp-/.test(b.action)) return rpayAction(b, Object.assign(surveyCtx(), { waFetch: mailFetch }));
     if (/^pln-/.test(b.action)) return plannerAction(b, surveyCtx());
     if (/^spol-/.test(b.action)) return spolAction(b, surveyCtx());
     if (/^rtp-/.test(b.action)) return rtpAction(b, surveyCtx());

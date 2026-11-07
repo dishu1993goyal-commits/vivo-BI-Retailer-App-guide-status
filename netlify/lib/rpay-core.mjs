@@ -161,8 +161,52 @@ export async function rpayAction(b, ctx) {
     visRows(x).forEach((r) => { const o = byR[r.rid] || (byR[r.rid] = { rid: r.rid, name: r.name, mobile: r.mobile, state: r.state, net: 0, items: 0, schemes: [] }); o.net += r.net; o.items += (r.items || []).length; if (!o.schemes.includes(r.scheme)) o.schemes.push(r.scheme); });
     const active = {}; for (const k of await store.list("rtplink:")) { const L = await store.get(k); if (L && byR[L.rid] && !L.revoked && L.exp > t + 5 * 864e5) active[L.rid] = k.slice(8); }
     const { randomBytes } = await import("node:crypto");
-    const out = await pool(Object.values(byR), 20, async (o) => { let k = active[o.rid]; if (!k) { k = randomBytes(16).toString("hex"); await store.set(`rtplink:${k}`, { rid: o.rid, at: t, by, exp: t + days * 864e5, via: "payout-batch" }); } return Object.assign(o, { net: Math.round(o.net * 100) / 100, k }); });
+    const out = await pool(Object.values(byR), 20, async (o) => { let k = active[o.rid]; if (!k) { k = randomBytes(16).toString("hex"); await store.set(`rtplink:${k}`, { rid: o.rid, at: t, by, exp: t + days * 864e5, via: "payout-batch" }); } return Object.assign(o, { net: Math.round(o.net * 100) / 100, k, wa: (x.wa || {})[o.rid] || null }); });
     return json(200, { ok: true, items: out, month: x.month, title: x.title });
+  }
+  // ---------- WhatsApp Business (Cloud API): send every retailer their payout link in one click ----------
+  if (b.action === "rp-wa-get") {
+    if (!isAdmin) return json(403, { ok: false, error: "HO only." });
+    const c = (await store.get("config:wa")) || {};
+    return json(200, { ok: true, configured: !!(c.token && c.phoneId && c.template), phoneId: c.phoneId || "", template: c.template || "", lang: c.lang || "en", vars: c.vars || "name,amount,month,link", hasToken: !!c.token, updatedBy: c.by || "", updatedAt: c.at || 0 });
+  }
+  if (b.action === "rp-wa-save") {
+    if (!isAdmin) return json(403, { ok: false, error: "HO only." });
+    const c = (await store.get("config:wa")) || {};
+    if (b.waToken) c.token = str(b.waToken, 600).replace(/\s+/g, "");   // write-only: never sent back to the app
+    if (b.clearToken) delete c.token;
+    c.phoneId = str(b.phoneId, 40).replace(/\D/g, ""); c.template = str(b.template, 80).replace(/[^a-z0-9_]/gi, "").toLowerCase(); c.lang = str(b.lang, 10) || "en";
+    c.vars = (str(b.vars, 120) || "name,amount,month,link").split(",").map((v) => v.trim()).filter((v) => ["name", "amount", "month", "link", "schemes", "rid"].includes(v)).join(",") || "name,amount,month,link";
+    c.by = by; c.at = t; await store.set("config:wa", c); return json(200, { ok: true });
+  }
+  if (b.action === "rp-wa-send") {   // { id: batch, only:[rid], mobiles:{rid: mobile}, days, test:"mobile" }
+    if (!isAdmin) return json(403, { ok: false, error: "Only HO admins can send WhatsApp messages in bulk." });
+    const c = (await store.get("config:wa")) || {};
+    if (!(c.token && c.phoneId && c.template)) return json(400, { ok: false, error: "WhatsApp Business isn't set up yet — ⚙️ WhatsApp settings." });
+    const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });
+    if (x.status !== "published") return json(400, { ok: false, error: "Publish the batch first." });
+    const days = Math.max(7, Math.min(90, Number(b.days) || 30)), only = new Set((b.only || []).map((r) => String(r).toUpperCase())), mob = b.mobiles || {}, byR = {};
+    visRows(x).forEach((r) => { if (only.size && !only.has(r.rid)) return; const o = byR[r.rid] || (byR[r.rid] = { rid: r.rid, name: r.name, mobile: r.mobile, net: 0, schemes: [] }); o.net += r.net; if (!o.schemes.includes(r.scheme)) o.schemes.push(r.scheme); });
+    const active = {}; for (const k of await store.list("rtplink:")) { const L = await store.get(k); if (L && byR[L.rid] && !L.revoked && L.exp > t + 5 * 864e5) active[L.rid] = k.slice(8); }
+    const { randomBytes } = await import("node:crypto");
+    const ML = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], monthTxt = x.month ? ML[+x.month.slice(5) - 1] + " " + x.month.slice(0, 4) : "";
+    const site = (ctx.env && ctx.env.SITE_URL) || "";
+    const send = async (o) => {
+      let k = active[o.rid]; if (!k) { k = randomBytes(16).toString("hex"); await store.set(`rtplink:${k}`, { rid: o.rid, at: t, by, exp: t + days * 864e5, via: "payout-wa" }); }
+      const ph = String(b.test || mob[o.rid] || o.mobile || "").replace(/\D/g, ""), to = ph.length === 10 ? "91" + ph : ph.length === 12 && ph.startsWith("91") ? ph : "";
+      if (!to) return { rid: o.rid, name: o.name, ok: false, error: "No valid mobile number" };
+      const val = { name: o.name || "Partner", amount: Math.round(o.net).toLocaleString("en-IN"), month: monthTxt, link: site + "/retailerportal.html?k=" + k, schemes: o.schemes.join(", ").slice(0, 200), rid: o.rid };
+      const params = c.vars.split(",").map((v) => ({ type: "text", text: String(val[v] || "-").slice(0, 900) }));
+      try {
+        const r = await (ctx.waFetch || fetch)(`https://graph.facebook.com/v21.0/${c.phoneId}/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + c.token }, body: JSON.stringify({ messaging_product: "whatsapp", to, type: "template", template: { name: c.template, language: { code: c.lang }, components: [{ type: "body", parameters: params }] } }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j.messages && j.messages[0]) return { rid: o.rid, name: o.name, ok: true, id: j.messages[0].id, to };
+        return { rid: o.rid, name: o.name, ok: false, error: (j.error && (j.error.error_user_msg || j.error.message) || "HTTP " + r.status).slice(0, 160), to };
+      } catch (e) { return { rid: o.rid, name: o.name, ok: false, error: String(e.message || e).slice(0, 120) }; }
+    };
+    const list = Object.values(byR).slice(0, b.test ? 1 : 200), res = await pool(list, 8, send);
+    if (!b.test) { x.wa = x.wa || {}; res.forEach((r) => { x.wa[r.rid] = { at: t, ok: r.ok, id: r.id || "", error: r.error || "", by }; }); await store.set(`rpb:${x.id}`, x); }
+    return json(200, { ok: true, sent: res.filter((r) => r.ok).length, failed: res.filter((r) => !r.ok).length, results: res, more: Object.keys(byR).length > list.length });
   }
   if (b.action === "rp-verify") {   // the exact rules + the retailer's numbers, so the page can re-run the payout engine
     const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });

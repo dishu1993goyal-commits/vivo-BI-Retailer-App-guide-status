@@ -14,35 +14,46 @@ export async function manAction(b, ctx) {
   if (b.action === "man-list") { const L = await store.list("man:"); return json(200, { ok: true, keys: L.slice(0, 500) }); }
   if (b.action === "man-gen") {
     if (!id) return json(400, { ok: false, error: "Pick a tool." });
-    const old = await store.get(key); if (old && !b.fresh) return json(200, { ok: true, item: old, cached: true });
-    const info = b.info || {}, screens = (Array.isArray(b.screens) ? b.screens : []).slice(0, 10).map((s) => str(s, 60));
+    const old = await store.get(key); if (old && !b.fresh && old.v === 2) return json(200, { ok: true, item: old, cached: true });
+    const info = b.info || {}, screens = (Array.isArray(b.screens) ? b.screens : []).slice(0, 10).map((x) => typeof x === "string" ? { name: str(x, 60), labels: [] } : { name: str(x.name, 60), labels: (x.labels || []).slice(0, 16).map((l) => str(l, 50)) });
     const L = LANGS[lang], keepUi = lang !== "en";
-    const sys = `You write software user manuals for vivo India's internal BI web portal and its two Android apps (Admin app for HO, State app for state BI teams) — they share one server, so data and settings stay in sync. The readers include vivo's IT developers in China and Indian field staff, so be concrete, visual and step by step; short sentences; no marketing language.
-Write ALL text in ${L}.${keepUi ? " Keep on-screen button / tab / field names exactly as they appear in English, in quotes, followed by the translation in brackets the first time, e.g. “Publish” (发布)." : ""}
-Reply with ONE JSON object only:
-{"title":"","tagline":"one line","overview":"3-4 sentences: what problem it solves, who uses it, where it lives (web + both apps)",
-"roles":[{"role":"HO admin|State user|Master admin|Retailer (link)|Partner (link)","can":["what this role can do"]}],
-"prerequisites":["data / settings needed first"],
-"navigation":[{"from":"screen or tab","action":"tap / choose …","to":"screen or tab"}],
-"screens":[{"name":"one of SCREENS (tab names) or a key screen","purpose":"","elements":[{"label":"on-screen label","what":"what it does"}],"tips":[""]}],
-"adminFlow":[{"step":"","detail":""}],"userFlow":[{"step":"","detail":""}],
-"settings":[{"name":"","where":"","effect":""}],
-"dataFlow":["how data moves: uploads → server → other tools / apps; which other tools it links to"],
-"rules":["important business rules, limits, permissions, validations"],
-"faqs":[{"q":"","a":""}],"troubleshooting":[{"problem":"","fix":""}],
-"glossary":[{"term":"","meaning":""}],
-"onePager":{"headline":"","benefits":["3 short"],"steps":["4-5 very short"],"cta":""},
-"videoScript":[{"screen":"screen name","caption":"one short line for a walkthrough video"}]}
-Audience: ${aud === "admin" ? "admins / developers only" : aud === "user" ? "end users only" : "both admins and end users (label which is which)"}. Use only the INFO and SCREENS given plus general good practice; do not invent features. 5-12 items per list where the INFO supports it.`;
-    const q = "Write the manual.";
-    const context = "INFO: " + JSON.stringify({ name: str(info.name, 120), who: str(info.who, 300), what: str(info.what, 2000), steps: (info.steps || []).slice(0, 15).map((x) => str(x, 400)), example: str(info.example, 800), tips: (info.tips || []).slice(0, 8).map((x) => str(x, 300)), target: str(info.target, 80), group: str(info.group, 80) }) + "\nSCREENS: " + JSON.stringify(screens);
-    const r = await ctx.askAI(env, q, context, [], ctx.aiFetch, { system: sys, label: "MANUAL" });
-    if (!r.ok) return json(200, { ok: false, error: r.error });
-    let d = null; try { const m = /\{[\s\S]*\}/.exec(r.text || ""); d = m ? JSON.parse(m[0]) : null; } catch (e) { d = null; }
-    if (!d || !d.title) d = { title: str(info.name, 120), tagline: "", overview: str(r.text, 3000), roles: [], prerequisites: [], navigation: [], screens: screens.map((s) => ({ name: s, purpose: "", elements: [], tips: [] })), adminFlow: [], userFlow: (info.steps || []).map((x) => ({ step: str(x, 200), detail: "" })), settings: [], dataFlow: [], rules: [], faqs: [], troubleshooting: [], glossary: [], onePager: { headline: str(info.name, 80), benefits: [], steps: (info.steps || []).slice(0, 5), cta: "" }, videoScript: [] };
-    const item = { tool: id, lang, aud, data: d, at: t, by };
+    const base = `You write software user manuals for vivo India's internal BI web portal and its two Android apps (Admin app for HO, State app for state BI teams) — one shared server, so data and settings stay in sync. Readers: vivo's IT developers in China and Indian field staff — be concrete and step by step, short sentences, no marketing words.
+Write ALL text values in ${L}.${keepUi ? " Keep on-screen button / tab / field names exactly in English inside quotes, followed by the translation in brackets, e.g. “Publish” (发布)." : ""}
+Audience: ${aud === "admin" ? "admins / developers" : aud === "user" ? "end users" : "both admins and end users (say which is which)"}. Use only INFO and SCREENS plus general good practice; never invent features. Reply with ONE valid JSON object and nothing else.`;
+    const ctxt = "INFO: " + JSON.stringify({ name: str(info.name, 120), who: str(info.who, 300), what: str(info.what, 2000), steps: (info.steps || []).slice(0, 15).map((x) => str(x, 400)), example: str(info.example, 800), tips: (info.tips || []).slice(0, 8).map((x) => str(x, 300)), target: str(info.target, 80), group: str(info.group, 80) }) + "\nSCREENS (tab name + the labels visible on it): " + JSON.stringify(screens);
+    const A = base + `
+JSON shape: {"title":"","tagline":"one line","overview":"3-4 sentences","roles":[{"role":"","can":["4-6 items"]}],"prerequisites":["…"],
+"navigation":[{"from":"screen","action":"tap … (the exact button / tab)","to":"screen"}],
+"adminFlow":[{"step":"short title","detail":"one sentence: what to tap / enter and what happens"}],"userFlow":[{"step":"","detail":""}],
+"settings":[{"name":"","where":"tab / button","effect":""}],"dataFlow":["4-6 lines"],"rules":["5-8 lines"],
+"onePager":{"headline":"","benefits":["3 short"],"steps":["4-5 very short"],"cta":""},"glossary":[{"term":"","meaning":""}]}
+5-8 steps in each flow; navigation must cover every screen in SCREENS.`;
+    const B = base + `
+JSON shape: {"screens":[{"name":"exact name from SCREENS","purpose":"1-2 sentences","elements":[{"label":"EXACT label from that screen's labels list","what":"what it does / when to use it","click":true or false}],"tips":["1-2"]}],
+"faqs":[{"q":"","a":""}],"troubleshooting":[{"problem":"","fix":""}],"videoScript":[{"screen":"screen name","caption":"one short line"}]}
+One entry per screen in SCREENS (same order), 5-8 elements each picked from its labels (most important first; click = it is tapped in the normal flow). 5-6 FAQs, 3-4 troubleshooting items, one video caption per screen.`;
+    const call = (sys) => ctx.askAI(env, "Write this part of the manual.", ctxt, [], ctx.aiFetch, { system: sys, label: "MANUAL", maxTokens: 6000, json: true, raw: true });
+    const [ra, rb] = await Promise.all([call(A), call(B)]);
+    const da = ra.ok ? parseLoose(ra.text) : null, db = rb.ok ? parseLoose(rb.text) : null;
+    if (!da && !db) return json(200, { ok: false, error: (ra.error || rb.error || "AI reply couldn't be read") + " — try again." });
+    const steps = (info.steps || []).map((x) => ({ step: str(x, 120), detail: "" }));
+    const d = Object.assign({ title: str(info.name, 120), tagline: str(info.who, 160), overview: str(info.what, 1200), roles: [], prerequisites: [], navigation: [], adminFlow: steps, userFlow: [], settings: [], dataFlow: [], rules: [], onePager: { headline: str(info.name, 80), benefits: [], steps: (info.steps || []).slice(0, 5).map((x) => str(x, 80)), cta: "" }, glossary: [] }, da || {},
+      { screens: (db && Array.isArray(db.screens) && db.screens.length ? db.screens : screens.map((x) => ({ name: x.name, purpose: "", elements: x.labels.slice(0, 6).map((l) => ({ label: l, what: "", click: false })), tips: [] }))), faqs: (db && db.faqs) || [], troubleshooting: (db && db.troubleshooting) || [], videoScript: (db && db.videoScript) || [] });
+    const item = { tool: id, lang, aud, data: d, at: t, by, v: 2, partial: !da || !db };
     if (JSON.stringify(item).length < 900000) await store.set(key, item);
     return json(200, { ok: true, item });
   }
   return json(400, { ok: false, error: "Unknown action" });
+}
+
+// JSON from an AI reply: strips code fences / extra text and, if the reply was cut off, closes it at the last complete value
+export function parseLoose(t) {
+  let s = String(t || "").replace(/^[\s\S]*?```(?:json)?\s*/i, (m) => (/```/.test(m) ? "" : m)).replace(/```[\s\S]*$/, "");
+  const a = s.indexOf("{"); if (a < 0) return null; s = s.slice(a);
+  try { return JSON.parse(s.slice(0, s.lastIndexOf("}") + 1)); } catch (e) { /* repair below */ }
+  const cuts = []; let inS = false, esc = false; const stack = [];
+  for (let i = 0; i < s.length; i++) { const c = s[i]; if (inS) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inS = false; continue; }
+    if (c === '"') inS = true; else if (c === "{" || c === "[") stack.push(c); else if (c === "}" || c === "]") { stack.pop(); cuts.push([i + 1, stack.slice()]); } else if (c === ",") cuts.push([i, stack.slice()]); }
+  for (let k = cuts.length - 1; k >= 0 && k > cuts.length - 400; k--) { const [pos, st] = cuts[k]; const tail = st.slice().reverse().map((c) => (c === "{" ? "}" : "]")).join(""); try { return JSON.parse(s.slice(0, pos) + tail); } catch (e) { /* next */ } }
+  return null;
 }
