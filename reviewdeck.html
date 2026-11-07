@@ -615,7 +615,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:1
       if (kind === "pptx") {
         var P = new window.PptxGenJS(); P.layout = "LAYOUT_WIDE"; P.author = "vivo BI dashboard"; P.title = "Monthly BI review";
         items.forEach(function (r) { addPptx(P, r.data, r.ai); });
-        return P.write({ outputType: "blob" }).then(function (blob) { download(blob, name + ".pptx"); return items; });
+        return P.write({ outputType: "blob" }).then(function (blob) { blob = new Blob([blob], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }); download(blob, name + ".pptx"); return items; });
       }
       var doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] }), first = { v: true };
       items.forEach(function (r) { pdfDeck(doc, r.data, r.ai, first); });

@@ -547,7 +547,7 @@ textarea.tx{min-height:60px}
             s.addChart(t, ch.series.map(function (x) { return { name: x.name, labels: ch.labels, values: x.values }; }), { x: o.x, y: o.y, w: o.w, h: o.h, barDir: ch.type === "bar" ? "bar" : "col", chartColors: o.T.pal.slice(0, Math.max(ch.series.length, ch.type === "doughnut" || ch.type === "pie" ? ch.labels.length : 1)), showLegend: ch.series.length > 1 || ch.type === "doughnut" || ch.type === "pie", legendPos: ch.type === "doughnut" || ch.type === "pie" ? "r" : "b", legendColor: o.T.text, legendFontFace: T.font, catAxisLabelColor: o.T.text, valAxisLabelColor: o.T.sub, catAxisLabelFontSize: 10, valAxisLabelFontSize: 9, catAxisLabelFontFace: T.font, showValue: ch.type !== "doughnut" && ch.type !== "pie", showPercent: ch.type === "doughnut" || ch.type === "pie", dataLabelFontSize: 9, dataLabelColor: ch.type === "doughnut" || ch.type === "pie" ? "FFFFFF" : o.T.text, valGridLine: { color: o.T.rule, size: 0.5 }, catGridLine: { style: "none" }, lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 7, holeSize: 55, dataLabelFormatCode: "0.0", dataLabelPosition: ch.type === "line" ? "t" : undefined, valAxisMinVal: ch.type === "line" ? Math.max(0, Math.floor(Math.min.apply(null, [].concat.apply([], ch.series.map(function (x) { return x.values; }))) * 0.9)) : undefined }); }
         });
       });
-      return Pp.write({ outputType: "blob" });
+      return Pp.write({ outputType: "blob" }).then(function (b) { return new Blob([b], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }); });   // typed as PowerPoint so phones keep the .pptx name (not .zip)
     });
   }
   var IMG = {};
