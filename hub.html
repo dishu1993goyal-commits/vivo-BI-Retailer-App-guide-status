@@ -429,7 +429,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       ["disputes", "⚖️", "Disputes", "disputes", "t:disputes.html", function () { return (N.disputes || {}).unread + (N.disputes || {}).assigned; }], ["support", "🎧", "Support desk", "support", "n:support", function () { return N.supportUnread; }],
       ["qr", "🔳", "Web login (QR)", null, "n:scanqr", null, "app"]] },
     { id: "admin", icon: "🛡️", name: "Admin", sub: "HO only", col: "#E8F6FB", admin: true, items: [
-      ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
+      ["manuals", "📘", "Tool manuals (PPT / PDF / video)", null, "t:manuals.html"], ["import", "📥", "Import users", null, "t:admin-tools.html#import"], ["modules", "🎛️", "Modules per state", null, "t:admin-tools.html#modules"], ["users", "👥", "Registered users", null, "n:users"],
       ["directory", "🪪", "vChat directory", null, "t:directory.html"], ["security", "🛡️", "Account security", null, "t:security.html", function () { return N.pwreq; }], ["insights", "📈", "Access insights", null, "n:logs"],
       ["supportrep", "🎧", "Support report", null, "n:supportReport"], ["aikeys", "🔌", "AI & research keys", null, "t:affordability.html#data"], ["config", "⚙️", "Configuration centre", null, "t:config.html"], ["access", "🔐", "Access control", null, "t:access.html", null, "master"], ["geolocate", "📡", "Email geo-locator", null, "t:geolocate.html"], ["studio", "🧩", "Studio (master)", null, "t:studio.html", null, "master"]] },
     { id: "smart", icon: "✨", name: "Smart tools", sub: "Less manual work", col: "#FFF1E6", items: [
@@ -448,7 +448,16 @@ td.n,th.n{text-align:right;white-space:nowrap}
     : [["☀️", "My Day", "#F2994A", "t:myday.html"], ["📍", "Punch in", "#1E9E61", "t:visits.html"], ["💳", "Offers", "#4D5BF9", "t:affordability.html"], ["⚖️", "Raise dispute", "#E05757", "t:disputes.html#new"]];
 
   if (window.CUST && CUST.master) QUICK[3] = ["🧩", "Studio", "#F5A623", "t:studio.html"];
+  // remember where the user was in the list, so coming back from a tool returns to the same place (web + apps)
+  var POSK = "bi-hub-pos", RESTORE = null;
+  function savePos() { try { var v = JSON.stringify({ y: Math.round(window.scrollY), t: Date.now(), q: Q }); sessionStorage.setItem(POSK, v); localStorage.setItem(POSK, v); } catch (e) { } }
+  function readPos() { try { var v = JSON.parse(sessionStorage.getItem(POSK) || localStorage.getItem(POSK) || "null"); return v && Date.now() - v.t < 45 * 60e3 ? v : null; } catch (e) { return null; } }
+  (function () { var p = readPos(); if (p && p.y > 0) RESTORE = p.y; })();
+  var spT; window.addEventListener("scroll", function () { clearTimeout(spT); spT = setTimeout(savePos, 150); }, { passive: true });
+  var backHere = function () { var p = readPos(); if (p && p.y > 0 && window.scrollY < 5) { [0, 150, 500].forEach(function (ms) { setTimeout(function () { if (window.scrollY < 5) window.scrollTo(0, p.y); }, ms); }); } };
+  window.addEventListener("pageshow", backHere); document.addEventListener("visibilitychange", function () { if (!document.hidden) backHere(); });
   function open(target, label) {
+    savePos();
     var kind = target.slice(0, 2), rest = target.slice(2), file = rest.split("#")[0], hash = rest.indexOf("#") >= 0 ? "#" + rest.split("#")[1] : "#list";
     try {
       if (IN_APP) {
@@ -489,7 +498,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
       }).join("") + "</div></div>";
     });
     if (!any) html += '<div class="empty2">No tool matches “' + esc(Q) + "”.</div>";
-    VIEW.innerHTML = html;
+    var keepY = window.scrollY; VIEW.innerHTML = html; if (keepY) window.scrollTo(0, keepY);
+    if (RESTORE != null) { var ry = RESTORE; RESTORE = null; [0, 120, 450, 1000].forEach(function (ms) { setTimeout(function () { if (Math.abs(window.scrollY - ry) > 4) window.scrollTo(0, ry); }, ms); }); }
     var qi = $("q"); qi.oninput = function () { Q = qi.value; var p = qi.selectionStart; draw(); var n = $("q"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
     [].forEach.call(VIEW.querySelectorAll(".it"), function (b) { b.onclick = function () { open(b.dataset.t, b.dataset.l); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-geo]"), function (b) { b.onclick = function () { open("t:geolocate.html#respond", "Location request"); }; });

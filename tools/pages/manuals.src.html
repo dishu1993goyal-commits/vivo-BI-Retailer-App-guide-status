@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tool manuals</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.step{display:flex;gap:10px;align-items:flex-start}.step>div{min-width:0}.step .n{width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;font-size:13px}
+.shots{display:flex;gap:8px;overflow-x:auto;padding:6px 2px}.shot{flex:none;width:118px;text-align:center;font-size:11px;position:relative}.shot img{width:118px;height:255px;object-fit:cover;object-position:top;border-radius:14px;border:3px solid #1B1D2E;background:#fff}.shot button{position:absolute;top:4px;right:4px;border:0;border-radius:50%;width:22px;height:22px;background:#0009;color:#fff;cursor:pointer}
+.exp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.exp button{border:0;border-radius:14px;padding:13px 8px;background:var(--card);box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;font:inherit;font-weight:700;font-size:13px;color:var(--ink)}.exp button small{display:block;font-weight:500;color:var(--mut);font-size:11px;margin-top:2px}
+.out{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55;max-height:46vh;overflow:auto}
+.out h4{margin:8px 0 3px;font-size:12.5px}.out ul{margin:0;padding-left:18px}
+.prog{height:6px;border-radius:9px;background:#EEF0F6;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5B6CFF,#8F5BFF);transition:width .3s}
+#stage{position:fixed;left:-20000px;top:0;width:1280px;z-index:-1}
+#cap{position:fixed;left:-20000px;top:0;width:390px;height:844px;border:0;background:#fff}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📘</span></div>
+  <h1>Tool manuals</h1><p>Editable PPT, PDF, one-pager or walkthrough video for any tool or dashboard section — with real screens, flows and any language</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<div id="stage"></div>
+<iframe id="cap" title="capture" aria-hidden="true"></iframe>
+<script src="/access-catalog.js"></script>
+<script src="/guidedata.js"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), SEL = null, SHOTS = [], MAN = null, LANG = "en", AUD = "both";
+  var LANGS = [["en", "English"], ["hi", "हिन्दी Hindi"], ["zh", "简体中文 Chinese"], ["ta", "தமிழ் Tamil"], ["te", "తెలుగు Telugu"], ["bn", "বাংলা Bengali"], ["mr", "मराठी Marathi"], ["gu", "ગુજરાતી Gujarati"], ["kn", "ಕನ್ನಡ Kannada"], ["ml", "മലയാളം Malayalam"], ["pa", "ਪੰਜਾਬੀ Punjabi"], ["or", "ଓଡ଼ିଆ Odia"]];
+  var FONT = { zh: "Microsoft YaHei", hi: "Nirmala UI", mr: "Nirmala UI", ta: "Nirmala UI", te: "Nirmala UI", bn: "Nirmala UI", gu: "Nirmala UI", kn: "Nirmala UI", ml: "Nirmala UI", pa: "Nirmala UI", or: "Nirmala UI" };
+  var CSSF = "'Segoe UI','Noto Sans','Noto Sans Devanagari','Noto Sans SC','Microsoft YaHei','Nirmala UI',system-ui,sans-serif";
+  var LIB = { pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js", img: "/vendor/html-to-image.js" }, LOADED = {};
+  function lib(k) { if (LOADED[k]) return LOADED[k]; LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIB[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load " + k)); }; document.head.appendChild(s); }); return LOADED[k]; }
+  var G = (window.BIGUIDE || []).filter(Boolean), CAT = window.BIACCESS_CAT || [];
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var stripE = function (s) { return String(s || "").replace(/^[^\w\u0900-\u0D7F\u4E00-\u9FFF]+/, ""); };
+
+  // ---------- catalogue: every tool + dashboard tab ----------
+  function items() {
+    var out = [];
+    CAT.forEach(function (g) { if (g.k !== "tool" && g.k !== "tab" && g.k !== "adm") return; g.items.forEach(function (it) { var file = String(it[2] || "").replace(/^t:/, ""), id = it[0]; if (g.k === "adm" && !file) return; out.push({ id: id, name: it[1], group: g.g, file: g.k === "tab" ? "index.html" : file.split("#")[0], hash: g.k === "tab" ? "" : (file.split("#")[1] || ""), tab: g.k === "tab" ? id.slice(4) : "" }); }); });
+    out.unshift({ id: "dash:home", name: "Dashboard (home)", group: "📑 Dashboard", file: "index.html", hash: "", tab: "" });
+    return out;
+  }
+  function guideFor(it) {
+    var f = it.file + (it.hash ? "#" + it.hash : ""), base = it.id.replace(/^tool:|^tab:|^adm:/, "");
+    return G.find(function (g) { return g[0] === base; }) || G.find(function (g) { return g[9] && String(g[9]).replace(/^t:/, "") === f; }) || G.find(function (g) { return g[9] && String(g[9]).replace(/^t:/, "").split("#")[0] === it.file && it.file !== "index.html"; }) || null;
+  }
+  function draw() {
+    var L = items(), groups = []; L.forEach(function (i) { if (groups.indexOf(i.group) < 0) groups.push(i.group); });
+    VIEW.innerHTML = '<div class="card"><div class="step"><span class="n">1</span><div style="flex:1"><b>Choose the tool or dashboard section</b><select class="tx" id="ms" style="margin-top:6px"><option value="">— select —</option>' + groups.map(function (g) { return '<optgroup label="' + esc(g) + '">' + L.filter(function (i) { return i.group === g; }).map(function (i) { return '<option value="' + esc(i.id) + '"' + (SEL && SEL.id === i.id ? " selected" : "") + ">" + esc(i.name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + '</select><div class="g2"><div><label class="lb">Language</label><select class="tx" id="ml">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === LANG ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">For</label><select class="tx" id="ma"><option value="both"' + (AUD === "both" ? " selected" : "") + '>Admins & end users</option><option value="admin"' + (AUD === "admin" ? " selected" : "") + '>Admins / IT team</option><option value="user"' + (AUD === "user" ? " selected" : "") + ">End users</option></select></div></div></div></div></div>" +
+      '<div class="card"><div class="step"><span class="n">2</span><div style="flex:1"><b>Capture the real screens</b><div class="muted" style="font-size:12px">Opens the tool as you see it (phone size) and photographs every tab. You can add your own screenshots too.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="mc"' + (SEL ? "" : " disabled") + '>📸 Capture screens</button><button class="btn sec sm" id="mu">＋ Add screenshot</button></div><div class="prog" id="cp" style="display:none"><i></i></div><div class="shots" id="sh">' + shotsHtml() + "</div></div></div></div>" +
+      '<div class="card"><div class="step"><span class="n">3</span><div style="flex:1"><b>Write the manual with AI</b><div class="muted" style="font-size:12px">Overview, roles, navigation map, every screen explained, admin & user flows, settings, data flow, rules, FAQs, troubleshooting, glossary, one-pager text and video captions — in the chosen language.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="mg"' + (SEL ? "" : " disabled") + ">✨ " + (MAN ? "Rewrite" : "Write manual") + '</button></div><div id="mo">' + (MAN ? outline(MAN) : "") + "</div></div></div></div>" +
+      '<div class="card"><div class="step"><span class="n">4</span><div style="flex:1"><b>Export</b><div class="exp"><button data-x="pptx">📊 PowerPoint<small>Editable .pptx — text, flowcharts, screens</small></button><button data-x="pdf">📄 PDF manual<small>Same slides as a PDF</small></button><button data-x="one">🖼️ One-pager creative<small>Poster PNG to share</small></button><button data-x="vid">🎬 Walkthrough video<small>Animated screens + captions (WebM)</small></button></div><div class="prog" id="xp" style="display:none"><i></i></div><div class="muted" id="xs" style="font-size:12px;margin-top:6px"></div></div></div></div>';
+    $("ms").onchange = function () { SEL = L.find(function (i) { return i.id === $("ms").value; }) || null; SHOTS = []; MAN = null; draw(); if (SEL) loadCached(); };
+    $("ml").onchange = function () { LANG = this.value; MAN = null; draw(); if (SEL) loadCached(); };
+    $("ma").onchange = function () { AUD = this.value; MAN = null; draw(); if (SEL) loadCached(); };
+    $("mc").onclick = capture; $("mu").onclick = addShot; $("mg").onclick = function () { gen(!!MAN); };
+    wireShots();
+    [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { if (!SEL) return toast("Choose a tool first"); if (!MAN) return toast("Write the manual first (step 3)"); ({ pptx: makePptx, pdf: makePdf, one: makeOne, vid: makeVideo })[b.dataset.x](); }; });
+  }
+  function shotsHtml() { return SHOTS.map(function (s, i) { return '<div class="shot"><img src="' + s.src + '" alt=""><button data-rm="' + i + '">✕</button><div>' + esc(s.label) + "</div></div>"; }).join("") || '<span class="muted" style="font-size:12px">No screens yet.</span>'; }
+  function wireShots() { [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { SHOTS.splice(+b.dataset.rm, 1); $("sh").innerHTML = shotsHtml(); wireShots(); }; }); }
+  function loadCached() { api({ action: "man-get", tool: SEL.id, lang: LANG, aud: AUD }).then(function (r) { if (r.ok && r.item) { MAN = r.item.data; draw(); toast("Loaded the saved manual — ✨ Rewrite for a fresh one"); } }); }
+  function addShot() { var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.multiple = true; i.onchange = function () { [].forEach.call(i.files, function (f) { var fr = new FileReader(); fr.onload = function () { SHOTS.push({ src: fr.result, label: f.name.replace(/\.[a-z]+$/i, "").slice(0, 30), w: 390, h: 844 }); $("sh").innerHTML = shotsHtml(); wireShots(); }; fr.readAsDataURL(f); }); }; i.click(); }
+
+  // ---------- 📸 capture real screens in a hidden phone-size frame ----------
+  function capture() {
+    if (!SEL) return; var fr = $("cap"), bar = $("cp"), btn = $("mc"); bar.style.display = ""; btn.disabled = true; btn.textContent = "Capturing…"; SHOTS = [];
+    var setP = function (p) { bar.firstChild.style.width = Math.round(p * 100) + "%"; };
+    var url = "/" + SEL.file + "?v=" + Date.now() + (SEL.hash ? "#" + SEL.hash : "");
+    new Promise(function (res) { fr.onload = res; fr.src = url; setTimeout(res, 15000); }).then(function () { return wait(3500); }).then(function () {
+      var w = fr.contentWindow, d = fr.contentDocument;
+      var inject = new Promise(function (res) { if (w.htmlToImage) return res(); var s = d.createElement("script"); s.src = LIB.img; s.onload = res; s.onerror = res; d.head.appendChild(s); });
+      return inject.then(function () {
+        var snap = function (label) { try { var fab = d.querySelectorAll(".cust-fab,#cx-fab,.cx-fab"); [].forEach.call(fab, function (e) { e.style.visibility = "hidden"; }); } catch (e) { }
+          var h = Math.min(Math.max(d.documentElement.scrollHeight, 844), 1700);
+          return w.htmlToImage.toPng(d.body, { width: 390, height: h, pixelRatio: 1.5, backgroundColor: "#F3F4FA", cacheBust: true, style: { margin: "0" }, filter: function (n) { return !(n.tagName === "SCRIPT" || n.tagName === "IFRAME"); } }).then(function (src) { SHOTS.push({ src: src, label: label, w: 390, h: h }); $("sh").innerHTML = shotsHtml(); wireShots(); }).catch(function () { }); };
+        var tabs = [];
+        if (SEL.tab) { var tb = d.querySelector('[data-t="' + SEL.tab + '"]'); if (tb) tabs = [tb]; }
+        else { var box = d.querySelector(".seg") || d.querySelector(".tabs"); if (box) tabs = [].slice.call(box.querySelectorAll("button")).filter(function (b) { return b.offsetParent !== null && b.textContent.trim(); }).slice(0, 7); }
+        var chain = snap(SEL.tab ? "Before" : stripE(tabs[0] ? tabs[0].textContent.trim() : "Home").slice(0, 28) || "Home"); if (SEL.tab) SHOTS.length = 0;
+        tabs.forEach(function (b, i) { if (!SEL.tab && i === 0) return; chain = chain.then(function () { setP((i + 1) / (tabs.length + 1)); try { b.click(); } catch (e) { } w.scrollTo(0, 0); return wait(2200); }).then(function () { return snap(stripE(b.textContent.trim()).slice(0, 28) || "Screen " + (i + 1)); }); });
+        return chain;
+      });
+    }).catch(function (e) { toast("Capture failed: " + (e.message || e)); }).then(function () { setP(1); btn.disabled = false; btn.textContent = "📸 Capture again"; setTimeout(function () { bar.style.display = "none"; }, 600); toast(SHOTS.length + " screen(s) captured"); fr.src = "about:blank"; });
+  }
+  // ---------- ✨ AI manual ----------
+  function gen(fresh) {
+    var g = guideFor(SEL) || [], b = $("mg"); b.disabled = true; b.textContent = "Writing… (20–60 s)";
+    api({ action: "man-gen", tool: SEL.id, lang: LANG, aud: AUD, fresh: fresh, screens: SHOTS.map(function (s) { return s.label; }), info: { name: SEL.name, group: SEL.group, target: SEL.file + (SEL.hash ? "#" + SEL.hash : ""), who: g[4] || "", what: g[5] || "", steps: g[6] || [], example: g[7] || "", tips: g[8] || [] } }).then(function (r) { b.disabled = false; if (!r.ok) { b.textContent = "✨ Write manual"; return toast(r.error); } MAN = r.item.data; draw(); });
+  }
+  var A = function (x) { return Array.isArray(x) ? x : []; };
+  function outline(M) {
+    var li = function (L, f) { return L.length ? "<ul>" + L.slice(0, 8).map(function (x) { return "<li>" + esc(f(x)) + "</li>"; }).join("") + "</ul>" : ""; };
+    return '<div class="out"><b style="font-size:14px">' + esc(M.title) + "</b><div>" + esc(M.tagline || "") + '</div><div style="margin-top:6px">' + esc(M.overview || "") + "</div>" +
+      "<h4>👥 Roles</h4>" + li(A(M.roles), function (r) { return r.role + ": " + A(r.can).join("; "); }) + "<h4>🧭 Navigation</h4>" + li(A(M.navigation), function (n) { return n.from + " → " + n.action + " → " + n.to; }) +
+      "<h4>🖥️ Screens (" + A(M.screens).length + ")</h4>" + li(A(M.screens), function (s) { return s.name + " — " + s.purpose; }) + "<h4>🛠️ Admin flow</h4>" + li(A(M.adminFlow), function (s) { return s.step; }) + "<h4>🙋 User flow</h4>" + li(A(M.userFlow), function (s) { return s.step; }) +
+      "<h4>⚙️ Settings</h4>" + li(A(M.settings), function (s) { return s.name + " — " + s.effect; }) + "<h4>❓ FAQs</h4>" + li(A(M.faqs), function (f) { return f.q; }) + "</div>";
+  }
+
+  // ---------- slide model (shared by PPT / PDF / video) ----------
+  function slides() {
+    var M = MAN, S = [], sc = A(M.screens);
+    S.push({ k: "title" });
+    S.push({ k: "overview" });
+    if (A(M.navigation).length) S.push({ k: "nav" });
+    SHOTS.forEach(function (sh, i) { var info = sc.find(function (x) { return String(x.name).toLowerCase().indexOf(String(sh.label).toLowerCase().slice(0, 6)) >= 0 || String(sh.label).toLowerCase().indexOf(String(x.name).toLowerCase().slice(0, 6)) >= 0; }) || sc[i] || { name: sh.label, purpose: "", elements: [], tips: [] }; S.push({ k: "screen", shot: sh, info: info, n: i + 1 }); });
+    if (!SHOTS.length) sc.forEach(function (x, i) { S.push({ k: "screen", shot: null, info: x, n: i + 1 }); });
+    if (A(M.adminFlow).length) S.push({ k: "flow", title: "🛠️ Admin flow", steps: M.adminFlow });
+    if (A(M.userFlow).length) S.push({ k: "flow", title: "🙋 End-user flow", steps: M.userFlow });
+    if (A(M.settings).length || A(M.rules).length) S.push({ k: "settings" });
+    S.push({ k: "data" });
+    if (A(M.faqs).length || A(M.troubleshooting).length) S.push({ k: "faq" });
+    if (A(M.glossary).length) S.push({ k: "gloss" });
+    return S;
+  }
+  // ---------- HTML slides (PDF + video) ----------
+  var C = { ink: "#1B1D2E", mut: "#6B7090", brand: "#4D5BF9", brand2: "#7A4CFF", soft: "#EEF0FF", card: "#FFFFFF", bg: "#F5F6FB" };
+  function hs(inner, title, n, total) { return '<div style="width:1280px;height:720px;position:relative;overflow:hidden;background:' + C.bg + ";font-family:" + CSSF + ";color:" + C.ink + '">' + (title ? '<div style="position:absolute;left:0;top:0;right:0;height:84px;background:linear-gradient(90deg,' + C.brand + "," + C.brand2 + ');color:#fff;display:flex;align-items:center;padding:0 46px;font-size:30px;font-weight:800">' + esc(title) + '<span style="margin-left:auto;font-size:15px;font-weight:600;opacity:.85">' + esc(SEL.name) + "</span></div>" : "") + '<div style="position:absolute;left:46px;right:46px;top:' + (title ? 108 : 0) + 'px;bottom:44px">' + inner + '</div><div style="position:absolute;left:46px;right:46px;bottom:14px;display:flex;font-size:13px;color:' + C.mut + '"><span>vivo Business Innovation · Tool manual</span><span style="margin-left:auto">' + (n ? n + " / " + total : "") + "</span></div></div>"; }
+  function boxFlow(steps, h) {
+    var L = A(steps).slice(0, 10), per = L.length > 5 ? 5 : L.length, w = Math.floor((1188 - (per - 1) * 34) / per);
+    return '<div style="display:flex;flex-wrap:wrap;gap:30px 34px;align-items:stretch">' + L.map(function (s, i) { return '<div style="position:relative;width:' + w + "px;background:#fff;border-radius:18px;padding:16px;box-shadow:0 6px 18px rgba(20,24,51,.08);border-top:6px solid " + (i % 2 ? C.brand2 : C.brand) + ";min-height:" + (h || 150) + 'px"><div style="width:34px;height:34px;border-radius:50%;background:' + C.brand + ';color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:17px">' + (i + 1) + '</div><div style="font-weight:800;font-size:17px;margin-top:8px">' + esc(s.step || s) + '</div><div style="font-size:14px;color:' + C.mut + ';margin-top:4px;line-height:1.4">' + esc(s.detail || "") + "</div>" + (i < L.length - 1 && (i + 1) % per ? '<div style="position:absolute;right:-30px;top:50%;font-size:26px;color:' + C.brand + '">➜</div>' : "") + "</div>"; }).join("") + "</div>";
+  }
+  function ul(L, f, size) { return '<ul style="margin:0;padding-left:22px;font-size:' + (size || 17) + 'px;line-height:1.5">' + A(L).slice(0, 9).map(function (x) { return "<li>" + (f ? f(x) : esc(x)) + "</li>"; }).join("") + "</ul>"; }
+  function htmlSlide(s, n, total) {
+    var M = MAN;
+    if (s.k === "title") return hs('<div style="position:absolute;inset:0 -46px -44px;background:linear-gradient(135deg,' + C.brand + "," + C.brand2 + ');color:#fff;padding:90px 80px"><div style="font-size:20px;font-weight:700;opacity:.85">vivo Business Innovation · ' + esc(SEL.group.replace(/^[^\w]+/, "")) + '</div><div style="font-size:64px;font-weight:900;margin-top:24px;line-height:1.1;max-width:780px">' + esc(M.title || SEL.name) + '</div><div style="font-size:24px;margin-top:18px;max-width:760px;opacity:.95">' + esc(M.tagline || "") + '</div><div style="position:absolute;left:80px;bottom:60px;font-size:16px;opacity:.85">Tool manual · ' + esc(LANGS.find(function (l) { return l[0] === LANG; })[1]) + " · " + new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) + " · Web portal + Admin app + State app</div>" + (SHOTS[0] ? '<img src="' + SHOTS[0].src + '" style="position:absolute;right:90px;top:60px;width:270px;height:585px;object-fit:cover;object-position:top;border-radius:34px;border:9px solid #111;box-shadow:0 20px 50px rgba(0,0,0,.35)">' : "") + "</div>", "", 0, 0);
+    if (s.k === "overview") return hs('<div style="display:flex;gap:30px;height:100%"><div style="flex:1.2"><div style="font-size:19px;line-height:1.55">' + esc(M.overview || "") + '</div>' + (A(M.prerequisites).length ? '<div style="font-weight:800;font-size:18px;margin-top:20px">Before you start</div>' + ul(M.prerequisites) : "") + '</div><div style="flex:1;display:flex;flex-direction:column;gap:12px">' + A(M.roles).slice(0, 4).map(function (r, i) { return '<div style="background:#fff;border-radius:16px;padding:14px 18px;border-left:7px solid ' + [C.brand, C.brand2, "#16A06A", "#F2A93B"][i] + '"><div style="font-weight:800;font-size:18px">👤 ' + esc(r.role) + "</div>" + ul(A(r.can).slice(0, 4), null, 15) + "</div>"; }).join("") + "</div></div>", "📘 Overview & who uses it", n, total);
+    if (s.k === "nav") { var nodes = []; A(M.navigation).forEach(function (x) { [x.from, x.to].forEach(function (v) { if (v && nodes.indexOf(v) < 0) nodes.push(v); }); }); return hs('<div style="display:flex;flex-wrap:wrap;gap:16px">' + A(M.navigation).slice(0, 9).map(function (x) { return '<div style="display:flex;align-items:center;gap:10px;width:584px;background:#fff;border-radius:14px;padding:12px 14px;box-shadow:0 4px 12px rgba(20,24,51,.06)"><span style="background:' + C.soft + ";color:" + C.brand + ';border-radius:10px;padding:7px 10px;font-weight:800;font-size:15px">' + esc(x.from) + '</span><span style="flex:1;text-align:center;font-size:13.5px;color:' + C.mut + '">— ' + esc(x.action) + ' →</span><span style="background:' + C.brand + ';color:#fff;border-radius:10px;padding:7px 10px;font-weight:800;font-size:15px">' + esc(x.to) + "</span></div>"; }).join("") + "</div>", "🧭 Navigation map", n, total); }
+    if (s.k === "screen") { var I = s.info || {}; return hs('<div style="display:flex;gap:36px;height:100%">' + (s.shot ? '<div style="flex:none;width:262px;height:566px;border-radius:30px;border:8px solid #1B1D2E;overflow:hidden;background:#fff;box-shadow:0 14px 36px rgba(20,24,51,.25)"><img src="' + s.shot.src + '" style="width:100%;display:block"></div>' : "") + '<div style="flex:1;min-width:0"><div style="font-size:20px;line-height:1.45;color:' + C.ink + '">' + esc(I.purpose || "") + '</div><div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:10px">' + A(I.elements).slice(0, 10).map(function (e, i) { return '<div style="display:flex;gap:10px;background:#fff;border-radius:12px;padding:10px 12px"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:#F2A93B;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center">' + (i + 1) + '</span><div><div style="font-weight:800;font-size:15px">' + esc(e.label) + '</div><div style="font-size:13.5px;color:' + C.mut + ';line-height:1.35">' + esc(e.what) + "</div></div></div>"; }).join("") + "</div>" + (A(I.tips).length ? '<div style="margin-top:12px;background:#FFF8EA;border-radius:12px;padding:10px 14px;font-size:14.5px">💡 ' + A(I.tips).slice(0, 2).map(esc).join(" · ") + "</div>" : "") + "</div></div>", "🖥️ " + (I.name || (s.shot && s.shot.label) || "Screen " + s.n), n, total); }
+    if (s.k === "flow") return hs(boxFlow(s.steps, 160), s.title, n, total);
+    if (s.k === "settings") return hs('<div style="display:flex;gap:26px"><div style="flex:1.3"><div style="font-weight:800;font-size:19px;margin-bottom:8px">⚙️ Settings & configuration</div>' + A(M.settings).slice(0, 7).map(function (x) { return '<div style="background:#fff;border-radius:12px;padding:9px 13px;margin-bottom:8px"><b style="font-size:16px">' + esc(x.name) + '</b> <span style="color:' + C.mut + ';font-size:13px">· ' + esc(x.where) + '</span><div style="font-size:14px;margin-top:2px">' + esc(x.effect) + "</div></div>"; }).join("") + '</div><div style="flex:1"><div style="font-weight:800;font-size:19px;margin-bottom:8px">📏 Rules & permissions</div>' + ul(M.rules, null, 15.5) + "</div></div>", "⚙️ Settings, rules & permissions", n, total);
+    if (s.k === "data") return hs('<div style="display:flex;align-items:center;gap:24px;margin-top:20px">' + [["📥", "Input", "Uploads, forms, scans, AI research"], ["☁️", "Server", "One shared database (Netlify) — every change saved once"], ["🖥️📱📱", "Everywhere", "Web portal · Admin app · State app show the same data"]].map(function (b, i) { return (i ? '<div style="font-size:40px;color:' + C.brand + '">➜</div>' : "") + '<div style="flex:1;background:#fff;border-radius:20px;padding:22px;text-align:center;box-shadow:0 8px 22px rgba(20,24,51,.08)"><div style="font-size:44px">' + b[0] + '</div><div style="font-weight:900;font-size:22px;margin-top:6px">' + b[1] + '</div><div style="font-size:15px;color:' + C.mut + ';margin-top:6px">' + b[2] + "</div></div>"; }).join("") + '</div><div style="margin-top:30px;font-weight:800;font-size:18px">How data moves in this tool</div>' + ul(M.dataFlow, null, 16), "🔄 Data flow & sync", n, total);
+    if (s.k === "faq") return hs('<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' + A(M.faqs).slice(0, 5).map(function (f) { return '<div style="background:#fff;border-radius:14px;padding:12px 15px"><div style="font-weight:800;font-size:16px">❓ ' + esc(f.q) + '</div><div style="font-size:14px;margin-top:4px;line-height:1.4">' + esc(f.a) + "</div></div>"; }).join("") + A(M.troubleshooting).slice(0, 3).map(function (f) { return '<div style="background:#FFF6F5;border-radius:14px;padding:12px 15px"><div style="font-weight:800;font-size:16px">🔧 ' + esc(f.problem) + '</div><div style="font-size:14px;margin-top:4px;line-height:1.4">' + esc(f.fix) + "</div></div>"; }).join("") + "</div>", "❓ FAQs & troubleshooting", n, total);
+    if (s.k === "gloss") return hs('<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' + A(M.glossary).slice(0, 12).map(function (g) { return '<div style="background:#fff;border-radius:14px;padding:12px 15px"><b style="font-size:16px;color:' + C.brand + '">' + esc(g.term) + '</b><div style="font-size:14px;margin-top:3px">' + esc(g.meaning) + "</div></div>"; }).join("") + "</div>", "📖 Glossary", n, total);
+    return hs("", "", n, total);
+  }
+  function renderCanvases(onP) {
+    var S = slides(), out = [], st = $("stage");
+    return lib("img").then(function () {
+      var chain = Promise.resolve();
+      S.forEach(function (s, i) { chain = chain.then(function () { st.innerHTML = htmlSlide(s, i + 1, S.length); var el = st.firstChild; return wait(60).then(function () { return window.htmlToImage.toCanvas(el, { width: 1280, height: 720, pixelRatio: 1.25, cacheBust: false }); }).then(function (cv) { out.push({ cv: cv, s: s }); onP && onP((i + 1) / S.length); }); }); });
+      return chain.then(function () { st.innerHTML = ""; return out; });
+    });
+  }
+  function busy(on, msg) { var b = $("xp"); b.style.display = on ? "" : "none"; b.firstChild.style.width = "0"; $("xs").textContent = msg || ""; [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (x) { x.disabled = on; }); }
+  var prog = function (p) { var b = $("xp"); if (b) b.firstChild.style.width = Math.round(p * 100) + "%"; };
+  var fname = function (ext) { return "Manual_" + SEL.name.replace(/\W+/g, "_").slice(0, 40) + "_" + LANG + "." + ext; };
+  // ---------- 📄 PDF ----------
+  function makePdf() {
+    busy(true, "Drawing slides…");
+    Promise.all([lib("pdf"), renderCanvases(prog)]).then(function (x) { var cvs = x[1], J = window.jspdf.jsPDF, doc = new J({ orientation: "landscape", unit: "px", format: [1280, 720], compress: true }); cvs.forEach(function (c, i) { if (i) doc.addPage([1280, 720], "landscape"); doc.addImage(c.cv.toDataURL("image/jpeg", .9), "JPEG", 0, 0, 1280, 720); }); download(doc.output("blob"), fname("pdf")); busy(false, "✅ PDF ready — " + cvs.length + " pages"); }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  // ---------- 📊 editable PPTX ----------
+  function makePptx() {
+    busy(true, "Building PowerPoint…");
+    lib("pptx").then(function () {
+      var P = new window.PptxGenJS(), M = MAN, F = FONT[LANG] || "Segoe UI", S = slides(), tot = S.length; P.layout = "LAYOUT_WIDE"; P.title = M.title || SEL.name; P.company = "vivo Business Innovation";
+      var B = "4D5BF9", B2 = "7A4CFF", MU = "6B7090", INK = "1B1D2E";
+      var head = function (sl, t, n) { sl.background = { color: "F5F6FB" }; sl.addShape(P.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: B } }); sl.addText(t, { x: 0.45, y: 0.12, w: 9.5, h: 0.66, fontFace: F, fontSize: 24, bold: true, color: "FFFFFF" }); sl.addText(SEL.name, { x: 9.6, y: 0.2, w: 3.3, h: 0.5, fontFace: F, fontSize: 11, color: "FFFFFF", align: "right" }); sl.addText("vivo Business Innovation · Tool manual", { x: 0.45, y: 7.05, w: 7, h: 0.3, fontFace: F, fontSize: 9, color: MU }); sl.addText(n + " / " + tot, { x: 11.5, y: 7.05, w: 1.4, h: 0.3, fontFace: F, fontSize: 9, color: MU, align: "right" }); };
+      var bullets = function (L) { return A(L).slice(0, 9).map(function (x) { return { text: String(x), options: { bullet: true, breakLine: true } }; }); };
+      var flow = function (sl, steps, y0) { var L = A(steps).slice(0, 10), per = Math.min(5, L.length), w = (12.4 - (per - 1) * 0.35) / per; L.forEach(function (st, i) { var r = Math.floor(i / per), c = i % per, x = 0.45 + c * (w + 0.35), y = y0 + r * 2.85;
+        sl.addShape(P.ShapeType.roundRect, { x: x, y: y, w: w, h: 2.45, fill: { color: "FFFFFF" }, line: { color: i % 2 ? B2 : B, width: 2 }, rectRadius: 0.12 });
+        sl.addShape(P.ShapeType.ellipse, { x: x + 0.15, y: y + 0.15, w: 0.45, h: 0.45, fill: { color: B } }); sl.addText(String(i + 1), { x: x + 0.15, y: y + 0.15, w: 0.45, h: 0.45, align: "center", valign: "middle", fontSize: 13, bold: true, color: "FFFFFF", fontFace: F });
+        sl.addText([{ text: String(st.step || st), options: { bold: true, fontSize: 13, color: INK, breakLine: true } }, { text: String(st.detail || ""), options: { fontSize: 10.5, color: MU } }], { x: x + 0.12, y: y + 0.65, w: w - 0.24, h: 1.7, fontFace: F, valign: "top", fit: "shrink" });
+        if (c < per - 1 && i < L.length - 1) sl.addShape(P.ShapeType.line, { x: x + w + 0.03, y: y + 1.22, w: 0.29, h: 0, line: { color: B, width: 2.5, endArrowType: "triangle" } }); }); };
+      S.forEach(function (s, i) {
+        var sl = P.addSlide(), n = i + 1;
+        if (s.k === "title") { sl.background = { color: B }; sl.addShape(P.ShapeType.rect, { x: 6.5, y: 0, w: 6.83, h: 7.5, fill: { color: B2, transparency: 30 } }); sl.addText("vivo Business Innovation · " + SEL.group.replace(/^[^\w]+/, ""), { x: 0.7, y: 0.6, w: 8, h: 0.4, fontFace: F, fontSize: 14, color: "FFFFFF" }); sl.addText(M.title || SEL.name, { x: 0.7, y: 1.6, w: 7.6, h: 2, fontFace: F, fontSize: 40, bold: true, color: "FFFFFF", valign: "top", fit: "shrink" }); sl.addText(M.tagline || "", { x: 0.7, y: 3.7, w: 7.4, h: 1.2, fontFace: F, fontSize: 18, color: "FFFFFF", valign: "top" }); sl.addText("Tool manual · " + LANGS.find(function (l) { return l[0] === LANG; })[1] + " · " + new Date().toLocaleDateString("en-IN") + " · Web + Admin app + State app", { x: 0.7, y: 6.6, w: 8, h: 0.4, fontFace: F, fontSize: 11, color: "FFFFFF" }); if (SHOTS[0]) { sl.addShape(P.ShapeType.roundRect, { x: 9.15, y: 0.5, w: 3.05, h: 6.5, fill: { color: "111111" }, rectRadius: 0.25 }); sl.addImage({ data: SHOTS[0].src, x: 9.27, y: 0.62, w: 2.81, h: 6.26, sizing: { type: "crop", w: 2.81, h: 6.26 } }); } return; }
+        if (s.k === "overview") { head(sl, "Overview & who uses it", n); sl.addText(M.overview || "", { x: 0.45, y: 1.1, w: 6.6, h: 2.6, fontFace: F, fontSize: 14, color: INK, valign: "top", fit: "shrink" }); if (A(M.prerequisites).length) { sl.addText("Before you start", { x: 0.45, y: 3.8, w: 6.6, h: 0.4, fontFace: F, fontSize: 14, bold: true, color: B }); sl.addText(bullets(M.prerequisites), { x: 0.45, y: 4.2, w: 6.6, h: 2.6, fontFace: F, fontSize: 12, color: INK, valign: "top", fit: "shrink" }); }
+          A(M.roles).slice(0, 4).forEach(function (r, k) { var y = 1.1 + k * 1.45; sl.addShape(P.ShapeType.roundRect, { x: 7.4, y: y, w: 5.45, h: 1.3, fill: { color: "FFFFFF" }, line: { color: [B, B2, "16A06A", "F2A93B"][k], width: 2 }, rectRadius: 0.1 }); sl.addText([{ text: "👤 " + r.role, options: { bold: true, fontSize: 13, color: INK, breakLine: true } }, { text: A(r.can).slice(0, 4).join(" · "), options: { fontSize: 10.5, color: MU } }], { x: 7.55, y: y + 0.08, w: 5.15, h: 1.14, fontFace: F, valign: "top", fit: "shrink" }); }); return; }
+        if (s.k === "nav") { head(sl, "Navigation map", n); A(M.navigation).slice(0, 10).forEach(function (x, k) { var c = k % 2, r = Math.floor(k / 2), X = 0.45 + c * 6.3, Y = 1.15 + r * 1.15; sl.addShape(P.ShapeType.roundRect, { x: X, y: Y, w: 2.3, h: 0.75, fill: { color: "EEF0FF" }, line: { color: B, width: 1 }, rectRadius: 0.1 }); sl.addText(x.from, { x: X, y: Y, w: 2.3, h: 0.75, align: "center", valign: "middle", fontFace: F, fontSize: 11, bold: true, color: B, fit: "shrink" }); sl.addShape(P.ShapeType.line, { x: X + 2.35, y: Y + 0.37, w: 1.3, h: 0, line: { color: B, width: 2, endArrowType: "triangle" } }); sl.addText(x.action, { x: X + 2.3, y: Y - 0.08, w: 1.45, h: 0.4, align: "center", fontFace: F, fontSize: 8.5, color: MU, fit: "shrink" }); sl.addShape(P.ShapeType.roundRect, { x: X + 3.7, y: Y, w: 2.3, h: 0.75, fill: { color: B }, rectRadius: 0.1 }); sl.addText(x.to, { x: X + 3.7, y: Y, w: 2.3, h: 0.75, align: "center", valign: "middle", fontFace: F, fontSize: 11, bold: true, color: "FFFFFF", fit: "shrink" }); }); return; }
+        if (s.k === "screen") { var I = s.info || {}; head(sl, I.name || (s.shot && s.shot.label) || "Screen", n);
+          var tx = 0.45; if (s.shot) { var ar = s.shot.h / s.shot.w, ih = Math.min(5.85, 2.7 * ar), iw = ih / ar; sl.addShape(P.ShapeType.roundRect, { x: 0.45, y: 1.05, w: iw + 0.2, h: ih + 0.2, fill: { color: "1B1D2E" }, rectRadius: 0.2 }); sl.addImage({ data: s.shot.src, x: 0.55, y: 1.15, w: iw, h: ih }); tx = iw + 1.0; }
+          sl.addText(I.purpose || "", { x: tx, y: 1.05, w: 12.85 - tx, h: 1.0, fontFace: F, fontSize: 14, color: INK, valign: "top", fit: "shrink" });
+          A(I.elements).slice(0, 8).forEach(function (e, k) { var c = k % 2, r = Math.floor(k / 2), cw = (12.85 - tx - 0.2) / 2, X = tx + c * (cw + 0.2), Y = 2.2 + r * 1.08; sl.addShape(P.ShapeType.roundRect, { x: X, y: Y, w: cw, h: 0.95, fill: { color: "FFFFFF" }, line: { color: "E1E3EE", width: 1 }, rectRadius: 0.08 }); sl.addShape(P.ShapeType.ellipse, { x: X + 0.1, y: Y + 0.12, w: 0.36, h: 0.36, fill: { color: "F2A93B" } }); sl.addText(String(k + 1), { x: X + 0.1, y: Y + 0.12, w: 0.36, h: 0.36, align: "center", valign: "middle", fontSize: 11, bold: true, color: "FFFFFF", fontFace: F }); sl.addText([{ text: String(e.label), options: { bold: true, fontSize: 11.5, color: INK, breakLine: true } }, { text: String(e.what || ""), options: { fontSize: 9.5, color: MU } }], { x: X + 0.55, y: Y + 0.05, w: cw - 0.65, h: 0.85, fontFace: F, valign: "top", fit: "shrink" }); });
+          if (A(I.tips).length) sl.addText("💡 " + A(I.tips).slice(0, 2).join(" · "), { x: tx, y: 6.55, w: 12.85 - tx, h: 0.42, fontFace: F, fontSize: 10.5, color: "8A5300", fill: { color: "FFF8EA" } });
+          if (s.shot && A(MAN.videoScript).length) sl.addNotes(A(MAN.videoScript).map(function (v) { return v.screen + ": " + v.caption; }).join("\n")); return; }
+        if (s.k === "flow") { head(sl, s.title.replace(/^\S+\s/, ""), n); flow(sl, s.steps, 1.15); return; }
+        if (s.k === "settings") { head(sl, "Settings, rules & permissions", n); var rows = [[{ text: "Setting", options: { bold: true, color: "FFFFFF", fill: { color: B } } }, { text: "Where", options: { bold: true, color: "FFFFFF", fill: { color: B } } }, { text: "Effect", options: { bold: true, color: "FFFFFF", fill: { color: B } } }]].concat(A(M.settings).slice(0, 8).map(function (x) { return [String(x.name), String(x.where), String(x.effect)]; })); if (rows.length > 1) sl.addTable(rows, { x: 0.45, y: 1.1, w: 7.6, colW: [2.1, 1.9, 3.6], fontFace: F, fontSize: 10, color: INK, border: { type: "solid", color: "E1E3EE", pt: 1 }, fill: { color: "FFFFFF" }, autoPage: false }); sl.addText("Rules & permissions", { x: 8.35, y: 1.05, w: 4.5, h: 0.4, fontFace: F, fontSize: 14, bold: true, color: B }); sl.addText(bullets(M.rules), { x: 8.35, y: 1.45, w: 4.5, h: 5.4, fontFace: F, fontSize: 11, color: INK, valign: "top", fit: "shrink" }); return; }
+        if (s.k === "data") { head(sl, "Data flow & sync (web + both apps)", n); [["📥 Input", "Uploads, forms, scans, AI research"], ["☁️ Server", "One shared database — saved once"], ["🖥️📱 Everywhere", "Web portal · Admin app · State app"]].forEach(function (b, k) { var X = 0.6 + k * 4.25; sl.addShape(P.ShapeType.roundRect, { x: X, y: 1.3, w: 3.6, h: 1.8, fill: { color: "FFFFFF" }, line: { color: k === 1 ? B2 : B, width: 2 }, rectRadius: 0.15 }); sl.addText([{ text: b[0], options: { bold: true, fontSize: 18, color: INK, breakLine: true } }, { text: b[1], options: { fontSize: 12, color: MU } }], { x: X, y: 1.3, w: 3.6, h: 1.8, align: "center", valign: "middle", fontFace: F }); if (k < 2) sl.addShape(P.ShapeType.line, { x: X + 3.65, y: 2.2, w: 0.55, h: 0, line: { color: B, width: 3, endArrowType: "triangle" } }); }); sl.addText(bullets(M.dataFlow), { x: 0.6, y: 3.5, w: 12.2, h: 3.3, fontFace: F, fontSize: 12.5, color: INK, valign: "top", fit: "shrink" }); return; }
+        if (s.k === "faq") { head(sl, "FAQs & troubleshooting", n); var Q = A(M.faqs).slice(0, 5).map(function (f) { return ["❓ " + f.q, f.a]; }).concat(A(M.troubleshooting).slice(0, 3).map(function (f) { return ["🔧 " + f.problem, f.fix]; })); Q.forEach(function (q, k) { var c = k % 2, r = Math.floor(k / 2), X = 0.45 + c * 6.3, Y = 1.1 + r * 1.45; sl.addShape(P.ShapeType.roundRect, { x: X, y: Y, w: 6.05, h: 1.3, fill: { color: "FFFFFF" }, line: { color: "E1E3EE", width: 1 }, rectRadius: 0.08 }); sl.addText([{ text: String(q[0]), options: { bold: true, fontSize: 12, color: INK, breakLine: true } }, { text: String(q[1] || ""), options: { fontSize: 10.5, color: MU } }], { x: X + 0.12, y: Y + 0.06, w: 5.8, h: 1.18, fontFace: F, valign: "top", fit: "shrink" }); }); return; }
+        if (s.k === "gloss") { head(sl, "Glossary", n); A(M.glossary).slice(0, 12).forEach(function (g, k) { var c = k % 3, r = Math.floor(k / 3), X = 0.45 + c * 4.2, Y = 1.1 + r * 1.42; sl.addShape(P.ShapeType.roundRect, { x: X, y: Y, w: 4, h: 1.28, fill: { color: "FFFFFF" }, line: { color: "E1E3EE", width: 1 }, rectRadius: 0.08 }); sl.addText([{ text: String(g.term), options: { bold: true, fontSize: 12.5, color: B, breakLine: true } }, { text: String(g.meaning || ""), options: { fontSize: 10.5, color: INK } }], { x: X + 0.12, y: Y + 0.06, w: 3.76, h: 1.16, fontFace: F, valign: "top", fit: "shrink" }); }); return; }
+      });
+      return P.write({ outputType: "blob" }).then(function (blob) { download(blob, fname("pptx")); busy(false, "✅ PowerPoint ready — " + tot + " editable slides"); });
+    }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  // ---------- 🖼️ one-pager creative ----------
+  function makeOne() {
+    var M = MAN, O = M.onePager || {}, st = $("stage"); busy(true, "Designing the one-pager…");
+    var shots = SHOTS.slice(0, 3);
+    st.innerHTML = '<div style="width:1080px;height:1528px;position:relative;overflow:hidden;font-family:' + CSSF + ';background:#F5F6FB;color:#1B1D2E"><div style="background:linear-gradient(135deg,#4D5BF9,#7A4CFF);color:#fff;padding:60px 64px 120px"><div style="font-size:22px;font-weight:700;opacity:.85">vivo Business Innovation</div><div style="font-size:66px;font-weight:900;line-height:1.08;margin-top:18px">' + esc(O.headline || M.title || SEL.name) + '</div><div style="font-size:26px;margin-top:16px;opacity:.95">' + esc(M.tagline || "") + '</div></div><div style="display:flex;justify-content:center;gap:26px;margin-top:-90px">' + shots.map(function (s, i) { return '<div style="width:250px;height:540px;border-radius:30px;border:8px solid #1B1D2E;overflow:hidden;background:#fff;box-shadow:0 18px 40px rgba(20,24,51,.25);transform:translateY(' + (i === 1 ? -14 : 10) + 'px)"><img src="' + s.src + '" style="width:100%;display:block"></div>'; }).join("") + '</div><div style="display:flex;gap:18px;padding:40px 64px 0">' + A(O.benefits).slice(0, 3).map(function (b, i) { return '<div style="flex:1;background:#fff;border-radius:20px;padding:22px;box-shadow:0 6px 18px rgba(20,24,51,.07)"><div style="font-size:40px">' + ["⚡", "🎯", "🔄"][i] + '</div><div style="font-size:21px;font-weight:800;margin-top:8px;line-height:1.3">' + esc(b) + "</div></div>"; }).join("") + '</div><div style="padding:34px 64px 0"><div style="font-size:28px;font-weight:900">How it works</div><div style="display:flex;gap:12px;margin-top:16px;align-items:stretch">' + A(O.steps).slice(0, 5).map(function (s, i, L) { return '<div style="flex:1;position:relative;background:#fff;border-radius:18px;padding:18px 14px;border-top:6px solid #4D5BF9"><div style="width:40px;height:40px;border-radius:50%;background:#4D5BF9;color:#fff;font-weight:900;font-size:20px;display:flex;align-items:center;justify-content:center">' + (i + 1) + '</div><div style="font-size:18px;font-weight:700;margin-top:10px;line-height:1.3">' + esc(s) + "</div></div>"; }).join("") + '</div></div><div style="position:absolute;left:64px;right:64px;bottom:50px;background:#1B1D2E;color:#fff;border-radius:22px;padding:24px 30px;display:flex;align-items:center;gap:20px"><div style="font-size:24px;font-weight:800;flex:1">' + esc(O.cta || "Open it from All tools — web portal, Admin app or State app") + '</div><div style="font-size:16px;opacity:.75">' + esc(SEL.group.replace(/^[^\w]+/, "")) + "</div></div></div>";
+    lib("img").then(function () { return wait(80); }).then(function () { return window.htmlToImage.toBlob(st.firstChild, { width: 1080, height: 1528, pixelRatio: 1.5 }); }).then(function (blob) { st.innerHTML = ""; download(blob, fname("png").replace("Manual_", "OnePager_")); busy(false, "✅ One-pager ready (PNG, 1620 × 2292)"); }).catch(function (e) { st.innerHTML = ""; busy(false, "❌ " + (e.message || e)); });
+  }
+  // ---------- 🎬 walkthrough video (canvas → WebM, recorded in the browser) ----------
+  function makeVideo() {
+    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return toast("This device can't record video — try Chrome on a laptop.");
+    busy(true, "Drawing scenes…");
+    renderCanvases(function (p) { prog(p * 0.3); }).then(function (cvs) {
+      var V = document.createElement("canvas"); V.width = 1280; V.height = 720; var g = V.getContext("2d"), cap = A(MAN.videoScript), stream = V.captureStream(30);
+      var mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(function (m) { return MediaRecorder.isTypeSupported(m); }) || "", rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : {}), chunks = [];
+      rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+      var per = 4200, total = cvs.length * per, t0 = 0, done = false;
+      rec.onstop = function () { download(new Blob(chunks, { type: "video/webm" }), fname("webm").replace("Manual_", "Walkthrough_")); busy(false, "✅ Video ready — " + Math.round(total / 1000) + " s WebM (plays in Chrome / VLC; convert to MP4 if needed)"); };
+      var capFor = function (s, i) { if (s.k === "screen") { var nm = String((s.info || {}).name || (s.shot && s.shot.label) || "").toLowerCase(), c = cap.find(function (x) { return String(x.screen).toLowerCase().indexOf(nm.slice(0, 5)) >= 0; }); return c ? c.caption : (s.info && s.info.purpose) || ""; } return { title: MAN.tagline, overview: MAN.overview, nav: "How to move between screens", flow: s.title, settings: "Settings, rules & permissions", data: "One server — web portal and both apps stay in sync", faq: "Common questions", gloss: "Words used in this tool" }[s.k] || ""; };
+      var frame = function (ts) {
+        if (!t0) t0 = ts; var el = ts - t0, i = Math.min(cvs.length - 1, Math.floor(el / per)), f = (el % per) / per, c = cvs[i].cv, z = 1 + 0.06 * f;
+        g.fillStyle = "#000"; g.fillRect(0, 0, 1280, 720); g.save(); g.globalAlpha = f < 0.12 ? f / 0.12 : 1; g.translate(640, 360); g.scale(z, z); g.drawImage(c, -640, -360, 1280, 720); g.restore();
+        var txt = String(capFor(cvs[i].s, i) || "").slice(0, 140);
+        if (txt) { g.fillStyle = "rgba(20,22,40,.82)"; g.fillRect(0, 640, 1280, 80); g.fillStyle = "#fff"; g.font = "600 26px " + CSSF; g.textAlign = "center"; g.fillText(txt.length > 95 ? txt.slice(0, 92) + "…" : txt, 640, 690); }
+        g.fillStyle = "#7C8BFF"; g.fillRect(0, 716, 1280 * el / total, 4);
+        prog(0.3 + 0.7 * el / total);
+        if (el < total) requestAnimationFrame(frame); else if (!done) { done = true; setTimeout(function () { rec.stop(); }, 200); }
+      };
+      $("xs").textContent = "Recording " + Math.round(total / 1000) + " s… keep this screen open"; rec.start(500); requestAnimationFrame(frame);
+    }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  if (!ADMIN) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>Tool manuals are for HO admins.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>

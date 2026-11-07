@@ -53,6 +53,8 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   function readSheet(file) { return libX().then(function () { return file.arrayBuffer(); }).then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }), all = wb.SheetNames.map(function (n) { return window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); });
     // use the sheet whose header row has a Retailer ID (templates may have a "How to fill" sheet first)
     return all.find(function (A) { return A.length > 1 && A[0].some(function (h) { return /retailer\s*id|^rid$/i.test(String(h).trim()); }); }) || all.find(function (A) { return A.length > 1; }) || []; }); }
+  function readBook(file) { return libX().then(function () { return file.arrayBuffer(); }).then(function (buf) { var wb = window.XLSX.read(buf, { type: "array" }); return wb.SheetNames.map(function (n) { return window.XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }); }); }); }
+  function libPI() { return window.PAYITEMS ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/payitems.js?v=1"; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
   function pickFile(acc, cb) { var i = document.createElement("input"); i.type = "file"; i.accept = acc; i.onchange = function () { if (i.files[0]) cb(i.files[0]); }; i.click(); }
   function col(H, re) { for (var i = 0; i < H.length; i++) if (re.test(String(H[i]).toLowerCase())) return i; return -1; }
   function xdate(v) { if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10); var s = String(v || "").trim(), m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(s); if (m) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ""; }
@@ -146,6 +148,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     $("mon").onchange = function () { MON = this.value; dash(); };
     $("pdf").onclick = letterPdf; $("wa").onclick = shareText; $("buy").onclick = buyFlow;
     if ($("adj")) $("adj").onclick = adjust;
+    [].forEach.call(VIEW.querySelectorAll("[data-items]"), function (b) { b.onclick = function () { var l = mLines[+b.dataset.items]; Promise.all([libPI(), api({ action: "rp-items", id: l.batch, row: l.row })]).then(function (x) { var r = x[1]; if (!r.ok) return toast(r.error); PAYITEMS.show(r.items, r.line, { sheet: sheet, esc: esc, download: download, xlsx: xlsx }); }); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-ver]"), function (b) { b.onclick = function () { verify(mLines[+b.dataset.ver], b.parentNode.parentNode.querySelector(".vres")); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { query(mLines[+b.dataset.q]); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { sheet("Remove this ledger line?", "", [["🗑️", "Remove", function () { api({ action: "rp-entry-delete", rid: me.rid, entry: b.dataset.del }).then(function (x) { if (!x.ok) return toast(x.error); openRetailer(me.rid); }); }, "danger"]]); }; });
@@ -162,7 +165,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       '<div class="pl"><span>Gross payout</span><b>' + rs(l.gross) + "</b></div>" + (l.ded ? '<div class="pl"><span>Deductions' + (inf.dedReason ? " (" + esc(inf.dedReason) + ")" : "") + '</span><b class="neg">−' + rs(l.ded) + "</b></div>" : "") + (l.tds ? '<div class="pl"><span>TDS</span><b class="neg">−' + rs(l.tds) + "</b></div>" : "") +
       '<div class="pl" style="border:0;font-size:15px"><b>Net payout</b><b class="pos">' + rs(l.net) + "</b></div></div>" +
       (l.remarks ? '<div class="muted" style="font-size:12px">ℹ️ ' + esc(l.remarks) + "</div>" : "") + (l.query ? '<div class="notice" style="margin-top:6px">🚩 ' + esc(l.query.note) + ' <span class="muted">— ' + esc(l.query.by) + "</span></div>" : "") +
-      '<div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" data-ver="' + i + '">✔ Verify this payout</button><button class="btn ghost sm" data-q="' + i + '">' + (l.query ? "Clear query" : "🚩 Raise query") + '</button></div><div class="vres"></div></div>';
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">' + (l.ni ? '<button class="btn pri sm" data-items="' + i + '">📄 IMEI / model report (' + l.ni + ")</button>" : "") + '<button class="btn sec sm" data-ver="' + i + '">✔ Verify this payout</button><button class="btn ghost sm" data-q="' + i + '">' + (l.query ? "Clear query" : "🚩 Raise query") + '</button></div><div class="vres"></div></div>';
   }
   function ledger() {
     var E = RET.entries; if (!E.length) return '<div class="muted" style="font-size:13px;margin-top:6px">No published credits or debits yet.</div>';
@@ -449,7 +452,12 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
         ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "S2FE Double Bonanza", "Slab 2: 6-9 units @ 1.5%", 10, 7, 70, 7, 140000, 2100, 630, "70% payout - monthly target missed", 0, 1470, "Uploaded on V-Work"],
         ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "Sellout payout", "X/V/S series 5.5% (>=90%)", 200000, 190000, 95, "", 150000, 8250, "", "", 0, "", ""],
         ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "Sellout payout", "Y51 Pro 4 x Rs1550", "", "", "", 4, "", 6200, "", "", 0, "", ""]] },
-        { name: "How to fill", rows: [["Column", "What to enter"], ["Retailer ID", "Required — the same ID used everywhere (vChat / DMS)"], ["Month", "Payout month, e.g. " + NOWM + " (one batch is made per month)"], ["Scheme", "Scheme name. Several rows with the same retailer + scheme are added up as breakup lines"], ["Payout line / slab", "What this amount is for — shown to the retailer and in the PDF letter"], ["Target / Achieved / Achievement %", "Optional but recommended — used in the dashboard, letter and the Verify check"], ["Gross / Deduction / TDS / Net", "Gross payout before cuts; Net = Gross − Deduction − TDS (left blank = calculated). Verify flags rows where they don't add up"]] }]), "Manual_payout_template.xlsx");
+        { name: "IMEI & model details", rows: [["Retailer ID", "Month (YYYY-MM)", "Scheme", "IMEI (optional)", "Model", "Qty", "Sale / activation date", "Sale value (Rs)", "Eligible (Y/N)", "Payout per unit (Rs)", "Payout amount (Rs)", "Remark"],
+          ["BRE010294", NOWM, "S2FE Double Bonanza", "356938035643809", "S2FE 8+256", 1, NOWM + "-04", 20000, "Y", 300, 300, ""],
+          ["BRE010294", NOWM, "S2FE Double Bonanza", "356938035643817", "S2FE 8+256", 1, NOWM + "-09", 20000, "Y", 300, 300, ""],
+          ["BRE010294", NOWM, "S2FE Double Bonanza", "356938035643825", "S2FE 8+128", 1, NOWM + "-11", 18000, "N", 0, 0, "Activated outside the scheme period"],
+          ["BRE010294", NOWM, "Sellout payout", "", "Y51 Pro", 4, "", 70000, "Y", 1550, 6200, "Model-wise row (no IMEI)"]] },
+        { name: "How to fill", rows: [["Column", "What to enter"], ["— Sheet “IMEI & model details” —", "Optional. One row per IMEI (Qty 1) or one row per model with its Qty. Retailer ID + Month + Scheme link each row to that retailer’s payout line. Each retailer then sees and downloads only their own list for that scheme (Retailer payouts, the PDF letter’s summary and their Retailer-portal link). If a retailer + scheme has detail rows but no row in “Payouts”, a payout line is made from the Payout amount column."], ["— Sheet “Payouts” —", "One row per retailer per scheme (breakup lines allowed) — as before."], ["Retailer ID", "Required — the same ID used everywhere (vChat / DMS)"], ["Month", "Payout month, e.g. " + NOWM + " (one batch is made per month)"], ["Scheme", "Scheme name. Several rows with the same retailer + scheme are added up as breakup lines"], ["Payout line / slab", "What this amount is for — shown to the retailer and in the PDF letter"], ["Target / Achieved / Achievement %", "Optional but recommended — used in the dashboard, letter and the Verify check"], ["Gross / Deduction / TDS / Net", "Gross payout before cuts; Net = Gross − Deduction − TDS (left blank = calculated). Verify flags rows where they don't add up"]] }]), "Manual_payout_template.xlsx");
     };
     $("imp").onclick = function () { pickFile(".xlsx,.xls,.csv", importManual); };
     $("tocalc").onclick = function () { TAB = "calc"; draw(); };
@@ -461,11 +469,14 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   }
   function importManual(file) {
     $("impres").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading…</div>';
-    readSheet(file).then(function (A) {
+    readBook(file).then(function (book) {
+      var isPay = function (A) { return A.length > 1 && A[0].some(function (h) { return /retailer\s*id|^rid$/i.test(String(h).trim()); }) && A[0].some(function (h) { return /gross|net/i.test(String(h)); }); };
+      var isDet = function (A) { return A.length > 1 && A[0].some(function (h) { return /retailer\s*id|^rid$/i.test(String(h).trim()); }) && A[0].some(function (h) { return /imei|model/i.test(String(h)); }) && A[0].some(function (h) { return /^qty|quantity|units/i.test(String(h).trim()); }) && !A[0].some(function (h) { return /gross/i.test(String(h)); }); };
+      var A = book.find(isPay) || [[]], DT = book.find(isDet);
       var H = A[0].map(function (h) { return String(h); }), c = {
         rid: col(H, /retailer\s*id|^rid|dealer\s*code|retailer\s*code/), name: col(H, /retailer\s*name|^name/), mobile: col(H, /mobile|phone/), state: col(H, /state/), city: col(H, /city|town/), month: col(H, /month/), scheme: col(H, /scheme/), line: col(H, /payout\s*line|slab|basis|component/),
         target: col(H, /^target/), achieved: col(H, /^achieved|achievement\s*\(?units|actual/), ach: col(H, /achievement\s*%|ach\s*%/), units: col(H, /^units/), value: col(H, /sale\s*value|value/), gross: col(H, /gross/), ded: col(H, /^deduction\s*\(|deduction \(rs|^deduction$/), dedr: col(H, /deduction\s*reason|reason/), tds: col(H, /tds/), net: col(H, /net/), remarks: col(H, /remark|note/) };
-      if (c.rid < 0) throw new Error("No “Retailer ID” column found — use the template.");
+      if (c.rid < 0 && !DT) throw new Error("No “Retailer ID” column found — use the template.");
       var g = (function (r, k) { return k < 0 ? "" : r[k]; }), groups = {}, months = {}, bad = 0;
       A.slice(1).forEach(function (r) {
         var rid = String(g(r, c.rid)).trim().toUpperCase(); if (!rid) return;
@@ -481,12 +492,31 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
         var rm = String(g(r, c.remarks) || "").trim(); if (rm) o.remarks.push(rm);
         months[m] = (months[m] || 0) + 1;
       });
+      // IMEI / model details → attached to their retailer × scheme payout line
+      var nItems = 0, orphan = 0, made = 0;
+      if (DT) {
+        var DH = DT[0].map(function (h) { return String(h); }), d = { rid: col(DH, /retailer\s*id|^rid/), month: col(DH, /month/), scheme: col(DH, /scheme/), imei: col(DH, /imei/), model: col(DH, /model/), qty: col(DH, /^qty|quantity|^units/), date: col(DH, /date/), value: col(DH, /sale\s*value|value/), elig: col(DH, /eligible/), pu: col(DH, /per\s*unit/), amt: col(DH, /payout\s*amount|^amount|payout \(rs/), rem: col(DH, /remark|note/) };
+        var byKey = {}; Object.keys(groups).forEach(function (k) { var o = groups[k]; byKey[o.rid + "|" + o.scheme.toLowerCase()] = byKey[o.rid + "|" + o.scheme.toLowerCase()] || o; });
+        DT.slice(1).forEach(function (r) {
+          var rid = String(g(r, d.rid)).trim().toUpperCase(), sch = String(g(r, d.scheme) || "").trim(); if (!rid || !sch) return;
+          var imei = String(g(r, d.imei) || "").replace(/\D/g, ""), model = String(g(r, d.model) || "").trim(); if (!imei && !model) return;
+          var m = xmonth(g(r, d.month)) || "", k = m + "|" + rid + "|" + sch, o = groups[k] || byKey[rid + "|" + sch.toLowerCase()];
+          var qty = numv(g(r, d.qty)); qty = qty == null ? 1 : qty; var el = String(g(r, d.elig)).trim().toUpperCase(), pu = numv(g(r, d.pu)) || 0, amt = numv(g(r, d.amt)); var ok = !(el === "N" || el === "NO" || el === "0");
+          if (amt == null) amt = ok ? pu * qty : 0;
+          if (!o) { o = groups[k] = { month: m, rid: rid, name: "", mobile: "", state: "", city: "", scheme: sch, parts: [], ded: 0, tds: 0, net: null, info: {}, remarks: [], auto: true }; byKey[rid + "|" + sch.toLowerCase()] = o; made++; if (m) months[m] = (months[m] || 0) + 1; }
+          var dv = g(r, d.date), ds = dv === "" ? "" : (typeof dv === "number" ? xdate(dv) : String(dv).slice(0, 10));
+          (o.items = o.items || []).push([imei, model, qty, ds, numv(g(r, d.value)) || 0, ok ? 1 : 0, pu, amt, String(g(r, d.rem) || "").trim()]); nItems++;
+        });
+        Object.keys(groups).forEach(function (k) { var o = groups[k]; if (o.auto) { var tot = (o.items || []).reduce(function (a, it) { return a + (it[7] || 0); }, 0); if (tot) { o.parts = [{ label: "As per IMEI / model list", amount: tot }]; } else { delete groups[k]; orphan++; } }
+          if (o.items && o.info.units == null) o.info.units = o.items.reduce(function (a, it) { return a + (it[5] ? it[2] : 0); }, 0); });
+      }
       var list = Object.keys(groups).map(function (k) { var o = groups[k]; o.gross = o.parts.reduce(function (a, p) { return a + (Number(p.amount) || 0); }, 0); if (o.net == null) o.net = o.gross - o.ded - o.tds; o.remarks = o.remarks.join("; "); if (o.info.ach == null && o.info.target && o.info.achieved != null) o.info.ach = Math.round(o.info.achieved / o.info.target * 1000) / 10; return o; });
       if (!list.length) throw new Error("No payout rows found (each row needs a Retailer ID and a Gross or Net payout).");
       var noMonth = list.filter(function (o) { return !o.month; }).length;
       var mm = Object.keys(months).filter(Boolean).sort();
       var bal = list.filter(function (o) { return Math.abs(o.gross - o.ded - o.tds - o.net) > 1; }).length;
       $("impres").innerHTML = '<div class="card" style="background:#F7F8FC"><b>Preview</b><div style="font-size:13px;margin-top:4px">' + list.length + " retailer × scheme lines · " + new Set(list.map(function (o) { return o.rid; })).size + " retailers · total " + rs(list.reduce(function (a, o) { return a + o.net; }, 0)) + "</div>" +
+        (DT ? '<div style="font-size:13px;margin-top:4px">📄 ' + nItems.toLocaleString("en-IN") + " IMEI / model rows attached to " + list.filter(function (o) { return o.items; }).length + " payout lines" + (made ? " · " + made + " line(s) made from the detail sheet" : "") + (orphan ? ' · <span style="color:#B42318">' + orphan + " retailer × scheme detail group(s) skipped — no payout row and no payout amount</span>" : "") + "</div>" : "") +
         (bad ? '<div class="muted" style="font-size:12px">' + bad + " row(s) skipped — no payout amount.</div>" : "") + (bal ? '<div class="notice" style="margin-top:6px">⚠️ ' + bal + " line(s) where Gross − Deduction − TDS ≠ Net. They’ll show as failed in Verify — fix the file or continue.</div>" : "") +
         (noMonth ? '<label class="lb">Month for rows without one</label><input class="tx" type="month" id="dm" value="' + NOWM + '">' : "") +
         '<label class="lb">Batch title</label><input class="tx" id="bt" value="Manual payouts ' + esc(file.name.replace(/\.[a-z]+$/i, "")).slice(0, 80) + '">' +
@@ -501,6 +531,16 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       };
     }).catch(function (e) { $("impres").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
   }
+  // one click: each retailer gets their own Retailer-portal link (payout letter lines + IMEI / model report to download)
+  function shareBatch(b) {
+    var bt = $("shr"); bt.disabled = true; bt.textContent = "Making links…";
+    api({ action: "rp-share", id: b.id, days: 30 }).then(function (r) {
+      bt.disabled = false; bt.textContent = "📤 Send to all retailers"; if (!r.ok) return toast(r.error);
+      var base = location.origin + "/retailerportal.html?k=", L = r.items.map(function (x) { var url = base + x.k, ph = String(x.mobile || "").replace(/\D/g, ""), msg = "Dear " + (x.name || "Partner") + ", your vivo payout for " + mlabel(r.month) + " (" + x.schemes.join(", ") + "): " + rs(x.net) + "." + (x.items ? " Your IMEI / model-wise report is on your page." : "") + " Check and download here: " + url; return Object.assign(x, { url: url, wa: "https://wa.me/" + (ph.length === 10 ? "91" + ph : ph) + "?text=" + encodeURIComponent(msg), msg: msg }); });
+      var ov = sheet("📤 Send payouts to " + L.length + " retailers", "Each link opens only that retailer’s page: payout per scheme, deductions, and the IMEI / model report to download. Valid 30 days.", [["⬇", "Excel with all links (bulk WhatsApp / SMS)", function () { download(xlsx([{ name: "Send", rows: [["Retailer ID", "Retailer", "Mobile", "State", "Schemes", "Net payout", "IMEI / model rows", "Link", "WhatsApp link", "Message"]].concat(L.map(function (x) { return [x.rid, x.name, x.mobile, x.state, x.schemes.join(", "), x.net, x.items, x.url, x.wa, x.msg]; })) }]), "Payout_links_" + r.month + ".xlsx"); }, "pri"], ["📋", "Copy all messages", function () { try { navigator.clipboard.writeText(L.map(function (x) { return x.msg; }).join("\n\n")); toast("Copied"); } catch (e) { } }]],
+        '<div style="max-height:52vh;overflow:auto;margin-top:8px">' + L.map(function (x) { return '<div class="row" style="gap:6px;border-top:1px solid #EEF0F6;padding:7px 0"><div style="flex:1;min-width:0;font-size:12.5px"><b>' + esc(x.name || x.rid) + '</b><div class="muted">' + esc(x.rid) + " · " + rs(x.net) + (x.items ? " · 📄 " + x.items : "") + '</div></div><a class="btn sec sm" href="' + esc(x.wa) + '" target="_blank" rel="noopener" style="text-decoration:none">💬 WhatsApp</a></div>'; }).join("") + "</div>");
+    });
+  }
   function openBatch(id) {
     VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
     api({ action: "rp-batch-get", id: id }).then(function (r) {
@@ -510,9 +550,10 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Batches</button><div class="card"><div class="row"><b style="flex:1;font-size:16px">' + esc(b.title) + '</b><span class="bdg ' + (pub ? "b-pub" : "b-dr") + '">' + (pub ? "Published" : "Draft") + '</span></div><div class="muted" style="font-size:12.5px">' + mlabel(b.month) + " · " + b.count + " lines · " + (b.source === "calc" ? "from the payout calculator" : "manual Excel") + " · by " + esc(b.by || "") + (pub ? " · published" : "") + "</div>" +
         '<div class="tiles" style="margin-top:10px">' + tile("💰", "#E6F4EA", rs(b.total), "Total net payout") + tile("👥", "#EEF0FF", new Set(b.rows.map(function (x) { return x.rid; })).size, "Retailers") + tile("🧩", "#F4EEFF", Object.keys(bys).length, "Schemes") + tile(bad ? "⚠️" : "✅", bad ? "#FDECEC" : "#E6F4EA", bad, "Lines that don’t add up") + "</div>" +
         hbars(Object.keys(bys).map(function (k) { return [k, bys[k]]; }), "#1E9E61") +
-        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">' + (ADMIN ? (pub ? '<button class="btn sec" id="unp">↩ Unpublish</button>' : '<button class="btn ok" id="pubb">🚀 Publish to retailer balances</button>') : '<span class="muted" style="font-size:12.5px">' + (pub ? "Published by HO." : "Waiting for HO to publish.") + "</span>") + (!pub ? '<button class="btn ghost" id="del" style="color:var(--bad)">🗑️ Delete draft</button>' : "") + '<button class="btn ghost" id="bx">⬇ Excel</button></div></div>' +
+        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">' + (ADMIN ? (pub ? '<button class="btn sec" id="unp">↩ Unpublish</button>' : '<button class="btn ok" id="pubb">🚀 Publish to retailer balances</button>') : '<span class="muted" style="font-size:12.5px">' + (pub ? "Published by HO." : "Waiting for HO to publish.") + "</span>") + (!pub ? '<button class="btn ghost" id="del" style="color:var(--bad)">🗑️ Delete draft</button>' : "") + '<button class="btn ghost" id="bx">⬇ Excel</button>' + (pub ? '<button class="btn pri" id="shr">📤 Send to all retailers</button>' : "") + "</div>" + (b.rows.some(function (x) { return x.ni; }) ? '<div class="muted" style="font-size:12px;margin-top:6px">📄 ' + b.rows.filter(function (x) { return x.ni; }).length + " lines have an IMEI / model report (" + b.rows.reduce(function (a, x) { return a + (x.ni || 0); }, 0).toLocaleString("en-IN") + " rows) — retailers download it from their link.</div>" : "") + "</div>" +
         '<div class="tbw"><table class="dt"><tr><th>Retailer</th><th>Scheme</th><th class="n">Ach %</th><th class="n">Gross</th><th class="n">Deduct.</th><th class="n">TDS</th><th class="n">Net</th><th>Check</th></tr>' + b.rows.map(function (x) { var okA = Math.abs(x.gross - x.ded - x.tds - x.net) <= 1; return '<tr data-r="' + esc(x.rid) + '" style="cursor:pointer"><td><b>' + esc(x.rid) + "</b>" + (x.name ? '<br><span class="muted">' + esc(x.name) + "</span>" : "") + "</td><td>" + esc(x.scheme) + (x.query ? ' <span class="bdg b-q">🚩</span>' : "") + '</td><td class="n">' + pc(x.info && x.info.ach) + '</td><td class="n">' + rs(x.gross) + '</td><td class="n">' + (x.ded ? rs(x.ded) : "") + '</td><td class="n">' + (x.tds ? rs(x.tds) : "") + '</td><td class="n"><b>' + rs(x.net) + "</b></td><td>" + (okA ? "✅" : "⚠️") + "</td></tr>"; }).join("") + "</table></div>";
       $("bk").onclick = function () { location.hash = ""; };
+      if ($("shr")) $("shr").onclick = function () { shareBatch(b); };
       [].forEach.call(VIEW.querySelectorAll("tr[data-r]"), function (tr) { tr.onclick = function () { MON = b.month; location.hash = "r=" + encodeURIComponent(tr.dataset.r); }; });
       if ($("pubb")) $("pubb").onclick = function () { sheet("Publish " + rs(b.total) + "?", b.count + " payout lines go into retailer balances for " + mlabel(b.month) + (bad ? ". ⚠️ " + bad + " line(s) don't add up." : "."), [["🚀", "Publish", function () { api({ action: "rp-publish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); toast("Published"); openBatch(b.id); }); }]]); };
       if ($("unp")) $("unp").onclick = function () { sheet("Unpublish this batch?", "Its payouts are taken out of retailer balances (vouchers already bought stay).", [["↩", "Unpublish", function () { api({ action: "rp-unpublish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); openBatch(b.id); }); }, "danger"]]); };

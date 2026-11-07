@@ -35,8 +35,10 @@ function cleanRow(x, defState) {
   const models = (Array.isArray(x.info && x.info.models) ? x.info.models : []).slice(0, 30).map((m) => ({ name: str(m && m.name, 40), target: numOr(m && m.target), sold: numOr(m && m.sold) })).filter((m) => m.name);
   if (models.length) info.models = models;
   const next = x.next && typeof x.next === "object" ? { need: numOr(x.next.need), model: str(x.next.model, 40), gain: money(x.next.gain) } : null;
+  // IMEI / model-wise detail for this payout line: [imei, model, qty, date, value, eligible 1|0, payout per unit, payout amount, remark]
+  const items = (Array.isArray(x.items) ? x.items : []).slice(0, 5000).map((it) => Array.isArray(it) ? [str(it[0], 20).replace(/[^0-9A-Za-z]/g, ""), str(it[1], 50), numOr(it[2]) == null ? 1 : numOr(it[2]), str(it[3], 10), money(it[4]), it[5] === 0 || it[5] === "N" || it[5] === false ? 0 : 1, money(it[6]), money(it[7]), str(it[8], 80)] : null).filter((it) => it && (it[0] || it[1]));
   let input = null; if (x.input && typeof x.input === "object") { try { const s = JSON.stringify(x.input); if (s.length < 60000) input = JSON.parse(s); } catch (e) { } }
-  return { rid: RID(x.rid), name: str(x.name, 80), mobile: str(x.mobile, 20), state: str(x.state, 40) || defState || "", city: str(x.city, 60), scheme: str(x.scheme, 100) || "Scheme", skey: str(x.skey, 40), parts, gross: Math.round(gross * 100) / 100, ded, tds, net: Math.round(net * 100) / 100, info, next, input, remarks: str(x.remarks, 300), query: x.query ? { by: str(x.query.by, 60), at: Number(x.query.at) || 0, note: str(x.query.note, 300) } : null };
+  return { rid: RID(x.rid), name: str(x.name, 80), mobile: str(x.mobile, 20), state: str(x.state, 40) || defState || "", city: str(x.city, 60), scheme: str(x.scheme, 100) || "Scheme", skey: str(x.skey, 40), parts, gross: Math.round(gross * 100) / 100, ded, tds, net: Math.round(net * 100) / 100, info, next, input, items: items.length ? items : undefined, remarks: str(x.remarks, 300), query: x.query ? { by: str(x.query.by, 60), at: Number(x.query.at) || 0, note: str(x.query.note, 300) } : null };
 }
 
 export async function rpayAction(b, ctx) {
@@ -90,7 +92,7 @@ export async function rpayAction(b, ctx) {
   if (b.action === "rp-batch-get") {
     const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });
     const rows = visRows(x); if (!isAdmin && !rows.length) return json(403, { ok: false, error: "Not your state." });
-    return json(200, { ok: true, batch: Object.assign(pubBatch(Object.assign({}, x, { rows })), { rows: rows.map((r) => Object.assign({}, r, { input: undefined })) }) });
+    return json(200, { ok: true, batch: Object.assign(pubBatch(Object.assign({}, x, { rows })), { rows: rows.map((r) => Object.assign({}, r, { input: undefined, items: undefined, ni: (r.items || []).length, nq: (r.items || []).reduce((a, it) => a + (it[5] ? it[2] : 0), 0) })) }) });
   }
   if (b.action === "rp-batch-delete") {
     const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(200, { ok: true });
@@ -140,12 +142,27 @@ export async function rpayAction(b, ctx) {
     const rid = RID(b.rid), r = await getR(rid);
     const batches = (await pool(await store.list("rpb:"), 30, (k) => store.get(k))).filter(Boolean);
     const lines = [];
-    batches.forEach((x) => x.rows.forEach((row, i) => { if (row.rid === rid) lines.push({ batch: x.id, row: i, title: x.title, month: x.month, status: x.status, source: x.source, scheme: row.scheme, parts: row.parts, gross: row.gross, ded: row.ded, tds: row.tds, net: row.net, info: row.info, next: row.next, remarks: row.remarks, query: row.query, verifiable: !!(row.input && row.skey && x.schemes && x.schemes[row.skey]), name: row.name, state: row.state, city: row.city, mobile: row.mobile }); }));
+    batches.forEach((x) => x.rows.forEach((row, i) => { if (row.rid === rid) lines.push({ batch: x.id, row: i, title: x.title, month: x.month, status: x.status, source: x.source, scheme: row.scheme, parts: row.parts, gross: row.gross, ded: row.ded, tds: row.tds, net: row.net, info: row.info, next: row.next, remarks: row.remarks, query: row.query, verifiable: !!(row.input && row.skey && x.schemes && x.schemes[row.skey]), ni: (row.items || []).length, nq: (row.items || []).reduce((a, it) => a + (it[5] ? it[2] : 0), 0), name: row.name, state: row.state, city: row.city, mobile: row.mobile }); }));
     const st = (r && r.state) || (lines[0] && lines[0].state) || "";
     if (!r && !lines.length) return json(404, { ok: false, error: "No payouts for this retailer yet." });
     if (!seeState(st)) return json(403, { ok: false, error: "This retailer is in another state." });
     const base = r || { rid, name: lines[0].name, mobile: lines[0].mobile, state: st, city: lines[0].city, entries: [] };
     return json(200, { ok: true, retailer: { rid, name: base.name, mobile: base.mobile, state: base.state, city: base.city }, entries: (base.entries || []).sort((a, c) => (a.date || "").localeCompare(c.date || "") || a.at - c.at), summary: sum(base), lines: lines.sort((a, c) => (c.month || "").localeCompare(a.month || "")) });
+  }
+  if (b.action === "rp-items") {   // IMEI / model-wise report behind one payout line
+    const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });
+    const row = x.rows[Number(b.row)]; if (!row || !seeState(row.state)) return json(404, { ok: false, error: "Not found." });
+    return json(200, { ok: true, items: row.items || [], line: { rid: row.rid, name: row.name, scheme: row.scheme, month: x.month, net: row.net, title: x.title, status: x.status } });
+  }
+  if (b.action === "rp-share") {   // one click: a read-only Retailer-portal link for every retailer in a batch (reuses active links)
+    const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });
+    if (x.status !== "published") return json(400, { ok: false, error: "Publish the batch first — retailers only see published payouts." });
+    const days = Math.max(7, Math.min(90, Number(b.days) || 30)), byR = {};
+    visRows(x).forEach((r) => { const o = byR[r.rid] || (byR[r.rid] = { rid: r.rid, name: r.name, mobile: r.mobile, state: r.state, net: 0, items: 0, schemes: [] }); o.net += r.net; o.items += (r.items || []).length; if (!o.schemes.includes(r.scheme)) o.schemes.push(r.scheme); });
+    const active = {}; for (const k of await store.list("rtplink:")) { const L = await store.get(k); if (L && byR[L.rid] && !L.revoked && L.exp > t + 5 * 864e5) active[L.rid] = k.slice(8); }
+    const { randomBytes } = await import("node:crypto");
+    const out = await pool(Object.values(byR), 20, async (o) => { let k = active[o.rid]; if (!k) { k = randomBytes(16).toString("hex"); await store.set(`rtplink:${k}`, { rid: o.rid, at: t, by, exp: t + days * 864e5, via: "payout-batch" }); } return Object.assign(o, { net: Math.round(o.net * 100) / 100, k }); });
+    return json(200, { ok: true, items: out, month: x.month, title: x.title });
   }
   if (b.action === "rp-verify") {   // the exact rules + the retailer's numbers, so the page can re-run the payout engine
     const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });

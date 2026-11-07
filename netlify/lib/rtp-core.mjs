@@ -130,7 +130,7 @@ async function portalData(store, pool, rid, opts) {
   const entries = ((pr && pr.entries) || []).map((e) => ({ date: e.date, month: e.month, type: e.type, kind: e.kind, amount: e.amount, scheme: e.scheme, note: e.note, item: e.item })).sort((a, c) => (c.date || "").localeCompare(a.date || ""));
   let cr = 0, dr = 0; entries.forEach((e) => { if (e.type === "cr") cr += e.amount; else dr += e.amount; });
   const lines = [];
-  for (const x of (await pool(await store.list("rpb:"), 30, (k) => store.get(k))).filter((x) => x && x.status === "published")) x.rows.forEach((row) => { if (row.rid === rid) lines.push({ title: x.title, month: x.month, scheme: row.scheme, gross: row.gross, ded: row.ded, tds: row.tds, net: row.net, info: row.info || {}, next: row.next || null, parts: (row.parts || []).slice(0, 12) }); });
+  for (const x of (await pool(await store.list("rpb:"), 30, (k) => store.get(k))).filter((x) => x && x.status === "published")) x.rows.forEach((row, ri) => { if (row.rid === rid) lines.push({ batch: x.id, row: ri, ni: (row.items || []).length, nq: (row.items || []).reduce((a, it) => a + (it[5] ? it[2] : 0), 0), title: x.title, month: x.month, scheme: row.scheme, gross: row.gross, ded: row.ded, tds: row.tds, net: row.net, info: row.info || {}, next: row.next || null, parts: (row.parts || []).slice(0, 12) }); });
   lines.sort((a, c) => (c.month || "").localeCompare(a.month || ""));
   // schemes that apply to this retailer's state
   const st = low(master.state);
@@ -185,6 +185,11 @@ export async function rtpPublic(b, ctx) {
     if (D.queries.filter((q) => q.status === "open").length >= 15) return json(429, { ok: false, error: "You already have many open queries — please wait for replies." });
     const q = { id: nid(t), rid: L.rid, rname: D.retailer.name, state: D.retailer.state, topic: RTP_TOPICS.includes(b.topic) ? b.topic : "Other", to: b.to === "ho" ? "ho" : "sales", text, status: "open", thread: [], at: t, by: str(b.name, 60) || D.retailer.name, via: "link" };
     await store.set(`rtpq:${q.id}`, q); return json(200, { ok: true, id: q.id });
+  }
+  if (b.action === "rtp-public-items") {   // the retailer's own IMEI / model report for one published payout line
+    const x = await store.get(`rpb:${str(b.batch, 30).replace(/[^a-z0-9]/gi, "")}`), row = x && x.rows[Number(b.row)];
+    if (!x || x.status !== "published" || !row || row.rid !== L.rid) return json(404, { ok: false, error: "Not found." });
+    return json(200, { ok: true, items: row.items || [], line: { scheme: row.scheme, month: x.month, net: row.net, title: x.title, name: row.name, rid: row.rid } });
   }
   if (b.action === "rtp-public-imei") { const i = IMEI(b.imei), il = (await store.get(`rtil:${L.rid}`)) || { items: [] }, x = il.items.find((y) => y.i === i); return json(200, x ? { ok: true, item: imeiOut(x, D.today), retailer: { rid: L.rid, name: D.retailer.name } } : { ok: false, error: "This IMEI isn't in your stock list." }); }
   if (b.action === "rtp-public-ordercat") return json(200, Object.assign({ ok: true }, await orderInfo(store, pool, L.rid, D)));
