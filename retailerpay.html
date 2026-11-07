@@ -431,6 +431,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     if (!route.sp) { route.sp = 1; try { var sp = new URLSearchParams(location.search).get("spol"); if (sp) { TAB = "calc"; draw(); policiesToRules([sp]); return; } } catch (e) { } }
     if ((m = /^r=(.+)$/.exec(h))) return openRetailer(decodeURIComponent(m[1]));
     if ((m = /^batch=(.+)$/.exec(h))) { TAB = "bat"; return openBatch(m[1]); }
+    if (h === "wa") { TAB = "bat"; draw(); if (!ADMIN) { toast("WhatsApp setup is for HO admins"); return; } api({ action: "rp-wa-get" }).then(function (r) { waSettings(r.ok ? r : {}); }); return; }
     draw();
   }
   window.addEventListener("hashchange", route);
