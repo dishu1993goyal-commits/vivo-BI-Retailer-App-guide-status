@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Competition analysis</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:7px 6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;vertical-align:top}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#666}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 2px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart,.cardx{background:var(--card);border-radius:16px;padding:12px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:16px;padding:13px;margin-top:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.bc{background:var(--card);border-radius:16px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06);cursor:pointer;border-top:4px solid #ccc}.bc b{font-size:14px}.bc .s{font-size:11.5px;color:var(--mut);margin-top:3px}
+.job{display:flex;gap:8px;align-items:center;background:#F4F2FF;border-radius:12px;padding:9px 12px;margin-top:8px;font-size:12.5px}
+.pos{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:8px}.pos div{border-radius:10px;padding:6px 4px;text-align:center;font-size:10.5px;line-height:1.3}.pos b{display:block;font-size:11px}
+.pos .leader{background:#13693F;color:#fff}.pos .strong{background:#4ACF8F;color:#063}.pos .present{background:#E6F4EA;color:#13693F}.pos .weak{background:#FFF4E5;color:#8A5300}.pos .absent{background:#F1F2F6;color:#999}
+.ul{margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.55}
+.msg{border-radius:14px;padding:9px 12px;margin-top:7px;font-size:13px;line-height:1.5;max-width:90%;white-space:pre-wrap}.msg.me{background:var(--brand);color:#fff;margin-left:auto}.msg.bot{background:var(--card);box-shadow:0 1px 7px rgba(20,24,51,.07)}
+.qk{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.qk button{border:1px solid #DADDF0;background:var(--card);border-radius:99px;padding:6px 11px;font:inherit;font-size:12px;cursor:pointer}
+.tent{font-size:11px;color:#8A5300;background:#FFF8EA;border-radius:8px;padding:5px 9px;margin-top:6px}
+@media (min-width:760px){.grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=2"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🥊</span></div>
+  <h1>Competition analysis</h1><p>Brands, price bands, states, offers, schemes and launches — AI web research + vivo field intel</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), TAB = "mkt", D = null, BR = null, CHAT = [], CS = null, POLL = null, IF = { brand: "", kind: "" };
+  var dd = function (t) { return t ? new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""; };
+  var arr = function (x) { return Array.isArray(x) ? x : []; };
+  window.__pageBack = function () { if (BR) { BR = null; draw(); return true; } if (TAB !== "mkt") { TAB = "mkt"; draw(); return true; } return false; };
+  function load() { return api({ action: "cmp-get" }).then(function (r) { if (!r.ok) throw new Error(r.error); D = r; }); }
+  function jobBar() {
+    var j = D.job, m = D.market;
+    if (j && j.status === "running") { return '<div class="job"><div class="spin" style="width:16px;height:16px;border-width:2px"></div><span style="flex:1">AI is researching the web… ' + esc(j.stage || "") + " (" + j.done.length + "/" + j.list.length + ")</span></div>"; }
+    return '<div class="job"><span style="flex:1">' + (m ? "Market researched " + dd(m.at) : "Not researched yet") + (j && j.errors && j.errors.length && j.end && Date.now() - j.end < 864e5 ? ' · <span style="color:#B42318">' + esc(j.errors[j.errors.length - 1]).slice(0, 90) + "</span>" : "") + "</span>" + (D.isHO ? '<button class="btn pri sm" id="rall">🔄 Refresh all with AI</button>' : '<button class="btn sec sm" id="rmk">🔄 Refresh market</button>') + "</div>";
+  }
+  function poll() { clearTimeout(POLL); if (D && D.job && D.job.status === "running") POLL = setTimeout(function () { load().then(function () { if (!BR) draw(); else poll(); }); }, 6000); }
+  function refresh(target) { api({ action: "cmp-refresh", target: target }).then(function (r) { if (!r.ok) return toast(r.error); toast(r.running ? "Research is already running" : "AI research started — takes a few minutes; you can leave this page"); load().then(draw); }); }
+  function draw() {
+    clearTimeout(POLL);
+    if (!D) { VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>'; return load().then(draw).catch(function (e) { VIEW.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; }); }
+    if (BR) return brandPage(BR);
+    var tabs = [["mkt", "🧭 Market"], ["brands", "🏷️ Brands"], ["trend", "📈 Trends & share"], ["intel", "🕵️ Field intel"], ["ask", "🤖 Ask AI"], ["cs", "📥 Counter share"]];
+    VIEW.innerHTML = jobBar() + '<div class="seg" style="overflow-x:auto;margin-top:8px">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    if ($("rall")) $("rall").onclick = function () { refresh("all"); }; if ($("rmk")) $("rmk").onclick = function () { refresh("market"); };
+    ({ mkt: tMkt, brands: tBrands, trend: tTrend, intel: tIntel, ask: tAsk, cs: tCs })[TAB](); poll();
+  }
+  // ---------- market ----------
+  function tMkt() {
+    var M = D.market && D.market.data;
+    if (!M) { $("tp").innerHTML = '<div class="card empty"><div class="big">🧭</div>No market research yet.<br>' + (D.isHO ? "Tap 🔄 Refresh all with AI (takes 3–8 minutes — it reads Counterpoint / IDC / Canalys reports, news and trade media)." : "Ask HO to run the research, or tap 🔄 Refresh market.") + "</div>"; return; }
+    var Q = arr(M.quarters).slice(-6), keys = []; Q.forEach(function (q) { Object.keys(q.shares || {}).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); }); });
+    keys.sort(function (a, b) { var s = function (k) { return Q.reduce(function (t, q) { return t + (+(q.shares || {})[k] || 0); }, 0); }; return s(b) - s(a); });
+    $("tp").innerHTML = '<div class="tent">⚠️ Market shares, price-band and state figures are AI estimates from public reports and news — directional, not official numbers. Your counter-share uploads (📥) are real data.</div>' +
+      '<div class="cardx"><b>Summary</b><div style="font-size:13px;line-height:1.6;margin-top:4px">' + esc(M.summary || "") + "</div>" + (M.vivoPosition ? '<div class="help" style="background:#EEF2FF"><b>Where vivo stands:</b> ' + esc(M.vivoPosition) + "</div>" : "") + "</div>" +
+      (Q.length ? '<div class="sh"><span>📊 Brand share by quarter (%)</span></div><div class="chart">' + BICH.stack({ rows: Q.map(function (q) { return { label: q.period, parts: q.shares || {} }; }), keys: keys.slice(0, 9), pct: true }) + '<div class="muted" style="font-size:11px">' + esc(arr(Q).map(function (q) { return q.period + ": " + (q.source || "?"); }).join(" · ")) + "</div></div>" : "") +
+      (arr(M.priceBands).length ? '<div class="sh"><span>💰 Who leads each price band</span></div><div class="tbw"><table class="tb"><tr><th>Price band</th><th>Leader</th><th>Top brands (est. %)</th></tr>' + M.priceBands.map(function (p) { var top = Object.keys(p.shares || {}).sort(function (a, b) { return p.shares[b] - p.shares[a]; }).slice(0, 4); return "<tr><td><b>" + esc(p.band) + '</b></td><td><span class="pill" style="background:' + BICH.color(p.leader) + ';color:#fff">' + esc(p.leader) + "</span></td><td>" + top.map(function (k) { return '<span style="white-space:nowrap">' + esc(k) + " <b>" + esc(p.shares[k]) + "</b></span>"; }).join(" · ") + (p.note ? '<br><small style="color:var(--mut)">' + esc(p.note) + "</small>" : "") + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      (arr(M.states).length ? '<div class="sh"><span>🗺️ State-wise brand strength</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Leader</th><th>Est. shares</th></tr>' + M.states.map(function (p) { var top = Object.keys(p.shares || {}).sort(function (a, b) { return p.shares[b] - p.shares[a]; }).slice(0, 4); return "<tr><td><b>" + esc(p.state) + '</b></td><td><span class="pill" style="background:' + BICH.color(p.leader) + ';color:#fff">' + esc(p.leader) + "</span></td><td>" + top.map(function (k) { return '<span style="white-space:nowrap">' + esc(k) + " <b>" + esc(p.shares[k]) + "</b></span>"; }).join(" · ") + (p.note ? '<br><small style="color:var(--mut)">' + esc(p.note) + "</small>" : "") + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      (arr(M.trends).length ? '<div class="sh"><span>📌 Market trends</span></div><div class="cardx"><ul class="ul">' + M.trends.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></div>" : "") + srcs(D.market);
+  }
+  function srcs(d) { var S = arr(d && d.sources); return S.length ? '<details class="help"><summary><b>Sources (' + S.length + ")</b> · " + esc(d.model || "") + "</summary>" + S.map(function (s) { var u = typeof s === "string" ? s : s.url, t = typeof s === "string" ? s : s.title || s.url; return /^https?:/.test(u) ? '<div><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(String(t).slice(0, 90)) + "</a></div>" : ""; }).join("") + "</details>" : ""; }
+  // ---------- brands ----------
+  function tBrands() {
+    $("tp").innerHTML = '<div class="grid">' + D.brands.map(function (b, i) { var d = b.doc; return '<div class="bc" data-b="' + b.slug + '" style="border-top-color:' + BICH.color(b.name, i) + '"><b>' + esc(b.name) + '</b><div class="s">' + (d ? esc(d.data.shareEst || "share n/a") + "<br>updated " + dd(d.at) : "not researched yet") + "</div>" + (d ? '<div class="s">' + arr(d.data.launchesUpcoming).length + " upcoming · " + arr(d.data.affordability).length + " offers · " + D.intel.filter(function (x) { return x.brand === b.name; }).length + " field intel</div>" : "") + "</div>"; }).join("") + "</div>" + (D.isHO ? '<button class="btn sec block" id="badd" style="margin-top:10px">＋ Add a brand</button>' : "");
+    [].forEach.call($("tp").querySelectorAll("[data-b]"), function (c) { c.onclick = function () { BR = c.dataset.b; draw(); window.scrollTo(0, 0); }; });
+    if ($("badd")) $("badd").onclick = function () { sheet("Add a brand", "", [["＋", "Add", function (ov) { api({ action: "cmp-brand-add", name: ov.querySelector("#bn").value }).then(function (r) { if (!r.ok) return toast(r.error); load().then(draw); }); }, "pri"]], '<input class="tx" id="bn" placeholder="e.g. Tecno" style="margin-top:8px">'); };
+  }
+  function brandPage(slug) {
+    var b = D.brands.find(function (x) { return x.slug === slug; }), d = b && b.doc, X = (d && d.data) || {}, col = BICH.color(b.name);
+    var intel = D.intel.filter(function (x) { return x.brand === b.name; });
+    var sec = function (t, body) { return body ? '<div class="sh"><span>' + t + "</span></div>" + body : ""; };
+    var tbl = function (L, cols) { return L.length ? '<div class="tbw"><table class="tb"><tr>' + cols.map(function (c) { return "<th>" + c[0] + "</th>"; }).join("") + "</tr>" + L.map(function (r) { return "<tr>" + cols.map(function (c) { return "<td>" + c[1](r) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" : ""; };
+    var li = function (L) { return L.length ? '<div class="cardx"><ul class="ul">' + L.map(function (x) { return "<li>" + esc(typeof x === "string" ? x : JSON.stringify(x)) + "</li>"; }).join("") + "</ul></div>" : ""; };
+    var PB = X.priceBands || {};
+    VIEW.innerHTML = '<div class="row" style="gap:6px"><button class="btn ghost sm" id="bk">← Brands</button><span style="flex:1"></span>' + (D.job && D.job.status === "running" ? '<span class="pill o">research running…</span>' : '<button class="btn sec sm" id="brf">🔄 Research again</button>') + "</div>" +
+      '<div class="cardx" style="border-top:5px solid ' + col + '"><h2 style="margin:0;font-size:20px">' + esc(b.name) + '</h2><div class="muted" style="font-size:12px">' + (d ? "AI web research · " + dd(d.at) + (d.grounded ? "" : " · ⚠️ without live search") : "Not researched yet") + "</div>" + (X.shareEst ? '<div style="margin-top:6px"><span class="pill">India share: ' + esc(X.shareEst) + "</span></div>" : "") + (X.overview ? '<div style="font-size:13px;line-height:1.6;margin-top:6px">' + esc(X.overview) + "</div>" : "") + "</div>" +
+      (d ? sec("💰 Price-band position", '<div class="cardx"><div class="pos">' + D.bands.map(function (bd) { var p = PB[bd] || {}, pos = String(p.position || "absent").toLowerCase(); return '<div class="' + esc(pos) + '"><b>' + esc(bd.replace("Under ", "<")) + "</b>" + esc(pos) + "</div>"; }).join("") + '</div><div style="font-size:12px;margin-top:8px">' + D.bands.map(function (bd) { var p = PB[bd] || {}; return arr(p.models).length ? "<div><b>" + esc(bd) + ":</b> " + esc(p.models.join(", ")) + "</div>" : ""; }).join("") + "</div></div>") +
+        sec("🎯 Strategy", li(arr(X.strategy))) + (arr(X.strengths).length || arr(X.weaknesses).length ? '<div class="g2"><div>' + sec("💪 Strengths", li(arr(X.strengths))) + "</div><div>" + sec("🩹 Weaknesses", li(arr(X.weaknesses))) + "</div></div>" : "") +
+        sec("🚀 Upcoming launches", tbl(arr(X.launchesUpcoming), [["Model", function (r) { return "<b>" + esc(r.model) + "</b>"; }], ["Expected", function (r) { return esc(r.expected); }], ["Price", function (r) { return esc(r.priceExpected); }], ["Notes", function (r) { return esc(r.notes); }]])) +
+        sec("🆕 Recent launches", tbl(arr(X.launchesRecent), [["Model", function (r) { return "<b>" + esc(r.model) + "</b>"; }], ["Date", function (r) { return esc(r.date); }], ["Price", function (r) { return esc(r.price); }], ["Highlights", function (r) { return esc(r.highlights); }]])) +
+        sec("💳 Consumer offers (affordability)", tbl(arr(X.affordability), [["Type", function (r) { return '<span class="pill">' + esc(r.type) + "</span>"; }], ["Partner", function (r) { return esc(r.partner); }], ["Offer", function (r) { return esc(r.details); }], ["Till", function (r) { return esc(r.validTill); }]])) +
+        sec("🤝 Distributor / retailer schemes (reported)", tbl(arr(X.channelSchemes), [["Level", function (r) { return '<span class="pill o">' + esc(r.level) + "</span>"; }], ["Scheme", function (r) { return esc(r.details); }], ["Period", function (r) { return esc(r.period); }], ["Source", function (r) { return esc(r.source); }]])) +
+        sec("🗺️ Regional strength", arr(X.regions).length ? '<div class="cardx">' + X.regions.map(function (r) { return '<span class="pill ' + ({ high: "g", medium: "o", low: "m" }[String(r.strength).toLowerCase()] || "") + '" style="margin:3px" title="' + esc(r.note) + '">' + esc(r.region) + " · " + esc(r.strength) + "</span>"; }).join("") + "</div>" : "") +
+        (arr(X.monthly).length > 1 ? sec("📈 Estimated monthly share (%)", '<div class="chart">' + BICH.lines({ labels: X.monthly.map(function (m) { return m.month; }), series: [{ name: b.name, values: X.monthly.map(function (m) { return +m.shareEst || null; }), color: col }], zero: false, fmt: function (v) { return v.toFixed(1); } }) + "</div>") : "") +
+        sec("📰 News", arr(X.news).length ? '<div class="cardx">' + X.news.map(function (n) { return '<div style="margin:6px 0;font-size:13px"><b>' + (n.url && /^https?:/.test(n.url) ? '<a href="' + esc(n.url) + '" target="_blank" rel="noopener">' + esc(n.title) + "</a>" : esc(n.title)) + '</b> <small class="muted">' + esc(n.date || "") + "</small><div class=\"muted\" style=\"font-size:12px\">" + esc(n.summary || "") + "</div></div>"; }).join("") + "</div>" : "") : '<div class="card empty"><div class="big">🔎</div>No research yet for ' + esc(b.name) + ".</div>") +
+      sec("🕵️ Field intel from vivo teams (" + intel.length + ")", intel.length ? intel.slice(0, 30).map(intelCard).join("") : '<div class="muted" style="font-size:12.5px;margin:4px 2px">None yet — add what you see in the market in 🕵️ Field intel.</div>') +
+      '<div class="row" style="gap:6px;margin-top:12px"><button class="btn pri" id="bvs" style="flex:1">🤖 vivo vs ' + esc(b.name.split(" (")[0]) + ': what should we do?</button></div><div id="bvo"></div>' + srcs(d);
+    $("bk").onclick = function () { BR = null; TAB = "brands"; draw(); };
+    wireIntel();
+    if ($("brf")) $("brf").onclick = function () { refresh(slug); };
+    $("bvs").onclick = function () { var bt = this; bt.disabled = true; bt.textContent = "Thinking…"; api({ action: "cmp-ask", q: "Compare vivo with " + b.name + " in India: price bands where they beat us, their offers and channel schemes, upcoming launches, states where they are strong — and give 6 specific counter-actions for vivo (offers, schemes, models, states)." }).then(function (r) { bt.disabled = false; bt.textContent = "🤖 Ask again"; $("bvo").innerHTML = '<div class="ai">' + esc(r.ok ? r.answer : r.error) + "</div>"; }); };
+    poll();
+  }
+  function intelCard(i) { return '<div class="cardx" style="padding:10px 12px"><div class="row"><b style="flex:1;font-size:13px">' + esc(i.brand) + " · " + esc(i.kind) + "</b>" + (i.verified ? '<span class="pill g">verified</span>' : '<span class="pill m">unverified</span>') + '</div><div style="font-size:13px;margin-top:3px">' + esc(i.details) + (i.value ? " <b>" + esc(i.value) + "</b>" : "") + '</div><div class="muted" style="font-size:11.5px;margin-top:3px">' + esc([i.model, i.area, i.state].filter(Boolean).join(" · ")) + " · " + esc(i.by) + " · " + dd(i.at) + (i.validTill ? " · till " + esc(i.validTill) : "") + "</div>" + (D.isHO && !i.verified ? '<button class="btn ghost sm" data-v="' + i.id + '" style="margin-top:4px">✓ Verify</button>' : "") + (D.isHO ? '<button class="btn ghost sm" data-del="' + i.id + '" style="margin-top:4px;color:var(--bad)">Delete</button>' : "") + "</div>"; }
+  // ---------- trends & counter share ----------
+  function tTrend() {
+    var M = D.market && D.market.data, mon = arr(M && M.monthly);
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    (CS ? Promise.resolve(CS) : api({ action: "cmp-cs-get" }).then(function (r) { CS = r.ok ? r : { rows: [] }; return CS; })).then(function (cs) {
+      var keys = []; mon.forEach(function (m) { Object.keys(m.shares || {}).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); }); });
+      var html = "";
+      if (mon.length > 1) html += '<div class="sh"><span>📈 Month-on-month brand share (AI estimate, %)</span></div><div class="chart">' + BICH.lines({ labels: mon.map(function (m) { return m.month; }), series: keys.slice(0, 9).map(function (k, i) { return { name: k, values: mon.map(function (m) { var v = (m.shares || {})[k]; return v == null ? null : +v; }), color: BICH.color(k, i), width: /vivo/i.test(k) ? 3.4 : 2 }; }), zero: false, fmt: function (v) { return v.toFixed(0); } }) + '<div class="tent">Estimated from reported quarterly / monthly figures.</div></div>';
+      var R = cs.rows || [];
+      if (R.length) {
+        var sts = [], pbs = []; R.forEach(function (r) { if (sts.indexOf(r.st) < 0) sts.push(r.st); if (r.pb && pbs.indexOf(r.pb) < 0) pbs.push(r.pb); }); sts.sort();
+        var F = { st: tTrend.st || "", pb: tTrend.pb || "" }, RR = R.filter(function (r) { return (!F.st || r.st === F.st) && (!F.pb || r.pb === F.pb); });
+        var ms = []; RR.forEach(function (r) { if (ms.indexOf(r.m) < 0) ms.push(r.m); }); ms.sort();
+        var brs = {}; RR.forEach(function (r) { brs[r.br] = (brs[r.br] || 0) + r.u; }); var bl = Object.keys(brs).sort(function (a, b) { return brs[b] - brs[a]; });
+        var share = function (rows, br) { var t = rows.reduce(function (a, r) { return a + r.u; }, 0); return t ? rows.filter(function (r) { return r.br === br; }).reduce(function (a, r) { return a + r.u; }, 0) / t * 100 : 0; };
+        var last = ms[ms.length - 1], prev = ms[ms.length - 2], RL = RR.filter(function (r) { return r.m === last; });
+        html += '<div class="sh"><span>🏪 Counter share — real data from the field</span></div><div class="row" style="gap:6px"><select class="tx" id="cst" style="flex:1"><option value="">All states</option>' + sts.map(function (s) { return "<option" + (s === F.st ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><select class="tx" id="cpb" style="flex:1"><option value="">All price bands</option>' + pbs.map(function (s) { return "<option" + (s === F.pb ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" +
+          '<div class="chart">' + BICH.stack({ rows: ms.slice(-8).map(function (m) { var p = {}; RR.filter(function (r) { return r.m === m; }).forEach(function (r) { p[r.br] = (p[r.br] || 0) + r.u; }); return { label: m.slice(2).replace("-", "/"), parts: p }; }), keys: bl.slice(0, 9), pct: true }) + "</div>" +
+          '<div class="sh"><span>' + esc(last) + " share & change</span></div>" + BICH.bars(bl.slice(0, 10).map(function (b, i) { var s = share(RL, b), p = prev ? share(RR.filter(function (r) { return r.m === prev; }), b) : null; return [b, Math.round(s * 10) / 10, p == null ? "" : (s - p >= 0 ? "▲" : "▼") + Math.abs(s - p).toFixed(1), BICH.color(b, i)]; }), { fmt: function (v) { return v + "%"; } }) +
+          (!F.st ? '<div class="sh"><span>🗺️ Leader by state (' + esc(last) + ')</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Leader</th><th>vivo share</th><th>Top 3</th></tr>' + sts.map(function (s) { var rs = RL.filter(function (r) { return r.st === s; }), by = {}; rs.forEach(function (r) { by[r.br] = (by[r.br] || 0) + r.u; }); var tot = rs.reduce(function (a, r) { return a + r.u; }, 0), top = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; }); var v = Object.keys(by).find(function (k) { return /vivo/i.test(k); }); return tot ? "<tr><td><b>" + esc(s) + '</b></td><td><span class="pill" style="background:' + BICH.color(top[0]) + ';color:#fff">' + esc(top[0]) + "</span></td><td>" + (v ? Math.round(by[v] / tot * 100) + "%" : "—") + "</td><td>" + top.slice(0, 3).map(function (k) { return esc(k) + " " + Math.round(by[k] / tot * 100) + "%"; }).join(" · ") + "</td></tr>" : ""; }).join("") + "</table></div>" : "") +
+          (pbs.length && !F.pb ? '<div class="sh"><span>💰 Leader by price band (' + esc(last) + ')</span></div><div class="tbw"><table class="tb"><tr><th>Band</th><th>Top 4 share</th></tr>' + pbs.map(function (p) { var rs = RL.filter(function (r) { return r.pb === p; }), by = {}; rs.forEach(function (r) { by[r.br] = (by[r.br] || 0) + r.u; }); var tot = rs.reduce(function (a, r) { return a + r.u; }, 0); return tot ? "<tr><td><b>" + esc(p) + "</b></td><td>" + Object.keys(by).sort(function (a, b) { return by[b] - by[a]; }).slice(0, 4).map(function (k) { return esc(k) + " <b>" + Math.round(by[k] / tot * 100) + "%</b>"; }).join(" · ") + "</td></tr>" : ""; }).join("") + "</table></div>" : "");
+      }
+      if (!html) html = '<div class="card empty"><div class="big">📈</div>Run the AI market research for estimated monthly shares, and upload counter-share data (📥) for real month-on-month analysis by state and price band.</div>';
+      $("tp").innerHTML = html;
+      if ($("cst")) $("cst").onchange = function () { tTrend.st = this.value; tTrend(); }; if ($("cpb")) $("cpb").onchange = function () { tTrend.pb = this.value; tTrend(); };
+    });
+  }
+  // ---------- field intel ----------
+  function tIntel() {
+    var L = D.intel.filter(function (i) { return (!IF.brand || i.brand === IF.brand) && (!IF.kind || i.kind === IF.kind); });
+    $("tp").innerHTML = '<div class="cardx"><b>➕ Report what you see in the market</b><div class="g2"><div><label class="lb">Brand</label><select class="tx" id="ib">' + D.brands.map(function (b) { return "<option>" + esc(b.name) + "</option>"; }).join("") + '</select></div><div><label class="lb">Type</label><select class="tx" id="ik">' + D.kinds.map(function (k) { return "<option>" + esc(k) + "</option>"; }).join("") + "</select></div></div>" + '<div class="g2">' + (D.isHO ? '<div><label class="lb">State</label><input class="tx" id="ist"></div>' : "") + '<div><label class="lb">Area / city / store</label><input class="tx" id="ia"></div><div><label class="lb">Model (optional)</label><input class="tx" id="imo"></div><div><label class="lb">Value (₹ / % / units)</label><input class="tx" id="iv"></div><div><label class="lb">Valid till</label><input class="tx" type="date" id="iu"></div></div><label class="lb">What exactly</label><textarea class="tx" id="id" style="min-height:70px" placeholder="e.g. Samsung giving retailers ₹1,500 extra per A26 sold above 10 units this month; HDFC 10% cashback on S25 FE"></textarea><button class="btn pri block" id="isv" style="margin-top:8px">Submit intel</button></div>' +
+      '<div class="row" style="gap:6px;margin-top:12px"><select class="tx" id="fb" style="flex:1"><option value="">All brands</option>' + D.brands.map(function (b) { return "<option" + (b.name === IF.brand ? " selected" : "") + ">" + esc(b.name) + "</option>"; }).join("") + '</select><select class="tx" id="fk" style="flex:1"><option value="">All types</option>' + D.kinds.map(function (k) { return "<option" + (k === IF.kind ? " selected" : "") + ">" + esc(k) + "</option>"; }).join("") + "</select></div>" + (L.length ? L.slice(0, 150).map(intelCard).join("") : '<div class="muted" style="font-size:12.5px;margin:8px 2px">No intel yet.</div>');
+    $("isv").onclick = function () { api({ action: "cmp-intel-add", item: { brand: $("ib").value, kind: $("ik").value, state: $("ist") ? $("ist").value : "", area: $("ia").value, model: $("imo").value, value: $("iv").value, validTill: $("iu").value, details: $("id").value } }).then(function (r) { if (!r.ok) return toast(r.error); toast("Thanks — intel added"); D.intel.unshift(r.item); tIntel(); }); };
+    $("fb").onchange = function () { IF.brand = this.value; tIntel(); }; $("fk").onchange = function () { IF.kind = this.value; tIntel(); };
+    wireIntel();
+  }
+  function wireIntel() {
+    [].forEach.call(VIEW.querySelectorAll("[data-v]"), function (b) { b.onclick = function () { api({ action: "cmp-intel-verify", id: b.dataset.v }).then(function (r) { if (r.ok) { var i = D.intel.find(function (x) { return x.id === b.dataset.v; }); i.verified = true; draw(); } }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { api({ action: "cmp-intel-delete", id: b.dataset.del }).then(function (r) { if (r.ok) { D.intel = D.intel.filter(function (x) { return x.id !== b.dataset.del; }); draw(); } }); }; });
+  }
+  // ---------- ask AI ----------
+  function tAsk() {
+    $("tp").innerHTML = '<div class="cardx"><b>🤖 Ask about the competition</b><div class="muted" style="font-size:12px">Answers from the AI research, field intel and counter-share data in this tool.</div><div id="cl">' + CHAT.map(function (m) { return '<div class="msg ' + (m.role === "user" ? "me" : "bot") + '">' + esc(m.text) + "</div>"; }).join("") + '</div><div class="qk">' + ["Who leads ₹15–20k and why?", "Which brand is gaining fastest this quarter?", "Samsung vs vivo in Bihar — what should we do?", "Best competitor consumer offers right now", "Competitor launches in the next 2 months", "Which retailer schemes are competitors running?"].map(function (q) { return "<button>" + esc(q) + "</button>"; }).join("") + '</div><div class="row" style="gap:6px;margin-top:8px"><input class="tx" id="aq" placeholder="Ask anything…" style="flex:1"><button class="btn pri" id="ab">Ask</button></div></div>';
+    var send = function (q) { q = String(q || "").trim(); if (!q) return; CHAT.push({ role: "user", text: q }); tAsk(); $("cl").insertAdjacentHTML("beforeend", '<div class="msg bot">…</div>'); api({ action: "cmp-ask", q: q, history: CHAT.slice(-6, -1) }).then(function (r) { CHAT.push({ role: "bot", text: r.ok ? r.answer : "⚠️ " + r.error }); tAsk(); }); };
+    $("ab").onclick = function () { send($("aq").value); }; $("aq").onkeydown = function (e) { if (e.key === "Enter") send(this.value); };
+    [].forEach.call($("tp").querySelectorAll(".qk button"), function (b) { b.onclick = function () { send(b.textContent); }; });
+  }
+  // ---------- counter share upload ----------
+  function tCs() {
+    $("tp").innerHTML = '<div class="cardx"><b>📥 Counter share (offline channel)</b><div class="muted" style="font-size:12.5px;margin-top:4px">Month-wise units sold per brand at counters you track (retailer / promoter reports). Columns: Month, State, Area, Brand, Units, Price band. Uploading a month replaces that month for the states in the file. These real numbers drive 📈 Trends & share.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="cu">📥 Upload Excel</button><button class="btn sec sm" id="ct">⬇ Template</button><button class="btn sec sm" id="csm">🧪 Sample data</button></div><div id="cres"></div></div>';
+    var H = ["Month (YYYY-MM)", "State", "Area / city", "Brand", "Units", "Price band"];
+    $("ct").onclick = function () { download(xlsx([{ name: "Counter share", rows: [H, ["2026-10", "Bihar", "Patna", "vivo", 420, "₹15–20k"], ["2026-10", "Bihar", "Patna", "Samsung", 380, "₹15–20k"]] }]), "Counter_share_template.xlsx"); };
+    $("csm").onclick = function () { var rows = [H], B = [["vivo", 1], ["Samsung", .95], ["OPPO", .7], ["realme", .6], ["Xiaomi", .65], ["Apple", .2], ["Motorola", .3], ["OnePlus", .15]], S = [["Bihar", 1, { vivo: 1.25 }], ["Uttar Pradesh", 1.8, { Samsung: 1.2 }], ["West Bengal", 1.1, { Xiaomi: 1.25 }], ["Maharashtra", 1.5, { Samsung: 1.25, Apple: 1.6 }], ["Kerala", .7, { Samsung: 1.3, Apple: 1.4 }]], P = [["Under ₹10k", { realme: 1.5, Xiaomi: 1.6, Motorola: 1.2, Apple: 0, OnePlus: 0 }], ["₹10–15k", { realme: 1.3, Xiaomi: 1.3, vivo: 1.1 }], ["₹15–20k", { vivo: 1.3, OPPO: 1.2 }], ["₹20–30k", { vivo: 1.2, Samsung: 1.2, OnePlus: 1.5 }], ["₹30–45k", { Samsung: 1.4, OnePlus: 1.6, Apple: 1.5 }], ["₹45k+", { Apple: 4, Samsung: 1.8, vivo: .6, realme: .1, Xiaomi: .2 }]], seed = 5, rnd = function () { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+      for (var k = 7; k >= 0; k--) { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); var m = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); S.forEach(function (s) { P.forEach(function (p) { B.forEach(function (b) { var f = (p[1][b[0]] == null ? 1 : p[1][b[0]]) * (s[2][b[0]] || 1) * (b[0] === "vivo" ? 1 + (7 - k) * .015 : b[0] === "Samsung" ? 1 - (7 - k) * .01 : 1); var u = Math.round(60 * b[1] * s[1] * f * (.85 + rnd() * .3)); if (u) rows.push([m, s[0], s[0].split(" ")[0] + " city", b[0], u, p[0]]); }); }); }); }
+      download(xlsx([{ name: "Counter share", rows: rows }]), "Counter_share_sample.xlsx"); };
+    $("cu").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { if (!i.files[0]) return; (window.XLSX ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; document.head.appendChild(s); })).then(function () { return i.files[0].arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array" }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }), h = A.findIndex(function (r) { return r.some(function (c) { return /brand/i.test(c); }); }); if (h < 0) return toast("Need a Brand column"); var hd = A[h].map(function (c) { return String(c).toLowerCase(); }), c = function (re) { return hd.findIndex(function (x) { return re.test(x); }); }, C = { m: c(/month|period/), state: c(/state/), area: c(/area|city|town/), brand: c(/brand/), units: c(/unit|qty|sales|volume/), band: c(/band|price/) };
+      var rows = A.slice(h + 1).filter(function (r) { return String(r[C.brand] || "").trim(); }).map(function (r) { var o = {}; Object.keys(C).forEach(function (k) { if (C[k] >= 0) o[k] = r[C[k]]; }); var mm = String(o.m || "").trim(), x = /^(\d{4})[-/](\d{1,2})/.exec(mm) || /^(\d{1,2})[-/](\d{4})$/.exec(mm); o.m = x ? (x[1].length === 4 ? x[1] + "-" + x[2].padStart(2, "0") : x[2] + "-" + x[1].padStart(2, "0")) : mm; return o; });
+      api({ action: "cmp-cs-import", rows: rows }).then(function (r) { $("cres").innerHTML = r.ok ? '<div class="help" style="background:#E6F4EA">✅ ' + r.saved + " rows saved — see 📈 Trends & share</div>" : '<div class="err">' + esc(r.error) + "</div>"; CS = null; }); }); }; i.click(); };
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>

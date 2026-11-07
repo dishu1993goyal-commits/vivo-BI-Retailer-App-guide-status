@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Demand forecast</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:19px;font-weight:800;margin-top:2px}.kt .s{font-size:11px;color:var(--mut);margin-top:2px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:right;padding:7px 6px;white-space:nowrap;position:sticky;top:0}.tb th:first-child,.tb td:first-child{text-align:left;position:sticky;left:0;background:inherit}.tb td{border-top:1px solid #EEF0F6;padding:6px;text-align:right;white-space:nowrap;background:#fff}
+.tbw{overflow:auto;max-height:70vh;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 2px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart{background:var(--card);border-radius:16px;padding:12px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:16px;padding:13px;margin-top:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.ev{background:var(--card);border-radius:13px;padding:10px 12px;margin-top:7px;box-shadow:0 1px 7px rgba(20,24,51,.06)}
+.heat{display:inline-block;min-width:44px;border-radius:7px;padding:2px 6px}
+.li{background:var(--card);border-radius:14px;padding:11px 12px;margin-top:8px;box-shadow:0 1px 7px rgba(20,24,51,.06);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔮</span></div>
+  <h1>Demand forecast & allocation</h1><p>Model × state demand for the coming months — festive-season aware — and how to split stock</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script src="/sodata.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "fc", DATA = null, FC = null, P = { h: 3, st: "", mo: "" }, ALLOC = { month: 1, cover: 30, safety: 10, supply: {} };
+  var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var ml = function (m) { return MN[+m.slice(5) - 1] + " " + m.slice(2, 4); }, nf = function (n) { return Math.round(n || 0).toLocaleString("en-IN"); };
+  var addM = function (m, k) { var y = +m.slice(0, 4), mo = +m.slice(5) - 1 + k; y += Math.floor(mo / 12); mo = ((mo % 12) + 12) % 12; return y + "-" + String(mo + 1).padStart(2, "0"); };
+  var nk = function (s) { return String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\b5g\b/g, "").replace(/[^a-z0-9+]/g, ""); };
+  window.__pageBack = function () { if (TAB === "fc") return false; TAB = "fc"; draw(); return true; };
+
+  function load() { return api({ action: "fc-data" }).then(function (r) { if (!r.ok) throw new Error(r.error); DATA = r; FC = null; }); }
+  function draw() {
+    var tabs = [["fc", "🔮 Forecast"], ["al", "📦 Allocation"], ["cal", "🎉 Festive calendar"], ["mdl", "📱 Model life-cycle"], ["data", "📥 Data"], ["plans", "💾 Plans"]];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    if (TAB === "data") return SODATA.render($("tp"), { api: api, toast: toast, download: download, xlsx: xlsx, esc: esc, onChange: function () { DATA = null; } });
+    if (TAB === "plans") return tPlans();
+    if (!DATA) { $("tp").innerHTML = '<div class="loading"><div class="spin"></div>Loading sell-out…</div>'; return load().then(draw).catch(function (e) { $("tp").innerHTML = '<div class="err">' + esc(e.message) + "</div>"; }); }
+    if (!DATA.rows.length && (TAB === "fc" || TAB === "al")) { $("tp").innerHTML = '<div class="card empty"><div class="big">🔮</div>No sell-out data yet.<br>Upload month-wise (or daily) sell-out by state and model in 📥 Data — or try the sample data there.<br><br><button class="btn pri" id="gd">📥 Data</button></div>'; $("gd").onclick = function () { TAB = "data"; draw(); }; return; }
+    ({ fc: tFc, al: tAl, cal: tCal, mdl: tMdl })[TAB]();
+  }
+
+  // ================= forecasting engine =================
+  function factor(st, month) { var m = +month.slice(5), f = 1; (DATA.cal || []).forEach(function (e) { if (e.months.indexOf(m) >= 0 && (!e.states.length || e.states.some(function (s) { return s.toLowerCase() === String(st).toLowerCase(); }))) f += e.uplift / 100 / e.months.length * (e.months.length > 1 ? 1.4 : 1); }); return Math.max(.3, f); }
+  function run() {
+    var rows = DATA.rows, months = []; rows.forEach(function (r) { if (months.indexOf(r[0]) < 0) months.push(r[0]); }); months.sort();
+    var first = months[0], last = months[months.length - 1], all = []; for (var m = first; m <= last; m = addM(m, 1)) all.push(m);
+    var cur = DATA.today.slice(0, 7), partial = last === cur; // current month is incomplete → scale it up
+    var dim = new Date(+cur.slice(0, 4), +cur.slice(5), 0).getDate(), day = +DATA.today.slice(8, 10);
+    var ser = {}; rows.forEach(function (r) { var k = r[1] + "|" + r[2]; (ser[k] = ser[k] || { st: r[1], mo: r[2], y: {} }).y[r[0]] = (ser[k].y[r[0]] || 0) + r[3]; });
+    var hist = partial ? all.slice(0, -1) : all, H = 6, fut = []; for (var i = 1; i <= H; i++) fut.push(addM(hist[hist.length - 1], i));
+    var cfg = (DATA.cfg && DATA.cfg.models) || {}, out = [];
+    Object.keys(ser).forEach(function (k) {
+      var S = ser[k], y = hist.map(function (m) { return S.y[m] || 0; }), fz = hist.map(function (m) { return factor(S.st, m); });
+      var nz = y.findIndex(function (v) { return v > 0; }); if (nz < 0) { nz = y.length - 1; }
+      var ds = y.slice(nz).map(function (v, i) { return v / fz[nz + i]; }), a = .5, b = .25, phi = .85, L = ds[0], T = ds.length > 1 ? (ds[Math.min(2, ds.length - 1)] - ds[0]) / Math.min(2, ds.length - 1) : 0, err = [];
+      for (var t = 1; t < ds.length; t++) { var pred = L + phi * T; err.push(ds[t] - pred); var L2 = a * ds[t] + (1 - a) * pred; T = b * (L2 - L) + (1 - b) * phi * T; L = L2; }
+      var life = (cfg[nk(S.mo)] || {}).status || "", rmse = err.length ? Math.sqrt(err.reduce(function (s, e) { return s + e * e; }, 0) / err.length) : L * .25;
+      var f = fut.map(function (m, h) { var tr = 0; for (var j = 1; j <= h + 1; j++) tr += Math.pow(phi, j) * T; var base = Math.max(0, L + tr); if (life === "eol") base *= Math.pow(.78, h + 1); if (life === "new") base *= Math.pow(1.06, h + 1); var fv = base * factor(S.st, m), band = rmse * factor(S.st, m) * 1.28 * Math.sqrt(h + 1); return [fv, Math.max(0, fv - band), fv + band]; });
+      out.push({ st: S.st, mo: S.mo, y: all.map(function (m) { return S.y[m] || 0; }), f: f, life: life, partialNow: partial ? (S.y[cur] || 0) : null });
+    });
+    // backtest: hide the last 3 full months, forecast them, compare (national total)
+    var acc = null; if (hist.length >= 9) { var bt = backtest(ser, hist); acc = bt; }
+    FC = { months: all, hist: hist, fut: fut, series: out, partial: partial, cur: cur, dayShare: day / dim, acc: acc };
+  }
+  function backtest(ser, hist) {
+    var cut = hist.length - 3, tot = 0, abs = 0;
+    Object.keys(ser).forEach(function (k) { var S = ser[k], y = hist.slice(0, cut).map(function (m) { return S.y[m] || 0; }), fz = hist.slice(0, cut).map(function (m) { return factor(S.st, m); }), ds = y.map(function (v, i) { return v / fz[i]; }), L = ds[0], T = 0, a = .5, b = .25, phi = .85;
+      for (var t = 1; t < ds.length; t++) { var pred = L + phi * T, L2 = a * ds[t] + (1 - a) * pred; T = b * (L2 - L) + (1 - b) * phi * T; L = L2; }
+      for (var h = 0; h < 3; h++) { var tr = 0; for (var j = 1; j <= h + 1; j++) tr += Math.pow(phi, j) * T; var fv = Math.max(0, L + tr) * factor(S.st, hist[cut + h]), act = S.y[hist[cut + h]] || 0; tot += act; abs += Math.abs(act - fv); } });
+    return tot ? Math.max(0, Math.round((1 - abs / tot) * 100)) : null;
+  }
+  function pick(s) { return (!P.st || s.st === P.st) && (!P.mo || s.mo === P.mo); }
+  function opts(list, cur, all) { return '<option value="">' + all + "</option>" + list.map(function (x) { return "<option" + (x === cur ? " selected" : "") + ">" + esc(x) + "</option>"; }).join(""); }
+  function lists() { var st = {}, mo = {}; FC.series.forEach(function (s) { st[s.st] = (st[s.st] || 0) + s.y.reduce(function (a, b) { return a + b; }, 0); mo[s.mo] = (mo[s.mo] || 0) + s.y.reduce(function (a, b) { return a + b; }, 0); }); return { st: Object.keys(st).sort(function (a, b) { return st[b] - st[a]; }), mo: Object.keys(mo).sort(function (a, b) { return mo[b] - mo[a]; }) }; }
+
+  // ================= forecast tab =================
+  function tFc() {
+    if (!FC) run(); var LS = lists(), S = FC.series.filter(pick), H = +P.h, fut = FC.fut.slice(0, H), last12 = FC.hist.slice(-12);
+    var histTot = last12.map(function (m) { var i = FC.months.indexOf(m); return S.reduce(function (a, s) { return a + s.y[i]; }, 0); });
+    var fTot = fut.map(function (m, h) { return S.reduce(function (a, s) { return a + s.f[h][0]; }, 0); }), fLo = fut.map(function (m, h) { return S.reduce(function (a, s) { return a + s.f[h][1]; }, 0); }), fHi = fut.map(function (m, h) { return S.reduce(function (a, s) { return a + s.f[h][2]; }, 0); });
+    var labels = last12.concat(FC.partial ? [] : []).concat(fut).filter(function (m, i, A) { return A.indexOf(m) === i; }).map(ml);
+    var nH = last12.length, hv = histTot.concat(fut.map(function () { return null; })), fv = last12.map(function (m, i) { return i === nH - 1 ? histTot[i] : null; }).concat(fTot), band = last12.map(function () { return null; }).concat(fut.map(function (m, h) { return [fLo[h], fHi[h]]; }));
+    if (FC.partial) { var ci = labels.indexOf(ml(FC.cur)); }
+    var l3 = histTot.slice(-3).reduce(function (a, b) { return a + b; }, 0) / 3, ly = fut.map(function (m) { var i = FC.months.indexOf(addM(m, -12)); return i < 0 ? null : S.reduce(function (a, s) { return a + s.y[i]; }, 0); });
+    var peak = fTot.indexOf(Math.max.apply(null, fTot));
+    var stRows = LS.st.filter(function (x) { return !P.st || x === P.st; }).map(function (st) { var ss = S.filter(function (s) { return s.st === st; }), a3 = [1, 2, 3].map(function (k) { return ss.reduce(function (a, s) { return a + s.y[FC.hist.length - k]; }, 0); }).reduce(function (a, b) { return a + b; }, 0) / 3; return { st: st, a3: a3, f: fut.map(function (m, h) { return ss.reduce(function (a, s) { return a + s.f[h][0]; }, 0); }) }; });
+    var moRows = LS.mo.filter(function (x) { return !P.mo || x === P.mo; }).map(function (mo) { var ss = S.filter(function (s) { return s.mo === mo; }); return { mo: mo, life: (ss[0] || {}).life, a3: [1, 2, 3].map(function (k) { return ss.reduce(function (a, s) { return a + s.y[FC.hist.length - k]; }, 0); }).reduce(function (a, b) { return a + b; }, 0) / 3, f: fut.map(function (m, h) { return ss.reduce(function (a, s) { return a + s.f[h][0]; }, 0); }) }; });
+    var ev = []; fut.forEach(function (m) { (DATA.cal || []).forEach(function (e) { if (e.months.indexOf(+m.slice(5)) >= 0 && (!P.st || !e.states.length || e.states.indexOf(P.st) >= 0) && e.uplift > 0 && ev.indexOf(e.name + " (" + ml(m) + ")") < 0) ev.push(e.name + " (" + ml(m) + ")"); }); });
+    var heat = function (v, base) { var g = base ? v / base - 1 : 0, c = g > .25 ? "#E6F4EA" : g > .05 ? "#F1FAF4" : g < -.15 ? "#FDECEC" : g < -.03 ? "#FFF6F5" : "transparent"; return '<span class="heat" style="background:' + c + '">' + nf(v) + "</span>"; };
+    $("tp").innerHTML = '<div class="row" style="gap:6px;flex-wrap:wrap"><select class="tx" id="fst" style="flex:1;min-width:120px">' + opts(LS.st, P.st, "All states") + '</select><select class="tx" id="fmo" style="flex:1;min-width:120px">' + opts(LS.mo, P.mo, "All models") + '</select><select class="tx" id="fh" style="width:110px">' + [1, 2, 3, 4, 5, 6].map(function (h) { return "<option" + (h === H ? " selected" : "") + ' value="' + h + '">' + h + " month" + (h > 1 ? "s" : "") + "</option>"; }).join("") + "</select></div>" +
+      '<div class="kp"><div class="kt"><div class="l">Next month · ' + ml(fut[0]) + '</div><div class="v">' + nf(fTot[0]) + '</div><div class="s">' + (l3 ? (fTot[0] >= l3 ? "▲ " : "▼ ") + Math.abs(Math.round((fTot[0] / l3 - 1) * 100)) + "% vs last 3-mo avg" : "") + '</div></div><div class="kt"><div class="l">Next ' + H + ' months</div><div class="v">' + nf(fTot.reduce(function (a, b) { return a + b; }, 0)) + '</div><div class="s">range ' + nf(fLo.reduce(function (a, b) { return a + b; }, 0)) + "–" + nf(fHi.reduce(function (a, b) { return a + b; }, 0)) + '</div></div><div class="kt"><div class="l">Peak month</div><div class="v">' + ml(fut[peak]) + '</div><div class="s">' + (FC.acc != null ? "model accuracy ~" + FC.acc + "% (last 3 mo)" : "needs 9+ months for accuracy") + "</div></div></div>" +
+      '<div class="chart">' + BICH.lines({ labels: last12.concat(fut).map(ml), series: [{ name: "Actual", values: hv, color: "#5B4CFF" }, { name: "Forecast (80% range)", values: fv, color: "#F2A93B", dash: true, band: band }].concat(ly.some(function (x) { return x != null; }) ? [{ name: "Same month last year", values: last12.map(function () { return null; }).concat(ly), color: "#B8BCCB", dots: false, width: 1.5 }] : []) }) + (FC.partial ? '<div class="muted" style="font-size:11px">' + ml(FC.cur) + " is in progress (" + nf(S.reduce(function (a, s) { return a + (s.partialNow || 0); }, 0)) + " so far) — it is forecast, not shown as actual.</div>" : "") + "</div>" +
+      (ev.length ? '<div class="help">🎉 <b>Festive / seasonal effects in this window:</b> ' + esc(ev.join(" · ")) + "</div>" : "") +
+      '<div class="sh"><span>🗺️ State-wise forecast</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Last 3-mo avg</th>' + fut.map(function (m) { return "<th>" + ml(m) + "</th>"; }).join("") + "</tr>" + stRows.map(function (r) { return "<tr><td><b>" + esc(r.st) + "</b></td><td>" + nf(r.a3) + "</td>" + r.f.map(function (v) { return "<td>" + heat(v, r.a3) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" +
+      '<div class="sh"><span>📱 Model-wise forecast</span></div><div class="tbw"><table class="tb"><tr><th>Model</th><th>Last 3-mo avg</th>' + fut.map(function (m) { return "<th>" + ml(m) + "</th>"; }).join("") + "</tr>" + moRows.map(function (r) { return "<tr><td><b>" + esc(r.mo) + "</b>" + (r.life ? ' <span class="pill ' + (r.life === "eol" ? "r" : "g") + '">' + (r.life === "eol" ? "phasing out" : "new") + "</span>" : "") + "</td><td>" + nf(r.a3) + "</td>" + r.f.map(function (v) { return "<td>" + heat(v, r.a3) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" +
+      '<div class="sh"><span>✨ AI planner</span><button class="btn pri sm" id="aib">✨ Explain & recommend</button></div><div id="aio"></div>' +
+      '<div class="row" style="gap:6px;margin-top:10px"><button class="btn sec" id="fx" style="flex:1">⬇ Excel (state × model × month)</button><button class="btn sec" id="gal" style="flex:1">📦 Plan allocation →</button></div>' +
+      '<details class="help"><summary><b>How the forecast works</b></summary>For every state × model: past months are divided by their festive / season factor (🎉 calendar), a damped trend (Holt’s method) finds the underlying level and direction, then each future month is multiplied by its own festive factor for that state. New models get a small ramp, phasing-out models decline (📱 Model life-cycle). The shaded band is an 80% range from past forecast errors. Data: ' + (DATA.source === "portal" ? "Retailer portal business data" : "uploaded sell-out") + ".</details>";
+    $("fst").onchange = function () { P.st = this.value; tFc(); }; $("fmo").onchange = function () { P.mo = this.value; tFc(); }; $("fh").onchange = function () { P.h = this.value; tFc(); };
+    $("gal").onclick = function () { TAB = "al"; draw(); };
+    $("fx").onclick = function () { var rows = [["State", "Model", "Life-cycle"].concat(FC.hist.slice(-12).map(function (m) { return "Actual " + m; })).concat(FC.fut.map(function (m) { return "Forecast " + m; })).concat(FC.fut.map(function (m) { return "Low " + m; })).concat(FC.fut.map(function (m) { return "High " + m; }))]; FC.series.filter(pick).forEach(function (s) { rows.push([s.st, s.mo, s.life || ""].concat(FC.hist.slice(-12).map(function (m) { return s.y[FC.months.indexOf(m)]; })).concat(s.f.map(function (x) { return Math.round(x[0]); })).concat(s.f.map(function (x) { return Math.round(x[1]); })).concat(s.f.map(function (x) { return Math.round(x[2]); }))); }); download(xlsx([{ name: "Forecast", rows: rows }]), "Demand_forecast.xlsx"); };
+    $("aib").onclick = function () { var b = this; b.disabled = true; b.textContent = "Thinking…"; api({ action: "fc-ai", q: "Explain this forecast" + (P.st ? " for " + P.st : "") + (P.mo ? " for " + P.mo : "") + " and recommend stock planning actions.", data: { window: fut, total: fTot.map(Math.round), last3Avg: Math.round(l3), states: stRows.slice(0, 20).map(function (r) { return { state: r.st, last3Avg: Math.round(r.a3), forecast: r.f.map(Math.round) }; }), models: moRows.slice(0, 20).map(function (r) { return { model: r.mo, life: r.life, last3Avg: Math.round(r.a3), forecast: r.f.map(Math.round) }; }), festive: ev, accuracyPct: FC.acc, stock: stockMap(true) } }).then(function (r) { b.disabled = false; b.textContent = "✨ Explain & recommend"; $("aio").innerHTML = '<div class="ai">' + esc(r.ok ? r.answer : r.error) + "</div>"; }); };
+  }
+  function stockMap(compact) { var M = {}; (DATA.stock.rows || []).forEach(function (r) { var k = r[0] + "|" + nk(r[1]); M[k] = (M[k] || 0) + r[2]; }); if (!compact) return M; var o = {}; (DATA.stock.rows || []).slice(0, 120).forEach(function (r) { o[r[0] + " " + r[1]] = r[2]; }); return o; }
+
+  // ================= allocation =================
+  function tAl() {
+    if (!FC) run(); var LS = lists(), h = Math.max(0, Math.min(5, ALLOC.month - 1)), month = FC.fut[h], SM = stockMap(), cover = +ALLOC.cover || 30, safety = (+ALLOC.safety || 0) / 100;
+    var models = LS.mo.filter(function (m) { return !P.mo || m === P.mo; }), states = LS.st.filter(function (s) { return !P.st || s === P.st; });
+    var res = {}, tot = {};
+    models.forEach(function (mo) {
+      var need = states.map(function (st) { var s = FC.series.find(function (x) { return x.st === st && x.mo === mo; }), fc = s ? s.f[h][0] : 0, stock = SM[st + "|" + nk(mo)] || 0, want = Math.max(0, Math.round(fc * cover / 30 * (1 + safety) - stock)); return { st: st, fc: fc, stock: stock, need: want }; });
+      var totalNeed = need.reduce(function (a, x) { return a + x.need; }, 0), sup = ALLOC.supply[mo] === undefined || ALLOC.supply[mo] === "" ? totalNeed : +ALLOC.supply[mo], left = sup;
+      if (sup >= totalNeed) { need.forEach(function (x) { x.alloc = x.need; }); left = sup - totalNeed; var ft = need.reduce(function (a, x) { return a + x.fc; }, 0) || 1; var given = 0; need.forEach(function (x, i) { var add = i === need.length - 1 ? left - given : Math.floor(left * x.fc / ft); x.alloc += add; given += add; }); }
+      else { var nt = totalNeed || 1, g2 = 0; need.forEach(function (x) { x.alloc = Math.floor(sup * x.need / nt); g2 += x.alloc; }); var rest = sup - g2; need.slice().sort(function (a, b) { return (b.need - b.alloc) - (a.need - a.alloc); }).forEach(function (x) { if (rest > 0) { x.alloc++; rest--; } }); }
+      res[mo] = need; tot[mo] = { need: totalNeed, supply: sup, short: Math.max(0, totalNeed - sup) };
+    });
+    $("tp").innerHTML = '<div class="card"><div class="g3"><div><label class="lb">Allocate for</label><select class="tx" id="am">' + FC.fut.map(function (m, i) { return '<option value="' + (i + 1) + '"' + (i === h ? " selected" : "") + ">" + ml(m) + "</option>"; }).join("") + '</select></div><div><label class="lb">Stock cover (days)</label><input class="tx" type="number" id="ac" value="' + cover + '"></div><div><label class="lb">Safety stock %</label><input class="tx" type="number" id="as" value="' + ALLOC.safety + '"></div></div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><select class="tx" id="fst" style="flex:1">' + opts(LS.st, P.st, "All states") + '</select><select class="tx" id="fmo" style="flex:1">' + opts(LS.mo, P.mo, "All models") + "</select></div>" +
+      '<div class="muted" style="font-size:12px;margin-top:6px">Need = forecast × cover days ÷ 30 × (1 + safety) − current stock' + (DATA.stock.asOf ? " (stock as of " + esc(DATA.stock.asOf) + ", " + (DATA.stock.source === "portal" ? "Retailer portal" : "uploaded") + ")" : " — no stock uploaded, so stock is taken as 0") + ". Enter the units you can supply per model; if supply is short, states get a fair share of their need.</div></div>" +
+      '<div class="sh"><span>📦 Supply by model</span></div><div class="tbw"><table class="tb"><tr><th>Model</th><th>Forecast</th><th>Need</th><th>Supply available</th><th>Short</th></tr>' + models.map(function (mo) { var t = tot[mo], fc = res[mo].reduce(function (a, x) { return a + x.fc; }, 0); return "<tr><td><b>" + esc(mo) + "</b></td><td>" + nf(fc) + "</td><td>" + nf(t.need) + '</td><td><input class="tx" type="number" data-sup="' + esc(mo) + '" value="' + (ALLOC.supply[mo] === undefined ? "" : esc(ALLOC.supply[mo])) + '" placeholder="' + t.need + '" style="width:90px;padding:5px;text-align:right"></td><td>' + (t.short ? '<span class="pill r">' + nf(t.short) + "</span>" : '<span class="pill g">0</span>') + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="sh"><span>🗺️ Allocation · ' + ml(month) + '</span></div><div class="tbw"><table class="tb"><tr><th>State</th>' + models.map(function (m) { return "<th>" + esc(m) + "</th>"; }).join("") + "<th>Total</th></tr>" + states.map(function (st) { var T = 0; return "<tr><td><b>" + esc(st) + "</b></td>" + models.map(function (mo) { var x = res[mo].find(function (y) { return y.st === st; }); T += x.alloc; return '<td title="forecast ' + nf(x.fc) + " · stock " + nf(x.stock) + " · need " + nf(x.need) + '">' + (x.alloc ? "<b>" + nf(x.alloc) + "</b>" : "—") + (x.alloc < x.need ? ' <span class="pill r">−' + nf(x.need - x.alloc) + "</span>" : "") + "</td>"; }).join("") + "<td><b>" + nf(T) + "</b></td></tr>"; }).join("") + "</table></div><div class=\"muted\" style=\"font-size:11px;margin:4px 2px\">Hover / long-press a cell for forecast, stock and need. Red = short of need.</div>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sec" id="ax" style="flex:1">⬇ Excel</button><button class="btn pri" id="asv" style="flex:1">💾 Save & share plan</button><button class="btn sec" id="aai" style="flex:1">✨ AI review</button></div><div id="aio"></div>';
+    var re = function () { ALLOC.month = +$("am").value; ALLOC.cover = $("ac").value; ALLOC.safety = $("as").value; tAl(); };
+    $("am").onchange = re; $("ac").onchange = re; $("as").onchange = re; $("fst").onchange = function () { P.st = this.value; tAl(); }; $("fmo").onchange = function () { P.mo = this.value; tAl(); };
+    [].forEach.call($("tp").querySelectorAll("[data-sup]"), function (i) { i.onchange = function () { ALLOC.supply[i.dataset.sup] = i.value; tAl(); }; });
+    var flat = function () { var rows = []; models.forEach(function (mo) { res[mo].forEach(function (x) { rows.push([x.st, mo, Math.round(x.fc), x.stock, x.need, x.alloc]); }); }); return rows; };
+    $("ax").onclick = function () { download(xlsx([{ name: "Allocation " + month, rows: [["State", "Model", "Forecast", "Stock", "Need", "Allocated"]].concat(flat()) }]), "Allocation_" + month + ".xlsx"); };
+    $("asv").onclick = function () { sheet("Save plan", "Saved plans open on web and both apps", [["💾", "Save", function (ov) { var name = ov.querySelector("#pnm").value.trim() || "Allocation " + ml(month); api({ action: "fc-plan-save", plan: { name: name, params: { month: month, cover: cover, safety: ALLOC.safety, supply: ALLOC.supply, state: P.st, model: P.mo }, summary: { month: month, units: flat().reduce(function (a, r) { return a + r[5]; }, 0), short: models.reduce(function (a, m) { return a + tot[m].short; }, 0), states: states.length, models: models.length }, rows: flat() } }).then(function (r) { toast(r.ok ? "Saved — open it in 💾 Plans (web & apps)" : r.error); }); }, "pri"]], '<input class="tx" id="pnm" value="Allocation ' + ml(month) + '" style="margin-top:8px">'); };
+    $("aai").onclick = function () { var b = this; b.disabled = true; api({ action: "fc-ai", q: "Review this stock allocation for " + month + ": risks, states that will run short or be overstocked, and what to change.", data: { month: month, cover: cover, safety: ALLOC.safety, models: models.map(function (m) { return Object.assign({ model: m }, tot[m]); }), allocation: flat().slice(0, 300) } }).then(function (r) { b.disabled = false; $("aio").innerHTML = '<div class="ai">' + esc(r.ok ? r.answer : r.error) + "</div>"; }); };
+  }
+
+  // ================= festive calendar =================
+  function tCal() {
+    var C = JSON.parse(JSON.stringify(DATA.cal || [])), isHO = DATA.isHO, states = lists ? (FC ? lists().st : []) : [];
+    var paint = function () {
+      $("tp").innerHTML = '<div class="help">Each event lifts (or lowers) expected sales in its months — for all India or only the states listed. Two-month events spread their lift. ' + (isHO ? "Edit, add, or ask AI to suggest events for the coming months." : "HO admins maintain this calendar.") + "</div>" +
+        '<div class="chart">' + BICH.bars(MN.map(function (m, i) { var f = 0; C.forEach(function (e) { if (e.months.indexOf(i + 1) >= 0 && !e.states.length) f += e.uplift / e.months.length * (e.months.length > 1 ? 1.4 : 1); }); return [m, Math.round(f), "", f >= 0 ? "#16A06A" : "#E05757"]; }), { fmt: function (v) { return (v > 0 ? "+" : "") + v + "%"; }, lw: 40 }) + '<div class="muted" style="font-size:11px">All-India seasonal lift by month (state-only events not included)</div></div>' +
+        C.map(function (e, i) { return '<div class="ev">' + (isHO ? '<div class="row" style="gap:6px"><input class="tx" data-i="' + i + '" data-k="name" value="' + esc(e.name) + '" style="flex:1;font-weight:700"><input class="tx" type="number" data-i="' + i + '" data-k="uplift" value="' + e.uplift + '" style="width:76px" title="Uplift %"><b>%</b><button class="ib" data-x="' + i + '" style="color:var(--bad)">✕</button></div><div class="g2" style="margin-top:6px"><input class="tx" data-i="' + i + '" data-k="months" value="' + e.months.map(function (m) { return MN[m - 1]; }).join(", ") + '" placeholder="Months e.g. Oct, Nov"><input class="tx" data-i="' + i + '" data-k="states" value="' + esc(e.states.join(", ")) + '" placeholder="States (blank = all India)"></div>' : "<b>" + esc(e.name) + '</b> <span class="pill ' + (e.uplift >= 0 ? "g" : "r") + '">' + (e.uplift > 0 ? "+" : "") + e.uplift + '%</span><div class="muted" style="font-size:12px">' + e.months.map(function (m) { return MN[m - 1]; }).join(", ") + " · " + (e.states.length ? esc(e.states.join(", ")) : "All India") + "</div>") + "</div>"; }).join("") +
+        (isHO ? '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sec" id="cadd">＋ Event</button><button class="btn sec" id="cai">✨ AI suggest (next 6 months)</button><button class="btn ghost" id="crs">Reset to default</button><span style="flex:1"></span><button class="btn pri" id="csv">💾 Save</button></div><div id="caio"></div>' : "");
+      if (!isHO) return;
+      [].forEach.call($("tp").querySelectorAll("[data-i]"), function (el) { el.onchange = function () { var e = C[+el.dataset.i], k = el.dataset.k; if (k === "months") e.months = el.value.split(/[\s,]+/).map(function (x) { var i = MN.map(function (m) { return m.toLowerCase(); }).indexOf(x.slice(0, 3).toLowerCase()); return i + 1; }).filter(Boolean); else if (k === "states") e.states = el.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean); else if (k === "uplift") e.uplift = +el.value || 0; else e[k] = el.value; }; });
+      [].forEach.call($("tp").querySelectorAll("[data-x]"), function (b) { b.onclick = function () { C.splice(+b.dataset.x, 1); paint(); }; });
+      $("cadd").onclick = function () { C.push({ id: "", name: "New event", months: [new Date().getMonth() + 1], states: [], uplift: 10 }); paint(); };
+      $("crs").onclick = function () { api({ action: "fc-cal-reset" }).then(function (r) { if (r.ok) { DATA.cal = r.cal; C = JSON.parse(JSON.stringify(r.cal)); FC = null; paint(); toast("Default calendar restored"); } }); };
+      $("csv").onclick = function () { api({ action: "fc-cal-save", cal: C }).then(function (r) { if (!r.ok) return toast(r.error); DATA.cal = r.cal; FC = null; toast("Saved — forecast updated"); }); };
+      $("cai").onclick = function () { var b = this, ms = []; for (var i = 1; i <= 6; i++) { var d = new Date(); d.setMonth(d.getMonth() + i); ms.push(MN[d.getMonth()] + " " + d.getFullYear()); } b.disabled = true; b.textContent = "Thinking…"; api({ action: "fc-ai", mode: "festive", months: ms.join(", "), states: (FC ? lists().st : []).join(", ") || "all major Indian states" }).then(function (r) { b.disabled = false; b.textContent = "✨ AI suggest (next 6 months)"; if (!r.ok) return toast(r.error); $("caio").innerHTML = '<div class="sh"><span>AI suggestions</span></div>' + r.events.map(function (e, i) { return '<div class="ev"><b>' + esc(e.name) + '</b> <span class="pill">' + (e.uplift > 0 ? "+" : "") + esc(e.uplift) + '%</span><div class="muted" style="font-size:12px">' + (e.months || []).map(function (m) { return MN[m - 1]; }).join(", ") + " · " + ((e.states || []).length ? esc(e.states.join(", ")) : "All India") + (e.why ? " — " + esc(e.why) : "") + '</div><button class="btn sec sm" data-add="' + i + '" style="margin-top:5px">＋ Add</button></div>'; }).join(""); [].forEach.call($("caio").querySelectorAll("[data-add]"), function (x) { x.onclick = function () { var e = r.events[+x.dataset.add]; C.push({ id: "", name: e.name, months: (e.months || []).map(Number), states: e.states || [], uplift: +e.uplift || 0 }); x.textContent = "Added — Save"; x.disabled = true; }; }); }); };
+    };
+    paint();
+  }
+  // ================= model life-cycle =================
+  function tMdl() {
+    if (!FC) run(); var LS = lists(), M = JSON.parse(JSON.stringify((DATA.cfg && DATA.cfg.models) || {}));
+    $("tp").innerHTML = '<div class="help">Mark models that are <b>new</b> (ramping up, +6% a month on top of trend) or <b>phasing out</b> (−22% a month). Everything else follows its own trend.</div><div class="tbw"><table class="tb"><tr><th>Model</th><th>Last 3 months</th><th>Status</th></tr>' + LS.mo.map(function (mo) { var s = (M[nk(mo)] || {}).status || "", a3 = FC.series.filter(function (x) { return x.mo === mo; }).reduce(function (a, x) { return a + x.y.slice(-4, -1).reduce(function (p, q) { return p + q; }, 0); }, 0); return "<tr><td><b>" + esc(mo) + "</b></td><td>" + nf(a3) + "</td><td>" + (DATA.isHO ? '<select class="tx" data-m="' + esc(mo) + '" style="padding:5px">' + [["", "Regular"], ["new", "New / ramping"], ["eol", "Phasing out"]].map(function (o) { return '<option value="' + o[0] + '"' + (s === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" : esc(s || "regular")) + "</td></tr>"; }).join("") + "</table></div>" + (DATA.isHO ? '<button class="btn pri block" id="msv" style="margin-top:10px">💾 Save</button>' : "");
+    if ($("msv")) $("msv").onclick = function () { [].forEach.call($("tp").querySelectorAll("[data-m]"), function (s) { M[nk(s.dataset.m)] = { status: s.value }; }); api({ action: "fc-cfg-save", cfg: { models: M } }).then(function (r) { if (!r.ok) return toast(r.error); DATA.cfg = r.cfg; FC = null; toast("Saved — forecast updated"); }); };
+  }
+  // ================= plans =================
+  function tPlans() {
+    api({ action: "fc-plan-list" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("tp").innerHTML = r.items.length ? r.items.map(function (p) { return '<div class="li" data-id="' + p.id + '"><b>' + esc(p.name) + '</b><div class="muted" style="font-size:12px">' + esc(p.summary.month || "") + " · " + nf(p.summary.units) + " units · " + (p.summary.short ? nf(p.summary.short) + " short · " : "") + esc(p.by) + " · " + new Date(p.at).toLocaleDateString("en-IN") + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">💾</div>No saved plans yet — make one in 📦 Allocation.</div>';
+      [].forEach.call($("tp").querySelectorAll("[data-id]"), function (d) { d.onclick = function () { api({ action: "fc-plan-get", id: d.dataset.id }).then(function (x) { if (!x.ok) return toast(x.error); var p = x.item; sheet(p.name, p.summary.month + " · " + nf(p.summary.units) + " units · cover " + p.params.cover + " days", [["⬇", "Excel", function () { download(xlsx([{ name: "Allocation", rows: [["State", "Model", "Forecast", "Stock", "Need", "Allocated"]].concat(p.rows) }]), p.name.replace(/\W+/g, "_") + ".xlsx"); }], ["🗑️", "Delete", function () { api({ action: "fc-plan-delete", id: p.id }).then(tPlans); }, "danger"]], '<div class="tbw"><table class="tb"><tr><th>State</th><th>Model</th><th>Need</th><th>Allocated</th></tr>' + p.rows.slice(0, 400).map(function (r) { return "<tr><td>" + esc(r[0]) + "</td><td>" + esc(r[1]) + "</td><td>" + nf(r[4]) + "</td><td><b>" + nf(r[5]) + "</b></td></tr>"; }).join("") + "</table></div>"); }); }; });
+    });
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>

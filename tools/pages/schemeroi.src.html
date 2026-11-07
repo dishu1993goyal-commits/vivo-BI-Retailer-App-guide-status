@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Scheme ROI analyzer</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:19px;font-weight:800;margin-top:2px}.kt .s{font-size:11px;color:var(--mut);margin-top:2px}
+.kt.g .v{color:#13693F}.kt.r .v{color:#B42318}.kt.o .v{color:#9A5B00}
+.vd{border-radius:18px;padding:15px;color:#fff;margin-top:10px;box-shadow:0 8px 22px rgba(20,24,51,.15)}.vd.g{background:linear-gradient(135deg,#0F8A55,#3CC07E)}.vd.o{background:linear-gradient(135deg,#C97800,#F2A93B)}.vd.r{background:linear-gradient(135deg,#B42318,#E86A5F)}.vd.m{background:linear-gradient(135deg,#59607A,#9097B0)}
+.vd h2{margin:2px 0 0;font-size:18px}.vd .m{font-size:12.5px;opacity:.9}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:right;padding:7px 6px;white-space:nowrap}.tb th:first-child,.tb td:first-child{text-align:left}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;text-align:right;white-space:nowrap}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#666}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 2px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart{background:var(--card);border-radius:16px;padding:12px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.li{background:var(--card);border-radius:14px;padding:11px 12px;margin-top:8px;box-shadow:0 1px 7px rgba(20,24,51,.06);cursor:pointer}.li b{font-size:14px}.li .d{font-size:11.5px;color:var(--mut);margin-top:2px}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:16px;padding:13px;margin-top:10px;font-size:13px;line-height:1.6}
+.ai h4{margin:10px 0 4px;font-size:13px}.ai ul{margin:0;padding-left:18px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.chips label{border:1px solid #DADDF0;border-radius:99px;padding:4px 10px;font-size:12px;cursor:pointer;background:#fff}.chips input{display:none}.chips label:has(input:checked){background:#EEF0FF;border-color:#9AA6FF;font-weight:700}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📐</span></div>
+  <h1>Scheme ROI analyzer</h1><p>Which schemes really moved volume — and which only cost money. With an AI action plan.</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script src="/sodata.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "list", CUR = null, SCH = [], ME = {}, SUM = null;
+  var inr = function (n) { n = Number(n) || 0; var a = Math.abs(n); return (n < 0 ? "−" : "") + "₹" + (a >= 1e7 ? (a / 1e7).toFixed(2) + " Cr" : a >= 1e5 ? (a / 1e5).toFixed(2) + " L" : Math.round(a).toLocaleString("en-IN")); };
+  var nf = function (n) { return n == null ? "—" : Math.round(n).toLocaleString("en-IN"); }, pc = function (n) { return n == null ? "—" : (n > 0 ? "+" : "") + n + "%"; };
+  var dd = function (d) { return d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" }) : ""; };
+  window.__pageBack = function () { if (TAB === "list" && !CUR) return false; CUR = null; TAB = "list"; draw(); return true; };
+  function draw() {
+    var tabs = [["list", "📊 Analyses"], ["new", "➕ New analysis"], ["data", "📥 Sell-out data"]];
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] && !CUR ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { CUR = null; TAB = b.dataset.t; draw(); }; });
+    if (CUR) return showResult(CUR);
+    ({ list: tList, "new": tNew, data: function () { SODATA.render($("tp"), { api: api, toast: toast, download: download, xlsx: xlsx, esc: esc, onChange: function () { SUM = null; } }); } })[TAB]();
+  }
+  // ---------- leaderboard ----------
+  function tList() {
+    api({ action: "roi-list" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var L = r.items;
+      $("tp").innerHTML = (L.length ? '<div class="sh"><span>🏆 Scheme ROI ranking</span></div><div class="chart">' + BICH.bars(L.filter(function (x) { return x.roi != null; }).sort(function (a, b) { return b.roi - a.roi; }).slice(0, 12).map(function (x) { return [x.name, x.roi, "", x.roi >= 0 ? "#16A06A" : "#E05757"]; }), { fmt: function (v) { return (v > 0 ? "+" : "") + Math.round(v) + "%"; }, lw: 130 }) + '<div class="muted" style="font-size:11px">ROI = (extra margin − scheme cost) ÷ cost</div></div>' +
+        '<div class="sh"><span>All analyses</span></div>' + L.map(function (x) { return '<div class="li" data-id="' + x.id + '"><div class="row"><b style="flex:1">' + esc(x.name) + '</b><span class="pill ' + x.tone + '">' + esc(x.verdict.split(" —")[0].split(",")[0]) + '</span></div><div class="d">' + dd(x.from) + " – " + dd(x.to) + " · " + (x.states.length ? esc(x.states.join(", ")) : "All states") + " · " + x.models + " models · by " + esc(x.by) + '</div><div class="d" style="color:var(--ink);margin-top:4px">Uplift <b>' + pc(x.uplift) + "</b> · extra <b>" + nf(x.extra) + "</b> units · cost <b>" + inr(x.cost) + "</b> · ROI <b>" + pc(x.roi) + "</b>" + (x.cpu ? " · ₹" + nf(x.cpu) + "/extra unit" : "") + (x.ai ? " · ✨ AI plan" : "") + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">📐</div>No analyses yet.<br>1 · Upload sell-out (or use Retailer portal data) · 2 · ➕ New analysis.<br><br><button class="btn pri" id="go1">➕ Analyse a scheme</button></div>') +
+        '<div class="help"><b>How it works:</b> sales of the scheme models during the scheme are compared with the same number of days just before it. That baseline is corrected for the market trend using vivo models <i>not</i> in the scheme (control). The difference is the extra volume the scheme created. Cost comes from payouts published in Retailer payouts for that scheme (or the cost you enter), and ROI uses your margin %.</div>';
+      [].forEach.call($("tp").querySelectorAll("[data-id]"), function (d) { d.onclick = function () { api({ action: "roi-get", id: d.dataset.id }).then(function (x) { if (!x.ok) return toast(x.error); CUR = x.item; draw(); window.scrollTo(0, 0); }); }; });
+      if ($("go1")) $("go1").onclick = function () { TAB = "new"; draw(); };
+    });
+  }
+  // ---------- new analysis ----------
+  function tNew(prefill) {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    Promise.all([api({ action: "roi-schemes" }), SUM ? Promise.resolve(SUM) : api({ action: "so-summary" })]).then(function (x) {
+      SCH = x[0].ok ? x[0].items : []; ME = x[0]; SUM = x[1];
+      var p = prefill || {}, models = SUM.models || [], states = SUM.states || [];
+      $("tp").innerHTML = '<div class="card"><label class="lb">Scheme from Scheme policies (fills the details)</label><select class="tx" id="ns"><option value="">— or enter a scheme manually —</option>' + SCH.map(function (s) { return '<option value="' + s.id + '"' + (p.spol === s.id ? " selected" : "") + ">" + esc(s.title) + " · " + dd(s.from) + "–" + dd(s.to) + "</option>"; }).join("") + '</select>' +
+        '<label class="lb">Scheme name (as written in payouts)</label><input class="tx" id="nn" value="' + esc(p.name || "") + '"><div class="g2"><div><label class="lb">From</label><input class="tx" type="date" id="nf" value="' + esc(p.from || "") + '"></div><div><label class="lb">To</label><input class="tx" type="date" id="nt" value="' + esc(p.to || "") + '"></div></div>' +
+        '<label class="lb">Scheme models</label><div class="chips" id="nm">' + (models.length ? models.map(function (m) { return '<label><input type="checkbox" value="' + esc(m) + '"' + ((p.models || []).some(function (y) { return nk(y) === nk(m); }) ? " checked" : "") + "><span>" + esc(m) + "</span></label>"; }).join("") : '<span class="muted" style="font-size:12px">Upload sell-out first (📥 tab)</span>') + "</div>" +
+        (ME.isHO ? '<label class="lb">States (none ticked = all)</label><div class="chips" id="nst">' + states.map(function (s) { return '<label><input type="checkbox" value="' + esc(s) + '"' + ((p.states || []).indexOf(s) >= 0 ? " checked" : "") + "><span>" + esc(s) + "</span></label>"; }).join("") + "</div>" : '<div class="muted" style="font-size:12px;margin-top:8px">Analysed for ' + esc(ME.myState) + ".</div>") +
+        '<div class="g2"><div><label class="lb">Company margin on extra sales %</label><input class="tx" type="number" id="nmg" value="' + esc(p.marginPct == null ? 10 : p.marginPct) + '"></div><div><label class="lb">Scheme cost ₹ (blank = from payouts)</label><input class="tx" type="number" id="nc" value="' + esc(p.cost || "") + '"></div></div><div class="g2"><div><label class="lb">Other cost ₹ (POS, promoters…)</label><input class="tx" type="number" id="no" value="' + esc(p.otherCost || "") + '"></div><div></div></div>' +
+        '<label class="lb">Notes for the AI (what the scheme tried to do, what happened in market)</label><textarea class="tx" id="nx" style="min-height:60px">' + esc(p.notes || "") + '</textarea><button class="btn pri block" id="nrun" style="margin-top:10px">📐 Analyse</button></div>';
+      $("ns").onchange = function () { var s = SCH.find(function (y) { return y.id === $("ns").value; }); if (!s) return; tNew({ spol: s.id, name: s.title, from: s.from, to: s.to, models: s.models, states: s.states, marginPct: $("nmg").value }); };
+      $("nrun").onclick = function () {
+        var g = function (id) { return [].filter.call(document.querySelectorAll("#" + id + " input:checked"), function () { return true; }).map(function (i) { return i.value; }); };
+        var inp = { spol: $("ns").value, name: $("nn").value, from: $("nf").value, to: $("nt").value, models: g("nm"), states: $("nst") ? g("nst") : [], marginPct: $("nmg").value, cost: $("nc").value, otherCost: $("no").value, notes: $("nx").value };
+        if (!inp.name) return toast("Name the scheme"); if (!inp.models.length) return toast("Tick the scheme models");
+        var b = this; b.disabled = true; b.textContent = "Analysing…";
+        api({ action: "roi-run", input: inp, id: p.id }).then(function (r) { b.disabled = false; b.textContent = "📐 Analyse"; if (!r.ok) return toast(r.error); CUR = r.item; draw(); window.scrollTo(0, 0); });
+      };
+    });
+  }
+  function nk(s) { return String(s || "").toLowerCase().replace(/^vivo\s+/, "").replace(/\b5g\b/g, "").replace(/[^a-z0-9+]/g, ""); }
+  // ---------- result ----------
+  function showResult(item) {
+    var R = item.result, I = item.input, U = R.units, V = R.value, C = R.cost;
+    var phases = R.series.map(function (s) { return s.phase; }), f0 = phases.indexOf("during"), f1 = phases.lastIndexOf("during");
+    var html = '<div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="bk">← Analyses</button><span style="flex:1"></span><button class="btn sec sm" id="ed">✏️ Change</button><button class="btn sec sm" id="xl">⬇ Excel</button></div>' +
+      '<div class="vd ' + R.tone + '"><div class="m">' + esc(I.name) + " · " + dd(I.from) + " – " + dd(I.to) + " · " + (I.states.length ? esc(I.states.join(", ")) : "All states") + "</div><h2>" + esc(R.verdict) + '</h2><div class="m">' + esc(I.models.join(", ")) + " · " + (R.granularity === "daily" ? "daily" : "month-wise") + " data from " + (R.source === "portal" ? "Retailer portal" : "uploaded sell-out") + "</div></div>" +
+      '<div class="kp"><div class="kt ' + (U.extra > 0 ? "g" : "r") + '"><div class="l">Extra units</div><div class="v">' + nf(U.extra) + '</div><div class="s">' + nf(U.during) + " sold vs " + nf(U.expected) + ' expected</div></div><div class="kt ' + ((R.upliftPct || 0) >= 10 ? "g" : (R.upliftPct || 0) >= 3 ? "o" : "r") + '"><div class="l">Uplift</div><div class="v">' + pc(R.upliftPct) + '</div><div class="s">market trend ' + pc(U.controlTrendPct) + '</div></div><div class="kt"><div class="l">Scheme cost</div><div class="v">' + inr(C.total) + '</div><div class="s">' + (C.manual ? "entered" : "from payouts") + (R.costPctOfSales != null ? " · " + R.costPctOfSales + "% of sales" : "") + "</div></div>" +
+      '<div class="kt ' + (R.roiPct == null ? "" : R.roiPct >= 0 ? "g" : "r") + '"><div class="l">ROI</div><div class="v">' + pc(R.roiPct) + '</div><div class="s">extra margin ' + inr(V.extraMargin) + " @ " + V.marginPct + '%</div></div><div class="kt"><div class="l">Cost per extra unit</div><div class="v">' + (R.costPerExtraUnit ? inr(R.costPerExtraUnit) : "—") + '</div><div class="s">avg price ' + inr(V.asp) + '</div></div><div class="kt ' + (R.pullForwardPct != null && R.pullForwardPct < -8 ? "r" : "") + '"><div class="l">After the scheme</div><div class="v">' + (R.pullForwardPct == null ? "—" : pc(R.pullForwardPct)) + '</div><div class="s">' + (R.pullForwardPct == null ? "not over yet / no data" : R.pullForwardPct < -8 ? "dip — sales pulled forward" : "no big dip") + "</div></div></div>" +
+      '<div class="sh"><span>📈 Scheme models vs other vivo models</span></div><div class="chart">' + BICH.lines({ labels: R.series.map(function (s) { return dd(s.from).replace(/ \d+$/, ""); }), series: [{ name: "Scheme models", values: R.series.map(function (s) { return s.s; }), color: "#5B4CFF" }, { name: "Other models (control)", values: R.series.map(function (s) { return s.c; }), color: "#9AA0B8", dash: true }], shade: f0 >= 0 ? [{ from: f0, to: f1, label: "scheme" }] : [] }) + '<div class="muted" style="font-size:11px">' + (R.granularity === "daily" ? "Weekly" : "Monthly") + " units · before → during → after</div></div>" +
+      '<div class="sh"><span>🗺️ By state</span></div>' + BICH.bars(R.byState.slice(0, 15).map(function (x) { return [x.name, x.extra, x.uplift == null ? "" : pc(x.uplift)]; }), { lw: 110 }) + tbl(R.byState) +
+      '<div class="sh"><span>📱 By model</span></div>' + tbl(R.byModel) +
+      (R.retail ? '<div class="sh"><span>💰 Where the money went</span></div><div class="kp"><div class="kt"><div class="l">Retailers paid</div><div class="v">' + R.retail.paid + '</div><div class="s">avg ' + inr(R.retail.avg) + '</div></div><div class="kt ' + ((R.retail.leakPct || 0) > 30 ? "r" : "o") + '"><div class="l">Paid with no growth</div><div class="v">' + (R.retail.leakPct == null ? "—" : R.retail.leakPct + "%") + '</div><div class="s">' + inr(R.retail.leak) + " · " + R.retail.flat + ' retailers</div></div><div class="kt"><div class="l">Top 10% got</div><div class="v">' + (R.retail.top10Pct == null ? "—" : R.retail.top10Pct + "%") + '</div><div class="s">of payouts</div></div></div>' + (R.retail.withData < R.retail.paid ? '<div class="muted" style="font-size:11.5px;margin:4px 2px">Growth known for ' + R.retail.withData + " of " + R.retail.paid + " paid retailers (needs retailer-wise sell-out).</div>" : "") : "") +
+      '<div class="sh"><span>✨ AI analysis & action plan</span><button class="btn pri sm" id="aib">' + (item.ai ? "↻ Redo" : "✨ Generate") + '</button></div><div id="aio">' + (item.ai ? aiHtml(item.ai) : '<div class="muted" style="font-size:12.5px;margin:4px 2px">AI reads these numbers, the scheme slabs and competitors’ schemes / offers (from Competition analysis) and suggests what to change.</div>') + "</div>" +
+      '<details class="help"><summary><b>How these numbers are worked out</b></summary>Baseline: ' + dd(R.periods.before[0]) + " – " + dd(R.periods.before[1]) + " (" + nf(U.before) + " units). Other vivo models changed " + pc(U.controlTrendPct) + " between the two periods, so without the scheme we expect " + nf(U.before) + " × " + (1 + (U.controlTrendPct || 0) / 100).toFixed(2) + " = " + nf(U.expected) + ". Sold " + nf(U.during) + " → extra " + nf(U.extra) + ". Extra value " + inr(V.extra) + " × margin " + V.marginPct + "% = " + inr(V.extraMargin) + " vs cost " + inr(C.total) + ". " + (R.periods.after ? "After-period " + dd(R.periods.after[0]) + " – " + dd(R.periods.after[1]) + " checks for a dip (pull-forward)." : "") + "</details>";
+    $("tp").innerHTML = html;
+    $("bk").onclick = function () { window.__pageBack(); };
+    $("ed").onclick = function () { var p = Object.assign({ id: item.id }, item.input); CUR = null; TAB = "new"; draw(); tNew(p); };
+    $("xl").onclick = function () { download(xlsx([{ name: "Summary", rows: [["Scheme", I.name], ["Period", I.from + " to " + I.to], ["States", I.states.join(", ") || "All"], ["Models", I.models.join(", ")], ["Verdict", R.verdict], ["Units during", U.during], ["Units before (baseline)", U.before], ["Market trend %", U.controlTrendPct], ["Expected without scheme", U.expected], ["Extra units", U.extra], ["Uplift %", R.upliftPct], ["Extra value", V.extra], ["Margin %", V.marginPct], ["Extra margin", V.extraMargin], ["Cost", C.total], ["ROI %", R.roiPct], ["Cost per extra unit", R.costPerExtraUnit], ["After-scheme change %", R.pullForwardPct]] }, { name: "By state", rows: [["State", "During", "Before", "Expected", "Extra", "Uplift %"]].concat(R.byState.map(function (x) { return [x.name, x.during, x.before, x.expected, x.extra, x.uplift]; })) }, { name: "By model", rows: [["Model", "During", "Before", "Expected", "Extra", "Uplift %"]].concat(R.byModel.map(function (x) { return [x.name, x.during, x.before, x.expected, x.extra, x.uplift]; })) }].concat(item.ai ? [{ name: "AI plan", rows: [["Summary", item.ai.summary]].concat((item.ai.changes || []).map(function (c) { return ["Change", c.change, c.why, c.impact]; })).concat([["Next design", item.ai.nextDesign || ""]]) }] : [])), "Scheme_ROI_" + I.name.replace(/\W+/g, "_").slice(0, 40) + ".xlsx"); };
+    $("aib").onclick = function () { var b = this; b.disabled = true; b.textContent = "Analysing…"; api({ action: "roi-ai", id: item.id }).then(function (r) { b.disabled = false; b.textContent = "↻ Redo"; if (!r.ok) return toast(r.error); item.ai = r.ai; $("aio").innerHTML = aiHtml(r.ai); }); };
+  }
+  function tbl(L) { return '<div class="tbw"><table class="tb"><tr><th>Name</th><th>During</th><th>Before</th><th>Expected</th><th>Extra</th><th>Uplift</th></tr>' + L.map(function (x) { return "<tr><td><b>" + esc(x.name) + "</b></td><td>" + nf(x.during) + "</td><td>" + nf(x.before) + "</td><td>" + nf(x.expected) + '</td><td style="color:' + (x.extra >= 0 ? "#13693F" : "#B42318") + '"><b>' + nf(x.extra) + "</b></td><td>" + (x.uplift == null ? "—" : '<span class="pill ' + (x.uplift >= 10 ? "g" : x.uplift >= 3 ? "o" : "r") + '">' + pc(x.uplift) + "</span>") + "</td></tr>"; }).join("") + "</table></div>"; }
+  function aiHtml(a) {
+    var li = function (L) { return L && L.length ? "<ul>" + L.map(function (x) { return "<li>" + esc(typeof x === "string" ? x : JSON.stringify(x)) + "</li>"; }).join("") + "</ul>" : ""; };
+    return '<div class="ai"><div>' + esc(a.summary) + "</div>" + (a.worked && a.worked.length ? "<h4>✅ What worked</h4>" + li(a.worked) : "") + (a.didnt && a.didnt.length ? "<h4>⚠️ What didn’t</h4>" + li(a.didnt) : "") +
+      (a.changes && a.changes.length ? '<h4>🛠️ Changes to make</h4><div class="tbw" style="box-shadow:none"><table class="tb"><tr><th>Change</th><th style="text-align:left">Why</th><th style="text-align:left">Expected effect</th></tr>' + a.changes.map(function (c) { return '<tr><td style="white-space:normal;min-width:150px"><b>' + esc(c.change) + '</b></td><td style="white-space:normal;text-align:left;min-width:140px">' + esc(c.why) + '</td><td style="white-space:normal;text-align:left;min-width:120px">' + esc(c.impact) + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      (a.nextDesign ? "<h4>🎯 Better next scheme</h4><div>" + esc(a.nextDesign) + "</div>" : "") + (a.watch && a.watch.length ? "<h4>👀 Track next time</h4>" + li(a.watch) : "") + "</div>";
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>

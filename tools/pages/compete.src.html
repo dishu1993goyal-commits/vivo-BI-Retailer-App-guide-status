@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Competition analysis</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:7px 6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;vertical-align:top}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#666}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 2px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart,.cardx{background:var(--card);border-radius:16px;padding:12px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:16px;padding:13px;margin-top:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.bc{background:var(--card);border-radius:16px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06);cursor:pointer;border-top:4px solid #ccc}.bc b{font-size:14px}.bc .s{font-size:11.5px;color:var(--mut);margin-top:3px}
+.job{display:flex;gap:8px;align-items:center;background:#F4F2FF;border-radius:12px;padding:9px 12px;margin-top:8px;font-size:12.5px}
+.pos{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:8px}.pos div{border-radius:10px;padding:6px 4px;text-align:center;font-size:10.5px;line-height:1.3}.pos b{display:block;font-size:11px}
+.pos .leader{background:#13693F;color:#fff}.pos .strong{background:#4ACF8F;color:#063}.pos .present{background:#E6F4EA;color:#13693F}.pos .weak{background:#FFF4E5;color:#8A5300}.pos .absent{background:#F1F2F6;color:#999}
+.ul{margin:4px 0 0;padding-left:18px;font-size:13px;line-height:1.55}
+.msg{border-radius:14px;padding:9px 12px;margin-top:7px;font-size:13px;line-height:1.5;max-width:90%;white-space:pre-wrap}.msg.me{background:var(--brand);color:#fff;margin-left:auto}.msg.bot{background:var(--card);box-shadow:0 1px 7px rgba(20,24,51,.07)}
+.qk{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.qk button{border:1px solid #DADDF0;background:var(--card);border-radius:99px;padding:6px 11px;font:inherit;font-size:12px;cursor:pointer}
+.tent{font-size:11px;color:#8A5300;background:#FFF8EA;border-radius:8px;padding:5px 9px;margin-top:6px}
+@media (min-width:760px){.grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🥊</span></div>
+  <h1>Competition analysis</h1><p>Brands, price bands, states, offers, schemes and launches — AI web research + vivo field intel</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "mkt", D = null, BR = null, CHAT = [], CS = null, POLL = null, IF = { brand: "", kind: "" };
+  var dd = function (t) { return t ? new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : ""; };
+  var arr = function (x) { return Array.isArray(x) ? x : []; };
+  window.__pageBack = function () { if (BR) { BR = null; draw(); return true; } if (TAB !== "mkt") { TAB = "mkt"; draw(); return true; } return false; };
+  function load() { return api({ action: "cmp-get" }).then(function (r) { if (!r.ok) throw new Error(r.error); D = r; }); }
+  function jobBar() {
+    var j = D.job, m = D.market;
+    if (j && j.status === "running") { return '<div class="job"><div class="spin" style="width:16px;height:16px;border-width:2px"></div><span style="flex:1">AI is researching the web… ' + esc(j.stage || "") + " (" + j.done.length + "/" + j.list.length + ")</span></div>"; }
+    return '<div class="job"><span style="flex:1">' + (m ? "Market researched " + dd(m.at) : "Not researched yet") + (j && j.errors && j.errors.length && j.end && Date.now() - j.end < 864e5 ? ' · <span style="color:#B42318">' + esc(j.errors[j.errors.length - 1]).slice(0, 90) + "</span>" : "") + "</span>" + (D.isHO ? '<button class="btn pri sm" id="rall">🔄 Refresh all with AI</button>' : '<button class="btn sec sm" id="rmk">🔄 Refresh market</button>') + "</div>";
+  }
+  function poll() { clearTimeout(POLL); if (D && D.job && D.job.status === "running") POLL = setTimeout(function () { load().then(function () { if (!BR) draw(); else poll(); }); }, 6000); }
+  function refresh(target) { api({ action: "cmp-refresh", target: target }).then(function (r) { if (!r.ok) return toast(r.error); toast(r.running ? "Research is already running" : "AI research started — takes a few minutes; you can leave this page"); load().then(draw); }); }
+  function draw() {
+    clearTimeout(POLL);
+    if (!D) { VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>'; return load().then(draw).catch(function (e) { VIEW.innerHTML = '<div class="err">' + esc(e.message) + "</div>"; }); }
+    if (BR) return brandPage(BR);
+    var tabs = [["mkt", "🧭 Market"], ["brands", "🏷️ Brands"], ["trend", "📈 Trends & share"], ["intel", "🕵️ Field intel"], ["ask", "🤖 Ask AI"], ["cs", "📥 Counter share"]];
+    VIEW.innerHTML = jobBar() + '<div class="seg" style="overflow-x:auto;margin-top:8px">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    if ($("rall")) $("rall").onclick = function () { refresh("all"); }; if ($("rmk")) $("rmk").onclick = function () { refresh("market"); };
+    ({ mkt: tMkt, brands: tBrands, trend: tTrend, intel: tIntel, ask: tAsk, cs: tCs })[TAB](); poll();
+  }
+  // ---------- market ----------
+  function tMkt() {
+    var M = D.market && D.market.data;
+    if (!M) { $("tp").innerHTML = '<div class="card empty"><div class="big">🧭</div>No market research yet.<br>' + (D.isHO ? "Tap 🔄 Refresh all with AI (takes 3–8 minutes — it reads Counterpoint / IDC / Canalys reports, news and trade media)." : "Ask HO to run the research, or tap 🔄 Refresh market.") + "</div>"; return; }
+    var Q = arr(M.quarters).slice(-6), keys = []; Q.forEach(function (q) { Object.keys(q.shares || {}).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); }); });
+    keys.sort(function (a, b) { var s = function (k) { return Q.reduce(function (t, q) { return t + (+(q.shares || {})[k] || 0); }, 0); }; return s(b) - s(a); });
+    $("tp").innerHTML = '<div class="tent">⚠️ Market shares, price-band and state figures are AI estimates from public reports and news — directional, not official numbers. Your counter-share uploads (📥) are real data.</div>' +
+      '<div class="cardx"><b>Summary</b><div style="font-size:13px;line-height:1.6;margin-top:4px">' + esc(M.summary || "") + "</div>" + (M.vivoPosition ? '<div class="help" style="background:#EEF2FF"><b>Where vivo stands:</b> ' + esc(M.vivoPosition) + "</div>" : "") + "</div>" +
+      (Q.length ? '<div class="sh"><span>📊 Brand share by quarter (%)</span></div><div class="chart">' + BICH.stack({ rows: Q.map(function (q) { return { label: q.period, parts: q.shares || {} }; }), keys: keys.slice(0, 9), pct: true }) + '<div class="muted" style="font-size:11px">' + esc(arr(Q).map(function (q) { return q.period + ": " + (q.source || "?"); }).join(" · ")) + "</div></div>" : "") +
+      (arr(M.priceBands).length ? '<div class="sh"><span>💰 Who leads each price band</span></div><div class="tbw"><table class="tb"><tr><th>Price band</th><th>Leader</th><th>Top brands (est. %)</th></tr>' + M.priceBands.map(function (p) { var top = Object.keys(p.shares || {}).sort(function (a, b) { return p.shares[b] - p.shares[a]; }).slice(0, 4); return "<tr><td><b>" + esc(p.band) + '</b></td><td><span class="pill" style="background:' + BICH.color(p.leader) + ';color:#fff">' + esc(p.leader) + "</span></td><td>" + top.map(function (k) { return '<span style="white-space:nowrap">' + esc(k) + " <b>" + esc(p.shares[k]) + "</b></span>"; }).join(" · ") + (p.note ? '<br><small style="color:var(--mut)">' + esc(p.note) + "</small>" : "") + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      (arr(M.states).length ? '<div class="sh"><span>🗺️ State-wise brand strength</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Leader</th><th>Est. shares</th></tr>' + M.states.map(function (p) { var top = Object.keys(p.shares || {}).sort(function (a, b) { return p.shares[b] - p.shares[a]; }).slice(0, 4); return "<tr><td><b>" + esc(p.state) + '</b></td><td><span class="pill" style="background:' + BICH.color(p.leader) + ';color:#fff">' + esc(p.leader) + "</span></td><td>" + top.map(function (k) { return '<span style="white-space:nowrap">' + esc(k) + " <b>" + esc(p.shares[k]) + "</b></span>"; }).join(" · ") + (p.note ? '<br><small style="color:var(--mut)">' + esc(p.note) + "</small>" : "") + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      (arr(M.trends).length ? '<div class="sh"><span>📌 Market trends</span></div><div class="cardx"><ul class="ul">' + M.trends.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></div>" : "") + srcs(D.market);
+  }
+  function srcs(d) { var S = arr(d && d.sources); return S.length ? '<details class="help"><summary><b>Sources (' + S.length + ")</b> · " + esc(d.model || "") + "</summary>" + S.map(function (s) { var u = typeof s === "string" ? s : s.url, t = typeof s === "string" ? s : s.title || s.url; return /^https?:/.test(u) ? '<div><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(String(t).slice(0, 90)) + "</a></div>" : ""; }).join("") + "</details>" : ""; }
+  // ---------- brands ----------
+  function tBrands() {
+    $("tp").innerHTML = '<div class="grid">' + D.brands.map(function (b, i) { var d = b.doc; return '<div class="bc" data-b="' + b.slug + '" style="border-top-color:' + BICH.color(b.name, i) + '"><b>' + esc(b.name) + '</b><div class="s">' + (d ? esc(d.data.shareEst || "share n/a") + "<br>updated " + dd(d.at) : "not researched yet") + "</div>" + (d ? '<div class="s">' + arr(d.data.launchesUpcoming).length + " upcoming · " + arr(d.data.affordability).length + " offers · " + D.intel.filter(function (x) { return x.brand === b.name; }).length + " field intel</div>" : "") + "</div>"; }).join("") + "</div>" + (D.isHO ? '<button class="btn sec block" id="badd" style="margin-top:10px">＋ Add a brand</button>' : "");
+    [].forEach.call($("tp").querySelectorAll("[data-b]"), function (c) { c.onclick = function () { BR = c.dataset.b; draw(); window.scrollTo(0, 0); }; });
+    if ($("badd")) $("badd").onclick = function () { sheet("Add a brand", "", [["＋", "Add", function (ov) { api({ action: "cmp-brand-add", name: ov.querySelector("#bn").value }).then(function (r) { if (!r.ok) return toast(r.error); load().then(draw); }); }, "pri"]], '<input class="tx" id="bn" placeholder="e.g. Tecno" style="margin-top:8px">'); };
+  }
+  function brandPage(slug) {
+    var b = D.brands.find(function (x) { return x.slug === slug; }), d = b && b.doc, X = (d && d.data) || {}, col = BICH.color(b.name);
+    var intel = D.intel.filter(function (x) { return x.brand === b.name; });
+    var sec = function (t, body) { return body ? '<div class="sh"><span>' + t + "</span></div>" + body : ""; };
+    var tbl = function (L, cols) { return L.length ? '<div class="tbw"><table class="tb"><tr>' + cols.map(function (c) { return "<th>" + c[0] + "</th>"; }).join("") + "</tr>" + L.map(function (r) { return "<tr>" + cols.map(function (c) { return "<td>" + c[1](r) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" : ""; };
+    var li = function (L) { return L.length ? '<div class="cardx"><ul class="ul">' + L.map(function (x) { return "<li>" + esc(typeof x === "string" ? x : JSON.stringify(x)) + "</li>"; }).join("") + "</ul></div>" : ""; };
+    var PB = X.priceBands || {};
+    VIEW.innerHTML = '<div class="row" style="gap:6px"><button class="btn ghost sm" id="bk">← Brands</button><span style="flex:1"></span>' + (D.job && D.job.status === "running" ? '<span class="pill o">research running…</span>' : '<button class="btn sec sm" id="brf">🔄 Research again</button>') + "</div>" +
+      '<div class="cardx" style="border-top:5px solid ' + col + '"><h2 style="margin:0;font-size:20px">' + esc(b.name) + '</h2><div class="muted" style="font-size:12px">' + (d ? "AI web research · " + dd(d.at) + (d.grounded ? "" : " · ⚠️ without live search") : "Not researched yet") + "</div>" + (X.shareEst ? '<div style="margin-top:6px"><span class="pill">India share: ' + esc(X.shareEst) + "</span></div>" : "") + (X.overview ? '<div style="font-size:13px;line-height:1.6;margin-top:6px">' + esc(X.overview) + "</div>" : "") + "</div>" +
+      (d ? sec("💰 Price-band position", '<div class="cardx"><div class="pos">' + D.bands.map(function (bd) { var p = PB[bd] || {}, pos = String(p.position || "absent").toLowerCase(); return '<div class="' + esc(pos) + '"><b>' + esc(bd.replace("Under ", "<")) + "</b>" + esc(pos) + "</div>"; }).join("") + '</div><div style="font-size:12px;margin-top:8px">' + D.bands.map(function (bd) { var p = PB[bd] || {}; return arr(p.models).length ? "<div><b>" + esc(bd) + ":</b> " + esc(p.models.join(", ")) + "</div>" : ""; }).join("") + "</div></div>") +
+        sec("🎯 Strategy", li(arr(X.strategy))) + (arr(X.strengths).length || arr(X.weaknesses).length ? '<div class="g2"><div>' + sec("💪 Strengths", li(arr(X.strengths))) + "</div><div>" + sec("🩹 Weaknesses", li(arr(X.weaknesses))) + "</div></div>" : "") +
+        sec("🚀 Upcoming launches", tbl(arr(X.launchesUpcoming), [["Model", function (r) { return "<b>" + esc(r.model) + "</b>"; }], ["Expected", function (r) { return esc(r.expected); }], ["Price", function (r) { return esc(r.priceExpected); }], ["Notes", function (r) { return esc(r.notes); }]])) +
+        sec("🆕 Recent launches", tbl(arr(X.launchesRecent), [["Model", function (r) { return "<b>" + esc(r.model) + "</b>"; }], ["Date", function (r) { return esc(r.date); }], ["Price", function (r) { return esc(r.price); }], ["Highlights", function (r) { return esc(r.highlights); }]])) +
+        sec("💳 Consumer offers (affordability)", tbl(arr(X.affordability), [["Type", function (r) { return '<span class="pill">' + esc(r.type) + "</span>"; }], ["Partner", function (r) { return esc(r.partner); }], ["Offer", function (r) { return esc(r.details); }], ["Till", function (r) { return esc(r.validTill); }]])) +
+        sec("🤝 Distributor / retailer schemes (reported)", tbl(arr(X.channelSchemes), [["Level", function (r) { return '<span class="pill o">' + esc(r.level) + "</span>"; }], ["Scheme", function (r) { return esc(r.details); }], ["Period", function (r) { return esc(r.period); }], ["Source", function (r) { return esc(r.source); }]])) +
+        sec("🗺️ Regional strength", arr(X.regions).length ? '<div class="cardx">' + X.regions.map(function (r) { return '<span class="pill ' + ({ high: "g", medium: "o", low: "m" }[String(r.strength).toLowerCase()] || "") + '" style="margin:3px" title="' + esc(r.note) + '">' + esc(r.region) + " · " + esc(r.strength) + "</span>"; }).join("") + "</div>" : "") +
+        (arr(X.monthly).length > 1 ? sec("📈 Estimated monthly share (%)", '<div class="chart">' + BICH.lines({ labels: X.monthly.map(function (m) { return m.month; }), series: [{ name: b.name, values: X.monthly.map(function (m) { return +m.shareEst || null; }), color: col }], zero: false, fmt: function (v) { return v.toFixed(1); } }) + "</div>") : "") +
+        sec("📰 News", arr(X.news).length ? '<div class="cardx">' + X.news.map(function (n) { return '<div style="margin:6px 0;font-size:13px"><b>' + (n.url && /^https?:/.test(n.url) ? '<a href="' + esc(n.url) + '" target="_blank" rel="noopener">' + esc(n.title) + "</a>" : esc(n.title)) + '</b> <small class="muted">' + esc(n.date || "") + "</small><div class=\"muted\" style=\"font-size:12px\">" + esc(n.summary || "") + "</div></div>"; }).join("") + "</div>" : "") : '<div class="card empty"><div class="big">🔎</div>No research yet for ' + esc(b.name) + ".</div>") +
+      sec("🕵️ Field intel from vivo teams (" + intel.length + ")", intel.length ? intel.slice(0, 30).map(intelCard).join("") : '<div class="muted" style="font-size:12.5px;margin:4px 2px">None yet — add what you see in the market in 🕵️ Field intel.</div>') +
+      '<div class="row" style="gap:6px;margin-top:12px"><button class="btn pri" id="bvs" style="flex:1">🤖 vivo vs ' + esc(b.name.split(" (")[0]) + ': what should we do?</button></div><div id="bvo"></div>' + srcs(d);
+    $("bk").onclick = function () { BR = null; TAB = "brands"; draw(); };
+    wireIntel();
+    if ($("brf")) $("brf").onclick = function () { refresh(slug); };
+    $("bvs").onclick = function () { var bt = this; bt.disabled = true; bt.textContent = "Thinking…"; api({ action: "cmp-ask", q: "Compare vivo with " + b.name + " in India: price bands where they beat us, their offers and channel schemes, upcoming launches, states where they are strong — and give 6 specific counter-actions for vivo (offers, schemes, models, states)." }).then(function (r) { bt.disabled = false; bt.textContent = "🤖 Ask again"; $("bvo").innerHTML = '<div class="ai">' + esc(r.ok ? r.answer : r.error) + "</div>"; }); };
+    poll();
+  }
+  function intelCard(i) { return '<div class="cardx" style="padding:10px 12px"><div class="row"><b style="flex:1;font-size:13px">' + esc(i.brand) + " · " + esc(i.kind) + "</b>" + (i.verified ? '<span class="pill g">verified</span>' : '<span class="pill m">unverified</span>') + '</div><div style="font-size:13px;margin-top:3px">' + esc(i.details) + (i.value ? " <b>" + esc(i.value) + "</b>" : "") + '</div><div class="muted" style="font-size:11.5px;margin-top:3px">' + esc([i.model, i.area, i.state].filter(Boolean).join(" · ")) + " · " + esc(i.by) + " · " + dd(i.at) + (i.validTill ? " · till " + esc(i.validTill) : "") + "</div>" + (D.isHO && !i.verified ? '<button class="btn ghost sm" data-v="' + i.id + '" style="margin-top:4px">✓ Verify</button>' : "") + (D.isHO ? '<button class="btn ghost sm" data-del="' + i.id + '" style="margin-top:4px;color:var(--bad)">Delete</button>' : "") + "</div>"; }
+  // ---------- trends & counter share ----------
+  function tTrend() {
+    var M = D.market && D.market.data, mon = arr(M && M.monthly);
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    (CS ? Promise.resolve(CS) : api({ action: "cmp-cs-get" }).then(function (r) { CS = r.ok ? r : { rows: [] }; return CS; })).then(function (cs) {
+      var keys = []; mon.forEach(function (m) { Object.keys(m.shares || {}).forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); }); });
+      var html = "";
+      if (mon.length > 1) html += '<div class="sh"><span>📈 Month-on-month brand share (AI estimate, %)</span></div><div class="chart">' + BICH.lines({ labels: mon.map(function (m) { return m.month; }), series: keys.slice(0, 9).map(function (k, i) { return { name: k, values: mon.map(function (m) { var v = (m.shares || {})[k]; return v == null ? null : +v; }), color: BICH.color(k, i), width: /vivo/i.test(k) ? 3.4 : 2 }; }), zero: false, fmt: function (v) { return v.toFixed(0); } }) + '<div class="tent">Estimated from reported quarterly / monthly figures.</div></div>';
+      var R = cs.rows || [];
+      if (R.length) {
+        var sts = [], pbs = []; R.forEach(function (r) { if (sts.indexOf(r.st) < 0) sts.push(r.st); if (r.pb && pbs.indexOf(r.pb) < 0) pbs.push(r.pb); }); sts.sort();
+        var F = { st: tTrend.st || "", pb: tTrend.pb || "" }, RR = R.filter(function (r) { return (!F.st || r.st === F.st) && (!F.pb || r.pb === F.pb); });
+        var ms = []; RR.forEach(function (r) { if (ms.indexOf(r.m) < 0) ms.push(r.m); }); ms.sort();
+        var brs = {}; RR.forEach(function (r) { brs[r.br] = (brs[r.br] || 0) + r.u; }); var bl = Object.keys(brs).sort(function (a, b) { return brs[b] - brs[a]; });
+        var share = function (rows, br) { var t = rows.reduce(function (a, r) { return a + r.u; }, 0); return t ? rows.filter(function (r) { return r.br === br; }).reduce(function (a, r) { return a + r.u; }, 0) / t * 100 : 0; };
+        var last = ms[ms.length - 1], prev = ms[ms.length - 2], RL = RR.filter(function (r) { return r.m === last; });
+        html += '<div class="sh"><span>🏪 Counter share — real data from the field</span></div><div class="row" style="gap:6px"><select class="tx" id="cst" style="flex:1"><option value="">All states</option>' + sts.map(function (s) { return "<option" + (s === F.st ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><select class="tx" id="cpb" style="flex:1"><option value="">All price bands</option>' + pbs.map(function (s) { return "<option" + (s === F.pb ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" +
+          '<div class="chart">' + BICH.stack({ rows: ms.slice(-8).map(function (m) { var p = {}; RR.filter(function (r) { return r.m === m; }).forEach(function (r) { p[r.br] = (p[r.br] || 0) + r.u; }); return { label: m.slice(2).replace("-", "/"), parts: p }; }), keys: bl.slice(0, 9), pct: true }) + "</div>" +
+          '<div class="sh"><span>' + esc(last) + " share & change</span></div>" + BICH.bars(bl.slice(0, 10).map(function (b, i) { var s = share(RL, b), p = prev ? share(RR.filter(function (r) { return r.m === prev; }), b) : null; return [b, Math.round(s * 10) / 10, p == null ? "" : (s - p >= 0 ? "▲" : "▼") + Math.abs(s - p).toFixed(1), BICH.color(b, i)]; }), { fmt: function (v) { return v + "%"; } }) +
+          (!F.st ? '<div class="sh"><span>🗺️ Leader by state (' + esc(last) + ')</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Leader</th><th>vivo share</th><th>Top 3</th></tr>' + sts.map(function (s) { var rs = RL.filter(function (r) { return r.st === s; }), by = {}; rs.forEach(function (r) { by[r.br] = (by[r.br] || 0) + r.u; }); var tot = rs.reduce(function (a, r) { return a + r.u; }, 0), top = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; }); var v = Object.keys(by).find(function (k) { return /vivo/i.test(k); }); return tot ? "<tr><td><b>" + esc(s) + '</b></td><td><span class="pill" style="background:' + BICH.color(top[0]) + ';color:#fff">' + esc(top[0]) + "</span></td><td>" + (v ? Math.round(by[v] / tot * 100) + "%" : "—") + "</td><td>" + top.slice(0, 3).map(function (k) { return esc(k) + " " + Math.round(by[k] / tot * 100) + "%"; }).join(" · ") + "</td></tr>" : ""; }).join("") + "</table></div>" : "") +
+          (pbs.length && !F.pb ? '<div class="sh"><span>💰 Leader by price band (' + esc(last) + ')</span></div><div class="tbw"><table class="tb"><tr><th>Band</th><th>Top 4 share</th></tr>' + pbs.map(function (p) { var rs = RL.filter(function (r) { return r.pb === p; }), by = {}; rs.forEach(function (r) { by[r.br] = (by[r.br] || 0) + r.u; }); var tot = rs.reduce(function (a, r) { return a + r.u; }, 0); return tot ? "<tr><td><b>" + esc(p) + "</b></td><td>" + Object.keys(by).sort(function (a, b) { return by[b] - by[a]; }).slice(0, 4).map(function (k) { return esc(k) + " <b>" + Math.round(by[k] / tot * 100) + "%</b>"; }).join(" · ") + "</td></tr>" : ""; }).join("") + "</table></div>" : "");
+      }
+      if (!html) html = '<div class="card empty"><div class="big">📈</div>Run the AI market research for estimated monthly shares, and upload counter-share data (📥) for real month-on-month analysis by state and price band.</div>';
+      $("tp").innerHTML = html;
+      if ($("cst")) $("cst").onchange = function () { tTrend.st = this.value; tTrend(); }; if ($("cpb")) $("cpb").onchange = function () { tTrend.pb = this.value; tTrend(); };
+    });
+  }
+  // ---------- field intel ----------
+  function tIntel() {
+    var L = D.intel.filter(function (i) { return (!IF.brand || i.brand === IF.brand) && (!IF.kind || i.kind === IF.kind); });
+    $("tp").innerHTML = '<div class="cardx"><b>➕ Report what you see in the market</b><div class="g2"><div><label class="lb">Brand</label><select class="tx" id="ib">' + D.brands.map(function (b) { return "<option>" + esc(b.name) + "</option>"; }).join("") + '</select></div><div><label class="lb">Type</label><select class="tx" id="ik">' + D.kinds.map(function (k) { return "<option>" + esc(k) + "</option>"; }).join("") + "</select></div></div>" + '<div class="g2">' + (D.isHO ? '<div><label class="lb">State</label><input class="tx" id="ist"></div>' : "") + '<div><label class="lb">Area / city / store</label><input class="tx" id="ia"></div><div><label class="lb">Model (optional)</label><input class="tx" id="imo"></div><div><label class="lb">Value (₹ / % / units)</label><input class="tx" id="iv"></div><div><label class="lb">Valid till</label><input class="tx" type="date" id="iu"></div></div><label class="lb">What exactly</label><textarea class="tx" id="id" style="min-height:70px" placeholder="e.g. Samsung giving retailers ₹1,500 extra per A26 sold above 10 units this month; HDFC 10% cashback on S25 FE"></textarea><button class="btn pri block" id="isv" style="margin-top:8px">Submit intel</button></div>' +
+      '<div class="row" style="gap:6px;margin-top:12px"><select class="tx" id="fb" style="flex:1"><option value="">All brands</option>' + D.brands.map(function (b) { return "<option" + (b.name === IF.brand ? " selected" : "") + ">" + esc(b.name) + "</option>"; }).join("") + '</select><select class="tx" id="fk" style="flex:1"><option value="">All types</option>' + D.kinds.map(function (k) { return "<option" + (k === IF.kind ? " selected" : "") + ">" + esc(k) + "</option>"; }).join("") + "</select></div>" + (L.length ? L.slice(0, 150).map(intelCard).join("") : '<div class="muted" style="font-size:12.5px;margin:8px 2px">No intel yet.</div>');
+    $("isv").onclick = function () { api({ action: "cmp-intel-add", item: { brand: $("ib").value, kind: $("ik").value, state: $("ist") ? $("ist").value : "", area: $("ia").value, model: $("imo").value, value: $("iv").value, validTill: $("iu").value, details: $("id").value } }).then(function (r) { if (!r.ok) return toast(r.error); toast("Thanks — intel added"); D.intel.unshift(r.item); tIntel(); }); };
+    $("fb").onchange = function () { IF.brand = this.value; tIntel(); }; $("fk").onchange = function () { IF.kind = this.value; tIntel(); };
+    wireIntel();
+  }
+  function wireIntel() {
+    [].forEach.call(VIEW.querySelectorAll("[data-v]"), function (b) { b.onclick = function () { api({ action: "cmp-intel-verify", id: b.dataset.v }).then(function (r) { if (r.ok) { var i = D.intel.find(function (x) { return x.id === b.dataset.v; }); i.verified = true; draw(); } }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { api({ action: "cmp-intel-delete", id: b.dataset.del }).then(function (r) { if (r.ok) { D.intel = D.intel.filter(function (x) { return x.id !== b.dataset.del; }); draw(); } }); }; });
+  }
+  // ---------- ask AI ----------
+  function tAsk() {
+    $("tp").innerHTML = '<div class="cardx"><b>🤖 Ask about the competition</b><div class="muted" style="font-size:12px">Answers from the AI research, field intel and counter-share data in this tool.</div><div id="cl">' + CHAT.map(function (m) { return '<div class="msg ' + (m.role === "user" ? "me" : "bot") + '">' + esc(m.text) + "</div>"; }).join("") + '</div><div class="qk">' + ["Who leads ₹15–20k and why?", "Which brand is gaining fastest this quarter?", "Samsung vs vivo in Bihar — what should we do?", "Best competitor consumer offers right now", "Competitor launches in the next 2 months", "Which retailer schemes are competitors running?"].map(function (q) { return "<button>" + esc(q) + "</button>"; }).join("") + '</div><div class="row" style="gap:6px;margin-top:8px"><input class="tx" id="aq" placeholder="Ask anything…" style="flex:1"><button class="btn pri" id="ab">Ask</button></div></div>';
+    var send = function (q) { q = String(q || "").trim(); if (!q) return; CHAT.push({ role: "user", text: q }); tAsk(); $("cl").insertAdjacentHTML("beforeend", '<div class="msg bot">…</div>'); api({ action: "cmp-ask", q: q, history: CHAT.slice(-6, -1) }).then(function (r) { CHAT.push({ role: "bot", text: r.ok ? r.answer : "⚠️ " + r.error }); tAsk(); }); };
+    $("ab").onclick = function () { send($("aq").value); }; $("aq").onkeydown = function (e) { if (e.key === "Enter") send(this.value); };
+    [].forEach.call($("tp").querySelectorAll(".qk button"), function (b) { b.onclick = function () { send(b.textContent); }; });
+  }
+  // ---------- counter share upload ----------
+  function tCs() {
+    $("tp").innerHTML = '<div class="cardx"><b>📥 Counter share (offline channel)</b><div class="muted" style="font-size:12.5px;margin-top:4px">Month-wise units sold per brand at counters you track (retailer / promoter reports). Columns: Month, State, Area, Brand, Units, Price band. Uploading a month replaces that month for the states in the file. These real numbers drive 📈 Trends & share.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="cu">📥 Upload Excel</button><button class="btn sec sm" id="ct">⬇ Template</button><button class="btn sec sm" id="csm">🧪 Sample data</button></div><div id="cres"></div></div>';
+    var H = ["Month (YYYY-MM)", "State", "Area / city", "Brand", "Units", "Price band"];
+    $("ct").onclick = function () { download(xlsx([{ name: "Counter share", rows: [H, ["2026-10", "Bihar", "Patna", "vivo", 420, "₹15–20k"], ["2026-10", "Bihar", "Patna", "Samsung", 380, "₹15–20k"]] }]), "Counter_share_template.xlsx"); };
+    $("csm").onclick = function () { var rows = [H], B = [["vivo", 1], ["Samsung", .95], ["OPPO", .7], ["realme", .6], ["Xiaomi", .65], ["Apple", .2], ["Motorola", .3], ["OnePlus", .15]], S = [["Bihar", 1, { vivo: 1.25 }], ["Uttar Pradesh", 1.8, { Samsung: 1.2 }], ["West Bengal", 1.1, { Xiaomi: 1.25 }], ["Maharashtra", 1.5, { Samsung: 1.25, Apple: 1.6 }], ["Kerala", .7, { Samsung: 1.3, Apple: 1.4 }]], P = [["Under ₹10k", { realme: 1.5, Xiaomi: 1.6, Motorola: 1.2, Apple: 0, OnePlus: 0 }], ["₹10–15k", { realme: 1.3, Xiaomi: 1.3, vivo: 1.1 }], ["₹15–20k", { vivo: 1.3, OPPO: 1.2 }], ["₹20–30k", { vivo: 1.2, Samsung: 1.2, OnePlus: 1.5 }], ["₹30–45k", { Samsung: 1.4, OnePlus: 1.6, Apple: 1.5 }], ["₹45k+", { Apple: 4, Samsung: 1.8, vivo: .6, realme: .1, Xiaomi: .2 }]], seed = 5, rnd = function () { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+      for (var k = 7; k >= 0; k--) { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - k); var m = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); S.forEach(function (s) { P.forEach(function (p) { B.forEach(function (b) { var f = (p[1][b[0]] == null ? 1 : p[1][b[0]]) * (s[2][b[0]] || 1) * (b[0] === "vivo" ? 1 + (7 - k) * .015 : b[0] === "Samsung" ? 1 - (7 - k) * .01 : 1); var u = Math.round(60 * b[1] * s[1] * f * (.85 + rnd() * .3)); if (u) rows.push([m, s[0], s[0].split(" ")[0] + " city", b[0], u, p[0]]); }); }); }); }
+      download(xlsx([{ name: "Counter share", rows: rows }]), "Counter_share_sample.xlsx"); };
+    $("cu").onclick = function () { var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { if (!i.files[0]) return; (window.XLSX ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; document.head.appendChild(s); })).then(function () { return i.files[0].arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array" }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }), h = A.findIndex(function (r) { return r.some(function (c) { return /brand/i.test(c); }); }); if (h < 0) return toast("Need a Brand column"); var hd = A[h].map(function (c) { return String(c).toLowerCase(); }), c = function (re) { return hd.findIndex(function (x) { return re.test(x); }); }, C = { m: c(/month|period/), state: c(/state/), area: c(/area|city|town/), brand: c(/brand/), units: c(/unit|qty|sales|volume/), band: c(/band|price/) };
+      var rows = A.slice(h + 1).filter(function (r) { return String(r[C.brand] || "").trim(); }).map(function (r) { var o = {}; Object.keys(C).forEach(function (k) { if (C[k] >= 0) o[k] = r[C[k]]; }); var mm = String(o.m || "").trim(), x = /^(\d{4})[-/](\d{1,2})/.exec(mm) || /^(\d{1,2})[-/](\d{4})$/.exec(mm); o.m = x ? (x[1].length === 4 ? x[1] + "-" + x[2].padStart(2, "0") : x[2] + "-" + x[1].padStart(2, "0")) : mm; return o; });
+      api({ action: "cmp-cs-import", rows: rows }).then(function (r) { $("cres").innerHTML = r.ok ? '<div class="help" style="background:#E6F4EA">✅ ' + r.saved + " rows saved — see 📈 Trends & share</div>" : '<div class="err">' + esc(r.error) + "</div>"; CS = null; }); }); }; i.click(); };
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>
