@@ -163,7 +163,7 @@
     ".biw-frame{position:fixed;inset:0;z-index:2147482700;background:#F3F4F9;display:flex;flex-direction:column}" +
     ".biw-frame .bar{background:#0b0b0c;color:#e6cf86;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:2px solid #c9a227}" +
     ".biw-frame iframe{flex:1;border:0;width:100%}" +
-    "@media(max-width:560px){html.biw-web .rp .top .sbfoot2{display:none!important}.biw-bar{top:13px;right:8px;padding:3px}.biw-bar button{width:31px;height:32px;font-size:15px}.biw-av{width:29px;height:29px}}";
+    "@media(max-width:560px){html.biw-web .rp .top .sbfoot2,html.biw-web .rp .top #btl-b,html.biw-web .rp .top #btp-b{display:none!important}html.biw-web .rp .top .wrap{padding-right:158px!important}.biw-bar{top:13px;right:8px;padding:3px}.biw-bar button{width:31px;height:32px;font-size:15px}.biw-av{width:29px;height:29px}}";
   function css() { if (!document.getElementById("biw-css")) { var s = el("style"); s.id = "biw-css"; s.textContent = CSS; document.head.appendChild(s); } }
 
   var ROOT = el("div"); ROOT.id = "biw-root";
@@ -863,7 +863,8 @@
     var toolItems = [["⊞", "All tools", admin ? "Field, reports, engage, help, admin" : "Field, reports, engage, help", function () { openTool("hub"); }]];
     if (p.master) toolItems.push(["🧩", "Studio", "Customize, build tools, release, access", function () { openTool("studio"); }], ["✏️", "Customize this dashboard", "Rename / hide labels here", function () { closeDrawer(); if (window.CUST) window.CUST.edit(true); }]);
     var accItems = [["👤", "Edit profile", p.email || "", showEdit], ["🔒", "Change password", "", showPassword]];
-    var setItems = [["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
+    var hdrBtn = function (id) { return function () { closeDrawer(); var b = document.getElementById(id); if (b) b.click(); else toast("Not available on this page"); }; };
+    var setItems = [["🌐", "Language", "Hindi, Tamil, Bengali and more", hdrBtn("btl-b")], ["🎨", "Theme & colours", "", hdrBtn("btp-b")], ["🔠", "Dashboard text size", zoomLabel(), chooseZoom], ["🔄", "Refresh dashboard", "", function () { location.reload(); }]];
     var supItems = [["📲", "Get the State app", "APK", function () { location.href = APP_LINKS.state; }], admin ? ["📲", "Get the Admin app", "APK", function () { location.href = APP_LINKS.admin; }] : null,
       ["🔗", "Copy dashboard link", "", function () { try { navigator.clipboard.writeText(location.origin + "/"); toast("Link copied"); } catch (e) { toast(location.origin); } }],
       ["🛡️", "Privacy policy", "", function () { window.open("privacy.html", "_blank"); }], ["📄", "Terms of service", "", function () { window.open("terms.html", "_blank"); }]];

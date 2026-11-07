@@ -237,7 +237,7 @@
   var CARD_SEL = { dashboard: [".rp .card", ".rp .tile", ".rp .pp", ".rp .m-card", ".rp .sdc", ".rp .t5", ".rp a.rm-tile", ".rp .cpan", ".rp .fgroup", ".rp .rm-out", ".rp .tip"], tools: [".card", ".tl", ".bx", ".it2", ".al", ".pp", ".res", ".sv", ".of", ".ln", ".nt", ".ev", ".gi", ".tipc", ".mapw", ".it", ".quick button", ".lst", ".rk", ".bg", ".wc", ".mp", ".nar", ".dg", ".types button", ".ops button"] };
   function inScope(sc) { return !sc || sc === "all" || sc === PAGE; }
   // ---------- dashboard tab layout (order / show / rename) ----------
-  var DEF_TABS = [["overview", "Overview"], ["rank", "Rankings"], ["trend", "Trends"], ["app", "Retailer app"], ["retv", "Active retailers"], ["sd", "Support desk"], ["plan", "Action plan"], ["news", "BI Newsletter"], ["creative", "HO Creative"], ["cfg", "Configuration"], ["rm", "Roadmap 2027"], ["how", "How to use"], ["kq4", "KPI framework"], ["grw", "Growth"], ["cmp", "Compare"], ["onb", "Onboarded"], ["q3", "Q3 rankings"], ["dl", "Get the app"], ["tl", "Smart tools"]];
+  var DEF_TABS = [["overview", "Overview"], ["rank", "Rankings"], ["trend", "Trends"], ["app", "Retailer app"], ["retv", "Active retailers"], ["sd", "Support desk"], ["plan", "Action plan"], ["news", "BI Newsletter"], ["creative", "HO Creative"], ["cfg", "Configuration"], ["rm", "Roadmap 2027"], ["how", "How to use"], ["kq4", "KPI framework"], ["grw", "Growth"], ["cmp", "Compare"], ["onb", "Onboarded"], ["q3", "Q3 rankings"], ["dl", "Get the app"], ["tl", "Smart tools"], ["pro_ms", "Monthly summary"], ["pro_cc", "Command Center"], ["pro_hm", "Heatmap Matrix"], ["pro_opp", "Opportunity Finder"], ["pro_sim", "Target Simulator"], ["pro_trk", "Action Tracker"], ["pro_alr", "Alerts & Rules"], ["pro_dq", "Data Health"], ["pro_rep", "Report Builder"], ["pro_studio", "One-Page Studio"]];
   function labelOf(b) { var sp = b.querySelector(".tl"); return (sp ? sp.textContent : b.textContent).trim(); }
   function setLabel(b, t) { var sp = b.querySelector(".tl"); if (sp) sp.textContent = t; else if (b.querySelector("svg")) { var n = Array.prototype.filter.call(b.childNodes, function (c) { return c.nodeType === 3 && c.nodeValue.trim(); })[0]; if (n) n.nodeValue = t; } else b.textContent = t; }
   function tabList() {
@@ -518,15 +518,20 @@
   }
 
   // ---------- public ----------
-  window.BITHEME = {
+  // The dashboard file may bring its own colour engine named BITHEME ({ refresh, conv, active }) that loads after this
+  // script. Keep our API in API and add it onto whichever object holds the name, so both keep working.
+  var API = {
     themes: THEMES, open: openPicker, current: function () { return CUR ? CUR.id : ""; },
     set: function (id) { ls("biw-theme", id || null); refresh(); },
     fileDefault: function (t) { if (t && typeof t === "object") { FILE = t; if (!CFG.def && t.custom && !CFG.custom) CFG = Object.assign({}, t, CFG); refresh(); } },
     _map: function (css, id) { var T = BYID[id]; return T ? mapDecls(css, prep(T)) : css; }
   };
+  window.BITHEME = API;
+  function keepApi() { var g = window.BITHEME; if (g && g !== API) { Object.keys(API).forEach(function (k) { if (!(k in g)) g[k] = API[k]; }); } else if (!g) window.BITHEME = API; }
   refresh();
   var tries = 0; (function place() { placeButton(); if (!document.getElementById("btp-b") && tries++ < 40) setTimeout(place, 250); })();
-  document.addEventListener("DOMContentLoaded", function () { placeButton(); studio(); [400, 1500, 4000].forEach(function (ms) { setTimeout(applyTabs, ms); }); if (window.__DASHAPI) BITHEME.fileDefault(window.__DASHAPI.META && window.__DASHAPI.META.theme); });
+  document.addEventListener("DOMContentLoaded", function () { placeButton(); studio(); [400, 1500, 4000].forEach(function (ms) { setTimeout(applyTabs, ms); }); keepApi(); if (window.__DASHAPI) API.fileDefault(window.__DASHAPI.META && window.__DASHAPI.META.theme); });
+  [0, 300, 1500].forEach(function (ms) { setTimeout(keepApi, ms); });
   setInterval(function () { if (!document.getElementById("btp-b")) placeButton(); }, 3000);
   loadCfg();
   // apps keep the page open in the background: pick up new HO design settings when it comes back
