@@ -251,7 +251,7 @@
   function showTools() {
     hero("Studio · Tools", "Forms, surveys, approval flows, links, info pages, saved reports");
     var tools = ITEMS.filter(function (x) { return x.kind === "tool"; });
-    $("pane").innerHTML = '<div class="row" style="margin-top:8px"><button class="btn pri" id="nt" style="flex:1;padding:12px">＋ New tool</button></div>' +
+    $("pane").innerHTML = '<div class="row" style="margin-top:8px;gap:6px"><button class="btn pri" id="nt" style="flex:1;padding:12px">＋ New tool</button><a class="btn sec" href="toolbuilder.html" style="padding:12px;text-decoration:none">🛠️ Advanced builder</a></div><div class="muted" style="font-size:12px;margin-top:6px">Advanced builder: formulas, lookups into existing tools, tables, rule-based approvals by role (ASM / ZSM…), TAT & escalation, 20 ready templates.</div>' +
       (tools.length ? tools.map(function (x) { var tl = x.tool, st = (tl.flow && tl.flow.steps) || []; return '<div class="ch"><div style="font-size:26px">' + esc(tl.icon) + '</div><div class="mid"><div class="k">' + esc({ form: "Form", link: "Link", page: "Info page", report: "Saved report" }[tl.type]) + (st.length ? " · " + st.length + "-step approval" : "") + (tl.form && tl.form.anonymous ? " · anonymous" : "") + " · " + esc(CATN[tl.category] || "") + ' · <span class="chip ' + (x.status === "released" ? "live" : "warn") + '">' + (x.status === "released" ? "Released" : "Draft") + '</span></div><div class="w"><b>' + esc(tl.name) + "</b>" + (tl.desc ? " — " + esc(tl.desc) : "") + '</div><div class="a">' + (x.status === "released" ? "Visible to: " + esc(aud(x.audience)) : "Only masters see it") + '</div></div><div class="acts3"><button class="rel" data-rel="' + x.id + '">🚀 Release…</button><button data-op="' + x.id + '" title="Open / test">▶</button><button data-ed="' + x.id + '" title="Edit">✏️</button></div></div>'; }).join("") : '<div class="card empty"><div class="big">🧩</div>No custom tools yet. Start from a template — audits, expense claims with approvals, request flows, surveys.</div>');
     $("nt").onclick = pickTemplate;
     [].forEach.call($("pane").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { toolEdit(JSON.parse(JSON.stringify(ITEMS.find(function (y) { return y.id === b.dataset.ed; })))); }; });
@@ -271,6 +271,7 @@
   }
   // Full-page builder: basics, look & feel, questions, survey settings, approval flow
   function toolEdit(x) {
+    if (x && x.tool && x.tool.pro && x.id) { location.href = "toolbuilder.html#ed=" + x.id; return; }
     var tl = x.tool; tl.fields = tl.fields || []; tl.form = tl.form || {}; tl.flow = tl.flow || { steps: [], allowResubmit: true }; tl.flow.steps = tl.flow.steps || [];
     hero(x.id ? "Edit tool" : "New tool", "Saved as a draft — test it with ▶, then release");
     var fm = tl.form;

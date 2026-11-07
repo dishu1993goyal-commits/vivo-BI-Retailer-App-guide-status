@@ -6,6 +6,7 @@
 //   ctsub:<toolId>:<id>    custom-form submission { id, tool, by, state, values, at }
 //   custver                { v }   bumped on every change so apps refresh their cached customizations
 import { randomBytes, createHash } from "node:crypto";
+import { cleanProTool, proValues, enterFrom, canActPro, isProApproverAny, actPro, tickTat, lookupRecord, roleDir, LOOKUP_SOURCES, PRO_TYPES } from "./toolpro-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const cid = (v) => String(v || "").replace(/[^a-z0-9]/gi, "").slice(0, 30);
@@ -129,12 +130,14 @@ export async function masterAction(b, ctx) {
   // ---- custom tool use (forms) ----
   const me = who(app, rec), myBk = sha256(app + ":" + key);
   // approvers named in a tool's flow can always open it to approve, even when it isn't released to them for filling
-  const flowApprover = (tl) => ((tl.tool.flow && tl.tool.flow.steps) || []).some((st) => isApprover(Object.assign({}, st, { sameState: false }), app, rec, null));
+  const flowApprover = (tl) => tl.tool.pro ? isProApproverAny(tl.tool, app, rec) : ((tl.tool.flow && tl.tool.flow.steps) || []).some((st) => isApprover(Object.assign({}, st, { sameState: false }), app, rec, null));
   const toolFor = async (id, approve) => { const tl = await store.get(`cust:${cid(id)}`); return tl && tl.kind === "tool" && ((tl.status === "released" && (inAudience(tl, app, rec) || (approve && flowApprover(tl)))) || isMaster) ? tl : null; };
   const isMine = (r) => r.bk === myBk || (!r.anon && sameUser(r.by, me));
   const steps = (tl) => (tl.tool.flow && tl.tool.flow.steps) || [];
-  const canAct = (tl, r) => r.status === "pending" && (isMaster || isApprover(steps(tl)[r.step], app, rec, r));
-  const approverAny = (tl, r) => steps(tl).some((st) => isApprover(st, app, rec, r));
+  const canAct = (tl, r) => tl.tool.pro ? r.status === "pending" && (canActPro(r, app, rec) || (isMaster && r.cur && !(r.cur.done || []).includes(String(rec.username || "").toLowerCase()) && !(r.cur.done || []).includes("@master"))) : r.status === "pending" && (isMaster || isApprover(steps(tl)[r.step], app, rec, r));
+  const myIds = [rec.username, rec.vchatId, rec.email, rec.mobile].filter(Boolean).map((x) => String(x).toLowerCase());
+  const approverAny = (tl, r) => tl.tool.pro ? (canActPro(r, app, rec) || (r.history || []).some((h) => h.by && myIds.includes(String(h.by.username || "").toLowerCase()) && /approved|rejected|returned/.test(h.action))) : steps(tl).some((st) => isApprover(st, app, rec, r));
+  const sysBy = { fullName: "System", username: "", app: "" };
   const ctxV = { store, app, rec, who, sameUser };
   const pub = (tl, r) => { const o = Object.assign({}, r, { mine: isMine(r), canAct: canAct(tl, r) }); delete o.bk; if (r.anon && !isMaster) { o.by = { fullName: "Anonymous", username: "" }; o.history = (r.history || []).map((h) => /submitted/.test(h.action) ? Object.assign({}, h, { by: { fullName: "Anonymous", username: "", app: "" } }) : h); } return o; };
 
@@ -144,6 +147,7 @@ export async function masterAction(b, ctx) {
     if (!tl || tl.tool.type !== "form") return json(404, { ok: false, error: "Form not available." });
     const fm = tl.tool.form || {};
     if (fm.closeAt && t > fm.closeAt && !isMaster) return json(400, { ok: false, error: "This form is closed." });
+    if (tl.tool.pro) return proSubmit(tl);
     const { vals, missing, bad } = await cleanValues(tl.tool.fields || [], b.values, ctxV);
     if (bad.length) return json(400, { ok: false, error: "Please check: " + bad.join(", ") });
     if (missing.length) return json(400, { ok: false, error: "Please fill: " + missing.join(", ") });
@@ -167,6 +171,32 @@ export async function masterAction(b, ctx) {
     await store.set(`ctsub:${tl.id}:${id}`, r);
     return json(200, { ok: true, id, status: r.status, next: st.length ? st[0].name : "" });
   }
+  async function proSubmit(tl) {   // Studio Pro: formulas, lookups, rules and the conditional approval flow
+    const fm = tl.tool.form || {};
+    const out = await proValues(tl.tool, b.values, { store, rec, app, pool, cleanBasic: (fs, inp) => cleanValues(fs, inp, ctxV) });
+    if (out.errs.length) return json(400, { ok: false, error: out.errs.slice(0, 4).join(" · ") });
+    const hasFlow = ((tl.tool.flow || {}).steps || []).length, hist = { at: t, by: { fullName: rec.fullName, username: rec.username || "", app }, comment: str(b.comment, 500) };
+    let r;
+    if (b.id) {
+      r = await store.get(`ctsub:${tl.id}:${cid(b.id)}`);
+      if (!r || !isMine(r)) return json(404, { ok: false, error: "Not found." });
+      if (r.status !== "returned") return json(400, { ok: false, error: "Only responses sent back to you can be edited." });
+      r.values = out.vals; r.user = out.user; r.updatedAt = t; r.trail = []; r.history.push(Object.assign(hist, { action: "resubmitted", step: "" }));
+    } else {
+      if (fm.oneResponse && (await pool(await store.list(`ctsub:${tl.id}:`), 40, (k) => store.get(k))).some((x) => x && x.bk === myBk)) return json(409, { ok: false, error: "You've already responded to this form." });
+      r = { id: nid(t), tool: tl.id, bk: myBk, anon: fm.anonymous === true, by: me, state: rec.state || (app === "admin" ? "HO" : ""), values: out.vals, user: out.user, at: t, status: "submitted", step: 0, history: [Object.assign(hist, { action: "submitted", step: "" })], trail: [] };
+    }
+    if (hasFlow) await enterFrom(store, tl.tool, r, 0, t, sysBy); else r.status = "submitted";
+    await store.set(`ctsub:${tl.id}:${r.id}`, r);
+    const s0 = r.cur ? tl.tool.flow.steps[r.cur.idx] : null;
+    return json(200, { ok: true, id: r.id, status: r.status, next: s0 ? s0.name : "", values: out.vals });
+  }
+  if (b.action === "ct-lookup") {   // live lookup while filling a Studio Pro form
+    const tl = await toolFor(b.tool); const f = tl && tl.tool.pro ? (tl.tool.fields || []).find((x) => x.key === str(b.field, 30) && x.type === "lookup") : null;
+    if (!f) return json(404, { ok: false, error: "Not found." });
+    return json(200, { ok: true, record: await lookupRecord(store, f, b.key, pool) });
+  }
+  if (b.action === "roledir-get") { if (app !== "admin") return json(403, { ok: false, error: "Admins only." }); return json(200, { ok: true, dir: await roleDir(store), sources: LOOKUP_SOURCES, types: PRO_TYPES }); }
   if (b.action === "ct-act") {   // approve / reject / send back
     const tl = await toolFor(b.tool, true);
     if (!tl) return json(404, { ok: false, error: "Not found." });
@@ -177,6 +207,7 @@ export async function masterAction(b, ctx) {
     if (!d) return json(400, { ok: false, error: "Choose approve, reject or send back." });
     const comment = str(b.comment, 500);
     if (d !== "approve" && !comment) return json(400, { ok: false, error: "Please add a comment." });
+    if (tl.tool.pro) { if (!r.cur && isMaster) return json(400, { ok: false, error: "Not waiting for approval." }); await actPro(store, tl.tool, r, d, app, rec, comment, t); r.updatedAt = t; await store.set(`ctsub:${tl.id}:${r.id}`, r); return json(200, { ok: true, item: pub(tl, r) }); }
     const st = steps(tl);
     r.history.push({ at: t, by: { fullName: rec.fullName, username: rec.username || "", app }, action: d === "approve" ? "approved" : d === "reject" ? "rejected" : "returned", step: r.step, stepName: (st[r.step] || {}).name || "", comment });
     if (d === "approve") { if (r.step + 1 < st.length) { r.step++; r.stepAt = t; } else r.status = "approved"; }
@@ -190,10 +221,11 @@ export async function masterAction(b, ctx) {
     const tl = await toolFor(b.tool, true);
     if (!tl) return json(404, { ok: false, error: "Not found." });
     let rows = (await pool(await store.list(`ctsub:${tl.id}:`), 40, (k) => store.get(k))).filter(Boolean);
+    if (tl.tool.pro) for (const r of rows) { if (await tickTat(store, tl.tool, r, t)) await store.set(`ctsub:${tl.id}:${r.id}`, r); }
     const all = app === "admin";
     if (!all) rows = rows.filter((r) => isMine(r) || approverAny(tl, r));
     const out = rows.sort((x, y) => (y.updatedAt || y.at) - (x.updatedAt || x.at)).slice(0, 3000).map((r) => pub(tl, r));
-    return json(200, { ok: true, tool: tl.tool, rows: out, all, approver: isMaster || steps(tl).some((st) => isApprover(st, app, rec, { state: rec.state })), pending: out.filter((r) => r.canAct).length });
+    return json(200, { ok: true, tool: tl.tool, rows: out, all, approver: isMaster || (tl.tool.pro ? isProApproverAny(tl.tool, app, rec) : steps(tl).some((st) => isApprover(st, app, rec, { state: rec.state }))), pending: out.filter((r) => r.canAct).length, now: t, me: { state: rec.state || (app === "admin" ? "HO" : ""), role: role, name: rec.fullName || "", username: rec.username || "", designation: rec.designation || "" } });
   }
   if (b.action === "ct-notify") {   // approvals waiting for me + my responses sent back, per tool
     const tools = (await listAll()).filter((c) => c.kind === "tool" && c.tool.type === "form" && ((c.status === "released" && (inAudience(c, app, rec) || flowApprover(c))) || isMaster));
@@ -201,7 +233,8 @@ export async function masterAction(b, ctx) {
     for (const tl of tools) {
       const ks = await store.list(`ctsub:${tl.id}:`); if (!ks.length) continue;
       const rows = (await pool(ks, 40, (k) => store.get(k))).filter(Boolean);
-      const n = rows.filter((r) => (steps(tl).length && canAct(tl, r) && (!isMaster || isApprover(steps(tl)[r.step], app, rec, r))) || (r.status === "returned" && isMine(r))).length;
+      if (tl.tool.pro) for (const r of rows) { if (await tickTat(store, tl.tool, r, t)) await store.set(`ctsub:${tl.id}:${r.id}`, r); }
+      const n = rows.filter((r) => (tl.tool.pro ? canAct(tl, r) && (!isMaster || canActPro(r, app, rec)) : steps(tl).length && canAct(tl, r) && (!isMaster || isApprover(steps(tl)[r.step], app, rec, r))) || (r.status === "returned" && isMine(r))).length;
       if (n) { out[tl.id] = n; total += n; }
     }
     return json(200, { ok: true, tools: out, total });
@@ -257,8 +290,9 @@ export async function masterAction(b, ctx) {
       const tl = c0.tool || {};
       c.tool = { name: str(tl.name, 60), icon: str(tl.icon, 4) || "🧩", category: CATS.includes(tl.category) ? tl.category : "more", type: TOOL_TYPES.includes(tl.type) ? tl.type : "form", desc: str(tl.desc, 300),
         fields: cleanFields(tl.fields), form: cleanForm(tl.form), flow: cleanFlow(tl.flow), url: /^https?:\/\//i.test(String(tl.url || "")) ? str(tl.url, 600) : "", body: str(tl.body, 20000), report: tl.report && typeof tl.report === "object" ? JSON.parse(JSON.stringify(tl.report).slice(0, 4000)) : null, allowMany: tl.allowMany !== false };
+      if (tl.pro === true) { Object.assign(c.tool, cleanProTool(tl), { pro: true, type: "form" }); if (!c.tool.fields.some((f) => !["heading", "image"].includes(f.type))) return json(400, { ok: false, error: "Add at least one field." }); }
       if (!c.tool.name) return json(400, { ok: false, error: "Give the tool a name." });
-      if (c.tool.type === "form" && !c.tool.fields.some((f) => !NOVALUE.includes(f.type))) return json(400, { ok: false, error: "Add at least one question / field to the form." });
+      if (!tl.pro && c.tool.type === "form" && !c.tool.fields.some((f) => !NOVALUE.includes(f.type))) return json(400, { ok: false, error: "Add at least one question / field to the form." });
       if (c.tool.type === "link" && !c.tool.url) return json(400, { ok: false, error: "Enter the link (https://…)." });
     }
     await store.set(`cust:${id}`, c); await bumpVersion(store, t);
@@ -285,6 +319,13 @@ export async function masterAction(b, ctx) {
     return json(200, { ok: true });
   }
 
+  if (b.action === "roledir-save") {   // who holds which role, per state / area (used by Studio Pro approvals)
+    const d = b.dir || {}, roles = (Array.isArray(d.roles) ? d.roles : []).map((x) => str(x, 60)).filter(Boolean).slice(0, 60);
+    const rows = (Array.isArray(d.rows) ? d.rows : []).slice(0, 5000).map((r) => ({ role: str(r.role, 60), state: str(r.state, 40), area: str(r.area, 60), users: (Array.isArray(r.users) ? r.users : String(r.users || "").split(/[\s,;]+/)).map((u) => str(u, 80)).filter(Boolean).slice(0, 50) })).filter((r) => r.role && r.users.length);
+    rows.forEach((r) => { if (!roles.includes(r.role)) roles.push(r.role); });
+    await store.set("config:roledir", { roles, rows, by: rec.fullName, at: t });
+    return json(200, { ok: true, dir: { roles, rows } });
+  }
   // ---- master: who is a master ----
   if (b.action === "master-users") {
     const admins = (await pool(await store.list("user:admin:"), 40, (k) => store.get(k))).filter(Boolean).map((u) => ({ username: u.username, fullName: u.fullName, email: u.email || "", master: !!u.master, disabled: !!u.disabled, lastSeen: u.lastSeen || 0 }));

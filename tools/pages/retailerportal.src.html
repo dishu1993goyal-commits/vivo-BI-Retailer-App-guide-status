@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Retailer portal</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:16px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06);position:relative;overflow:hidden}
+.kt .l{font-size:11.5px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.3px}.kt .v{font-size:21px;font-weight:800;margin-top:3px}.kt .s{font-size:11.5px;color:var(--mut);margin-top:2px}
+.kt .bar{height:6px;border-radius:9px;background:#EEF0F6;margin-top:7px;overflow:hidden}.kt .bar i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,#5B6CFF,#8F5BFF)}
+.kt.g .bar i{background:linear-gradient(90deg,#16A06A,#4ACF8F)}.kt.o .bar i{background:linear-gradient(90deg,#F2A93B,#F7C873)}
+.rh{background:linear-gradient(135deg,#2B33A6,#6A4CFF);color:#fff;border-radius:20px;padding:15px 16px;margin-top:4px;box-shadow:0 8px 24px rgba(43,51,166,.25)}
+.rh h2{margin:0;font-size:19px}.rh .m{font-size:12.5px;opacity:.85;margin-top:3px}.rh .ch{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.rh .ch button,.rh .ch a{border:0;background:rgba(255,255,255,.17);color:#fff;border-radius:99px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-decoration:none}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:12px 0 2px;padding-bottom:4px;scrollbar-width:none}.tabs button{flex:none;border:0;background:var(--card);border-radius:99px;padding:8px 13px;font:inherit;font-size:13px;font-weight:700;color:var(--ink2);cursor:pointer;box-shadow:0 1px 6px rgba(20,24,51,.06)}.tabs button.on{background:var(--brand);color:#fff}
+.li{display:flex;gap:10px;align-items:center;background:var(--card);border-radius:14px;padding:11px 12px;margin-top:7px;box-shadow:0 1px 7px rgba(20,24,51,.06);cursor:pointer}
+.li .av{width:38px;height:38px;border-radius:12px;background:#EEF0FF;color:#3346C9;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex:none}
+.li .md{flex:1;min-width:0}.li .md b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.li .md span{font-size:11.5px;color:var(--mut)}.li .rt{text-align:right;font-size:12px;color:var(--mut)}.li .rt b{display:block;font-size:14px;color:var(--ink)}
+.sc{background:var(--card);border-radius:16px;padding:13px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06);border-left:4px solid #6A4CFF}
+.sc h4{margin:0;font-size:14.5px}.sc .d{font-size:11.5px;color:var(--mut);margin-top:2px}.sc p{font-size:13px;margin:7px 0 0;line-height:1.5}.sc ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;line-height:1.55}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;margin:4px 4px 0 0}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:right;padding:7px 6px;white-space:nowrap}.tb th:first-child,.tb td:first-child{text-align:left}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;text-align:right;white-space:nowrap}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:16px;padding:13px;margin-top:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.msg{border-radius:14px;padding:9px 12px;margin-top:7px;font-size:13px;line-height:1.5;max-width:88%;white-space:pre-wrap}.msg.me{background:var(--brand);color:#fff;margin-left:auto}.msg.bot{background:var(--card);box-shadow:0 1px 7px rgba(20,24,51,.07)}
+.qk{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.qk button{border:1px solid #DADDF0;background:var(--card);border-radius:99px;padding:6px 11px;font:inherit;font-size:12px;cursor:pointer}
+.links{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.links a{background:var(--card);border-radius:14px;padding:11px;text-decoration:none;color:var(--ink);font-size:13px;font-weight:700;box-shadow:0 1px 7px rgba(20,24,51,.06)}.links a span{display:block;font-size:11px;color:var(--mut);font-weight:500;margin-top:2px}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 2px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart{background:var(--card);border-radius:16px;padding:12px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.lg{display:flex;gap:12px;font-size:11.5px;color:var(--mut);margin-top:4px}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.th{border-radius:12px;padding:9px 11px;margin-top:6px;font-size:13px}.th.s{background:#EEF0FF}.th.r{background:#F7F8FC}.th small{display:block;color:var(--mut);font-size:11px}
+@media (min-width:760px){.kp{grid-template-columns:repeat(4,1fr)}.links{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🏬</span></div>
+  <h1 id="h1">Retailer portal</h1><p id="hp">Schemes, payouts, business, launches and help — everything for a retailer in one place</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), KEY = "", ME = null, CUR = null, RT = "ov", CHAT = [], BIZV = "u";
+  try { KEY = (new URLSearchParams(location.search).get("k") || "").replace(/[^a-zA-Z0-9]/g, ""); } catch (e) { }
+  var PUB = !!KEY;
+  function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", k: KEY }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection." }; }); }
+  var inr = function (n) { n = Number(n) || 0; var a = Math.abs(n); return (n < 0 ? "−" : "") + "₹" + (a >= 1e7 ? (a / 1e7).toFixed(2) + " Cr" : a >= 1e5 ? (a / 1e5).toFixed(2) + " L" : Math.round(a).toLocaleString("en-IN")); };
+  var nf = function (n) { return (Number(n) || 0).toLocaleString("en-IN"); };
+  var MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var mLabel = function (m) { return m ? MN[+m.slice(5) - 1] + " " + m.slice(2, 4) : ""; };
+  var ini = function (s) { return String(s || "?").replace(/[^A-Za-z0-9 ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(function (x) { return x[0]; }).join("").toUpperCase() || "R"; };
+  var dd = function (d) { return d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""; };
+
+  // ---------------- routing ----------------
+  function route() {
+    if (PUB) return openRetailer();
+    var h = location.hash.slice(1), m;
+    if ((m = /^r=(.+)$/.exec(h))) return openRetailer(decodeURIComponent(m[1]));
+    if (h === "ann") return annPage(); if (h === "q") return qPage(); if (h === "up") return upPage();
+    home();
+  }
+  window.addEventListener("hashchange", route);
+  window.__pageBack = function () { if (PUB || !location.hash || location.hash === "#list") return false; try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; } route(); return true; };
+  function head(t, p) { $("h1").textContent = t; $("hp").textContent = p; }
+  function back() { return '<button class="btn ghost sm" id="bk">← Retailers</button>'; }
+  function wireBack() { var b = $("bk"); if (b) b.onclick = function () { window.__pageBack(); }; }
+
+  // ---------------- staff home: retailer list ----------------
+  var LQ = "", LS = "";
+  function home() {
+    head("Retailer portal", "Schemes, payouts, business, launches and help — everything for a retailer in one place");
+    api({ action: "rtp-list", q: LQ, state: LS }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      VIEW.innerHTML = '<div class="links" style="margin-top:0"><a href="#q">💬 Queries' + (r.openQ ? ' <span class="pill r">' + r.openQ + " open</span>" : "") + '<span>From retailers & staff</span></a><a href="#ann">📣 Announcements<span>News & launches for retailers</span></a><a href="#up">📥 Upload data<span>Retailers, purchase, sales, stock</span></a></div>' +
+        '<div class="row" style="gap:6px;margin-top:12px"><input class="tx" id="sq" placeholder="🔍 Search retailer, ID or city" value="' + esc(LQ) + '" style="flex:1">' + (r.states.length > 1 ? '<select class="tx" id="ss" style="width:130px"><option value="">All states</option>' + r.states.map(function (s) { return "<option" + (s === LS ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : "") + "</div>" +
+        '<div class="muted" style="font-size:12px;margin:8px 2px 0">' + r.count + " retailer" + (r.count === 1 ? "" : "s") + (r.count > r.items.length ? " · showing " + r.items.length : "") + "</div>" +
+        (r.items.length ? r.items.map(function (x) { return '<div class="li" data-r="' + esc(x.rid) + '"><div class="av">' + esc(ini(x.n)) + '</div><div class="md"><b>' + esc(x.n || x.rid) + "</b><span>" + esc(x.rid) + (x.c ? " · " + esc(x.c) : "") + (x.s ? " · " + esc(x.s) : "") + '</span></div><div class="rt">' + (x.m ? "<b>" + nf(x.su) + " units</b>" + mLabel(x.m) : x.bal != null ? "<b>" + inr(x.bal) + "</b>wallet" : "") + "</div></div>"; }).join("") : '<div class="card empty"><div class="big">🏬</div>No retailers yet.<br>Upload the retailer list and business data, or publish payouts in Retailer payouts.<br><br><a class="btn pri" href="#up">📥 Upload data</a></div>');
+      var t0; $("sq").oninput = function () { var v = this.value; clearTimeout(t0); t0 = setTimeout(function () { LQ = v; home(); setTimeout(function () { var e = $("sq"); if (e) { e.focus(); e.setSelectionRange(v.length, v.length); } }, 50); }, 350); };
+      if ($("ss")) $("ss").onchange = function () { LS = this.value; home(); };
+      [].forEach.call(VIEW.querySelectorAll("[data-r]"), function (d) { d.onclick = function () { location.hash = "r=" + encodeURIComponent(d.dataset.r); }; });
+    });
+  }
+
+  // ---------------- one retailer ----------------
+  function openRetailer(rid) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    (PUB ? papi({ action: "rtp-public" }) : api({ action: "rtp-get", rid: rid })).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = (PUB ? "" : back()) + '<div class="card empty" style="margin-top:10px"><div class="big">🏬</div>' + esc(r.error) + "</div>"; wireBack(); return; }
+      if (!CUR || CUR.retailer.rid !== r.retailer.rid) { RT = "ov"; CHAT = []; }
+      CUR = r; head(PUB ? "Hi, " + (r.retailer.owner || r.retailer.name) : "Retailer portal", PUB ? "Your vivo partner page — schemes, payouts, launches and help" : "Staff view of the retailer’s page"); paint();
+    });
+  }
+  function biz() {
+    var R = CUR.biz.rows, months = [];
+    R.forEach(function (r) { if (months.indexOf(r.m) < 0) months.push(r.m); }); months.sort();
+    var agg = function (m) { var L = R.filter(function (r) { return r.m === m; }); return { pu: L.reduce(function (a, r) { return a + r.pu; }, 0), pv: L.reduce(function (a, r) { return a + r.pv; }, 0), su: L.reduce(function (a, r) { return a + r.su; }, 0), sv: L.reduce(function (a, r) { return a + r.sv; }, 0), t: CUR.biz.targets[m] || null }; };
+    var last = months[months.length - 1], stockM = R.filter(function (r) { return r.stk; }).map(function (r) { return r.m; }).sort().pop();
+    var models = {}; R.forEach(function (r) { var x = models[r.model] || (models[r.model] = { model: r.model, pu: 0, su: 0, stk: 0, su3: 0 }); if (r.m === last) { x.pu += r.pu; x.su += r.su; } if (r.m === stockM) x.stk += r.stk; if (months.slice(-3).indexOf(r.m) >= 0) x.su3 += r.su; });
+    var ML = Object.keys(models).map(function (k) { var x = models[k], perDay = x.su3 / (Math.min(3, months.length) * 30 || 1); x.doc = perDay ? Math.round(x.stk / perDay) : (x.stk ? 999 : 0); return x; }).sort(function (a, b) { return b.su - a.su || b.stk - a.stk; });
+    return { months: months, last: last, cur: last ? agg(last) : null, prev: months.length > 1 ? agg(months[months.length - 2]) : null, agg: agg, models: ML, stock: ML.reduce(function (a, x) { return a + x.stk; }, 0) };
+  }
+  function paint() {
+    var R = CUR.retailer, w = CUR.wallet, B = biz();
+    var tabs = [["ov", "🏠 Overview"], ["biz", "📊 Business"], ["sch", "🎯 Schemes" + (CUR.schemes.length ? " · " + CUR.schemes.length : "")], ["pay", "💰 Payouts"], ["news", "📣 News" + (CUR.anns.length + CUR.launches.length ? " · " + (CUR.anns.length + CUR.launches.length) : "")], ["help", "💬 Help"]];
+    VIEW.innerHTML = (PUB ? "" : back()) + '<div class="rh"' + (PUB ? "" : ' style="margin-top:10px"') + '><h2>' + esc(R.name) + '</h2><div class="m">' + esc([R.rid, R.type, R.city, R.state].filter(Boolean).join(" · ")) + (R.owner && !PUB ? " · " + esc(R.owner) : "") + '</div><div class="ch"><button data-go="help">🤖 Ask AI</button><button data-go="helpq">✉️ Raise a query</button>' + (PUB ? "" : '<button id="shr">🔗 Share with retailer</button>' + (R.mobile ? '<a href="tel:' + esc(R.mobile) + '">📞 Call</a>' : "")) + "</div></div>" +
+      '<div class="tabs">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (RT === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    wireBack();
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { RT = b.dataset.t; paint(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-go]"), function (b) { b.onclick = function () { RT = "help"; paint(); if (b.dataset.go === "helpq") raiseQ(); }; });
+    if ($("shr")) $("shr").onclick = share;
+    ({ ov: tOv, biz: tBiz, sch: tSch, pay: tPay, news: tNews, help: tHelp })[RT](B);
+  }
+  function tOv(B) {
+    var c = B.cur, w = CUR.wallet, t = c && c.t, pct = t && t.u ? Math.round(c.su / t.u * 100) : null, pctV = t && t.v ? Math.round(c.sv / t.v * 100) : null;
+    var low = B.models.filter(function (x) { return x.stk > 0 && x.doc < 7 && x.su3; }), high = B.models.filter(function (x) { return x.doc > 45 && x.stk >= 3; });
+    var avgDoc = (function () { var s = B.models.reduce(function (a, x) { return a + x.su3; }, 0) / (Math.min(3, B.months.length) * 30 || 1); return s ? Math.round(B.stock / s) : null; })();
+    $("tp").innerHTML = '<div class="kp">' +
+      '<div class="kt"><div class="l">Sales · ' + esc(mLabel(B.last) || "—") + '</div><div class="v">' + (c ? nf(c.su) : "—") + ' <small style="font-size:12px;color:var(--mut)">units</small></div><div class="s">' + (c ? inr(c.sv) : "Upload sales data") + (t && t.u ? " · target " + nf(t.u) : "") + "</div>" + (pct != null ? '<div class="bar"><i style="width:' + Math.min(100, pct) + '%"></i></div><div class="s">' + pct + "% of target" + (pctV != null ? " · value " + pctV + "%" : "") + "</div>" : "") + "</div>" +
+      '<div class="kt"><div class="l">Purchase · ' + esc(mLabel(B.last) || "—") + '</div><div class="v">' + (c ? nf(c.pu) : "—") + ' <small style="font-size:12px;color:var(--mut)">units</small></div><div class="s">' + (c ? inr(c.pv) : "") + (B.prev && c ? " · last month " + nf(B.prev.pu) : "") + "</div></div>" +
+      '<div class="kt o"><div class="l">Stock in hand</div><div class="v">' + nf(B.stock) + ' <small style="font-size:12px;color:var(--mut)">units</small></div><div class="s">' + (avgDoc != null ? "≈ " + avgDoc + " days of sales" : "—") + "</div>" + (avgDoc != null ? '<div class="bar"><i style="width:' + Math.min(100, avgDoc / 60 * 100) + '%"></i></div>' : "") + "</div>" +
+      '<div class="kt g"><div class="l">Wallet balance</div><div class="v">' + inr(w.balance) + '</div><div class="s">Earned ' + inr(w.earned) + " · used " + inr(w.used) + "</div></div></div>" +
+      '<div class="sh"><span>🤖 AI business summary</span><button class="btn sec sm" id="ais">' + (CUR.aiSum ? "↻ Refresh" : "✨ Generate") + "</button></div>" + (CUR.aiSum ? '<div class="ai">' + esc(CUR.aiSum) + "</div>" : '<div class="muted" style="font-size:12.5px;margin:4px 2px">One tap for how the month is going, stock health, money and the best scheme chances.</div>') +
+      (low.length || high.length ? '<div class="sh"><span>⚠️ Stock alerts</span></div><div class="card" style="margin-top:6px;font-size:13px">' + low.slice(0, 4).map(function (x) { return '<div>🔴 <b>' + esc(x.model) + "</b> — only " + x.stk + " left (~" + x.doc + " days). Reorder.</div>"; }).join("") + high.slice(0, 4).map(function (x) { return '<div>🟠 <b>' + esc(x.model) + "</b> — " + x.stk + " in stock, ~" + (x.doc > 300 ? "no recent sales" : x.doc + " days") + ". Push sales / check schemes.</div>"; }).join("") + "</div>" : "") +
+      '<div class="sh"><span>🎯 Running schemes</span>' + (CUR.schemes.length > 2 ? '<button class="btn ghost sm" data-go2="sch">All ' + CUR.schemes.length + "</button>" : "") + "</div>" + (CUR.schemes.length ? CUR.schemes.slice(0, 2).map(schemeCard).join("") : '<div class="muted" style="font-size:12.5px;margin:4px 2px">No running schemes right now.</div>') +
+      (CUR.anns.length || CUR.launches.length ? '<div class="sh"><span>📣 Latest from vivo</span><button class="btn ghost sm" data-go2="news">All</button></div>' + CUR.anns.slice(0, 2).map(annCard).join("") + CUR.launches.slice(0, 1).map(launchCard).join("") : "") +
+      (PUB ? "" : '<div class="sh"><span>🧰 Open in tools</span></div><div class="links"><a href="retailerpay.html#r=' + encodeURIComponent(CUR.retailer.rid) + '">💼 Retailer payouts<span>Wallet, letters, vouchers</span></a><a href="schemepolicy.html">📜 Scheme policies<span>All scheme letters</span></a><a href="schemeassist.html">🎯 Scheme assistant<span>Payout from a letter</span></a><a href="payplanner.html">🎯 Target planner<span>Reverse: payout → targets</span></a><a href="schemecalc.html">🧮 Payout calculator<span>Bulk payout run</span></a><a href="producthub.html">📱 Product hub<span>Specs & launches</span></a></div>');
+    $("ais").onclick = function () { var b = this; b.disabled = true; b.textContent = "Thinking…"; ai({ summary: true }).then(function (r) { if (!r.ok) { toast(r.error); b.disabled = false; b.textContent = "✨ Generate"; return; } CUR.aiSum = r.answer; tOv(B); }); };
+    [].forEach.call($("tp").querySelectorAll("[data-go2]"), function (b) { b.onclick = function () { RT = b.dataset.go2; paint(); }; });
+    wireScheme();
+  }
+  function ai(o) { return PUB ? papi(Object.assign({ action: "rtp-public-ask" }, o)) : api(Object.assign({ action: "rtp-ask", rid: CUR.retailer.rid }, o)); }
+  // ---- business ----
+  function tBiz(B) {
+    if (!B.months.length) { $("tp").innerHTML = '<div class="card empty"><div class="big">📊</div>No purchase / sales / stock data yet.' + (PUB ? "" : '<br><br><a class="btn pri" href="#up">📥 Upload business data</a>') + "</div>"; return; }
+    var M = B.months.slice(-6), vals = M.map(B.agg), key = BIZV === "u" ? ["pu", "su"] : ["pv", "sv"], mx = Math.max.apply(null, vals.map(function (v) { return Math.max(v[key[0]], v[key[1]], v.t ? (BIZV === "u" ? v.t.u : v.t.v) : 0); }).concat([1]));
+    var W = 320, H = 150, bw = W / M.length, svg = '<svg viewBox="0 0 ' + W + " " + (H + 22) + '" style="width:100%;height:auto">' + vals.map(function (v, i) { var x = i * bw, h1 = v[key[0]] / mx * H, h2 = v[key[1]] / mx * H, tg = v.t ? (BIZV === "u" ? v.t.u : v.t.v) : 0; return '<rect x="' + (x + bw * .16) + '" y="' + (H - h1) + '" width="' + bw * .32 + '" height="' + h1 + '" rx="3" fill="#B9C2FF"><title>Purchase ' + (BIZV === "u" ? nf(v.pu) : inr(v.pv)) + '</title></rect><rect x="' + (x + bw * .5) + '" y="' + (H - h2) + '" width="' + bw * .32 + '" height="' + h2 + '" rx="3" fill="#5B4CFF"><title>Sales ' + (BIZV === "u" ? nf(v.su) : inr(v.sv)) + "</title></rect>" + (tg ? '<line x1="' + (x + bw * .1) + '" x2="' + (x + bw * .9) + '" y1="' + (H - tg / mx * H) + '" y2="' + (H - tg / mx * H) + '" stroke="#F2A93B" stroke-width="2.5" stroke-dasharray="4 3"/>' : "") + '<text x="' + (x + bw / 2) + '" y="' + (H + 15) + '" font-size="10.5" text-anchor="middle" fill="#6B7090">' + mLabel(M[i]) + "</text>"; }).join("") + "</svg>";
+    $("tp").innerHTML = '<div class="chart"><div class="row" style="gap:6px"><b style="flex:1;font-size:13.5px">Purchase vs sales · last ' + M.length + ' months</b><div class="seg" style="margin:0"><button data-v="u" class="' + (BIZV === "u" ? "on" : "") + '">Units</button><button data-v="v" class="' + (BIZV === "v" ? "on" : "") + '">Value</button></div></div>' + svg + '<div class="lg"><span><i style="background:#B9C2FF"></i>Purchase</span><span><i style="background:#5B4CFF"></i>Sales</span><span><i style="background:#F2A93B"></i>Target</span></div></div>' +
+      '<div class="sh"><span>📱 Model-wise · ' + esc(mLabel(B.last)) + '</span></div><div class="tbw"><table class="tb"><tr><th>Model</th><th>Purchase</th><th>Sales</th><th>Stock</th><th>Days cover</th></tr>' + B.models.map(function (x) { return "<tr><td><b>" + esc(x.model) + "</b></td><td>" + nf(x.pu) + "</td><td>" + nf(x.su) + "</td><td>" + nf(x.stk) + "</td><td>" + (x.stk ? (x.doc > 300 ? '<span class="pill o">no sales</span>' : x.doc < 7 ? '<span class="pill r">' + x.doc + "d</span>" : x.doc > 45 ? '<span class="pill o">' + x.doc + "d</span>" : '<span class="pill g">' + x.doc + "d</span>") : "—") + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="muted" style="font-size:11.5px;margin:6px 2px">Days of cover = stock ÷ average daily sales of the last 3 months. 🔴 under 7 days · 🟠 over 45 days. Data updated ' + (CUR.biz.updatedAt ? new Date(CUR.biz.updatedAt).toLocaleDateString("en-IN") : "") + ".</div>" +
+      (PUB ? "" : '<button class="btn sec block" id="bx" style="margin-top:8px">⬇ Download Excel</button>');
+    [].forEach.call($("tp").querySelectorAll("[data-v]"), function (b) { b.onclick = function () { BIZV = b.dataset.v; tBiz(B); }; });
+    if ($("bx")) $("bx").onclick = function () { download(xlsx([{ name: "Business", rows: [["Month", "Model", "Purchase units", "Purchase value", "Sales units", "Sales value", "Stock units"]].concat(CUR.biz.rows.map(function (r) { return [r.m, r.model, r.pu, r.pv, r.su, r.sv, r.stk]; })) }]), CUR.retailer.rid + "_business.xlsx"); };
+  }
+  // ---- schemes ----
+  function schemeCard(s) {
+    return '<div class="sc"><h4>' + esc(s.title) + '</h4><div class="d">' + (s.upcoming ? '<span class="pill o">Starts ' + dd(s.from) + "</span>" : '<span class="pill g">Running</span>') + (s.to ? '<span class="pill">Till ' + dd(s.to) + "</span>" : "") + (s.category ? '<span class="pill">' + esc(s.category) + "</span>" : "") + (s.maxPayout ? '<span class="pill g">Up to ' + esc(String(s.maxPayout)) + "</span>" : "") + "</div>" + (s.summary ? "<p>" + esc(s.summary) + "</p>" : "") +
+      ((s.keyPoints || []).length ? "<ul>" + s.keyPoints.map(function (k) { return "<li>" + esc(typeof k === "string" ? k : JSON.stringify(k)) + "</li>"; }).join("") + "</ul>" : "") +
+      ((s.slabs || []).length ? '<div class="tbw" style="box-shadow:none;background:#F7F8FC"><table class="tb">' + s.slabs.map(function (x) { return "<tr><td>" + esc(typeof x === "string" ? x : [x.slab || x.label || x.range || "", x.payout || x.amount || x.value || ""].filter(Boolean).join(" → ") || JSON.stringify(x)) + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      ((s.models || []).length ? '<div class="d" style="margin-top:6px">Models: ' + esc(s.models.join(", ")) + "</div>" : "") +
+      (PUB ? "" : '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" data-sp="' + s.id + '">📜 Letter</button><button class="btn sec sm" data-pl="' + s.id + '">🎯 Plan targets</button><button class="btn sec sm" data-as="' + s.id + '">🧮 Work out payout</button></div>') + "</div>";
+  }
+  function wireScheme() {
+    [].forEach.call($("tp").querySelectorAll("[data-sp]"), function (b) { b.onclick = function () { location.href = "schemepolicy.html#p=" + b.dataset.sp; }; });
+    [].forEach.call($("tp").querySelectorAll("[data-pl]"), function (b) { b.onclick = function () { location.href = "payplanner.html?spol=" + b.dataset.pl; }; });
+    [].forEach.call($("tp").querySelectorAll("[data-as]"), function (b) { b.onclick = function () { location.href = "schemeassist.html?spol=" + b.dataset.as; }; });
+  }
+  function tSch() { $("tp").innerHTML = CUR.schemes.length ? CUR.schemes.map(schemeCard).join("") + '<div class="muted" style="font-size:11.5px;margin:8px 2px">From Scheme policies published for ' + esc(CUR.retailer.state || "this state") + ". Always check the scheme letter for full terms.</div>" : '<div class="card empty"><div class="big">🎯</div>No running schemes right now.</div>'; wireScheme(); }
+  // ---- payouts ----
+  function tPay() {
+    var w = CUR.wallet;
+    $("tp").innerHTML = '<div class="kp" style="grid-template-columns:repeat(3,1fr)"><div class="kt g"><div class="l">Earned</div><div class="v" style="font-size:17px">' + inr(w.earned) + '</div></div><div class="kt"><div class="l">Used / paid</div><div class="v" style="font-size:17px">' + inr(w.used) + '</div></div><div class="kt o"><div class="l">Balance</div><div class="v" style="font-size:17px">' + inr(w.balance) + "</div></div></div>" +
+      '<div class="sh"><span>🧾 Scheme payouts</span></div>' + (CUR.payouts.length ? CUR.payouts.map(function (p) { return '<div class="sc" style="border-left-color:#16A06A"><div class="row"><h4 style="flex:1">' + esc(p.scheme) + '</h4><b style="color:#13693F">' + inr(p.net) + '</b></div><div class="d">' + esc(mLabel(p.month)) + " · " + esc(p.title) + (p.info && p.info.slab ? " · slab " + esc(p.info.slab) : "") + (p.ded || p.tds ? " · gross " + inr(p.gross) + (p.ded ? ", deductions " + inr(p.ded) : "") + (p.tds ? ", TDS " + inr(p.tds) : "") : "") + "</div>" + (p.info && p.info.target ? '<div class="d">Target ' + nf(p.info.target) + " · achieved " + nf(p.info.achieved || p.info.units || 0) + "</div>" : "") + (p.next && p.next.need ? '<div class="d" style="color:#3346C9;font-weight:700">💡 ' + nf(p.next.need) + " more" + (p.next.model ? " " + esc(p.next.model) : "") + " → +" + inr(p.next.gain) + "</div>" : "") + "</div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin:4px 2px">No published payouts yet.</div>') +
+      '<div class="sh"><span>📒 Wallet ledger</span></div>' + (w.entries.length ? '<div class="tbw"><table class="tb"><tr><th>Date</th><th>Details</th><th>Amount</th></tr>' + w.entries.map(function (e) { return "<tr><td>" + esc(e.date || mLabel(e.month)) + "</td><td style=\"text-align:left;white-space:normal\">" + esc(e.item || e.scheme || e.note || e.kind || "") + '</td><td style="color:' + (e.type === "cr" ? "#13693F" : "#B42318") + '">' + (e.type === "cr" ? "+" : "−") + inr(e.amount).replace("−", "") + "</td></tr>"; }).join("") + "</table></div>" : '<div class="muted" style="font-size:12.5px;margin:4px 2px">No entries yet.</div>') +
+      (PUB ? "" : '<a class="btn sec block" href="retailerpay.html#r=' + encodeURIComponent(CUR.retailer.rid) + '" style="margin-top:10px;text-decoration:none;text-align:center">💼 Open in Retailer payouts (letters, vouchers)</a>');
+  }
+  // ---- news ----
+  var KI = { news: "📰", launch: "🚀", scheme: "🎯", alert: "⚠️" };
+  function annCard(a) { return '<div class="sc" style="border-left-color:' + ({ alert: "#E05757", launch: "#F2A93B", scheme: "#16A06A" }[a.kind] || "#6A4CFF") + '"><h4>' + (a.pin ? "📌 " : "") + (KI[a.kind] || "📰") + " " + esc(a.title) + '</h4><div class="d">' + new Date(a.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + (a.until ? " · till " + dd(a.until) : "") + (a.model ? " · " + esc(a.model) : "") + "</div>" + (a.body ? "<p>" + esc(a.body) + "</p>" : "") + (a.link ? '<a class="btn sec sm" href="' + esc(a.link) + '" target="_blank" rel="noopener" style="margin-top:8px;display:inline-block;text-decoration:none">Open link ↗</a>' : "") + "</div>"; }
+  function launchCard(l) { return '<div class="sc" style="border-left-color:#F2A93B;display:flex;gap:10px">' + (l.img ? '<img src="' + esc(l.img) + '" alt="" style="width:64px;height:64px;object-fit:contain;border-radius:10px;background:#F7F8FC">' : "") + '<div style="flex:1"><h4>🚀 ' + esc(l.name) + '</h4><div class="d">Launch ' + dd(l.launch) + (l.mrp ? " · MRP " + inr(l.mrp) : "") + "</div>" + (l.highlights.length ? "<ul>" + l.highlights.map(function (h) { return "<li>" + esc(h) + "</li>"; }).join("") + "</ul>" : "") + "</div></div>"; }
+  function tNews() { $("tp").innerHTML = (CUR.anns.length ? CUR.anns.map(annCard).join("") : "") + (CUR.launches.length ? '<div class="sh"><span>🚀 New launches</span></div>' + CUR.launches.map(launchCard).join("") : "") + (!CUR.anns.length && !CUR.launches.length ? '<div class="card empty"><div class="big">📣</div>No announcements right now.</div>' : ""); }
+  // ---- help: AI chat + queries ----
+  function tHelp() {
+    var qs = CUR.queries;
+    $("tp").innerHTML = '<div class="card"><b>🤖 Ask the AI assistant</b><div class="muted" style="font-size:12px">Answers from this retailer’s schemes, payouts, sales, stock and announcements.</div><div id="cl">' + CHAT.map(function (m) { return '<div class="msg ' + (m.role === "user" ? "me" : "bot") + '">' + esc(m.text) + "</div>"; }).join("") + '</div><div class="qk">' + ["Which scheme gives me the most payout?", "How much more do I need to sell this month?", "Which models should I reorder?", "Why is my wallet balance this amount?"].map(function (q) { return "<button>" + esc(q) + "</button>"; }).join("") + '</div><div class="row" style="gap:6px;margin-top:8px"><input class="tx" id="aq" placeholder="Type a question…" style="flex:1"><button class="btn pri" id="ab">Ask</button></div></div>' +
+      '<div class="sh"><span>✉️ Queries to vivo</span><button class="btn pri sm" id="rq">＋ New query</button></div>' + (qs.length ? qs.map(function (q) { return '<div class="sc" style="border-left-color:' + (q.status === "open" ? "#F2A93B" : q.status === "answered" ? "#16A06A" : "#9AA0B8") + '"><div class="row"><h4 style="flex:1">' + esc(q.topic) + '</h4><span class="pill ' + (q.status === "open" ? "o" : q.status === "answered" ? "g" : "") + '">' + esc(q.status) + '</span></div><div class="d">To ' + (q.to === "ho" ? "HO" : "sales team") + " · " + new Date(q.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + (PUB ? "" : " · by " + esc(q.by)) + '</div><div class="th r">' + esc(q.text) + "</div>" + q.thread.map(function (m) { return '<div class="th ' + (m.staff ? "s" : "r") + '"><small>' + esc(m.by) + " · " + new Date(m.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) + "</small>" + esc(m.text) + "</div>"; }).join("") + (PUB ? "" : '<button class="btn ghost sm" data-rp="' + q.id + '" style="margin-top:6px">↩ Reply</button>') + "</div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin:4px 2px">No queries yet. Ask about payouts, stock, pricing or anything else — the sales team or HO replies here.</div>');
+    var send = function (q) { q = String(q || "").trim(); if (!q) return; CHAT.push({ role: "user", text: q }); tHelp(); var cl = $("cl"); cl.insertAdjacentHTML("beforeend", '<div class="msg bot" id="typing">…</div>'); ai({ q: q, history: CHAT.slice(-6).map(function (m) { return { role: m.role, text: m.text }; }) }).then(function (r) { CHAT.push({ role: "bot", text: r.ok ? r.answer : "⚠️ " + (r.error || "Couldn't answer") }); tHelp(); }); };
+    $("ab").onclick = function () { send($("aq").value); }; $("aq").onkeydown = function (e) { if (e.key === "Enter") send(this.value); };
+    [].forEach.call($("tp").querySelectorAll(".qk button"), function (b) { b.onclick = function () { send(b.textContent); }; });
+    $("rq").onclick = raiseQ;
+    [].forEach.call($("tp").querySelectorAll("[data-rp]"), function (b) { b.onclick = function () { replyQ(qs.find(function (x) { return x.id === b.dataset.rp; }), function () { openRetailer(CUR.retailer.rid); }); }; });
+  }
+  function raiseQ() {
+    var ov = sheet("New query", PUB ? "The vivo team replies on this page" : "Raised for " + CUR.retailer.name, [["✉️", "Send", function (ov) {
+      var body = { topic: ov.querySelector("#qt").value, to: ov.querySelector("#qto").value, text: ov.querySelector("#qx").value, name: ov.querySelector("#qn") ? ov.querySelector("#qn").value : "" };
+      (PUB ? papi(Object.assign({ action: "rtp-public-q" }, body)) : api(Object.assign({ action: "rtp-q-raise", rid: CUR.retailer.rid }, body))).then(function (r) { if (!r.ok) return toast(r.error); toast("Query sent"); RT = "help"; openRetailer(CUR.retailer.rid); });
+    }, "pri"]], '<label class="lb">About</label><select class="tx" id="qt">' + (CUR.topics || []).map(function (t) { return "<option>" + esc(t) + "</option>"; }).join("") + '</select><label class="lb">Send to</label><select class="tx" id="qto"><option value="sales">Sales team (ASM / state)</option><option value="ho">vivo HO</option></select>' + (PUB ? '<label class="lb">Your name</label><input class="tx" id="qn">' : "") + '<label class="lb">Your query</label><textarea class="tx" id="qx" style="min-height:90px"></textarea>');
+    setTimeout(function () { var x = ov.querySelector("#qx"); if (x) x.focus(); }, 60);
+  }
+  function replyQ(q, done) {
+    if (!q) return;
+    sheet("Reply · " + q.rname, q.topic + " — " + q.text.slice(0, 120), [["↩", "Send reply", function (ov) { api({ action: "rtp-q-reply", id: q.id, text: ov.querySelector("#rx").value, status: ov.querySelector("#rs").value, to: ov.querySelector("#rto").value }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); done(); }); }, "pri"]],
+      '<textarea class="tx" id="rx" style="min-height:90px" placeholder="Reply (seen by the retailer on their link)"></textarea><div class="g2"><div><label class="lb">Status</label><select class="tx" id="rs"><option value="answered">Answered</option><option value="open">Keep open</option><option value="closed">Closed</option></select></div><div><label class="lb">With</label><select class="tx" id="rto"><option value="sales"' + (q.to === "sales" ? " selected" : "") + '>Sales team</option><option value="ho"' + (q.to === "ho" ? " selected" : "") + ">HO (escalate)</option></select></div></div>");
+  }
+  function share() {
+    var R = CUR.retailer;
+    var ov = sheet("Share with retailer", "A read-only web page with their schemes, payouts, business, news, AI help and queries. No login needed — anyone with the link can see it, so send it only to the retailer.", [["🔗", "Create a link", function (ov) {
+      api({ action: "rtp-link", rid: R.rid, days: +ov.querySelector("#ld").value }).then(function (r) { if (!r.ok) return toast(r.error); var url = location.origin + "/retailerportal.html?k=" + r.k, msg = "Hello " + (R.owner || R.name) + ", here is your vivo partner page with your schemes, payouts and updates: " + url;
+        sheet("Link ready", "Valid till " + new Date(r.exp).toLocaleDateString("en-IN"), [["📋", "Copy link", function () { try { navigator.clipboard.writeText(url); toast("Copied"); } catch (e) { } }], ["💬", "Send on WhatsApp", function () { window.open("https://wa.me/" + (String(R.mobile || "").replace(/\D/g, "").length === 10 ? "91" + String(R.mobile).replace(/\D/g, "") : "") + "?text=" + encodeURIComponent(msg), "_blank"); }]], '<input class="tx" readonly value="' + esc(url) + '" style="margin-top:8px">'); CUR.links.push({ k: r.k, exp: r.exp, by: "you" }); });
+    }, "pri"]], '<label class="lb">Valid for</label><select class="tx" id="ld"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select>' + ((CUR.links || []).length ? '<div class="lb">Active links</div>' + CUR.links.map(function (l) { return '<div class="row" style="font-size:12.5px;margin-top:4px"><span style="flex:1">…' + esc(l.k.slice(-6)) + " · till " + new Date(l.exp).toLocaleDateString("en-IN") + " · " + esc(l.by) + '</span><button class="btn ghost sm" data-rv="' + l.k + '" style="color:var(--bad)">Revoke</button></div>'; }).join("") : ""));
+    [].forEach.call(ov.querySelectorAll("[data-rv]"), function (b) { b.onclick = function () { api({ action: "rtp-link-revoke", k: b.dataset.rv }).then(function () { CUR.links = CUR.links.filter(function (l) { return l.k !== b.dataset.rv; }); b.parentNode.remove(); toast("Link revoked"); }); }; });
+  }
+
+  // ---------------- queries inbox ----------------
+  var QF = "open";
+  function qPage() {
+    head("Retailer queries", "Questions from retailers and staff — reply, escalate to HO or close");
+    api({ action: "rtp-q-list", status: QF === "all" ? "" : QF }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = back() + '<div class="err">' + esc(r.error) + "</div>"; wireBack(); return; }
+      VIEW.innerHTML = back() + '<div class="seg" style="margin-top:10px">' + [["open", "Open"], ["answered", "Answered"], ["closed", "Closed"], ["all", "All"]].map(function (x) { return '<button data-f="' + x[0] + '" class="' + (QF === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>" +
+        (r.items.length ? r.items.map(function (q) { return '<div class="sc" style="border-left-color:' + (q.status === "open" ? "#F2A93B" : q.status === "answered" ? "#16A06A" : "#9AA0B8") + '"><div class="row"><h4 style="flex:1">' + esc(q.rname) + " · " + esc(q.topic) + '</h4><span class="pill ' + (q.to === "ho" ? "r" : "") + '">' + (q.to === "ho" ? "HO" : "Sales") + '</span></div><div class="d">' + esc(q.rid) + " · " + esc(q.state) + " · " + new Date(q.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) + " · " + (q.via === "link" ? "from retailer link" : "by " + esc(q.by)) + '</div><div class="th r">' + esc(q.text) + "</div>" + q.thread.map(function (m) { return '<div class="th s"><small>' + esc(m.by) + "</small>" + esc(m.text) + "</div>"; }).join("") + '<div class="row" style="gap:6px;margin-top:7px"><button class="btn sec sm" data-rp="' + q.id + '">↩ Reply / status</button><button class="btn ghost sm" data-op="' + esc(q.rid) + '">Open retailer</button></div></div>'; }).join("") : '<div class="card empty"><div class="big">💬</div>Nothing here.</div>');
+      wireBack();
+      [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (b) { b.onclick = function () { QF = b.dataset.f; qPage(); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-rp]"), function (b) { b.onclick = function () { replyQ(r.items.find(function (x) { return x.id === b.dataset.rp; }), qPage); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-op]"), function (b) { b.onclick = function () { location.hash = "r=" + encodeURIComponent(b.dataset.op); }; });
+    });
+  }
+
+  // ---------------- announcements ----------------
+  function annPage() {
+    head("Announcements", "News, launches, scheme alerts — shown on retailers’ pages");
+    Promise.all([api({ action: "rtp-ann-list" }), api({ action: "rtp-me" })]).then(function (x) {
+      var r = x[0]; ME = x[1];
+      if (!r.ok) { VIEW.innerHTML = back() + '<div class="err">' + esc(r.error) + "</div>"; wireBack(); return; }
+      VIEW.innerHTML = back() + '<button class="btn pri block" id="na" style="margin-top:10px">＋ New announcement</button>' + (r.items.length ? r.items.map(function (a) { return annCard(a).replace('<div class="d">', '<div class="d">' + esc(a.states.length ? a.states.join(", ") : "All states") + (a.rids.length ? " · " + a.rids.length + " retailers" : "") + " · by " + esc(a.by) + " · ") + (a.mine ? '<div class="row" style="gap:6px;margin:-4px 0 0 4px"><button class="btn ghost sm" data-ed="' + a.id + '">✏️ Edit</button><button class="btn ghost sm" data-dl="' + a.id + '" style="color:var(--bad)">🗑️ Delete</button></div>' : ""); }).join("") : '<div class="card empty"><div class="big">📣</div>No announcements yet.</div>');
+      wireBack(); $("na").onclick = function () { annEdit({}); };
+      [].forEach.call(VIEW.querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { annEdit(r.items.find(function (a) { return a.id === b.dataset.ed; })); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-dl]"), function (b) { b.onclick = function () { api({ action: "rtp-ann-delete", id: b.dataset.dl }).then(function () { toast("Deleted"); annPage(); }); }; });
+    });
+  }
+  function annEdit(a) {
+    sheet(a.id ? "Edit announcement" : "New announcement", "", [["📣", "Publish", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id); };
+      api({ action: "rtp-ann-save", item: { id: a.id, kind: g("ak").value, title: g("at").value, body: g("ab").value, link: g("al").value, model: g("am").value, states: g("as") ? g("as").value.split(",").map(function (s) { return s.trim(); }).filter(Boolean) : [], rids: g("ar").value, pin: g("ap").checked, until: g("au").value } }).then(function (r) { if (!r.ok) return toast(r.error); toast("Published"); annPage(); });
+    }, "pri"]], '<div class="g2"><div><label class="lb">Type</label><select class="tx" id="ak">' + [["news", "📰 News"], ["launch", "🚀 New launch"], ["scheme", "🎯 Scheme alert"], ["alert", "⚠️ Important"]].map(function (k) { return '<option value="' + k[0] + '"' + (a.kind === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Show till (optional)</label><input class="tx" type="date" id="au" value="' + esc(a.until || "") + '"></div></div><label class="lb">Title</label><input class="tx" id="at" value="' + esc(a.title || "") + '"><label class="lb">Message</label><textarea class="tx" id="ab" style="min-height:90px">' + esc(a.body || "") + '</textarea><div class="g2"><div><label class="lb">Link (https, optional)</label><input class="tx" id="al" value="' + esc(a.link || "") + '"></div><div><label class="lb">Model (optional)</label><input class="tx" id="am" value="' + esc(a.model || "") + '"></div></div>' +
+      (ME && ME.isHO ? '<label class="lb">States (blank = all)</label><input class="tx" id="as" value="' + esc((a.states || []).join(", ")) + '" placeholder="e.g. Bihar, Jharkhand">' : '<div class="muted" style="font-size:12px;margin-top:8px">Goes to retailers in ' + esc(ME ? ME.state : "your state") + ".</div>") +
+      '<label class="lb">Only these retailer IDs (optional)</label><input class="tx" id="ar" value="' + esc((a.rids || []).join(", ")) + '"><label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ap"' + (a.pin ? " checked" : "") + "><i></i><span>📌 Pin to top</span></label>");
+  }
+
+  // ---------------- upload ----------------
+  function upPage() {
+    head("Upload retailer data", "Retailer list and month-wise purchase, sales, stock and targets (Excel)");
+    VIEW.innerHTML = back() + '<div class="card" style="margin-top:10px"><b>1 · Retailer list</b><div class="muted" style="font-size:12.5px">Retailer ID, name, owner, mobile, state, city, area, type, ASM, GSTIN. State users can upload only their state.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="t1">⬇ Template</button><button class="btn pri sm" id="u1">📥 Upload Excel</button></div></div>' +
+      '<div class="card"><b>2 · Purchase, sales, stock & targets</b><div class="muted" style="font-size:12.5px">One row per retailer × month × model. Uploading a month again replaces that month for those retailers. Put the month target on any row of that month (or a row with no model).</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="t2">⬇ Template</button><button class="btn pri sm" id="u2">📥 Upload Excel</button></div></div><div id="res"></div>';
+    wireBack();
+    var H1 = ["Retailer ID", "Retailer name", "Owner", "Mobile", "State", "City", "Area", "Type", "ASM", "GSTIN"], H2 = ["Retailer ID", "Retailer name", "Month (YYYY-MM)", "Model", "Purchase units", "Purchase value", "Sales units", "Sales value", "Stock units", "Target units (month)", "Target value (month)"];
+    var m0 = new Date(); var mm = function (k) { var d = new Date(m0.getFullYear(), m0.getMonth() - k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
+    $("t1").onclick = function () { download(xlsx([{ name: "Retailers", rows: [H1, ["BRE001", "Shree Mobiles", "Ramesh Gupta", "9876500001", "Bihar", "Patna", "Boring Road", "Multi-brand", "Asha", ""]] }]), "Retailer_list_template.xlsx"); };
+    $("t2").onclick = function () { download(xlsx([{ name: "Business", rows: [H2, ["BRE001", "Shree Mobiles", mm(1), "V60", 12, 359880, 10, 329900, 6, 40, 1200000], ["BRE001", "Shree Mobiles", mm(1), "Y39", 20, 339800, 18, 323820, 9, "", ""], ["BRE001", "Shree Mobiles", mm(0), "V60", 10, 299900, 4, 131960, 12, 45, 1350000], ["BRE001", "Shree Mobiles", mm(0), "Y39", 15, 254850, 11, 197890, 13, "", ""]] }]), "Retailer_business_template.xlsx"); };
+    var pick = function (kind) { var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { var f = i.files[0]; if (!f) return; $("res").innerHTML = '<div class="loading"><div class="spin"></div>Reading…</div>'; (window.XLSX ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; document.head.appendChild(s); })).then(function () { return f.arrayBuffer(); }).then(function (buf) {
+      var wb = XLSX.read(buf, { type: "array", cellDates: false }), best = null;
+      wb.SheetNames.forEach(function (n) { var A = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }); for (var h = 0; h < Math.min(10, A.length); h++) if (A[h].some(function (c) { return /retailer\s*id|^rid$|dealer\s*code|retailer\s*code/i.test(String(c)); })) { best = best || { A: A, h: h }; break; } });
+      if (!best) { $("res").innerHTML = '<div class="err">Couldn’t find a “Retailer ID” column.</div>'; return; }
+      var hd = best.A[best.h].map(function (c) { return String(c).toLowerCase(); }), col = function (re) { return hd.findIndex(function (c) { return re.test(c); }); };
+      var C = kind === "master" ? { rid: col(/retailer\s*id|^rid$|code/), name: col(/retailer\s*name|shop|^name$/), owner: col(/owner/), mobile: col(/mobile|phone/), state: col(/state/), city: col(/city|town/), area: col(/area|location|cluster/), type: col(/type|format|channel/), asm: col(/asm|manager/), gst: col(/gst/) }
+        : { rid: col(/retailer\s*id|^rid$|code/), name: col(/retailer\s*name|shop|^name$/), month: col(/month|period|date/), model: col(/model/), pu: col(/purchase\s*(units|qty)|^purchase$|sell.?in\s*(units|qty)/), pv: col(/purchase\s*(value|amount)|sell.?in\s*value/), su: col(/sales?\s*(units|qty)|sell.?out\s*(units|qty)|^sales$/), sv: col(/sales?\s*(value|amount)|sell.?out\s*value/), stk: col(/stock|inventory|closing/), tu: col(/target\s*(units|qty)|^target$/), tv: col(/target\s*(value|amount)/), city: col(/city/), state: col(/state/) };
+      var rows = best.A.slice(best.h + 1).filter(function (r) { return String(r[C.rid] || "").trim(); }).map(function (r) { var o = {}; Object.keys(C).forEach(function (k) { if (C[k] >= 0) o[k] = r[C[k]]; }); return o; });
+      api({ action: "rtp-import", kind: kind, rows: rows }).then(function (r) { $("res").innerHTML = r.ok ? '<div class="card" style="background:#E6F4EA">✅ ' + r.saved + " row" + (r.saved === 1 ? "" : "s") + " saved" + (r.retailers ? " for " + r.retailers + " retailers" : "") + (r.skipped ? " · " + r.skipped + " skipped (another state)" : "") + (r.bad ? " · " + r.bad + " without a valid month" : "") + '<br><a class="btn sec sm" href="#" id="gh" style="margin-top:8px;display:inline-block">See retailers →</a></div>' : '<div class="err">' + esc(r.error) + "</div>"; if ($("gh")) $("gh").onclick = function (e) { e.preventDefault(); window.__pageBack(); }; });
+    }); }; i.click(); };
+    $("u1").onclick = function () { pick("master"); }; $("u2").onclick = function () { pick("biz"); };
+  }
+
+  if (!PUB && (!AUTH || !AUTH.token)) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  if (PUB) { try { document.querySelectorAll(".cust-fab,#cx-fab").forEach(function (e) { e.remove(); }); } catch (e) { } }
+  route();
+})();
+</script>
+</body>
+</html>

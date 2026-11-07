@@ -63,6 +63,11 @@
         else if (f.type === "longtext") inner = lab + '<textarea class="tx" id="' + id + '" data-k="' + f.key + '"' + ph + ">" + esc(v || "") + "</textarea>" + help;
         else if (f.type === "photo") inner = lab + '<div class="cx-row"><button type="button" class="btn sec sm" data-photo="' + f.key + '">📷 ' + (v ? "Change photo" : "Add photo") + '</button><span class="cx-pn">' + (v ? "✓ added" : "") + '</span></div><input type="hidden" data-k="' + f.key + '" value="' + esc(v || "") + '">' + help;
         else if (f.type === "location") inner = lab + '<div class="cx-row"><button type="button" class="btn sec sm" data-loc="' + f.key + '">📍 ' + (v ? "Update location" : "Capture my location") + '</button><span class="cx-pn">' + esc(v || "") + '</span></div><input type="hidden" data-k="' + f.key + '" value="' + esc(v || "") + '">' + help;
+        else if (f.type === "currency") inner = lab + '<div class="cx-cur"><span>₹</span><input class="tx" id="' + id + '" data-k="' + f.key + '" type="number" inputmode="decimal"' + ph + mm + ' value="' + esc(v == null ? "" : v) + '"></div>' + help;
+        else if (f.type === "calc") inner = '<div class="cx-calc"><span>' + esc(f.label) + '</span><b data-calc="' + f.key + '">—</b></div>' + help;
+        else if (f.type === "lookup") inner = lab + (f.lookup && f.lookup.match ? "" : '<input class="tx" id="' + id + '" data-lk="' + f.key + '" placeholder="' + esc(f.placeholder || "Type the ID / name") + '" value="' + esc(v && typeof v === "object" ? v.key || "" : v || "") + '">') + '<div class="cx-lk" data-lkc="' + f.key + '"><span class="cx-help">' + (f.lookup && f.lookup.match ? "Fills in from the field above" : "") + "</span></div>" + help;
+        else if (f.type === "table") inner = lab + '<div class="cx-tbw"><table class="cx-tb" data-tb="' + f.key + '"><thead><tr>' + (f.columns || []).map(function (c) { return "<th>" + esc(c.label) + (c.required ? ' <b style="color:#E05757">*</b>' : "") + "</th>"; }).join("") + '<th></th></tr></thead><tbody></tbody></table></div><button type="button" class="btn sec sm" data-addrow="' + f.key + '" style="margin-top:6px">＋ Add row</button>' + help;
+        else if (f.type === "user") inner = lab + '<input class="tx" id="' + id + '" data-k="' + f.key + '" placeholder="' + esc(f.placeholder || "vChat ID or user name") + '" value="' + esc(v || "") + '">' + help;
         else { var ty = { number: "number", date: "date", email: "email", phone: "tel", time: "time", datetime: "datetime-local" }[f.type] || "text"; inner = lab + '<input class="tx" id="' + id + '" data-k="' + f.key + '" type="' + ty + '"' + ph + mm + (f.type === "phone" ? ' inputmode="tel"' : f.type === "number" ? ' inputmode="decimal"' : "") + ' value="' + esc(v == null ? "" : v) + '">' + help; }
         return '<div class="cx-f cx-t-' + f.type + '" data-f="' + f.key + '" data-page="' + page + '">' + inner + "</div>";
       });
@@ -72,12 +77,49 @@
       pages = page + 1;
       box.innerHTML = html.map(function (h, i) { return h.replace(/data-page="\d+"/, 'data-page="' + fs[i].__p + '"'); }).join("");
       [].forEach.call(box.querySelectorAll("img[data-asset]"), function (im) { var a = im.getAttribute("data-asset"); if (!a || !opts.asset) { im.remove(); return; } opts.asset(a).then(function (u) { if (u) im.src = u; else im.remove(); }); });
+      // ---- Studio Pro: tables, lookups, calculated fields, formula-based show / required rules ----
+      var PRO = opts.pro || null, FX = window.BIFX, LK = {}, ENV = { vals: {}, user: (PRO && PRO.user) || {} };
+      var rowHtml = function (f, r) { r = r || {}; return "<tr>" + (f.columns || []).map(function (c) { var v = r[c.key]; if (c.formula) return '<td class="cx-tf" data-c="' + c.key + '">' + esc(v == null ? "" : v) + "</td>"; if (c.type === "select") return '<td><select data-c="' + c.key + '"><option value=""></option>' + c.options.map(function (o) { return "<option" + (v === o ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select></td>"; return '<td><input data-c="' + c.key + '" type="' + (c.type === "number" || c.type === "currency" ? "number" : c.type === "date" ? "date" : "text") + '"' + (c.type === "number" || c.type === "currency" ? ' inputmode="decimal"' : "") + ' value="' + esc(v == null ? "" : v) + '"></td>'; }).join("") + '<td><button type="button" class="cx-rm" title="Remove row">✕</button></td></tr>'; };
+      fs.forEach(function (f) { if (f.type !== "table") return; var tb = box.querySelector('[data-tb="' + f.key + '"] tbody'), rows = Array.isArray(values[f.key]) && values[f.key].length ? values[f.key] : [{}]; tb.innerHTML = rows.map(function (r) { return rowHtml(f, r); }).join(""); });
+      var fmt = function (f, v) { if (v === "" || v == null) return "—"; if (typeof v === "boolean") return v ? "Yes" : "No"; if (f.format === "currency" || f.type === "currency") return "₹" + (Math.round(Number(v) * 100) / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 }); if (f.format === "percent") return (Math.round(Number(v) * 10) / 10) + "%"; if (typeof v === "number") return v.toLocaleString("en-IN", { maximumFractionDigits: f.decimals != null ? f.decimals : 2 }); return String(v); };
+      var lkTimer = {}, lkKey = {};
+      var doLookup = function (f, key) {
+        var c = box.querySelector('[data-lkc="' + f.key + '"]'); if (!c) return;
+        key = String(key == null ? "" : key).trim(); if (lkKey[f.key] === key) return; lkKey[f.key] = key;
+        if (!key) { LK[f.key] = ""; c.innerHTML = '<span class="cx-help">' + (f.lookup.match ? "Fills in from the field above" : "") + "</span>"; return; }
+        c.innerHTML = '<span class="cx-help">Looking up…</span>'; clearTimeout(lkTimer[f.key]);
+        lkTimer[f.key] = setTimeout(function () { (PRO.lookup ? PRO.lookup(f.key, key) : Promise.resolve(null)).then(function (rec) {
+          if (lkKey[f.key] !== key) return; LK[f.key] = rec || "";
+          var show = (f.lookup.show && f.lookup.show.length ? f.lookup.show : rec ? Object.keys(rec).filter(function (k) { return k !== "key"; }).slice(0, 6) : []);
+          c.innerHTML = rec ? '<div class="cx-lkr">' + show.map(function (k) { return rec[k] === "" || rec[k] == null ? "" : "<span>" + esc(k) + "</span><b>" + esc(rec[k]) + "</b>"; }).join("") + "</div>" : '<span class="cx-help" style="color:#B42318">Not found</span>';
+          fire();
+        }); }, 350);
+      };
+      var compute = function (o) {
+        if (!PRO || !FX) return o;
+        fs.forEach(function (f) { if (f.type === "lookup") o[f.key] = LK[f.key] || ""; });
+        ENV = FX.computeAll(fs, o, PRO.user || {});
+        fs.forEach(function (f) {
+          if (f.type === "calc") { var b = box.querySelector('[data-calc="' + f.key + '"]'); if (b) b.textContent = fmt(f, o[f.key]); }
+          if (f.type === "table") { var tb = box.querySelector('[data-tb="' + f.key + '"] tbody'); (o[f.key] || []).forEach(function (r, i) { var tr = tb && tb.children[i]; if (!tr) return; (f.columns || []).forEach(function (c) { if (!c.formula) return; var td = tr.querySelector('[data-c="' + c.key + '"]'); if (td) td.textContent = fmt(c, r[c.key]); }); }); }
+          if (f.type === "lookup" && f.lookup && f.lookup.match) doLookup(f, o[f.lookup.match]);
+        });
+        return o;
+      };
       var update = function () {
-        var o = collectRaw();
-        fs.forEach(function (f) { var el = box.querySelector('[data-f="' + f.key + '"]'); if (!el) return; var vis = isVis(f, o) && (curPage < 0 || f.__p === curPage); el.style.display = vis ? "" : "none"; });
+        var o = compute(collectRaw());
+        fs.forEach(function (f) { var el = box.querySelector('[data-f="' + f.key + '"]'); if (!el) return; var vis = isVis(f, o) && (curPage < 0 || f.__p === curPage); el.style.display = vis ? "" : "none";
+          if (PRO && FX && f.requiredIf) { var l = el.querySelector(".cx-l"); if (l) { var rq = FX.truthy(f.requiredIf, ENV, false), star = l.querySelector(".cx-rq"); if (rq && !star) l.insertAdjacentHTML("beforeend", ' <b class="cx-rq" style="color:#E05757">*</b>'); if (!rq && star) star.remove(); } } });
       };
       var fire = function () { update(); if (onChange) onChange(collectRaw()); };
       [].forEach.call(box.querySelectorAll("input[data-k],select[data-k],textarea[data-k]"), function (i) { i.addEventListener("input", fire); i.addEventListener("change", fire); });
+      box.addEventListener("input", function (e) { if (e.target.closest(".cx-tb")) fire(); if (e.target.dataset && e.target.dataset.lk) { var f = fs.find(function (x) { return x.key === e.target.dataset.lk; }); if (f) doLookup(f, e.target.value); } });
+      box.addEventListener("change", function (e) { if (e.target.closest(".cx-tb")) fire(); });
+      box.addEventListener("click", function (e) {
+        var a = e.target.closest("[data-addrow]"); if (a) { var f = fs.find(function (x) { return x.key === a.dataset.addrow; }), tb = box.querySelector('[data-tb="' + f.key + '"] tbody'); if (tb.children.length >= (f.maxRows || 20)) return toast("Up to " + (f.maxRows || 20) + " rows"); tb.insertAdjacentHTML("beforeend", rowHtml(f, {})); fire(); return; }
+        var rm = e.target.closest(".cx-rm"); if (rm) { var tr = rm.closest("tr"), tb2 = tr.parentNode; tr.remove(); if (!tb2.children.length) { var f2 = fs.find(function (x) { return x.key === tb2.parentNode.dataset.tb; }); tb2.insertAdjacentHTML("beforeend", rowHtml(f2, {})); } fire(); }
+      });
+      fs.forEach(function (f) { if (f.type === "lookup") { var kv = values[f.key] && typeof values[f.key] === "object" ? values[f.key].key : f.lookup && f.lookup.match ? values[f.lookup.match] : values[f.key]; if (kv) doLookup(f, kv); } });
       [].forEach.call(box.querySelectorAll(".cx-ch"), function (g) { [].forEach.call(g.children, function (b) { b.onclick = function () {
         if (EDIT) return;
         if (g.classList.contains("cx-star")) { var n = +b.dataset.v, cur = [].filter.call(g.children, function (x) { return x.classList.contains("on"); }).length; [].forEach.call(g.children, function (x) { x.classList.toggle("on", +x.dataset.v <= (cur === n ? 0 : n)); }); }
@@ -90,13 +132,16 @@
         navigator.geolocation.getCurrentPosition(function (p) { var v = p.coords.latitude.toFixed(6) + "," + p.coords.longitude.toFixed(6); box.querySelector('input[data-k="' + b.dataset.loc + '"]').value = v; b.parentNode.querySelector(".cx-pn").textContent = v + " (±" + Math.round(p.coords.accuracy) + " m)"; b.disabled = false; b.textContent = "📍 Update location"; fire(); },
           function () { b.disabled = false; b.textContent = "📍 Capture my location"; toast("Couldn't get your location — turn on GPS and allow location."); }, { enableHighAccuracy: true, timeout: 20000 });
       }; });
-      function isVis(f, o) { if (!f.show || !f.show.key) return true; var x = o[f.show.key]; return Array.isArray(x) ? x.indexOf(f.show.value) >= 0 : String(x == null ? "" : x) === f.show.value; }
+      function isVis(f, o) { if (PRO && FX && f.showIf) return FX.truthy(f.showIf, ENV, true); if (!f.show || !f.show.key) return true; var x = o[f.show.key]; return Array.isArray(x) ? x.indexOf(f.show.value) >= 0 : String(x == null ? "" : x) === f.show.value; }
       function collectRaw() {
         var o = {};
         fs.forEach(function (f) {
+          if (f.type === "table") { var tb = box.querySelector('[data-tb="' + f.key + '"] tbody'); o[f.key] = tb ? [].map.call(tb.children, function (tr) { var r = {}; (f.columns || []).forEach(function (c) { var x = tr.querySelector('[data-c="' + c.key + '"]'); if (!x || c.formula) return; r[c.key] = c.type === "number" || c.type === "currency" ? (x.value === "" ? "" : Number(x.value)) : x.value; }); return r; }).filter(function (r) { return Object.keys(r).some(function (k) { return r[k] !== "" && r[k] != null; }); }) : []; return; }
+          if (f.type === "lookup") { o[f.key] = LK[f.key] || ""; var ki = box.querySelector('[data-lk="' + f.key + '"]'); if (ki && !LK[f.key]) o[f.key] = ki.value ? { key: ki.value } : ""; return; }
           var el = box.querySelector('[data-k="' + f.key + '"]'); if (!el) return;
           if (el.classList.contains("cx-ch")) { var on = [].filter.call(el.children, function (x) { return x.classList.contains("on"); }); if (el.dataset.num) o[f.key] = el.classList.contains("cx-star") ? (on.length || "") : (on[0] ? +on[0].dataset.v : ""); else { on = on.map(function (x) { return x.textContent; }); o[f.key] = el.dataset.multi ? on : on[0] || ""; } }
           else if (el.type === "checkbox") o[f.key] = el.checked ? "Yes" : "";
+          else if (f.type === "currency") o[f.key] = el.value === "" ? "" : Number(el.value);
           else o[f.key] = el.value;
         });
         return o;
@@ -105,9 +150,18 @@
       var api2 = { count: fs.filter(function (f) { return f.type !== "heading" && f.type !== "image"; }).length, pages: pages,
         setPage: function (n) { curPage = n; update(); },
         collect: function (quiet, onlyPage) {
-          var o = collectRaw();
+          var o = compute(collectRaw());
           fs.forEach(function (f) { if (!isVis(f, o) && f.key in o) o[f.key] = Array.isArray(o[f.key]) ? [] : ""; });
-          var miss = fs.filter(function (f) { var v = o[f.key]; return f.required && isVis(f, o) && (onlyPage == null || f.__p === onlyPage) && (v === "" || v == null || (Array.isArray(v) && !v.length)); });
+          if (PRO && FX) {   // Studio Pro checks (the server checks them again)
+            var perr = [];
+            fs.forEach(function (f) { if (!isVis(f, o) || (onlyPage != null && f.__p !== onlyPage)) return; var v = o[f.key], empty = v === "" || v == null || (Array.isArray(v) && !v.length);
+              if (f.type === "table" && (f.minRows || (f.required ? 1 : 0)) > (v || []).length) perr.push(f.label + ": add at least " + Math.max(1, f.minRows || 1) + " row(s)");
+              else if (f.type !== "table" && !f.required && f.requiredIf && FX.truthy(f.requiredIf, ENV, false) && empty) perr.push("Please fill: " + f.label);
+              if (!empty) (f.validations || []).forEach(function (r) { if (!FX.truthy(r.rule, ENV, true)) perr.push(r.msg || f.label + " doesn't meet the rule"); }); });
+            if (onlyPage == null) ((PRO.rules) || []).forEach(function (r) { if (!FX.truthy(r.rule, ENV, true)) perr.push(r.msg || "A form rule isn't met"); });
+            if (perr.length && !quiet) { toast(perr[0]); return null; }
+          }
+          var miss = fs.filter(function (f) { var v = o[f.key]; return f.required && f.type !== "calc" && f.type !== "table" && isVis(f, o) && (onlyPage == null || f.__p === onlyPage) && (v === "" || v == null || (Array.isArray(v) && !v.length)); });
           var bad = fs.filter(function (f) { var v = o[f.key]; if (v === "" || v == null || (onlyPage != null && f.__p !== onlyPage)) return false; if (f.type === "email") return !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); if (f.type === "phone") return String(v).replace(/\D/g, "").length < 6; if (f.type === "number") return (f.min != null && +v < f.min) || (f.max != null && +v > f.max); return false; });
           if ((miss.length || bad.length) && !quiet) { toast(miss.length ? "Please fill: " + miss.map(function (f) { return f.label; }).join(", ") : "Please check: " + bad.map(function (f) { return f.label; }).join(", ")); var first = box.querySelector('[data-f="' + (miss[0] || bad[0]).key + '"]'); if (first && first.scrollIntoView) first.scrollIntoView({ block: "center", behavior: "smooth" }); return null; }
           return o;
@@ -281,6 +335,10 @@
     ".cx-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cx-pn{font-size:12px;color:#6B7090}.cx-star button{font-size:22px;color:#C9CCDA;padding:2px 8px!important;border:0!important;background:none!important}.cx-star button.on{color:#F5A623!important}" +
     ".cx-scale button{min-width:38px;padding:7px 0!important}.cx-auto{margin-top:6px}.cx-auto:empty{display:none}" +
     ".cx-l{display:block;font-size:12px;color:#6B7090;font-weight:600;margin:10px 2px 3px}.cx-d{background:#FFF4E5;color:#B26A00;border-radius:6px;padding:0 5px;font-size:10.5px}" +
+    ".cx-cur{display:flex;align-items:center;gap:6px}.cx-cur span{font-weight:800;color:#5A5F7A}.cx-cur .tx{flex:1}" +
+    ".cx-calc{display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(135deg,#F2F4FF,#F8F5FF);border:1px solid #DCDFF7;border-radius:12px;padding:11px 13px}.cx-calc span{font-size:13px;font-weight:700;color:#3D4260}.cx-calc b{font-size:17px;color:#2B33A6;font-variant-numeric:tabular-nums}" +
+    ".cx-lk{margin-top:6px}.cx-lkr{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;background:#F5F7FB;border-radius:10px;padding:8px 10px;font-size:12.5px}.cx-lkr span{color:#6B7090;text-transform:capitalize}" +
+    ".cx-tbw{overflow-x:auto;border:1px solid #E1E3EE;border-radius:12px}.cx-tb{border-collapse:collapse;width:100%;font-size:13px}.cx-tb th{background:#F3F4FA;font-size:11px;color:#6B7090;text-align:left;padding:6px;white-space:nowrap}.cx-tb td{border-top:1px solid #EEF0F6;padding:4px}.cx-tb input,.cx-tb select{width:100%;min-width:80px;border:1px solid #E1E3EE;border-radius:8px;padding:7px;font:inherit;background:#fff}.cx-tb .cx-tf{font-weight:700;color:#2B33A6;text-align:right;white-space:nowrap;padding:6px 8px}.cx-rm{border:0;background:#FDECEC;color:#B42318;border-radius:8px;width:28px;height:28px;cursor:pointer}" +
     ".cx-ch{display:flex;flex-wrap:wrap;gap:6px}.cx-ch button{border:1px solid #D8DAE5;background:#fff;border-radius:99px;padding:6px 12px;font:600 13px inherit;cursor:pointer}.cx-ch button.on{background:#EEF0FF;border-color:#4D5BF9;color:#2B33A6}" +
     ".cx-fab{position:fixed;left:12px;bottom:14px;z-index:2147483000;border:0;border-radius:99px;padding:10px 14px;font:700 13px Segoe UI,Arial;background:#1F2340;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.25);cursor:pointer}" +
     "body:has(.biw-frame) .cx-fab,body:has(.biw-frame) .cx-bar{display:none!important}.cx-fab.on{background:#F5A623;color:#1F2340}.cx-bar{position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#F5A623;color:#1F2340;font:700 12.5px Segoe UI,Arial;padding:7px 12px;text-align:center}" +

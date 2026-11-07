@@ -17,7 +17,8 @@
 .btn.tc{background:var(--tc,#4D5BF9);color:#fff;border:0}
 .done{text-align:center;padding:26px 18px}.done .big{font-size:52px}.done h2{margin:6px 0 4px}.done p{color:var(--mut);margin:6px 0 14px}
 .sb{background:var(--card);border-radius:14px;padding:12px 14px;margin-top:8px;box-shadow:0 1px 8px rgba(20,24,51,.06);font-size:13.5px}
-.sb .top2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sb .kv2{display:grid;grid-template-columns:minmax(110px,40%) 1fr;gap:3px 10px;margin-top:8px}.sb .kv2 span{color:var(--mut)}
+.sb .top2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.sb .mtb{border-collapse:collapse;font-size:12px;margin-top:2px}.mtb th,.mtb td{border:1px solid #E6E8F2;padding:3px 6px;text-align:left}.mtb th{background:#F3F4FA}
+.kv2{display:grid;grid-template-columns:minmax(110px,40%) 1fr;gap:3px 10px;margin-top:8px}.sb .kv2 span{color:var(--mut)}
 .st{border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:800;white-space:nowrap}
 .st.pending{background:#FFF4E5;color:#B26A00}.st.approved{background:#E6F4EA;color:#0F7B4F}.st.rejected{background:#FDECEC;color:#B3402F}.st.returned{background:#EEF0FF;color:#2B33A6}.st.submitted{background:#F1F2F8;color:#3A3F5C}
 .tl{margin:10px 0 0;padding:0 0 0 14px;border-left:2px solid #E1E3EE;font-size:12.5px}.tl div{margin:0 0 7px;position:relative}.tl div:before{content:"";position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--tc,#4D5BF9)}
@@ -78,11 +79,12 @@
 
   // ================= FORMS =================
   var FM = function () { return TL.form || {}; }, STEPS = function () { return (TL.flow && TL.flow.steps) || []; };
-  function startForm() { api({ action: "ct-list", tool: ID }).then(function (r) { LIST = r.ok ? r : { rows: [], all: false, approver: false, pending: 0 }; if (LIST.pending && TAB === "fill" && !EDITING) TAB = "approve"; showForm(); }); }
+  function libFX() { return !TL.pro || window.BIFX ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = "/formula.js?v=1"; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
+  function startForm() { libFX().then(function () { return api({ action: "ct-list", tool: ID }); }).then(function (r) { LIST = r.ok ? r : { rows: [], all: false, approver: false, pending: 0 }; if (LIST.pending && TAB === "fill" && !EDITING) TAB = "approve"; showForm(); }); }
   function reloadList(then) { api({ action: "ct-list", tool: ID }).then(function (r) { if (r.ok) LIST = r; (then || showForm)(); }); }
   function statusTxt(r) {
     var st = STEPS();
-    if (r.status === "pending") return "⏳ Waiting · " + ((st[r.step] || {}).name || "approval");
+    if (r.status === "pending") { var due = r.cur && r.cur.dueAt ? r.cur.dueAt - Date.now() : null; return "⏳ Waiting · " + ((st[r.step] || {}).name || "approval") + (due == null ? "" : due < 0 ? " · ⚠️ overdue" + (r.cur.escalated ? " (escalated)" : "") : " · due in " + (due > 864e5 ? Math.round(due / 864e5) + "d" : Math.max(1, Math.round(due / 36e5)) + "h")); }
     return { approved: "✅ Approved", rejected: "❌ Rejected", returned: "↩️ Sent back for changes", submitted: "📨 Submitted" }[r.status] || "📨 Submitted";
   }
   function showForm() {
@@ -104,10 +106,11 @@
     var st = STEPS();
     pane.innerHTML = head + (EDITING ? '<div class="notice info">Sent back' + (EDITING.lastComment ? ": “" + esc(EDITING.lastComment) + "”" : "") + " — make the changes and resubmit.</div>" : "") +
       '<div class="fcard"><div class="prog" id="pg"></div><div id="ff"></div><div class="navb"><button class="btn sec" id="pb">← Back</button><button class="btn tc" id="nb">Next →</button></div>' +
-      (st.length ? '<div class="muted" style="font-size:12px;margin-top:10px;text-align:center">After you submit: ' + st.map(function (x) { return esc(x.name); }).join(" → ") + "</div>" : "") +
+      (st.length ? '<div class="muted" style="font-size:12px;margin-top:10px;text-align:center">After you submit: ' + st.map(function (x) { return esc(x.name) + (x.when ? " (if needed)" : ""); }).join(" → ") + (TL.pro && st.some(function (x) { return x.tatHours; }) ? " · each step has a time limit" : "") + "</div>" : "") +
       (fm.closeAt ? '<div class="muted" style="font-size:12px;margin-top:4px;text-align:center">Open till ' + dOnly(fm.closeAt) + "</div>" : "") + "</div>";
     banner();
-    F = CUST.renderFields($("ff"), TL.fields, EDITING ? EDITING.values : DRAFTV, function (v) { DRAFTV = v; }, "tool", { asset: asset });
+    F = CUST.renderFields($("ff"), TL.fields, EDITING ? EDITING.values : DRAFTV, function (v) { DRAFTV = v; }, "tool", { asset: asset,
+      pro: TL.pro ? { user: LIST.me || {}, rules: TL.rules || [], lookup: function (field, key) { return api({ action: "ct-lookup", tool: T.id, field: field, key: key }).then(function (x) { return x.ok ? x.record : null; }); } } : null });
     PAGE_N = Math.min(PAGE_N, F.pages - 1);
     var paint = function () {
       F.setPage(PAGE_N);
@@ -140,7 +143,11 @@
     if ($("ag")) $("ag").onclick = function () { showForm(); };
     $("my").onclick = function () { TAB = "mine"; showForm(); };
   }
-  function valTxt(f, v) { if (f.type === "photo") return v ? "📷 photo" : ""; if (f.type === "rating") return v ? "★".repeat(+v) : ""; if (f.type === "location" && v) return "📍 " + v; return Array.isArray(v) ? v.join(", ") : v == null ? "" : String(v); }
+  function valTxt(f, v) { if (f.type === "photo") return v ? "📷 photo" : "";
+    if (f.type === "table") return Array.isArray(v) ? v.length + " row" + (v.length === 1 ? "" : "s") : "";
+    if (f.type === "lookup") return v && typeof v === "object" ? [v.name || v.title || v.key, v.state].filter(Boolean).join(" · ") : String(v || "");
+    if ((f.type === "currency" || f.format === "currency") && v !== "" && v != null) return "₹" + Number(v).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+    if (f.type === "calc" && typeof v === "boolean") return v ? "Yes" : "No"; if (f.type === "rating") return v ? "★".repeat(+v) : ""; if (f.type === "location" && v) return "📍 " + v; return Array.isArray(v) ? v.join(", ") : v == null ? "" : String(v); }
   function dataFields() { return TL.fields.filter(function (f) { return f.type !== "heading" && f.type !== "image"; }); }
   function showRows(rows, mode) {
     var pane = $("pane"), fs = dataFields(), st = STEPS();
@@ -151,8 +158,10 @@
       (shown.length ? shown.slice(0, 300).map(function (s) {
         var hist = s.history || [];
         return '<div class="sb" data-id="' + s.id + '"><div class="top2"><b>' + esc(s.by.fullName) + '</b><span class="muted">' + esc(s.state || "") + " · " + dt(s.at) + '</span><span class="grow" style="flex:1"></span><span class="st ' + (s.status || "submitted") + '">' + esc(statusTxt(s)) + "</span></div>" +
-          '<div class="kv2">' + fs.map(function (f) { var v = s.values[f.key]; if (v === "" || v == null || (Array.isArray(v) && !v.length)) return ""; return "<span>" + esc(f.label) + "</span><div>" + (f.type === "photo" ? '<a href="javascript:void 0" data-f="' + esc(v) + '" data-s="' + s.id + '">📷 view</a>' : f.type === "location" ? '<a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + esc(v) + '">📍 ' + esc(v) + "</a>" : esc(valTxt(f, v))) + "</div>"; }).join("") + "</div>" +
-          (st.length && hist.length ? '<div class="tl">' + hist.map(function (h) { return "<div><b>" + esc({ submitted: "Submitted", resubmitted: "Resubmitted", approved: "Approved", rejected: "Rejected", returned: "Sent back" }[h.action] || h.action) + "</b>" + (h.stepName ? " · " + esc(h.stepName) : "") + " <i>by " + esc(h.by.fullName) + " · " + dt(h.at) + "</i>" + (h.comment ? "<span class=\"cm\">“" + esc(h.comment) + "”</span>" : "") + "</div>"; }).join("") + (s.status === "pending" ? '<div style="opacity:.6"><b>Waiting</b> · ' + esc((st[s.step] || {}).name || "") + "</div>" : "") + "</div>" : "") +
+          '<div class="kv2">' + fs.map(function (f) { var v = s.values[f.key]; if (v === "" || v == null || (Array.isArray(v) && !v.length)) return ""; if (f.type === "table" && Array.isArray(v)) return "<span>" + esc(f.label) + '</span><div><table class="mtb"><tr>' + (f.columns || []).map(function (c) { return "<th>" + esc(c.label) + "</th>"; }).join("") + "</tr>" + v.map(function (row) { return "<tr>" + (f.columns || []).map(function (c) { return "<td>" + esc(row[c.key] == null ? "" : row[c.key]) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>";
+          return "<span>" + esc(f.label) + "</span><div>" + (f.type === "photo" ? '<a href="javascript:void 0" data-f="' + esc(v) + '" data-s="' + s.id + '">📷 view</a>' : f.type === "location" ? '<a target="_blank" rel="noopener" href="https://maps.google.com/?q=' + esc(v) + '">📍 ' + esc(v) + "</a>" : esc(valTxt(f, v))) + "</div>"; }).join("") + "</div>" +
+          (st.length && hist.length ? '<div class="tl">' + hist.map(function (h) { return "<div><b>" + esc({ submitted: "Submitted", resubmitted: "Resubmitted", approved: "Approved", rejected: "Rejected", returned: "Sent back", skipped: "Skipped", "auto-approved": "Auto-approved", escalated: "⏰ Escalated", routed: "Routed" }[h.action] || h.action) + "</b>" + (h.stepName ? " · " + esc(h.stepName) : "") + " <i>by " + esc(h.by.fullName) + " · " + dt(h.at) + "</i>" + (h.comment ? "<span class=\"cm\">“" + esc(h.comment) + "”</span>" : "") + "</div>"; }).join("") + (s.status === "pending" ? '<div style="opacity:.6"><b>Waiting</b> · ' + esc((st[s.step] || {}).name || "") + "</div>" : "") + "</div>" : "") +
+          (TL.pro && s.status === "pending" && s.cur && s.cur.approvers ? '<div class="muted" style="font-size:11.5px;margin-top:4px">With: ' + s.cur.approvers.map(function (a) { return esc(a.charAt(0) === "@" ? { "@admin": "HO admins", "@master": "Master admins", "@state": "State users" }[a] || a : a); }).join(", ") + (s.cur.done && s.cur.done.length ? " · approved by " + s.cur.done.length : "") + "</div>" : "") +
           (s.canAct ? '<div class="acts4"><button class="btn ok" data-d="approve">✅ Approve</button><button class="btn sec" data-d="back">↩️ Send back</button><button class="btn danger" data-d="reject">❌ Reject</button></div>' : "") +
           (s.mine && s.status === "returned" ? '<div class="acts4"><button class="btn tc" data-ed="1">✏️ Edit & resubmit</button></div>' : "") + "</div>";
       }).join("") : '<div class="card empty"><div class="big">' + (mode === "approve" ? "✅" : "🗂️") + "</div>" + (mode === "approve" ? "Nothing waiting for your approval." : "No responses yet.") + "</div>");
