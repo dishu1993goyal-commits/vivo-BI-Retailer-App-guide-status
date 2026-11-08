@@ -10938,6 +10938,9 @@ window.BITHEME = (function () {
   addNav(); regroup(); addSearchBtn(); TABS.forEach(function (x) { ensurePane(x.t); });
   [0, 600, 1800, 4000].forEach(function (ms) { setTimeout(refresh, ms); });
   window.BIPRO = {insights: insights, open: openPro, addTask: addTask, model: function () { return M || build(); }};
+  // Tools hub tile (app: n:dash:monthly-one-pager · web: same) opens the Monthly one-pager by its address
+  var opHash = function () { if (/^#(monthly-one-pager|pro_op)$/.test(location.hash)) [80, 700].forEach(function (ms) { setTimeout(function () { if (active !== 'pro_op') try { openPro('pro_op'); } catch (e) {} }, ms); }); };
+  window.addEventListener('hashchange', opHash); setTimeout(opHash, 300);
 })();
 
 /* ===== v10 navigation: categories, collapsible sidebar groups (web) and 5-item bottom bar with sheet (app) ===== */
