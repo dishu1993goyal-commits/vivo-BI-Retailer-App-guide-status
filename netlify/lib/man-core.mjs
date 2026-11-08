@@ -13,6 +13,12 @@ export async function manAction(b, ctx) {
   if (b.action === "man-get") { const x = await store.get(key); return json(200, { ok: true, item: x || null }); }
   if (b.action === "man-list") { const L = await store.list("man:"); return json(200, { ok: true, keys: L.slice(0, 500) }); }
   if (b.action === "man-tts") return manTts(b, ctx, lang);
+  if (b.action === "man-voice") {   // which voice engines are connected; HO can save a Sarvam AI key (write-only, like the other AI keys)
+    const c = (await store.get("config:aikeys")) || {};
+    if (b.sarvam) { const k = str(b.sarvam, 200).replace(/\s+/g, ""); if (k.length < 16) return json(400, { ok: false, error: "That doesn't look like a Sarvam API subscription key." }); c.sarvam = k; c.by = by; c.at = t; await store.set("config:aikeys", c); }
+    if (b.clear === "sarvam") { delete c.sarvam; await store.set("config:aikeys", c); }
+    return json(200, { ok: true, sarvam: !!(env.SARVAM_API_KEY || c.sarvam), gemini: !!env.GEMINI_API_KEY, groq: !!(env.GROQ_API_KEY || c.groq) });
+  }
   if (b.action === "man-gen") {
     if (!id) return json(400, { ok: false, error: "Pick a tool." });
     const old = await store.get(key), onlyC = !!(old && old.v === 2 && !b.fresh);
@@ -126,18 +132,37 @@ async function ttsGroq(key, text, voice, f) {
   }
   return { ok: false, error: "Groq voice " + last };
 }
+const SARVAM_LANG = { en: "en-IN", hi: "hi-IN", ta: "ta-IN", te: "te-IN", bn: "bn-IN", mr: "mr-IN", gu: "gu-IN", kn: "kn-IN", ml: "ml-IN", pa: "pa-IN", or: "od-IN" };
+async function ttsSarvam(key, text, lang, voice, f) {   // Sarvam AI Bulbul: Indian English + 10 Indian languages, fast, ≤ 2500 chars
+  let last = "";
+  for (const [model, spk] of [["bulbul:v3", voice === "m" ? "shubh" : "priya"], ["bulbul:v2", voice === "m" ? "abhilash" : "anushka"]]) {
+    try {
+      const r = await f("https://api.sarvam.ai/text-to-speech", { method: "POST", headers: { "content-type": "application/json", "api-subscription-key": key }, body: JSON.stringify({ text, language_code: SARVAM_LANG[lang], model, speaker: spk, speech_sample_rate: 24000, pace: 1.05 }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.audios && j.audios[0]) { const w = wavPcm(Buffer.from(j.audios.join ? j.audios[0] : j.audios, "base64")); if (w) return { ok: true, buf: wav(w.pcm, w.rate), src: "sarvam" }; last = "unreadable audio"; continue; }
+      if (r.status === 429) return { ok: false, retry: 8, error: "voice quota busy" };
+      last = r.status + ": " + String((j.error && (j.error.message || j.error)) || j.message || "").slice(0, 140);
+      if (r.status === 401 || r.status === 403) break;
+    } catch (e) { last = "network " + e.message; }
+  }
+  return { ok: false, error: "Sarvam voice " + last };
+}
 async function manTts(b, ctx, lang) {
-  const { store, env } = ctx, f = ctx.aiFetch || fetch;
+  const { store } = ctx, f = ctx.aiFetch || fetch, kc = (await store.get("config:aikeys")) || {}, env = Object.assign({}, ctx.env || {}, { SARVAM_API_KEY: (ctx.env && ctx.env.SARVAM_API_KEY) || kc.sarvam || "", GROQ_API_KEY: (ctx.env && ctx.env.GROQ_API_KEY) || kc.groq || "" });
   const text = String(b.text || "").replace(/[\u{1F000}-\u{1FAFF}\u2600-\u27BF]/gu, "").replace(/\s+/g, " ").trim().slice(0, 700), voice = b.voice === "m" ? "m" : "f";
   if (!text) return json(400, { ok: false, error: "Nothing to read." });
-  if (!env || (!env.GEMINI_API_KEY && !env.GROQ_API_KEY)) return json(200, { ok: false, notConfigured: true, error: "AI voice needs the Gemini or Groq AI key (the same one the AI features use)." });
+  if (!env.SARVAM_API_KEY && !env.GEMINI_API_KEY && !env.GROQ_API_KEY) return json(200, { ok: false, notConfigured: true, error: "No AI voice is connected — add a Sarvam AI key in 🎙️ Voice settings." });
   let h = 0; for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
   const ck = `mantts:${lang}:${voice}:${h.toString(36)}:${text.length}`, hit = await store.get(ck);
   if (hit && hit.b64) return json(200, { ok: true, b64: hit.b64, src: hit.src, cached: true });
-  const errs = []; let r = null;
-  if (env.GEMINI_API_KEY) { r = await ttsGemini(env, text, lang, voice, f); if (!r.ok) errs.push(r.error); }
-  if ((!r || !r.ok) && env.GROQ_API_KEY && lang === "en") { const g = await ttsGroq(env.GROQ_API_KEY, text, voice, f); if (g.ok || !r) r = g; if (!g.ok) errs.push(g.error); }
-  if (!r || !r.ok) return json(200, { ok: false, retry: r && r.retry, error: r && r.retry ? "The AI voice is busy — waiting a moment." : (errs.filter(Boolean).join(" · ") || "No AI voice for this language yet") + (lang !== "en" && !env.GEMINI_API_KEY ? " (non-English voices need the Gemini key)" : "") });
+  // fastest first; a busy engine never blocks — the next one is tried straight away, "retry" only if all of them are busy
+  const errs = [], plan = []; let r = null, busy = 0;
+  if (env.SARVAM_API_KEY && SARVAM_LANG[lang]) plan.push(() => ttsSarvam(env.SARVAM_API_KEY, text, lang, voice, f));
+  if (env.GROQ_API_KEY && lang === "en") plan.push(() => ttsGroq(env.GROQ_API_KEY, text, voice, f));
+  if (env.GEMINI_API_KEY) plan.push(() => ttsGemini(env, text, lang, voice, f));
+  for (const go of plan) { const x = await go(); if (x.ok) { r = x; break; } if (x.retry) busy = Math.max(busy, x.retry); else errs.push(x.error); }
+  if (!r && busy && !errs.length) r = { ok: false, retry: Math.min(busy, 20) };
+  if (!r || !r.ok) return json(200, { ok: false, retry: r && r.retry, error: r && r.retry ? "The AI voice is busy — waiting a moment." : (errs.filter(Boolean).join(" · ") || "No AI voice for this language yet") + (lang === "zh" && !env.GEMINI_API_KEY ? " (Chinese voice needs the Gemini key)" : !env.SARVAM_API_KEY ? " — add a Sarvam AI key in 🎙️ Voice settings for fast Indian voices" : "") });
   const b64 = r.buf.toString("base64");
   if (b64.length < 4500000) await store.set(ck, { b64, src: r.src, at: ctx.t });
   return json(200, { ok: true, b64, src: r.src });
