@@ -6189,6 +6189,22 @@ window.HOX = (function () {
     s5.appendChild(nav); body.appendChild(s5);
   }
 
+  const APP_BEN = [['Know every scheme on day one', 'Scheme announcements and notices reach the retailer the moment they start, so offers are never missed.'],
+     ['See earnings clearly', 'Scheme payout and incentive income show what has been earned and paid, which keeps the retailer motivated.'],
+     ['Order and stock in one place', 'New orders, product retail price and store details are a tap away, so selling and restocking stay simple.'],
+     ['Get help quickly', 'The Retailer Support Desk, IMEI query and NDC files keep queries and paperwork from slowing a sale.']];
+  const APP_FEATS = [['imei', 'IMEI query India', 'Look up a device by scanning or typing its IMEI.'], ['payout', 'Scheme payout', 'See what you earn, scheme by scheme.'], ['scheme', 'Scheme announcement', 'Read new schemes as they start.'], ['store360', 'Store 360', 'A full view of the store.'], ['ndc', 'NDC files', 'Access no-debt certificate files.'], ['afford', 'Affordability management', 'Manage affordability offers for customers.'], ['support', 'Retailer Support Desk', 'Raise and follow up queries.'], ['price', 'Product retail price', 'Check the current retail price of products.'], ['order', 'New order', 'Place orders for stock.'], ['reports', 'Reports', 'Purchases, sales and stock details in real time.'], ['ann', 'Announcements and notices', 'Company news and notices in one feed.']];
+  // read-only view of the Retailer App page (banner → "Explore the app") for the Monthly one-pager
+  window.BIAPPINFO = function () { try {
+    const KS = dsets('kpi_state'), pan = KS.find(r => r.state === 'PAN India') || {}, st = KS.filter(r => !BIAGG(r.state)), best = st.slice().sort((a, b) => b.app - a.app)[0] || {};
+    return {title: 'vivo Retailer Workplace app', hero: MEDIA.hero || '', usage: pan.app, best: best.state ? {state: best.state, v: best.app} : null, weight: KEY.app.w, total: CAT.overall.w, period: LB.title,
+      benefits: APP_BEN.map(x => ({t: x[0], d: x[1]})), features: APP_FEATS.map(x => ({k: x[0], name: x[1], d: x[2], ic: MEDIA[icid(x[0])] || '', detail: !!AFK[x[0]]})),
+      usageBy: FEAT.map(f => ({k: f.k, name: f.name, v: pan[f.k], col: f.col})),
+      details: AFEATS.map(f => ({k: f.k, name: f.name, tag: f.tag || '', ic: MEDIA[icid(f.k)] || '', nav: f.nav || [], shots: (f.shots || []).map(x => ({src: MEDIA[x[0]] || '', cap: x[1]})), items: (f.items || []).map(x => ({t: x[0], d: x[1]})), ben: (f.ben || []).map(x => ({t: x[0], d: x[1]}))}))};
+  } catch (e) { console.error(e); return null; } };
+  window.BIRMMOUNT = function (t, host) { try { rmMount(t, host); return true; } catch (e) { return false; } };
+  window.BIRMCAP = function (t) { return rmCap(t); };   // roadmap as flows + rendered pictures (for the one-pager)
+  window.BIRMSUB = () => RMSUB;
   function renderApp() {
     const KS = dsets('kpi_state'), pan = KS.find(r => r.state === 'PAN India'), body = document.getElementById('d-body'); body.replaceChildren();
     const st = KS.filter(r => !BIAGG(r.state)), best = st.slice().sort((a, b) => b.app - a.app)[0];
@@ -6198,15 +6214,12 @@ window.HOX = (function () {
 
     const s1 = sec('Benefits', 'Why retailers use the app', 'One place for everything a retailer needs to sell vivo with confidence.');
     const g1 = el('div', 'g4');
-    [['Know every scheme on day one', 'Scheme announcements and notices reach the retailer the moment they start, so offers are never missed.'],
-     ['See earnings clearly', 'Scheme payout and incentive income show what has been earned and paid, which keeps the retailer motivated.'],
-     ['Order and stock in one place', 'New orders, product retail price and store details are a tap away, so selling and restocking stay simple.'],
-     ['Get help quickly', 'The Retailer Support Desk, IMEI query and NDC files keep queries and paperwork from slowing a sale.']].forEach((x, i) => { const c = el('div', 'card bn'); c.appendChild(el('div', 'bnum', String(i + 1))); c.appendChild(el('b', null, x[0])); c.appendChild(el('p', 'note', x[1])); g1.appendChild(c); });
+    APP_BEN.forEach((x, i) => { const c = el('div', 'card bn'); c.appendChild(el('div', 'bnum', String(i + 1))); c.appendChild(el('b', null, x[0])); c.appendChild(el('p', 'note', x[1])); g1.appendChild(c); });
     s1.appendChild(g1); body.appendChild(s1);
 
     const s2 = sec('Key features', 'What is inside the app', 'The services on the Retailer Workplace home screen. Open the highlighted ones for screens and steps.');
     const g2 = el('div', 'g3');
-    [['imei', 'IMEI query India', 'Look up a device by scanning or typing its IMEI.'], ['payout', 'Scheme payout', 'See what you earn, scheme by scheme.'], ['scheme', 'Scheme announcement', 'Read new schemes as they start.'], ['store360', 'Store 360', 'A full view of the store.'], ['ndc', 'NDC files', 'Access no-debt certificate files.'], ['afford', 'Affordability management', 'Manage affordability offers for customers.'], ['support', 'Retailer Support Desk', 'Raise and follow up queries.'], ['price', 'Product retail price', 'Check the current retail price of products.'], ['order', 'New order', 'Place orders for stock.'], ['reports', 'Reports', 'Purchases, sales and stock details in real time.'], ['ann', 'Announcements and notices', 'Company news and notices in one feed.']].forEach(x => { const lk = !!AFK[x[0]]; const c = el(lk ? 'a' : 'div', 'sdc ft' + (lk ? ' fl' : '')); c.appendChild(mimg(icid(x[0]), 'tic', x[1] + ' icon')); const t = el('div', 'tx'); t.appendChild(el('b', null, x[1])); t.firstChild.style.fontSize = '1.05rem'; t.appendChild(el('span', null, x[2])); if (lk) { c.href = lnk('appf', x[0]); t.appendChild(el('em', 'go', 'View screens and steps →')); c.addEventListener('click', ev => { ev.preventDefault(); go('appf', x[0]); }); } c.appendChild(t); g2.appendChild(c); });
+    APP_FEATS.forEach(x => { const lk = !!AFK[x[0]]; const c = el(lk ? 'a' : 'div', 'sdc ft' + (lk ? ' fl' : '')); c.appendChild(mimg(icid(x[0]), 'tic', x[1] + ' icon')); const t = el('div', 'tx'); t.appendChild(el('b', null, x[1])); t.firstChild.style.fontSize = '1.05rem'; t.appendChild(el('span', null, x[2])); if (lk) { c.href = lnk('appf', x[0]); t.appendChild(el('em', 'go', 'View screens and steps →')); c.addEventListener('click', ev => { ev.preventDefault(); go('appf', x[0]); }); } c.appendChild(t); g2.appendChild(c); });
     s2.appendChild(g2);
     const uc = card(note('The four app features in the KPI, PAN India share of eligible retailers, ' + LB.title + '. Click one for its analysis.'));
     uc.style.marginTop = '14px'; uc.appendChild(hbars(FEAT.map(x => ({v: pan[x.k], link: mkLink('lk', x.name, 'feat', x.k), col: x.col})), {mx: 1}));
@@ -9379,7 +9392,7 @@ window.BITHEME = (function () {
     {t: 'pro_alr', l: 'Alerts & Rules', ic: 'bell', sub: 'Automatic warnings with your own thresholds', r: rAlr},
     {t: 'pro_dq', l: 'Data Health', ic: 'shield', sub: 'Checks that the numbers can be trusted', r: rDq},
     {t: 'pro_studio', l: 'One-Page Studio', ic: 'img', sub: 'Design an editable one-page PPT summary', r: rStudio},
-    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=2'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
+    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=7'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
     {t: 'pro_rep', l: 'Report Builder', ic: 'file', sub: 'Copy, print or download a ready summary', r: rRep}
   ];
   var TT = {}; TABS.forEach(function (x) { TT[x.t] = x; });
