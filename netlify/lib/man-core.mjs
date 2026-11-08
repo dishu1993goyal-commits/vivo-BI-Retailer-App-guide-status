@@ -8,9 +8,40 @@ export const LANGS = { en: "English", hi: "Hindi (हिन्दी)", ta: "Tam
 
 export async function manAction(b, ctx) {
   const { store, t, app, rec, env } = ctx, by = rec.fullName || rec.username || "";
-  if (app !== "admin") return json(403, { ok: false, error: "Tool manuals are for HO admins." });
   const id = str(b.tool, 60).replace(/[^a-z0-9:_-]/gi, ""), lang = LANGS[b.lang] ? b.lang : "en", aud = ["both", "admin", "user"].includes(b.aud) ? b.aud : "both", key = `man:${id}:${lang}:${aud}`;
-  if (b.action === "man-get") { const x = await store.get(key); return json(200, { ok: true, item: x || null }); }
+  // read-only for everyone (the Monthly one-pager shows tool details); writing manuals is for HO admins
+  if (b.action === "man-get") { let x = await store.get(key); if (!x && b.any) { const L = (await store.list(`man:${id}:`)).sort((a, c) => (a.indexOf(":en:") >= 0 ? -1 : 1) - (c.indexOf(":en:") >= 0 ? -1 : 1)); if (L[0]) x = await store.get(L[0]); } return json(200, { ok: true, item: x || null }); }
+  if (b.action === "man-shots-get") { const x = await store.get(`manshot:${id}`); return json(200, { ok: true, shots: (x && x.shots) || [], at: x ? x.at : 0 }); }
+  if (b.action === "man-have") { const L = await store.list("manshot:"), M = await store.list("man:"); return json(200, { ok: true, shots: L.map((k) => k.slice(8)), manuals: [...new Set(M.map((k) => k.split(":").slice(1, -2).join(":")))] }); }
+  if (app !== "admin") return json(403, { ok: false, error: "Tool manuals are for HO admins." });
+  if (b.action === "man-shots-save") {   // the captured app screens (compressed), so other tools can show the real screens
+    const shots = (Array.isArray(b.shots) ? b.shots : []).slice(0, 10).map((x) => ({ label: str(x.label, 60), src: /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(String(x.src || "")) ? String(x.src) : "", w: Number(x.w) || 390, h: Number(x.h) || 844, marks: (x.marks || []).slice(0, 24).map((m) => ({ t: str(m.t, 60), x: +m.x || 0, y: +m.y || 0, w: +m.w || 0, h: +m.h || 0, inp: m.inp ? 1 : 0, ex: str(m.ex, 60) })), click: x.click ? { t: str(x.click.t, 60), x: +x.click.x || 0, y: +x.click.y || 0, w: +x.click.w || 0, h: +x.click.h || 0 } : null })).filter((x) => x.src);
+    if (!shots.length) return json(400, { ok: false, error: "No screens to save." });
+    if (JSON.stringify(shots).length > 3800000) return json(413, { ok: false, error: "Screens are too large." });
+    await store.set(`manshot:${id}`, { shots, at: t, by }); return json(200, { ok: true, n: shots.length });
+  }
+  if (b.action === "man-script-save") {   // the narration the video speaks (edited by HO)
+    const x = await store.get(key); if (!x) return json(400, { ok: false, error: "Write the manual first." });
+    const lines = {}; Object.keys(b.lines || {}).slice(0, 200).forEach((k) => { const v = String(b.lines[k] || "").replace(/\s+/g, " ").trim().slice(0, 700); if (v) lines[str(k, 40)] = v; });
+    x.script = { lines, at: t, by, ai: !!(x.script && x.script.ai) && !b.edited, tone: (x.script && x.script.tone) || "" }; await store.set(key, x); return json(200, { ok: true, script: x.script });
+  }
+  if (b.action === "man-script") {   // ✨ AI writes a spoken script per scene — explains why and how, not a reading of the slide
+    const x = await store.get(key); if (!x) return json(400, { ok: false, error: "Write the manual first." });
+    const sc = (Array.isArray(b.scenes) ? b.scenes : []).slice(0, 160).map((q) => ({ id: str(q.id, 40), kind: str(q.kind, 10), title: str(q.title, 120), context: str(q.ctx, 500) })).filter((q) => q.id);
+    if (!sc.length) return json(400, { ok: false, error: "No scenes." });
+    const L = LANGS[lang], tone = str(b.tone, 40) || "friendly trainer", info = x.data || {};
+    const sys = `You write the spoken voice-over for a walkthrough video of an internal vivo India BI tool (web portal + Admin and State Android apps, one shared server). A presenter character speaks it while pointing at the part of the screen in each scene.
+Write in ${L}${lang !== "en" ? " (keep on-screen button names in English inside quotes)" : ""}, as a ${tone}, to ${aud === "admin" ? "admins" : aud === "user" ? "end users" : "both admins and end users"}. Natural spoken sentences, second person ("you"), no emojis, no markdown, no reading of lists or labels word for word.
+Explain WHY each thing matters and WHEN to use it, give a quick practical tip or example where useful, and link scenes so it flows like a guided tour ("Now tap…", "Once that's done…").
+Length: title/closing 1-2 sentences; slide scenes 2-3 sentences; a screen intro 1-2 sentences; each numbered step 1-2 short sentences (it plays while the presenter points at that element).
+Reply with ONE JSON object: {"lines":{"<scene id>":"spoken text", ...}} with an entry for EVERY scene id given.`;
+    const ctxt = "TOOL: " + JSON.stringify({ name: str(info.title, 120), tagline: str(info.tagline, 200), overview: str(info.overview, 800) }) + "\nSCENES (in order): " + JSON.stringify(sc);
+    const r = await ctx.askAI(env, "Write the voice-over script.", ctxt, [], ctx.aiFetch, { system: sys, label: "MANUAL", maxTokens: 7000, json: true, raw: true });
+    const d = r.ok ? parseLoose(r.text) : null, got = d && (d.lines || d);
+    if (!got || typeof got !== "object") return json(200, { ok: false, error: (r.error || "The AI reply couldn't be read") + " — try again." });
+    const lines = {}; sc.forEach((q) => { const v = got[q.id]; if (v) lines[q.id] = String(v).replace(/\s+/g, " ").trim().slice(0, 700); });
+    x.script = { lines, at: t, by, ai: true, tone }; await store.set(key, x); return json(200, { ok: true, script: x.script, missing: sc.length - Object.keys(lines).length });
+  }
   if (b.action === "man-list") { const L = await store.list("man:"); return json(200, { ok: true, keys: L.slice(0, 500) }); }
   if (b.action === "man-tts") return manTts(b, ctx, lang);
   if (b.action === "man-voice") {   // which voice engines are connected; HO can save a Sarvam AI key (write-only, like the other AI keys)
@@ -66,7 +97,7 @@ RESULT SCREENS: ${JSON.stringify(results)}`;
     const steps = (info.steps || []).map((x) => ({ step: str(x, 120), detail: "" }));
     const d = Object.assign({ title: str(info.name, 120), tagline: str(info.who, 160), overview: str(info.what, 1200), roles: [], prerequisites: [], navigation: [], adminFlow: steps, userFlow: [], settings: [], dataFlow: [], rules: [], onePager: { headline: str(info.name, 80), benefits: [], steps: (info.steps || []).slice(0, 5).map((x) => str(x, 80)), cta: "" }, glossary: [] }, da || {},
       { screens: (db && Array.isArray(db.screens) && db.screens.length ? db.screens : screens.map((x) => ({ name: x.name, purpose: "", elements: x.labels.slice(0, 6).map((l) => ({ label: l, what: "", click: false })), tips: [] }))), faqs: (db && db.faqs) || [], troubleshooting: (db && db.troubleshooting) || [], videoScript: (db && db.videoScript) || [] }, C);
-    const item = { tool: id, lang, aud, data: d, at: t, by, v: 2, c: !!dc, partial: !da || !db };
+    const item = { tool: id, lang, aud, data: d, at: t, by, v: 2, c: !!dc, partial: !da || !db, script: old && old.script ? old.script : undefined };   // a rewrite keeps the edited video script
     if (JSON.stringify(item).length < 900000) await store.set(key, item);
     return json(200, { ok: true, item });
   }
