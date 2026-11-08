@@ -16,6 +16,7 @@ export async function manAction(b, ctx) {
   if (app !== "admin") return json(403, { ok: false, error: "Tool manuals are for HO admins." });
   if (b.action === "man-shots-save") {   // the captured app screens (compressed), so other tools can show the real screens
     const shots = (Array.isArray(b.shots) ? b.shots : []).slice(0, 10).map((x) => ({ label: str(x.label, 60), src: /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(String(x.src || "")) ? String(x.src) : "", w: Number(x.w) || 390, h: Number(x.h) || 844, marks: (x.marks || []).slice(0, 24).map((m) => ({ t: str(m.t, 60), x: +m.x || 0, y: +m.y || 0, w: +m.w || 0, h: +m.h || 0, inp: m.inp ? 1 : 0, ex: str(m.ex, 60) })), click: x.click ? { t: str(x.click.t, 60), x: +x.click.x || 0, y: +x.click.y || 0, w: +x.click.w || 0, h: +x.click.h || 0 } : null })).filter((x) => x.src);
+    if (b.clear === true && !shots.length) { await store.delete(`manshot:${id}`).catch(() => store.set(`manshot:${id}`, { shots: [], at: t, by })); return json(200, { ok: true, n: 0 }); }
     if (!shots.length) return json(400, { ok: false, error: "No screens to save." });
     if (JSON.stringify(shots).length > 3800000) return json(413, { ok: false, error: "Screens are too large." });
     await store.set(`manshot:${id}`, { shots, at: t, by }); return json(200, { ok: true, n: shots.length });

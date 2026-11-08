@@ -4136,7 +4136,8 @@ window.HOX = (function () {
     const go1 = btn('⬇ Download creative', 'big', () => exportCreative([COPT.mode]));
     const go2 = btn('⬇ Download desktop + mobile', '', () => exportCreative(['d', 'm']));
     acts.appendChild(go1); acts.appendChild(go2);
-    acts.appendChild(btn('📄 Download PDF', '', () => exportDoc('pdf'))); acts.appendChild(btn('📽 Download PPT', '', () => exportDoc('ppt')));
+    const creX = k => bxOpen({title: 'Export the creative', sub: 'Everything on the creative goes into the file — every heading, number, table and card. In PowerPoint and Word all text stays editable; the PDF is split only between items, never through a line of text.', name: 'BI_OnePager_' + String((snapData().LB || {}).title || 'period').replace(/[^A-Za-z0-9]+/g, '_') + '_' + (COPT.mode === 'm' ? 'Mobile' : 'Desktop'), kinds: ['ppt', 'word', 'pdf'], kind: k, shape: COPT.mode === 'm' ? 'portrait' : 'wide', getRoot: creRoot});
+    acts.appendChild(btn('📄 Download PDF', '', () => creX('pdf'))); acts.appendChild(btn('📽 Download PPT (editable)', '', () => creX('ppt'))); acts.appendChild(btn('📝 Download Word', '', () => creX('word')));
     if (navigator.canShare) acts.appendChild(btn('📤 Share (WhatsApp, mail…)', '', () => exportCreative([COPT.mode], true)));
     if (A.isAdmin()) acts.appendChild(btn('💾 Keep these texts in the file', 'ghost', () => { Object.assign(ST.creative, {ord: (COPT.ord || []).slice(), sec: Object.assign({}, COPT.sec), headline: COPT.headline, tagline: COPT.tagline, tagline2: COPT.tagline2, action: COPT.actionTxt, future: COPT.futureTxt, hl: JSON.parse(JSON.stringify(COPT.hl)), trTitle: COPT.trTitle, trFit: COPT.trFit}); changed(); A.say('Creative texts kept. Use Save updated file to store them in the html.', 4500); }));
     ctl.appendChild(acts);
@@ -4172,6 +4173,14 @@ window.HOX = (function () {
     const opt = {pixelRatio: pr, backgroundColor: '#f8f4e8', width: w, height: h, cacheBust: false};
     if (!previewW) { try { await htmlToImage.toCanvas(node, Object.assign({}, opt, {pixelRatio: 0.2})); } catch (e) {} }
     try { const cvs = await htmlToImage.toCanvas(node, opt); cvs._b = Array.from(node.children).map(c => c.offsetTop * pr); return cvs; } finally { slot.remove(); }
+  }
+  // editable PPT / Word and a cleanly paged PDF of whatever is on screen (biexport.js — shared with the one-pager and the newsletter)
+  function bxOpen(o) { const go = () => window.BIEXPORT.open(Object.assign({say: m => A.say(m, 5000)}, o)); if (window.BIEXPORT) return go(); const s = document.createElement('script'); s.src = '/biexport.js?v=1'; s.onload = go; s.onerror = () => A.say('Could not load the export module — check the connection.', 5000); document.head.appendChild(s); }
+  async function creRoot() {
+    let host = document.getElementById('hx-host'); if (!host) { host = E('div'); host.id = 'hx-host'; document.body.appendChild(host); }
+    await hdPrepBg(); const node = buildCreative(COPT.mode === 'm', creativeOpts()); if (!node) throw new Error('No data for this period'); const slot = E('div'); slot.appendChild(node); host.appendChild(slot);
+    await Promise.all(Array.from(node.querySelectorAll('img')).map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 80))); return {root: node, done: () => slot.remove()};
   }
   async function exportCreative(modes, share) {
     if (!window.htmlToImage) { A.say('The image library did not load.', 4000); return; }
@@ -4956,6 +4965,8 @@ window.HOX = (function () {
     mk('HTML', 'Preparing...', async () => { dlBlob(new Blob([nlDoc(getCur())], {type: 'text/html'}), nm + '.html'); A.say('Saved ' + nm + '.html', 4000); });
     mk('PDF', 'Preparing PDF...', async () => { dlBlob(await nlRender('pdf', getCur()), nm + '.pdf'); A.say('Saved ' + nm + '.pdf', 4000); });
     mk('Image', 'Preparing image...', async () => { dlBlob(await nlRender('png', getCur()), nm + '.png'); A.say('Saved ' + nm + '.png', 4000); });
+    const nlX = k => bxOpen({title: 'Export the newsletter', sub: 'Every page of the newsletter goes into the file. In PowerPoint each text box, tile and table is editable; in Word you get headings, paragraphs, tables and pictures.', name: nm, kinds: ['ppt', 'word'], kind: k, shape: 'portrait', getRoot: () => { const host = E('div'); host.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px'; host.innerHTML = '<style>' + NLC + '</style>' + getCur(); document.body.appendChild(host); return new Promise(r => setTimeout(r, 200)).then(() => ({root: host.querySelector('.nl'), done: () => host.remove()})); }});
+    { const b1 = btn('PPT (editable)', 'big', () => nlX('ppt')), b2 = btn('Word', 'big', () => nlX('word')); bar.appendChild(b1); bar.appendChild(b2); }
     mk('Share', 'Preparing...', async () => { const b = await nlRender('png', getCur()), f = new File([b], nm + '.png', {type: 'image/png'}); if (navigator.canShare && navigator.canShare({files: [f]})) await navigator.share({files: [f], title: 'vivo BI Newsletter'}); else { dlBlob(b, nm + '.png'); A.say('Sharing is not available here, so the image was downloaded. Share that file.', 5000); } });
     const x = btn('Close', '', () => ov.remove()); x.style.marginLeft = 'auto'; bar.appendChild(x);
     // ----- customise panel
@@ -9392,7 +9403,7 @@ window.BITHEME = (function () {
     {t: 'pro_alr', l: 'Alerts & Rules', ic: 'bell', sub: 'Automatic warnings with your own thresholds', r: rAlr},
     {t: 'pro_dq', l: 'Data Health', ic: 'shield', sub: 'Checks that the numbers can be trusted', r: rDq},
     {t: 'pro_studio', l: 'One-Page Studio', ic: 'img', sub: 'Design an editable one-page PPT summary', r: rStudio},
-    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=8'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
+    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=9'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
     {t: 'pro_rep', l: 'Report Builder', ic: 'file', sub: 'Copy, print or download a ready summary', r: rRep}
   ];
   var TT = {}; TABS.forEach(function (x) { TT[x.t] = x; });
