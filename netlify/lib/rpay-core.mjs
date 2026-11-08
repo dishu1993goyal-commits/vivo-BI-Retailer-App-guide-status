@@ -41,6 +41,8 @@ function cleanRow(x, defState) {
   return { rid: RID(x.rid), name: str(x.name, 80), mobile: str(x.mobile, 20), state: str(x.state, 40) || defState || "", city: str(x.city, 60), scheme: str(x.scheme, 100) || "Scheme", skey: str(x.skey, 40), parts, gross: Math.round(gross * 100) / 100, ded, tds, net: Math.round(net * 100) / 100, info, next, input, items: items.length ? items : undefined, remarks: str(x.remarks, 300), query: x.query ? { by: str(x.query.by, 60), at: Number(x.query.at) || 0, note: str(x.query.note, 300) } : null };
 }
 
+const PK_TEXT = "Hi {name}, this is the vivo BI team. Your retailer payout for {month} is ready: ₹{amount}. See the scheme-wise details and your IMEI / model report here: {link}\nIf you'd rather not get these messages, just reply STOP.";
+const pkDay = (t) => new Date(t + 5.5 * 36e5).toISOString().slice(0, 10);
 export async function rpayAction(b, ctx) {
   const { store, t, app, rec, pool } = ctx, isAdmin = app === "admin";
   const by = rec.fullName || rec.username || "";
@@ -167,14 +169,22 @@ export async function rpayAction(b, ctx) {
   // ---------- WhatsApp Business (Cloud API): send every retailer their payout link in one click ----------
   if (b.action === "rp-wa-get") {
     if (!isAdmin) return json(403, { ok: false, error: "HO only." });
-    const c = (await store.get("config:wa")) || {};
-    return json(200, { ok: true, configured: !!(c.token && c.phoneId && c.template), phoneId: c.phoneId || "", template: c.template || "", lang: c.lang || "en", vars: c.vars || "name,amount,month,link", hasToken: !!c.token, updatedBy: c.by || "", updatedAt: c.at || 0 });
+    const c = (await store.get("config:wa")) || {}, pk = c.provider === "periskope", day = pkDay(t), used = pk ? (((await store.get(`wapk:day:${day}`)) || {}).n || 0) : 0;
+    return json(200, { ok: true, provider: pk ? "periskope" : "meta", configured: pk ? !!(c.pkKey && c.pkPhone) : !!(c.token && c.phoneId && c.template), pkPhone: c.pkPhone || "", pkText: c.pkText || PK_TEXT, pkDaily: c.pkDaily || 40, pkGap: c.pkGap || 30, hasPkKey: !!c.pkKey, sentToday: used, phoneId: c.phoneId || "", template: c.template || "", lang: c.lang || "en", vars: c.vars || "name,amount,month,link", hasToken: !!c.token, updatedBy: c.by || "", updatedAt: c.at || 0 });
   }
   if (b.action === "rp-wa-save") {
     if (!isAdmin) return json(403, { ok: false, error: "HO only." });
     const c = (await store.get("config:wa")) || {};
     if (b.waToken) c.token = str(b.waToken, 600).replace(/\s+/g, "");   // write-only: never sent back to the app
     if (b.clearToken) delete c.token;
+    c.provider = b.provider === "periskope" ? "periskope" : "meta";
+    if (b.pkKey) c.pkKey = str(b.pkKey, 800).replace(/\s+/g, "");   // write-only, like the Meta token
+    if (b.clearPkKey) delete c.pkKey;
+    if (b.pkPhone !== undefined) { const d = str(b.pkPhone, 20).replace(/\D/g, ""); c.pkPhone = d.length === 10 ? "91" + d : d; }
+    if (b.pkText !== undefined) c.pkText = String(b.pkText || "").slice(0, 900).trim() || PK_TEXT;
+    if (b.pkDaily !== undefined) c.pkDaily = Math.max(5, Math.min(250, Number(b.pkDaily) || 40));
+    if (b.pkGap !== undefined) c.pkGap = Math.max(8, Math.min(300, Number(b.pkGap) || 30));
+    if (c.provider === "periskope" && b.phoneId === undefined) { c.by = by; c.at = t; await store.set("config:wa", c); return json(200, { ok: true }); }
     c.phoneId = str(b.phoneId, 40).replace(/\D/g, ""); c.template = str(b.template, 80).replace(/[^a-z0-9_]/gi, "").toLowerCase(); c.lang = str(b.lang, 10) || "en";
     c.vars = (str(b.vars, 120) || "name,amount,month,link").split(",").map((v) => v.trim()).filter((v) => ["name", "amount", "month", "link", "schemes", "rid"].includes(v)).join(",") || "name,amount,month,link";
     c.by = by; c.at = t; await store.set("config:wa", c); return json(200, { ok: true });
@@ -182,7 +192,8 @@ export async function rpayAction(b, ctx) {
   if (b.action === "rp-wa-send") {   // { id: batch, only:[rid], mobiles:{rid: mobile}, days, test:"mobile" }
     if (!isAdmin) return json(403, { ok: false, error: "Only HO admins can send WhatsApp messages in bulk." });
     const c = (await store.get("config:wa")) || {};
-    if (!(c.token && c.phoneId && c.template)) return json(400, { ok: false, error: "WhatsApp Business isn't set up yet — ⚙️ WhatsApp settings." });
+    const PK = c.provider === "periskope";
+    if (PK ? !(c.pkKey && c.pkPhone) : !(c.token && c.phoneId && c.template)) return json(400, { ok: false, error: "WhatsApp sending isn't set up yet — ⚙️ WhatsApp settings." });
     const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });
     if (x.status !== "published") return json(400, { ok: false, error: "Publish the batch first." });
     const days = Math.max(7, Math.min(90, Number(b.days) || 30)), only = new Set((b.only || []).map((r) => String(r).toUpperCase())), mob = b.mobiles || {}, byR = {};
@@ -196,6 +207,15 @@ export async function rpayAction(b, ctx) {
       const ph = String(b.test || mob[o.rid] || o.mobile || "").replace(/\D/g, ""), to = ph.length === 10 ? "91" + ph : ph.length === 12 && ph.startsWith("91") ? ph : "";
       if (!to) return { rid: o.rid, name: o.name, ok: false, error: "No valid mobile number" };
       const val = { name: o.name || "Partner", amount: Math.round(o.net).toLocaleString("en-IN"), month: monthTxt, link: site + "/retailerportal.html?k=" + k, schemes: o.schemes.join(", ").slice(0, 200), rid: o.rid };
+      if (PK) {   // Periskope: a normal WhatsApp message from HO's own number (linked device)
+        const text = String(c.pkText || PK_TEXT).replace(/\{(name|amount|month|link|schemes|rid)\}/g, (m, v) => String(val[v] || ""));
+        try {
+          const r = await (ctx.waFetch || fetch)("https://api.periskope.app/v1/message/send", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + c.pkKey, "x-phone": c.pkPhone }, body: JSON.stringify({ chat_id: to + "@c.us", message: text }) });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && (j.unique_id || j.status === "queued")) return { rid: o.rid, name: o.name, ok: true, id: j.unique_id || "", to };
+          return { rid: o.rid, name: o.name, ok: false, error: (r.status === 401 ? "Periskope API key not accepted" : r.status === 400 ? "Your phone is offline in Periskope — open WhatsApp on it" : r.status === 429 ? "Periskope rate limit — try again shortly" : (j.message || j.error || "HTTP " + r.status)).toString().slice(0, 160), to };
+        } catch (e) { return { rid: o.rid, name: o.name, ok: false, error: String(e.message || e).slice(0, 120) }; }
+      }
       const params = c.vars.split(",").map((v) => ({ type: "text", text: String(val[v] || "-").slice(0, 900) }));
       try {
         const r = await (ctx.waFetch || fetch)(`https://graph.facebook.com/v21.0/${c.phoneId}/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + c.token }, body: JSON.stringify({ messaging_product: "whatsapp", to, type: "template", template: { name: c.template, language: { code: c.lang }, components: [{ type: "body", parameters: params }] } }) });
@@ -204,9 +224,17 @@ export async function rpayAction(b, ctx) {
         return { rid: o.rid, name: o.name, ok: false, error: (j.error && (j.error.error_user_msg || j.error.message) || "HTTP " + r.status).slice(0, 160), to };
       } catch (e) { return { rid: o.rid, name: o.name, ok: false, error: String(e.message || e).slice(0, 120) }; }
     };
-    const list = Object.values(byR).slice(0, b.test ? 1 : 200), res = await pool(list, 8, send);
+    let list = Object.values(byR).slice(0, b.test ? 1 : 200), dayKey = "", used = 0, capped = false;
+    if (PK) {   // safety for a personal number: daily cap (IST day) and the page sends one at a time with gaps
+      dayKey = `wapk:day:${pkDay(t)}`; used = ((await store.get(dayKey)) || {}).n || 0;
+      const left = Math.max(0, (c.pkDaily || 40) - used); if (list.length > left) { list = list.slice(0, left); capped = true; }
+      list = list.slice(0, b.test ? 1 : 5);
+      if (!list.length) return json(200, { ok: true, sent: 0, failed: 0, results: [], capped: true, left: 0, error: "Today's safe limit of " + (c.pkDaily || 40) + " messages is reached — continue tomorrow." });
+    }
+    const res = await pool(list, PK ? 1 : 8, send);
+    if (PK) { const n = res.filter((r) => r.ok).length; if (n) await store.set(dayKey, { n: used + n, at: t }); used += n; }
     if (!b.test) { x.wa = x.wa || {}; res.forEach((r) => { x.wa[r.rid] = { at: t, ok: r.ok, id: r.id || "", error: r.error || "", by }; }); await store.set(`rpb:${x.id}`, x); }
-    return json(200, { ok: true, sent: res.filter((r) => r.ok).length, failed: res.filter((r) => !r.ok).length, results: res, more: Object.keys(byR).length > list.length });
+    return json(200, { ok: true, sent: res.filter((r) => r.ok).length, failed: res.filter((r) => !r.ok).length, results: res, more: Object.keys(byR).length > list.length, capped, left: PK ? Math.max(0, (c.pkDaily || 40) - used) : null });
   }
   if (b.action === "rp-verify") {   // the exact rules + the retailer's numbers, so the page can re-run the payout engine
     const x = await store.get(`rpb:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!x) return json(404, { ok: false, error: "Not found." });
