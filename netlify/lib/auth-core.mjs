@@ -1034,7 +1034,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^cmp-/.test(b.action)) return cmpAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^man-/.test(b.action)) return manAction(b, surveyCtx());
     if (/^bm-/.test(b.action)) return bmAction(b, surveyCtx());
-    if (/^sal-/.test(b.action)) return salAction(b, surveyCtx());
+    if (/^sal-/.test(b.action)) return salAction(b, Object.assign(surveyCtx(), { mailFetch, waFetch: mailFetch }));
     if (/^rw-/.test(b.action)) return rewardsAction(b, Object.assign(surveyCtx(), { siteFetch }));
     if (/^pm-/.test(b.action)) return pmailAction(b, Object.assign(surveyCtx(), { mailFetch }));
     if (/^(ins|board|cal|fest|launch|mkt|tr|my)-/.test(b.action)) { const r = await insightsAction(b, Object.assign(surveyCtx(), { siteFetch })); if (r) return r; return json(400, { ok: false, error: "Unknown action." }); }

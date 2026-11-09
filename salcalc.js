@@ -37,6 +37,9 @@ function evalExpr(src, vars) {
   const peek = (t) => { ws(); return s.startsWith(t, i); };
   const eat = (t) => { if (peek(t)) { i += t.length; return true; } return false; };
   const FN = { min: Math.min, max: Math.max, round: (x, d) => { const p = Math.pow(10, d || 0); return Math.round(x * p) / p; }, floor: Math.floor, ceil: Math.ceil, abs: Math.abs, if: (c, a, b) => (c ? a : b), between: (x, a, b) => (x >= a && x <= b ? 1 : 0),
+    // easy words for everyday maths
+    percent: (a, b) => (b ? a / b * 100 : 0), pct: (x, p) => x * p / 100, above: (x, limit) => Math.max(0, x - limit), below: (x, limit) => Math.max(0, limit - x),
+    cap: (x, mx) => Math.min(x, mx), atleast: (x, mn) => Math.max(x, mn), per: (x, every, amt) => (every ? Math.floor(x / every) * amt : 0), avg: (...a) => (a.length ? a.reduce((p, q) => p + q, 0) / a.length : 0), sum: (...a) => a.reduce((p, q) => p + q, 0),
     slab: (x, ...a) => { for (let k = 0; k + 1 < a.length; k += 2) if (x <= a[k]) return a[k + 1]; return a.length % 2 ? a[a.length - 1] : 0; } };
   const prim = () => {
     ws();
@@ -102,7 +105,30 @@ const PLANS = [
     rules: [R({ id: "r1", type: "slab", n: "Achievement slab (₹ per unit)", on_: "ach", mode: "perUnit", slabs: [[70, 99.99, 35], [100, 1e9, 55]] }), R({ id: "r2", type: "financier", n: "EMI by financier", rates: FINR([40, 35, 35, 25, 25, 25, 20, 20, 15]) }),
       R({ id: "r3", type: "kicker", n: "Above-target units", minAch: 100, amount: 0, perUnitAbove: 25 }), R({ id: "r4", type: "vshield", n: "V-Shield", rate: 50, slabs: [[25, 1e9, 300]] })] }
 ];
-const RULE_TYPES = { slab: "Slab by achievement % / units", perUnit: "₹ per unit", model: "Model / series-wise ₹ per unit", vshield: "V-Shield per unit + attach bonus", emiAttach: "EMI attach % slab", financier: "₹ per IMEI by EMI company", valuePct: "% of sales value", kicker: "Kicker / above-target bonus", tiCurve: "Target incentive payout curve", formula: "Custom formula" };
+// fields a simple rule can use (label shown to HR)
+const EASY_FIELDS = [["units", "Units sold"], ["aboveTarget", "Units above target"], ["target", "Target (units)"], ["ach", "Achievement %"], ["value", "Sales value ₹"], ["valueTarget", "Value target ₹"], ["vshield", "V-Shield units"], ["vsAttach", "V-Shield attach %"], ["emi", "EMI units"], ["emiAttach", "EMI attach %"], ["paidDays", "Paid days"], ["presentDays", "Present days"], ["fieldDays", "Field days"], ["lopDays", "Leave without pay days"], ["ti", "Target incentive ₹"]];
+const EASY_OPS = [[">=", "is at least"], [">", "is more than"], ["<=", "is at most"], ["<", "is less than"], ["==", "is exactly"], ["!=", "is not"]];
+const fieldName = (k) => ((EASY_FIELDS.find((f) => f[0] === k) || [k, k])[1]);
+// a "simple rule": pay a fixed ₹ / ₹ per unit / % of a number / ₹ for every N — only when all its conditions are met — with an optional maximum
+function easyRule(r, V) {
+  const conds = (r.conds || []).filter((c) => c && c.f), fails = conds.filter((c) => { const x = num(V[c.f]), v = num(c.v); return !({ ">=": x >= v, ">": x > v, "<=": x <= v, "<": x < v, "==": x === v, "!=": x !== v })[c.op || ">="]; });
+  const opT = (op) => ((EASY_OPS.find((o) => o[0] === (op || ">=")) || ["", "is"])[1]), show = (c) => fieldName(c.f) + " " + opT(c.op) + " " + c.v;
+  if (fails.length) return { amt: 0, why: "Not paid: " + fails.map((c) => fieldName(c.f) + " is " + Math.round(num(V[c.f]) * 10) / 10 + " (needs " + opT(c.op).replace(/^is /, "") + " " + c.v + ")").join("; ") };
+  const q = num(V[r.of || "units"]), a = num(r.amt); let amt = 0, why = "";
+  if (r.pay === "fixed") { amt = a; why = inr(a) + " fixed"; }
+  else if (r.pay === "pct") { amt = q * a / 100; why = a + "% of " + fieldName(r.of) + " " + inr(q); }
+  else if (r.pay === "every") { const n = Math.max(1, num(r.every) || 1); amt = Math.floor(q / n) * a; why = inr(a) + " for every " + n + " " + fieldName(r.of).toLowerCase() + " (" + q + " → " + Math.floor(q / n) + " × " + inr(a) + ")"; }
+  else { amt = q * a; why = q + " " + fieldName(r.of || "units").toLowerCase() + " × " + inr(a); }
+  if (num(r.max) && amt > num(r.max)) { amt = num(r.max); why += " · capped at " + inr(r.max); }
+  if (conds.length) why += " · because " + conds.map(show).join(" and ");
+  return { amt, why };
+}
+function easyText(r) {
+  const of = fieldName(r.of || "units").toLowerCase(), a = num(r.amt), pay = r.pay === "fixed" ? "Pay " + inr(a) : r.pay === "pct" ? "Pay " + a + "% of " + of : r.pay === "every" ? "Pay " + inr(a) + " for every " + (num(r.every) || 1) + " " + of : "Pay " + inr(a) + " per " + of.replace(/s$/, "");
+  const c = (r.conds || []).filter((x) => x && x.f).map((x) => fieldName(x.f).toLowerCase() + " " + ((EASY_OPS.find((o) => o[0] === (x.op || ">=")) || ["", "is"])[1]) + " " + x.v);
+  return pay + (c.length ? " when " + c.join(" and ") : "") + (num(r.max) ? ", up to " + inr(r.max) : "") + ".";
+}
+const RULE_TYPES = { easy: "✅ Simple rule (pay ₹ / % when …)", slab: "Slab by achievement % / units", perUnit: "₹ per unit", model: "Model / series-wise ₹ per unit", vshield: "V-Shield per unit + attach bonus", emiAttach: "EMI attach % slab", financier: "₹ per IMEI by EMI company", valuePct: "% of sales value", kicker: "Kicker / above-target bonus", tiCurve: "Target incentive payout curve", formula: "Custom formula" };
 
 // ---------- helpers ----------
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -189,6 +215,7 @@ function incentive(emp, plan, inp, month, att) {
       else if (r.type === "tiCurve") { const P = (r.points || []).slice().sort((a, b) => a[0] - b[0]); let p = 0; if (P.length && ach >= P[0][0]) { p = P[P.length - 1][1]; for (let k = 0; k + 1 < P.length; k++) if (ach <= P[k + 1][0]) { p = P[k][1] + (ach - P[k][0]) / (P[k + 1][0] - P[k][0]) * (P[k + 1][1] - P[k][1]); break; } }
         amt = ti * p / 100; why = pct1(ach) + " achievement → " + pct1(p) + " of TI " + inr(ti); }
       else if (r.type === "formula") { amt = evalExpr(r.expr, V); why = r.expr; }
+      else if (r.type === "easy") { const e = easyRule(r, V); amt = e.amt; why = e.why; }
     } catch (e) { amt = 0; why = "Formula error: " + e.message; }
     out.push({ id: r.id, n: r.n, type: r.type, amt: r2(Math.max(0, amt)), why, lines }); });
   let gross = r2(out.reduce((a, x) => a + x.amt, 0)); const notes = [], g = plan.gates || {};
@@ -215,5 +242,5 @@ function compute(emp, st, plan, inp, month, settings) {
   return { month, code: emp.code, name: emp.name, salary: sal, incentive: inc, total: (sal ? sal.net : 0) + (inc ? inc.net : 0), credit: creditDates(month, settings.salDay, settings.incDelay) };
 }
 
-window.SALCALC = { FINANCIERS: FINANCIERS, PT_PRESETS: PT_PRESETS, TAX: TAX, annualTax: annualTax, evalExpr: evalExpr, STRUCTURES: STRUCTURES, PLANS: PLANS, RULE_TYPES: RULE_TYPES, daysIn: daysIn, attendance: attendance, salary: salary, incentive: incentive, creditDates: creditDates, compute: compute };
+window.SALCALC = { FINANCIERS: FINANCIERS, PT_PRESETS: PT_PRESETS, TAX: TAX, annualTax: annualTax, evalExpr: evalExpr, STRUCTURES: STRUCTURES, PLANS: PLANS, EASY_FIELDS: EASY_FIELDS, EASY_OPS: EASY_OPS, easyRule: easyRule, easyText: easyText, RULE_TYPES: RULE_TYPES, daysIn: daysIn, attendance: attendance, salary: salary, incentive: incentive, creditDates: creditDates, compute: compute };
 })();

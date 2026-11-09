@@ -6,7 +6,8 @@
 //   sal:emp:<state> {list}   sal:in:<state>:<yyyy-mm> {att, sales, adj}   sal:run:<state>:<yyyy-mm> {status, rows}
 //   sallink:<token> {state, code, fails, lockUntil}
 import { randomBytes } from "node:crypto";
-import { STRUCTURES, PLANS, compute } from "./salcalc-core.mjs";
+import { STRUCTURES, PLANS, compute, evalExpr, easyRule, easyText, EASY_FIELDS, RULE_TYPES } from "./salcalc-core.mjs";
+import { parseLoose } from "./man-core.mjs";
 import { STATES } from "./cmp-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
@@ -20,7 +21,7 @@ const SIZE = 400000;
 
 // the HO library starts as a copy of the ready-made structures and plans
 function seedHO() { return { structures: STRUCTURES.map((x) => Object.assign(clone(x), { id: "ho-" + x.id, scope: "HO" })), plans: PLANS.map((x) => Object.assign(clone(x), { id: "ho-" + x.id, scope: "HO" })), settings: { salDay: 1, incDelay: 15 } }; }
-const cleanEmp = (x, state) => ({ code: code(x.code), name: str(x.name, 80), state, city: str(x.city, 60), role: str(x.role, 60) || "Sales promoter", doj: str(x.doj, 10), mobile: String(x.mobile || "").replace(/\D/g, "").slice(-10), gross: num(x.gross), ctc: num(x.ctc), dailyRate: num(x.dailyRate), ti: num(x.ti), insurance: num(x.insurance), otherAnnual: num(x.otherAnnual), struct: str(x.struct, 40), plan: str(x.plan, 40), uan: str(x.uan, 20), pan: str(x.pan, 12).toUpperCase(), bank: String(x.bank || "").replace(/\D/g, "").slice(-4), ifsc: str(x.ifsc, 15).toUpperCase(), store: str(x.store, 80), active: x.active !== false && !/^(no|inactive|left|0)$/i.test(String(x.active)) });
+const cleanEmp = (x, state) => ({ code: code(x.code), name: str(x.name, 80), state, city: str(x.city, 60), role: str(x.role, 60) || "Sales promoter", doj: str(x.doj, 10), mobile: String(x.mobile || "").replace(/\D/g, "").slice(-10), email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(x.email || "").trim()) ? String(x.email).trim().toLowerCase().slice(0, 80) : "", gross: num(x.gross), ctc: num(x.ctc), dailyRate: num(x.dailyRate), ti: num(x.ti), insurance: num(x.insurance), otherAnnual: num(x.otherAnnual), struct: str(x.struct, 40), plan: str(x.plan, 40), uan: str(x.uan, 20), pan: str(x.pan, 12).toUpperCase(), bank: String(x.bank || "").replace(/\D/g, "").slice(-4), ifsc: str(x.ifsc, 15).toUpperCase(), store: str(x.store, 80), active: x.active !== false && !/^(no|inactive|left|0)$/i.test(String(x.active)) });
 
 export async function salAction(b, ctx) {
   const { store, t, app, rec } = ctx, isHO = app === "admin", by = rec.fullName || rec.username || "";
@@ -98,6 +99,71 @@ export async function salAction(b, ctx) {
   if (b.action === "sal-publish") {
     const st = stOf(b.state), m = mon(b.month), k = `sal:run:${st}:${m}`, r = await store.get(k); if (!r) return json(400, { ok: false, error: "Calculate first." });
     r.status = b.undo ? "draft" : "published"; if (!b.undo) { r.pubAt = t; r.pubBy = by; } await store.set(k, r); return json(200, { ok: true, status: r.status });
+  }
+  // 📣 after publishing: each employee gets an e-mail with their payslip PDF and / or a WhatsApp message with their pay link
+  if (b.action === "sal-notify-info") {
+    const ec = await store.get("config:email"), wa = (await store.get("config:wa")) || {}, pk = wa.provider === "periskope";
+    return json(200, { ok: true, mail: !!((ctx.env && ctx.env.BREVO_API_KEY && ctx.env.OTP_FROM_EMAIL) || (ec && ec.apiKey && ec.from)), wa: pk ? !!(wa.pkKey && wa.pkPhone) : !!(wa.token && wa.phoneId && wa.template), provider: pk ? "periskope" : "meta", gap: pk ? wa.pkGap || 30 : 0, daily: pk ? wa.pkDaily || 40 : 0 });
+  }
+  if (b.action === "sal-notify") {
+    const st = stOf(b.state), m = mon(b.month), k = `sal:run:${st}:${m}`, r = await store.get(k); if (!r) return json(400, { ok: false, error: "Calculate first." });
+    if (r.status !== "published") return json(400, { ok: false, error: "Publish the month first." });
+    const E = await emps(st), e = E.list.find((x) => x.code === code(b.code)), row = r.rows[code(b.code)]; if (!e || !row) return json(404, { ok: false, error: "Employee not in this month." });
+    if (!e.token) { e.token = randomBytes(12).toString("hex"); await store.set("sallink:" + e.token, { state: st, code: e.code, at: t }); await store.set("sal:emp:" + st, E); }
+    const origin = /^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(String(b.origin || "")) ? b.origin : (ctx.env && (ctx.env.SITE_URL || ctx.env.URL)) || "";
+    const link = origin + "/salary.html#me=" + e.token, ML = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], mT = ML[+m.slice(5) - 1] + " " + m.slice(0, 4);
+    const sal = row.salary ? Math.round(row.salary.net) : 0, inc = row.incentive ? Math.round(row.incentive.net) : 0, rs = (n) => "₹" + Number(n || 0).toLocaleString("en-IN");
+    const via = Array.isArray(b.via) ? b.via : ["mail", "wa"], out = { code: e.code, name: e.name, mail: null, wa: null };
+    if (via.includes("mail")) {
+      if (!e.email) out.mail = { ok: false, error: "No e-mail saved" };
+      else {
+        let env = ctx.env || {}; if (!env.BREVO_API_KEY || !env.OTP_FROM_EMAIL) { const ec = await store.get("config:email"); if (ec && ec.apiKey && ec.from) env = Object.assign({}, env, { BREVO_API_KEY: ec.apiKey, OTP_FROM_EMAIL: ec.from }); }
+        if (!env.BREVO_API_KEY) out.mail = { ok: false, error: "E-mail isn't set up on the server" };
+        else {
+          const pdf = String(b.pdf || "").replace(/^data:application\/pdf;base64,/, ""), att = /^[A-Za-z0-9+/=]+$/.test(pdf) && pdf.length > 200 && pdf.length < 2600000 ? [{ content: pdf, name: `Payslip_${m}_${e.code}.pdf` }] : undefined;
+          const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:auto;color:#1b1d2e"><div style="background:#2B33A6;color:#fff;padding:16px 18px;border-radius:12px 12px 0 0"><b style="font-size:18px">Your pay for ${mT}</b><div style="font-size:12px;opacity:.85">vivo sales team · ${st}</div></div><div style="border:1px solid #e6e8f2;border-top:0;padding:16px 18px;border-radius:0 0 12px 12px;font-size:14px;line-height:1.6">Hi ${e.name},<br><br>${row.salary ? `Net salary: <b>${rs(sal)}</b> (credited on ${row.credit && row.credit.salary || "the 1st"})<br>` : ""}${row.incentive ? `Net incentive: <b>${rs(inc)}</b> (credited on ${row.credit && row.credit.incentive || "the 16th"})<br>` : ""}<br>Your payslip${att ? " is attached" : ""}. See every line of how it was worked out here:<br><a href="${link}" style="display:inline-block;margin-top:8px;background:#2B33A6;color:#fff;padding:10px 18px;border-radius:9px;text-decoration:none;font-weight:700">Open my pay details</a><div style="font-size:12px;color:#6b7090;margin-top:10px">The page asks for the last 4 digits of your registered mobile.</div></div></div>`;
+          try { const res = await (ctx.mailFetch || fetch)("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "content-type": "application/json", accept: "application/json", "api-key": env.BREVO_API_KEY }, body: JSON.stringify({ sender: { name: "vivo Payroll", email: env.OTP_FROM_EMAIL }, to: [{ email: e.email, name: e.name }], subject: `Your payslip · ${mT}`, htmlContent: html, attachment: att }) });
+            out.mail = res.ok ? { ok: true } : { ok: false, error: "E-mail " + res.status };
+          } catch (er) { out.mail = { ok: false, error: String(er.message || er).slice(0, 100) }; }
+        }
+      }
+    }
+    if (via.includes("wa")) {
+      const c = (await store.get("config:wa")) || {}, PK = c.provider === "periskope", to = e.mobile && e.mobile.length === 10 ? "91" + e.mobile : "";
+      if (!to) out.wa = { ok: false, error: "No mobile number" };
+      else if (PK ? !(c.pkKey && c.pkPhone) : !(c.token && c.phoneId && c.template)) out.wa = { ok: false, error: "WhatsApp isn't set up (Retailer payouts → ⚙️ WhatsApp settings)" };
+      else {
+        const dayKey = "wapk:day:" + new Date(t + 5.5 * 36e5).toISOString().slice(0, 10), used = PK ? (((await store.get(dayKey)) || {}).n || 0) : 0;
+        if (PK && used >= (c.pkDaily || 40)) out.wa = { ok: false, error: "Today's safe WhatsApp limit is reached — the rest go tomorrow" };
+        else {
+          const text = `Hi ${e.name}, your pay for ${mT} is published ✅\n${row.salary ? "Net salary: " + rs(sal) + "\n" : ""}${row.incentive ? "Net incentive: " + rs(inc) + "\n" : ""}Payslip & full breakup: ${link}\n(Enter the last 4 digits of your mobile.)`;
+          try {
+            const res = PK ? await (ctx.waFetch || fetch)("https://api.periskope.app/v1/message/send", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + c.pkKey, "x-phone": c.pkPhone }, body: JSON.stringify({ chat_id: to + "@c.us", message: text }) })
+              : await (ctx.waFetch || fetch)(`https://graph.facebook.com/v21.0/${c.phoneId}/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + c.token }, body: JSON.stringify({ messaging_product: "whatsapp", to, type: "template", template: { name: c.template, language: { code: c.lang || "en" }, components: [{ type: "body", parameters: (c.vars || "name,amount,month,link").split(",").map((v) => ({ type: "text", text: String({ name: e.name, amount: (sal + inc).toLocaleString("en-IN"), month: mT, link, schemes: "Salary & incentive", rid: e.code }[v] || "-") })) }] } }) });
+            out.wa = res.ok ? { ok: true } : { ok: false, error: "WhatsApp " + res.status };
+            if (res.ok && PK) await store.set(dayKey, { n: used + 1, at: t });
+          } catch (er) { out.wa = { ok: false, error: String(er.message || er).slice(0, 100) }; }
+        }
+      }
+    }
+    r.notified = r.notified || {}; r.notified[e.code] = Object.assign({}, r.notified[e.code], out.mail && out.mail.ok ? { mail: t } : {}, out.wa && out.wa.ok ? { wa: t } : {}); await store.set(k, r);
+    return json(200, Object.assign({ ok: true }, out));
+  }
+  // ✨ AI writes a rule / formula from plain words
+  if (b.action === "sal-ai-rule") {
+    const text = String(b.text || "").trim().slice(0, 600); if (text.length < 6) return json(400, { ok: false, error: "Describe the rule in a sentence." });
+    const fields = EASY_FIELDS.map((f) => f[0] + " = " + f[1]).join("; ");
+    const sys = b.kind === "expr"
+      ? `You write payroll formulas for an Indian sales team. Names you can use: gross, ctc, basic (if defined), paidDays, monthDays, basisDays, lopDays, presentDays, fieldDays, extraDays, dailyRate, ti, insurance. Functions: min max round floor ceil abs if(c,a,b) pct(x,p) percent(a,b) above(x,limit) below(x,limit) cap(x,max) atleast(x,min) per(x,every,amt) slab(x, upto1, v1, …, else). Operators + - * / ( ) < <= > >= == != and or not, cond ? a : b. Reply ONLY JSON {"expr":"…","explain":"one simple sentence"}.`
+      : `You turn an incentive rule written in plain words into JSON for a sales incentive tool. Prefer a SIMPLE rule: {"type":"easy","n":"short name","pay":"fixed|perUnit|pct|every","amt":number,"of":"field","every":number,"conds":[{"f":"field","op":">=|>|<=|<|==|!=","v":number}],"max":number}. Fields: ${fields}. For slabs use {"type":"slab","n":"","on_":"ach|units","mode":"perUnit|fixed|pctTI","base":"all|above","slabs":[[from,to,value]]} (to = 999999999 for no limit). Only if nothing else fits use {"type":"formula","n":"","expr":"…"} with the same field names and functions min max round if(c,a,b) pct percent above per slab. Reply ONLY JSON {"rule":{…},"explain":"one simple sentence"}.`;
+    const r = await ctx.askAI(ctx.env, text, "", [], ctx.aiFetch, { system: sys, label: "RULE", maxTokens: 700, json: true, raw: true });
+    const j = r.ok ? parseLoose(r.text) : null; if (!j) return json(200, { ok: false, error: r.error || "The AI reply couldn't be read — try saying it another way." });
+    const V = { units: 42, target: 40, ach: 105, aboveTarget: 2, value: 777000, valueTarget: 700000, vshield: 13, vsAttach: 31, emi: 17, emiAttach: 40, paidDays: 30, presentDays: 26, fieldDays: 24, lopDays: 0, ti: 5000, gross: 18000, ctc: 21000, basic: 9000, monthDays: 31, basisDays: 31, extraDays: 0, dailyRate: 700, insurance: 250 };
+    if (b.kind === "expr") { try { evalExpr(j.expr, V); } catch (er) { return json(200, { ok: false, error: "The AI formula didn't work (" + er.message + ") — try again." }); } return json(200, { ok: true, expr: String(j.expr).slice(0, 400), explain: String(j.explain || "").slice(0, 300) }); }
+    const ru = j.rule || j; if (!ru || !RULE_TYPES[ru.type]) return json(200, { ok: false, error: "The AI didn't return a usable rule — try again." });
+    if (ru.type === "formula") { try { evalExpr(ru.expr, V); } catch (er) { return json(200, { ok: false, error: "The AI formula didn't work (" + er.message + ")." }); } }
+    ru.id = "r" + t.toString(36).slice(-5); ru.on = true; ru.n = String(ru.n || text).slice(0, 60);
+    return json(200, { ok: true, rule: ru, explain: String(j.explain || (ru.type === "easy" ? easyText(ru) : "")).slice(0, 300) });
   }
   // employee links: one secure link each (re-used), opened with the last 4 digits of their mobile
   if (b.action === "sal-links") {
