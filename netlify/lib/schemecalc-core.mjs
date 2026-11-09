@@ -81,7 +81,8 @@ Use numbers only (no ₹ or % signs). Percent values like 100 mean 100%. If a va
 
 const OCR_ASK = "This is a vivo India scheme circular / poster (it may be a phone screenshot or photo). Transcribe ALL the text exactly: headings, dates, every table row (cells separated by |, keep merged cells by repeating them), examples, terms & conditions, and amounts with ₹. If a table is cut off at the edge, write what is visible. No commentary.";
 // Image → text. Groq's vision models change over time, so the list is read from Groq; Gemini is the fallback.
-export async function readImages(keys, env, images, fetchImpl) {
+export async function readImages(keys, env, images, fetchImpl, prompt) {
+  const ASK = prompt || OCR_ASK;
   const errs = [];
   const ask = async (label, fn) => { try { const t = await fn(); if (t && t.trim().length > 20) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
   // 1) Groq: only models it lists right now that can see images
@@ -96,7 +97,7 @@ export async function readImages(keys, env, images, fetchImpl) {
     if (!vis.length) errs.push("Groq: no picture-reading model available right now");
     for (const m of vis) {
       const t = await ask("Groq " + m.split("/").pop(), async () => {
-        const content = [{ type: "text", text: OCR_ASK }].concat(images.slice(0, 3).map((u) => ({ type: "image_url", image_url: { url: u } })));
+        const content = [{ type: "text", text: ASK }].concat(images.slice(0, 3).map((u) => ({ type: "image_url", image_url: { url: u } })));
         const r = await fetchImpl("https://api.groq.com/openai/v1/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + keys.groq }, body: JSON.stringify({ model: m, messages: [{ role: "user", content }], temperature: 0, max_completion_tokens: 6000 }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
@@ -120,7 +121,7 @@ export async function readImages(keys, env, images, fetchImpl) {
     if (!pick.length) errs.push("Gemini: no model available for this key");
     for (const m of pick) {
       const t = await ask("Gemini " + m, async () => {
-        const parts = [{ text: OCR_ASK }].concat(images.slice(0, 5).map((u) => { const mm = /^data:(image\/[a-z]+);base64,(.+)$/.exec(u); return { inline_data: { mime_type: mm[1], data: mm[2] } }; }));
+        const parts = [{ text: ASK }].concat(images.slice(0, 5).map((u) => { const mm = /^data:(image\/[a-z]+);base64,(.+)$/.exec(u); return { inline_data: { mime_type: mm[1], data: mm[2] } }; }));
         const r = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8000 } }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));

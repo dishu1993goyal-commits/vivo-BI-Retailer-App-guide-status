@@ -29,6 +29,7 @@ import { storesAction } from "./stores-core.mjs";
 import { productsAction } from "./products-core.mjs";
 import { schemeaiAction } from "./schemeai-core.mjs";
 import { rpayAction } from "./rpay-core.mjs";
+import { khAdmin, khPublic } from "./kh-core.mjs";
 import { plannerAction } from "./planner-core.mjs";
 import { spolAction } from "./spol-core.mjs";
 import { rtpAction, rtpPublic } from "./rtp-core.mjs";
@@ -513,6 +514,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   if (b.action === "theme-get") return json(200, { ok: true, theme: cleanTheme(await store.get("config:theme")) });
   { const pub = await extrasPublic(b, store); if (pub) return pub; }
   if (/^sal-p-/.test(b.action)) return salPublic(b, { store, t });   // employee salary view: secure link + last 4 of mobile
+  if (/^kh-[op]-/.test(b.action)) return khPublic(b, { store, t, env, aiFetch, askAI, mailFetch, waFetch: mailFetch });   // shop owner (own login) + customers / distributors (secure link)
   if (/^rtp-public/.test(b.action)) return rtpPublic(b, { store, t, pool, askAI, env, aiFetch });
   if (/^iub-p-/.test(b.action)) return iubPublic(b, { store, t, pool, env, mailFetch });   // finance partner's secure link (no login)   // retailer's read-only link (no login)
   const uKeyOf = (k) => `user:${app}:${k}`;
@@ -893,7 +895,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-report-ai", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal)-/;
+  const NEW_PREFIX = /^(mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username);
     const rec = key ? await store.get(uKeyOf(key)) : null;
@@ -1020,6 +1022,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^store-/.test(b.action)) return storesAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^(phub|advis)-/.test(b.action)) return productsAction(b, surveyCtx());
     if (/^scha-/.test(b.action)) return schemeaiAction(b, surveyCtx());
+    if (/^kh-/.test(b.action)) return khAdmin(b, Object.assign(surveyCtx(), { mailFetch, waFetch: mailFetch }));
     if (/^rp-/.test(b.action)) return rpayAction(b, Object.assign(surveyCtx(), { waFetch: mailFetch }));
     if (/^pln-/.test(b.action)) return plannerAction(b, surveyCtx());
     if (/^spol-/.test(b.action)) return spolAction(b, surveyCtx());

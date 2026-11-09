@@ -1,0 +1,31 @@
+{
+ "name": "Shop Khata",
+ "short_name": "Khata",
+ "description": "Your shop's digital book \u2014 bills, payments, stock and dues",
+ "start_url": "/khata.html",
+ "scope": "/khata",
+ "display": "standalone",
+ "orientation": "portrait",
+ "background_color": "#F4F6F2",
+ "theme_color": "#14532D",
+ "icons": [
+  {
+   "src": "/khata-icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "/khata-icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "/khata-icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}

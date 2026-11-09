@@ -26,6 +26,7 @@
 <iframe id="cap" title="capture" aria-hidden="true"></iframe>
 <script src="/access-catalog.js"></script>
 <script src="/guidedata.js"></script>
+<script src="/appfeats.js?v=1"></script>
 <script>
 (function () {
   "use strict";
@@ -45,6 +46,8 @@
     var out = [];
     CAT.forEach(function (g) { if (g.k !== "tool" && g.k !== "tab" && g.k !== "adm") return; g.items.forEach(function (it) { var file = String(it[2] || "").replace(/^t:/, ""), id = it[0]; if (g.k === "adm" && !file) return; out.push({ id: id, name: it[1], group: g.g, file: g.k === "tab" ? "index.html" : file.split("#")[0], hash: g.k === "tab" ? "" : (file.split("#")[1] || ""), tab: g.k === "tab" ? id.slice(4) : "" }); }); });
     out.unshift({ id: "dash:home", name: "Dashboard (home)", group: "📑 Dashboard", file: "index.html", hash: "", tab: "" });
+    // vivo Retailer app features (the app guide assistant covers them too): screens come from the dashboard's own feature pages
+    (window.BIAPPFEATS || []).forEach(function (f) { out.push({ id: "app:" + f[0], name: f[1], group: "📲 vivo Retailer app features", file: "index.html", hash: "", tab: "", app: f[0], desc: f[2] }); });
     return out;
   }
   function guideFor(it) {
@@ -56,7 +59,7 @@
     VIEW.innerHTML = '<div class="card"><div class="step"><span class="n">1</span><div style="flex:1"><b>Choose the tool or dashboard section</b><select class="tx" id="ms" style="margin-top:6px"><option value="">— select —</option>' + groups.map(function (g) { return '<optgroup label="' + esc(g) + '">' + L.filter(function (i) { return i.group === g; }).map(function (i) { return '<option value="' + esc(i.id) + '"' + (SEL && SEL.id === i.id ? " selected" : "") + ">" + esc(i.name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + '</select><div class="g2"><div><label class="lb">Language</label><select class="tx" id="ml">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === LANG ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">For</label><select class="tx" id="ma"><option value="both"' + (AUD === "both" ? " selected" : "") + '>Admins & end users</option><option value="admin"' + (AUD === "admin" ? " selected" : "") + '>Admins / IT team</option><option value="user"' + (AUD === "user" ? " selected" : "") + ">End users</option></select></div></div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">2</span><div style="flex:1"><b>Capture the real screens</b><div class="muted" style="font-size:12px">Opens the tool as you see it (phone size) and photographs every tab. You can add your own screenshots too.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="mc"' + (SEL ? "" : " disabled") + '>📸 Capture screens</button><button class="btn sec sm" id="mu">＋ Add screenshot</button><button class="btn ghost sm" id="msv"' + (SEL ? "" : " disabled") + ' title="Saves these screens (and result examples) so the Monthly one-pager shows them">💾 Save for Monthly one-pager</button></div><div class="muted" id="svst" style="font-size:11.5px;margin-top:4px">' + (SAVED_AT ? "✅ Saved for the Monthly one-pager · " + SAVED_AT : "Screens are saved automatically after capturing, for the Monthly one-pager → App tools.") + '</div><div class="prog" id="cp" style="display:none"><i></i></div><div class="shots" id="sh">' + shotsHtml() + '</div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><b style="font-size:13px">✅ End result examples (sample data)</b><div class="muted" style="font-size:12px">What users see after finishing the task — shown in the PPT, PDF, one-pager and video. Empty fields on captured screens are filled with dummy examples. AI draws a sample result screen when you write the manual; add real app screenshots of a result too.</div><div class="row" style="gap:6px;margin-top:6px"><button class="btn sec sm" id="mr">＋ Add result screenshot</button></div><div class="shots" id="rs">' + shotsHtml(true) + "</div></div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">3</span><div style="flex:1"><b>Write the manual with AI</b><div class="muted" style="font-size:12px">Overview, roles, navigation map, every screen explained, admin & user flows, settings, data flow, rules, FAQs, troubleshooting, glossary, one-pager text and video captions — in the chosen language.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="mg"' + (SEL ? "" : " disabled") + ">✨ " + (MAN ? "Rewrite" : "Write manual") + '</button></div><div id="mo">' + (MAN ? outline(MAN) : "") + "</div></div></div></div>" +
-      '<div class="card"><div class="step"><span class="n">4</span><div style="flex:1"><b>Export</b><div class="exp"><button data-x="pptx">📊 PowerPoint<small>Editable .pptx — text, flowcharts, screens</small></button><button data-x="pdf">📄 PDF manual<small>Same slides as a PDF</small></button><button data-x="one">🖼️ One-pager creative<small>Poster PNG to share</small></button><button data-x="vid">🎬 Walkthrough video<small>Animated screens, captions + AI voice (MP4)</small></button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🎙️ Video voice-over</span><select class="tx" id="vv" style="flex:1;max-width:240px"><option value="f"' + (VOICE === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (VOICE === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (VOICE === "off" ? " selected" : "") + '>No voice</option></select><button class="btn ghost sm" id="vset" type="button">⚙️ Voice settings</button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🧑‍🏫 AI presenter</span><select class="tx" id="vp" style="flex:1;max-width:240px">' + [["off", "None"], ["vee", "Vee — friendly guide"], ["dev", "Dev — friendly guide"], ["robo", "Robo — AI robot"]].map(function (o) { return '<option value="' + o[0] + '"' + (PRES === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><span class="muted" style="font-size:11.5px">points at each step, gestures & talks with the voice</span></div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><div class="row" style="gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:12.5px">📝 Video script</b><button class="btn sec sm" id="scai" type="button">✨ Write with AI</button><button class="btn ghost sm" id="sced" type="button">✏️ View / edit</button><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="scuse"' + (USE_SCRIPT ? " checked" : "") + '> use it in the video</label></div><div class="muted" id="scst" style="font-size:11.5px;margin-top:4px"></div></div><div class="prog" id="xp" style="display:none"><i></i></div><div class="muted" id="xs" style="font-size:12px;margin-top:6px"></div></div></div></div>';
+      '<div class="card"><div class="step"><span class="n">4</span><div style="flex:1"><b>Export</b><div class="exp"><button data-x="pptx">📊 PowerPoint<small>Editable .pptx — text, flowcharts, screens</small></button><button data-x="pdf">📄 PDF manual<small>Same slides as a PDF</small></button><button data-x="one">🖼️ One-pager creative<small>Poster PNG to share</small></button><button data-x="vid">🎬 Walkthrough video<small>Animated screens, captions + AI voice (MP4)</small></button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🎙️ Video voice-over</span><select class="tx" id="vv" style="flex:1;max-width:240px"><option value="f"' + (VOICE === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (VOICE === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (VOICE === "off" ? " selected" : "") + '>No voice</option></select><button class="btn ghost sm" id="vset" type="button">⚙️ Voice settings</button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🧑‍🏫 AI presenter</span><select class="tx" id="vp" style="flex:1;max-width:240px">' + [["off", "None"], ["priya", "Priya — human presenter (female)"], ["arjun", "Arjun — human presenter (male)"], ["vee", "Vee — friendly guide"], ["dev", "Dev — friendly guide"], ["robo", "Robo — AI robot"]].map(function (o) { return '<option value="' + o[0] + '"' + (PRES === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><span class="muted" style="font-size:11.5px">points at each step, gestures & talks with the voice</span></div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><div class="row" style="gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:12.5px">📝 Video script</b><button class="btn sec sm" id="scai" type="button">✨ Write with AI</button><button class="btn ghost sm" id="sced" type="button">✏️ View / edit</button><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="scuse"' + (USE_SCRIPT ? " checked" : "") + '> use it in the video</label></div><div class="muted" id="scst" style="font-size:11.5px;margin-top:4px"></div></div><div class="prog" id="xp" style="display:none"><i></i></div><div class="muted" id="xs" style="font-size:12px;margin-top:6px"></div></div></div></div>';
     $("ms").onchange = function () { SEL = L.find(function (i) { return i.id === $("ms").value; }) || null; SHOTS = []; RES = []; MAN = null; SAVED_AT = ""; SAVED_SIG = ""; draw(); if (SEL) { loadBundled(); loadCached(); } };
     $("ml").onchange = function () { LANG = this.value; MAN = null; dropMock(); draw(); if (SEL) loadCached(); };
     $("ma").onchange = function () { AUD = this.value; MAN = null; dropMock(); draw(); if (SEL) loadCached(); };
@@ -123,7 +126,7 @@
     } catch (e) { return ""; }
   }
   function capture() {
-    if (!SEL) return; var fr = $("cap"), bar = $("cp"), btn = $("mc"); bar.style.display = ""; btn.disabled = true; btn.textContent = "Capturing…"; SHOTS = [];
+    if (!SEL) return; if (SEL.app) return captureApp(); var fr = $("cap"), bar = $("cp"), btn = $("mc"); bar.style.display = ""; btn.disabled = true; btn.textContent = "Capturing…"; SHOTS = [];
     var setP = function (p) { bar.firstChild.style.width = Math.round(p * 100) + "%"; };
     var url = "/" + SEL.file + "?v=" + Date.now() + (SEL.hash ? "#" + SEL.hash : "");
     new Promise(function (res) { fr.onload = res; fr.src = url; setTimeout(res, 15000); }).then(function () { return wait(3500); }).then(function () {
@@ -148,6 +151,21 @@
       });
     }).catch(function (e) { toast("Capture failed: " + (e.message || e)); }).then(function () { setP(1); btn.disabled = false; btn.textContent = "📸 Capture again"; setTimeout(function () { bar.style.display = "none"; }, 600); toast(SHOTS.length + " screen(s) captured"); fr.src = "about:blank"; saveShots(); });
   }
+  // Retailer app feature: the dashboard keeps real app screenshots, the steps and every field for each feature (BIAPPINFO)
+  function captureApp() {
+    var fr = $("cap"), bar = $("cp"), btn = $("mc"), id = SEL.id; bar.style.display = ""; btn.disabled = true; btn.textContent = "Reading the app feature…"; SHOTS = [];
+    var setP = function (p) { bar.firstChild.style.width = Math.round(p * 100) + "%"; };
+    var poll = function (w, n) { return new Promise(function (res) { var k = 0, t = setInterval(function () { k++; var ok = false; try { ok = !!(w.BIAPPINFO && w.BIAPPINFO()); } catch (e) { } if (ok || k > n) { clearInterval(t); res(ok); } }, 500); }); };
+    new Promise(function (res) { fr.onload = res; fr.src = "/index.html?v=" + Date.now(); setTimeout(res, 20000); }).then(function () { setP(0.4); return poll(fr.contentWindow, 40); }).then(function (ok) {
+      if (!ok) throw new Error("the dashboard didn't open — log in to the dashboard on this device first");
+      var info = fr.contentWindow.BIAPPINFO(), k = SEL.app, nm = String(SEL.name).toLowerCase();
+      var det = (info.details || []).find(function (x) { return x.k === k; }) || (info.details || []).find(function (x) { return String(x.name).toLowerCase() === nm; }), f0 = (info.features || []).find(function (x) { return x.k === k; }) || {};
+      SEL.appInfo = { what: (det && det.tag) || f0.d || SEL.desc || "", steps: det ? det.nav : [], items: det ? det.items : [], ben: det ? det.ben : [] };
+      var shots = det ? det.shots.filter(function (x) { return x.src; }) : [];
+      return Promise.all(shots.map(function (x, i) { return new Promise(function (res) { var im = new Image(); im.onload = function () { var c = document.createElement("canvas"), W = Math.min(im.width, 900); c.width = W; c.height = Math.round(im.height * W / im.width); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res({ src: c.toDataURL("image/jpeg", 0.88), label: String(x.cap || SEL.name + " " + (i + 1)).replace(/^\s*\d+\s*[·.):-]\s*/, "").slice(0, 40), w: 390, h: Math.round(390 * im.height / im.width), marks: [], app: true }); }; im.onerror = function () { res(null); }; im.src = x.src; }); }));
+    }).then(function (L) { if (!SEL || SEL.id !== id) return; SHOTS = (L || []).filter(Boolean); wireShots(); toast(SHOTS.length ? SHOTS.length + " real app screen(s) of " + SEL.name + " added from the dashboard" : "No app screenshots of this feature on the dashboard yet — use ＋ Add screenshot to add photos from the phone");
+    }).catch(function (e) { toast("Couldn't read the feature: " + (e.message || e)); }).then(function () { setP(1); btn.disabled = false; btn.textContent = "📸 Capture again"; setTimeout(function () { bar.style.display = "none"; }, 600); fr.src = "about:blank"; saveShots(); });
+  }
   // ---------- ✨ AI manual ----------
   function gen(fresh) {
     var b = $("mg"), id = SEL.id; b.disabled = true; b.textContent = "Writing… (20–60 s)";
@@ -157,7 +175,7 @@
     var g = guideFor(SEL) || [], fields = [];
     SHOTS.forEach(function (s) { A(s.marks).forEach(function (m) { if (m.inp && fields.indexOf(m.t) < 0) fields.push(m.t); }); });
     return { action: "man-gen", tool: SEL.id, lang: LANG, aud: AUD, fresh: fresh, fields: fields.slice(0, 30), results: RES.filter(function (x) { return !x.mock; }).map(function (x) { return { name: x.label, labels: A(x.marks).map(function (m) { return m.t; }).slice(0, 16) }; }),
-      screens: SHOTS.map(function (s) { return { name: s.label, labels: (s.marks || []).map(function (m) { return m.t; }).slice(0, 16) }; }), info: { name: SEL.name, group: SEL.group, target: SEL.file + (SEL.hash ? "#" + SEL.hash : ""), who: g[4] || "", what: g[5] || "", steps: g[6] || [], example: g[7] || "", tips: g[8] || [] } };
+      screens: SHOTS.map(function (s) { return { name: s.label, labels: (s.marks || []).map(function (m) { return m.t; }).slice(0, 16) }; }), info: SEL.app ? { name: SEL.name + " (vivo Retailer Workplace app — used by retailers on their phone)", group: SEL.group, target: "vivo Retailer Workplace app → " + SEL.name, who: "Retailers (store owners and staff); state BI teams support them", what: (SEL.appInfo && SEL.appInfo.what) || SEL.desc || "", steps: (SEL.appInfo && SEL.appInfo.steps) || [], example: "", tips: ((SEL.appInfo && SEL.appInfo.items) || []).map(function (x) { return x.t + ": " + x.d; }).concat(((SEL.appInfo && SEL.appInfo.ben) || []).map(function (x) { return "Benefit — " + x.t + ": " + x.d; })).slice(0, 14) } : { name: SEL.name, group: SEL.group, target: SEL.file + (SEL.hash ? "#" + SEL.hash : ""), who: g[4] || "", what: g[5] || "", steps: g[6] || [], example: g[7] || "", tips: g[8] || [] } };
   }
 
   // ---------- ✅ end-result examples: real app screenshots bundled for some tools + an AI sample result screen ----------
@@ -389,9 +407,85 @@
   function wrap(g, text, maxW) { var words = String(text || "").split(/(\s+)/), lines = [], cur = ""; words.forEach(function (w) { var t = cur + w; if (g.measureText(t).width > maxW && cur.trim()) { lines.push(cur.trim()); cur = w.trim(); } else cur = t; }); if (cur.trim()) lines.push(cur.trim()); if (lines.length === 1 && g.measureText(lines[0]).width > maxW) { var s = lines[0], out = [], c = ""; for (var i = 0; i < s.length; i++) { if (g.measureText(c + s[i]).width > maxW) { out.push(c); c = s[i]; } else c += s[i]; } if (c) out.push(c); return out; } return lines; }
   function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   // ---------- 🧑‍🏫 animated AI presenter: points at the highlighted element, gestures, expressions, lips follow the voice ----------
-  var PRESETS = { vee: { n: "Vee", skin: "#F2C6A0", hair: "#2B1B14", long: true, coat: "#4D5BF9", shirt: "#FFFFFF" }, dev: { n: "Dev", skin: "#C98E62", hair: "#1A1410", long: false, coat: "#2B33A6", shirt: "#EAF0FF", beard: true }, robo: { n: "Robo", robot: true, coat: "#7A4CFF", shirt: "#E9E4FF" } };
+  var PRESETS = { priya: { n: "Priya", human: true, long: true, skin: "#E2B08F", skin2: "#C98F6E", hair: "#1E130E", coat: "#1E3A8A", coat2: "#14285F", shirt: "#F8FAFC", lip: "#B5545F", eye: "#3B2414", acc: "#D4A017" },
+    arjun: { n: "Arjun", human: true, skin: "#C99273", skin2: "#A5725A", hair: "#16100C", coat: "#334155", coat2: "#1E2533", shirt: "#EEF2FF", tie: "#B91C1C", lip: "#9A5B55", eye: "#2A1A10", beard: true }, vee: { n: "Vee", skin: "#F2C6A0", hair: "#2B1B14", long: true, coat: "#4D5BF9", shirt: "#FFFFFF" }, dev: { n: "Dev", skin: "#C98E62", hair: "#1A1410", long: false, coat: "#2B33A6", shirt: "#EAF0FF", beard: true }, robo: { n: "Robo", robot: true, coat: "#7A4CFF", shirt: "#E9E4FF" } };
   // o: {x, y (feet), s, style, pose: idle|point|wave|present|thumb, tx, ty, mouth 0..1, expr: smile|explain|excited|happy, blink, t}
+  // a human-looking presenter (waist-up, shaded face, eyes, lips that move with the voice, natural arm gestures)
+  function drawHuman(g, o, P) {
+    var s = o.s || 1, t = o.t || 0, sway = Math.sin(t / 700) * 1.6, br = Math.sin(t / 900) * 1.4, ex = o.expr || "smile";
+    var W = function (x, y) { return [o.x + (x + sway) * s, o.y + y * s]; }, L = function (x, y) { return [(x - o.x) / s - sway, (y - o.y) / s]; };
+    var lg = function (x0, y0, x1, y1, a, b) { var q = g.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, a); q.addColorStop(1, b); return q; };
+    g.save(); g.translate(o.x + sway * s, o.y); g.scale(s, s); g.lineCap = "round"; g.lineJoin = "round";
+    var sh = -270 + br, hy = sh - 122, look = o.tx != null ? Math.max(-1, Math.min(1, L(o.tx, o.ty)[0] / 420)) : 0.25;
+    // long hair behind the shoulders
+    if (P.long) { g.fillStyle = P.hair; g.beginPath(); g.moveTo(-60, hy - 40); g.bezierCurveTo(-104, hy + 40, -96, sh + 30, -78, sh + 62); g.lineTo(78, sh + 62); g.bezierCurveTo(96, sh + 30, 104, hy + 40, 60, hy - 40); g.closePath(); g.fill(); }
+    // torso
+    g.fillStyle = lg(-120, sh, 120, 0, P.coat, P.coat2); g.beginPath(); g.moveTo(-30, sh - 16); g.bezierCurveTo(-82, sh - 12, -114, sh + 2, -122, sh + 46); g.lineTo(-108, 0); g.lineTo(108, 0); g.lineTo(122, sh + 46); g.bezierCurveTo(114, sh + 2, 82, sh - 12, 30, sh - 16); g.closePath(); g.fill();
+    g.fillStyle = P.shirt; g.beginPath(); g.moveTo(-28, sh - 16); g.lineTo(0, sh + 78); g.lineTo(28, sh - 16); g.closePath(); g.fill();
+    // neck (with chin shadow)
+    g.fillStyle = lg(0, sh - 62, 0, sh, P.skin2, P.skin); g.beginPath(); g.moveTo(-19, sh - 66); g.lineTo(-21, sh - 10); g.quadraticCurveTo(0, sh + 26, 21, sh - 10); g.lineTo(19, sh - 66); g.closePath(); g.fill();
+    if (P.tie) { g.fillStyle = P.shirt; g.beginPath(); g.moveTo(-22, sh - 14); g.lineTo(-4, sh + 6); g.lineTo(-14, sh + 14); g.closePath(); g.moveTo(22, sh - 14); g.lineTo(4, sh + 6); g.lineTo(14, sh + 14); g.closePath(); g.fill(); g.fillStyle = P.tie; g.beginPath(); g.moveTo(-8, sh - 4); g.lineTo(8, sh - 4); g.lineTo(6, sh + 10); g.lineTo(-6, sh + 10); g.closePath(); g.fill(); g.beginPath(); g.moveTo(-6, sh + 10); g.lineTo(6, sh + 10); g.lineTo(11, sh + 70); g.lineTo(0, sh + 82); g.lineTo(-11, sh + 70); g.closePath(); g.fill(); }
+    else { g.strokeStyle = P.acc || "#D4A017"; g.lineWidth = 2; g.beginPath(); g.arc(0, sh - 34, 30, 0.25 * Math.PI, 0.75 * Math.PI); g.stroke(); g.fillStyle = P.acc || "#D4A017"; g.beginPath(); g.arc(0, sh - 4, 4, 0, Math.PI * 2); g.fill(); }
+    // lapels + buttons + badge
+    g.fillStyle = "rgba(0,0,0,.22)"; [-1, 1].forEach(function (d) { g.beginPath(); g.moveTo(d * 28, sh - 16); g.lineTo(d * 56, sh + 34); g.lineTo(d * 30, sh + 44); g.lineTo(d * 2, sh + 118); g.lineTo(0, sh + 78); g.closePath(); g.fill(); });
+    g.fillStyle = "rgba(255,255,255,.55)"; [sh + 140, sh + 190].forEach(function (y) { g.beginPath(); g.arc(6, y, 4, 0, Math.PI * 2); g.fill(); });
+    g.fillStyle = "#fff"; rr(g, -92, sh + 66, 52, 22, 6); g.fill(); g.fillStyle = P.coat2; g.font = "800 11px " + CSSF; g.textAlign = "center"; g.fillText("AI · " + P.n, -66, sh + 81); g.textAlign = "left";
+    // arms: sleeve (upper arm + forearm) and a hand with fingers
+    var limb = function (sx, sy, a1, a2, hand) {
+      var l1 = 108, l2 = 96, ex1 = sx + Math.cos(a1) * l1, ey1 = sy + Math.sin(a1) * l1, hx = ex1 + Math.cos(a2) * l2, hy2 = ey1 + Math.sin(a2) * l2;
+      g.strokeStyle = P.coat2; g.lineWidth = 38; g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex1, ey1); g.stroke(); g.strokeStyle = P.coat; g.lineWidth = 32; g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex1, ey1); g.lineTo(hx - Math.cos(a2) * 10, hy2 - Math.sin(a2) * 10); g.stroke();
+      g.strokeStyle = P.shirt; g.lineWidth = 26; g.beginPath(); g.moveTo(hx - Math.cos(a2) * 12, hy2 - Math.sin(a2) * 12); g.lineTo(hx - Math.cos(a2) * 6, hy2 - Math.sin(a2) * 6); g.stroke();
+      g.fillStyle = P.skin; g.save(); g.translate(hx, hy2); g.rotate(a2); g.beginPath(); g.ellipse(8, 0, 15, 13, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = P.skin; var fing = function (ang, len, w) { g.lineWidth = w; g.beginPath(); g.moveTo(14, 0); g.lineTo(14 + Math.cos(ang) * len, Math.sin(ang) * len); g.stroke(); };
+      var tipL = null;
+      if (hand === "point") { fing(0, 30, 8); [0.5, 0.8, 1.1].forEach(function (a) { fing(a, 9, 8); }); fing(-0.9, 12, 7); tipL = [14 + 34, 0]; }
+      else if (hand === "open") { [-0.45, -0.15, 0.15, 0.45].forEach(function (a) { fing(a, 22, 7); }); fing(-1.2, 14, 7); }
+      else if (hand === "thumb") { [0.2, 0.5, 0.8, 1.1].forEach(function (a) { fing(a, 8, 9); }); var up = -Math.PI / 2 - a2; g.lineWidth = 9; g.beginPath(); g.moveTo(8, 0); g.lineTo(8 + Math.cos(up) * 28, Math.sin(up) * 28); g.stroke(); }
+      else { [0.1, 0.35, 0.6].forEach(function (a) { fing(a, 12, 7); }); }
+      g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 1.2; g.beginPath(); g.ellipse(8, 0, 15, 13, 0, 0, Math.PI * 2); g.stroke(); g.restore();
+      return tipL ? [hx + Math.cos(a2) * tipL[0], hy2 + Math.sin(a2) * tipL[0]] : [hx, hy2];
+    };
+    limb(-108, sh + 34, Math.PI / 2 + 0.16, Math.PI / 2 + 0.04, "rest");
+    var tip = null, pose = o.pose || "idle";
+    if (pose === "point" && o.tx != null) { var lt = L(o.tx, o.ty), ang = Math.atan2(lt[1] - (sh + 34), lt[0] - 108); ang = Math.max(-1.2, Math.min(0.85, ang)); tip = limb(108, sh + 34, ang + 0.5, ang, "point"); }
+    else if (pose === "wave") limb(108, sh + 34, -0.15, -1.5 + Math.sin(t / 150) * 0.32, "open");
+    else if (pose === "present") limb(108, sh + 34, 0.55, -0.12 + Math.sin(t / 520) * 0.07, "open");
+    else if (pose === "thumb") limb(108, sh + 34, 0.75, -1.05, "thumb");
+    else limb(108, sh + 34, Math.PI / 2 - 0.16, Math.PI / 2 - 0.04, "rest");
+    // head
+    g.save(); g.translate(0, hy); g.rotate(look * 0.05 + Math.sin(t / 1100) * 0.022 + (ex === "explain" ? 0.025 : 0));
+    g.fillStyle = P.skin2; [-1, 1].forEach(function (d) { g.beginPath(); g.ellipse(d * 55, 6, 9, 15, 0, 0, Math.PI * 2); g.fill(); });
+    if (!P.tie) { g.fillStyle = P.acc || "#D4A017"; [-1, 1].forEach(function (d) { g.beginPath(); g.arc(d * 56, 24, 3.5, 0, Math.PI * 2); g.fill(); }); }
+    var fg = g.createRadialGradient(-14, -14, 10, 0, 6, 86); fg.addColorStop(0, P.skin); fg.addColorStop(1, P.skin2);
+    g.fillStyle = fg; g.beginPath(); g.moveTo(0, -76); g.bezierCurveTo(-46, -76, -60, -36, -56, 4); g.bezierCurveTo(-52, 46, -26, 80, 0, 82); g.bezierCurveTo(26, 80, 52, 46, 56, 4); g.bezierCurveTo(60, -36, 46, -76, 0, -76); g.closePath(); g.fill();
+    if (P.beard) { g.fillStyle = "rgba(30,20,14,.28)"; g.beginPath(); g.moveTo(-50, 22); g.bezierCurveTo(-44, 62, -22, 82, 0, 83); g.bezierCurveTo(22, 82, 44, 62, 50, 22); g.bezierCurveTo(34, 46, 14, 50, 0, 50); g.bezierCurveTo(-14, 50, -34, 46, -50, 22); g.closePath(); g.fill(); }
+    // hair
+    g.fillStyle = P.hair; g.beginPath();
+    if (P.long) { g.moveTo(-60, 18); g.bezierCurveTo(-70, -60, -40, -96, 4, -94); g.bezierCurveTo(48, -94, 70, -62, 62, 10); g.bezierCurveTo(56, -22, 44, -44, 26, -52); g.bezierCurveTo(4, -40, -26, -40, -46, -30); g.bezierCurveTo(-54, -16, -56, 0, -60, 18); }
+    else { g.moveTo(-58, -2); g.bezierCurveTo(-64, -60, -36, -94, 6, -92); g.bezierCurveTo(46, -92, 66, -64, 58, -4); g.bezierCurveTo(54, -34, 46, -48, 34, -54); g.bezierCurveTo(10, -46, -24, -50, -44, -40); g.bezierCurveTo(-52, -30, -54, -18, -58, -2); }
+    g.closePath(); g.fill();
+    // eyebrows
+    var bry = ex === "excited" ? -36 : ex === "explain" ? -31 : -29; g.strokeStyle = P.hair; g.lineWidth = P.long ? 4 : 5.5;
+    [-1, 1].forEach(function (d) { g.beginPath(); g.moveTo(d * 36, bry + 4 + (ex === "explain" && d > 0 ? -3 : 0)); g.quadraticCurveTo(d * 24, bry - 3 + (ex === "explain" && d > 0 ? -3 : 0), d * 10, bry + 1); g.stroke(); });
+    // eyes
+    [-1, 1].forEach(function (d) { var x = d * 22, y = -10;
+      if (o.blink) { g.strokeStyle = "#2B1B14"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x - 11, y); g.quadraticCurveTo(x, y + 4, x + 11, y); g.stroke(); return; }
+      g.fillStyle = "#FBFAF7"; g.beginPath(); g.moveTo(x - 12, y); g.quadraticCurveTo(x, y - (ex === "excited" ? 11 : 9), x + 12, y); g.quadraticCurveTo(x, y + 7, x - 12, y); g.fill();
+      g.save(); g.clip(); g.fillStyle = P.eye; g.beginPath(); g.arc(x + look * 4, y, 6, 0, Math.PI * 2); g.fill(); g.fillStyle = "#0c0705"; g.beginPath(); g.arc(x + look * 4, y, 2.8, 0, Math.PI * 2); g.fill(); g.fillStyle = "#fff"; g.beginPath(); g.arc(x + look * 4 + 2, y - 2, 1.4, 0, Math.PI * 2); g.fill(); g.restore();
+      g.strokeStyle = "#1c120d"; g.lineWidth = P.long ? 3 : 2.2; g.beginPath(); g.moveTo(x - 12, y); g.quadraticCurveTo(x, y - (ex === "excited" ? 11 : 9), x + 12, y); g.stroke();
+      if (P.long) { g.lineWidth = 1.6; g.beginPath(); g.moveTo(x + d * 11, y - 1); g.lineTo(x + d * 15, y - 4); g.stroke(); } });
+    // nose
+    g.strokeStyle = "rgba(90,50,30,.35)"; g.lineWidth = 2; g.beginPath(); g.moveTo(-2, -4); g.quadraticCurveTo(-8, 16, -6, 22); g.stroke(); g.beginPath(); g.arc(-5, 24, 3, 0.2, 2.6); g.arc(5, 24, 3, 0.5, 2.9); g.stroke();
+    if (ex === "happy" || ex === "excited") { g.fillStyle = "rgba(230,90,90,.16)"; g.beginPath(); g.ellipse(-34, 18, 12, 7, 0, 0, Math.PI * 2); g.ellipse(34, 18, 12, 7, 0, 0, Math.PI * 2); g.fill(); }
+    // mouth: opens with the voice
+    var m = Math.max(0, Math.min(1, o.mouth || 0)), smile = ex === "happy" || ex === "excited" ? 6 : ex === "explain" ? 2 : 4, mw = 17 + m * 2, my = 44;
+    if (m > 0.08) { var oh = 3 + m * 13; g.fillStyle = "#4A1717"; g.beginPath(); g.moveTo(-mw, my); g.quadraticCurveTo(0, my - 5 + smile * 0.3, mw, my); g.quadraticCurveTo(0, my + oh + smile, -mw, my); g.fill(); g.fillStyle = "#fff"; g.beginPath(); g.moveTo(-mw + 4, my); g.quadraticCurveTo(0, my - 3, mw - 4, my); g.lineTo(mw - 5, my + 3); g.quadraticCurveTo(0, my + 1, -mw + 5, my + 3); g.closePath(); g.fill(); g.strokeStyle = P.lip; g.lineWidth = 3.5; g.beginPath(); g.moveTo(-mw, my); g.quadraticCurveTo(0, my + oh + smile + 1, mw, my); g.stroke(); g.lineWidth = 3; g.beginPath(); g.moveTo(-mw, my); g.quadraticCurveTo(-mw / 2, my - 4, 0, my - 2); g.quadraticCurveTo(mw / 2, my - 4, mw, my); g.stroke(); }
+    else { g.fillStyle = P.lip; g.beginPath(); g.moveTo(-17, my); g.quadraticCurveTo(-8, my - 5, 0, my - 3); g.quadraticCurveTo(8, my - 5, 17, my); g.quadraticCurveTo(0, my + smile + 5, -17, my); g.fill(); g.strokeStyle = "rgba(70,20,20,.55)"; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-16, my); g.quadraticCurveTo(0, my + smile * 0.6, 16, my); g.stroke(); }
+    g.restore(); g.restore();
+    if (tip && o.tx != null) { var tw = W(tip[0], tip[1]); g.save(); g.strokeStyle = "rgba(255,90,60,.75)"; g.setLineDash([4, 7]); g.lineWidth = 3; g.beginPath(); g.moveTo(tw[0], tw[1]); g.lineTo(o.tx, o.ty); g.stroke(); g.setLineDash([]); g.fillStyle = "rgba(255,90,60,.9)"; g.beginPath(); g.arc(o.tx, o.ty, 5 + Math.sin(t / 120) * 1.5, 0, Math.PI * 2); g.fill(); g.restore(); }
+  }
   function drawPresenter(g, o) {
+    if (PRESETS[o.style] && PRESETS[o.style].human) return drawHuman(g, o, PRESETS[o.style]);
     var P = PRESETS[o.style] || PRESETS.vee, s = o.s || 1, t = o.t || 0, sway = Math.sin(t / 650) * 2.2;
     g.save(); g.translate(o.x + sway * s, o.y); g.scale(s, s);
     var W = function (x, y) { return [o.x + (x + sway) * s, o.y + y * s]; };   // local → canvas
