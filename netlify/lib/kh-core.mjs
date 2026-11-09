@@ -313,7 +313,9 @@ async function ownerOp(op, b, ctx) {
     if (!old && B.prods.some((p) => p.on !== false && p.n.toLowerCase() === n.n.toLowerCase() && (p.u || "") === n.u)) return json(409, { ok: false, error: "An item with this name already exists." });
     if (!old && x.stk) { n.stk = qn(x.stk); if (n.stk > 0) n.lots = [{ d: day(x.lp) || today, q: n.stk, c: n.cost, e: day(x.e), doc: "open" }]; }
     if (old) { const nv = { cost: n.cost, sp: n.sp, mrp: n.mrp }; Object.keys(PF).forEach((f) => { n[f] = old[f]; }); Object.assign(old, n); Object.keys(PF).forEach((f) => priceSet(old, f, nv[f], "edit", today)); } else { B.prods.push(n); if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." }); }
-    await saveProds(); return json(200, { ok: true, item: old || n });
+    await saveProds();
+    const sv = old || n; if (sv.bc && /^\d{8,14}$/.test(sv.bc) && sv.n) { const c0 = await store.get("kh:bc:" + sv.bc); if (!c0 || !c0.name || c0.src !== "shop") await store.set("kh:bc:" + sv.bc, { name: sv.n, brand: sv.br || "", qty: "", mrp: sv.mrp || 0, src: "shop", at: t }); }   // teach the shared barcode book
+    return json(200, { ok: true, item: sv });
   }
   if (op === "prod-bulk") {   // Excel import: match by id, barcode or name; never touches stock of existing items
     const rows = Array.isArray(b.rows) ? b.rows.slice(0, 6000) : []; let add = 0, upd = 0;
@@ -449,15 +451,29 @@ async function ownerOp(op, b, ctx) {
     const j = r.ok ? parseLoose(r.text) : null;
     return json(200, { ok: true, picks: j && Array.isArray(j.picks) ? j.picks.map((x) => ({ i: num(x.i), k: str(x.k, 80) })) : [] });
   }
-  if (op === "bc-find") {   // 📷 barcode not in my items → open product databases for the name (MRP is read from the pack photo)
+  if (op === "bc-find") {   // 📷 barcode not in my items → shared cache → product databases → web search (name, brand, size, MRP)
     const code = String(b.code || "").replace(/\D/g, "").slice(0, 14); if (code.length < 8) return json(400, { ok: false, error: "That barcode looks too short." });
-    const cache = (await store.get("kh:bc:" + code)) || null; if (cache) return json(200, Object.assign({ ok: true }, cache));
-    let out = { name: "", brand: "", qty: "", src: "" };
-    for (const host of ["world.openfoodfacts.org", "world.openproductsfacts.org", "world.openbeautyfacts.org"]) {
-      try { const r = await ctx.aiFetch(`https://${host}/api/v2/product/${code}.json?fields=product_name,product_name_en,product_name_hi,brands,quantity`, { headers: { "user-agent": "ShopKhata/1.0" } }); const j = await r.json().catch(() => ({}));
-        const pr = j && j.status === 1 && j.product; if (pr && (pr.product_name || pr.product_name_en)) { out = { name: str(pr.product_name_en || pr.product_name, 90), brand: str(String(pr.brands || "").split(",")[0], 40), qty: str(pr.quantity, 30), src: host.split(".")[1] }; break; } } catch (e) { }
+    const cache = await store.get("kh:bc:" + code); if (cache && (cache.name || (cache.miss && t - cache.at < 7 * 864e5 && !b.deep))) return json(200, Object.assign({ ok: true, cached: true }, cache));
+    let out = { name: "", brand: "", qty: "", mrp: 0, src: "" };
+    const tidy = () => { if (out.brand && out.name.toLowerCase().indexOf(out.brand.toLowerCase()) < 0) out.name = out.brand + " " + out.name; if (out.qty && out.name.toLowerCase().replace(/\s/g, "").indexOf(String(out.qty).toLowerCase().replace(/\s/g, "")) < 0) out.name += " " + out.qty; };
+    const get = async (u, h) => { try { const r = await ctx.aiFetch(u, { headers: Object.assign({ "user-agent": "ShopKhata/1.0 (kirana billing)", accept: "application/json" }, h || {}) }); return r.ok ? await r.json().catch(() => null) : null; } catch (e) { return null; } };
+    for (const host of ["in.openfoodfacts.org", "world.openfoodfacts.org", "world.openproductsfacts.org", "world.openbeautyfacts.org"]) {
+      const j = await get(`https://${host}/api/v2/product/${code}.json?fields=product_name,product_name_en,product_name_hi,generic_name,brands,quantity`);
+      const pr = j && j.status === 1 && j.product; if (pr && (pr.product_name || pr.product_name_en || pr.generic_name)) { out = { name: str(pr.product_name_en || pr.product_name || pr.generic_name, 90), brand: str(String(pr.brands || "").split(",")[0], 40), qty: str(pr.quantity, 30), mrp: 0, src: "openfoodfacts" }; break; }
     }
-    if (out.name) { if (out.brand && out.name.toLowerCase().indexOf(out.brand.toLowerCase()) < 0) out.name = out.brand + " " + out.name; if (out.qty && out.name.toLowerCase().indexOf(String(out.qty).toLowerCase()) < 0) out.name += " " + out.qty; await store.set("kh:bc:" + code, out); }
+    if (!out.name) { const j = await get("https://api.upcitemdb.com/prod/trial/lookup?upc=" + code); const it = j && Array.isArray(j.items) && j.items[0]; if (it && it.title) out = { name: str(it.title, 90), brand: str(it.brand, 40), qty: str(it.size, 30), mrp: 0, src: "upcitemdb" }; }
+    // web search: Indian shopping sites list most EAN codes with the product name and MRP
+    if (!out.name || !out.mrp) {
+      try {
+        const r = await research(store, ctx.env, { queries: [code + " barcode", code + " MRP", '"' + code + '" product'], validate: (d) => d && typeof d === "object",
+          prompt: `Find the packaged product sold in India whose barcode (EAN / GTIN) is ${code}${out.name ? " (a database says: " + out.name + ")" : ""}. Use only results that show this exact number. Reply with ONLY JSON: {"name":"brand + product + variant","brand":"","pack":"net quantity e.g. 70 g / 1 L","mrp":0,"category":"","source":"url"} — mrp = printed MRP in rupees if a page shows it, else 0. If no page shows this exact barcode, reply {"name":""}.` }, { fetchImpl: ctx.aiFetch, now: () => t });
+        const d = r.ok ? r.data || {} : {};
+        if (d.name && !out.name) out = { name: str(d.name, 90), brand: str(d.brand, 40), qty: str(d.pack, 30), mrp: num(d.mrp), src: "web", cat: str(d.category, 40) };
+        else if (out.name && num(d.mrp) > 0) out.mrp = num(d.mrp);
+      } catch (e) { }
+    }
+    if (out.name) tidy();
+    await store.set("kh:bc:" + code, out.name ? Object.assign({}, out, { at: t }) : { miss: true, at: t });   // shared by every shop: each barcode is searched once
     return json(200, Object.assign({ ok: true }, out));
   }
   if (op === "pack-read") {   // 📷 photo of the pack → name, MRP, net quantity, barcode (Indian packs must print the MRP)
