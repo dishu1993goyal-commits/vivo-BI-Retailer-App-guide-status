@@ -260,9 +260,25 @@ async function sendWa(ctx, shop, to, text) {
 }
 
 // ---------- one shop's books ----------
+// items are kept in shards of 2,500 (a shop can have 50,000+ items); only changed shards are written and re-sent
+const SH = 2500, MAXP = 60000, shKey = (sid, i) => "kh:prodsh:" + sid + ":" + i;
 async function books(store, sid) {
   const [shop, P, R] = await Promise.all([store.get(K.shop(sid)), store.get(K.prod(sid)), store.get(K.party(sid))]);
-  return { shop: shop ? cleanShop({}, shop) : null, prods: (P && P.list) || [], parties: (R && R.list) || [] };
+  let prods = [], orig = [], vers = [];
+  if (P && P.shards != null) {
+    const parts = await Promise.all(Array.from({ length: P.shards }, (_, i) => store.get(shKey(sid, i))));
+    parts.forEach((x, i) => { const L = (x && x.list) || []; orig[i] = JSON.stringify(L); prods = prods.concat(L); }); vers = (P.vers || []).slice(0, P.shards);
+  } else prods = (P && P.list) || [];
+  return { shop: shop ? cleanShop({}, shop) : null, prods, parties: (R && R.list) || [], _po: orig, _pv: vers, _legacy: !(P && P.shards != null) };
+}
+async function writeProds(store, sid, B, t) {
+  const n = Math.max(1, Math.ceil(B.prods.length / SH)), vers = [], jobs = [];
+  for (let i = 0; i < n; i++) {
+    const L = B.prods.slice(i * SH, (i + 1) * SH), js = JSON.stringify(L);
+    if (B._legacy || js !== B._po[i] || !B._pv[i]) { jobs.push(store.set(shKey(sid, i), { list: L, at: t })); vers[i] = t.toString(36) + i; B._po[i] = js; } else vers[i] = B._pv[i];
+  }
+  await Promise.all(jobs); B._pv = vers; B._legacy = false;
+  await store.set(K.prod(sid), { shards: n, vers, count: B.prods.length, at: t });
 }
 async function addLog(store, sid, t, by, what) { const L = (await store.get(K.log(sid))) || { list: [] }; L.list.unshift({ at: t, by, what: String(what).slice(0, 240) }); L.list = L.list.slice(0, 1500); await store.set(K.log(sid), L); }
 async function loadMv(store, sid, months) { const out = {}; await Promise.all(months.map(async (m) => { out[m] = (await store.get(K.mv(sid, m))) || { p: {} }; })); return out; }
@@ -283,7 +299,9 @@ async function ownerOp(op, b, ctx) {
   const { store, t, sid, by } = ctx, today = istDay(t);
   const B = await books(store, sid); if (!B.shop) return json(404, { ok: false, error: "Shop not found." });
   const { shop } = B, PM = Object.fromEntries(B.prods.map((p) => [p.id, p])), RM = Object.fromEntries(B.parties.map((p) => [p.id, p]));
-  const saveProds = () => store.set(K.prod(sid), { list: B.prods, at: t });
+  const saveProds = () => writeProds(store, sid, B, t);
+  // big shops: send shard versions instead of every item; the page fetches only the shards that changed
+  const allP = () => (B.prods.length <= SH ? { prods: B.prods } : { pv: B._pv, pcount: B.prods.length });
   const saveParties = () => store.set(K.party(sid), { list: B.parties, at: t });
   const docsOf = async (pid) => ((await store.get(K.pt(sid, pid))) || { list: [] }).list;
   const refresh = (p, docs) => { const L = ledger(p, docs, today); p.s = L.s; return L; };
@@ -293,8 +311,10 @@ async function ownerOp(op, b, ctx) {
     const inbox = ((await store.get(K.inbox(sid))) || { list: [] }).list.filter((x) => !x.done).slice(0, 80);
     const ym = today.slice(0, 7), D = (await store.get(K.day(sid, ym))) || { days: {} };
     const months = lastMonths(today, 3), mv = await loadMv(store, sid, months);
-    return json(200, { ok: true, shop: shopOut(shop), prods: B.prods.map(prodLite), parties: B.parties, inbox, today, todayDay: D.days[today] || null, month: D.days, vel: velocity(mv, months, today), modes: MODES, by });
+    if (B._legacy && B.prods.length) await saveProds();
+    return json(200, Object.assign({ ok: true, shop: shopOut(shop), parties: B.parties }, allP(), { inbox, today, todayDay: D.days[today] || null, month: D.days, vel: velocity(mv, months, today), modes: MODES, by }));
   }
+  if (op === "prod-shard") { const i = Math.max(0, Math.round(num(b.i))); if (i >= (B._pv || []).length) return json(404, { ok: false, error: "No such part." }); return json(200, { ok: true, i, v: B._pv[i], list: B.prods.slice(i * SH, (i + 1) * SH) }); }
   if (op === "shop-save") {
     const n = cleanShop(b.shop, shop); n.id = sid; await store.set(K.shop(sid), Object.assign({}, n, { pk: shop.pk }));
     const S = (await store.get(K.shops)) || { list: [] }, e = S.list.find((x) => x.id === sid); if (e) { e.name = n.name; e.owner = n.owner; e.city = n.city; e.state = n.state; await store.set(K.shops, S); }
@@ -318,23 +338,26 @@ async function ownerOp(op, b, ctx) {
     return json(200, { ok: true, item: sv });
   }
   if (op === "prod-bulk") {   // Excel import: match by id, barcode or name; never touches stock of existing items
-    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 6000) : []; let add = 0, upd = 0;
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 3000) : []; let add = 0, upd = 0;
     const byName = {}; B.prods.forEach((p) => { byName[p.n.toLowerCase() + "|" + (p.u || "")] = p; if (p.bc) byName["bc:" + p.bc] = p; });
     for (const r of rows) {
       if (!str(r.n, 90)) continue; const u = str(r.u, 12) || "pc";
-      const old = (r.id && PM[cid(r.id)]) || (r.bc && byName["bc:" + str(r.bc, 40)]) || byName[str(r.n, 90).toLowerCase() + "|" + u] || byName[str(r.n, 90).toLowerCase() + "|pc"];
+      const rbc = r.bc ? String(r.bc).replace(/\.0$/, "").trim() : "", nm = byName[str(r.n, 90).toLowerCase() + "|" + u] || byName[str(r.n, 90).toLowerCase() + "|pc"];
+      if (rbc) r.bc = rbc;
+      // same name but a different barcode = a different pack / variant → its own item
+      const old = (r.id && PM[cid(r.id)]) || (rbc && byName["bc:" + str(rbc, 40)]) || (nm && (!rbc || !nm.bc || nm.bc === rbc) ? nm : null);
       const clean = {}; Object.keys(r).forEach((k) => { if (r[k] !== "" && r[k] != null) clean[k] = r[k]; });
       if (old) { const n = cleanProd(clean, old), nv = { cost: n.cost, sp: n.sp, mrp: n.mrp }; Object.keys(PF).forEach((f) => { n[f] = old[f]; }); Object.assign(old, n); Object.keys(PF).forEach((f) => priceSet(old, f, nv[f], "import", today)); upd++; }
-      else { const n = cleanProd(clean, null); if (clean.stk) { n.stk = qn(clean.stk); if (n.stk > 0) n.lots = [{ d: today, q: n.stk, c: n.cost, e: day(clean.e), doc: "open" }]; } B.prods.push(n); byName[n.n.toLowerCase() + "|" + n.u] = n; add++; }
+      else { const n = cleanProd(clean, null); if (clean.stk) { n.stk = qn(clean.stk); if (n.stk > 0) n.lots = [{ d: today, q: n.stk, c: n.cost, e: day(clean.e), doc: "open" }]; } B.prods.push(n); byName[n.n.toLowerCase() + "|" + n.u] = n; if (n.bc) byName["bc:" + n.bc] = n; add++; }
     }
-    if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." });
-    await saveProds(); await addLog(store, sid, t, by, `Items imported: ${add} new, ${upd} updated`); return json(200, { ok: true, add, upd, prods: B.prods });
+    if (B.prods.length > MAXP) return json(400, { ok: false, error: "Too many items (60,000 max)." });
+    await saveProds(); if (!b.quiet || b.last) await addLog(store, sid, t, by, `Items imported: ${add} new, ${upd} updated`); return json(200, Object.assign({ ok: true, add, upd }, b.quiet && !b.last ? { pv: B._pv, pcount: B.prods.length, noFetch: true } : allP()));
   }
   if (op === "prod-price") {   // set selling prices from a target margin (category or selected items)
     const ids = new Set((b.ids || []).map(cid)), m = num(b.margin); let n = 0;
     if (!(m >= 0 && m < 500)) return json(400, { ok: false, error: "Enter a margin %." });
     for (const p of B.prods) { if (!ids.has(p.id) || !p.cost) continue; let sp = p.cost * (1 + m / 100); sp = b.round ? Math.ceil(sp) : r2(sp); if (p.mrp && sp > p.mrp && !b.overMrp) sp = p.mrp; priceSet(p, "sp", sp, "margin", today); n++; }
-    await saveProds(); await addLog(store, sid, t, by, `Selling price set at ${m}% margin for ${n} items`); return json(200, { ok: true, n, prods: B.prods });
+    await saveProds(); await addLog(store, sid, t, by, `Selling price set at ${m}% margin for ${n} items`); return json(200, Object.assign({ ok: true, n }, allP()));
   }
   if (op === "prod-del") { const p = PM[cid(b.id)]; if (!p) return json(404, { ok: false, error: "Not found" }); p.on = false; await saveProds(); return json(200, { ok: true }); }
   if (op === "count") {   // physical stock count: the difference is stock used / sold (feeds re-order speed)
@@ -346,11 +369,11 @@ async function ownerOp(op, b, ctx) {
       p.stk = c; out.push({ n: p.n, from: qn(c - dl), to: c });
     }
     await saveProds(); await saveMv(store, sid, mv); if (out.length) await addLog(store, sid, t, by, "Stock count: " + out.slice(0, 12).map((x) => `${x.n} ${x.from}→${x.to}`).join(", ") + (out.length > 12 ? ` +${out.length - 12} more` : ""));
-    return json(200, { ok: true, changed: out.length, prods: B.prods });
+    return json(200, Object.assign({ ok: true, changed: out.length }, allP()));
   }
 
   if (op === "stock-bulk") {   // ⬆ bulk stock update from Excel: set the counted stock or add received stock, item by item
-    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 6000) : [], mvm = await loadMv(store, sid, [today.slice(0, 7)]), mm = mvm[today.slice(0, 7)];
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 3000) : [], mvm = await loadMv(store, sid, [today.slice(0, 7)]), mm = mvm[today.slice(0, 7)];
     const byName = {}; B.prods.forEach((p) => { if (p.on === false) return; byName[p.n.toLowerCase()] = byName[p.n.toLowerCase()] || p; if (p.bc) byName["bc:" + p.bc] = p; });
     let set = 0, added = 0, created = 0, prices = 0; const missing = [], lines = [];
     for (const r of rows) {
@@ -364,13 +387,13 @@ async function ownerOp(op, b, ctx) {
       else { const dl = qn(q - from); if (dl < 0) { consume(p, -dl); mp.o = qn(mp.o - dl); } else if (dl > 0) p.lots.push({ d: today, q: dl, c: p.cost, e: day(r.e), doc: "count" }); p.stk = q; set++; }
       lines.push(`${p.n} ${from}→${p.stk}`);
     }
-    if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." });
+    if (B.prods.length > MAXP) return json(400, { ok: false, error: "Too many items (60,000 max)." });
     await saveProds(); await saveMv(store, sid, mvm);
     await addLog(store, sid, t, by, `Stock import: ${set} counted, ${added} received, ${created} new items, ${prices} price changes` + (lines.length ? " — " + lines.slice(0, 8).join(", ") + (lines.length > 8 ? " …" : "") : ""));
-    return json(200, { ok: true, set, added, created, prices, missing: missing.slice(0, 200), prods: B.prods });
+    return json(200, Object.assign({ ok: true, set, added, created, prices, missing: missing.slice(0, 200) }, b.quiet && !b.last ? { noFetch: true } : allP()));
   }
   if (op === "price-bulk") {   // 📈 price list update (Excel / distributor rate list) — every change goes into the history
-    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 6000) : [], ch = [], missing = [];
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 3000) : [], ch = [], missing = [];
     const byName = {}; B.prods.forEach((p) => { if (p.on === false) return; byName[p.n.toLowerCase()] = byName[p.n.toLowerCase()] || p; if (p.bc) byName["bc:" + p.bc] = p; });
     for (const r of rows) {
       const nm = str(r.n, 90), p = (r.id && PM[cid(r.id)]) || (r.bc && byName["bc:" + str(r.bc, 40)]) || (nm && byName[nm.toLowerCase()]); if (!p) { if (nm) missing.push(nm); continue; }
@@ -378,7 +401,7 @@ async function ownerOp(op, b, ctx) {
       if (b.keepMargin && r.cost && !r.sp && p.sp && ch.length && ch[ch.length - 1].n === p.n && ch[ch.length - 1].f === "cost") { const c0 = ch[ch.length - 1]; const m = c0.o > 0 ? (p.sp - c0.o) / c0.o : 0; let sp = Math.ceil(p.cost * (1 + m)); if (p.mrp && sp > p.mrp) sp = p.mrp; const o = p.sp; if (priceSet(p, "sp", sp, "keep margin", today)) ch.push({ n: p.n, f: "sp", o, nv: sp }); }
     }
     await saveProds(); await addLog(store, sid, t, by, `Price update: ${ch.length} changes` + (ch.length ? " — " + ch.slice(0, 6).map((c) => `${c.n} ${PF[c.f]} ${c.o}→${c.nv}`).join(", ") : ""));
-    return json(200, { ok: true, changes: ch, missing: missing.slice(0, 200), prods: B.prods });
+    return json(200, Object.assign({ ok: true, changes: ch.slice(0, 2000), nch: ch.length, missing: missing.slice(0, 200) }, b.quiet && !b.last ? { noFetch: true } : allP()));
   }
   if (op === "price-hist" || op === "price-ai") {   // drops & hikes of the last N days, and AI advice on them
     const days = Math.max(1, Math.min(365, Math.round(num(b.days) || 30))), from = addD(today, -days), L = [];
@@ -847,7 +870,7 @@ export async function khAdmin(b, ctx) {
   const by = (rec.fullName || rec.username) + " (BI)";
   if (b.action === "kh-shops") {
     const S = (await store.get(K.shops)) || { list: [] };
-    const list = await Promise.all(S.list.map(async (x) => { const R = (await store.get(K.party(x.id))) || { list: [] }, P = (await store.get(K.prod(x.id))) || { list: [] }; const sum = (k) => R.list.filter((p) => p.k === k).reduce((s, p) => s + Math.max(0, (p.s && p.s.bal) || 0), 0); return Object.assign({}, x, { items: P.list.length, parties: R.list.length, recv: r2(sum("c")), pay: r2(sum("d")) }); }));
+    const list = await Promise.all(S.list.map(async (x) => { const R = (await store.get(K.party(x.id))) || { list: [] }, P = (await store.get(K.prod(x.id))) || { list: [] }; const sum = (k) => R.list.filter((p) => p.k === k).reduce((s, p) => s + Math.max(0, (p.s && p.s.bal) || 0), 0); return Object.assign({}, x, { items: P.count != null ? P.count : (P.list || []).length, parties: R.list.length, recv: r2(sum("c")), pay: r2(sum("d")) }); }));
     return json(200, { ok: true, shops: list });
   }
   if (b.action === "kh-shop-new" || b.action === "kh-shop-login") {
