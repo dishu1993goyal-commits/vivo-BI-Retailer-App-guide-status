@@ -20,6 +20,18 @@
     ["ROUND", "ROUND(number, decimals)", "Round", "ROUND(amount * 1.18, 0)", "Numbers"],
     ["ROUNDUP", "ROUNDUP(number, decimals)", "Round up", "ROUNDUP(km / 10, 0)", "Numbers"],
     ["ROUNDDOWN", "ROUNDDOWN(number, decimals)", "Round down", "ROUNDDOWN(units / 5, 0)", "Numbers"],
+    ["PCT", "PCT(amount, percent)", "That percent of the amount", "PCT(bill, 18)  → 18% of bill", "Easy maths"],
+    ["ADDGST", "ADDGST(amount, rate)", "Amount with GST added", "ADDGST(amount, 18)", "Easy maths"],
+    ["GSTOF", "GSTOF(amount, rate)", "Only the GST part", "GSTOF(amount, 18)", "Easy maths"],
+    ["DISCOUNT", "DISCOUNT(amount, percent)", "Amount after a % discount", "DISCOUNT(mrp, 5)", "Easy maths"],
+    ["ABOVE", "ABOVE(value, limit)", "Only the part above a limit (never below 0)", "ABOVE(units, target)", "Easy maths"],
+    ["BELOW", "BELOW(value, limit)", "How much short of a limit", "BELOW(achieved, target)", "Easy maths"],
+    ["CAP", "CAP(value, maximum)", "Never more than the maximum", "CAP(claim, 5000)", "Easy maths"],
+    ["ATLEAST", "ATLEAST(value, minimum)", "Never less than the minimum", "ATLEAST(payout, 0)", "Easy maths"],
+    ["PER", "PER(value, every, amount)", "₹amount for every full ‘every’", "PER(units, 10, 500) → ₹500 per 10 units", "Easy maths"],
+    ["BETWEEN", "BETWEEN(value, from, to)", "True when value is from…to", "BETWEEN(days, 1, 3)", "Easy maths"],
+    ["DIFF", "DIFF(a, b)", "a minus b", "DIFF(claimed, approved)", "Easy maths"],
+    ["RATIO", "RATIO(a, b)", "a ÷ b (0 if b is 0)", "RATIO(sold, visits)", "Easy maths"],
     ["PERCENT", "PERCENT(part, whole)", "part ÷ whole × 100 (0 if whole is 0)", "PERCENT(achieved, target)", "Numbers"],
     ["SLAB", 'SLAB(value, "from:result, from:result, …")', "Slab payout — highest ‘from’ the value reaches", 'SLAB(units, "0:0,10:1000,25:3000,50:7500")', "Numbers"],
     ["TIER", 'TIER(value, "from:label, …")', "Same as SLAB but returns text", 'TIER(ach, "0:Red,80:Amber,100:Green")', "Numbers"],
@@ -101,8 +113,8 @@
 
   // open(opts): { esc, sheet, toast, input (element), fields, purpose:"value"|"cond", sample:fn, aiCall:fn(desc)->Promise<{ok,formula,explain}> , test:fn }
   window.BIFXHELP = { FUNCS: F, RECIPES: R, open: function (o) {
-    var esc = o.esc, fields = o.fields || [], inp = o.input, purpose = o.purpose || "value", TAB = "rec";
-    var ov = o.sheet("🪄 Formula helper", purpose === "cond" ? "This box needs a condition — something that is true or false." : "This box needs a value — a number, amount, date or text.", [], '<div class="seg" id="fh_t" style="margin-top:8px"><button data-t="rec">📋 Recipes</button><button data-t="ai">✨ Describe it</button><button data-t="fn">ƒ Functions</button><button data-t="fld">🧾 Fields</button></div><div id="fh_b" style="max-height:58vh;overflow:auto;margin-top:6px"></div>' +
+    var esc = o.esc, fields = o.fields || [], inp = o.input, purpose = o.purpose || "value", TAB = "bld";
+    var ov = o.sheet("🪄 Formula helper", purpose === "cond" ? "This box needs a condition — something that is true or false." : "This box needs a value — a number, amount, date or text.", [], '<div class="seg" id="fh_t" style="margin-top:8px"><button data-t="bld">🧱 Build it</button><button data-t="rec">📋 Recipes</button><button data-t="ai">✨ Describe it</button><button data-t="fn">ƒ Functions</button><button data-t="fld">🧾 Fields</button></div><div id="fh_b" style="max-height:58vh;overflow:auto;margin-top:6px"></div>' +
       '<label class="lb">Formula</label><input class="tx fx" id="fh_f" value="' + esc(inp.value || "") + '"><div class="fxr" id="fh_r"></div><button class="btn pri block" id="fh_ok" style="margin-top:8px">✓ Use this formula</button>');
     var f = ov.querySelector("#fh_f"), res = ov.querySelector("#fh_r");
     var check = function () { if (!f.value.trim()) { res.textContent = ""; return; } var r = o.test(f.value); res.className = "fxr " + (r.ok ? "ok" : "bad"); res.textContent = r.ok ? "✓ Works · with sample values = " + JSON.stringify(r.value) : "✗ " + r.error; };
@@ -112,6 +124,7 @@
     var paint = function () {
       [].forEach.call(ov.querySelectorAll("#fh_t [data-t]"), function (b) { b.className = b.dataset.t === TAB ? "on" : ""; b.onclick = function () { TAB = b.dataset.t; paint(); }; });
       var box = ov.querySelector("#fh_b");
+      if (TAB === "bld") { builder(box); return; }
       if (TAB === "rec") {
         var L = R.filter(function (r) { return purpose === "any" || r[1] === purpose; }).concat(R.filter(function (r) { return purpose !== "any" && r[1] !== purpose; })), groups = [];
         L.forEach(function (r) { if (groups.indexOf(r[0]) < 0) groups.push(r[0]); });
@@ -130,7 +143,7 @@
           [].forEach.call(ph.querySelectorAll("[data-ph]"), function (e) { e.oninput = e.onchange = upd; }); upd();
         };
       } else if (TAB === "fn") {
-        var gs = ["Logic", "Numbers", "Dates", "Text"];
+        var gs = ["Easy maths", "Logic", "Numbers", "Dates", "Text"];
         box.innerHTML = '<input class="tx" id="fh_q" placeholder="🔍 Search e.g. date, slab, total">' + '<div id="fh_fl"></div><div class="help">Operators: <span class="fx">+ − * / ^</span> · compare <span class="fx">= != &lt; &lt;= &gt; &gt;=</span> · <span class="fx">AND OR NOT</span> · join text <span class="fx">&amp;</span> · text in "double quotes" · numbers without ₹ or commas.</div>';
         var draw = function (q) { q = String(q || "").toLowerCase(); box.querySelector("#fh_fl").innerHTML = gs.map(function (g) { var L = F.filter(function (x) { return x[4] === g && (!q || (x.join(" ").toLowerCase().indexOf(q) >= 0)); }); return L.length ? '<div style="font-weight:800;font-size:12px;margin:10px 0 2px;color:var(--mut)">' + g + "</div>" + L.map(function (x) { return '<div class="it" style="margin-top:5px;cursor:pointer" data-fn="' + esc(x[0]) + '"><div class="m"><b class="fx">' + esc(x[1]) + "</b><span>" + esc(x[2]) + ' · e.g. <span class="fx">' + esc(x[3]) + '</span></span></div><button class="ib" title="Insert">＋</button></div>'; }).join("") : ""; }).join("");
           [].forEach.call(box.querySelectorAll("[data-fn]"), function (d) { d.onclick = function () { var x = F.find(function (y) { return y[0] === d.dataset.fn; }); insert(/\(\)$/.test(x[1]) ? x[0] + "()" : x[0] + "("); }; }); };
@@ -145,6 +158,53 @@
         box.querySelector("#fh_go").onclick = function () { var b = this, d = box.querySelector("#fh_d").value.trim(); if (!d) return o.toast("Describe it first"); b.disabled = true; b.textContent = "Writing…"; o.aiCall(d).then(function (r) { b.disabled = false; b.textContent = "✨ Write the formula"; if (!r.ok) return o.toast(r.error || "AI is busy"); f.value = r.formula; check(); var ex = box.querySelector("#fh_ex"); ex.style.display = ""; ex.innerHTML = "<b>How it works:</b> " + esc(r.explain || ""); }); };
       }
     };
+    // 🧱 build without typing: conditions (field · is · value, all / any) or a calculation (maths, %, days, if-then scenarios, slabs, totals, limits)
+    function builder(box) {
+      var flds = fields.filter(function (x) { return x.type !== "heading" && x.type !== "image" && x.type !== "table"; }), tables = fields.filter(function (x) { return x.type === "table"; });
+      var qv = function (v) { v = String(v == null ? "" : v).trim(); return v === "" ? '""' : isFinite(+v.replace(/,/g, "")) && /\d/.test(v) ? v.replace(/,/g, "") : /^[A-Za-z_][\w.]*\(.*\)$|^[a-z_][\w.]*$/.test(v) && fields.some(function (f) { return f.key === v.split(".")[0]; }) ? v : '"' + v.replace(/"/g, "") + '"'; };
+      var fOpts = function (sel, extra) { return (extra || []).concat(flds.map(function (x) { return [x.key, x.label || x.key]; })).concat([["user.state", "Submitter's state"], ["user.role", "Submitter's role"], ["TODAY()", "Today"]]).map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === sel ? " selected" : "") + ">" + esc(x[1]) + "</option>"; }).join(""); };
+      var side = function (id, dflt) { return '<span style="display:flex;gap:4px;flex:1;min-width:0"><select class="tx" data-s="' + id + '" style="flex:1;min-width:0">' + fOpts(dflt, [["#", "a number / text →"]]) + '</select><input class="tx" data-v="' + id + '" placeholder="value" style="width:80px;display:none"></span>'; };
+      var sideVal = function (root, id) { var s2 = root.querySelector('[data-s="' + id + '"]'), v = root.querySelector('[data-v="' + id + '"]'); v.style.display = s2.value === "#" ? "" : "none"; return s2.value === "#" ? (String(v.value).trim() === "" ? "0" : qv(v.value)) : s2.value; };
+      var OPS = [["=", "is"], ["!=", "is not"], [">", "is more than"], [">=", "is at least"], ["<", "is less than"], ["<=", "is at most"], ["blank", "is empty"], ["filled", "is filled"], ["has", "contains"], ["in", "is one of (a, b, c)"]];
+      var condRow = function (i) { return '<div class="row" data-cr="' + i + '" style="gap:4px;margin-top:5px;flex-wrap:wrap"><select class="tx" data-cf style="flex:1.3;min-width:110px">' + fOpts("") + '</select><select class="tx" data-co style="flex:1;min-width:100px">' + OPS.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + "</option>"; }).join("") + '</select><input class="tx" data-cv placeholder="value" style="flex:1;min-width:80px"></div>'; };
+      var condOf = function (r) { var f = r.querySelector("[data-cf]").value, op = r.querySelector("[data-co]").value, v = r.querySelector("[data-cv]").value; r.querySelector("[data-cv]").style.display = op === "blank" || op === "filled" ? "none" : "";
+        if (op === "blank") return "ISBLANK(" + f + ")"; if (op === "filled") return "NOT(ISBLANK(" + f + "))"; if (op === "has") return "CONTAINS(" + f + ", " + qv(v) + ")"; if (op === "in") return "IN(" + f + ", " + v.split(",").map(qv).join(", ") + ")"; return f + " " + op + " " + qv(v); };
+      if (purpose === "cond") {
+        box.innerHTML = '<div class="muted" style="font-size:12px">Build the condition from the lists — no typing of formulas.</div><label class="lb">When</label><select class="tx" id="bj"><option value=" AND ">ALL of these are true</option><option value=" OR ">ANY one of these is true</option></select><div id="brs">' + condRow(0) + '</div><button class="btn ghost sm" id="bad" type="button" style="margin-top:6px">＋ Another condition</button>';
+        var n = 1, upd = function () { f.value = [].map.call(box.querySelectorAll("[data-cr]"), condOf).join(box.querySelector("#bj").value); check(); };
+        box.querySelector("#bad").onclick = function () { box.querySelector("#brs").insertAdjacentHTML("beforeend", condRow(n++)); wire(); upd(); };
+        var wire = function () { [].forEach.call(box.querySelectorAll("select,input"), function (e) { e.oninput = e.onchange = upd; }); }; wire(); upd(); return;
+      }
+      var KINDS = [["math", "➗ Maths between two things (+ − × ÷)"], ["pct", "％ A percent of an amount"], ["share", "📊 A as % of B (achievement %)"], ["days", "📅 Days between two dates"], ["scen", "🔀 Different value for different situations (if … then …)"], ["slab", "🪜 Slab / range table"], ["total", "🧾 Total of a table column (+ GST)"], ["limit", "🚧 A value with a maximum / minimum"]];
+      box.innerHTML = '<label class="lb">What should it work out?</label><select class="tx" id="bk">' + KINDS.map(function (k) { return '<option value="' + k[0] + '">' + k[1] + "</option>"; }).join("") + '</select><div id="bp" style="margin-top:6px"></div>';
+      var draw = function () {
+        var k = box.querySelector("#bk").value, bp = box.querySelector("#bp"), h = "";
+        if (k === "math") h = '<div class="row" style="gap:4px;flex-wrap:wrap">' + side("a") + '<select class="tx" id="bo" style="width:70px"><option value="+">+</option><option value="-">−</option><option value="*">×</option><option value="/">÷</option></select>' + side("b") + '</div><label class="lb">Round to</label><select class="tx" id="br"><option value="">no rounding</option><option value="0">whole number</option><option value="2">2 decimals</option></select>';
+        else if (k === "pct") h = '<div class="row" style="gap:4px;flex-wrap:wrap"><input class="tx" id="bpp" type="number" value="18" style="width:80px"><span style="align-self:center">% of</span>' + side("a") + '</div><label class="lb">Result</label><select class="tx" id="bpm"><option value="only">only the percent part</option><option value="add">amount + percent (e.g. with GST)</option><option value="less">amount − percent (after discount)</option></select>';
+        else if (k === "share") h = '<div class="row" style="gap:4px;flex-wrap:wrap">' + side("a") + '<span style="align-self:center">as % of</span>' + side("b") + "</div>";
+        else if (k === "days") h = '<div class="row" style="gap:4px;flex-wrap:wrap"><span style="align-self:center">From</span>' + side("a") + '<span style="align-self:center">to</span>' + side("b") + '</div><label class="chk" style="display:flex;gap:6px;margin-top:6px"><input type="checkbox" id="bi" checked> count both days (+1)</label>';
+        else if (k === "scen") h = '<div class="muted" style="font-size:12px">The first situation that is true gives the value.</div><div id="bsc"></div><button class="btn ghost sm" id="bsa" type="button" style="margin-top:6px">＋ Another situation</button><div class="row" style="gap:4px;margin-top:8px"><span style="align-self:center;font-weight:700">Otherwise</span><input class="tx" id="bel" placeholder="value" style="flex:1"></div>';
+        else if (k === "slab") h = '<div class="row" style="gap:4px"><span style="align-self:center">Based on</span><select class="tx" data-s="a" style="flex:1">' + fOpts("") + '</select></div><table class="ed" style="margin-top:6px;width:100%"><tr><td class="muted">From (and above)</td><td class="muted">Result</td></tr>' + [[0, 0], [10, 1000], [25, 3000], [50, 7500]].map(function (r) { return '<tr><td><input class="tx" data-sf value="' + r[0] + '"></td><td><input class="tx" data-sr value="' + r[1] + '"></td></tr>'; }).join("") + "</table>";
+        else if (k === "total") h = tables.length ? '<div class="row" style="gap:4px"><select class="tx" id="btt" style="flex:1">' + tables.map(function (t) { return '<option value="' + esc(t.key) + '">' + esc(t.label || t.key) + "</option>"; }).join("") + '</select><select class="tx" id="btc" style="flex:1"></select></div><div class="row" style="gap:4px;margin-top:6px"><span style="align-self:center">+ GST %</span><input class="tx" id="btg" type="number" value="0" style="width:80px"></div>' : '<div class="muted">Add a table field first (e.g. expense lines).</div>';
+        else if (k === "limit") h = '<div class="row" style="gap:4px;flex-wrap:wrap"><span style="align-self:center">Take</span>' + side("a") + '</div><div class="row" style="gap:4px;margin-top:6px"><span style="align-self:center">but not more than</span><input class="tx" id="bmx" placeholder="no maximum" style="flex:1"><span style="align-self:center">and not less than</span><input class="tx" id="bmn" placeholder="no minimum" style="flex:1"></div>';
+        bp.innerHTML = h;
+        var scN = 0, scRow = function () { var i = scN++; return '<div class="bxx" data-sci="' + i + '" style="border:1px dashed #d9dbe8;border-radius:10px;padding:6px;margin-top:6px"><b style="font-size:12px">If</b>' + condRow("s" + i) + '<div class="row" style="gap:4px;margin-top:4px"><b style="font-size:12px;align-self:center">then</b><input class="tx" data-then placeholder="value e.g. ZSM or 500" style="flex:1"></div></div>'; };
+        if (k === "scen") { bp.querySelector("#bsc").innerHTML = scRow() + scRow(); bp.querySelector("#bsa").onclick = function () { bp.querySelector("#bsc").insertAdjacentHTML("beforeend", scRow()); wire(); upd(); }; }
+        if (k === "total" && tables.length) { var fillC = function () { var t = tables.find(function (x) { return x.key === bp.querySelector("#btt").value; }); bp.querySelector("#btc").innerHTML = (t.columns || []).filter(function (c) { return c.type === "number" || c.type === "currency" || c.type === "calc"; }).map(function (c) { return '<option value="' + esc(c.key) + '">' + esc(c.label || c.key) + "</option>"; }).join(""); }; fillC(); bp.querySelector("#btt").addEventListener("change", fillC); }
+        var upd = function () { var A = bp.querySelector('[data-s="a"]') ? sideVal(bp, "a") : "", Bv = bp.querySelector('[data-s="b"]') ? sideVal(bp, "b") : "", out = "";
+          if (k === "math") { out = A + " " + bp.querySelector("#bo").value + " " + Bv; var rd = bp.querySelector("#br").value; if (rd !== "") out = "ROUND(" + out + ", " + rd + ")"; }
+          else if (k === "pct") { var pp = bp.querySelector("#bpp").value || 0, m = bp.querySelector("#bpm").value; out = m === "add" ? "ADDGST(" + A + ", " + pp + ")" : m === "less" ? "DISCOUNT(" + A + ", " + pp + ")" : "PCT(" + A + ", " + pp + ")"; }
+          else if (k === "share") out = "ROUND(PERCENT(" + A + ", " + Bv + "), 1)";
+          else if (k === "days") out = "DAYS(" + Bv + ", " + A + ")" + (bp.querySelector("#bi").checked ? " + 1" : "");
+          else if (k === "scen") { var parts = [].map.call(bp.querySelectorAll("[data-sci]"), function (d) { return condOf(d.querySelector("[data-cr]")) + ", " + qv(d.querySelector("[data-then]").value); }); out = "IFS(" + parts.join(", ") + ", TRUE, " + qv(bp.querySelector("#bel").value) + ")"; }
+          else if (k === "slab") { var pr = [].map.call(bp.querySelectorAll("[data-sf]"), function (x, i) { return x.value === "" ? "" : x.value + ":" + bp.querySelectorAll("[data-sr]")[i].value; }).filter(Boolean).join(","); out = "SLAB(" + bp.querySelector('[data-s="a"]').value + ', "' + pr + '")'; }
+          else if (k === "total" && tables.length) { out = "SUM(" + bp.querySelector("#btt").value + "." + bp.querySelector("#btc").value + ")"; var g = +bp.querySelector("#btg").value; if (g) out = "ADDGST(" + out + ", " + g + ")"; }
+          else if (k === "limit") { out = A; var mx = bp.querySelector("#bmx").value.trim(), mn = bp.querySelector("#bmn").value.trim(); if (mx) out = "CAP(" + out + ", " + qv(mx) + ")"; if (mn) out = "ATLEAST(" + out + ", " + qv(mn) + ")"; }
+          f.value = out; check(); };
+        var wire = function () { [].forEach.call(bp.querySelectorAll("select,input"), function (e) { e.oninput = e.onchange = upd; }); }; wire(); upd();
+      };
+      box.querySelector("#bk").onchange = draw; draw();
+    }
     paint();
     return ov;
   } };

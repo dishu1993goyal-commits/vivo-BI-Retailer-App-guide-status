@@ -7,7 +7,7 @@
 //   custver                { v }   bumped on every change so apps refresh their cached customizations
 import { randomBytes, createHash } from "node:crypto";
 import { test as fxTest, refs as fxRefs, FUNCTIONS as FX_FUNCS } from "./formula-core.mjs";
-import { cleanProTool, proValues, enterFrom, canActPro, isProApproverAny, actPro, tickTat, lookupRecord, roleDir, LOOKUP_SOURCES, PRO_TYPES } from "./toolpro-core.mjs";
+import { cleanProTool, lintTool, proValues, enterFrom, canActPro, isProApproverAny, actPro, tickTat, lookupRecord, roleDir, LOOKUP_SOURCES, PRO_TYPES } from "./toolpro-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const cid = (v) => String(v || "").replace(/[^a-z0-9]/gi, "").slice(0, 30);
@@ -216,6 +216,40 @@ ${cond ? "The result must be a CONDITION that is true or false." : "The result m
       out = { formula: fx, explain: str(d.explain, 300) };
     }
     return json(200, out ? Object.assign({ ok: true }, out) : { ok: false, error: "Couldn't write a working formula (" + last + "). Try describing it differently or pick a recipe." });
+  }
+  if (b.action === "ct-tool-ai") {   // Studio: "describe your process" → a whole form + rules + approval steps
+    if (!isMaster) return json(403, { ok: false, error: "Master admins only." });
+    const desc = str(b.desc, 2000); if (desc.length < 10) return json(400, { ok: false, error: "Describe the process in a sentence or two." });
+    const dir = await roleDir(store);
+    const sys = `You design business forms with approval workflows for a mobile-phone sales company in India (vivo). Reply with JSON only:
+{"name":"…","icon":"one emoji","category":"field|admin|finance|reports|support|more","desc":"one line","useCase":"2-3 plain sentences of the business rules",
+ "fields":[{"key":"short_snake","label":"…","type":"${PRO_TYPES.filter((x) => x !== "image").join("|")}","required":true,"options":["for select/multi"],"formula":"only for type calc","format":"currency|number|text|date (calc only)","showIf":"condition","requiredIf":"condition","columns":[{"key":"…","label":"…","type":"text|number|currency|select|date","formula":"optional, uses other columns of the same row"}],"validations":[{"rule":"condition","msg":"…"}]}],
+ "rules":[{"rule":"condition that must be true","msg":"shown when false"}],
+ "steps":[{"name":"…","role":"one of ROLES","when":"condition (blank = always)","autoApproveIf":"condition","tatHours":24,"escalateRole":"role or blank","endIf":"condition after which no further step is needed"}]}
+Formula rules: refer to fields by key; table columns as table.column only inside SUM/AVG/MIN/MAX/COUNT; COUNTROWS(table). Text in "double quotes". Numbers plain. Dates "YYYY-MM-DD"; TODAY(), DAYS(later, earlier), ADDDAYS(d,n), HOURS(later, earlier).
+Operators + - * / , = != < <= > >=, AND OR NOT, & joins text. Functions ONLY: ${FX_FUNCS.join(", ")}.
+Prefer the easy ones: PCT(amount, rate) = rate% of amount; PERCENT(a,b) = a/b*100; ABOVE(x, limit) = how much x is above limit (0 if not); BELOW; CAP(x, max); ATLEAST(x, min); BETWEEN(x, lo, hi); PER(x, every, pay) = pay for every 'every' units; ADDGST(x, rate); GSTOF(x, rate); DISCOUNT(x, rate); DIFF(a,b); RATIO(a,b); SLAB(v,"from:result,from:result"); TIER same but text; IF; IFS(c1,v1,c2,v2,TRUE,v); SWITCH(x,"a",1,"b",2,default); IN(x,"a","b"); NUM(text).
+Select values are text, so compare as type = "Sick" and use NUM(field) when an option is a number. 4–14 fields, at most 5 steps. Only use roles from ROLES.`;
+    let last = "", out = null;
+    for (let attempt = 0; attempt < 3 && !out; attempt++) {
+      const q = desc + (last ? `\n\nYour previous design had these problems: ${last}. Fix them and send the whole JSON again.` : "");
+      const r = await ctx.askAI(ctx.env, q, "ROLES: " + JSON.stringify(dir.roles || []), [], ctx.aiFetch, { system: sys, label: "TOOLDESIGN", maxTokens: 3500 });
+      if (!r.ok) return json(200, { ok: false, error: r.error });
+      let d = null; try { const m = /\{[\s\S]*\}/.exec(r.text || ""); d = m ? JSON.parse(m[0]) : null; } catch (e) { d = null; }
+      if (!d || !Array.isArray(d.fields) || !d.fields.length) { last = "no JSON with fields"; continue; }
+      const steps = (Array.isArray(d.steps) ? d.steps : []).slice(0, 5).map((s, i) => ({ id: "s" + (i + 1), name: str(s.name, 60) || "Step " + (i + 1), when: str(s.when, 400), approver: { type: "role", role: str(s.role, 40) || "ASM", scope: "submitterState", users: [] }, mode: "any", tatHours: Math.max(0, Math.min(720, Number(s.tatHours) || 24)), escalate: s.escalateRole ? { type: "role", role: str(s.escalateRole, 40), scope: "submitterState", users: [] } : null, autoApproveIf: str(s.autoApproveIf, 400), routes: s.endIf ? [{ if: str(s.endIf, 400), goto: "end" }] : [], onReject: "end" }));
+      const tl = cleanProTool({ fields: d.fields.map((f) => Object.assign({}, f, f && f.type === "calc" ? { formula: String(f.formula || "").replace(/^=/, ""), format: f.format || "currency", decimals: 0 } : {})), rules: d.rules, flow: { steps } });
+      const fl = tl.fields;
+      const lintIn = { fields: fl, rules: tl.rules, flow: { steps } };
+      const probs = lintTool(lintIn), keys = new Set(fl.map((f) => f.key));
+      const all = [].concat(fl.flatMap((f) => [f.formula, f.showIf, f.requiredIf].concat((f.validations || []).map((v) => v.rule)))).concat(tl.rules.map((r) => r.rule)).concat(steps.flatMap((s) => [s.when, s.autoApproveIf].concat(s.routes.map((r) => r.if)))).filter(Boolean);
+      const unknown = [...new Set(all.flatMap((x) => { try { return fxRefs(x); } catch (e) { return []; } }).filter((k) => k !== "user" && !keys.has(k)))];
+      if (unknown.length) probs.push("unknown field(s) " + unknown.join(", "));
+      fl.filter((f) => f.type === "calc" && !f.formula).forEach((f) => probs.push(f.label + " is a calc with no formula"));
+      if (probs.length) { last = probs.slice(0, 8).join("; "); continue; }
+      out = { tool: { name: str(d.name, 80) || "New tool", icon: str(d.icon, 8) || "🧩", category: CATS.includes(d.category) ? d.category : (["finance"].includes(d.category) ? "admin" : "more"), desc: str(d.desc, 300), useCase: str(d.useCase, 1500), fields: fl, rules: tl.rules, steps } };
+    }
+    return json(200, out ? Object.assign({ ok: true }, out) : { ok: false, error: "Couldn't design a working tool (" + last + "). Add a little more detail and try again, or start from a template." });
   }
   if (b.action === "ct-lookup") {   // live lookup while filling a Studio Pro form
     const tl = await toolFor(b.tool); const f = tl && tl.tool.pro ? (tl.tool.fields || []).find((x) => x.key === str(b.field, 30) && x.type === "lookup") : null;

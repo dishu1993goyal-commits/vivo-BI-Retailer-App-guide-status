@@ -35,6 +35,11 @@ Object.assign(FN, {
   SUM: (...a) => flat(a).reduce((s, x) => s + N(x), 0), AVG: (...a) => { const v = flat(a).filter((x) => !isBlank(x)); return v.length ? v.reduce((s, x) => s + N(x), 0) / v.length : 0; },
   COUNT: (...a) => flat(a).filter((x) => !isBlank(x) && x !== false).length, COUNTROWS: (t) => (Array.isArray(t) ? t.length : 0),
   PERCENT: (a, b) => (N(b) ? N(a) / N(b) * 100 : 0),
+  // easy maths words (plain-language helpers)
+  PCT: (x, p) => N(x) * N(p) / 100, ABOVE: (x, limit) => Math.max(0, N(x) - N(limit)), BELOW: (x, limit) => Math.max(0, N(limit) - N(x)),
+  CAP: (x, mx) => Math.min(N(x), N(mx)), ATLEAST: (x, mn) => Math.max(N(x), N(mn)), BETWEEN: (x, a, b) => N(x) >= N(a) && N(x) <= N(b),
+  PER: (x, every, amt) => (N(every) ? Math.floor(N(x) / N(every)) * N(amt) : 0), ADDGST: (x, rate) => Math.round(N(x) * (1 + N(rate) / 100) * 100) / 100, GSTOF: (x, rate) => Math.round(N(x) * N(rate) / 100 * 100) / 100,
+  DISCOUNT: (x, p) => Math.round(N(x) * (1 - N(p) / 100) * 100) / 100, DIFF: (a, b) => N(a) - N(b), RATIO: (a, b) => (N(b) ? N(a) / N(b) : 0),
   SLAB: (v, spec) => { const x = N(v); let out = 0; slabPairs(spec).forEach((p) => { if (x >= p[0]) out = N(p[1]); }); return out; },
   TIER: (v, spec) => { const x = N(v); let out = ""; slabPairs(spec).forEach((p) => { if (x >= p[0]) out = p[1]; }); return out; },
   LEN: (s) => S(s).length, LOWER: (s) => S(s).toLowerCase(), UPPER: (s) => S(s).toUpperCase(), TRIM: (s) => S(s).trim(), CONCAT: (...a) => flat(a).map(S).join(""),
