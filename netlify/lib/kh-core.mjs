@@ -20,7 +20,7 @@
 //   kh:user:<mobile> owner login      kh:sess:<sha> owner session      kh:link:<token> party link
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { readImages } from "./schemecalc-core.mjs";
-import { aiKeys } from "./aff-core.mjs";
+import { aiKeys, research } from "./aff-core.mjs";
 import { parseLoose } from "./man-core.mjs";
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -425,6 +425,27 @@ async function ownerOp(op, b, ctx) {
     const inR = (d) => d >= from && d <= to, docs = all.filter((d) => inR(d.d)), dd = Object.keys(days).filter(inR).sort();
     return json(200, { ok: true, from, to, docs: docs.map((d) => ({ id: d.id, pid: d.pid, pk: d.pk, pn: d.pn, ty: d.ty, no: d.no, d: d.d, amt: d.amt, paid: d.paid, mode: d.mode, items: d.items.map((i) => ({ p: i.p, n: i.n, q: i.q, r: i.r, amt: i.amt, c: i.c || 0 })) })), days: dd.map((k) => Object.assign({ d: k }, days[k])) });
   }
+  // ----- 📚 product catalogue: HO's updated price list + AI search of Indian retailer sites -----
+  if (op === "catalog") { const c = await store.get("kh:catalog"); return json(200, { ok: true, rows: c ? c.rows : [], at: c ? c.at : 0, by: c ? c.by : "" }); }
+  if (op === "find" || op === "price-check") {
+    const keys = await aiKeys(store, ctx.env); if (!keys.groq && !keys.tavily && !(ctx.env && ctx.env.GEMINI_API_KEY)) return json(400, { ok: false, error: "Online search isn't set up yet — ask your BI team." });
+    const cats = (Array.isArray(b.cats) ? b.cats : []).map((c) => str(c, 40)).slice(0, 40).join(", ");
+    let task;
+    if (op === "find") {
+      const q = str(b.q, 80); if (q.length < 2) return json(400, { ok: false, error: "Type what to search, e.g. Haldiram namkeen" });
+      task = { queries: [q + " MRP price India bigbasket", q + " MRP jiomart blinkit"], validate: (d) => d && Array.isArray(d.items) && d.items.length > 0,
+        prompt: `Find packaged grocery / kirana / confectionery products sold in Indian shops that match "${q}". List every distinct product and pack size you can find (up to 30). Reply with ONLY JSON: {"items":[{"name":"brand + product name","brand":"","pack":"pack size e.g. 500 g / 1 L / pack of 10","category":"one of: ${cats}","mrp":0,"price":0,"source":"url"}]} — mrp = printed MRP in rupees, price = usual selling price online in rupees, numbers only. Only real products with real current prices from Indian retailer or brand sites; leave out anything you are not sure about.` };
+    } else {
+      const L = (Array.isArray(b.items) ? b.items : []).slice(0, 12).map((x, i) => ({ i, n: str(x.n, 90), pack: str(x.pack, 30), mrp: num(x.mrp) })).filter((x) => x.n);
+      if (!L.length) return json(400, { ok: false, error: "Pick items to check." });
+      task = { queries: L.slice(0, 4).map((x) => x.n + " " + x.pack + " MRP"), validate: (d) => d && Array.isArray(d.items),
+        prompt: `For each Indian grocery product below, find today's printed MRP and the usual online selling price in India (BigBasket, JioMart, Blinkit, Zepto, Amazon or the brand site). Reply with ONLY JSON: {"items":[{"i":0,"mrp":0,"price":0,"pack":"pack size the price is for","source":"url"}]} — numbers only, skip a product if you can't find it.\n` + L.map((x) => `${x.i}. ${x.n}${x.pack ? " (" + x.pack + ")" : ""}${x.mrp ? " — our current MRP ₹" + x.mrp : ""}`).join("\n") };
+    }
+    const r = await research(store, ctx.env, task, { fetchImpl: ctx.aiFetch, now: () => t });
+    if (!r.ok) return json(200, { ok: false, error: "Couldn't search online right now — try again in a minute. (" + String(r.error).slice(0, 160) + ")" });
+    const items = (r.data.items || []).slice(0, 40).map((x) => ({ i: x.i != null ? Math.round(num(x.i)) : undefined, name: str(x.name, 90), brand: str(x.brand, 40), pack: str(x.pack, 30), category: str(x.category, 40), mrp: num(x.mrp), price: num(x.price), source: /^https?:\/\//.test(String(x.source || "")) ? str(x.source, 300) : "" })).filter((x) => x.mrp > 0 || x.price > 0);
+    return json(200, { ok: true, items, sources: (r.sources || []).slice(0, 8), model: r.model || "" });
+  }
   if (op === "log") return json(200, { ok: true, list: ((await store.get(K.log(sid))) || { list: [] }).list.slice(0, 400) });
 
   // ----- AI: read a bill photo, insights, order plan, ask anything -----
@@ -514,6 +535,12 @@ export async function khAdmin(b, ctx) {
     await store.set(K.user(mob), Object.assign({ sid, name: str(b.ownerName, 60) || sh.owner || "", fails: 0 }, hashPw(b.pw), { sessions: [] }));
     if (e) { e.mob = mob; e.loginAt = t; } await store.set(K.shops, S); await addLog(store, sid, t, by, "Owner login set for " + mob.slice(0, 2) + "******" + mob.slice(-2));
     return json(200, { ok: true, sid, mob });
+  }
+  if (b.action === "kh-cat-save") {   // HO's updated catalogue prices (Excel) — every shop sees them
+    const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 8000).map((x) => ({ n: str(x.n, 90), br: str(x.br, 40), cat: str(x.cat, 40), u: str(x.u, 12) || "pc", pack: str(x.pack, 30), mrp: num(x.mrp), dp: num(x.dp), sp: num(x.sp) })).filter((x) => x.n && (x.mrp || x.sp));
+    if (b.clear) { await store.delete("kh:catalog"); return json(200, { ok: true, n: 0 }); }
+    if (!rows.length) return json(400, { ok: false, error: "No rows with a name and a price." });
+    await store.set("kh:catalog", { rows, at: t, by }); return json(200, { ok: true, n: rows.length });
   }
   if (b.action === "kh-shop-off") {
     const S = (await store.get(K.shops)) || { list: [] }, e = S.list.find((x) => x.id === cid(b.shop)); if (!e) return json(404, { ok: false, error: "Not found" });
