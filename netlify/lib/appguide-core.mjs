@@ -211,7 +211,7 @@ async function freshVideo(v, keys, f) {
 function pubCfg(c, isAdmin, keys) {
   const p = c.presenter || {}, V = vcfg(c);
   return { kb: c.kb || "", video: isAdmin ? { provider: V.provider, show: V.show, hfSpace: V.hfSpace, hfApi: V.hfApi, hfNeedsVoice: V.hfNeedsVoice, motion: V.motion, expr: V.expr, keys: keys ? { did: !!keys.did, heygen: !!keys.heygen, hf: !!keys.hf } : undefined } : { provider: V.provider, show: V.show }, presenter: { name: p.name || "", voice: p.voice === "m" ? "m" : "f", hasPhoto: !!p.hasPhoto, consentBy: p.consentBy || "", consentAt: p.consentAt || 0 },
-    videos: (c.videos || []).filter((v) => isAdmin || v.status === "done").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did", stored: !!v.stored, saveErr: isAdmin ? v.saveErr || "" : "", bytes: v.bytes || 0, codec: v.codec || "" })) };
+    videos: (c.videos || []).filter((v) => (isAdmin || v.status === "done") && v.src !== "manual").map((v) => ({ id: v.id, title: v.title, tag: v.tag || "", lang: v.lang, k: v.k, scenes: v.scenes || [], status: v.status, at: v.at, by: v.by, error: v.error, stage: v.stage || "", provider: v.provider || "did", stored: !!v.stored, saveErr: isAdmin ? v.saveErr || "" : "", bytes: v.bytes || 0, codec: v.codec || "" })) };
 }
 
 // GET /api/auth?agvid=<videoId> — stream the finished D-ID video from the same origin, so the page can draw it onto a
@@ -359,10 +359,15 @@ ${feat}`;
     if (prov === "hf" && !V.hfSpace) return json(200, { ok: false, error: "Set the free Hugging Face Space in Presenter settings first." });
     if (prov !== "hf" && !keys[prov]) return json(200, { ok: false, error: "Add the " + (prov === "heygen" ? "HeyGen" : "D-ID") + " API key first (Presenter settings)." });
     if (!P.hasPhoto) return json(200, { ok: false, error: "Upload the presenter photo first." });
-    const text = String(b.text || "").replace(/\s+/g, " ").trim().slice(0, 1800); if (text.length < 10) return json(400, { ok: false, error: "Write the script first." });
+    const text = String(b.text || "").replace(/\s+/g, " ").trim().slice(0, b.src === "manual" ? 4800 : 1800); if (text.length < 10) return json(400, { ok: false, error: "Write the script first." });
     const lang = langOf(b.lang), loc = AG_LANGS[lang];
+    const th = createHash("sha1").update(prov + "|" + (P.voice || "f") + "|" + (P.consentAt || 0) + "|" + lang + "|" + text).digest("hex").slice(0, 16);
+    if (b.src === "manual") {   // Tool manuals: the same script with the same presenter is made once and reused (saves credits)
+      const old = (c.videos || []).find((x) => x.th === th && (x.status === "done" || x.status === "making"));
+      if (old) return json(200, { ok: true, reused: true, video: { id: old.id, title: old.title, status: old.status, provider: old.provider } });
+    }
     const scenes = (Array.isArray(b.scenes) ? b.scenes : []).slice(0, 10).map((s) => ({ say: str(s && s.say, 500), caption: str(s && s.caption, 80), shot: str(s && s.shot, 40) }));
-    const v = { id: t.toString(36) + randomBytes(3).toString("hex"), provider: prov, title: str(b.title, 100) || "App guide video", tag: str(b.tag, 120), lang, k: str(b.k, 30), scenes, status: "making", at: t, by: rec.fullName || rec.username };
+    const v = { id: t.toString(36) + randomBytes(3).toString("hex"), provider: prov, title: str(b.title, 100) || "App guide video", tag: str(b.tag, 120), lang, k: str(b.k, 30), scenes, status: "making", at: t, by: rec.fullName || rec.username, th, src: b.src === "manual" ? "manual" : "" };
     if (prov === "hf") {   // free model: runs in a background job (it can take several minutes)
       const jid = t.toString(36) + randomBytes(5).toString("hex");
       if (b.audio) {

@@ -59,11 +59,11 @@
     VIEW.innerHTML = '<div class="card"><div class="step"><span class="n">1</span><div style="flex:1"><b>Choose the tool or dashboard section</b><select class="tx" id="ms" style="margin-top:6px"><option value="">— select —</option>' + groups.map(function (g) { return '<optgroup label="' + esc(g) + '">' + L.filter(function (i) { return i.group === g; }).map(function (i) { return '<option value="' + esc(i.id) + '"' + (SEL && SEL.id === i.id ? " selected" : "") + ">" + esc(i.name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + '</select><div class="g2"><div><label class="lb">Language</label><select class="tx" id="ml">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === LANG ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">For</label><select class="tx" id="ma"><option value="both"' + (AUD === "both" ? " selected" : "") + '>Admins & end users</option><option value="admin"' + (AUD === "admin" ? " selected" : "") + '>Admins / IT team</option><option value="user"' + (AUD === "user" ? " selected" : "") + ">End users</option></select></div></div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">2</span><div style="flex:1"><b>Capture the real screens</b><div class="muted" style="font-size:12px">Opens the tool as you see it (phone size) and photographs every tab. You can add your own screenshots too.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="mc"' + (SEL ? "" : " disabled") + '>📸 Capture screens</button><button class="btn sec sm" id="mu">＋ Add screenshot</button><button class="btn ghost sm" id="msv"' + (SEL ? "" : " disabled") + ' title="Saves these screens (and result examples) so the Monthly one-pager shows them">💾 Save for Monthly one-pager</button></div><div class="muted" id="svst" style="font-size:11.5px;margin-top:4px">' + (SAVED_AT ? "✅ Saved for the Monthly one-pager · " + SAVED_AT : "Screens are saved automatically after capturing, for the Monthly one-pager → App tools.") + '</div><div class="prog" id="cp" style="display:none"><i></i></div><div class="shots" id="sh">' + shotsHtml() + '</div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><b style="font-size:13px">✅ End result examples (sample data)</b><div class="muted" style="font-size:12px">What users see after finishing the task — shown in the PPT, PDF, one-pager and video. Empty fields on captured screens are filled with dummy examples. AI draws a sample result screen when you write the manual; add real app screenshots of a result too.</div><div class="row" style="gap:6px;margin-top:6px"><button class="btn sec sm" id="mr">＋ Add result screenshot</button></div><div class="shots" id="rs">' + shotsHtml(true) + "</div></div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">3</span><div style="flex:1"><b>Write the manual with AI</b><div class="muted" style="font-size:12px">Overview, roles, navigation map, every screen explained, admin & user flows, settings, data flow, rules, FAQs, troubleshooting, glossary, one-pager text and video captions — in the chosen language.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="mg"' + (SEL ? "" : " disabled") + ">✨ " + (MAN ? "Rewrite" : "Write manual") + '</button></div><div id="mo">' + (MAN ? outline(MAN) : "") + "</div></div></div></div>" +
-      '<div class="card"><div class="step"><span class="n">4</span><div style="flex:1"><b>Export</b><div class="exp"><button data-x="pptx">📊 PowerPoint<small>Editable .pptx — text, flowcharts, screens</small></button><button data-x="pdf">📄 PDF manual<small>Same slides as a PDF</small></button><button data-x="one">🖼️ One-pager creative<small>Poster PNG to share</small></button><button data-x="vid">🎬 Walkthrough video<small>Animated screens, captions + AI voice (MP4)</small></button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🎙️ Video voice-over</span><select class="tx" id="vv" style="flex:1;max-width:240px"><option value="f"' + (VOICE === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (VOICE === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (VOICE === "off" ? " selected" : "") + '>No voice</option></select><button class="btn ghost sm" id="vset" type="button">⚙️ Voice settings</button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🧑‍🏫 AI presenter</span><select class="tx" id="vp" style="flex:1;max-width:240px">' + [["off", "None"], ["priya", "Priya — human presenter (female)"], ["arjun", "Arjun — human presenter (male)"], ["vee", "Vee — friendly guide"], ["dev", "Dev — friendly guide"], ["robo", "Robo — AI robot"]].map(function (o) { return '<option value="' + o[0] + '"' + (PRES === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><span class="muted" style="font-size:11.5px">points at each step, gestures & talks with the voice</span></div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><div class="row" style="gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:12.5px">📝 Video script</b><button class="btn sec sm" id="scai" type="button">✨ Write with AI</button><button class="btn ghost sm" id="sced" type="button">✏️ View / edit</button><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="scuse"' + (USE_SCRIPT ? " checked" : "") + '> use it in the video</label></div><div class="muted" id="scst" style="font-size:11.5px;margin-top:4px"></div></div><div class="prog" id="xp" style="display:none"><i></i></div><div class="muted" id="xs" style="font-size:12px;margin-top:6px"></div></div></div></div>';
+      '<div class="card"><div class="step"><span class="n">4</span><div style="flex:1"><b>Export</b><div class="exp"><button data-x="pptx">📊 PowerPoint<small>Editable .pptx — text, flowcharts, screens</small></button><button data-x="pdf">📄 PDF manual<small>Same slides as a PDF</small></button><button data-x="one">🖼️ One-pager creative<small>Poster PNG to share</small></button><button data-x="vid">🎬 Walkthrough video<small>Animated screens, captions + AI voice (MP4)</small></button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🎙️ Video voice-over</span><select class="tx" id="vv" style="flex:1;max-width:240px"><option value="f"' + (VOICE === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (VOICE === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (VOICE === "off" ? " selected" : "") + '>No voice</option></select><button class="btn ghost sm" id="vset" type="button">⚙️ Voice settings</button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🧑‍🏫 AI presenter</span><select class="tx" id="vp" style="flex:1;max-width:240px">' + [["off", "None"], ["real", "📸 Real person — lifelike talking video"], ["priya", "Priya — illustrated (female)"], ["arjun", "Arjun — illustrated (male)"], ["vee", "Vee — friendly guide"], ["dev", "Dev — friendly guide"], ["robo", "Robo — AI robot"]].map(function (o) { return '<option value="' + o[0] + '"' + (PRES === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><span class="muted" id="vph" style="font-size:11.5px">' + (PRES === "real" ? "a real-looking person (your consented presenter photo, animated by D-ID / HeyGen) talks in a picture-in-picture" : "points at each step, gestures & talks with the voice") + '</span></div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><div class="row" style="gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:12.5px">📝 Video script</b><button class="btn sec sm" id="scai" type="button">✨ Write with AI</button><button class="btn ghost sm" id="sced" type="button">✏️ View / edit</button><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="scuse"' + (USE_SCRIPT ? " checked" : "") + '> use it in the video</label></div><div class="muted" id="scst" style="font-size:11.5px;margin-top:4px"></div></div><div class="prog" id="xp" style="display:none"><i></i></div><div class="muted" id="xs" style="font-size:12px;margin-top:6px"></div></div></div></div>';
     $("ms").onchange = function () { SEL = L.find(function (i) { return i.id === $("ms").value; }) || null; SHOTS = []; RES = []; MAN = null; SAVED_AT = ""; SAVED_SIG = ""; draw(); if (SEL) { loadBundled(); loadCached(); } };
     $("ml").onchange = function () { LANG = this.value; MAN = null; dropMock(); draw(); if (SEL) loadCached(); };
     $("ma").onchange = function () { AUD = this.value; MAN = null; dropMock(); draw(); if (SEL) loadCached(); };
-    $("mc").onclick = capture; $("msv").onclick = function () { saveShots(true); }; $("mu").onclick = function () { addShot(false); }; $("mr").onclick = function () { addShot(true); }; if ($("vv")) $("vv").onchange = function () { VOICE = this.value; }; if ($("vset")) $("vset").onclick = voiceSettings; if ($("vp")) $("vp").onchange = function () { PRES = this.value; };
+    $("mc").onclick = capture; $("msv").onclick = function () { saveShots(true); }; $("mu").onclick = function () { addShot(false); }; $("mr").onclick = function () { addShot(true); }; if ($("vv")) $("vv").onchange = function () { VOICE = this.value; }; if ($("vset")) $("vset").onclick = voiceSettings; if ($("vp")) $("vp").onchange = function () { PRES = this.value; $("vph").textContent = PRES === "real" ? "a real-looking person (your consented presenter photo, animated by D-ID / HeyGen) talks in a picture-in-picture" : "points at each step, gestures & talks with the voice"; if (PRES === "real") realCheck(true); };
       if ($("scai")) { $("scai").onclick = function () { aiScript(SCRIPT_META && SCRIPT_META.tone); }; $("sced").onclick = editScript; $("scuse").onchange = function () { USE_SCRIPT = this.checked; scriptStatus(); }; scriptStatus(); } $("mg").onclick = function () { gen(!!MAN); };
     wireShots();
     [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { if (!SEL) return toast("Choose a tool first"); if (!MAN) return toast("Write the manual first (step 3)"); ({ pptx: makePptx, pdf: makePdf, one: makeOne, vid: makeVideo })[b.dataset.x](); }; });
@@ -597,10 +597,74 @@
     [].forEach.call(ov.querySelectorAll("[data-sc]"), function (t) { t.oninput = function () { var q = plan.find(function (x) { return x.id === t.dataset.sc; }); ov.querySelector('[data-tm="' + t.dataset.sc + '"]').textContent = "~" + secs(t.value || q.def) + " s"; }; });
   }
   var V2 = function (ov, id) { var e = ov.querySelector("#" + id); return e ? e.value : ""; };
+  // 📸 lifelike presenter: one talking-head video of the whole script, made by the service set up in App guide → Presenter
+  // (a consented real photo animated by D-ID / HeyGen / the free Hugging Face model). Same script = reused, no new credits.
+  var AGLANG = { en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu", bn: "Bengali", mr: "Marathi", gu: "Gujarati", kn: "Kannada", ml: "Malayalam", pa: "Punjabi", or: "Odia" };
+  function realCheck(quiet) {
+    return api({ action: "ag-config" }).then(function (r) {
+      if (!r.ok) return { ok: false, error: r.error };
+      var V = r.video || {}, K = V.keys || {}, P = r.presenter || {};
+      var ok = P.hasPhoto && (V.provider === "hf" ? !!V.hfSpace : !!K[V.provider || "did"]);
+      var why = !P.hasPhoto ? "upload the presenter's photo (with their consent)" : "add the " + (V.provider === "heygen" ? "HeyGen" : V.provider === "hf" ? "free Hugging Face Space" : "D-ID") + " key";
+      if (!ok && quiet) toast("📸 For the lifelike presenter, open App guide → 🧑 Presenter settings and " + why + ".");
+      return ok ? { ok: true, provider: V.provider || "did", name: P.name || "" } : { ok: false, error: "Lifelike presenter isn't set up — in App guide → Presenter settings, " + why + "." };
+    });
+  }
+  function realPresenter(ac, scenes) {
+    var text = scenes.map(function (x) { return x.say; }).filter(Boolean).join(" ").slice(0, 4800);
+    return realCheck(false).then(function (c) {
+      if (!c.ok) return c;
+      $("xs").textContent = "📸 Asking the presenter service to film the talking video…";
+      return api({ action: "ag-avatar", src: "manual", text: text, lang: AGLANG[LANG] || "English", title: "Manual: " + (SEL.n || SEL.name || SEL.id) }).then(function (r) {
+        if (!r.ok) return { ok: false, error: r.error };
+        var id = r.video.id, t0 = Date.now();
+        var poll = function () {
+          if (r.video.status === "done") return Promise.resolve({ status: "done" });
+          return api({ action: "ag-avatar-status", id: id }).then(function (s) {
+            if (s.ok && s.status === "done") return s;
+            if (!s.ok || s.status === "error") throw new Error((s && s.error) || "the presenter service couldn't make the video");
+            if (Date.now() - t0 > 15 * 60000) throw new Error("the presenter video is taking too long — try again in a few minutes (it will be reused)");
+            $("xs").textContent = "📸 Filming the presenter… " + Math.round((Date.now() - t0) / 1000) + " s" + (s.stage ? " · " + s.stage : " (usually 1–4 minutes)");
+            prog(0.25 + Math.min(0.1, (Date.now() - t0) / 3e6));
+            return wait(6000).then(poll);
+          });
+        };
+        return poll().then(function () { $("xs").textContent = "📸 Downloading the presenter video…"; return fetch("/api/auth?agvid=" + encodeURIComponent(id)); })
+          .then(function (res) { if (!res.ok) throw new Error("couldn't download the presenter video (" + res.status + ")"); return res.arrayBuffer(); })
+          .then(function (ab) {
+            var url = URL.createObjectURL(new Blob([ab], { type: "video/mp4" })), vid = document.createElement("video");
+            vid.muted = true; vid.playsInline = true; vid.preload = "auto"; vid.src = url;
+            return decode(ac, ab.slice(0)).then(function (buf) {
+              return new Promise(function (res2, rej2) { if (vid.readyState >= 2) return res2(); vid.onloadeddata = function () { res2(); }; vid.onerror = function () { rej2(new Error("the presenter video can't be played in this browser")); }; }).then(function () { return grabFrames(vid); }).then(function (fr) { return { ok: true, real: true, buf: buf, video: vid, frames: fr, reused: !!r.reused }; });
+            });
+          });
+      });
+    }).catch(function (e) { return { ok: false, error: e.message || String(e) }; });
+  }
+  // plays the clip silently (2× speed) once and keeps small JPEG frames of the head & shoulders, so the fast encoder can
+  // place the right frame at any moment without seeking the video for every frame
+  function grabFrames(vid) {
+    var W = 300, H = 400, cv = document.createElement("canvas"); cv.width = W; cv.height = H; var g = cv.getContext("2d"), out = [], busy2 = 0;
+    var crop = function () { var vw = vid.videoWidth, vh = vid.videoHeight, a = W / H, sw = Math.min(vw, vh * a), sh = sw / a; return [(vw - sw) / 2, Math.max(0, Math.min(vh - sh, vh * 0.02)), sw, sh]; };
+    return new Promise(function (res) {
+      if (!vid.requestVideoFrameCallback) return res(null);   // older browsers: the live recorder draws the playing video instead
+      var C = null, fin = false, end = function () { if (fin) return; fin = true; var w8 = function () { if (busy2) return setTimeout(w8, 50); out.sort(function (a, b) { return a.t - b.t; }); res(out); }; w8(); };
+      var cb = function (now, md) {
+        C = C || crop(); g.drawImage(vid, C[0], C[1], C[2], C[3], 0, 0, W, H); var tt = md.mediaTime; busy2++;
+        cv.toBlob(function (bl) { busy2--; if (bl) out.push({ t: tt, b: bl }); }, "image/jpeg", 0.82);
+        $("xs").textContent = "📸 Preparing the presenter… " + Math.round(tt / Math.max(1, vid.duration) * 100) + "%";
+        if (!vid.ended && !fin) vid.requestVideoFrameCallback(cb);
+      };
+      vid.onended = end; vid.currentTime = 0; vid.playbackRate = 2; vid.requestVideoFrameCallback(cb);
+      vid.play().catch(function () { res(null); });
+      setTimeout(end, (vid.duration || 300) * 1000 / 2 + 15000);
+    });
+  }
   function makeVideo() {
     if (!HTMLCanvasElement.prototype.captureStream && !window.VideoEncoder) return toast("This device can't make video — try Chrome on a laptop.");
     var AC = window.AudioContext || window.webkitAudioContext, ac = null;
-    if (VOICE !== "off" && AC) { try { ac = new AC(); ac.resume(); } catch (e) { ac = null; } }   // created on the tap, so the browser lets it play
+    var REAL = PRES === "real", RV = null, RFR = null, RBM = {}, RS = 0;
+    if ((VOICE !== "off" || REAL) && AC) { try { ac = new AC(); ac.resume(); } catch (e) { ac = null; } }   // created on the tap, so the browser lets it play
     busy(true, "Preparing scenes…");
     var M = MAN, N = M.narration || {}, clean = function (t) { return String(t || "").replace(/[\u{1F000}-\u{1FAFF}☀-➿✓➜👆✏️]/gu, "").replace(/\s+/g, " ").trim(); };
     renderCanvases(function (p) { prog(p * 0.25); }).then(function (cvs) {
@@ -611,14 +675,20 @@
       scenes.forEach(function (sc) { sc.say = clean(sc.say).slice(0, 600); });
       // voice clips: neighbouring scenes of one screen share a clip (≤ 900 characters) to keep the number of AI calls low
       var segs = []; scenes.forEach(function (sc) { if (!sc.say) return; var last = segs[segs.length - 1]; if (last && last.g === sc.g && (last.text + " " + sc.say).length <= 900) { last.text += " " + sc.say; last.sc.push(sc); } else segs.push({ g: sc.g, text: sc.say, sc: [sc] }); });
-      return (ac && segs.length ? voiceClips(ac, segs) : Promise.resolve({ ok: false, skip: true })).then(function (vr) {
+      var realP = REAL && ac ? realPresenter(ac, scenes).then(function (rp) { if (rp.ok) return rp; toast("📸 " + rp.error + " — using the illustrated presenter instead"); PRES = "priya"; return null; }) : Promise.resolve(null);
+      return realP.then(function (rp) {
+        if (rp) { RV = rp.video; RFR = rp.frames; segs = [{ g: "all", text: "", sc: scenes.slice(), buf: rp.buf, real: true }]; return { ok: true }; }
+        if (REAL && !ac) PRES = "priya";
+        REAL = false; return ac && VOICE !== "off" && segs.length ? voiceClips(ac, segs) : { ok: false, skip: true };
+      }).then(function (vr) {
         var voiced = !!(vr.ok && ac);
         if (!vr.ok && !vr.skip) toast("No AI voice (" + (vr.error || "unavailable") + ") — making the video with captions only");
         else if (vr.part) toast("Some voice clips failed — those scenes are silent");
-        if (voiced) segs.forEach(function (sg) { if (!sg.buf) return; var D = sg.buf.duration * 1000 + 450, W = sg.sc.reduce(function (a, x) { return a + Math.max(20, x.say.length); }, 0); sg.sc.forEach(function (x) { x.dur = Math.max(1500, D * Math.max(20, x.say.length) / W); }); });
+        if (voiced) segs.forEach(function (sg) { if (!sg.buf) return; var D = sg.buf.duration * 1000 + 450, W = sg.sc.reduce(function (a, x) { return a + (sg.real ? x.say.length : Math.max(20, x.say.length)); }, 0); sg.sc.forEach(function (x) { x.dur = sg.real ? (x.say ? D * x.say.length / Math.max(1, W) : 0) : Math.max(1500, D * Math.max(20, x.say.length) / W); }); });
+        if (REAL) { scenes = scenes.filter(function (x) { return x.dur > 0; }); segs[0].sc = scenes; }
         var t = 0; scenes.forEach(function (x) { x.start = t; t += x.dur; }); var total = t;
         var V = document.createElement("canvas"); V.width = 1280; V.height = 720; var g = V.getContext("2d");
-        var PRZ = PRES !== "off" && PRESETS[PRES], PW = 300, PX = PRZ ? 330 : 120, PY = 92, QX = PRZ ? 680 : 520, QW = PRZ ? 560 : 700;   // phone + panel positions (moved right when the presenter stands on the left)
+        var PRZ = PRES !== "off" && (PRESETS[PRES] || REAL), PW = 300, PX = PRZ ? 330 : 120, PY = 92, QX = PRZ ? 680 : 520, QW = PRZ ? 560 : 700;   // phone + panel positions (moved right when the presenter stands on the left)
         // voice loudness per 20 ms → the presenter's mouth
         var ENV = new Float32Array(Math.ceil(total / 20) + 2);
         if (voiced) segs.forEach(function (sg) { if (!sg.buf) return; var d = sg.buf.getChannelData(0), sr = sg.buf.sampleRate, st = sg.sc[0].start; for (var q = 0; q * 20 < sg.buf.duration * 1000; q++) { var a = Math.floor(q * 0.02 * sr), e = Math.min(d.length, a + Math.floor(0.02 * sr)), m = 0; for (var z = a; z < e; z += 4) m += d[z] * d[z]; var rms = Math.sqrt(m / Math.max(1, (e - a) / 4)), ix = Math.round((st + 150) / 20) + q; if (ix < ENV.length) ENV[ix] = Math.min(1, rms * 6); } });
@@ -651,7 +721,18 @@
               if (b.click && f > .45 && f < .75) { g.strokeStyle = "rgba(255,90,60," + (1 - (f - .45) / .3) + ")"; g.lineWidth = 3; g.beginPath(); g.arc(x + Math.min(w, 120) / 2, y + h / 2, 10 + 60 * (f - .45), 0, Math.PI * 2); g.stroke(); } }
             panel(b, sc.j, Math.min(1, f * 4));
             g.fillStyle = "#8A8FA8"; g.font = "600 16px " + CSSF; g.textAlign = "left"; g.fillText((sc.s.k === "result" ? "Result tile " : "Step ") + (sc.j + 1) + " of " + (sc.s.co || []).length + (sc.s.k === "result" ? " · sample data" : " on this screen"), QX, 520); }
-          if (PRZ) {   // 🧑‍🏫 the presenter: points at the highlighted element, presents slides, waves at the start and the end
+          if (PRZ && REAL) {   // 📸 lifelike presenter: the filmed talking video in a card (left) or a round picture-in-picture
+            var src = RFR ? RBM.cur : RV;
+            if (src) { var big = sc.k === "beat" || sc.k === "intro", cx, cy, cw, ch;
+              if (big) { cx = 22; cy = 92; cw = 276; ch = 368; } else { cw = ch = 210; cx = 1280 - cw - 28; cy = 720 - ch - 30; }
+              g.save(); g.shadowColor = "rgba(20,22,40,.35)"; g.shadowBlur = 18; g.fillStyle = "#fff"; if (big) rr(g, cx - 5, cy - 5, cw + 10, ch + 10, 22); else { g.beginPath(); g.arc(cx + cw / 2, cy + ch / 2, cw / 2 + 5, 0, Math.PI * 2); } g.fill(); g.restore();
+              g.save(); if (big) rr(g, cx, cy, cw, ch, 18); else { g.beginPath(); g.arc(cx + cw / 2, cy + ch / 2, cw / 2, 0, Math.PI * 2); } g.clip();
+              if (RFR) { var bw = src.width, bh = src.height; if (big) g.drawImage(src, cx, cy, cw, ch); else g.drawImage(src, 0, 0, bw, bw, cx, cy, cw, ch); }
+              else { var vw = RV.videoWidth || 1, vh = RV.videoHeight || 1, a2 = cw / ch, sw = Math.min(vw, vh * a2), sh = sw / a2; g.drawImage(RV, (vw - sw) / 2, Math.max(0, vh * 0.02), sw, Math.min(sh, vh), cx, cy, cw, ch); }
+              g.restore();
+              if (big) { g.fillStyle = "rgba(20,22,40,.6)"; rr(g, cx + 10, cy + ch - 40, Math.min(cw - 20, 170), 30, 15); g.fill(); g.fillStyle = "#fff"; g.font = "700 15px " + CSSF; g.textAlign = "left"; g.fillText("🎙️ Your guide", cx + 22, cy + ch - 20); } }
+          }
+          else if (PRZ) {   // 🧑‍🏫 the presenter: points at the highlighted element, presents slides, waves at the start and the end
             var mo = mouthAt(el, sc, f), bl = blinkAt(el);
             if (sc.k === "beat" && sc.b.m && sc.b.m.y * (PW / 390) < 600) { var k2 = PW / 390, mm = sc.b.m, tx = PX + (mm.x + Math.min(mm.w, 120) / 2) * k2, ty = PY + (mm.y + mm.h / 2) * k2; drawPresenter(g, { x: 170, y: 712, s: 1, style: PRES, pose: f < 0.12 ? "present" : "point", tx: tx, ty: ty, mouth: mo, expr: sc.b.click ? "excited" : sc.s.k === "result" ? "happy" : "explain", blink: bl, t: el }); }
             else if (sc.k === "beat" || sc.k === "intro") drawPresenter(g, { x: 170, y: 712, s: 1, style: PRES, pose: sc.k === "intro" && sc.s.i === 0 && sc.s.k === "screen" && f < 0.45 ? "wave" : sc.s.k === "result" && f > 0.55 ? "thumb" : "present", tx: PX + PW / 2, ty: 330, mouth: mo, expr: sc.s.k === "result" ? "happy" : "smile", blink: bl, t: el });
@@ -660,9 +741,16 @@
           }
           g.fillStyle = "#7C8BFF"; g.fillRect(0, 714, 1280 * Math.min(1, el / total), 6);
         };
+        // nearest filmed frame for time el (ms) → ImageBitmap (decoded once, reused while the frame stays the same)
+        var lastIdx = -1, lastBm = null, realFrame = function (el) {
+          var tt = (el - segs[0].sc[0].start - 150) / 1000, lo = 0, hi = RFR.length - 1;
+          if (tt <= RFR[0].t) hi = 0; else { while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (RFR[mid].t <= tt) lo = mid; else hi = mid - 1; } hi = lo; }
+          if (hi === lastIdx && lastBm) return Promise.resolve(lastBm);
+          return createImageBitmap(RFR[hi].b).then(function (bm) { lastIdx = hi; lastBm = bm; return bm; });
+        };
         var done = function (blob, ext, how) { if (ac) { try { ac.close(); } catch (e) { } } download(blob, fname(ext).replace("Manual_", "Walkthrough_")); busy(false, "✅ Video ready — " + Math.round(total / 1000) + " s " + ext.toUpperCase() + (voiced ? " with AI voice-over" : "") + " · " + how); };
         // ⚡ fast path: encode frames straight to MP4 (no waiting in real time), then mux the voice track
-        return fastVideo(voiced).then(function (fv) {
+        return fastVideo(voiced).then(function (fv) { if (RV && !RFR) fv = null;
           if (fv) {
             var FPS = 25, NF = Math.ceil(total / 1000 * FPS), err = null, t0 = Date.now();
             var mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: /^vp09/.test(fv.vc) ? "vp9" : "avc", width: 1280, height: 720, frameRate: FPS }, audio: fv.ac ? { codec: fv.ac[1], numberOfChannels: 1, sampleRate: 48000 } : undefined, fastStart: "in-memory", firstTimestampBehavior: "offset" });
@@ -683,7 +771,9 @@
                 if (err) return rej(err);
                 if (venc.encodeQueueSize > 6) return setTimeout(step, 4);
                 var lim = Math.min(NF, i + 8);
-                for (; i < lim; i++) { drawAt(i * 1000 / FPS); var fr = new VideoFrame(V, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) }); venc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close(); }
+                if (RFR && !step.ready) { var need = []; for (var q2 = i; q2 < lim; q2++) need.push(realFrame(q2 * 1000 / FPS)); return Promise.all(need).then(function (bms) { step.bms = bms; step.ready = true; step(); }).catch(rej); }
+                step.ready = false;
+                for (; i < lim; i++) { if (RFR) RBM.cur = step.bms[i - (lim - step.bms.length)]; drawAt(i * 1000 / FPS); var fr = new VideoFrame(V, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) }); venc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close(); }
                 prog(0.4 + 0.55 * i / NF); $("xs").textContent = "⚡ Rendering the video… " + Math.round(i / NF * 100) + "%";
                 if (i < NF) return setTimeout(step, 0);
                 venc.flush().then(audio).then(function () { if (err) throw err; mux.finalize(); res(new Blob([mux.target.buffer], { type: "video/mp4" })); }).catch(rej);
@@ -707,6 +797,7 @@
           };
           $("xs").textContent = "Recording " + Math.round(total / 1000) + " s guided tour" + (voiced ? " with voice (you'll hear it)" : "") + "… keep this screen open";
           rec.start(500);
+          if (RV) { RFR = null; RV.pause(); RV.playbackRate = 1; RV.currentTime = 0; setTimeout(function () { RV.play().catch(function () { }); }, 150 + segs[0].sc[0].start); }
           if (dest) { base = ac.currentTime + 0.15; segs.forEach(function (sg) { if (!sg.buf) return; var src = ac.createBufferSource(); src.buffer = sg.buf; src.connect(dest); src.connect(ac.destination); src.start(base + sg.sc[0].start / 1000); }); }
           requestAnimationFrame(frame);
         });
