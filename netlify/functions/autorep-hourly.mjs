@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { isDue } from "../lib/autorep-core.mjs";
 import { runReminders } from "../lib/insights-core.mjs";
 import { runRewardsAuto } from "../lib/rewards-core.mjs";
+import { runKhataDaily } from "../lib/kh-core.mjs";
 
 export default async () => {
   const blobs = getStore({ name: "bi-users", consistency: "strong" });
@@ -13,6 +14,7 @@ export default async () => {
       list: async (prefix) => { const keys = []; for await (const page of blobs.list({ prefix, paginate: true })) for (const x of page.blobs) keys.push(x.key); return keys; } };
     await runReminders(store, { BREVO_API_KEY: Netlify.env.get("BREVO_API_KEY"), OTP_FROM_EMAIL: Netlify.env.get("OTP_FROM_EMAIL"), OTP_FROM_NAME: Netlify.env.get("OTP_FROM_NAME") });
     try { await runRewardsAuto(store, { SITE_URL: Netlify.env.get("URL") }); } catch (e) { }   // rewards: credit the period that just ended
+    try { await runKhataDaily(store, { URL: Netlify.env.get("URL"), BREVO_API_KEY: Netlify.env.get("BREVO_API_KEY"), OTP_FROM_EMAIL: Netlify.env.get("OTP_FROM_EMAIL") }, Date.now(), fetch); } catch (e) { }   // Shop Khata: each shop's automatic reminders / alerts, once a day
   } catch (e) { }
   const cfg = await blobs.get("config:autorep", { type: "json" });
   const t = Date.now();

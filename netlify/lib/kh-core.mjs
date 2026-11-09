@@ -66,7 +66,38 @@ function cleanShop(x, o) {
     gst: x.gst !== undefined ? !!x.gst : !!o.gst, low: x.low !== undefined ? Math.max(0, qn(x.low)) : o.low != null ? o.low : 5, expWarn: x.expWarn !== undefined ? Math.max(1, Math.min(365, Math.round(num(x.expWarn)))) : o.expWarn || 30,
     auto: { wa: x.auto ? !!x.auto.wa : !!(o.auto && o.auto.wa), mail: x.auto ? x.auto.mail !== false : !(o.auto && o.auto.mail === false) },
     seq: o.seq || { sale: 0, rcpt: 0, pay: 0, po: 0, ret: 0 }, pk: o.pk || null, created: o.created || 0, off: !!o.off,
+    rules: x.rules !== undefined ? cleanRules(x.rules) : o.rules ? cleanRules(o.rules) : defaultRules(), rulesOn: x.rulesOn !== undefined ? x.rulesOn !== false : o.rulesOn !== false,
+    rhour: x.rhour !== undefined ? Math.max(6, Math.min(21, Math.round(num(x.rhour)))) : o.rhour || 10, rlast: o.rlast || "",
+    grps: x.grps !== undefined ? (Array.isArray(x.grps) ? x.grps : String(x.grps).split(",")).map((g) => str(g, 24)).filter(Boolean).slice(0, 20) : o.grps || ["Regular", "Wholesale", "VIP", "New", "Risky"],
   };
+}
+// ---------- ⚙️ rules: what happens automatically for customers / distributors in each situation ----------
+export const TRIGS = { overdue: "A bill is overdue by N days or more", limit: "Balance goes above the credit limit", due_soon: "A payment falls due within N days", no_pay: "No payment for N days (with a balance)", big_bal: "Balance is ₹N or more", pay_done: "A payment is entered (instant)", sale_done: "A sale / purchase bill is entered (instant)" };
+export const ACTS = { wa: "WhatsApp them (auto)", mail: "E-mail them", owner: "Alert me (inbox + e-mail)", block: "Stop credit (warn on new bills)", interest: "Add interest on overdue (monthly)", thank: "Send a thank-you" };
+function cleanRules(a) {
+  return (Array.isArray(a) ? a : []).slice(0, 30).map((r, i) => ({ id: cid(r.id) || "r" + i + randomBytes(2).toString("hex"), name: str(r.name, 60) || "Rule " + (i + 1), on: r.on !== false, who: r.who === "d" ? "d" : "c", grp: str(r.grp, 24),
+    trig: TRIGS[r.trig] ? r.trig : "overdue", n: Math.max(0, Math.min(100000000, num(r.n))), acts: (Array.isArray(r.acts) ? r.acts : []).filter((x) => ACTS[x]).slice(0, 6), every: Math.max(0, Math.min(90, Math.round(num(r.every)))), rate: Math.max(0, Math.min(5, num(r.rate))), msg: str(r.msg, 300) }));
+}
+function defaultRules() {
+  return cleanRules([
+    { id: "r_od", name: "Remind customers when a bill is overdue", who: "c", trig: "overdue", n: 1, acts: ["wa", "mail"], every: 3 },
+    { id: "r_lim", name: "Credit limit crossed — alert me & stop credit", who: "c", trig: "limit", acts: ["owner", "block", "wa"], every: 7 },
+    { id: "r_od30", name: "30+ days late — alert me", who: "c", trig: "overdue", n: 30, acts: ["owner", "block"], every: 7 },
+    { id: "r_paid", name: "Thank the customer when they pay", who: "c", trig: "pay_done", acts: ["wa"] },
+    { id: "r_dpay", name: "Tell the distributor when I pay him", who: "d", trig: "pay_done", acts: ["wa", "mail"] },
+    { id: "r_ddue", name: "Distributor payment due in 2 days — alert me", who: "d", trig: "due_soon", n: 2, acts: ["owner"], every: 2 },
+    { id: "r_int", name: "Interest 1.5%/month on 60+ days overdue", on: false, who: "c", trig: "overdue", n: 60, acts: ["interest"], rate: 1.5 },
+  ]);
+}
+function ruleHits(r, p, s, today) {
+  if (!r.on || p.on === false || r.who !== p.k || (r.grp && r.grp !== (p.grp || ""))) return "";
+  s = s || {};
+  if (r.trig === "overdue") return s.over > 0.5 && s.od >= Math.max(1, r.n) ? `${rs(s.over)} overdue, ${s.od} days late` : "";
+  if (r.trig === "limit") { const lim = p.lim || 0; return lim > 0 && s.bal > lim + 0.5 ? `balance ${rs(s.bal)} is above the limit ${rs(lim)}` : ""; }
+  if (r.trig === "due_soon") return s.bal > 0.5 && s.soon > 0.5 && s.nextDue && diffD(s.nextDue, today) <= r.n ? `${rs(s.soon)} due on ${dShow(s.nextDue)}` : "";
+  if (r.trig === "no_pay") return s.bal > 0.5 && (!s.lastCr || diffD(today, s.lastCr) >= Math.max(1, r.n)) ? `no payment ${s.lastCr ? "since " + dShow(s.lastCr) : "yet"}, balance ${rs(s.bal)}` : "";
+  if (r.trig === "big_bal") return r.n > 0 && s.bal >= r.n ? `balance ${rs(s.bal)}` : "";
+  return "";
 }
 const shopOut = (s) => { const o = Object.assign({}, s); o.pkSet = !!(s.pk && s.pk.key); o.pkPhone = s.pk ? s.pk.phone || "" : ""; delete o.pk; return o; };
 function cleanProd(x, o) {
@@ -74,7 +105,15 @@ function cleanProd(x, o) {
   const g = (k, n) => (x[k] !== undefined ? str(x[k], n) : o[k] || ""), n = (k) => (x[k] !== undefined && x[k] !== "" ? num(x[k]) : o[k] || 0);
   return { id: o.id || cid(x.id) || nid("i"), n: g("n", 90), cat: g("cat", 40) || "General", br: g("br", 40), u: g("u", 12) || "pc", bc: g("bc", 40), hsn: g("hsn", 12),
     cost: n("cost"), mrp: n("mrp"), sp: n("sp"), gst: n("gst"), rol: x.rol !== undefined && x.rol !== "" ? qn(x.rol) : o.rol != null ? o.rol : null, pack: x.pack !== undefined ? qn(x.pack) : o.pack || 0,
-    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
+    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
+}
+// 📈 every change of cost / selling price / MRP is kept (newest first) — price drop & hike history
+const PF = { cost: "Cost", sp: "Selling", mrp: "MRP" };
+function priceSet(p, f, nv, src, today) {
+  nv = num(nv); if (!(nv > 0)) return false; const ov = num(p[f]); if (Math.abs(ov - nv) < 0.009) return false;
+  p[f] = nv; if (ov > 0) p.prh = [{ d: today, f, o: ov, n: nv, src: str(src, 20) }].concat(p.prh || []).slice(0, 40);
+  if (f === "cost" && ov > 0) p.ph = [[today, ov, nv, src]].concat(p.ph || []).slice(0, 8);
+  return ov > 0;
 }
 function cleanParty(x, o, shop) {
   x = x || {}; o = o || {};
@@ -84,7 +123,8 @@ function cleanParty(x, o, shop) {
     lim: x.lim !== undefined ? num(x.lim) : o.lim || 0, upi: x.upi !== undefined ? (Array.isArray(x.upi) ? x.upi : String(x.upi).split(/[\s,;]+/)).map((u) => str(u, 60).toLowerCase()).filter(Boolean).slice(0, 8) : o.upi || [],
     sman: g("sman", 60), sph: x.sph !== undefined ? ph10(x.sph) : o.sph || "", od: g("od", 40), lead: x.lead !== undefined ? Math.max(0, Math.min(60, Math.round(num(x.lead)))) : o.lead != null ? o.lead : 2,
     ob: x.ob !== undefined ? num(x.ob) : o.ob || 0, obd: x.obd !== undefined ? day(x.obd) : o.obd || "", notes: g("notes", 300), on: x.on !== undefined ? x.on !== false : o.on !== false,
-    tok: o.tok || "", conf: o.conf || null, s: o.s || null, at: o.at || Date.now() };
+    grp: x.grp !== undefined ? str(x.grp, 24) : o.grp || "", hold: x.hold !== undefined ? (x.hold ? { by: "owner", why: str(x.holdWhy, 120) || "Stopped by owner", at: Date.now() } : null) : o.hold || null,
+    rem: o.rem || {}, int: o.int || {}, tok: o.tok || "", conf: o.conf || null, s: o.s || null, at: o.at || Date.now() };
 }
 function cleanItems(a) {
   return (Array.isArray(a) ? a : []).slice(0, 300).map((i) => ({ p: cid(i.p), n: str(i.n, 90), q: qn(i.q), fq: qn(i.fq), r: num(i.r), u: str(i.u, 12), g: num(i.g), dsc: Math.max(0, Math.min(100, num(i.dsc))),
@@ -162,8 +202,8 @@ function applyStock(PM, mv, kind, doc, sign, today) {
       if (sign > 0) {
         const tot = it.q + it.fq, landed = tot ? r2((it.amt || it.q * it.r) / tot) : it.r;
         pr.lots.push({ d: doc.d, q: tot, e: it.e || "", c: landed, doc: doc.id, b: it.b || "" });
-        if (!pr.lp || doc.d >= pr.lp) { if (pr.cost && Math.abs(pr.cost - landed) > 0.009) pr.ph = [[doc.d, pr.cost, landed, doc.id]].concat(pr.ph || []).slice(0, 8); pr.cost = landed; pr.lp = doc.d; pr.dist = pr.dist || doc._pid || ""; }
-        if (it.mrp) pr.mrp = it.mrp;
+        if (!pr.lp || doc.d >= pr.lp) { priceSet(pr, "cost", landed, "purchase", doc.d); pr.lp = doc.d; pr.dist = pr.dist || doc._pid || ""; }
+        if (it.mrp) priceSet(pr, "mrp", it.mrp, "purchase", doc.d);
       } else consume(pr, -dl, doc.id);
     } else if (dl < 0) { consume(pr, -dl); if (doc.ty === "sale") { mp.o = qn(mp.o - dl); if (!pr.ls || doc.d > pr.ls) pr.ls = doc.d; } }
     else { addBack(pr, dl, doc.d || today); if (doc.ty === "sale") mp.o = qn(mp.o - dl); }
@@ -272,8 +312,7 @@ async function ownerOp(op, b, ctx) {
     if (!n.n) return json(400, { ok: false, error: "Item name is needed." });
     if (!old && B.prods.some((p) => p.on !== false && p.n.toLowerCase() === n.n.toLowerCase() && (p.u || "") === n.u)) return json(409, { ok: false, error: "An item with this name already exists." });
     if (!old && x.stk) { n.stk = qn(x.stk); if (n.stk > 0) n.lots = [{ d: day(x.lp) || today, q: n.stk, c: n.cost, e: day(x.e), doc: "open" }]; }
-    if (old && old.cost !== n.cost && n.cost) n.ph = [[today, old.cost, n.cost, "edit"]].concat(old.ph || []).slice(0, 8);
-    if (old) Object.assign(old, n); else { B.prods.push(n); if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." }); }
+    if (old) { const nv = { cost: n.cost, sp: n.sp, mrp: n.mrp }; Object.keys(PF).forEach((f) => { n[f] = old[f]; }); Object.assign(old, n); Object.keys(PF).forEach((f) => priceSet(old, f, nv[f], "edit", today)); } else { B.prods.push(n); if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." }); }
     await saveProds(); return json(200, { ok: true, item: old || n });
   }
   if (op === "prod-bulk") {   // Excel import: match by id, barcode or name; never touches stock of existing items
@@ -283,7 +322,7 @@ async function ownerOp(op, b, ctx) {
       if (!str(r.n, 90)) continue; const u = str(r.u, 12) || "pc";
       const old = (r.id && PM[cid(r.id)]) || (r.bc && byName["bc:" + str(r.bc, 40)]) || byName[str(r.n, 90).toLowerCase() + "|" + u] || byName[str(r.n, 90).toLowerCase() + "|pc"];
       const clean = {}; Object.keys(r).forEach((k) => { if (r[k] !== "" && r[k] != null) clean[k] = r[k]; });
-      if (old) { const keepCost = old.cost; Object.assign(old, cleanProd(clean, old)); if (keepCost !== old.cost && keepCost) old.ph = [[today, keepCost, old.cost, "import"]].concat(old.ph || []).slice(0, 8); upd++; }
+      if (old) { const n = cleanProd(clean, old), nv = { cost: n.cost, sp: n.sp, mrp: n.mrp }; Object.keys(PF).forEach((f) => { n[f] = old[f]; }); Object.assign(old, n); Object.keys(PF).forEach((f) => priceSet(old, f, nv[f], "import", today)); upd++; }
       else { const n = cleanProd(clean, null); if (clean.stk) { n.stk = qn(clean.stk); if (n.stk > 0) n.lots = [{ d: today, q: n.stk, c: n.cost, e: day(clean.e), doc: "open" }]; } B.prods.push(n); byName[n.n.toLowerCase() + "|" + n.u] = n; add++; }
     }
     if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." });
@@ -292,7 +331,7 @@ async function ownerOp(op, b, ctx) {
   if (op === "prod-price") {   // set selling prices from a target margin (category or selected items)
     const ids = new Set((b.ids || []).map(cid)), m = num(b.margin); let n = 0;
     if (!(m >= 0 && m < 500)) return json(400, { ok: false, error: "Enter a margin %." });
-    for (const p of B.prods) { if (!ids.has(p.id) || !p.cost) continue; let sp = p.cost * (1 + m / 100); sp = b.round ? Math.ceil(sp) : r2(sp); if (p.mrp && sp > p.mrp && !b.overMrp) sp = p.mrp; p.sp = sp; n++; }
+    for (const p of B.prods) { if (!ids.has(p.id) || !p.cost) continue; let sp = p.cost * (1 + m / 100); sp = b.round ? Math.ceil(sp) : r2(sp); if (p.mrp && sp > p.mrp && !b.overMrp) sp = p.mrp; priceSet(p, "sp", sp, "margin", today); n++; }
     await saveProds(); await addLog(store, sid, t, by, `Selling price set at ${m}% margin for ${n} items`); return json(200, { ok: true, n, prods: B.prods });
   }
   if (op === "prod-del") { const p = PM[cid(b.id)]; if (!p) return json(404, { ok: false, error: "Not found" }); p.on = false; await saveProds(); return json(200, { ok: true }); }
@@ -306,6 +345,81 @@ async function ownerOp(op, b, ctx) {
     }
     await saveProds(); await saveMv(store, sid, mv); if (out.length) await addLog(store, sid, t, by, "Stock count: " + out.slice(0, 12).map((x) => `${x.n} ${x.from}→${x.to}`).join(", ") + (out.length > 12 ? ` +${out.length - 12} more` : ""));
     return json(200, { ok: true, changed: out.length, prods: B.prods });
+  }
+
+  if (op === "stock-bulk") {   // ⬆ bulk stock update from Excel: set the counted stock or add received stock, item by item
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 6000) : [], mvm = await loadMv(store, sid, [today.slice(0, 7)]), mm = mvm[today.slice(0, 7)];
+    const byName = {}; B.prods.forEach((p) => { if (p.on === false) return; byName[p.n.toLowerCase()] = byName[p.n.toLowerCase()] || p; if (p.bc) byName["bc:" + p.bc] = p; });
+    let set = 0, added = 0, created = 0, prices = 0; const missing = [], lines = [];
+    for (const r of rows) {
+      const nm = str(r.n, 90); if (!nm && !r.bc && !r.id) continue;
+      let p = (r.id && PM[cid(r.id)]) || (r.bc && byName["bc:" + str(r.bc, 40)]) || (nm && byName[nm.toLowerCase()]);
+      if (!p) { if (!b.create || !nm) { missing.push(nm || r.bc); continue; } p = cleanProd({ n: nm, u: r.u, cat: r.cat, bc: r.bc, cost: r.cost, sp: r.sp, mrp: r.mrp, gst: r.gst }, null); B.prods.push(p); PM[p.id] = p; byName[nm.toLowerCase()] = p; created++; }
+      ["cost", "sp", "mrp"].forEach((f) => { if (r[f] !== undefined && r[f] !== "" && priceSet(p, f, r[f], "stock import", today)) prices++; });
+      if (r.q === undefined || r.q === "" || r.q == null) continue;
+      const q = qn(r.q), mode = /^(add|in|\+|received|purchase)/i.test(String(r.mode || "")) ? "add" : "set", mp = (mm.p[p.id] = mm.p[p.id] || { i: 0, o: 0 }), from = p.stk || 0;
+      if (mode === "add") { if (q <= 0) continue; p.lots.push({ d: day(r.d) || today, q, c: num(r.cost) || p.cost, e: day(r.e), doc: "import", b: str(r.b, 20) }); p.stk = qn(from + q); mp.i = qn(mp.i + q); added++; }
+      else { const dl = qn(q - from); if (dl < 0) { consume(p, -dl); mp.o = qn(mp.o - dl); } else if (dl > 0) p.lots.push({ d: today, q: dl, c: p.cost, e: day(r.e), doc: "count" }); p.stk = q; set++; }
+      lines.push(`${p.n} ${from}→${p.stk}`);
+    }
+    if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." });
+    await saveProds(); await saveMv(store, sid, mvm);
+    await addLog(store, sid, t, by, `Stock import: ${set} counted, ${added} received, ${created} new items, ${prices} price changes` + (lines.length ? " — " + lines.slice(0, 8).join(", ") + (lines.length > 8 ? " …" : "") : ""));
+    return json(200, { ok: true, set, added, created, prices, missing: missing.slice(0, 200), prods: B.prods });
+  }
+  if (op === "price-bulk") {   // 📈 price list update (Excel / distributor rate list) — every change goes into the history
+    const rows = Array.isArray(b.rows) ? b.rows.slice(0, 6000) : [], ch = [], missing = [];
+    const byName = {}; B.prods.forEach((p) => { if (p.on === false) return; byName[p.n.toLowerCase()] = byName[p.n.toLowerCase()] || p; if (p.bc) byName["bc:" + p.bc] = p; });
+    for (const r of rows) {
+      const nm = str(r.n, 90), p = (r.id && PM[cid(r.id)]) || (r.bc && byName["bc:" + str(r.bc, 40)]) || (nm && byName[nm.toLowerCase()]); if (!p) { if (nm) missing.push(nm); continue; }
+      ["cost", "sp", "mrp"].forEach((f) => { const o = p[f]; if (r[f] !== undefined && r[f] !== "" && priceSet(p, f, r[f], str(r.src, 20) || "price list", day(r.d) || today)) ch.push({ n: p.n, f, o, nv: p[f] }); });
+      if (b.keepMargin && r.cost && !r.sp && p.sp && ch.length && ch[ch.length - 1].n === p.n && ch[ch.length - 1].f === "cost") { const c0 = ch[ch.length - 1]; const m = c0.o > 0 ? (p.sp - c0.o) / c0.o : 0; let sp = Math.ceil(p.cost * (1 + m)); if (p.mrp && sp > p.mrp) sp = p.mrp; const o = p.sp; if (priceSet(p, "sp", sp, "keep margin", today)) ch.push({ n: p.n, f: "sp", o, nv: sp }); }
+    }
+    await saveProds(); await addLog(store, sid, t, by, `Price update: ${ch.length} changes` + (ch.length ? " — " + ch.slice(0, 6).map((c) => `${c.n} ${PF[c.f]} ${c.o}→${c.nv}`).join(", ") : ""));
+    return json(200, { ok: true, changes: ch, missing: missing.slice(0, 200), prods: B.prods });
+  }
+  if (op === "price-hist" || op === "price-ai") {   // drops & hikes of the last N days, and AI advice on them
+    const days = Math.max(1, Math.min(365, Math.round(num(b.days) || 30))), from = addD(today, -days), L = [];
+    B.prods.forEach((p) => { if (p.on === false) return; (p.prh || []).forEach((h) => { if (h.d >= from) L.push({ id: p.id, n: p.n, cat: p.cat, u: p.u, stk: p.stk, cost: p.cost, sp: p.sp, mrp: p.mrp, d: h.d, f: h.f, o: h.o, nv: h.n, pct: h.o ? Math.round((h.n - h.o) / h.o * 1000) / 10 : 0, src: h.src }); }); });
+    L.sort((a, c) => (a.d < c.d ? 1 : a.d > c.d ? -1 : Math.abs(c.pct) - Math.abs(a.pct)));
+    if (op === "price-hist") return json(200, { ok: true, days, list: L.slice(0, 600) });
+    if (!L.length) return json(200, { ok: true, ai: { headline: "No price changes in the last " + days + " days.", items: [], message: "" } });
+    const months = lastMonths(today, 3), vel = velocity(await loadMv(store, sid, months), months, today);
+    const facts = L.slice(0, 60).map((x) => `${x.n} (${x.cat}): ${PF[x.f]} ${x.o}→${x.nv} (${x.pct > 0 ? "+" : ""}${x.pct}%) on ${x.d}; now cost ${x.cost}, selling ${x.sp}, MRP ${x.mrp}, stock ${x.stk} ${x.u}, sells ${vel[x.id] || 0}/day`).join("\n");
+    const lang = b.lang === "en" ? "English" : "simple Hindi (Devanagari) mixed with common English business words";
+    const r = await ctx.askAI(ctx.env, "Advise the shop owner on these price drops and hikes.", facts, [], ctx.aiFetch, { system: `You advise an Indian kirana shop owner on price changes. Reply in ${lang} as JSON only: {"headline":"one line","items":[{"n":"exact item name","kind":"hike|drop","advice":"one practical sentence (raise / keep selling price, buy more before the next hike, sell old stock first, tell customers, etc.)","newSp":0}],"message":"a short friendly WhatsApp message for regular customers announcing the PRICE DROPS / offers only (empty if there are none)"}. newSp = suggested selling price in rupees (0 = keep). Never suggest a selling price above MRP.`, label: "SHOP DATA", maxTokens: 1800, json: true, raw: true });
+    const j = r.ok ? parseLoose(r.text) : null; if (!j || !Array.isArray(j.items)) return json(200, { ok: false, error: r.error || "The AI reply couldn't be read — try again." });
+    j.items = j.items.slice(0, 40).map((x) => { const p = B.prods.find((y) => y.n.toLowerCase() === str(x.n, 90).toLowerCase()); let sp = num(x.newSp); if (p && p.mrp && sp > p.mrp) sp = p.mrp; return { id: p ? p.id : "", n: str(x.n, 90), kind: x.kind === "drop" ? "drop" : "hike", advice: str(x.advice, 300), newSp: sp }; });
+    return json(200, { ok: true, ai: { headline: str(j.headline, 200), items: j.items, message: str(j.message, 1200) } });
+  }
+  if (op === "broadcast") {   // send one message (e.g. price-drop offer) to chosen customers — auto WhatsApp needs Periskope
+    const text = String(b.text || "").slice(0, 1500).trim(); if (text.length < 5) return json(400, { ok: false, error: "Write the message." });
+    const ids = (Array.isArray(b.pids) ? b.pids : []).map(cid).slice(0, 60), L = ids.map((id) => RM[id]).filter((p) => p && p.on !== false && (p.wa || p.ph));
+    if (!shop.pk || !shop.pk.key) return json(200, { ok: true, auto: false, list: L.map((p) => ({ id: p.id, n: pname0(p), wa: p.wa || p.ph })) });
+    let sent = 0; const fails = [];
+    for (const p of L) { const r = await sendWa(ctx, shop, p.wa || p.ph, text.replace(/\{name\}/g, p.n || p.firm || "")); if (r.ok) sent++; else fails.push(pname0(p) + ": " + r.error); }
+    await addLog(store, sid, t, by, `Message sent to ${sent} of ${L.length} customers`); return json(200, { ok: true, auto: true, sent, fails });
+  }
+  if (op === "list-read") {   // ✨ customer's handwritten / printed item list → lines for a sale bill
+    const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 3000000).slice(0, 3);
+    if (!imgs.length) return json(400, { ok: false, error: "Add a clear photo of the list." });
+    const keys = await aiKeys(store, ctx.env);
+    const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, "This is a customer's shopping list for an Indian grocery (kirana) shop — usually handwritten, in Hindi, Hinglish or English, sometimes with quantities like 2 kg, 500 g, 1 packet, 3 pc, ½ kg, 1 dozen. Read EVERY line and reply with ONLY JSON: {\"items\":[{\"name\":\"item name in English as a shop would call it (keep the brand if written, e.g. Tata salt, Aashirvaad atta)\",\"written\":\"exactly as written\",\"qty\":0,\"unit\":\"kg|g|L|ml|pc|pkt|dozen\",\"rate\":0}]} — qty as a number (½ = 0.5); rate only if a price is written, else 0. Do not skip lines you are unsure about — give your best reading.");
+    if (!v.ok) return json(502, { ok: false, error: "Couldn't read the photo right now (" + String(v.error).slice(0, 160) + "). Try a clearer photo." });
+    const j = parseLoose(v.text); if (!j || !Array.isArray(j.items)) return json(502, { ok: false, error: "The list couldn't be read clearly — try again with the whole list in the photo." });
+    return json(200, { ok: true, items: j.items.slice(0, 120).map((x) => ({ name: str(x.name, 90), written: str(x.written, 90), qty: qn(x.qty) || 1, unit: str(x.unit, 10), rate: num(x.rate) })).filter((x) => x.name) });
+  }
+  if (op === "rules-run") {   // ⚙️ run the rules now (or preview: dry)
+    const res = await runRules(ctx, store, sid, B, { dry: b.dry === true, origin, today, t });
+    return json(200, Object.assign({ ok: true }, res));
+  }
+  if (op === "rules-log") return json(200, { ok: true, list: ((await store.get("kh:rlog:" + sid)) || { list: [] }).list.slice(0, 300) });
+  if (op === "rules-ai") {   // ✨ describe a rule in words → a rule the engine understands
+    const q = str(b.q, 500); if (q.length < 6) return json(400, { ok: false, error: "Describe the rule in a sentence." });
+    const sys = `Turn the shop owner's sentence into automation rules for an Indian kirana shop khata app. Reply with JSON only: {"rules":[{"name":"short name","who":"c (customers) or d (distributors)","grp":"customer group or empty for all — one of: ${shop.grps.join(", ")}","trig":"one of: ${Object.entries(TRIGS).map(([k, v]) => k + " = " + v).join("; ")}","n":0,"acts":["any of: ${Object.entries(ACTS).map(([k, v]) => k + " = " + v).join("; ")}"],"every":0,"rate":0,"msg":"optional extra line added to the WhatsApp / e-mail"}]}. n = the number of days or rupees in the trigger. every = repeat every N days while it stays true (0 = once). rate = interest % per month (only with the interest action).`;
+    const r = await ctx.askAI(ctx.env, q, "GROUPS: " + shop.grps.join(", "), [], ctx.aiFetch, { system: sys, label: "RULE", maxTokens: 900, json: true, raw: true });
+    const j = r.ok ? parseLoose(r.text) : null; if (!j || !Array.isArray(j.rules) || !j.rules.length) return json(200, { ok: false, error: r.error || "Couldn't turn that into a rule — try saying who, when and what should happen." });
+    return json(200, { ok: true, rules: cleanRules(j.rules.map((x) => Object.assign({}, x, { id: "" }))) });
   }
 
   // ----- parties -----
@@ -338,6 +452,11 @@ async function ownerOp(op, b, ctx) {
     if (old && old.void) return json(400, { ok: false, error: "This entry was cancelled." });
     const n = cleanDoc(x, old, p, shop); if (!n) return json(400, { ok: false, error: "Unknown entry type." });
     if (!n.amt && n.ty !== "po") return json(400, { ok: false, error: "Enter the amount or the items." });
+    if (!old && n.ty === "sale" && n.st === "final" && n.amt - n.paid > 0.5 && !b.override) {   // ⚙️ credit stopped / limit — the owner decides
+      const s0 = p.s || {}, after = r2((s0.bal || 0) + n.amt - n.paid);
+      if (p.hold) return json(409, { ok: false, hold: true, error: `Credit is stopped for ${pname0(p)}: ${p.hold.why}. Balance after this bill: ${rs(after)}.` });
+      if (p.lim > 0 && after > p.lim + 0.5 && shop.rules.some((r) => r.on && r.trig === "limit" && r.who === "c" && r.acts.includes("block") && (!r.grp || r.grp === (p.grp || "")))) return json(409, { ok: false, hold: true, error: `This bill takes ${pname0(p)} to ${rs(after)} — above the credit limit of ${rs(p.lim)}.` });
+    }
     if (n.ty === "sale") n.items.forEach((i) => { const pr = PM[i.p]; i.c = pr ? pr.cost : 0; });
     const mv = await loadMv(store, sid, [...new Set([n.d.slice(0, 7), old ? old.d.slice(0, 7) : n.d.slice(0, 7)])]);
     const touched = new Set();
@@ -352,6 +471,14 @@ async function ownerOp(op, b, ctx) {
     await addLog(store, sid, t, by, `${old ? "Edited" : "New"} ${n.ty} ${n.no || ""} · ${p.n || p.firm} · ${rs(n.amt)}${n.st !== "final" ? " (" + n.st + ")" : ""}`);
     const doc = old || n, out = { ok: true, doc, party: p, s: L.s, prods: [...touched].map((id) => PM[id]) };
     if (doc.st === "final" && (b.send || (!old && (shop.auto.wa || shop.auto.mail)))) out.sent = await deliver(ctx, shop, p, doc, L.s, origin, b.send ? b.via : null, store, sid);
+    if (!old && doc.st === "final") {   // ⚙️ instant rules: payment made / received, bill entered, credit limit crossed
+      const trig = doc.ty === "rcpt" || doc.ty === "pay" ? "pay_done" : doc.ty === "sale" || doc.ty === "pur" ? "sale_done" : "";
+      const R = shop.rules.filter((r) => r.on && r.trig === trig && r.who === p.k && (!r.grp || r.grp === (p.grp || "")));
+      const via = [...new Set(R.flatMap((r) => r.acts.filter((a) => a === "wa" || a === "mail" || a === "thank").map((a) => (a === "thank" ? "wa" : a))))].filter((v) => !(out.sent && (v === "wa" ? out.sent.auto && out.sent.auto.ok : out.sent.mail && out.sent.mail.ok)));
+      if (via.length) { const extra = R.map((r) => r.msg).filter(Boolean).join(" "); const sent = await deliver(ctx, shop, p, doc, L.s, origin, via, store, sid, null, extra); out.sent = out.sent ? Object.assign({}, out.sent, { auto: sent.auto || out.sent.auto, mail: sent.mail || out.sent.mail }) : sent; out.ruled = R.map((r) => r.name); }
+      if (R.some((r) => r.acts.includes("owner"))) { const I = (await store.get(K.inbox(sid))) || { list: [] }; I.list.unshift({ id: nid("n"), kind: "rule", text: `⚙️ ${{ rcpt: "Payment received from", pay: "You paid", sale: "Bill to", pur: "Bill from" }[doc.ty]} ${pname0(p)}: ${rs(doc.amt)}`, at: t }); await store.set(K.inbox(sid), I); }
+      if (doc.ty === "sale" || doc.ty === "rcpt") { const B2 = { shop, parties: B.parties }; const rr = await runRules(ctx, store, sid, B2, { dry: false, origin, today, t, only: p.id, trigs: ["limit"] }); if (rr.list.length) out.rules = rr.list; }
+    }
     return json(200, out);
   }
   if (op === "doc-void") {
@@ -500,16 +627,80 @@ async function ownerOp(op, b, ctx) {
 }
 
 // sends a bill / receipt / statement: always returns the WhatsApp text + link; e-mail / auto-WhatsApp when available
-async function deliver(ctx, shop, p, doc, s, origin, via, store, sid, kind) {
+const pname0 = (p) => (p ? p.n || p.firm || "—" : "—");
+async function deliver(ctx, shop, p, doc, s, origin, via, store, sid, kind, extra) {
   await ensureLink(store, sid, p);
   const k = kind || (doc ? (doc.ty === "rcpt" ? "rcpt" : doc.ty === "pay" ? "pay" : doc.ty === "po" ? "po" : doc.ty === "pur" ? "pur" : "sale") : "stmt");
-  const link = linkUrl(origin, p.tok, doc ? doc.id : ""), text = message(k, shop, p, doc || { items: [] }, s, link), out = { text, link, wa: p.wa || p.ph || "", mail: null, auto: null };
+  const link = linkUrl(origin, p.tok, doc ? doc.id : ""); let text = message(k, shop, p, doc || { items: [] }, s, link);
+  if (extra) { const L = text.split("\n"); L.splice(1, 0, String(extra).slice(0, 300)); text = L.join("\n"); }
+  const out = { text, link, wa: p.wa || p.ph || "", mail: null, auto: null };
   const wantMail = via ? via.includes("mail") : shop.auto.mail, wantWa = via ? via.includes("wa") : shop.auto.wa;
   if (wantMail && p.em) out.mail = await sendMail(Object.assign({}, ctx, { replyTo: shop.em }), p.em, `${shop.name} · ${{ sale: "Bill", rcpt: "Payment receipt", pay: "Payment advice", po: "Purchase order", pur: "Purchase bill", remind: "Payment reminder", stmt: "Account statement" }[k] || "Update"}${doc && doc.no ? " " + doc.no : ""}`, mailHtml(shop, p, doc, text, link));
   if (wantWa && (p.wa || p.ph) && shop.pk && shop.pk.key) out.auto = await sendWa(ctx, shop, p.wa || p.ph, text);
   if (doc && (out.mail && out.mail.ok || out.auto && out.auto.ok)) {
     const docs = ((await store.get(K.pt(sid, p.id))) || { list: [] }).list, d = docs.find((x) => x.id === doc.id);
     if (d) { d.sent = Object.assign({}, d.sent, out.mail && out.mail.ok ? { mail: Date.now() } : {}, out.auto && out.auto.ok ? { wa: Date.now() } : {}); await store.set(K.pt(sid, p.id), { list: docs }); doc.sent = d.sent; }
+  }
+  return out;
+}
+
+// ---------- ⚙️ run the rules for one shop (daily schedule, "Run now", or instantly after a bill) ----------
+async function runRules(ctx, store, sid, B, o) {
+  const { dry, origin, today, t } = o, shop = B.shop, out = [], owner = [];
+  const rules = shop.rules.filter((r) => r.on && r.trig !== "pay_done" && r.trig !== "sale_done" && (!o.trigs || o.trigs.includes(r.trig)));
+  let changed = false;
+  for (const p of B.parties) {
+    if (p.on === false || (o.only && p.id !== o.only)) continue;
+    const docs = ((await store.get(K.pt(sid, p.id))) || { list: [] }).list; p.s = ledger(p, docs, today).s; changed = true;
+    const s = p.s; let holdWhy = "", holdRule = "";
+    for (const r of rules) {
+      const why = ruleHits(r, p, s, today); if (!why) continue;
+      if (r.acts.includes("block") && !holdWhy) { holdWhy = r.name + " — " + why; holdRule = r.id; }
+      const last = (p.rem || {})[r.id], due = !last || (r.every > 0 && diffD(today, last) >= r.every) || (o.force && last !== today);
+      const row = { pid: p.id, n: pname0(p), k: p.k, rule: r.name, why, acts: r.acts };
+      if (!due) { row.skip = "already done on " + dShow(last); out.push(row); continue; }
+      if (dry) { out.push(row); continue; }
+      const done = [], via = r.acts.filter((x) => x === "wa" || x === "mail");
+      if (via.length) {
+        const res = await deliver(ctx, shop, p, null, s, origin, via, store, sid, p.k === "c" ? "remind" : "stmt", r.msg);
+        if (via.includes("wa")) done.push(res.auto ? (res.auto.ok ? "WhatsApp sent" : "WhatsApp failed (" + res.auto.error + ")") : (p.wa || p.ph) ? "WhatsApp not connected" : "no mobile");
+        if (via.includes("mail")) done.push(res.mail ? (res.mail.ok ? "e-mail sent" : "e-mail failed") : "no e-mail");
+      }
+      if (r.acts.includes("owner")) { owner.push(`${pname0(p)}: ${why} (${r.name})`); done.push("alerted you"); }
+      if (r.acts.includes("block")) done.push("credit stopped");
+      if (r.acts.includes("interest") && r.rate > 0 && s.over > 0.5 && (p.int || {})[r.id] !== today.slice(0, 7)) {
+        const amt = r2(s.over * r.rate / 100), d = cleanDoc({ ty: "adj", amt, d: today, note: `Interest @${r.rate}%/month on overdue ${rs(s.over)} — ${r.name}` }, null, p, shop);
+        if (d && amt >= 1) { d.src = "rule"; d.by = "Rule"; docs.push(d); await store.set(K.pt(sid, p.id), { list: docs }); p.s = ledger(p, docs, today).s; p.int = Object.assign({}, p.int, { [r.id]: today.slice(0, 7) }); done.push("interest " + rs(amt) + " added"); }
+      }
+      p.rem = Object.assign({}, p.rem, { [r.id]: today }); row.done = done; out.push(row);
+    }
+    if (!dry) {
+      if (holdWhy && !p.hold) p.hold = { by: "rule", rule: holdRule, why: holdWhy, at: t };
+      else if (!holdWhy && p.hold && p.hold.by === "rule" && (!o.trigs || rules.some((r) => r.id === p.hold.rule))) p.hold = null;
+    }
+  }
+  if (!dry) {
+    if (changed) await store.set(K.party(sid), { list: B.parties, at: t });
+    const done = out.filter((x) => x.done);
+    if (done.length) { const Lg = (await store.get("kh:rlog:" + sid)) || { list: [] }; Lg.list = done.map((x) => ({ at: t, n: x.n, rule: x.rule, why: x.why, done: x.done })).concat(Lg.list).slice(0, 1500); await store.set("kh:rlog:" + sid, Lg); }
+    if (owner.length) {
+      const I = (await store.get(K.inbox(sid))) || { list: [] }; owner.slice(0, 40).forEach((x) => I.list.unshift({ id: nid("n"), kind: "rule", text: "⚙️ " + x.slice(0, 280), at: t })); I.list = I.list.slice(0, 600); await store.set(K.inbox(sid), I);
+      if (shop.em) await sendMail(ctx, shop.em, `${shop.name} · ${owner.length} alert${owner.length > 1 ? "s" : ""} from your rules`, `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;line-height:1.6"><h3 style="color:#14532D">⚙️ Today’s alerts</h3><ul>${owner.map((x) => "<li>" + escH(x) + "</li>").join("")}</ul></div>`);
+    }
+  }
+  return { list: out.slice(0, 500), alerts: owner.length, sent: out.filter((x) => x.done && x.done.some((d) => /sent/.test(d))).length };
+}
+// called every hour by the scheduler: each shop's rules run once a day at the owner's chosen hour (IST)
+export async function runKhataDaily(store, env, t, fetchImpl) {
+  const S = (await store.get(K.shops)) || { list: [] }, today = istDay(t), hr = new Date(t + 19800000).getUTCHours(), out = [];
+  for (const e of S.list) {
+    if (e.off) continue;
+    try {
+      const B = await books(store, e.id); if (!B.shop || !B.shop.rulesOn || B.shop.rlast === today || hr < (B.shop.rhour || 10)) continue;
+      const raw = await store.get(K.shop(e.id)); raw.rlast = today; await store.set(K.shop(e.id), raw);
+      const r = await runRules({ env, store, mailFetch: fetchImpl, waFetch: fetchImpl }, store, e.id, B, { dry: false, origin: env.URL || env.SITE_URL || "", today, t });
+      await addLog(store, e.id, t, "Rules", `Daily rules: ${r.list.filter((x) => x.done).length} actions, ${r.alerts} alerts`); out.push(e.id);
+    } catch (err) { }
   }
   return out;
 }
