@@ -9066,10 +9066,10 @@ window.BIMSUM = (function () {
       else if (tries > 60) clearInterval(iv);
     }, 250);
   })();
-  function digest() {
+  function digest(o) {
     var A = window.BITLAPI; if (!A) return null; var c = ctxOf(A), per = c.per, tx = function (h) { var d = document.createElement('div'); d.innerHTML = String(h == null ? '' : h); return (d.textContent || '').replace(/\s+/g, ' ').trim(); };
     var tiles = c.cfg.tiles.map(function (t) { var o = null; try { o = tileData(t, c); } catch (e) {} if (!o) return null; var z = o.z || {}; return {l: tx(o.l), v: tx(o.v), s: tx(o.s), pct: z.pct != null ? z.pct : null, mk: z.mk != null ? z.mk : null, dl: z.dl ? {t: z.dl.t, c: z.dl.c} : null}; }).filter(Boolean);
-    var SEL = window.BIPJ ? BIPJ.get() : [], SK = {}; SEL.forEach(function (n) { SK[nk(n)] = 1; }); var PJA = c.PJ, PJS = SEL.length ? c.PJ.filter(function (p) { return SK[nk(p.name)]; }) : c.PJ; if (SEL.length && !PJS.length) PJS = c.PJ;
+    var SEL = o && o.all ? [] : window.BIPJ ? BIPJ.get() : [], SK = {}; SEL.forEach(function (n) { SK[nk(n)] = 1; }); var PJA = c.PJ, PJS = SEL.length ? c.PJ.filter(function (p) { return SK[nk(p.name)]; }) : c.PJ; if (SEL.length && !PJS.length) PJS = c.PJ;
     var done = [], ph = [];
     PJS.forEach(function (p) { var rs = p.inP.filter(function (r) { return r.upd; }).sort(function (x, y) { return x.m < y.m ? 1 : -1; }); if (rs.length) done.push({name: p.name, stage: p.stage, st: (ST[p.stage] || ST.upcoming)[0], type: p.type, txt: rs[0].upd, sc: rs[0].sc || p.scope, pr: p.progress}); rs.forEach(function (r) { (r.imgs || []).forEach(function (im) { if (!im.fl) ph.push({d: im.d, cap: im.cap || p.name}); }); }); });
     var XN = [];
@@ -9403,7 +9403,7 @@ window.BITHEME = (function () {
     {t: 'pro_alr', l: 'Alerts & Rules', ic: 'bell', sub: 'Automatic warnings with your own thresholds', r: rAlr},
     {t: 'pro_dq', l: 'Data Health', ic: 'shield', sub: 'Checks that the numbers can be trusted', r: rDq},
     {t: 'pro_studio', l: 'One-Page Studio', ic: 'img', sub: 'Design an editable one-page PPT summary', r: rStudio},
-    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=9'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
+    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=10'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
     {t: 'pro_rep', l: 'Report Builder', ic: 'file', sub: 'Copy, print or download a ready summary', r: rRep}
   ];
   var TT = {}; TABS.forEach(function (x) { TT[x.t] = x; });
