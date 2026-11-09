@@ -74,6 +74,8 @@ html,body{background:#F4F6F2;min-height:100%}
 .wk{display:flex;align-items:flex-end;gap:6px;height:92px;margin-top:6px}.wk div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:10px;color:#6b7280;gap:3px}.wk i{display:block;width:100%;border-radius:7px 7px 3px 3px;background:linear-gradient(180deg,#22C55E,#15803D);min-height:3px}.wk div.t i{background:linear-gradient(180deg,#F59E0B,#D97706)}
 .rc{border:1px solid #E5E7EB;border-radius:14px;padding:10px 11px;margin-top:8px;background:#fff}.rc.off{opacity:.55}.rc .rt{display:flex;gap:8px;align-items:center}.rc .rt b{flex:1;font-size:14px}.rc .rw{font-size:12.5px;color:#4b5563;margin-top:4px;line-height:1.45}
 .sw{position:relative;width:42px;height:24px;flex:none}.sw input{opacity:0;width:0;height:0}.sw span{position:absolute;inset:0;background:#D1D5DB;border-radius:99px;transition:.2s;cursor:pointer}.sw span:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}.sw input:checked+span{background:var(--g2)}.sw input:checked+span:before{transform:translateX(18px)}
+.av.ph{padding:0;overflow:hidden;background:#eee}.av.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.aitr{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:9px}.aitr button{border:0;border-radius:13px;padding:8px 2px;font:700 11.5px inherit;cursor:pointer;background:linear-gradient(135deg,#F5F3FF,#EDE9FE);color:#4C1D95;display:flex;flex-direction:column;align-items:center;gap:2px}.aitr button b{font-size:19px;font-weight:400}.aitr button:first-child{background:linear-gradient(135deg,#ECFDF5,#D1FAE5);color:#065F46}
 .up{color:var(--rd);font-weight:800}.dn{color:var(--g2);font-weight:800}
 </style>
 </head>
@@ -142,8 +144,56 @@ html,body{background:#F4F6F2;min-height:100%}
   function setProds(list) { (list || []).forEach(function (n) { if (!n) return; var o = PM[n.id]; if (o) Object.assign(o, n); else { D.prods.push(n); PM[n.id] = n; } }); }
   function setParty(p) { if (!p) return; var o = RM[p.id]; if (o) Object.assign(o, p); else { D.parties.push(p); RM[p.id] = p; } }
 
+  // ================= 🌐 language: English · हिंदी · Hinglish =================
+  // Only the app's own words are translated (a list made from this page's code) — names, items and numbers stay as they are.
+  // Translations are made once by AI on the server, shared by all shops, and kept on the phone.
+  var ULANG = (function () { try { return localStorage.getItem("kh-lang") || "en"; } catch (e) { return "en"; } })(), I18 = { map: {}, wl: null, pend: {}, t: null, warm: false };
+  function trStr(t) {
+    var core = t.trim(); if (!core || !/[A-Za-z]{2}/.test(core)) return null;
+    var lead = t.slice(0, t.indexOf(core.charAt(0))), trail = t.slice(t.lastIndexOf(core.charAt(core.length - 1)) + 1), vals = [];
+    var norm = core.replace(/\s+/g, " ").replace(/₹?\d[\d,]*(?:\.\d+)?/g, function (m) { vals.push(m); return "{#}"; });
+    var put = function (x) { var i = 0; return x.replace(/\{#\}/g, function () { return vals[i++] || ""; }); };
+    var key = norm.replace(/^[\s·—:|,.()]+|[\s·—:|,.()]+$/g, "");
+    if (I18.map[key]) return lead + put(norm.replace(key, I18.map[key])) + trail;
+    if (I18.wl && I18.wl[key]) want(key);
+    var any = false, out = norm.split(/( · | — |: |\(|\)|\{#\}|, | – |\? )/).map(function (pc) { var k = pc.replace(/^[\s·—:|,.()]+|[\s·—:|,.()]+$/g, ""); if (!k || k === "{#}") return pc; if (I18.map[k]) { any = true; return pc.replace(k, I18.map[k]); } if (I18.wl && I18.wl[k]) want(k); return pc; }).join("");
+    return any ? lead + put(out) + trail : null;
+  }
+  function trNode(n) {
+    if (n.nodeType === 3) { var pe = n.parentNode; if (!pe || /^(SCRIPT|STYLE|TEXTAREA)$/.test(pe.nodeName) || (pe.closest && pe.closest("[data-notr]"))) return; if (n.__tr === n.nodeValue) return; var r = trStr(n.nodeValue); if (r != null && r !== n.nodeValue) { n.__tr = r; n.nodeValue = r; } return; }
+    if (n.nodeType !== 1) return; ["placeholder", "title"].forEach(function (a) { var v = n.getAttribute(a); if (v && n["__" + a] !== v) { var r = trStr(v); if (r != null) { n["__" + a] = r; n.setAttribute(a, r); } } });
+  }
+  function trTree(root) { if (!root) return; if (root.nodeType === 3) return trNode(root); if (root.nodeType !== 1 || /^(SCRIPT|STYLE)$/.test(root.nodeName)) return; trNode(root); var w = document.createTreeWalker(root, 1 | 4), x; while ((x = w.nextNode())) trNode(x); }
+  function want(k) { I18.pend[k] = 1; if (!I18.t) I18.t = setTimeout(flushTr, 700); }
+  function flushTr() {
+    I18.t = null; var keys = Object.keys(I18.pend).filter(function (k) { return !I18.map[k]; }).slice(0, 70); if (!keys.length || !(KA && KA.ktok) && MODE !== "admin") return;
+    keys.forEach(function (k) { delete I18.pend[k]; });
+    K("i18n", { lang: ULANG, keys: keys }).then(function (r) { if (r && r.map) { Object.assign(I18.map, r.map); saveTr(); trTree(document.body); } if (Object.keys(I18.pend).length) I18.t = setTimeout(flushTr, 400); });
+  }
+  function saveTr() { try { localStorage.setItem("kh-i18n-" + ULANG, JSON.stringify(I18.map)); } catch (e) { } }
+  function i18nInit() {
+    if (ULANG === "en") return;
+    try { I18.map = JSON.parse(localStorage.getItem("kh-i18n-" + ULANG) || "{}"); } catch (e) { I18.map = {}; }
+    new MutationObserver(function (ms) { ms.forEach(function (m) { if (m.type === "characterData") trNode(m.target); else if (m.type === "attributes") trNode(m.target); else m.addedNodes.forEach(trTree); }); }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["placeholder", "title"] });
+    libJ("/khata-strings.js?v=" + (document.querySelector('meta[name="khv"]') || { content: "1" }).content, function () { return !!window.KH_STR; }).then(function () { I18.wl = {}; window.KH_STR.forEach(function (k) { I18.wl[k] = 1; }); trTree(document.body); }).catch(function () { });
+    trTree(document.body);
+  }
+  // after login: get the shared translations, then fill whatever is still missing in the background
+  function i18nSync() {
+    if (ULANG === "en" || I18.warm) return; I18.warm = true;
+    K("i18n-get", { lang: ULANG }).then(function (r) { if (r && r.ok) { Object.assign(I18.map, r.map); saveTr(); trTree(document.body); }
+      var go = function () { if (!I18.wl) return setTimeout(go, 800); var miss = Object.keys(I18.wl).filter(function (k) { return !I18.map[k]; }); if (!miss.length) return; var tot = miss.length, i = 0;
+        var step = function () { var keys = miss.slice(i, i + 70); if (!keys.length) { toast("🌐 " + (ULANG === "hi" ? "हिंदी तैयार है" : "Hinglish ready")); return; } i += 70; K("i18n", { lang: ULANG, keys: keys }).then(function (r2) { if (r2 && r2.map) { Object.assign(I18.map, r2.map); saveTr(); trTree(document.body); } if (r2 && r2.ok === false && r2.error) return; setTimeout(step, 300); }); };
+        if (tot > 40) toast("🌐 " + (ULANG === "hi" ? "हिंदी तैयार हो रही है…" : "Hinglish taiyaar ho rahi hai…")); step(); };
+      go(); });
+  }
+  function setLang(l) { try { localStorage.setItem("kh-lang", l); } catch (e) { } location.reload(); }
+  function langBar() { return '<div class="sg" id="lgs" data-notr="1">' + [["en", "English"], ["hi", "हिंदी"], ["hn", "Hinglish"]].map(function (x) { return '<button data-lg="' + x[0] + '" class="' + (ULANG === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>"; }
+  function wireLang(el) { [].forEach.call(el.querySelectorAll("[data-lg]"), function (b) { b.onclick = function () { if (b.dataset.lg !== ULANG) setLang(b.dataset.lg); }; }); }
+
   // ================= start =================
   function start() {
+    i18nInit();
     if (H.l) return linkView(H.l, H.d);
     if (KA && KA.ktok) { MODE = "owner"; SID = KA.sid; return loadShop(); }
     if (AUTH && AUTH.app === "admin" && !Q.login) { MODE = "admin"; return adminHome(); }
@@ -152,7 +202,7 @@ html,body{background:#F4F6F2;min-height:100%}
 
   // ---------- owner login (own mobile + password; no BI account) ----------
   function login(err) {
-    MODE = ""; ROOT.innerHTML = '<div class="lgn"><div class="lo">🏪</div><h2 style="text-align:center;margin:0">Shop Khata</h2><p class="muted" style="text-align:center;margin:4px 0 16px">Your shop’s digital book — bills, payments, stock and dues in one place.</p>' +
+    MODE = ""; ROOT.innerHTML = '<div class="lgn"><div class="lo">🏪</div><h2 style="text-align:center;margin:0">Shop Khata</h2><p class="muted" style="text-align:center;margin:4px 0 12px">Your shop’s digital book — bills, payments, stock and dues in one place.</p>' + langBar() + '<div style="height:10px"></div>' +
       '<div class="kf bx"><label>Mobile number</label><input id="lm" type="tel" inputmode="numeric" maxlength="10" value="' + esc(Q.m || ls("kh-last") || "") + '" placeholder="10-digit mobile"><label>Password</label><input id="lp" type="password" placeholder="Password from your BI team"><div class="muted" id="le" style="color:var(--rd);font-size:13px;margin-top:8px">' + esc(err || "") + '</div><button class="bt w" id="lb" style="margin-top:12px">Log in</button></div>' +
       '<div class="note">🔒 This login opens only your shop’s book. Ask your BI team if you forgot the password.' + (AUTH && AUTH.app === "admin" ? ' <a href="khata.html">← Back to shops (BI admin)</a>' : "") + "</div></div>";
     $("lb").onclick = function () {
@@ -160,6 +210,7 @@ html,body{background:#F4F6F2;min-height:100%}
       busy(b, true, "Logging in…"); post({ action: "kh-o-login", mob: m, pw: $("lp").value }).then(function (r) { busy(b, false); if (!r.ok) { $("le").textContent = r.error; return; } ls("kh-last", m); KA = { ktok: r.ktok, sid: r.sid, shop: r.shop, name: r.name }; ls("kh-auth", KA); MODE = "owner"; SID = r.sid; if (Q.login) history.replaceState(null, "", "khata.html"); loadShop(); });
     };
     $("lp").onkeydown = function (e) { if (e.key === "Enter") $("lb").click(); };
+    wireLang(ROOT);
   }
 
   // ---------- HO admin: shops, owner logins ----------
@@ -192,7 +243,7 @@ html,body{background:#F4F6F2;min-height:100%}
   // ---------- the shop ----------
   function loadShop() {
     ROOT.innerHTML = '<div class="empty" style="padding-top:80px">Opening your khata…</div>';
-    K("boot").then(function (r) { if (!r.ok) { ROOT.innerHTML = '<div class="empty" style="padding-top:60px">' + esc(r.error) + '<br><br><button class="bt" onclick="location.reload()">Try again</button></div>'; return; } D = r; TODAY = r.today; idx(); shell(); go(TAB); installHint(); });
+    K("boot").then(function (r) { if (!r.ok) { ROOT.innerHTML = '<div class="empty" style="padding-top:60px">' + esc(r.error) + '<br><br><button class="bt" onclick="location.reload()">Try again</button></div>'; return; } D = r; TODAY = r.today; i18nSync(); idx(); shell(); go(TAB); installHint(); });
   }
   function shell() {
     ROOT.innerHTML = '<div class="kbar"><div class="t">' + (MODE === "admin" ? '<button class="ib" id="bk">←</button>' : "") + '<div class="nm"><b id="snm"></b><small id="ssub"></small></div><button class="ib" id="ibx">🔔<i id="ibn" style="display:none"></i></button></div><div class="ks"><input id="gs" placeholder="Search item, customer or distributor…" autocomplete="off"><div class="sr" id="gsr" style="display:none"></div></div></div>' +
@@ -211,7 +262,7 @@ html,body{background:#F4F6F2;min-height:100%}
   function gsearch(q) {
     var sr = $("gsr"); q = q.trim(); if (!q) { sr.style.display = "none"; return; }
     var P = findProds(q, 8), w = words(q), R = D.parties.filter(function (p) { var h = (p.n + " " + (p.firm || "") + " " + (p.ph || "")).toLowerCase(); return p.on !== false && w.every(function (x) { return h.indexOf(x) >= 0; }); }).slice(0, 6);
-    sr.innerHTML = (R.length ? '<div class="h">KHATA</div>' + R.map(function (p) { var s = p.s || {}; return '<button data-p="' + p.id + '"><div class="av' + (p.k === "d" ? " d" : "") + '">' + esc(ini(pname(p))) + "</div><span><b>" + esc(pname(p)) + "</b><small>" + (p.k === "c" ? "Customer" : "Distributor") + (s.over > 0 ? " · overdue " + rs(s.over) : "") + "</small></span><b>" + balTxt(p) + "</b></button>"; }).join("") : "") +
+    sr.innerHTML = (R.length ? '<div class="h">KHATA</div>' + R.map(function (p) { var s = p.s || {}; return '<button data-p="' + p.id + '">' + avHtml(p) + "<span><b>" + esc(pname(p)) + "</b><small>" + (p.k === "c" ? "Customer" : "Distributor") + (s.over > 0 ? " · overdue " + rs(s.over) : "") + "</small></span><b>" + balTxt(p) + "</b></button>"; }).join("") : "") +
       (P.length ? '<div class="h">ITEMS</div>' + P.map(function (p) { var m = margin(p); return '<button data-i="' + p.id + '"><span><b>' + esc(p.n) + "</b><small>Cost " + rs2(p.cost) + " · Sell " + rs2(p.sp) + (p.mrp ? " · MRP " + rs2(p.mrp) : "") + (m != null ? " · margin " + m + "%" : "") + "</small></span><b>" + qf(p.stk) + " " + esc(p.u) + "</b></button>"; }).join("") : "") +
       (!R.length && !P.length ? '<div class="empty">Nothing found</div>' : "");
     sr.style.display = "";
@@ -236,7 +287,7 @@ html,body{background:#F4F6F2;min-height:100%}
     var hr = new Date(Date.now() + 19800000).getUTCHours(), hiTxt = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
     kv.innerHTML = '<div class="hh"><div class="hi">' + hiTxt + (D.shop.owner ? ", " + esc(D.shop.owner.replace(/^(mr|mrs|ms|shri|smt|dr)\.?\s+/i, "").split(" ")[0]) + " ji" : "") + ' 👋 · today’s sale</div><div class="big" id="tdv">' + rs((td.cs || 0) + (td.us || 0) + (td.cd || 0)) + '</div><div class="sub" id="tdn">Cash ' + rs(td.cs || 0) + " · UPI " + rs(td.us || 0) + "</div>" +
       '<div class="hhg"><button data-go="recv"><small>⬇️ To collect</small><b>' + rs(recv) + "</b><i>" + (over > 0 ? rs(over) + " overdue" : "nothing late") + '</i></button><button data-go="pay"><small>⬆️ To pay</small><b>' + rs(pay) + "</b><i>" + (pover > 0 ? rs(pover) + " overdue" : rs(psoon) + " in 7 days") + '</i></button><button data-go="stock"><small>📦 Stock</small><b>' + rs(val) + "</b><i>" + live.length + " items</i></button></div></div>" +
-      '<div class="qa2">' + [["sale", "🧾", "Sale bill", "c1"], ["scan", "📝", "Scan list → bill", "c6"], ["rcpt", "💰", "Got payment", "c5"], ["pay", "💸", "Paid", "c2"], ["pur", "📥", "Purchase", "c3"], ["photo", "📷", "Bill photo AI", "c7"], ["day", "🏪", "Counter sale", "c4"], ["more2", "⋯", "More", "c8"]].map(function (x) { return '<button data-q="' + x[0] + '"><b class="' + x[3] + '">' + x[1] + "</b>" + x[2] + "</button>"; }).join("") + "</div>" +
+      '<div class="qa2">' + [["sale", "🧾", "Sale bill", "c1"], ["scan", "📝", "Scan list → bill", "c6"], ["rcpt", "💰", "Got payment", "c5"], ["pay", "💸", "Paid", "c2"], ["pur", "📥", "Purchase", "c3"], ["bcode", "📷", "Barcode bill", "c7"], ["day", "🏪", "Counter sale", "c4"], ["more2", "⋯", "More", "c8"]].map(function (x) { return '<button data-q="' + x[0] + '"><b class="' + x[3] + '">' + x[1] + "</b>" + x[2] + "</button>"; }).join("") + "</div>" +
       '<div class="chips">' + [[odC.length, "r", "⏰ " + odC.length + " overdue", "recv"], [held.length, "r", "🚫 " + held.length + " credit stopped", "held"], [low.length, "a", "🔻 " + low.length + " low stock", "low"], [exp.length, "r", "⏳ " + exp.length + " expiring", "exp"], [pch.length, "a", "📈 " + pch.length + " price changes", "price"], [unack, "a", "✍️ " + unack + " not confirmed", "ack"], [1, "g", "⚙️ Rules " + (D.shop.rulesOn ? "on" : "off"), "rules"]].filter(function (x) { return x[0]; }).map(function (x) { return '<button class="' + x[1] + '" data-go="' + x[3] + '">' + x[2] + "</button>"; }).join("") + "</div>" +
       ((D.inbox || []).length ? '<div class="bx"><h3><span>🔔 New for you</span><button class="bt s l" id="hib">See all ' + D.inbox.length + "</button></h3>" + D.inbox.slice(0, 3).map(inboxRow).join("") + "</div>" : "") +
       '<div class="bx"><h3><span>📊 Last 7 days</span><small class="muted" id="wks"></small></h3><div class="wk" id="wk"><div class="muted" style="align-self:center;width:100%;text-align:center">…</div></div></div>' +
@@ -244,7 +295,7 @@ html,body{background:#F4F6F2;min-height:100%}
       '<div class="bx ai" id="aib"><h3><span>✨ AI insights & action plan</span><button class="bt s" id="aig">Get my plan</button></h3><div class="muted" style="font-size:12.5px">Who to collect from first, what to re-order, dead stock, expiry, margins, price changes and cash flow — from your own books, with a step to take for each.</div></div>' +
       listBox("⏰ Collect first (overdue customers)", odC.sort(function (a, b) { return b.s.over - a.s.over; }).slice(0, 8), "remind") +
       listBox("📅 Pay soon (distributors)", Dd.filter(function (p) { return p.s && (p.s.over > 0 || p.s.soon > 0); }).sort(function (a, b) { return (a.s.nextDue || "9") < (b.s.nextDue || "9") ? -1 : 1; }).slice(0, 8), "pay");
-    [].forEach.call(kv.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var q = b.dataset.q; if (q === "sale" || q === "pur") docForm(q); else if (q === "scan") docForm("sale", null, null, null, null, { _scan: true }); else if (q === "rcpt" || q === "pay") payForm(q); else if (q === "day") dayForm(TODAY); else if (q === "photo") billPhoto(); else newMenu(); }; });
+    [].forEach.call(kv.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var q = b.dataset.q; if (q === "sale" || q === "pur") docForm(q); else if (q === "scan") docForm("sale", null, null, null, null, { _scan: true }); else if (q === "bcode") docForm("sale", null, null, null, null, { _bc: true }); else if (q === "rcpt" || q === "pay") payForm(q); else if (q === "day") dayForm(TODAY); else if (q === "photo") billPhoto(); else newMenu(); }; });
     [].forEach.call(kv.querySelectorAll("[data-go]"), function (b) { b.onclick = function () { var g = b.dataset.go; if (g === "recv" || g === "held") { PSEG = "c"; go("parties"); } else if (g === "pay") { PSEG = "d"; go("parties"); } else if (g === "stock") report("stock"); else if (g === "low") { ISEG = "low"; go("items"); } else if (g === "exp") report("expiry"); else if (g === "price") priceView(); else if (g === "rules") rulesView(); else report("ack"); }; });
     wireLists(kv); if ($("hib")) $("hib").onclick = inbox; wireInbox(kv);
     $("aig").onclick = function () { aiInsights(this); }; if ($("hcat")) { $("hcat").onclick = catalog; $("hpar").onclick = partyImport; $("hsmp").onclick = samples; }
@@ -257,7 +308,7 @@ html,body{background:#F4F6F2;min-height:100%}
   }
   function listBox(title, L, kind) {
     if (!L.length) return "";
-    return '<div class="bx"><h3><span>' + title + "</span></h3>" + L.map(function (p) { var s = p.s || {}; return '<div class="li" data-p="' + p.id + '"><div class="av' + (p.k === "d" ? " d" : "") + '">' + esc(ini(pname(p))) + '</div><div class="m"><b>' + esc(pname(p)) + "</b><small>" + (s.over > 0 ? "<span class='pl r'>" + rs(s.over) + " · " + s.od + " days late</span> " : "") + (s.nextDue ? "next due " + dS(s.nextDue) : "") + (s.lastCr ? " · last paid " + dS(s.lastCr) : "") + '</small></div><div class="a">' + balTxt(p) + (kind === "remind" && (p.wa || p.ph) ? '<small><button class="bt wa s" data-rm="' + p.id + '" style="margin-top:4px">Remind</button></small>' : "") + (kind === "pay" ? '<small><button class="bt s l" data-py="' + p.id + '" style="margin-top:4px">Pay</button></small>' : "") + "</div></div>"; }).join("") + "</div>";
+    return '<div class="bx"><h3><span>' + title + "</span></h3>" + L.map(function (p) { var s = p.s || {}; return '<div class="li" data-p="' + p.id + '">' + avHtml(p) + '<div class="m"><b>' + esc(pname(p)) + "</b><small>" + (s.over > 0 ? "<span class='pl r'>" + rs(s.over) + " · " + s.od + " days late</span> " : "") + (s.nextDue ? "next due " + dS(s.nextDue) : "") + (s.lastCr ? " · last paid " + dS(s.lastCr) : "") + '</small></div><div class="a">' + balTxt(p) + (kind === "remind" && (p.wa || p.ph) ? '<small><button class="bt wa s" data-rm="' + p.id + '" style="margin-top:4px">Remind</button></small>' : "") + (kind === "pay" ? '<small><button class="bt s l" data-py="' + p.id + '" style="margin-top:4px">Pay</button></small>' : "") + "</div></div>"; }).join("") + "</div>";
   }
   function wireLists(el) {
     [].forEach.call(el.querySelectorAll(".li[data-p]"), function (r) { r.onclick = function (e) { if (e.target.closest("button")) return; partyView(r.dataset.p); }; });
@@ -288,21 +339,24 @@ html,body{background:#F4F6F2;min-height:100%}
     kv.innerHTML = '<div class="sg"><button data-s="c" class="' + (PSEG === "c" ? "on" : "") + '">🧑 Customers</button><button data-s="d" class="' + (PSEG === "d" ? "on" : "") + '">🚚 Distributors</button></div>' +
       '<div class="hero2' + (PSEG === "d" ? " d" : "") + '"><div class="l">' + (PSEG === "c" ? "Customers owe you" : "You owe distributors") + '</div><div class="v">' + rs(tot) + '</div><div class="l">' + (ov > 0 ? rs(ov) + " overdue · " : "") + L.length + " " + (PSEG === "c" ? "customers" : "distributors") + "</div></div>" +
       '<div class="row" style="margin-top:9px;gap:6px"><select class="in" id="ps" style="flex:1;padding:8px">' + opts([["due", "Sort: overdue first"], ["bal", "Sort: highest balance"], ["name", "Sort: name"]], sort) + '</select><button class="bt s" id="pa">＋ Add</button><button class="bt gh s" id="pimp">⬆ Excel</button></div>' +
-      '<div class="bx">' + (L.length ? L.map(function (p) { var s = p.s || {}; return '<div class="li" data-p="' + p.id + '"><div class="av' + (p.k === "d" ? " d" : "") + '">' + esc(ini(pname(p))) + '</div><div class="m"><b>' + esc(pname(p)) + "</b><small>" + (s.over > 0 ? "<span class='pl r'>" + rs(s.over) + " overdue</span> " : s.nextDue ? "due " + dS(s.nextDue) + " " : "") + (s.unack ? "<span class='pl a'>" + s.unack + " not confirmed</span> " : "") + (p.hold ? "<span class='pl r'>🚫 credit stopped</span> " : "") + (p.grp ? "<span class='pl'>" + esc(p.grp) + "</span> " : "") + (p.conf ? (p.conf.ok ? "<span class='pl g'>balance agreed " + dS(new Date(p.conf.at + 19800000).toISOString().slice(0, 10)) + "</span>" : "<span class='pl r'>balance disputed</span>") : "") + (p.ph ? "<br>📞 " + p.ph : "") + '</small></div><div class="a">' + balTxt(p) + "<small>" + (PSEG === "c" ? ((s.bal || 0) > 0 ? "to collect" : (s.bal || 0) < -0.5 ? "advance" : "") : ((s.bal || 0) > 0 ? "to pay" : "")) + "</small></div></div>"; }).join("") : '<div class="empty">No ' + (PSEG === "c" ? "customers" : "distributors") + " yet — tap ＋ Add.</div>") + "</div>";
+      '<div class="bx">' + (L.length ? L.map(function (p) { var s = p.s || {}; return '<div class="li" data-p="' + p.id + '">' + avHtml(p) + '<div class="m"><b>' + esc(pname(p)) + "</b><small>" + (s.over > 0 ? "<span class='pl r'>" + rs(s.over) + " overdue</span> " : s.nextDue ? "due " + dS(s.nextDue) + " " : "") + (s.unack ? "<span class='pl a'>" + s.unack + " not confirmed</span> " : "") + (p.hold ? "<span class='pl r'>🚫 credit stopped</span> " : "") + (p.grp ? "<span class='pl'>" + esc(p.grp) + "</span> " : "") + (p.conf ? (p.conf.ok ? "<span class='pl g'>balance agreed " + dS(new Date(p.conf.at + 19800000).toISOString().slice(0, 10)) + "</span>" : "<span class='pl r'>balance disputed</span>") : "") + (p.ph ? "<br>📞 " + p.ph : "") + '</small></div><div class="a">' + balTxt(p) + "<small>" + (PSEG === "c" ? ((s.bal || 0) > 0 ? "to collect" : (s.bal || 0) < -0.5 ? "advance" : "") : ((s.bal || 0) > 0 ? "to pay" : "")) + "</small></div></div>"; }).join("") : '<div class="empty">No ' + (PSEG === "c" ? "customers" : "distributors") + " yet — tap ＋ Add.</div>") + "</div>";
     [].forEach.call(kv.querySelectorAll("[data-s]"), function (b) { b.onclick = function () { PSEG = b.dataset.s; go("parties"); }; });
     $("ps").onchange = function () { ls("kh-psort", this.value); go("parties"); }; $("pa").onclick = function () { partyForm(null, PSEG); }; $("pimp").onclick = partyImport; wireLists(kv);
   }
   function partyForm(id, k, done) {
     var p = id ? RM[id] : { k: k || "c", days: k === "d" ? D.shop.ddays : D.shop.days, lead: 2 }, isD = p.k === "d";
-    var o = full((id ? "Edit " : "New ") + (isD ? "distributor" : "customer"), '<div class="kf bx"><label>' + (isD ? "Distributor / company name" : "Customer name") + '</label><input id="pn" value="' + esc(p.n || "") + '"><label>' + (isD ? "Firm (as on bill)" : "Shop / firm (optional)") + '</label><input id="pf" value="' + esc(p.firm || "") + '">' +
+    var o = full((id ? "Edit " : "New ") + (isD ? "distributor" : "customer"), '<div class="kf bx"><div class="row" style="gap:12px;align-items:center"><div id="pfav" style="cursor:pointer">' + (p.av ? avHtml(p, 1) : '<div class="av" style="width:64px;height:64px;font-size:26px">📷</div>') + '</div><div style="flex:1"><b>' + (p.av ? "Photo saved" : "Add a photo") + '</b><div class="muted" style="font-size:12px">Helps you recognise ' + (isD ? "the salesman / firm" : "customers with similar names") + ' — tap to take it with the camera</div></div></div><label>' + (isD ? "Distributor / company name" : "Customer name") + '</label><input id="pn" value="' + esc(p.n || "") + '"><label>' + (isD ? "Firm (as on bill)" : "Shop / firm (optional)") + '</label><input id="pf" value="' + esc(p.firm || "") + '">' +
       '<div class="g2"><div><label>Mobile (for link & WhatsApp)</label><input id="pp" type="tel" maxlength="10" value="' + esc(p.ph || "") + '"></div><div><label>WhatsApp (if different)</label><input id="pw" type="tel" maxlength="10" value="' + esc(p.wa || "") + '"></div></div><label>E-mail (bills are e-mailed here)</label><input id="pe" type="email" value="' + esc(p.em || "") + '">' +
       '<div class="g2"><div><label>Credit days allowed</label><input id="pd" type="number" value="' + esc(p.days) + '"></div><div><label>' + (isD ? "Delivery lead time (days)" : "Credit limit ₹ (0 = none)") + '</label><input id="pl" type="number" value="' + esc(isD ? p.lead : p.lim || 0) + '"></div></div>' +
       (isD ? '<div class="g2"><div><label>Salesman name</label><input id="psm" value="' + esc(p.sman || "") + '"></div><div><label>Salesman mobile</label><input id="psp" type="tel" maxlength="10" value="' + esc(p.sph || "") + '"></div></div><label>Order / visit days</label><input id="pod" placeholder="e.g. Mon, Thu" value="' + esc(p.od || "") + '">' : '<label>UPI IDs they pay from (helps match UPI SMS)</label><input id="pu" placeholder="name@ybl, 98xxxxxx@paytm" value="' + esc((p.upi || []).join(", ")) + '">') +
       '<label>Address</label><input id="pad" value="' + esc(p.addr || "") + '"><label>GSTIN (optional)</label><input id="pg" value="' + esc(p.gst || "") + '">' +
       '<div class="g2"><div><label>Opening balance ₹ ' + (isD ? "(you owe them)" : "(they owe you)") + '</label><input id="pob" type="number" value="' + esc(p.ob || "") + '"></div><div><label>As on date</label><input id="pobd" type="date" value="' + esc(p.obd || TODAY) + '"></div></div><div class="muted" style="font-size:11.5px;margin-top:4px">Old balance from your paper book. Use minus for advance.</div><div class="g2"><div><label>Group (rules can target a group)</label><select id="pgr"><option value="">—</option>' + opts(D.shop.grps || [], p.grp || "") + '</select></div><div><label>&nbsp;</label><label class="chk" style="margin:8px 0"><input type="checkbox" id="phd"' + (p.hold ? " checked" : "") + "> 🚫 Stop credit" + (p.hold && p.hold.by === "rule" ? " (by rule)" : "") + '</label></div></div>' + (p.hold ? '<div class="muted" style="font-size:11.5px">' + esc(p.hold.why || "") + "</div>" : "") + '<label>Notes</label><input id="pno" value="' + esc(p.notes || "") + '"></div><div style="height:70px"></div><div class="bar2"><button class="bt w" id="psv">Save</button></div>');
+    var pend = null; o.querySelector("#pfav").onclick = function () { var fav = this; if (id) return photoTake(RM[id], function (pp) { fav.innerHTML = avHtml(pp, 1); });
+      var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.capture = "user"; i.onchange = function () { if (i.files[0]) { pend = i.files[0]; var u = URL.createObjectURL(pend); fav.innerHTML = '<div class="av ph" style="width:64px;height:64px"><img src="' + u + '"></div>'; } }; i.click(); };
     $("psv").onclick = function () { var b = this; var x = { id: id || undefined, k: p.k, n: V(o, "pn"), firm: V(o, "pf"), ph: V(o, "pp"), wa: V(o, "pw"), em: V(o, "pe"), days: V(o, "pd"), addr: V(o, "pad"), gst: V(o, "pg"), ob: V(o, "pob"), obd: V(o, "pobd"), notes: V(o, "pno"), grp: V(o, "pgr") }; var hd = o.querySelector("#phd").checked; if (hd !== !!p.hold) { x.hold = hd; x.holdWhy = "Stopped by owner"; }
       if (isD) { x.lead = V(o, "pl"); x.sman = V(o, "psm"); x.sph = V(o, "psp"); x.od = V(o, "pod"); } else { x.lim = V(o, "pl"); x.upi = V(o, "pu"); }
-      busy(b, true); K("party-save", { party: x }).then(function (r) { busy(b, false); if (!r.ok) return toast(r.error); setParty(r.party); o.remove(); toast("✅ Saved"); if (done) done(r.party); else refreshTab(); }); };
+      busy(b, true); K("party-save", { party: x }).then(function (r) { busy(b, false); if (!r.ok) return toast(r.error); setParty(r.party); o.remove(); toast("✅ Saved"); var fin = function (pp) { if (done) done(pp); else refreshTab(); };
+        if (pend && !id) { var ff = pend; shrink(ff, 640).then(function (u) { var im = new Image(); im.onload = function () { var c = document.createElement("canvas"), sz = Math.min(im.width, im.height); c.width = c.height = 96; c.getContext("2d").drawImage(im, (im.width - sz) / 2, (im.height - sz) / 2, sz, sz, 0, 0, 96, 96); K("party-photo", { pid: r.party.id, img: u, av: c.toDataURL("image/jpeg", 0.8) }).then(function (r2) { if (r2.ok) setParty(r2.party); fin(r2.ok ? r2.party : r.party); }); }; im.src = u; }); } else fin(r.party); }); };
   }
   function partyImport() {
     sheet("⬆ Import customers / distributors", "Excel columns: Type (Customer/Distributor), Name, Firm, Mobile, WhatsApp, Email, Credit days, Credit limit, Group, Opening balance, Address, UPI IDs, Lead time days, Salesman, Salesman mobile. Same name / mobile = updated.", [["⬇", "Download sample file", function () { download(xlsx([{ name: "Parties", rows: SAMPLE.parties() }]), "Khata_sample_parties.xlsx"); return false; }],
@@ -315,11 +369,13 @@ html,body{background:#F4F6F2;min-height:100%}
   function partyView(pid) {
     var p = RM[pid]; if (!p) return; var o = full(pname(p), '<div class="empty">Loading…</div>', '<button data-ed>✏️</button>');
     o.querySelector("[data-ed]").onclick = function () { partyForm(pid, null, function () { o.remove(); partyView(pid); }); };
+    o.addEventListener("click", function (e) { if (e.target.closest("#pvav")) { var pp = RM[pid]; if (pp.av) photoShow(pp); else photoTake(pp, function () { o.remove(); partyView(pid); }); } });
     K("ledger", { pid: pid }).then(function (r) {
       if (!r.ok) { o.querySelector(".bd").innerHTML = '<div class="empty">' + esc(r.error) + "</div>"; return; }
       setParty(r.party); p = RM[pid]; var s = r.s, isC = p.k === "c", docs = r.docs, DM = {}; docs.forEach(function (d) { DM[d.id] = d; });
       var hcls = Math.abs(s.bal) < 0.5 ? " z" : isC ? "" : " d";
-      var h = '<div class="hero2' + hcls + '"><div class="l">' + (Math.abs(s.bal) < 0.5 ? "All settled" : isC ? (s.bal > 0 ? "They owe you" : "Advance with you") : (s.bal > 0 ? "You owe them" : "Advance paid")) + '</div><div class="v">' + rs(Math.abs(s.bal)) + '</div><div class="l">' + (s.over > 0 ? "⚠️ " + rs(s.over) + " overdue (" + s.od + " days) · " : "") + (s.nextDue ? "next due " + dS(s.nextDue) + " · " : "") + p.days + " days credit" + (s.lastCr ? " · last payment " + dS(s.lastCr) + " (" + rs(s.lastAmt) + ")" : "") + "</div>" +
+      var h = '<div class="row" style="gap:12px;align-items:center;margin:2px 0 10px"><div id="pvav" style="cursor:pointer;position:relative">' + avHtml(p, 1) + (p.av ? "" : '<span style="position:absolute;right:-4px;bottom:-4px;background:#fff;border-radius:50%;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.2);width:24px;height:24px;display:flex;align-items:center;justify-content:center">📷</span>') + '</div><div style="flex:1;min-width:0"><b style="font-size:16px">' + esc(pname(p)) + "</b><div class='muted' style='font-size:12.5px'>" + esc([p.firm && p.n ? p.n : "", p.ph, p.addr, p.grp].filter(Boolean).join(" · ")) + "</div></div></div>";
+      h += '<div class="hero2' + hcls + '"><div class="l">' + (Math.abs(s.bal) < 0.5 ? "All settled" : isC ? (s.bal > 0 ? "They owe you" : "Advance with you") : (s.bal > 0 ? "You owe them" : "Advance paid")) + '</div><div class="v">' + rs(Math.abs(s.bal)) + '</div><div class="l">' + (s.over > 0 ? "⚠️ " + rs(s.over) + " overdue (" + s.od + " days) · " : "") + (s.nextDue ? "next due " + dS(s.nextDue) + " · " : "") + p.days + " days credit" + (s.lastCr ? " · last payment " + dS(s.lastCr) + " (" + rs(s.lastAmt) + ")" : "") + "</div>" +
         '<div class="ag">' + ["0–30 d", "31–60 d", "61–90 d", "90+ d"].map(function (l, i) { return "<div>" + l + "<b>" + rs(s.aging[i]) + "</b></div>"; }).join("") + "</div></div>";
       h += '<div class="qa" style="grid-template-columns:repeat(4,1fr)">' + (isC ? [["sale", "🧾", "Sale bill"], ["rcpt", "💰", "Got payment"], ["ret", "↩️", "Return"], ["adj", "⚖️", "Adjust"]] : [["pur", "📥", "Purchase"], ["pay", "💸", "Pay"], ["po", "🛒", "Order"], ["ret", "↩️", "Return"]]).map(function (x) { return '<button data-n="' + x[0] + '"><b>' + x[1] + "</b>" + x[2] + "</button>"; }).join("") + "</div>";
       h += '<div class="btr">' + ((p.wa || p.ph) ? '<button class="bt wa s" data-sh="stmt">💬 Send statement</button>' + (isC && s.bal > 0.5 ? '<button class="bt wa s" data-sh="remind">🙏 Reminder</button>' : "") : "") + (p.em ? '<button class="bt l s" data-ml="1">✉️ E-mail statement</button>' : "") + '<button class="bt l s" data-lk="1">🔗 Their link</button>' + (p.ph ? '<a class="bt gh s" href="tel:' + p.ph + '" style="text-decoration:none">📞 Call</a>' : "") + '<button class="bt gh s" data-xl="1">⬇ Excel</button><button class="bt gh s" data-pdf="1">📄 PDF</button></div>';
@@ -372,13 +428,21 @@ html,body{background:#F4F6F2;min-height:100%}
   }
 
   // ---------- bill editor: sale / purchase / order / return ----------
+  function avHtml(p, big) { return '<div class="av' + (p.k === "d" ? " d" : "") + (p.av ? " ph" : "") + '"' + (big ? ' style="width:64px;height:64px;font-size:22px"' : "") + ">" + (p.av ? '<img src="' + p.av + '" alt="">' : esc(ini(pname(p)))) + "</div>"; }
+  // 📷 take / change a party's photo — square, small; the thumbnail shows everywhere, tap to see it big
+  function photoTake(p, done) {
+    var go = function (f) { shrink(f, 640).then(function (u) { if (!u) return toast("Couldn't open the photo"); var im = new Image(); im.onload = function () { var c = document.createElement("canvas"), sz = Math.min(im.width, im.height); c.width = c.height = 96; c.getContext("2d").drawImage(im, (im.width - sz) / 2, (im.height - sz) / 2, sz, sz, 0, 0, 96, 96);
+      K("party-photo", { pid: p.id, img: u, av: c.toDataURL("image/jpeg", 0.8) }).then(function (r) { if (!r.ok) return toast(r.error); setParty(r.party); toast("📷 Photo saved"); if (done) done(r.party); }); }; im.src = u; }); };
+    var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.capture = "user"; i.onchange = function () { if (i.files[0]) go(i.files[0]); }; i.click();
+  }
+  function photoShow(p) { K("party-photo-get", { pid: p.id }).then(function (r) { var u = (r.ok && r.img) || p.av; if (!u) return; var o = full(pname(p), '<div style="text-align:center"><img src="' + u + '" style="max-width:100%;border-radius:16px"></div><div class="btr"><button class="bt l" id="phc">📷 Change photo</button><button class="bt gh" id="phx">🗑 Remove</button></div>'); o.querySelector("#phc").onclick = function () { o.remove(); photoTake(p); }; o.querySelector("#phx").onclick = function () { K("party-photo", { pid: p.id, remove: true }).then(function (r2) { if (r2.ok) { setParty(r2.party); o.remove(); toast("Removed"); } }); }; }); }
   function partyPick(k, cur, cb) {
     return '<div class="dd"><input class="in" id="ppk" placeholder="🔎 Choose ' + (k === "d" ? "distributor" : "customer") + '…" value="' + esc(cur ? pname(cur) : "") + '" autocomplete="off"><div class="sr" id="ppr" style="display:none"></div></div>';
   }
   function wirePartyPick(o, k, onPick) {
     var inp = o.querySelector("#ppk"), sr = o.querySelector("#ppr");
     var draw = function () { var w = words(inp.value), L = D.parties.filter(function (p) { return p.k === k && p.on !== false && (!w.length || w.every(function (x) { return (pname(p) + " " + (p.ph || "")).toLowerCase().indexOf(x) >= 0; })); }).slice(0, 8);
-      sr.innerHTML = L.map(function (p) { return '<button data-p="' + p.id + '"><span><b>' + esc(pname(p)) + "</b><small>" + (p.ph || "") + "</small></span>" + balTxt(p) + "</button>"; }).join("") + '<button data-new="1"><span><b>＋ New ' + (k === "d" ? "distributor" : "customer") + (inp.value ? ": " + esc(inp.value) : "") + "</b></span></button>"; sr.style.display = "";
+      sr.innerHTML = L.map(function (p) { return '<button data-p="' + p.id + '">' + avHtml(p) + '<span><b>' + esc(pname(p)) + "</b><small>" + (p.ph || "") + "</small></span>" + balTxt(p) + "</button>"; }).join("") + '<button data-new="1"><span><b>＋ New ' + (k === "d" ? "distributor" : "customer") + (inp.value ? ": " + esc(inp.value) : "") + "</b></span></button>"; sr.style.display = "";
       [].forEach.call(sr.querySelectorAll("[data-p]"), function (b) { b.onclick = function () { var p = RM[b.dataset.p]; inp.value = pname(p); sr.style.display = "none"; onPick(p); }; });
       sr.querySelector("[data-new]").onclick = function () { sr.style.display = "none"; var nm = inp.value; partyForm(null, k, function (p) { inp.value = pname(p); onPick(p); }); setTimeout(function () { var f = document.querySelectorAll(".full"); var last = f[f.length - 1]; if (last && last.querySelector("#pn")) last.querySelector("#pn").value = nm; }, 30); }; };
     inp.oninput = draw; inp.onfocus = draw; o.addEventListener("click", function (e) { if (!e.target.closest(".dd")) sr.style.display = "none"; });
@@ -394,11 +458,12 @@ html,body{background:#F4F6F2;min-height:100%}
     wirePartyPick(o, kind, function (p) { P = p; if (!edit) E.due = ""; drawX(); });
     [].forEach.call(o.querySelectorAll("[data-m]"), function (b) { b.onclick = function () { amtOnly = b.dataset.m === "a"; [].forEach.call(o.querySelectorAll("[data-m]"), function (x) { x.classList.toggle("on", x === b); }); drawI(); drawT(); }; });
     function rateFor(pr) { return isS ? (pr.sp || pr.mrp || pr.cost) : (pr.cost || 0); }
+    function addLine(l) { var ex = l.p && E.items.find(function (i) { return i.p === l.p; }); if (ex) ex.q = Math.round((num(ex.q) + num(l.q)) * 1000) / 1000; else E.items.push({ p: l.p, n: l.n, u: l.u, q: l.q, fq: 0, r: l.r, mrp: l.mrp || 0, e: "", g: l.g || 0, w: l.w }); drawI(); drawT(); }
     function addItem(pr) { var ex = E.items.find(function (i) { return i.p === pr.id; }); if (ex) ex.q = num(ex.q) + 1; else E.items.push({ p: pr.id, n: pr.n, u: pr.u, q: 1, fq: 0, r: rateFor(pr), mrp: pr.mrp || 0, e: "", g: pr.gst || 0 }); drawI(); drawT(); }
     function drawI() {
       var ib = o.querySelector("#ibox"); if (amtOnly) { ib.innerHTML = '<div class="bx kf"><label>Bill amount ₹</label><input id="ao" type="number" inputmode="decimal" value="' + esc(E.amt || "") + '" style="font-size:22px;font-weight:800"><div class="muted" style="font-size:12px;margin-top:6px">Quick entry without items — stock doesn’t change.' + (isPur ? " Attach the bill photo below." : "") + "</div></div>"; o.querySelector("#ao").oninput = function () { E.amt = num(this.value); drawT(); }; return; }
-      ib.innerHTML = '<div class="bx">' + (isS && ty === "sale" ? '<div class="row" style="gap:6px;margin-bottom:8px"><button class="bt s" id="iscan" style="flex:1;background:linear-gradient(135deg,#6D28D9,#9333EA)">📝 Scan customer’s list (AI)</button></div>' : "") + '<div class="dd"><input class="in" id="ip" placeholder="🔎 Add item — type name or scan barcode" autocomplete="off"><div class="sr" id="ipr" style="display:none"></div></div><div id="ils"></div></div>';
-      if (o.querySelector("#iscan")) o.querySelector("#iscan").onclick = function () { scanList(this); };
+      ib.innerHTML = '<div class="bx">' + aiRow("air", ty, ty === "sale" || ty === "po" || ty === "ret") + '<div class="dd"><input class="in" id="ip" placeholder="🔎 Add item — type name or barcode" autocomplete="off"><div class="sr" id="ipr" style="display:none"></div></div><div id="ils"></div></div>';
+      [].forEach.call(o.querySelectorAll("#air [data-ai]"), function (bt) { bt.onclick = function () { var k = bt.dataset.ai; if (k === "bc") bcScan(isS, function (l) { addLine(l); }); else aiList(k, ty === "po" ? "po" : "sale", isS, function (L) { L.forEach(addLine); toast("✅ " + L.length + " items added — check quantities and rates"); }); }; });
       var ip = o.querySelector("#ip"), ipr = o.querySelector("#ipr");
       ip.oninput = function () { var L = findProds(ip.value, 8); ipr.innerHTML = L.map(function (pr) { return '<button data-i="' + pr.id + '"><span><b>' + esc(pr.n) + "</b><small>" + (isS ? "Sell " + rs2(pr.sp) + " · " : "") + "Cost " + rs2(pr.cost) + " · stock " + qf(pr.stk) + " " + esc(pr.u) + "</small></span></button>"; }).join("") + (ip.value.trim() && ty !== "po" ? '<button data-one="1"><span><b>➕ One-off: “' + esc(ip.value) + '”</b><small>bill it without an item / stock record</small></span></button>' : "") + (ip.value.trim() ? '<button data-new="1"><span><b>＋ New item: ' + esc(ip.value) + "</b><small>save it in your items with prices & stock</small></span></button>" : ""); ipr.style.display = ip.value.trim() ? "" : "none";
         var ob = ipr.querySelector("[data-one]"); if (ob) ob.onclick = function () { E.items.push({ p: "", n: ip.value.trim(), u: "pc", q: 1, fq: 0, r: 0, mrp: 0, e: "", g: 0 }); ip.value = ""; ipr.style.display = "none"; drawI(); drawT(); var rr = o.querySelectorAll('#ils input[data-f="r"]'); if (rr.length) rr[rr.length - 1].focus(); };
@@ -432,28 +497,6 @@ html,body{background:#F4F6F2;min-height:100%}
       var ph = xb.querySelector("#xph"); if (ph) { ph.onclick = function () { pick("image/*", function (f) { shrink(f, 1600).then(function (u) { photo = u; xb.querySelector("#xpt").textContent = u ? "✅ photo attached" : "couldn't read photo"; }); }, true); };
         xb.querySelector("#xai").onclick = function () { var b = this; var run = function (u) { photo = u; busy(b, true, "✨ Reading…"); K("bill-read", { images: [u] }).then(function (r) { busy(b, false); if (!r.ok) return toast(r.error); applyBill(r.bill); }); }; if (photo) run(photo); else pick("image/*", function (f) { shrink(f, 1800).then(run); }, true); }; }
     }
-    // 📝 AI reads the customer's (handwritten) list → matched items with quantity; unknown ones become one-off lines
-    function bestProd(nm) {
-      var L = findProds(nm, 1); if (L.length) return L[0];
-      var w = words(nm).filter(function (x) { return x.length > 2; }); if (!w.length) return null; var best = null, bs = 0;
-      D.prods.forEach(function (p) { if (p.on === false) return; var h = p.n.toLowerCase(), sc = w.filter(function (x) { return h.indexOf(x) >= 0; }).length / w.length; if (sc > bs) { bs = sc; best = p; } });
-      return bs >= 0.6 ? best : null;
-    }
-    function scanList(btn) {
-      pick("image/*", function (f) { shrink(f, 1800).then(function (u) {
-        if (!u) return toast("Couldn't open the photo"); busy(btn, true, "✨ Reading the list…");
-        K("list-read", { images: [u] }).then(function (r) { busy(btn, false); if (!r.ok) return toast(r.error);
-          amtOnly = false; [].forEach.call(o.querySelectorAll("[data-m]"), function (x) { x.classList.toggle("on", x.dataset.m === "i"); });
-          var m = 0, one = 0;
-          r.items.forEach(function (it) { var pr = bestProd(it.name) || bestProd(it.written || ""), q = num(it.qty) || 1;
-            if (pr) { var u2 = String(it.unit || "").toLowerCase(); if (pr.u === "kg" && u2 === "g") q = q / 1000; if (pr.u === "ltr" && u2 === "ml") q = q / 1000; if (u2 === "dozen" && pr.u !== "doz") q = q * 12;
-              var ex = E.items.find(function (i) { return i.p === pr.id; }); if (ex) ex.q = num(ex.q) + q; else E.items.push({ p: pr.id, n: pr.n, u: pr.u, q: Math.round(q * 1000) / 1000, fq: 0, r: num(it.rate) || rateFor(pr), mrp: pr.mrp || 0, e: "", g: pr.gst || 0, w: it.written || it.name }); m++; }
-            else { E.items.push({ p: "", n: it.name, u: it.unit || "pc", q: q, fq: 0, r: num(it.rate), mrp: 0, e: "", g: 0, w: it.written }); one++; } });
-          drawI(); drawT();
-          sheet("📝 List read — " + r.items.length + " lines", "", [["👍", "OK, let me check the bill", function () { }, "pri"]], '<div style="font-size:14px;line-height:1.6">✅ <b>' + m + "</b> matched to your items with quantity" + (one ? "<br>➕ <b>" + one + "</b> one-off lines (not in your items) — <b>type their rate</b> (orange)" : "") + '<div class="note">Check every line and quantity against the paper before saving — handwriting can be read wrong.</div></div>');
-        });
-      }); }, true);
-    }
     function applyBill(bl) {
       if (bl.billNo) o.querySelector("#dn").value = bl.billNo; if (/^\d{4}-\d{2}-\d{2}$/.test(bl.date || "")) o.querySelector("#dd").value = bl.date;
       if (!P && bl.distributor) { var w = words(bl.distributor), m = D.parties.find(function (p) { return p.k === "d" && w.some(function (x) { return x.length > 3 && pname(p).toLowerCase().indexOf(x) >= 0; }); }); if (m) { P = m; o.querySelector("#ppk").value = pname(m); } }
@@ -469,7 +512,8 @@ html,body{background:#F4F6F2;min-height:100%}
       toast("✨ Bill read — please check every line before saving");
     }
     drawI(); drawT(); drawX();
-    if (E._scan) { delete E._scan; setTimeout(function () { var sb = o.querySelector("#iscan"); if (sb) scanList(sb); }, 50); }
+    if (E._scan) { delete E._scan; setTimeout(function () { var sb = o.querySelector('#air [data-ai="photo"]'); if (sb) sb.click(); }, 50); }
+    if (E._bc) { delete E._bc; setTimeout(function () { var sb = o.querySelector('#air [data-ai="bc"]'); if (sb) sb.click(); }, 50); }
     if (E._bill) { var bl0 = E._bill; photo = E._photo || null; delete E._bill; delete E._photo; applyBill(bl0); if (photo && o.querySelector("#xpt")) o.querySelector("#xpt").textContent = "✅ photo attached"; }
     o.querySelector("#dd").onchange = function () { E.d = this.value; if (!E.due) drawX(); };
     [].forEach.call(o.querySelectorAll("[data-s]"), function (b) { b.onclick = function () {
@@ -529,11 +573,13 @@ html,body{background:#F4F6F2;min-height:100%}
   }
   function counterForm(d) {
     d = d || TODAY; var items = [], mode = "Cash";
-    var o = full("🛍️ Counter bill", '<div class="bx"><div class="dd"><input class="in" id="kp" placeholder="🔎 Item name or barcode" autocomplete="off"><div class="sr" id="kpr" style="display:none"></div></div><div id="kls"></div></div><div class="tot"><div class="gt"><span>Total</span><span id="ktt">₹0</span></div></div><div class="sg" style="margin-top:10px"><button data-md="Cash" class="on">💵 Cash</button><button data-md="UPI">📱 UPI</button></div><div class="bar2"><button class="bt w" id="ksv">Save bill</button></div>');
+    var o = full("🛍️ Counter bill", '<div class="bx">' + aiRow("kai", "sale", true) + '<div class="dd"><input class="in" id="kp" placeholder="🔎 Item name or barcode" autocomplete="off"><div class="sr" id="kpr" style="display:none"></div></div><div id="kls"></div></div><div class="tot"><div class="gt"><span>Total</span><span id="ktt">₹0</span></div></div><div class="sg" style="margin-top:10px"><button data-md="Cash" class="on">💵 Cash</button><button data-md="UPI">📱 UPI</button></div><div class="bar2"><button class="bt w" id="ksv">Save bill</button></div>');
     var tot = function () { return items.reduce(function (s, i) { return s + num(i.q) * num(i.r); }, 0); };
     var draw = function () { o.querySelector("#kls").innerHTML = items.map(function (i, k) { return '<div class="ln"><div class="r1"><b>' + esc(i.n) + '</b><button class="x" data-x="' + k + '">✕</button></div><div class="r2"><label><span>Qty</span><input type="number" data-k="' + k + '" data-f="q" value="' + i.q + '"></label><label><span>Rate</span><input type="number" data-k="' + k + '" data-f="r" value="' + i.r + '"></label><label><span>Amount</span><input disabled value="' + rs2(i.q * i.r) + '"></label></div></div>'; }).join(""); o.querySelector("#ktt").textContent = rs2(tot());
       [].forEach.call(o.querySelectorAll("#kls [data-x]"), function (b) { b.onclick = function () { items.splice(+b.dataset.x, 1); draw(); }; });
       [].forEach.call(o.querySelectorAll("#kls [data-f]"), function (inp) { inp.onchange = function () { items[+inp.dataset.k][inp.dataset.f] = num(inp.value); draw(); }; }); };
+    var kadd = function (l) { var ex = l.p && items.find(function (i) { return i.p === l.p; }); if (ex) ex.q = Math.round((num(ex.q) + num(l.q)) * 1000) / 1000; else items.push({ p: l.p, n: l.n, u: l.u, q: l.q, r: l.r }); draw(); };
+    [].forEach.call(o.querySelectorAll("#kai [data-ai]"), function (bt) { bt.onclick = function () { var k = bt.dataset.ai; if (k === "bc") bcScan(true, kadd); else aiList(k, "sale", true, function (L) { L.forEach(kadd); }); }; });
     var kp = o.querySelector("#kp"), kpr = o.querySelector("#kpr");
     kp.oninput = function () { var L = findProds(kp.value, 8); kpr.innerHTML = L.map(function (p) { return '<button data-i="' + p.id + '"><span><b>' + esc(p.n) + "</b><small>" + rs2(p.sp) + " · stock " + qf(p.stk) + "</small></span></button>"; }).join(""); kpr.style.display = L.length ? "" : "none";
       [].forEach.call(kpr.querySelectorAll("[data-i]"), function (b) { b.onclick = function () { var p = PM[b.dataset.i], ex = items.find(function (i) { return i.p === p.id; }); if (ex) ex.q++; else items.push({ p: p.id, n: p.n, u: p.u, q: 1, r: p.sp || p.mrp || 0 }); kp.value = ""; kpr.style.display = "none"; draw(); }; }); };
@@ -819,6 +865,129 @@ html,body{background:#F4F6F2;min-height:100%}
     draw();
   }
 
+  // ================= 📷 BARCODE · ✨ AI LIST (photo / voice / typed) → bill lines =================
+  var ALIAS = { cheeni: "sugar", chini: "sugar", "चीनी": "sugar", shakkar: "sugar", "शक्कर": "sugar", "मैदा": "maida", aata: "atta", "आटा": "atta", "बेसन": "besan", sooji: "suji", rava: "suji", rawa: "suji", "सूजी": "suji", namak: "salt", "नमक": "salt", tel: "oil", "तेल": "oil", sarso: "mustard", sarson: "mustard", "सरसों": "mustard",
+    chawal: "rice", chaval: "rice", "चावल": "rice", daal: "dal", "दाल": "dal", "चना": "chana", chhole: "kabuli", chole: "kabuli", chhola: "kabuli", "छोले": "kabuli", "राजमा": "rajma", arhar: "toor", tuvar: "toor", tur: "toor", "अरहर": "toor", "तूर": "toor", "मसूर": "masoor", mung: "moong", "मूंग": "moong", "मूँग": "moong", udad: "urad", "उड़द": "urad",
+    haldi: "turmeric", "हल्दी": "turmeric", mirch: "chilli", mirchi: "chilli", "मिर्च": "chilli", dhaniya: "coriander", dhania: "coriander", "धनिया": "coriander", jeera: "cumin", jira: "cumin", "जीरा": "cumin", gud: "jaggery", gur: "jaggery", "गुड़": "jaggery", "घी": "ghee", doodh: "milk", dudh: "milk", "दूध": "milk", dahi: "curd", "दही": "curd", "पनीर": "paneer",
+    ande: "eggs", anda: "eggs", egg: "eggs", "अंडे": "eggs", "अंडा": "eggs", chai: "tea", chaipatti: "tea", patti: "tea", "चाय": "tea", "चायपत्ती": "tea", sabun: "soap", "साबुन": "soap", "पोहा": "poha", "साबूदाना": "sabudana", biskut: "biscuit", "बिस्कुट": "biscuit", biscuits: "biscuit", "नमकीन": "namkeen", "मैगी": "maggi", "अगरबत्ती": "agarbatti", machis: "matchbox", "माचिस": "matchbox",
+    kaju: "cashew", badam: "almond", kishmish: "raisin", elaichi: "cardamom", ilaichi: "cardamom", laung: "clove", dalchini: "cinnamon", saunf: "fennel", imli: "tamarind", achar: "pickle", dalda: "vanaspati", sarf: "detergent", washing: "detergent", "pyaj": "onion", pyaz: "onion", aloo: "potato", namkin: "namkeen", "बादाम": "almond", "काजू": "cashew" };
+  var UNITW = { kg: 1, g: 1, gm: 1, gms: 1, gram: 1, grams: 1, ml: 1, l: 1, ltr: 1, litre: 1, liter: 1, pc: 1, pcs: 1, pkt: 1, packet: 1, pack: 1, loose: 1, of: 1, and: 1, the: 1, x: 1, kilo: 1, "किलो": 1, "ग्राम": 1, "लीटर": 1, "पैकेट": 1 };
+  function toks(s) { var o = []; words(s).forEach(function (a) { a = ALIAS[a] || a; if (a.length > 1 && !/^\d+(\.\d+)?$/.test(a) && !UNITW[a] && o.indexOf(a) < 0) o.push(a); }); return o; }
+  function packKg(n) { var m = /(\d+(?:\.\d+)?)\s*(kg|kgs|g|gm|gms|l|ltr|ml)\b/i.exec(n || ""); if (!m) return 0; var v = +m[1], u = m[2].toLowerCase(); return /^(g|gm|gms|ml)$/.test(u) ? v / 1000 : v; }
+  function nameScore(it, target) {
+    var A = toks(it.name), X = toks((it.hi || "") + " " + (it.written || "")).filter(function (t) { return A.indexOf(t) < 0 && /^[a-z]+$/.test(t); }), T = toks(target);
+    if (!A.length || !T.length) return 0;
+    var same = function (a, b) { return a === b || (a.length > 3 && b.length > 3 && (a.indexOf(b) === 0 || b.indexOf(a) === 0)); };
+    var hit = A.filter(function (a) { return T.some(function (t) { return same(a, t); }); }).length + X.filter(function (a) { return T.some(function (t) { return same(a, t); }); }).length * 0.5;
+    var sc = Math.min(1, hit / A.length) * 0.75 + Math.min(1, hit / T.length) * 0.25, pa = packKg(it.name), pb = packKg(target);
+    if (pa && pb) sc += Math.abs(pa - pb) < 0.001 ? 0.15 : -0.3;
+    return sc;
+  }
+  // each AI line → a bill line: one of my items, a catalogue product (one-off, with its MRP) or a new one-off line
+  function resolveLines(items, isS) {
+    return catLoad().catch(function () { return null; }).then(function (CT) {
+      var cat = CT ? CT.list : [], need = [];
+      var res = items.map(function (it, i) {
+        var sh = D.prods.filter(function (p) { return p.on !== false; }).map(function (p) { return { p: p, s: nameScore(it, p.n + " " + (p.br || "")) }; }).filter(function (x) { return x.s > 0.4; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 6);
+        var ca = cat.map(function (c) { return { c: c, s: nameScore(it, c.n) }; }).filter(function (x) { return x.s > 0.4; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 5);
+        var x = { it: it, sh: sh, ca: ca };
+        if (sh[0] && sh[0].s >= 0.95 && (!sh[1] || sh[1].s < sh[0].s - 0.1)) x.p = sh[0].p;
+        else if (sh.length || ca.length) need.push({ i: i, name: it.name, hi: it.hi, written: it.written, unit: it.unit, cands: sh.map(function (y) { return { k: "p:" + y.p.id, n: y.p.n + (y.p.u === "kg" ? " (loose, per kg)" : "") }; }).concat(ca.map(function (y) { return { k: "c:" + y.c.id, n: y.c.n + (y.c.u === "kg" ? " (loose, per kg)" : "") }; })) });
+        return x;
+      });
+      return (need.length ? K("match-ai", { lines: need }) : Promise.resolve({ ok: true, picks: [] })).then(function (r) {
+        var got = {}; if (r.ok) (r.picks || []).forEach(function (pk) { var x = res[pk.i]; if (!x) return; got[pk.i] = 1; if (!pk.k) return; if (pk.k.indexOf("p:") === 0) x.p = PM[pk.k.slice(2)]; else x.c = cat.find(function (c) { return c.id === pk.k.slice(2); }); });
+        // lines AI didn't answer, or answered "none" while every written word is in one of my items: the simple match decides
+        need.forEach(function (n) { var x = res[n.i]; if (x.p || x.c) return; var strong = x.sh[0] && x.sh[0].s >= 0.9 && (!x.sh[1] || x.sh[1].s < x.sh[0].s - 0.05);
+          if (!got[n.i] || strong) { if (x.sh[0] && x.sh[0].s >= (got[n.i] ? 0.9 : 0.7)) x.p = x.sh[0].p; else if (!got[n.i] && x.ca[0] && x.ca[0].s >= 0.8) x.c = x.ca[0].c; } });
+        return res.map(function (x) {
+          var it = x.it, q = it.qty, conv = function (u, n) { if ((u === "pc" || u === "pkt") && (it.unit === "kg" || it.unit === "L")) { var pk = packKg(n); if (!pk) return null; var qq = q / pk; return Math.abs(qq - Math.round(qq)) < 0.02 && qq >= 0.98 ? Math.round(qq) : null; } return q; };
+          var loose = function (n, per, mrp) { var pk = packKg(n); return { p: "", n: n.replace(/\s*\d+(?:\.\d+)?\s*(kg|kgs|g|gm|gms|l|ltr|ml)\b.*$/i, "").trim() + " (loose)", u: it.unit === "L" ? "L" : "kg", q: q, fq: 0, r: it.rate || Math.round(per / pk * 100) / 100, mrp: mrp ? Math.round(mrp / pk * 100) / 100 : 0, e: "", g: 0, w: it.written || it.name, src: "cat" }; };
+          if (x.p) { var q1 = conv(x.p.u, x.p.n); if (q1 == null && packKg(x.p.n)) return loose(x.p.n, isS ? x.p.sp || x.p.mrp : x.p.cost, x.p.mrp); if (q1 != null) return { p: x.p.id, n: x.p.n, u: x.p.u, q: q1, fq: 0, r: it.rate || (isS ? x.p.sp || x.p.mrp || x.p.cost : x.p.cost || 0), mrp: x.p.mrp || 0, e: "", g: x.p.gst || 0, w: it.written || it.name, src: "item" }; }
+          if (x.c) { var q2 = conv(x.c.u, x.c.n); if (q2 == null && packKg(x.c.n)) return loose(x.c.n, isS ? x.c.sp || x.c.mrp : x.c.dp, x.c.mrp); if (q2 != null) return { p: "", n: x.c.n, u: x.c.u === "kg" ? "kg" : x.c.u, q: q2, fq: 0, r: it.rate || (isS ? x.c.sp || x.c.mrp : x.c.dp), mrp: x.c.mrp || 0, e: "", g: 0, w: it.written || it.name, src: "cat" }; }
+          return { p: "", n: it.name, u: it.unit || "pc", q: q, fq: 0, r: it.rate || 0, mrp: 0, e: "", g: 0, w: it.written || it.name, src: "new" };
+        });
+      });
+    });
+  }
+  // review what AI read before it goes into the bill
+  function aiReview(lines, heard, done) {
+    var ic = { item: "✅", cat: "📚", new: "➕" };
+    var ov = sheet("✨ " + lines.length + " items read", "Tick what to add — you can still change quantity and price in the bill.", [["➕", "Add to bill", function (ov) { var keep = lines.filter(function (l, i) { return ov.querySelector('[data-al="' + i + '"]').checked; }); done(keep); }, "pri"]],
+      (heard ? '<div class="note" style="margin-top:0">🎤 Heard: “' + esc(heard) + "”</div>" : "") + '<div style="max-height:52vh;overflow:auto">' + lines.map(function (l, i) { return '<label class="chk" style="align-items:flex-start;padding:7px 0;border-bottom:1px solid #f0f0f0"><input type="checkbox" data-al="' + i + '" checked> <span style="flex:1"><b>' + ic[l.src] + " " + esc(l.n) + "</b> — " + qf(l.q) + " " + esc(l.u) + (l.r ? " × " + rs2(l.r) : " · <span class='pl a'>enter rate</span>") + (l.w && l.w !== l.n ? '<br><small class="muted">written: “' + esc(l.w) + "”</small>" : "") + "</span></label>"; }).join("") + '</div><div class="muted" style="font-size:11.5px;margin-top:6px">✅ your item · 📚 from the product catalogue (one-off, with MRP) · ➕ new one-off item (no stock record)</div>');
+    return ov;
+  }
+  // kind: photo | voice | text; mode: sale | po
+  function aiList(kind, mode, isS, add) {
+    var go = function (body, heard0) { toast("✨ Reading…"); return K("read-order", Object.assign({ mode: mode }, body)).then(function (r) { if (!r.ok) { toast(r.error); return; } toast("🔎 Matching with your items…"); return resolveLines(r.items, isS).then(function (L) { aiReview(L, r.heard || heard0, add); }); }); };
+    if (kind === "photo") return pick("image/*", function (f) { shrink(f, 2200).then(function (u) { if (!u) return toast("Couldn't open the photo"); go({ images: [u] }); }); }, true);
+    if (kind === "text") return sheet(mode === "po" ? "✍️ Type the order" : "✍️ Type / paste the list", "Any language — one item per line or one long sentence. Example: “2 kg cheeni, maida 250 gm, Tata salt 2, chana dal aadha kilo, Maggi 10”.", [["✨", "Read with AI", function (ov) { var t = V(ov, "atx"); if (t.trim().length < 2) { toast("Write the items"); return false; } go({ text: t }); }, "pri"]], '<div class="kf"><textarea id="atx" rows="7" placeholder="चीनी 2 किलो&#10;maida 250 gm&#10;Tata namak 2&#10;chana dal aadha kilo&#10;Maggi 10 packet"></textarea></div>');
+    // 🎤 voice: record, then speech-to-text on the server (Hindi / English / mixed)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return toast("Voice recording isn't available on this device — type the list instead.");
+    var ov = document.createElement("div"), rec = null, chunks = [], stream = null, t0 = 0, tm = null, stop = function () { if (tm) clearInterval(tm); if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); };
+    ov.className = "full"; ov.style.cssText = "background:linear-gradient(160deg,#0F3D22,#15803D);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:24px";
+    ov.innerHTML = '<div style="font-size:15px;opacity:.9">' + (mode === "po" ? "Speak the order" : "Speak the items") + ' — Hindi or English<br><small style="opacity:.8">e.g. “do kilo cheeni, ek packet Maggi, aadha kilo chana dal, maida dhai sau gram”</small></div><div id="vmic" style="width:120px;height:120px;border-radius:50%;background:#fff;color:#15803D;display:flex;align-items:center;justify-content:center;font-size:54px;box-shadow:0 0 0 0 rgba(255,255,255,.6);animation:vp 1.2s infinite">🎤</div><div id="vtm" style="font:800 22px inherit">0:00</div><div style="display:flex;gap:10px"><button class="bt l" id="vx" style="background:rgba(255,255,255,.15);color:#fff;border:0">Cancel</button><button class="bt" id="vok" style="background:#fff;color:#15803D">✓ Done — read it</button></div><style>@keyframes vp{70%{box-shadow:0 0 0 26px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}</style>';
+    document.body.appendChild(ov);
+    ov.querySelector("#vx").onclick = function () { stop(); if (rec && rec.state !== "inactive") { rec.onstop = null; rec.stop(); } ov.remove(); };
+    ov.querySelector("#vok").onclick = function () { if (rec && rec.state !== "inactive") rec.stop(); };
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function (s) {
+      stream = s; var mt = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].filter(function (m) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m); })[0];
+      rec = new MediaRecorder(s, mt ? { mimeType: mt, audioBitsPerSecond: 32000 } : undefined); rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function () { stop(); ov.remove(); var bl = new Blob(chunks, { type: (rec.mimeType || "audio/webm").split(";")[0] }); if (bl.size < 1500) return toast("Didn't hear anything — try again"); var fr = new FileReader(); fr.onload = function () { go({ audio: fr.result }); }; fr.readAsDataURL(bl); };
+      rec.start(); t0 = Date.now(); tm = setInterval(function () { var sec = Math.round((Date.now() - t0) / 1000); ov.querySelector("#vtm").textContent = Math.floor(sec / 60) + ":" + ("0" + sec % 60).slice(-2); if (sec >= 120) rec.stop(); }, 500);
+    }).catch(function (e) { ov.remove(); toast((e && e.name === "NotAllowedError" ? "Microphone permission was denied. " : "Microphone couldn't start. ") + "You can type the list instead."); });
+  }
+  // 📷 camera barcode scanner — scan item after item; unknown barcodes are looked up, MRP is read from the pack photo
+  var zxp = null;
+  function loadZX() { if (window.ZXing) return Promise.resolve(); if (!zxp) zxp = new Promise(function (res, rej) { var s2 = document.createElement("script"); s2.src = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"; s2.onload = res; s2.onerror = function () { zxp = null; rej(new Error("Scanner couldn't load — check the internet.")); }; document.head.appendChild(s2); }); return zxp; }
+  function bcScan(isS, onLine) {
+    var ov = document.createElement("div"), n = 0, total = 0, last = {}, paused = false, stopped = false, stream = null, reader = null;
+    ov.style.cssText = "position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column";
+    ov.innerHTML = '<div style="position:relative;flex:1;overflow:hidden"><video playsinline muted style="width:100%;height:100%;object-fit:cover"></video><div style="position:absolute;left:9%;right:9%;top:30%;height:24%;border:3px solid #7CFFB2;border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.4)"></div><div style="position:absolute;top:12px;left:0;right:0;text-align:center;color:#fff;font:700 14px system-ui">📷 Point at the barcode — items add one after another</div><div id="bsm" style="position:absolute;top:57%;left:12px;right:12px;text-align:center;color:#7CFFB2;font:800 16px system-ui"></div></div>' +
+      '<div id="bsp" style="background:#fff;border-radius:18px 18px 0 0;padding:12px 14px;max-height:52vh;overflow:auto"><div style="display:flex;align-items:center;gap:8px"><b id="bsc" style="flex:1">0 items scanned</b><button class="bt gh s" id="bsk">⌨️ Type code</button><button class="bt s" id="bsd">✓ Done</button></div><div id="bsf"></div></div>';
+    document.body.appendChild(ov);
+    var video = ov.querySelector("video"), msg = function (t) { ov.querySelector("#bsm").textContent = t; };
+    var close = function () { stopped = true; try { reader && reader.reset(); } catch (e) { } if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); ov.remove(); };
+    var beep = function () { try { navigator.vibrate && navigator.vibrate(70); var ac = new (window.AudioContext || window.webkitAudioContext)(), o2 = ac.createOscillator(), g = ac.createGain(); o2.frequency.value = 1150; g.gain.value = 0.08; o2.connect(g); g.connect(ac.destination); o2.start(); setTimeout(function () { o2.stop(); ac.close(); }, 110); } catch (e) { } };
+    var added = function (l) { onLine(l); n++; total += num(l.q) * num(l.r); ov.querySelector("#bsc").textContent = n + " item" + (n > 1 ? "s" : "") + " scanned · " + rs2(total); msg("✓ " + l.n + (l.r ? " · " + rs2(l.r) : "")); };
+    var frame = function () { var c = document.createElement("canvas"), w = video.videoWidth || 1280, h = video.videoHeight || 720, k = Math.min(1, 1600 / Math.max(w, h)); c.width = w * k; c.height = h * k; c.getContext("2d").drawImage(video, 0, 0, c.width, c.height); return c.toDataURL("image/jpeg", 0.88); };
+    var unknown = function (code) {
+      paused = true; var f = ov.querySelector("#bsf");
+      f.innerHTML = '<div class="kf" style="margin-top:8px"><div class="note" style="margin-top:0">🆕 New barcode <b>' + esc(code) + '</b> — <span id="bsl">looking it up…</span></div><label>Item name</label><input id="bn"><div class="g3"><div><label>MRP ₹</label><input id="bm" type="number" inputmode="decimal"></div><div><label>' + (isS ? "Selling ₹" : "Cost ₹") + '</label><input id="bp" type="number" inputmode="decimal"></div><div><label>Unit</label><select id="bu">' + opts(["pc", "pkt", "kg", "ltr", "box"], "pc") + '</select></div></div><button class="bt l s" id="bpk" style="margin-top:8px;width:100%">📷 Read name & MRP from the pack (AI)</button><div class="btr"><button class="bt s" id="bsv">➕ Add & save item</button><button class="bt l s" id="bone">Add once</button><button class="bt gh s" id="bsx">Skip</button></div><label>…or it is one of my items (remember this barcode)</label><div class="dd"><input class="in" id="blk" placeholder="🔎 search my items" autocomplete="off"><div class="sr" id="blr" style="display:none"></div></div></div>';
+      var put = function (o) { if (o.name && !V(f, "bn")) f.querySelector("#bn").value = o.name; if (o.mrp) { f.querySelector("#bm").value = o.mrp; if (!V(f, "bp")) f.querySelector("#bp").value = o.mrp; } };
+      K("bc-find", { code: code }).then(function (r) { var l = f.querySelector("#bsl"); if (!l) return; if (r.ok && r.name) { put(r); l.textContent = "found: " + r.name + " — check the MRP on the pack"; } else l.textContent = "not in the product databases — read it from the pack or type it"; });
+      f.querySelector("#bm").oninput = function () { if (isS) f.querySelector("#bp").value = this.value; };
+      f.querySelector("#bpk").onclick = function () { var b = this, readIt = function (img) { busy(b, true, "✨ Reading the pack…"); K("pack-read", { images: [img] }).then(function (r) { busy(b, false); if (!r.ok) return toast(r.error); put(r); if (!r.mrp) toast("MRP not visible — turn the pack to the MRP and try again, or type it"); }); };
+        if (stream && video.videoWidth) readIt(frame()); else pick("image/*", function (fl) { shrink(fl, 1600).then(function (u) { if (u) readIt(u); }); }, true); };
+      var done2 = function () { f.innerHTML = ""; paused = false; last = {}; };
+      f.querySelector("#bsx").onclick = done2;
+      var blk = f.querySelector("#blk"), blr = f.querySelector("#blr");
+      blk.oninput = function () { var L = findProds(blk.value, 6); blr.innerHTML = L.map(function (p) { return '<button data-i="' + p.id + '"><span><b>' + esc(p.n) + "</b><small>MRP " + rs2(p.mrp) + " · sell " + rs2(p.sp) + (p.bc ? " · has barcode " + esc(p.bc) : "") + "</small></span></button>"; }).join(""); blr.style.display = L.length ? "" : "none";
+        [].forEach.call(blr.querySelectorAll("[data-i]"), function (bb) { bb.onclick = function () { var p = PM[bb.dataset.i]; K("prod-save", { item: { id: p.id, bc: code } }).then(function (r) { if (!r.ok) return toast(r.error); setProds([r.item]); added(line(r.item)); done2(); }); }; }); };
+      var line = function (p) { return p ? { p: p.id, n: p.n, u: p.u, q: 1, fq: 0, r: isS ? p.sp || p.mrp : p.cost || 0, mrp: p.mrp || 0, e: "", g: p.gst || 0 } : { p: "", n: V(f, "bn"), u: V(f, "bu"), q: 1, fq: 0, r: num(V(f, "bp")), mrp: num(V(f, "bm")), e: "", g: 0 }; };
+      f.querySelector("#bone").onclick = function () { if (!V(f, "bn")) return toast("Type the item name"); added(line()); done2(); };
+      f.querySelector("#bsv").onclick = function () { var b = this; if (!V(f, "bn")) return toast("Type the item name"); busy(b, true); var mrp = num(V(f, "bm")), pr = num(V(f, "bp"));
+        K("prod-save", { item: { n: V(f, "bn"), bc: code, u: V(f, "bu"), mrp: mrp, sp: isS ? pr || mrp : mrp, cost: isS ? 0 : pr } }).then(function (r) { busy(b, false); if (!r.ok) return toast(r.error); setProds([r.item]); added(line(r.item)); done2(); }); };
+    };
+    var hit = function (code) {
+      code = String(code || "").replace(/\s/g, ""); if (paused || !code || (last[code] && Date.now() - last[code] < 1800)) return; last[code] = Date.now(); beep();
+      var p = D.prods.find(function (x) { return x.on !== false && x.bc === code; });
+      if (p) added({ p: p.id, n: p.n, u: p.u, q: 1, fq: 0, r: isS ? p.sp || p.mrp || p.cost : p.cost || 0, mrp: p.mrp || 0, e: "", g: p.gst || 0 }); else unknown(code);
+    };
+    ov.querySelector("#bsd").onclick = close;
+    ov.querySelector("#bsk").onclick = function () { var c = prompt("Barcode number"); if (c) hit(c); };
+    var noCam = function (m) { msg(m + " — type the barcode with ⌨️"); ov.querySelector("video").style.display = "none"; };
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { noCam("Camera isn't available here"); return { hit: hit, close: close }; }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } } }).then(function (st) { stream = st; video.srcObject = st; return video.play(); }).then(function () {
+      if ("BarcodeDetector" in window) { var det; try { det = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "itf"] }); } catch (e) { det = null; }
+        if (det) { var loop = function () { if (stopped) return; det.detect(video).then(function (r) { r.forEach(function (x) { hit(x.rawValue); }); }).catch(function () { }).then(function () { if (!stopped) setTimeout(loop, 160); }); }; loop(); return; } }
+      return loadZX().then(function () { if (stopped) return; reader = new window.ZXing.BrowserMultiFormatReader(); reader.decodeFromVideoElementContinuously(video, function (r) { if (r) hit(r.getText()); }); });
+    }).catch(function (e) { noCam(e && e.name === "NotAllowedError" ? "Camera permission was denied" : (e && e.message) || "Camera couldn't start"); });
+    return { hit: hit, close: close };
+  }
+  // the row of smart-entry buttons shown on bills / orders / counter
+  function aiRow(id, mode, all) { return '<div class="aitr" id="' + id + '"><button data-ai="bc"><b>📷</b>Barcode</button>' + (all ? '<button data-ai="photo"><b>📝</b>List photo</button><button data-ai="voice"><b>🎤</b>Speak</button><button data-ai="text"><b>✍️</b>Type list</button>' : "") + "</div>"; }
+
   // ================= 📥 EXCEL HELPERS + SAMPLE FILES =================
   function readXl(cb) { pick(".xlsx,.xls,.csv", function (f) { libX().then(function () { return f.arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array", cellDates: true }), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: false, dateNF: "yyyy-mm-dd" }); if (!rows.length) return toast("The file is empty"); cb(rows); }).catch(function (e) { toast("Couldn't read the file: " + (e.message || e)); }); }); }
   var col = function (r, re) { var k = Object.keys(r).find(function (k) { return re.test(k.toLowerCase().replace(/[^a-z]/g, "")); }); return k ? String(r[k]).trim() : ""; };
@@ -942,7 +1111,8 @@ html,body{background:#F4F6F2;min-height:100%}
   // ================= MORE =================
   function more(kv) {
     var s = D.shop;
-    kv.innerHTML = '<div class="bx">' + [["rules", "⚙️", "Rules & automation", (s.rulesOn ? "On" : "Off") + " · " + (s.rules || []).filter(function (r) { return r.on; }).length + " rules: reminders, credit limits, payment alerts, interest"], ["price", "📈", "Price drops & hikes", "History of every price change, AI advice, tell customers about offers"], ["samples", "📥", "Sample Excel files", "Ready files to try every import: items, stock, prices, parties, UPI statement"], ["shop", "🏪", "Shop details & bill settings", "Name, address, GSTIN, UPI ID for payments, bill prefix, credit days, margin"], ["msg", "💬", "WhatsApp & e-mail", s.pkSet ? "Auto WhatsApp connected" : "Messages open WhatsApp ready to send · connect auto-send"], ["sms", "📩", "Import UPI SMS / statement", "Match UPI payments to customers & distributors"], ["count", "🧮", "Stock count", "Correct the stock after counting shelves"], ["order", "🛒", "Re-order plan (AI)", "What to order from whom"], ["imp", "⬆", "Import from Excel", "Items, stock update, price update, customers & distributors"], ["install", "📲", "Add to home screen", "Open your khata like an app, with its own icon"], ["help", "❓", "How it works", "Every logic, step by step"]].concat(MODE === "owner" ? [["pw", "🔑", "Change password", ""], ["out", "🚪", "Log out", ""]] : []).map(function (x) { return '<div class="li" data-m="' + x[0] + '"><div class="av">' + x[1] + '</div><div class="m"><b>' + x[2] + "</b><small>" + esc(x[3]) + "</small></div><div class='a'>›</div></div>"; }).join("") + "</div>";
+    kv.innerHTML = '<div class="bx"><h3><span>🌐 App language</span></h3>' + langBar() + '<div class="muted" style="font-size:11.5px;margin-top:6px">Changes the app’s words on this phone. Customer messages follow “Message language” in Shop details.</div></div><div class="bx">' + [["rules", "⚙️", "Rules & automation", (s.rulesOn ? "On" : "Off") + " · " + (s.rules || []).filter(function (r) { return r.on; }).length + " rules: reminders, credit limits, payment alerts, interest"], ["price", "📈", "Price drops & hikes", "History of every price change, AI advice, tell customers about offers"], ["samples", "📥", "Sample Excel files", "Ready files to try every import: items, stock, prices, parties, UPI statement"], ["shop", "🏪", "Shop details & bill settings", "Name, address, GSTIN, UPI ID for payments, bill prefix, credit days, margin"], ["msg", "💬", "WhatsApp & e-mail", s.pkSet ? "Auto WhatsApp connected" : "Messages open WhatsApp ready to send · connect auto-send"], ["sms", "📩", "Import UPI SMS / statement", "Match UPI payments to customers & distributors"], ["count", "🧮", "Stock count", "Correct the stock after counting shelves"], ["order", "🛒", "Re-order plan (AI)", "What to order from whom"], ["imp", "⬆", "Import from Excel", "Items, stock update, price update, customers & distributors"], ["install", "📲", "Add to home screen", "Open your khata like an app, with its own icon"], ["help", "❓", "How it works", "Every logic, step by step"]].concat(MODE === "owner" ? [["pw", "🔑", "Change password", ""], ["out", "🚪", "Log out", ""]] : []).map(function (x) { return '<div class="li" data-m="' + x[0] + '"><div class="av">' + x[1] + '</div><div class="m"><b>' + x[2] + "</b><small>" + esc(x[3]) + "</small></div><div class='a'>›</div></div>"; }).join("") + "</div>";
+    wireLang(kv);
     [].forEach.call(kv.querySelectorAll("[data-m]"), function (r) { r.onclick = function () { ({ rules: rulesView, price: priceView, samples: samples, shop: shopSettings, msg: msgSettings, sms: smsImport, count: function () { stockCount(D.prods.filter(function (p) { return p.on !== false; }).sort(function (a, b) { return a.n.localeCompare(b.n); })); }, order: orderPlan, imp: function () { sheet("⬆ Import", "", [["📦", "Items (new list / details)", itemImport], ["🔢", "Stock update — item-wise quantities", stockImport], ["💲", "Price update — drops & hikes", priceImport], ["👥", "Customers / distributors", partyImport], ["📥", "Sample files to try", samples]]); }, install: install, help: help, pw: changePw, out: logout })[r.dataset.m](); }; });
   }
   function shopSettings() {

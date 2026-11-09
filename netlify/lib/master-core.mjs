@@ -7,7 +7,7 @@
 //   custver                { v }   bumped on every change so apps refresh their cached customizations
 import { randomBytes, createHash } from "node:crypto";
 import { test as fxTest, refs as fxRefs, FUNCTIONS as FX_FUNCS } from "./formula-core.mjs";
-import { cleanProTool, lintTool, proValues, enterFrom, canActPro, isProApproverAny, actPro, tickTat, lookupRecord, roleDir, LOOKUP_SOURCES, PRO_TYPES } from "./toolpro-core.mjs";
+import { cleanProTool, lintTool, proValues, enterFrom, canActPro, isProApproverAny, actPro, tickTat, lookupRecord, roleDir, fyiOf, LOOKUP_SOURCES, PRO_TYPES } from "./toolpro-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const cid = (v) => String(v || "").replace(/[^a-z0-9]/gi, "").slice(0, 30);
@@ -139,6 +139,7 @@ export async function masterAction(b, ctx) {
   const myIds = [rec.username, rec.vchatId, rec.email, rec.mobile].filter(Boolean).map((x) => String(x).toLowerCase());
   const approverAny = (tl, r) => tl.tool.pro ? (canActPro(r, app, rec) || (r.history || []).some((h) => h.by && myIds.includes(String(h.by.username || "").toLowerCase()) && /approved|rejected|returned/.test(h.action))) : steps(tl).some((st) => isApprover(st, app, rec, r));
   const sysBy = { fullName: "System", username: "", app: "" };
+  const seesState = () => false;
   const ctxV = { store, app, rec, who, sameUser };
   const pub = (tl, r) => { const o = Object.assign({}, r, { mine: isMine(r), canAct: canAct(tl, r) }); delete o.bk; if (r.anon && !isMaster) { o.by = { fullName: "Anonymous", username: "" }; o.history = (r.history || []).map((h) => /submitted/.test(h.action) ? Object.assign({}, h, { by: { fullName: "Anonymous", username: "", app: "" } }) : h); } return o; };
 
@@ -257,6 +258,42 @@ Select values are text, so compare as type = "Sick" and use NUM(field) when an o
     return json(200, { ok: true, record: await lookupRecord(store, f, b.key, pool) });
   }
   if (b.action === "roledir-get") { if (app !== "admin") return json(403, { ok: false, error: "Admins only." }); return json(200, { ok: true, dir: await roleDir(store), sources: LOOKUP_SOURCES, types: PRO_TYPES }); }
+  // one decision on one request; at a step with its own fields (filled by the approver) those values come with it
+  async function actOne(tl, r, d, values, comment) {
+    if (!r) return { ok: false, error: "Not found." };
+    if (!canAct(tl, r)) return { ok: false, error: "This isn't waiting for your approval." };
+    if (!["approve", "reject", "back"].includes(d)) return { ok: false, error: "Choose approve, reject or send back." };
+    comment = str(comment, 500);
+    if (tl.tool.pro) {
+      if (!r.cur) return { ok: false, error: "Not waiting for approval." };
+      const stepId = r.cur.id, hasStepF = (tl.tool.fields || []).some((f) => f.step === stepId);
+      if (hasStepF) { const out = await proValues(tl.tool, values || {}, { store, rec, app, pool, cleanBasic: (fs, inp) => cleanValues(fs, inp, ctxV) }, { step: stepId, base: r.values, noRequire: d !== "approve" }); if (out.errs.length) return { ok: false, error: out.errs.slice(0, 4).join(" · ") }; r.values = out.vals; }
+      if (d !== "approve" && !comment) return { ok: false, error: "Please add remarks." };
+      const s0 = r.cur; await actPro(store, tl.tool, r, d, app, rec, comment, t); r.updatedAt = t;
+      if (hasStepF) { const h = r.history.filter((x) => x.step === stepId).pop(); if (h) h.filled = Object.fromEntries((tl.tool.fields || []).filter((f) => f.step === stepId).map((f) => [f.key, r.values[f.key]])); }
+      if (r.status === "approved" || r.status === "rejected") { const fy = await fyiOf(store, tl.tool, r); if (fy.length) { r.fyi = fy; r.fyiSeen = []; } }
+      await store.set(`ctsub:${tl.id}:${r.id}`, r); return { ok: true, item: pub(tl, r) };
+    }
+    return null;
+  }
+  if (b.action === "ct-bulk-act") {   // many decisions at once (ticked rows, or an Excel sheet of decisions)
+    const tl = await toolFor(b.tool, true); if (!tl || !tl.tool.pro) return json(404, { ok: false, error: "Not found." });
+    const L = (Array.isArray(b.items) ? b.items : []).slice(0, 500), res = [];
+    for (const x of L) { const r = await store.get(`ctsub:${tl.id}:${cid(x.id)}`); const o = await actOne(tl, r, x.decision, x.values, x.comment); res.push({ id: x.id, ok: !!(o && o.ok), error: o && !o.ok ? o.error : "" }); }
+    return json(200, { ok: true, done: res.filter((x) => x.ok).length, results: res });
+  }
+  if (b.action === "ct-bulk-submit") {   // many requests at once from an Excel sheet — one request per row
+    const tl = await toolFor(b.tool); if (!tl || !tl.tool.pro || tl.tool.type !== "form") return json(404, { ok: false, error: "Form not available." });
+    const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 1000), res = [], hasFlow = ((tl.tool.flow || {}).steps || []).length;
+    for (let i = 0; i < rows.length; i++) {
+      const out = await proValues(tl.tool, rows[i], { store, rec, app, pool, cleanBasic: (fs, inp) => cleanValues(fs, inp, ctxV) });
+      if (out.errs.length) { res.push({ row: i + 1, ok: false, error: out.errs.slice(0, 3).join(" · ") }); continue; }
+      const r = { id: nid(t + i), tool: tl.id, bk: myBk, anon: false, by: me, state: rec.state || (app === "admin" ? "HO" : ""), values: out.vals, user: out.user, at: t + i, status: "submitted", step: 0, history: [{ at: t, by: { fullName: rec.fullName, username: rec.username || "", app }, comment: str(b.comment, 300) || "Imported from Excel", action: "submitted", step: "" }], trail: [] };
+      if (hasFlow) await enterFrom(store, tl.tool, r, 0, t, sysBy); else r.status = "submitted";
+      await store.set(`ctsub:${tl.id}:${r.id}`, r); res.push({ row: i + 1, ok: true, id: r.id, next: r.cur ? (tl.tool.flow.steps[r.cur.idx] || {}).name : "" });
+    }
+    return json(200, { ok: true, created: res.filter((x) => x.ok).length, results: res });
+  }
   if (b.action === "ct-act") {   // approve / reject / send back
     const tl = await toolFor(b.tool, true);
     if (!tl) return json(404, { ok: false, error: "Not found." });
@@ -266,8 +303,8 @@ Select values are text, so compare as type = "Sick" and use NUM(field) when an o
     const d = ["approve", "reject", "back"].includes(b.decision) ? b.decision : null;
     if (!d) return json(400, { ok: false, error: "Choose approve, reject or send back." });
     const comment = str(b.comment, 500);
+    if (tl.tool.pro) { const o = await actOne(tl, r, d, b.values, comment); return json(o.ok ? 200 : 400, o); }
     if (d !== "approve" && !comment) return json(400, { ok: false, error: "Please add a comment." });
-    if (tl.tool.pro) { if (!r.cur && isMaster) return json(400, { ok: false, error: "Not waiting for approval." }); await actPro(store, tl.tool, r, d, app, rec, comment, t); r.updatedAt = t; await store.set(`ctsub:${tl.id}:${r.id}`, r); return json(200, { ok: true, item: pub(tl, r) }); }
     const st = steps(tl);
     r.history.push({ at: t, by: { fullName: rec.fullName, username: rec.username || "", app }, action: d === "approve" ? "approved" : d === "reject" ? "rejected" : "returned", step: r.step, stepName: (st[r.step] || {}).name || "", comment });
     if (d === "approve") { if (r.step + 1 < st.length) { r.step++; r.stepAt = t; } else r.status = "approved"; }
@@ -283,7 +320,9 @@ Select values are text, so compare as type = "Sick" and use NUM(field) when an o
     let rows = (await pool(await store.list(`ctsub:${tl.id}:`), 40, (k) => store.get(k))).filter(Boolean);
     if (tl.tool.pro) for (const r of rows) { if (await tickTat(store, tl.tool, r, t)) await store.set(`ctsub:${tl.id}:${r.id}`, r); }
     const all = app === "admin";
-    if (!all) rows = rows.filter((r) => isMine(r) || approverAny(tl, r));
+    const fyiMe = (r) => (r.fyi || []).some((u) => myIds.includes(u) || u === "@" + role || (u === "@admin" && role === "master") || (role === "state" && rec.state && u === "@state:" + String(rec.state).toLowerCase()));
+    if (!all) rows = rows.filter((r) => isMine(r) || approverAny(tl, r) || fyiMe(r) || (tl.tool.pro && seesState(tl, r)));
+    for (const r of rows) if (fyiMe(r) && !(r.fyiSeen || []).includes(String(rec.username || "").toLowerCase())) { r.fyiSeen = (r.fyiSeen || []).concat([String(rec.username || "").toLowerCase()]); r.fyiNew = true; await store.set(`ctsub:${tl.id}:${r.id}`, Object.assign({}, r, { fyiNew: undefined })); }
     const out = rows.sort((x, y) => (y.updatedAt || y.at) - (x.updatedAt || x.at)).slice(0, 3000).map((r) => pub(tl, r));
     return json(200, { ok: true, tool: tl.tool, rows: out, all, approver: isMaster || (tl.tool.pro ? isProApproverAny(tl.tool, app, rec) : steps(tl).some((st) => isApprover(st, app, rec, { state: rec.state }))), pending: out.filter((r) => r.canAct).length, now: t, me: { state: rec.state || (app === "admin" ? "HO" : ""), role: role, name: rec.fullName || "", username: rec.username || "", designation: rec.designation || "" } });
   }
@@ -294,7 +333,8 @@ Select values are text, so compare as type = "Sick" and use NUM(field) when an o
       const ks = await store.list(`ctsub:${tl.id}:`); if (!ks.length) continue;
       const rows = (await pool(ks, 40, (k) => store.get(k))).filter(Boolean);
       if (tl.tool.pro) for (const r of rows) { if (await tickTat(store, tl.tool, r, t)) await store.set(`ctsub:${tl.id}:${r.id}`, r); }
-      const n = rows.filter((r) => (tl.tool.pro ? canAct(tl, r) && (!isMaster || canActPro(r, app, rec)) : steps(tl).length && canAct(tl, r) && (!isMaster || isApprover(steps(tl)[r.step], app, rec, r))) || (r.status === "returned" && isMine(r))).length;
+      const me2 = String(rec.username || "").toLowerCase();
+      const n = rows.filter((r) => (tl.tool.pro ? canAct(tl, r) && (!isMaster || canActPro(r, app, rec)) : steps(tl).length && canAct(tl, r) && (!isMaster || isApprover(steps(tl)[r.step], app, rec, r))) || (r.status === "returned" && isMine(r)) || ((r.fyi || []).some((u) => myIds.includes(u) || (role === "state" && rec.state && u === "@state:" + String(rec.state).toLowerCase())) && !(r.fyiSeen || []).includes(me2))).length;
       if (n) { out[tl.id] = n; total += n; }
     }
     return json(200, { ok: true, tools: out, total });

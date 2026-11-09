@@ -306,7 +306,7 @@
 
   // ---------- page ----------
   var W = null, EDIT = false;
-  var CSS = '<style id="op-css">.op{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}.op-mini{border:1px solid #e6e2d4;background:#fffdf6;border-radius:8px;padding:2px 6px;font-size:13px;cursor:pointer}.op-ctl{background:#fff;border:1px solid #e6e2d4;border-radius:16px;padding:12px;position:sticky;top:8px;max-height:calc(100vh - 30px);overflow:auto}.op-ctl h4{margin:12px 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8a8573}.op-ctl h4:first-child{margin-top:0}.op-ctl label{display:block;font-size:12px;color:#5d584a;margin:6px 0 2px}.op-ctl input[type=text],.op-ctl select,.op-ctl textarea{width:100%;box-sizing:border-box;border:1px solid #d9d3bf;border-radius:9px;padding:7px 9px;font:inherit;font-size:13px;background:#fff}.op-ctl input[type=range]{width:100%}.op-sw{display:flex;flex-wrap:wrap;gap:6px}.op-sw button{width:34px;height:34px;border-radius:10px;border:2px solid transparent;cursor:pointer}.op-sw button.on{border-color:#111;box-shadow:0 0 0 2px #fff inset}.op-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #f1ecdc;font-size:13px}.op-row b{flex:1;font-weight:600}.op-row select{width:auto!important;padding:3px 4px!important;font-size:12px!important}.op-row button,.op-btn{border:1px solid #d9d3bf;background:#fff;border-radius:8px;padding:3px 8px;cursor:pointer;font-size:12px}.op-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.op-bar .op-btn{padding:8px 12px;font-size:13px;font-weight:600}.op-bar .dk{background:#111;color:#e6cf86;border-color:#111}.op-stage{overflow:hidden;border-radius:12px;background:#e9e6dc;padding:10px}.op-stage>div{transform-origin:0 0}.op-editing .op-ed{outline:1px dashed rgba(65,95,255,.45);outline-offset:3px;border-radius:4px;cursor:text}.op-editing .op-ed:focus{outline:2px solid #415FFF;background:rgba(65,95,255,.04)}.op-hint{font-size:11.5px;color:#7a7462;margin-top:6px}@media(max-width:860px){.op{grid-template-columns:1fr}.op-ctl{position:static;max-height:none}}</style>';
+  var CSS = '<style id="op-css">.op-aiov{position:fixed;inset:0;z-index:2147483000;background:rgba(17,17,17,.55);display:flex;align-items:center;justify-content:center;font-family:Segoe UI,system-ui,sans-serif}.op-aic{background:#fff;color:#1c1a14;width:min(900px,96vw);max-height:92vh;overflow:auto;border-radius:20px;padding:18px 18px 20px;position:relative}.op-aic h3{margin:0 0 10px;font-size:19px}.op-aix{position:absolute;right:12px;top:10px;border:0;background:#f3f1ea;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer}.op-aisum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.op-aisum div{background:#f6f4ec;border-radius:12px;padding:8px 10px;font-size:12px;color:#6b6657}.op-aisum b{display:block;font-size:20px;color:#111}.op-ailist{font-size:13px;line-height:1.55;padding-left:18px}.op-aipv{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:8px 0}.op-aipv>div{font-size:11.5px;color:#6b6657}.op-aith{aspect-ratio:16/9;background:#f1efe6;border-radius:8px;overflow:hidden;border:1px solid #e6e2d4;margin-bottom:4px}.op-aith img{width:100%;height:100%;object-fit:cover;object-position:top}.op-aibr{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}.op{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}.op-mini{border:1px solid #e6e2d4;background:#fffdf6;border-radius:8px;padding:2px 6px;font-size:13px;cursor:pointer}.op-ctl{background:#fff;border:1px solid #e6e2d4;border-radius:16px;padding:12px;position:sticky;top:8px;max-height:calc(100vh - 30px);overflow:auto}.op-ctl h4{margin:12px 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#8a8573}.op-ctl h4:first-child{margin-top:0}.op-ctl label{display:block;font-size:12px;color:#5d584a;margin:6px 0 2px}.op-ctl input[type=text],.op-ctl select,.op-ctl textarea{width:100%;box-sizing:border-box;border:1px solid #d9d3bf;border-radius:9px;padding:7px 9px;font:inherit;font-size:13px;background:#fff}.op-ctl input[type=range]{width:100%}.op-sw{display:flex;flex-wrap:wrap;gap:6px}.op-sw button{width:34px;height:34px;border-radius:10px;border:2px solid transparent;cursor:pointer}.op-sw button.on{border-color:#111;box-shadow:0 0 0 2px #fff inset}.op-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-top:1px solid #f1ecdc;font-size:13px}.op-row b{flex:1;font-weight:600}.op-row select{width:auto!important;padding:3px 4px!important;font-size:12px!important}.op-row button,.op-btn{border:1px solid #d9d3bf;background:#fff;border-radius:8px;padding:3px 8px;cursor:pointer;font-size:12px}.op-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.op-bar .op-btn{padding:8px 12px;font-size:13px;font-weight:600}.op-bar .dk{background:#111;color:#e6cf86;border-color:#111}.op-stage{overflow:hidden;border-radius:12px;background:#e9e6dc;padding:10px}.op-stage>div{transform-origin:0 0}.op-editing .op-ed{outline:1px dashed rgba(65,95,255,.45);outline-offset:3px;border-radius:4px;cursor:text}.op-editing .op-ed:focus{outline:2px solid #415FFF;background:rgba(65,95,255,.04)}.op-hint{font-size:11.5px;color:#7a7462;margin-top:6px}@media(max-width:860px){.op{grid-template-columns:1fr}.op-ctl{position:static;max-height:none}}</style>';
   function ctlHtml() {
     var sel = function (id, cur, opts) { return '<select id="' + id + '">' + opts.map(function (o) { return '<option value="' + o[0] + '"' + (String(cur) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select>'; };
     var b = C.banner;
@@ -416,12 +416,96 @@
     var eb = w.querySelector('#op-ed'); eb.onclick = function () { EDIT = !EDIT; eb.textContent = EDIT ? '✓ Done editing' : '✏️ Edit text on the page'; eb.classList.toggle('dk', EDIT); paint(); say(EDIT ? 'Click any heading, number or sentence on the page and type.' : 'Edits saved on this device.'); };
     w.querySelector('#op-png').onclick = function () { say('Making PNG…'); snap().then(function (r) { return fetch(r.png).then(function (x) { return x.blob(); }); }).then(function (b) { dl(b, fname('png')); say('✅ PNG downloaded'); }).catch(function (e) { say('❌ ' + (e.message || e)); }); };
     w.querySelector('#op-pdf').onclick = function () { say('Making PDF…'); Promise.all([snap(true), libJs('/vendor/jspdf/jspdf.umd.min.js', function () { return !!(window.jspdf && window.jspdf.jsPDF); })]).then(function (x) { var r = x[0], P = new window.jspdf.jsPDF({orientation: r.w > r.h ? 'landscape' : 'portrait', unit: 'px', format: [r.w, r.h], hotfixes: ['px_scaling']}); P.addImage(r.png, 'JPEG', 0, 0, r.w, r.h); dl(P.output('blob'), fname('pdf')); say('✅ PDF downloaded'); }).catch(function (e) { say('❌ ' + (e.message || e)); }); };
-    var exp = function (kind) { libJs('/biexport.js?v=1', function () { return !!window.BIEXPORT; }).then(function () { if (!W || !W.querySelector('#op-page')) return; if (EDIT) w.querySelector('#op-ed').click();
+    var exp = function (kind) { libJs('/biexport.js?v=2', function () { return !!window.BIEXPORT; }).then(function () { if (!W || !W.querySelector('#op-page')) return; if (EDIT) w.querySelector('#op-ed').click();
       window.BIEXPORT.open({title: 'Export the one-pager', sub: 'Everything on the one-pager goes into the file. Every text box, tile and table stays editable; charts and photos become pictures.', name: fname('x').replace(/\.x$/, ''), kinds: ['ppt', 'word'], kind: kind, getRoot: function () { return {root: W.querySelector('#op-page')}; }, say: say}); }).catch(function (e) { say('❌ ' + (e.message || e)); }); };
-    w.querySelector('#op-ppt').onclick = function () { exp('ppt'); }; w.querySelector('#op-doc').onclick = function () { exp('word'); };
+    w.querySelector('#op-ppt').onclick = function () { if (this.__old) { this.__old = 0; return exp('ppt'); } if (EDIT) w.querySelector('#op-ed').click(); aiCheck(); }; w.querySelector('#op-doc').onclick = function () { exp('word'); };
     w.querySelector('#op-rf').onclick = function () { G = digest(); INS = insights(); TLC = {}; TLP = {}; HAVE = null; HAVEP = false; GL = null; drawCtl(); paint(); say('Data refreshed from the Monthly summary' + (Object.keys(C.edits).length ? ' — sections you edited keep your text (↺ to undo)' : '')); };
     w.querySelector('#op-rst').onclick = function () { if (this.dataset.sure) { C = def(); save(); drawCtl(); paint(); say('Reset to the default design'); delete this.dataset.sure; this.textContent = 'Reset'; } else { this.dataset.sure = 1; this.textContent = 'Tap again to reset everything'; } };
     if (!window.__opRs) { window.__opRs = 1; window.addEventListener('resize', function () { fit(); }); }
+  }
+  // ---------- ✨ AI check → slides: whole sections per slide, long sections split between rows (never through them) ----------
+  var SW = 1280, SH = 720;
+  function units(sec) {   // the pieces a long section may be split between: table rows, list items, cards
+    var body = sec.querySelector('.op-ed:not(h3)') || sec, tb = body.querySelector('tbody');
+    if (tb && tb.children.length > 2) return {box: tb, list: [].slice.call(tb.children), table: body.querySelector('table')};
+    var li = body.querySelector('ul,ol'); if (li && li.children.length > 2 && li.offsetHeight > body.offsetHeight * 0.6) return {box: li, list: [].slice.call(li.children)};
+    var c = body; for (var d = 0; d < 3 && c && c.children.length === 1; d++) c = c.children[0];
+    return c && c.children.length > 2 ? {box: c, list: [].slice.call(c.children)} : null;
+  }
+  function slideShell(title, sub, t, pageStyle) {
+    var d = document.createElement('div'); d.setAttribute('style', pageStyle); d.style.width = SW + 'px'; d.style.minHeight = '0'; d.style.height = 'auto'; d.style.padding = '22px 28px 24px'; d.style.gridAutoFlow = 'row'; d.style.fontSize = '15.5px'; d.className = 'op-slide';
+    d.innerHTML = '<div style="grid-column:span 6;display:flex;align-items:center;gap:12px;border-bottom:3px solid ' + t.acc + ';padding-bottom:8px;margin-bottom:2px"><div style="width:10px;height:30px;border-radius:4px;background:' + t.acc + '"></div><div style="flex:1;font-size:1.55em;font-weight:800;color:' + t.ink + '">' + esc(title) + '</div><div style="font-size:.85em;color:' + t.sub + '">' + esc(sub) + '</div></div>';
+    return d;
+  }
+  function aiCheck() {
+    var pg = W && W.querySelector('#op-page'); if (!pg) return;
+    var t = T(), month = (G && G.month) || '', pageStyle = pg.getAttribute('style'), host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:-40000px;top:0;width:' + SW + 'px;pointer-events:none'; document.body.appendChild(host);
+    var ov = document.createElement('div'); ov.className = 'op-aiov'; ov.innerHTML = '<div class="op-aic"><button class="op-aix" type="button">×</button><h3>✨ AI check before PowerPoint</h3><div id="op-air">Measuring every section…</div></div>'; document.body.appendChild(ov);
+    var close = function () { ov.remove(); host.remove(); }; ov.querySelector('.op-aix').onclick = close;
+    var R = function (h) { ov.querySelector('#op-air').innerHTML = h; };
+    var USE = SH - 92;   // room below the slide title
+    // 1) the pieces: every section; a section taller than a slide is cut between its rows / items into parts
+    var secs = [].slice.call(pg.children).filter(function (e) { return e.offsetHeight > 4 && !/vivo Business Innovation · Monthly one-pager/.test(e.textContent.slice(0, 80)); });
+    var items = [];
+    var meas = slideShell('x', '', t, pageStyle); host.appendChild(meas);
+    secs.forEach(function (sec, si) {
+      var k = sec.getAttribute('data-b') || (si === 0 ? 'banner' : 'part'), span = parseInt((sec.style.gridColumn || '').replace(/\D+/g, ''), 10) || 6, title = ((sec.querySelector('h3') || {}).textContent || (k === 'banner' ? 'Cover' : 'Section')).trim();
+      var c = sec.cloneNode(true); c.style.gridColumn = 'span 6'; meas.appendChild(c); var h = c.offsetHeight;
+      if (h <= USE) { var c2 = sec.cloneNode(true); meas.removeChild(c); items.push({el: c2, title: title, k: k, span: span, h: h}); return; }
+      var U = units(c); if (!U) { meas.removeChild(c); items.push({el: sec.cloneNode(true), title: title, k: k, span: 6, h: h, big: 1}); return; }
+      // cut points between units so each part fits on a slide (the section heading and table header repeat on each part)
+      var base = h - U.list.reduce(function (a, u) { return a + u.offsetHeight; }, 0), groups = [], cur = [], hh = base;
+      U.list.forEach(function (u, i) { var uh = u.offsetHeight + (parseFloat(getComputedStyle(u).marginTop) || 0) + (parseFloat(getComputedStyle(u).marginBottom) || 0); if (cur.length && hh + uh > USE) { groups.push(cur); cur = []; hh = base; } cur.push(i); hh += uh; });
+      if (cur.length) groups.push(cur); meas.removeChild(c);
+      groups.forEach(function (g, gi) { var p = sec.cloneNode(true), PU = units(p); p.style.gridColumn = 'span 6'; PU.list.forEach(function (u, i) { if (g.indexOf(i) < 0) u.remove(); }); var h3 = p.querySelector('h3'); if (h3 && groups.length > 1) h3.innerHTML += ' <span style="font-weight:600;opacity:.65;font-size:.8em">(' + (gi + 1) + '/' + groups.length + ')</span>';
+        meas.appendChild(p); var ph = p.offsetHeight; meas.removeChild(p); items.push({el: p, title: title, k: k, span: 6, h: ph, part: (gi + 1) + '/' + groups.length}); });
+    });
+    // 2) slides: fill each up to the room left, measured for real (side-by-side sections share a row)
+    // a section left alone in a row is widened to the full slide (no half-empty rows); two in a row share it evenly
+    var spans = function (ids) { var out = {}, row = [], sum = 0, flush = function () { if (!row.length) return; if (sum < 6) { if (row.length === 1) out[row[0]] = 6; else if (row.length === 2) { out[row[0]] = 3; out[row[1]] = 3; } else if (row.length === 3) row.forEach(function (i) { out[i] = 2; }); } row = []; sum = 0; };
+      ids.forEach(function (i) { var sp = Math.min(6, items[i].span || 6); if (sum + sp > 6) flush(); row.push(i); sum += sp; out[i] = sp; }); flush(); return out; };
+    var fill = function (d, ids) { var sp = spans(ids); ids.forEach(function (i) { var e = items[i].el.cloneNode(true); e.style.gridColumn = 'span ' + sp[i]; d.appendChild(e); }); };
+    var fits = function (ids) { var d = slideShell('x', '', t, pageStyle); host.appendChild(d); fill(d, ids); var h = d.offsetHeight; host.removeChild(d); return h; };
+    var greedy = function () { var out = [], cur = []; items.forEach(function (it, i) { if (cur.length && fits(cur.concat([i])) > SH) { out.push(cur); cur = []; } cur.push(i); }); if (cur.length) out.push(cur); return out.map(function (ids) { return {ids: ids, title: ''}; }); };
+    var plan = greedy();
+    R('Asking AI to group the ' + items.length + ' sections into slides…');
+    api({action: 'ai-slide-plan', month: month, items: items.map(function (it) { return {title: it.title, kind: it.k, h: Math.round(it.h / USE * 100), span: it.span, part: it.part || ''}; })}).then(function (r) {
+      var used = 'rules';
+      if (r && r.ok && r.slides && r.slides.length) {
+        var seen = {}, ok = true, flat = []; r.slides.forEach(function (s) { s.ids.forEach(function (i) { if (seen[i]) ok = false; seen[i] = 1; flat.push(i); }); });
+        if (ok && flat.length === items.length && flat.every(function (v, i) { return v === i; })) {
+          var P2 = []; r.slides.forEach(function (s) { if (!s.ids.length) return; if (fits(s.ids) <= SH) P2.push({ids: s.ids, title: s.title}); else { var cur = []; s.ids.forEach(function (i) { if (cur.length && fits(cur.concat([i])) > SH) { P2.push({ids: cur, title: s.title}); cur = []; } cur.push(i); }); if (cur.length) P2.push({ids: cur, title: s.title + ' (cont.)'}); } });
+          plan = P2; used = 'ai';
+        }
+      }
+      // repair: merge neighbours that fit together when one is under half full; then keep whichever plan is tighter
+      var fillOf = function (ids) { return fits(ids) / SH; };
+      var repair = function (P) { var out = P.map(function (x) { return {ids: x.ids.slice(), title: x.title}; }), ch = true; while (ch) { ch = false; for (var i = 0; i < out.length - 1; i++) { var a2 = out[i], b2 = out[i + 1]; if ((fillOf(a2.ids) < 0.5 || fillOf(b2.ids) < 0.5) && fits(a2.ids.concat(b2.ids)) <= SH) { a2.ids = a2.ids.concat(b2.ids); out.splice(i + 1, 1); ch = true; break; } } } return out; };
+      var score = function (P) { return P.length * 10 + P.filter(function (x) { return fillOf(x.ids) < 0.45; }).length * 6; };
+      if (used === 'ai') { var A2 = repair(plan), G2 = repair(greedy()); if (score(G2) < score(A2)) { var tt = {}; A2.forEach(function (x) { x.ids.forEach(function (i) { if (!tt[i]) tt[i] = x.title; }); }); G2.forEach(function (x) { x.title = tt[x.ids[0]] || ''; }); plan = G2; } else plan = A2; }
+      else plan = repair(plan);
+      plan.forEach(function (s, i) { var prev = plan[i - 1]; if (s.title && prev && prev.title && prev.title.replace(/ \(cont\.\)$/, '') === s.title.replace(/ \(cont\.\)$/, '')) s.title = s.title.replace(/ \(cont\.\)$/, '') + ' (cont.)'; });
+      plan.forEach(function (s) { if (!s.title) s.title = items[s.ids[0]].k === 'banner' ? ((G && G.title) || 'Monthly report') : items[s.ids[0]].title.replace(/^[^\w(]+/, ''); });
+      // 3) build the slides
+      var slides = plan.map(function (s, i) { var d = slideShell(s.title, (month ? month + ' · ' : '') + 'vivo BI · ' + (i + 1) + '/' + plan.length, t, pageStyle); fill(d, s.ids); host.appendChild(d); var h = d.offsetHeight; if (h < SH) d.style.minHeight = SH + 'px'; s.fill = Math.min(100, Math.round(h / SH * 100)); return d; });
+      var cut = items.filter(function (it) { return it.part && it.part.indexOf('1/') !== 0; }).length, low = plan.filter(function (s) { return s.fill < 45; }).length, big = items.filter(function (it) { return it.big; });
+      var rep = '<div class="op-aisum"><div><b>' + plan.length + '</b>slides</div><div><b>' + items.length + '</b>sections & parts</div><div><b>0</b>sections cut through</div><div><b>100%</b>text size kept</div></div>' +
+        '<ul class="op-ailist"><li>✅ Every section stays whole' + (cut ? '; long ones continue on the next slide between rows (heading repeats): ' + esc(items.filter(function (it) { return it.part === '1/' + (it.part || '').split('/')[1]; }).map(function (it) { return it.title.replace(/^[^\w(]+/, ''); }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(', ')) : '') + '</li>' +
+        '<li>' + (used === 'ai' ? '✨ AI grouped related sections and wrote the slide titles' : '⚙️ Grouped by size (AI not available just now)') + '</li>' +
+        (low ? '<li>⚠️ ' + low + ' slide' + (low > 1 ? 's are' : ' is') + ' less than half full (a section that has to start fresh) — fine to keep, or turn off a section to merge</li>' : '<li>✅ No near-empty slides</li>') +
+        (big.length ? '<li>⚠️ Too tall to split and will be shrunk to fit: ' + esc(big.map(function (b) { return b.title; }).join(', ')) + '</li>' : '') + '</ul>' +
+        '<div class="op-aipv" id="op-aipv">' + plan.map(function (s, i) { return '<div><div class="op-aith" data-i="' + i + '"></div><span>' + (i + 1) + '. ' + esc(s.title) + ' · ' + s.fill + '% full</span></div>'; }).join('') + '</div>' +
+        '<div class="op-aibr"><button class="op-btn dk" id="op-aigo" type="button">📊 Export editable PPT · ' + plan.length + ' slides</button><button class="op-btn" id="op-aiold" type="button">Use the page-cut way instead</button></div>';
+      R(rep);
+      libJs('/vendor/html-to-image.js', function () { return !!window.htmlToImage; }).then(function () { slides.forEach(function (d, i) { window.htmlToImage.toJpeg(d, {pixelRatio: 0.22, quality: 0.8, width: SW, height: Math.max(SH, d.offsetHeight), cacheBust: false, backgroundColor: t.bg}).then(function (u) { var th = ov.querySelector('.op-aith[data-i="' + i + '"]'); if (th) th.innerHTML = '<img src="' + u + '">'; }).catch(function () { }); }); });
+      ov.querySelector('#op-aiold').onclick = function () { close(); W.querySelector('#op-ppt').__old = 1; W.querySelector('#op-ppt').click(); };
+      ov.querySelector('#op-aigo').onclick = function () { var b = this; b.disabled = true; b.textContent = 'Making the PowerPoint…';
+        libJs('/biexport.js?v=2', function () { return !!(window.BIEXPORT && window.BIEXPORT.pptxPages); }).then(function () { var caps = [], i = 0;
+          var next = function () { if (i >= slides.length) return window.BIEXPORT.pptxPages(caps, 'wide', {title: (G && G.title) || 'BI one-pager'}); return window.BIEXPORT.capture(slides[i++]).then(function (c) { caps.push(c); b.textContent = 'Reading slide ' + i + ' of ' + slides.length + '…'; return next(); }); };
+          return next(); }).then(function (r) { window.BIEXPORT.save(r.blob, fname('pptx')); b.textContent = '✅ ' + r.n + ' editable slides downloaded'; say('✅ PowerPoint · ' + r.n + ' slides (AI-arranged)'); b.disabled = false; })
+          .catch(function (e) { b.disabled = false; b.textContent = '❌ ' + (e.message || e); }); };
+    });
   }
   window.BIOP = {render: render};
 })();

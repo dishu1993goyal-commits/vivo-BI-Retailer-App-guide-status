@@ -124,7 +124,7 @@ function cleanParty(x, o, shop) {
     sman: g("sman", 60), sph: x.sph !== undefined ? ph10(x.sph) : o.sph || "", od: g("od", 40), lead: x.lead !== undefined ? Math.max(0, Math.min(60, Math.round(num(x.lead)))) : o.lead != null ? o.lead : 2,
     ob: x.ob !== undefined ? num(x.ob) : o.ob || 0, obd: x.obd !== undefined ? day(x.obd) : o.obd || "", notes: g("notes", 300), on: x.on !== undefined ? x.on !== false : o.on !== false,
     grp: x.grp !== undefined ? str(x.grp, 24) : o.grp || "", hold: x.hold !== undefined ? (x.hold ? { by: "owner", why: str(x.holdWhy, 120) || "Stopped by owner", at: Date.now() } : null) : o.hold || null,
-    rem: o.rem || {}, int: o.int || {}, tok: o.tok || "", conf: o.conf || null, s: o.s || null, at: o.at || Date.now() };
+    av: o.av || "", rem: o.rem || {}, int: o.int || {}, tok: o.tok || "", conf: o.conf || null, s: o.s || null, at: o.at || Date.now() };
 }
 function cleanItems(a) {
   return (Array.isArray(a) ? a : []).slice(0, 300).map((i) => ({ p: cid(i.p), n: str(i.n, 90), q: qn(i.q), fq: qn(i.fq), r: num(i.r), u: str(i.u, 12), g: num(i.g), dsc: Math.max(0, Math.min(100, num(i.dsc))),
@@ -400,14 +400,74 @@ async function ownerOp(op, b, ctx) {
     for (const p of L) { const r = await sendWa(ctx, shop, p.wa || p.ph, text.replace(/\{name\}/g, p.n || p.firm || "")); if (r.ok) sent++; else fails.push(pname0(p) + ": " + r.error); }
     await addLog(store, sid, t, by, `Message sent to ${sent} of ${L.length} customers`); return json(200, { ok: true, auto: true, sent, fails });
   }
-  if (op === "list-read") {   // ✨ customer's handwritten / printed item list → lines for a sale bill
-    const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 3000000).slice(0, 3);
-    if (!imgs.length) return json(400, { ok: false, error: "Add a clear photo of the list." });
+  if (op === "list-read" || op === "read-order") {   // ✨ a list (photo / voice / typed) → bill lines with quantity, in any Indian language
+    let text = String(b.text || "").slice(0, 6000).trim(), heard = "";
+    if (b.audio) {
+      const st = await speechToText(ctx, store, String(b.audio));
+      if (!st.ok) return json(502, { ok: false, error: st.error });
+      text = heard = st.text; if (!text.trim()) return json(400, { ok: false, error: "Couldn't hear any items — speak a little slower, close to the phone." });
+    }
+    const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 4000000).slice(0, 4);
+    const who = b.mode === "po" ? "an order a shop owner is placing with his distributor / wholesaler" : "a customer's shopping list for an Indian grocery (kirana) shop";
+    const shape = `{"items":[{"name":"English name","hi":"हिंदी नाम","written":"as written","qty":0,"unit":"kg|g|L|ml|pc|pkt|box|bag|dozen","amount":0}]}`;
+    let raw = null;
+    if (imgs.length) {
+      const keys = await aiKeys(store, ctx.env);
+      const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, `This photo is ${who}. It may be handwritten or printed, in Hindi (Devanagari), English, Hinglish (Hindi in English letters) or another Indian language (Punjabi, Gujarati, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Odia, Urdu). Read EVERY line carefully, letter by letter. Reply with ONLY JSON: ${shape}\n${LIST_RULES}`, { prefer: "gemini" });
+      if (!v.ok) return json(502, { ok: false, error: "Couldn't read the photo right now (" + String(v.error).slice(0, 160) + "). Try a clearer, straight photo in good light." });
+      raw = parseLoose(v.text);
+    } else {
+      if (text.length < 2) return json(400, { ok: false, error: "Write or speak the items first." });
+      const r = await ctx.askAI(ctx.env, text, "", [], ctx.aiFetch, { system: `You turn ${who} into bill lines. The text may be typed or spoken (speech-to-text), in Hindi, English, Hinglish or another Indian language, and may be one long sentence ("do kilo cheeni, ek packet maggi aur aadha kilo chana dal"). Reply with ONLY JSON: ${shape}\n${LIST_RULES}`, label: "LIST", maxTokens: 2500, json: true, raw: true });
+      if (!r.ok) return json(502, { ok: false, error: r.error || "AI is busy — try again." });
+      raw = parseLoose(r.text);
+    }
+    if (!raw || !Array.isArray(raw.items)) return json(502, { ok: false, error: "The list couldn't be read clearly — try again (whole list in the photo, or speak item by item)." });
+    const items = raw.items.slice(0, 150).map(fixLine).filter((x) => x && x.name);
+    if (!items.length) return json(400, { ok: false, error: "No items found in that. Try again." });
+    return json(200, { ok: true, items, heard });
+  }
+  if (op === "i18n-get" || op === "i18n") {   // 🌐 app screens in Hindi / Hinglish — translated once by AI, shared by every shop
+    const lang = b.lang === "hn" ? "hn" : "hi", key = "kh:i18n:" + lang, M = (await store.get(key)) || { map: {} };
+    if (op === "i18n-get") return json(200, { ok: true, map: M.map, n: Object.keys(M.map).length });
+    const want = [...new Set((Array.isArray(b.keys) ? b.keys : []).map((k) => String(k).slice(0, 300)).filter((k) => k.length > 1 && !M.map[k]))].slice(0, 70);
+    if (!want.length) return json(200, { ok: true, map: {} });
+    const sys = lang === "hi"
+      ? "Translate the on-screen labels of a mobile khata (accounts, billing and stock) app for Indian kirana shop owners into simple, everyday Hindi in Devanagari — the words a shopkeeper actually uses (बिक्री, खरीद, उधार, बकाया, भुगतान, माल, ग्राहक, वितरक). Keep these as they are or in common Devanagari form: UPI, GST, WhatsApp, PDF, Excel, MRP, AI, SMS, OTP, IMEI, QR, e-mail, link, app. Keep emojis, ₹, and the {#} placeholders exactly. Keep the meaning short — button labels stay short."
+      : "Translate the on-screen labels of a mobile khata (accounts, billing and stock) app for Indian kirana shop owners into Hinglish — conversational Hindi written in English letters, the way shopkeepers text (e.g. 'Aaj ki bikri', 'Udhaar', 'Baaki paise', 'Grahak', 'Maal', 'Bill banao', 'Payment mila'). Common English words (bill, stock, item, UPI, GST, WhatsApp, Excel, MRP, rate) stay English. Keep emojis, ₹ and the {#} placeholders exactly. Keep button labels short.";
+    const r = await ctx.askAI(ctx.env, "Translate each value. Reply with ONLY JSON {\"t\":{\"<original>\":\"<translation>\"}} with every original as a key.", JSON.stringify(want), [], ctx.aiFetch, { system: sys, label: "LABELS", maxTokens: 3500, json: true, raw: true });
+    const j = r.ok ? parseLoose(r.text) : null, add = {};
+    if (j && j.t && typeof j.t === "object") want.forEach((k) => { const v = j.t[k]; if (typeof v === "string" && v.trim() && v.length < 600 && (k.match(/\{#\}/g) || []).length === (v.match(/\{#\}/g) || []).length) add[k] = v.trim(); });
+    if (Object.keys(add).length) { const M2 = (await store.get(key)) || { map: {} }; Object.assign(M2.map, add); await store.set(key, M2); }
+    return json(200, { ok: !!Object.keys(add).length || !want.length, map: add, error: r.ok ? "" : r.error });
+  }
+  if (op === "match-ai") {   // AI picks the right item (shop list or catalogue) for lines the simple search wasn't sure about
+    const L = (Array.isArray(b.lines) ? b.lines : []).slice(0, 80).map((x, i) => ({ i: num(x.i) || i, name: str(x.name, 90), hi: str(x.hi, 90), written: str(x.written, 90), unit: str(x.unit, 10), cands: (Array.isArray(x.cands) ? x.cands : []).slice(0, 8).map((c) => ({ k: str(c.k, 80), n: str(c.n, 100) })) })).filter((x) => x.cands.length);
+    if (!L.length) return json(200, { ok: true, picks: [] });
+    const facts = L.map((x) => `LINE ${x.i}: "${x.name}"${x.hi ? " / " + x.hi : ""}${x.written ? " (written: " + x.written + ")" : ""}${x.unit ? " [" + x.unit + "]" : ""}\n` + x.cands.map((c) => `  - ${c.k}: ${c.n}`).join("\n")).join("\n");
+    const r = await ctx.askAI(ctx.env, "Pick the matching product for each line.", facts, [], ctx.aiFetch, { system: `You match lines from an Indian kirana list to the shop's products. For each LINE choose the candidate key that is the SAME product (same item; same brand if a brand is written; for loose goods like sugar / dal / chana, a loose or any-brand candidate of that item is fine; pack size can differ only for loose goods). Hindi names: cheeni/चीनी = sugar, maida = refined flour, atta = wheat flour, besan = gram flour, suji/rava = semolina, chhole/kabuli chana = chickpeas, rajma = kidney beans, arhar/toor/tuvar = pigeon pea dal, masoor = red lentil, moong = green gram, urad = black gram, namak = salt, tel = oil, sarson = mustard, ghee, gud = jaggery, haldi = turmeric, mirch = chilli, dhaniya = coriander, jeera = cumin, chai patti = tea, sabun = soap, ande = eggs, doodh = milk, chawal = rice, poha = flattened rice, sabudana = sago. If no candidate is the same product, answer "". Reply with ONLY JSON: {"picks":[{"i":0,"k":"key or empty"}]}`, label: "MATCH", maxTokens: 1500, json: true, raw: true });
+    const j = r.ok ? parseLoose(r.text) : null;
+    return json(200, { ok: true, picks: j && Array.isArray(j.picks) ? j.picks.map((x) => ({ i: num(x.i), k: str(x.k, 80) })) : [] });
+  }
+  if (op === "bc-find") {   // 📷 barcode not in my items → open product databases for the name (MRP is read from the pack photo)
+    const code = String(b.code || "").replace(/\D/g, "").slice(0, 14); if (code.length < 8) return json(400, { ok: false, error: "That barcode looks too short." });
+    const cache = (await store.get("kh:bc:" + code)) || null; if (cache) return json(200, Object.assign({ ok: true }, cache));
+    let out = { name: "", brand: "", qty: "", src: "" };
+    for (const host of ["world.openfoodfacts.org", "world.openproductsfacts.org", "world.openbeautyfacts.org"]) {
+      try { const r = await ctx.aiFetch(`https://${host}/api/v2/product/${code}.json?fields=product_name,product_name_en,product_name_hi,brands,quantity`, { headers: { "user-agent": "ShopKhata/1.0" } }); const j = await r.json().catch(() => ({}));
+        const pr = j && j.status === 1 && j.product; if (pr && (pr.product_name || pr.product_name_en)) { out = { name: str(pr.product_name_en || pr.product_name, 90), brand: str(String(pr.brands || "").split(",")[0], 40), qty: str(pr.quantity, 30), src: host.split(".")[1] }; break; } } catch (e) { }
+    }
+    if (out.name) { if (out.brand && out.name.toLowerCase().indexOf(out.brand.toLowerCase()) < 0) out.name = out.brand + " " + out.name; if (out.qty && out.name.toLowerCase().indexOf(String(out.qty).toLowerCase()) < 0) out.name += " " + out.qty; await store.set("kh:bc:" + code, out); }
+    return json(200, Object.assign({ ok: true }, out));
+  }
+  if (op === "pack-read") {   // 📷 photo of the pack → name, MRP, net quantity, barcode (Indian packs must print the MRP)
+    const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 4000000).slice(0, 2);
+    if (!imgs.length) return json(400, { ok: false, error: "Take a photo of the pack." });
     const keys = await aiKeys(store, ctx.env);
-    const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, "This is a customer's shopping list for an Indian grocery (kirana) shop — usually handwritten, in Hindi, Hinglish or English, sometimes with quantities like 2 kg, 500 g, 1 packet, 3 pc, ½ kg, 1 dozen. Read EVERY line and reply with ONLY JSON: {\"items\":[{\"name\":\"item name in English as a shop would call it (keep the brand if written, e.g. Tata salt, Aashirvaad atta)\",\"written\":\"exactly as written\",\"qty\":0,\"unit\":\"kg|g|L|ml|pc|pkt|dozen\",\"rate\":0}]} — qty as a number (½ = 0.5); rate only if a price is written, else 0. Do not skip lines you are unsure about — give your best reading.");
-    if (!v.ok) return json(502, { ok: false, error: "Couldn't read the photo right now (" + String(v.error).slice(0, 160) + "). Try a clearer photo." });
-    const j = parseLoose(v.text); if (!j || !Array.isArray(j.items)) return json(502, { ok: false, error: "The list couldn't be read clearly — try again with the whole list in the photo." });
-    return json(200, { ok: true, items: j.items.slice(0, 120).map((x) => ({ name: str(x.name, 90), written: str(x.written, 90), qty: qn(x.qty) || 1, unit: str(x.unit, 10), rate: num(x.rate) })).filter((x) => x.name) });
+    const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, 'This is a photo of a packaged product sold in India. Read the printed label. Reply with ONLY JSON: {"name":"product name with brand and variant in English","brand":"","net":"net quantity e.g. 500 g / 1 L / 10 pcs","mrp":0,"barcode":"digits under the barcode if visible","category":"e.g. Biscuits, Dal, Oil, Soap"} — mrp = the number after "MRP" / "M.R.P." / "Max. Retail Price" (incl. of all taxes) in rupees; if several MRPs, the latest / not crossed out. 0 if you cannot see it. Never guess.', { prefer: "gemini" });
+    if (!v.ok) return json(502, { ok: false, error: "Couldn't read the pack (" + String(v.error).slice(0, 120) + ")." });
+    const j = parseLoose(v.text) || {};
+    return json(200, { ok: true, name: str(j.name, 90), brand: str(j.brand, 40), net: str(j.net, 30), mrp: num(j.mrp), bc: String(j.barcode || "").replace(/\D/g, "").slice(0, 14), cat: str(j.category, 40) });
   }
   if (op === "rules-run") {   // ⚙️ run the rules now (or preview: dry)
     const res = await runRules(ctx, store, sid, B, { dry: b.dry === true, origin, today, t });
@@ -422,6 +482,17 @@ async function ownerOp(op, b, ctx) {
     return json(200, { ok: true, rules: cleanRules(j.rules.map((x) => Object.assign({}, x, { id: "" }))) });
   }
 
+  if (op === "party-photo") {   // 📷 customer / distributor photo — a small thumbnail lives with the party, the full photo separately
+    const p = RM[cid(b.pid)]; if (!p) return json(404, { ok: false, error: "Not found." });
+    if (b.remove) { p.av = ""; await store.delete("kh:pimg:" + sid + ":" + p.id); }
+    else {
+      const img = String(b.img || ""), av = String(b.av || "");
+      if (!/^data:image\/(jpeg|webp|png);base64,/.test(img) || img.length > 400000 || !/^data:image\/(jpeg|webp|png);base64,/.test(av) || av.length > 20000) return json(400, { ok: false, error: "Photo is too large or not an image." });
+      await store.set("kh:pimg:" + sid + ":" + p.id, { img, at: t }); p.av = av;
+    }
+    await store.set(K.party(sid), { list: B.parties, at: t }); return json(200, { ok: true, party: p });
+  }
+  if (op === "party-photo-get") { const x = await store.get("kh:pimg:" + sid + ":" + cid(b.pid)); return json(200, { ok: true, img: x ? x.img : "" }); }
   // ----- parties -----
   if (op === "party-save") {
     const x = b.party || {}, old = x.id ? RM[cid(x.id)] : null, n = cleanParty(x, old, shop);
@@ -642,6 +713,54 @@ async function deliver(ctx, shop, p, doc, s, origin, via, store, sid, kind, extr
     if (d) { d.sent = Object.assign({}, d.sent, out.mail && out.mail.ok ? { mail: Date.now() } : {}, out.auto && out.auto.ok ? { wa: Date.now() } : {}); await store.set(K.pt(sid, p.id), { list: docs }); doc.sent = d.sent; }
   }
   return out;
+}
+
+// ---------- ✨ reading lists: rules shared by photo / voice / typed text ----------
+const LIST_RULES = `Rules:
+- One entry per item. Keep every item line, even if unsure (give your best reading). Ignore totals, dates, shop names, phone numbers and doodles.
+- "name": the item in simple English as an Indian kirana shop calls it; keep brand and pack size if written (e.g. "Tata Salt 1 kg", "Maida", "Chana dal", "Kabuli chana (chhole)", "Sugar"). "hi": the same in Hindi (Devanagari). "written": exactly as written, in the original script.
+- qty + unit = HOW MUCH is wanted. A weight / volume written with a loose item IS the amount: "maida 250gm" → qty 0.25, unit "kg" (NOT 250 pieces); "chana dal 250 g" → 0.25 kg; "chini 1/2 kilo" or "aadha kilo cheeni" → 0.5 kg; "chhole 1 kg" → 1 kg; "sarson tel 1 ltr" → 1 L; "doodh 500 ml" → 0.5 L. Always give grams as kg and ml as L (divide by 1000).
+- A plain count means pieces / packets: "maggi 10" → 10 pc; "parle g 5 pkt" → 5 pkt; "ande 1 darjan" → 12 pc.
+- If BOTH a pack size and a count are written ("tata salt 1kg x 2", "atta 5kg 1 bag", "surf 500g - 3"), keep the pack size in the name and qty = the count: name "Tata Salt 1 kg", qty 2, unit "pc".
+- Hindi number words: paav/pav = 0.25, aadha/adha = 0.5, sawa = 1.25, dedh = 1.5, dhai/adhai = 2.5, ek 1, do 2, teen 3, char 4, paanch 5, chhe 6, saat 7, aath 8, nau 9, das 10, darjan 12; Devanagari digits ०१२३४५६७८९ = 0-9; ½ = 0.5, ¼ = 0.25.
+- "amount": only if a price is written on that line (₹ / Rs / /- / =) — the rupees written for that line; else 0. Never invent prices.`;
+const UNITS = { g: "g", gm: "g", gms: "g", gram: "g", grams: "g", gr: "g", "ग्राम": "g", kg: "kg", kgs: "kg", kilo: "kg", kilogram: "kg", "किलो": "kg", ml: "ml", "मिली": "ml", l: "L", lt: "L", ltr: "L", litre: "L", liter: "L", "लीटर": "L", pc: "pc", pcs: "pc", piece: "pc", pieces: "pc", nag: "pc", no: "pc", nos: "pc", pkt: "pkt", packet: "pkt", packets: "pkt", pack: "pkt", "पैकेट": "pkt", box: "box", bag: "bag", bori: "bag", dozen: "dozen", darjan: "dozen", doz: "dozen", "दर्जन": "dozen" };
+function fixLine(x) {
+  if (!x) return null;
+  const dev = (t) => String(t || "").replace(/[०-९]/g, (d) => "०१२३४५६७८९".indexOf(d));
+  let q = num(dev(x.qty)), u = UNITS[String(x.unit || "").toLowerCase().replace(/\./g, "").trim()] || "pc";
+  const w = dev(x.written || "") + " " + dev(x.name || "");
+  const wm = /(\d+(?:\.\d+)?)\s*(g|gm|gms|grams?|ml|ग्राम|मिली)\b/i.exec(w);
+  if ((u === "pc" || u === "pkt") && wm && Math.abs(q - num(wm[1])) < 0.001 && q >= 20) { u = /ml|मिली/i.test(wm[2]) ? "ml" : "g"; }   // "maida 250gm" read as 250 pieces
+  if (u === "g") { q = q / 1000; u = "kg"; } else if (u === "ml") { q = q / 1000; u = "L"; }
+  if (u === "dozen") { q = q * 12; u = "pc"; }
+  if ((u === "kg" || u === "L") && q > 60 && /g|ml|ग्राम/i.test(w)) q = q / 1000;   // grams left as kg
+  if (!(q > 0)) q = 1;
+  const amt = num(dev(x.amount)) || 0, rate = amt ? Math.round(amt / q * 100) / 100 : num(dev(x.rate));
+  return { name: str(x.name, 90), hi: str(x.hi, 90), written: str(x.written, 90), qty: Math.round(q * 1000) / 1000, unit: u, rate };
+}
+async function speechToText(ctx, store, dataUrl) {
+  const m = /^data:(audio\/[a-z0-9.+-]+)(?:;[^,]*)?;base64,(.+)$/i.exec(dataUrl); if (!m) return { ok: false, error: "No recording received." };
+  const mime = m[1], buf = Buffer.from(m[2], "base64"); if (buf.length < 800) return { ok: false, error: "The recording is too short." }; if (buf.length > 6e6) return { ok: false, error: "Keep the recording under 2 minutes." };
+  const c = (await store.get("config:aikeys")) || {}, keys = await aiKeys(store, ctx.env), sarvam = ctx.env.SARVAM_API_KEY || c.sarvam, errs = [], f = ctx.aiFetch;
+  const ext = /mp4|m4a|aac/.test(mime) ? "m4a" : /ogg/.test(mime) ? "ogg" : /wav/.test(mime) ? "wav" : "webm";
+  const file = () => new Blob([buf], { type: mime.split(";")[0] });
+  if (sarvam) {   // best for Hindi & Indian languages (and mixed Hindi-English)
+    try { const fd = new FormData(); fd.append("file", file(), "list." + ext); fd.append("model", "saarika:v2.5"); fd.append("language_code", "unknown");
+      const r = await f("https://api.sarvam.ai/speech-to-text", { method: "POST", headers: { "api-subscription-key": sarvam }, body: fd }); const j = await r.json().catch(() => ({}));
+      if (r.ok && j.transcript) return { ok: true, text: String(j.transcript), src: "sarvam" }; errs.push("Sarvam " + r.status); } catch (e) { errs.push("Sarvam: " + e.message); }
+  }
+  if (keys.groq) {
+    try { const fd = new FormData(); fd.append("file", file(), "list." + ext); fd.append("model", "whisper-large-v3"); fd.append("response_format", "json"); fd.append("temperature", "0"); fd.append("prompt", "किराना सामान: चीनी 1 किलो, आटा 5 किलो, Maggi 10 packet, chana dal aadha kilo, Tata salt 2, sarson tel 1 litre.");
+      const r = await f("https://api.groq.com/openai/v1/audio/transcriptions", { method: "POST", headers: { authorization: "Bearer " + keys.groq }, body: fd }); const j = await r.json().catch(() => ({}));
+      if (r.ok && j.text != null) return { ok: true, text: String(j.text), src: "groq" }; errs.push("Groq " + r.status + " " + String((j.error && j.error.message) || "").slice(0, 60)); } catch (e) { errs.push("Groq: " + e.message); }
+  }
+  if (ctx.env.GEMINI_API_KEY) {
+    try { const r = await f(`https://generativelanguage.googleapis.com/v1beta/models/${ctx.env.GEMINI_MODEL || "gemini-2.5-flash"}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": ctx.env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: "Transcribe this voice note exactly (it lists grocery items in Hindi / English / an Indian language). Reply with only the words spoken." }, { inline_data: { mime_type: mime.split(";")[0], data: m[2] } }] }] }) });
+      const j = await r.json().catch(() => ({})); const t = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "";
+      if (r.ok && t.trim()) return { ok: true, text: t.trim(), src: "gemini" }; errs.push("Gemini " + r.status); } catch (e) { errs.push("Gemini: " + e.message); }
+  }
+  return { ok: false, error: errs.length ? "Couldn't understand the recording (" + errs.join(" | ").slice(0, 160) + ")." : "Voice needs an AI key — the HO admin can add the free Groq key (AI keys)." };
 }
 
 // ---------- ⚙️ run the rules for one shop (daily schedule, "Run now", or instantly after a bill) ----------

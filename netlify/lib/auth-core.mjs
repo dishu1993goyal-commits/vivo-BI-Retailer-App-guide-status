@@ -884,7 +884,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   }
 
   // ---------- Actions for a logged-in user (user name + session token) ----------
-  const SESSION_ACTIONS = ["me", "ping", "update-profile", "change-password", "upload-photo", "get-photo",
+  const SESSION_ACTIONS = ["me", "ping", "ai-slide-plan", "update-profile", "change-password", "upload-photo", "get-photo",
     "remove-photo", "logout", "delete-account", "admin-users", "admin-logs", "admin-set-state", "set-state-once",
     "support-list", "support-get", "support-create", "support-reply", "support-rate", "support-status",
     "support-upload", "support-att", "support-unread", "ai-ask", "ai-status", "admin-logs-range", "admin-support-data",
@@ -951,6 +951,16 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const r = await askAI(env, q, b.context, b.history, aiFetch);
       if (r.ok) await store.set(ck, { n: used + 1 });
       return json(r.ok ? 200 : 502, r);
+    }
+
+    if (b.action === "ai-slide-plan") {   // one-pager → slides: AI groups the (already measured) sections into slides and names each slide
+      const items = (Array.isArray(b.items) ? b.items : []).slice(0, 80).map((x, i) => ({ id: i, title: String(x.title || "").slice(0, 90), kind: String(x.kind || "").slice(0, 20), h: Math.round(Number(x.h) || 0), span: Number(x.span) || 6, part: String(x.part || "").slice(0, 12) }));
+      if (!items.length) return json(400, { ok: false, error: "Nothing to arrange." });
+      const sys = `You arrange sections of a monthly business report (vivo India BI team) into presentation slides. Each section has a height as % of one slide (h) and a width in sixths of the slide (span: 6 = full width, 3 = half, 2 = third). Sections must stay in the given order. Make slides that are neither cluttered nor empty: total height of a slide about 55-100% (side-by-side sections in the same row share height). Never put more than 100%. Keep a section's parts ("1/3", "2/3") on consecutive slides, and keep closely related sections together (KPI cards with their insight; work done with next month's plan only if they fit). The banner/cover goes alone or with the first small section. Give each slide a short professional title (max 7 words). Reply with ONLY JSON: {"slides":[{"title":"…","ids":[0,1]}]} using every id exactly once, in order.`;
+      const r = await askAI(env, "Arrange these sections into slides.", JSON.stringify({ month: String(b.month || "").slice(0, 30), items }), [], aiFetch, { system: sys, label: "SECTIONS", maxTokens: 1800, json: true, raw: true });
+      let j = null; try { const m = /\{[\s\S]*\}/.exec(r.text || ""); j = m ? JSON.parse(m[0]) : null; } catch (e) { j = null; }
+      if (!r.ok || !j || !Array.isArray(j.slides)) return json(200, { ok: false, error: r.error || "AI reply couldn't be read." });
+      return json(200, { ok: true, slides: j.slides.slice(0, 60).map((x) => ({ title: String(x.title || "").slice(0, 80), ids: (Array.isArray(x.ids) ? x.ids : []).map(Number).filter((n) => n >= 0 && n < items.length) })) });
     }
 
     // Existing state-app users pick their state once.

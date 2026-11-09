@@ -21,7 +21,7 @@ export const PRO_TYPES = ["text", "longtext", "number", "currency", "date", "tim
   "email", "phone", "photo", "location", "heading", "image", "calc", "lookup", "table", "user"];
 const NOVALUE = ["heading", "image"];
 export const LOOKUP_SOURCES = { retailer: "Retailer (payouts / portal)", user: "User (state / HO)", product: "vivo model (Affordability price)", scheme: "Scheme policy", tool: "Another Studio tool's entries" };
-const APPROVER_TYPES = ["role", "users", "field", "submitter", "group"];
+const APPROVER_TYPES = ["role", "users", "field", "submitter", "group", "stateUsers"];
 
 function cleanExpr(v) { return str(v, 600); }
 export function cleanProFields(a) {
@@ -40,6 +40,7 @@ export function cleanProFields(a) {
     if (type === "user") o.userScope = ["any", "sameState", "admins"].includes(f.userScope) ? f.userScope : "any";
     if (type === "currency") o.unit = "₹";
     o.validations = (Array.isArray(f.validations) ? f.validations : []).slice(0, 6).map((v) => ({ rule: cleanExpr(v.rule), msg: str(v.msg, 160) })).filter((v) => v.rule);
+    if (f.step) o.step = keyOf(f.step);   // filled by the approver at this step (hidden from the person submitting)
     return o;
   }).filter((f) => f.label || f.type === "image" || (f.type === "heading" && (f.text || f.image)));
 }
@@ -57,7 +58,8 @@ export function cleanProFlow(x) {
     onReject: str(s.onReject, 30).replace(/[^a-z0-9_]/gi, "") || "end", note: str(s.note, 300) }));
   const ids = new Set(steps.map((s) => s.id));
   steps.forEach((s) => { s.routes = s.routes.filter((r) => r.goto === "end" || r.goto === "next" || ids.has(r.goto)); if (!["end", "back"].includes(s.onReject) && !ids.has(s.onReject)) s.onReject = "end"; });
-  return { version: 2, steps, allowResubmit: x.allowResubmit !== false, notifySubmitter: x.notifySubmitter !== false };
+  return { version: 2, steps, allowResubmit: x.allowResubmit !== false, notifySubmitter: x.notifySubmitter !== false,
+    notifyDone: (Array.isArray(x.notifyDone) ? x.notifyDone : []).slice(0, 6).map(cleanApprover) };
 }
 export function cleanProTool(tl) {
   return { fields: cleanProFields(tl.fields), flow: cleanProFlow(tl.flow), useCase: str(tl.useCase, 3000),
@@ -108,12 +110,15 @@ export async function lookupRecord(store, f, keyVal, pool) {
 }
 
 // ---------- submit: clean, look up, compute, check ----------
-export async function proValues(tl, input, ctx) {
+export async function proValues(tl, input, ctx, opt) {
   const { store, rec, app, pool, cleanBasic } = ctx, fields = tl.fields || [], vals = {}, errs = [];
-  input = input || {};
+  input = input || {}; opt = opt || {};
+  // acting at an approval step: the submitter's answers stay as they were; only this step's fields are taken from the input
+  const base = opt.base || {}, mineAt = (f) => (opt.step ? f.step === opt.step : !f.step);
   const user = { state: rec.state || (app === "admin" ? "HO" : ""), role: app === "admin" ? (rec.master ? "master" : "admin") : "state", name: rec.fullName || "", username: rec.username || "", designation: rec.designation || "" };
   for (const f of fields) {
     if (NOVALUE.includes(f.type) || f.type === "calc") continue;
+    if (!mineAt(f)) { vals[f.key] = opt.step && base[f.key] != null ? base[f.key] : ""; continue; }
     let v = input[f.key];
     if (f.type === "table") {
       const rows = (Array.isArray(v) ? v : []).slice(0, f.maxRows || 20).map((r) => { const o = {}; (f.columns || []).forEach((c) => { if (c.formula) return; let x = r && r[c.key]; if (c.type === "number" || c.type === "currency") { x = num(x); x = x == null ? "" : x; } else x = str(x, 200); if (c.type === "select" && x && c.options.length && !c.options.includes(x)) x = ""; o[c.key] = x; }); return o; })
@@ -132,6 +137,7 @@ export async function proValues(tl, input, ctx) {
   // visibility, required, validations
   for (const f of fields) {
     if (NOVALUE.includes(f.type)) continue;
+    if (!mineAt(f) || opt.noRequire) continue;
     const vis = truthy(f.showIf, env, true);
     if (!vis) { vals[f.key] = Array.isArray(vals[f.key]) ? [] : ""; continue; }
     const v = vals[f.key], empty = v === "" || v == null || (Array.isArray(v) && !v.length);
@@ -141,7 +147,7 @@ export async function proValues(tl, input, ctx) {
     if ((f.type === "number" || f.type === "currency") && v !== "" && v != null) { if (f.min != null && v < f.min) errs.push(f.label + " must be at least " + f.min); if (f.max != null && v > f.max) errs.push(f.label + " must be at most " + f.max); }
     if (!empty) (f.validations || []).forEach((r) => { if (!truthy(r.rule, env, true)) errs.push(r.msg || f.label + " doesn't meet the rule"); });
   }
-  (tl.rules || []).forEach((r) => { if (!truthy(r.rule, env, true)) errs.push(r.msg || "A form rule isn't met"); });
+  if (!opt.step) (tl.rules || []).forEach((r) => { if (!truthy(r.rule, env, true)) errs.push(r.msg || "A form rule isn't met"); });
   return { vals, errs, env, user };
 }
 
@@ -153,6 +159,10 @@ async function resolve(store, ap, sub, env) {
   if (ap.type === "users") return ap.users.map(low);
   if (ap.type === "submitter") return [low(sub.by && sub.by.username)].filter(Boolean);
   if (ap.type === "group") return ["@" + ap.group];
+  if (ap.type === "stateUsers") {   // every state-app user of the state named in a field (or the submitter's state)
+    const sv = ap.stateField ? vals[ap.stateField] : sub.state, st = low(typeof sv === "object" && sv ? sv.state : sv);
+    return st && st !== "ho" ? ["@state:" + st] : [];
+  }
   if (ap.type === "field") { const v = vals[ap.field]; return (Array.isArray(v) ? v : [v]).map((x) => low(typeof x === "object" && x ? x.username || x.key : x)).filter(Boolean); }
   if (ap.type === "role") {
     const dir = await roleDir(store), stateOf = ap.scope === "fieldState" ? (typeof vals[ap.stateField] === "object" && vals[ap.stateField] ? vals[ap.stateField].state : vals[ap.stateField]) : ap.scope === "any" ? "" : sub.state;
@@ -194,17 +204,17 @@ export function canActPro(sub, app, rec) {
   if (sub.status !== "pending" || !sub.cur) return false;
   const role = app === "admin" ? (rec.master ? "master" : "admin") : "state", ids = [rec.username, rec.vchatId, rec.email, rec.mobile].filter(Boolean).map(low);
   const ap = sub.cur.approvers || [], done = sub.cur.done || [];
-  const mine = ap.filter((a) => (a === "@" + role) || (a === "@admin" && role === "master") || ids.includes(a));
+  const mine = ap.filter((a) => (a === "@" + role) || (a === "@admin" && role === "master") || ids.includes(a) || (role === "state" && rec.state && a === "@state:" + low(rec.state)));
   return mine.some((a) => !done.includes(a));
 }
 export function isProApproverAny(tl, app, rec) {   // could this user ever approve in this tool? (lets approvers open it)
   const ids = [rec.username, rec.vchatId, rec.email].filter(Boolean).map(low), role = app === "admin" ? (rec.master ? "master" : "admin") : "state";
-  return ((tl.flow || {}).steps || []).some((s) => [s.approver, s.escalate].filter(Boolean).some((a) => (a.type === "group" && (a.group === role || (a.group === "admin" && role === "master"))) || (a.type === "users" && a.users.map(low).some((u) => ids.includes(u))) || a.type === "role" || a.type === "field"));
+  return ((tl.flow || {}).steps || []).some((s) => [s.approver, s.escalate].filter(Boolean).some((a) => (a.type === "group" && (a.group === role || (a.group === "admin" && role === "master"))) || (a.type === "users" && a.users.map(low).some((u) => ids.includes(u))) || a.type === "role" || a.type === "field" || (a.type === "stateUsers" && role === "state")));
 }
 export async function actPro(store, tl, sub, decision, app, rec, comment, t) {
   const steps = tl.flow.steps, s = steps[sub.cur.idx], by = { fullName: rec.fullName, username: rec.username || "", app }, env = envOf(tl, sub);
   const ids = [rec.username, rec.vchatId, rec.email, rec.mobile].filter(Boolean).map(low), role = app === "admin" ? (rec.master ? "master" : "admin") : "state";
-  const myTag = (sub.cur.approvers || []).find((a) => ids.includes(a)) || "@" + role;
+  const myTag = (sub.cur.approvers || []).find((a) => ids.includes(a)) || (role === "state" && rec.state && (sub.cur.approvers || []).includes("@state:" + low(rec.state)) ? "@state:" + low(rec.state) : "@" + role);
   if (decision === "approve") {
     sub.history.push(nowHist(t, by, "approved", s, { comment }));
     sub.cur.done = [...new Set((sub.cur.done || []).concat([myTag]))];
@@ -218,6 +228,12 @@ export async function actPro(store, tl, sub, decision, app, rec, comment, t) {
   if (s.onReject === "back") { sub.status = "returned"; sub.cur = null; return sub; }
   if (s.onReject && s.onReject !== "end") { const j = steps.findIndex((x) => x.id === s.onReject); if (j >= 0) return enterFrom(store, tl, sub, j, t, { fullName: "System", username: "", app: "" }); }
   sub.status = "rejected"; sub.cur = null; sub.doneAt = t; return sub;
+}
+// people told when a request is finished (e.g. the state admin and the submitter when the HO SPOC closes it)
+export async function fyiOf(store, tl, sub) {
+  const L = ((tl.flow || {}).notifyDone || []); if (!L.length) return [];
+  const out = []; for (const ap of L) out.push(...(await resolve(store, ap, sub, envOf(tl, sub))));
+  return [...new Set(out)];
 }
 // TAT: when a step runs past its time, add the escalation approver (done lazily whenever the tool is read)
 export async function tickTat(store, tl, sub, t) {

@@ -144,6 +144,28 @@
       fields: [F("imei", "IMEI", "text", { required: true, validations: [{ rule: "LEN(imei) = 15", msg: "IMEI has 15 digits" }] }), F("bought", "Purchase date", "date", RQ), O("plan", "Plan", ["Standard", "V-Shield 1 year", "V-Shield 2 years"], RQ), C("till", "Covered till", 'ADDDAYS(bought, SWITCH(plan, "V-Shield 1 year", 730, "V-Shield 2 years", 1095, 365))', { format: "date" }), F("issue", "Issue", "longtext", RQ), F("pic", "Device photo", "photo", RQ)],
       rules: [{ rule: "TODAY() <= till", msg: "Warranty has expired for this device" }],
       steps: [S("s1", "Service centre", R("Service centre", { scope: "any" }), { tatHours: 48 })] }
+,
+    { icon: "🚫", name: "Store suspension — market hygiene (IMEI pre-activation)", category: "admin", desc: "HO market hygiene raises stores with a high IMEI pre-activation rate; each state confirms (yes/no, days or reason), the state head approves, HO BI suspends in vWork and updates the status.", shows: "Excel import (one row = one store) · state team of the store's state · approver-filled fields · Excel decisions · notify state + submitter at the end",
+      useCase: "1) HO market hygiene submits stores one by one or imports the Excel (State, City, Store name, Store code, Pre-activation rate %). 2) Each store goes ONLY to the state team of its own state: they answer “Ready to suspend?” — Yes + number of days, or No + reason with description. 3) The state head (role directory) approves or rejects with remarks. 4) HO BI SPOC exports all approved requests to Excel, suspends in vWork, then updates the status (one by one or by uploading the decisions sheet). 5) The state team and the market hygiene SPOC are notified when it is closed.",
+      fields: [H("Store & violation"), O("state", "State", ["Andhra Pradesh", "Assam", "Bihar", "Chhattisgarh", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu & Kashmir", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Mumbai", "North East", "Odisha", "Punjab", "Rajasthan", "Tamil Nadu", "Telangana", "Uttar Pradesh East", "Uttar Pradesh West", "Uttarakhand", "West Bengal"], RQ),
+        F("city", "City", "text", RQ), F("store", "Store name", "text", RQ), F("code", "Store code", "text", RQ), F("period", "Data period", "text", { placeholder: "e.g. Oct 2026" }),
+        F("rate", "Pre-activation rate %", "number", { required: true, validations: [{ rule: "rate >= 0 AND rate <= 100", msg: "Rate must be between 0 and 100" }] }), F("preimei", "Pre-activated IMEIs (count)", "number"),
+        C("risk", "Risk level", 'TIER(rate, "0:🟢 Low,10:🟠 Medium,20:🔴 High,35:⛔ Critical")', { format: "text" }), C("sugg", "Suggested suspension (days)", "IFS(rate >= 35, 30, rate >= 20, 15, rate >= 10, 7, TRUE, 0)", { format: "number" }),
+        F("mh_note", "Market hygiene remarks", "longtext"),
+        Object.assign(H("State decision"), { step: "s1" }), O("ready", "Is the state ready to suspend this store?", ["Yes", "No"], { required: true, step: "s1" }),
+        F("days", "Suspend for how many days", "number", { step: "s1", showIf: 'ready = "Yes"', requiredIf: 'ready = "Yes"', validations: [{ rule: "days >= 1 AND days <= 90", msg: "Between 1 and 90 days" }] }),
+        O("reason", "Reason for not suspending", ["Store already corrected", "Business-critical store", "Data mismatch / wrong IMEIs", "Under investigation", "Other"], { step: "s1", showIf: 'ready = "No"', requiredIf: 'ready = "No"' }),
+        F("reason_d", "Describe the reason", "longtext", { step: "s1", showIf: 'ready = "No"', requiredIf: 'ready = "No"' }),
+        F("head_rmk", "State head remarks", "longtext", { step: "s2", required: true }),
+        O("sus_status", "Suspension status in vWork", ["Suspended", "Partially suspended", "Not suspended (state said no)", "On hold"], { step: "s3", required: true }),
+        F("sus_from", "Suspended from", "date", { step: "s3", showIf: 'IN(sus_status, "Suspended", "Partially suspended")', requiredIf: 'IN(sus_status, "Suspended", "Partially suspended")' }),
+        C("sus_till", "Suspended till", 'IF(ISBLANK(sus_from), "", ADDDAYS(sus_from, days))', { format: "date" }),
+        F("vwork_ref", "vWork reference / remarks", "text", { step: "s3" })],
+      rules: [],
+      steps: [S("s1", "State team review", { type: "stateUsers", stateField: "state", users: [] }, { tatHours: 48, escalate: R("State head", { scope: "fieldState", stateField: "state" }) }),
+        S("s2", "State head approval", R("State head", { scope: "fieldState", stateField: "state" }), { tatHours: 48, escalate: G("admin") }),
+        S("s3", "HO BI SPOC — suspension in vWork", R("HO BI SPOC", { scope: "any" }), { tatHours: 72, escalate: G("admin") })],
+      notifyDone: [{ type: "stateUsers", stateField: "state", users: [] }, { type: "submitter", users: [] }] }
   ];
   window.BITOOL_TEMPLATES = T;
 })();

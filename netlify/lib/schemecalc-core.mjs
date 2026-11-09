@@ -81,10 +81,18 @@ Use numbers only (no ₹ or % signs). Percent values like 100 mean 100%. If a va
 
 const OCR_ASK = "This is a vivo India scheme circular / poster (it may be a phone screenshot or photo). Transcribe ALL the text exactly: headings, dates, every table row (cells separated by |, keep merged cells by repeating them), examples, terms & conditions, and amounts with ₹. If a table is cut off at the edge, write what is visible. No commentary.";
 // Image → text. Groq's vision models change over time, so the list is read from Groq; Gemini is the fallback.
-export async function readImages(keys, env, images, fetchImpl, prompt) {
+export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
   const ASK = prompt || OCR_ASK;
   const errs = [];
   const ask = async (label, fn) => { try { const t = await fn(); if (t && t.trim().length > 20) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
+  // handwriting in Hindi / regional scripts: Gemini reads it far better, so it goes first when asked (and a key exists)
+  if (opt && opt.prefer === "gemini" && env && env.GEMINI_API_KEY && !opt._g) {
+    const g = await readImages({}, env, images, fetchImpl, prompt, { _g: 1 });
+    if (g.ok) return g; errs.push(g.error);
+    if (!keys.groq) return { ok: false, error: errs.join(" | ") };
+    const q = await readImages(keys, {}, images, fetchImpl, prompt, { _g: 1 });
+    return q.ok ? q : { ok: false, error: errs.concat([q.error]).join(" | ") };
+  }
   // 1) Groq: only models it lists right now that can see images
   if (keys.groq) {
     let ids = [];

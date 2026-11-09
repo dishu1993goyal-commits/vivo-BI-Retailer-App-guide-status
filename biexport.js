@@ -166,8 +166,21 @@
     return lib("pptx").then(function () {
       var P = new window.PptxGenJS(), G = geo(shape), B = bandsFor(cap, n), ST = P.ShapeType || P.shapes || {};
       if (shape === "portrait") P.defineLayout({ name: "A4P", width: G.w, height: G.h }); P.layout = G.name; P.title = (meta && meta.title) || "vivo BI"; P.company = "vivo Business Innovation";
-      B.forEach(function (b, si) {
-        var s = scaleOf(cap, b, G), ox = G.m + ((G.w - 2 * G.m) - cap.W * s) / 2, oy = G.m, S = P.addSlide(); S.background = { color: cap.bg };
+      B.forEach(function (b, si) { drawSlide(P, ST, cap, b, G, si, B.length); });
+      return P.write({ outputType: "blob" }).then(function (bl) { return { blob: new Blob([bl], { type: MIME.pptx }), n: B.length }; });
+    });
+  }
+  // one slide per captured page (used by the one-pager's AI-arranged slides) — each fitted and centred on its slide
+  function pptxPages(caps, shape, meta) {
+    return lib("pptx").then(function () {
+      var P = new window.PptxGenJS(), G = geo(shape), ST = P.ShapeType || P.shapes || {};
+      if (shape === "portrait") P.defineLayout({ name: "A4P", width: G.w, height: G.h }); P.layout = G.name; P.title = (meta && meta.title) || "vivo BI"; P.company = "vivo Business Innovation";
+      caps.forEach(function (cap, si) { drawSlide(P, ST, cap, [0, cap.H], G, si, caps.length, true); });
+      return P.write({ outputType: "blob" }).then(function (bl) { return { blob: new Blob([bl], { type: MIME.pptx }), n: caps.length }; });
+    });
+  }
+  function drawSlide(P, ST, cap, b, G, si, total, centre) {
+        var s = scaleOf(cap, b, G), ox = G.m + ((G.w - 2 * G.m) - cap.W * s) / 2, oy = centre ? Math.max(G.m, (G.h - (b[1] - b[0]) * s) / 2 - 0.05) : G.m, S = P.addSlide(); S.background = { color: cap.bg };
         var px = function (v) { return v * s; }, ptOf = function (v) { return Math.max(4, Math.round(v * s * 72 * 10) / 10); };
         cap.items.forEach(function (i) { if (!inBand(i, b)) return;
           var y0 = Math.max(i.y, b[0]), y1 = i.t === "box" ? Math.min(i.y + i.h, b[1]) : i.y + i.h, x = ox + px(i.x), y = oy + px(y0 - b[0]), w = Math.max(0.01, px(i.w)), h = Math.max(0.01, px(y1 - y0));
@@ -179,10 +192,7 @@
             if (!runs.length) return; var extra = i.al === "l" ? Math.max(0.06, w * 0.06) : 0;
             S.addText(runs, { x: i.al === "ctr" ? x - w * 0.03 : x, y: y, w: w + extra + (i.al === "ctr" ? w * 0.06 : 0), h: Math.max(h, ptOf(i.px) / 72 * 1.1), margin: 0, align: i.al === "ctr" ? "center" : i.al === "r" ? "right" : "left", valign: "top", wrap: !i.one, lineSpacing: i.one ? undefined : Math.max(6, Math.round(i.lh * s * 72 * 10) / 10), paraSpaceBefore: 0, paraSpaceAfter: 0, fit: "none" });
           } });
-        if (B.length > 1) S.addText(String(si + 1) + " / " + B.length, { x: G.w - 1.2, y: G.h - 0.32, w: 1, h: 0.25, fontSize: 8, color: lum(cap.bg) < 0.5 ? "DDDDDD" : "8A8573", align: "right", margin: 0 });
-      });
-      return P.write({ outputType: "blob" }).then(function (bl) { return { blob: new Blob([bl], { type: MIME.pptx }), n: B.length }; });
-    });
+        if (total > 1) S.addText(String(si + 1) + " / " + total, { x: G.w - 1.2, y: G.h - 0.32, w: 1, h: 0.25, fontSize: 8, color: lum(cap.bg) < 0.5 ? "DDDDDD" : "8A8573", align: "right", margin: 0 });
   }
 
   // ---------- PDF (picture of the page, paged at the same safe lines) ----------
@@ -321,5 +331,5 @@
     };
     return { close: close };
   }
-  window.BIEXPORT = { _wb: wordBlocks, open: open, capture: capture, pptx: pptx, docx: docx, pdf: pdf, bands: bandsFor, suggest: suggest, save: save };
+  window.BIEXPORT = { _wb: wordBlocks, open: open, capture: capture, pptx: pptx, pptxPages: pptxPages, cuts: cutsOf, minPt: minPt, geo: geo, docx: docx, pdf: pdf, bands: bandsFor, suggest: suggest, save: save };
 })();

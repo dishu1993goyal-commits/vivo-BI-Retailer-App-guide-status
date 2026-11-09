@@ -9403,7 +9403,7 @@ window.BITHEME = (function () {
     {t: 'pro_alr', l: 'Alerts & Rules', ic: 'bell', sub: 'Automatic warnings with your own thresholds', r: rAlr},
     {t: 'pro_dq', l: 'Data Health', ic: 'shield', sub: 'Checks that the numbers can be trusted', r: rDq},
     {t: 'pro_studio', l: 'One-Page Studio', ic: 'img', sub: 'Design an editable one-page PPT summary', r: rStudio},
-    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=10'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
+    {t: 'pro_op', l: 'Monthly one-pager', ic: 'file', sub: 'Editable one-page report from the Monthly summary', r: function (w) { if (window.BIOP) return BIOP.render(w); w.innerHTML = '<div style="padding:20px;color:#6b6657">Loading the one-pager…</div>'; var s = document.createElement('script'); s.src = '/onepager.js?v=11'; s.onload = function () { if (window.BIOP) BIOP.render(w); }; s.onerror = function () { w.innerHTML = '<div style="padding:20px">Could not load the one-pager — check the connection and open it again.</div>'; }; document.head.appendChild(s); }},
     {t: 'pro_rep', l: 'Report Builder', ic: 'file', sub: 'Copy, print or download a ready summary', r: rRep}
   ];
   var TT = {}; TABS.forEach(function (x) { TT[x.t] = x; });
