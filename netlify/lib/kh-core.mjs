@@ -1,13 +1,13 @@
 // 🏪 Kirana Business Manager ("Khata"): a complete digital book for a retail shop — items with cost / selling price /
 // margin, distributors and key customers, purchase bills, sale bills, payments both ways, cash & UPI counter sales,
 // stock with FIFO lots (ageing + expiry), reports and AI insights. Every rupee has a record, and every bill / payment
-// can be acknowledged by the other side through their own secure link (checked with the last 4 digits of their mobile).
+// can be acknowledged by the other side through their own secure link (the link itself is the key — no PIN).
 //
 // Who uses it
 //   • The shop owner: his own login (mobile + password) on khata.html — no BI account, no dashboard, nothing else.
 //     Actions "kh-o-<op>" carry the owner's session token (b.ktok).
 //   • HO admins (BI session, admin app): create shops and owner logins, open any shop to help: "kh-a-<op>" with b.shop.
-//   • Customers / distributors (no login): "kh-p-open" / "kh-p-act" with their link token (b.l) + last 4 of mobile (b.pin).
+//   • Customers / distributors (no login): "kh-p-open" / "kh-p-act" with their link token (b.l) — no PIN.
 // Storage (sid = shop id, pid = party id)
 //   kh:shops {list}                     kh:shop:<sid> profile & settings (pk = Periskope key, write-only)
 //   kh:prod:<sid> {list}  items incl. stock lots [{d,q,e,c,doc}] and price history
@@ -128,13 +128,13 @@ function cleanParty(x, o, shop) {
 }
 function cleanItems(a) {
   return (Array.isArray(a) ? a : []).slice(0, 300).map((i) => ({ p: cid(i.p), n: str(i.n, 90), q: qn(i.q), fq: qn(i.fq), r: num(i.r), u: str(i.u, 12), g: num(i.g), dsc: Math.max(0, Math.min(100, num(i.dsc))),
-    mrp: num(i.mrp), e: day(i.e), b: str(i.b, 20) })).filter((i) => (i.p || i.n) && (i.q || i.fq));
+    mrp: num(i.mrp), e: day(i.e), b: str(i.b, 20), ta: Math.max(0, num(i.ta)) })).filter((i) => (i.p || i.n) && (i.q || i.fq));
 }
 function cleanDoc(x, o, party, shop) {
   x = x || {}; o = o || {};
   const ty = TYPES[party.k].includes(x.ty) ? x.ty : o.ty; if (!ty) return null;
   const d = day(x.d) || o.d || istDay(Date.now()), items = ty === "rcpt" || ty === "pay" || ty === "adj" ? [] : cleanItems(x.items);
-  items.forEach((i) => { i.amt = r2(i.q * i.r * (1 - i.dsc / 100)); });
+  items.forEach((i) => { i.amt = i.ta > 0 ? i.ta : r2(i.q * i.r * (1 - i.dsc / 100)); if (!i.ta) delete i.ta; });
   const sub = r2(items.reduce((s, i) => s + i.amt, 0)), disc = num(x.disc), oth = num(x.oth), rnd = num(x.rnd);
   let amt = items.length ? r2(sub - disc + oth + rnd) : num(x.amt); if (ty !== "adj") amt = Math.abs(amt);
   const paid = ty === "sale" || ty === "pur" ? Math.max(0, Math.min(amt, num(x.paid))) : 0;
@@ -233,7 +233,7 @@ function message(kind, shop, p, doc, s, link) {
     if (doc.note) lines.push(doc.note);
   } else if (kind === "remind") { lines.push(`🙏 ${T.remind}: ${balLine}` + (s.nextDue && s.over < 0.5 ? ` · ${T.due} ${dShow(s.nextDue)}` : "")); if (shop.upi && p.k === "c" && s.bal > 0) lines.push(`UPI: ${shop.upi}`); }
   else lines.push(`📒 ${T.stmt} · ${dShow(istDay(Date.now()))}`, balLine);
-  if (link) lines.push("", `${T.view}: ${link}`, `(${T.code})`);
+  if (link) lines.push("", `${T.view}: ${link}`);
   lines.push("", `${T.thanks} 🙏`, `${shop.name}${shop.ph ? " · " + shop.ph : ""}`);
   return lines.join("\n");
 }
@@ -649,7 +649,7 @@ async function ownerOp(op, b, ctx) {
   }
   if (op === "counter") {   // an itemised walk-in bill: reduces stock and adds to the day's cash / UPI sale
     const d = day(b.d) || today, m = d.slice(0, 7), D = (await store.get(K.day(sid, m))) || { days: {} }, x = D.days[d] || { cs: 0, us: 0, ex: [], bills: [], note: "" };
-    const items = cleanItems(b.items); items.forEach((i) => { i.amt = r2(i.q * i.r * (1 - i.dsc / 100)); i.c = PM[i.p] ? PM[i.p].cost : 0; });
+    const items = cleanItems(b.items); items.forEach((i) => { i.amt = i.ta > 0 ? i.ta : r2(i.q * i.r * (1 - i.dsc / 100)); if (!i.ta) delete i.ta; i.c = PM[i.p] ? PM[i.p].cost : 0; });
     const amt = r2(items.reduce((s, i) => s + i.amt, 0) - num(b.disc)); if (!items.length || amt <= 0) return json(400, { ok: false, error: "Add items." });
     const mode = b.mode === "UPI" ? "UPI" : "Cash", bill = { id: nid("w"), items, amt, mode, at: t };
     const mv = await loadMv(store, sid, [m]); const touched = applyStock(PM, mv, "c", { ty: "sale", d, items, id: bill.id }, 1, today);
@@ -681,11 +681,12 @@ async function ownerOp(op, b, ctx) {
   // ----- reports -----
   if (op === "report") {
     const from = day(b.from) || addD(today, -30), to = day(b.to) || today, all = [];
-    await Promise.all(B.parties.map(async (p) => { (await docsOf(p.id)).forEach((d) => { if (!d.void && d.st === "final") all.push(Object.assign({ pid: p.id, pk: p.k, pn: p.n || p.firm }, d)); }); }));
+    const OUT = {}; // what is still unpaid on each bill right now (later payments settle the oldest bills first)
+    await Promise.all(B.parties.map(async (p) => { const ds = await docsOf(p.id); ds.forEach((d) => { if (!d.void && d.st === "final") all.push(Object.assign({ pid: p.id, pk: p.k, pn: p.n || p.firm }, d)); }); try { ledger(p, ds, today).bills.forEach((x) => { OUT[x.id] = x.out; }); } catch (e) { /* summary only */ } }));
     const months = []; { let m = from.slice(0, 7); while (m <= to.slice(0, 7) && months.length < 25) { months.push(m); const d = new Date(m + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 1); m = d.toISOString().slice(0, 7); } }
     const days = {}; await Promise.all(months.map(async (m) => { Object.assign(days, ((await store.get(K.day(sid, m))) || { days: {} }).days); }));
     const inR = (d) => d >= from && d <= to, docs = all.filter((d) => inR(d.d)), dd = Object.keys(days).filter(inR).sort();
-    return json(200, { ok: true, from, to, docs: docs.map((d) => ({ id: d.id, pid: d.pid, pk: d.pk, pn: d.pn, ty: d.ty, no: d.no, d: d.d, amt: d.amt, paid: d.paid, mode: d.mode, items: d.items.map((i) => ({ p: i.p, n: i.n, q: i.q, r: i.r, amt: i.amt, c: i.c || 0 })) })), days: dd.map((k) => Object.assign({ d: k }, days[k])) });
+    return json(200, { ok: true, from, to, docs: docs.map((d) => ({ id: d.id, pid: d.pid, pk: d.pk, pn: d.pn, ty: d.ty, no: d.no, d: d.d, amt: d.amt, paid: d.paid, out: OUT[d.id] != null ? Math.max(0, OUT[d.id]) : undefined, mode: d.mode, items: d.items.map((i) => ({ p: i.p, n: i.n, q: i.q, r: i.r, amt: i.amt, c: i.c || 0 })) })), days: dd.map((k) => Object.assign({ d: k }, days[k])) });
   }
   // ----- 📚 product catalogue: HO's updated price list + AI search of Indian retailer sites -----
   if (op === "catalog") { const c = await store.get("kh:catalog"); return json(200, { ok: true, rows: c ? c.rows : [], at: c ? c.at : 0, by: c ? c.by : "" }); }
@@ -964,8 +965,8 @@ export async function khPublic(b, ctx) {
   const [sh, R] = await Promise.all([store.get(K.shop(L.sid)), store.get(K.party(L.sid))]); const parties = (R && R.list) || [], p = parties.find((x) => x.id === L.pid);
   if (!sh || !p || p.tok !== tok) return json(404, { ok: false, error: "This link isn't valid any more — ask the shop for a new one." });
   const shop = cleanShop({}, sh), pin = String(b.pin || "").replace(/\D/g, "");
-  if (!p.ph) return json(403, { ok: false, need: "phone", shop: shop.name, error: "The shop hasn't saved your mobile number yet — ask them to add it, then open the link again." });
-  if (pin !== p.ph.slice(-4)) { L.fails = (L.fails || 0) + 1; if (L.fails >= 8) { L.lockUntil = t + 36e5; L.fails = 0; } await store.set(K.link(tok), L); return json(403, { ok: false, need: "pin", shop: shop.name, party: p.n, error: pin ? "That doesn't match — enter the last 4 digits of your mobile number." : "" }); }
+  // the link itself is the key (96-bit random token, reset any time from the party page) — no PIN asked
+  void pin;
   if (L.fails) { L.fails = 0; await store.set(K.link(tok), L); }
   const docs = ((await store.get(K.pt(L.sid, p.id))) || { list: [] }).list;
   const inbox = async (kind, text, extra) => { const I = (await store.get(K.inbox(L.sid))) || { list: [] }; I.list.unshift(Object.assign({ id: nid("n"), kind, pid: p.id, pn: p.n || p.firm, pk: p.k, text: String(text).slice(0, 300), at: t }, extra || {})); I.list = I.list.slice(0, 600); await store.set(K.inbox(L.sid), I); };
