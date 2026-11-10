@@ -478,7 +478,7 @@ html,body{background:#F4F6F2;min-height:100%}
       if (r && r.ok && r.job && op !== "job-get") { var t0 = Date.now(), job = r.job; return new Promise(function (res) { var tick = function () { K("job-get", { job: job }).then(function (j) {
         if (j && j.ok && j.done) return res(j.out || { ok: false, error: "No result" }); if (j && !j.ok && !/expired/.test(j.error || "")) return res(j);
         if (Date.now() - t0 > 150000) return res({ ok: false, error: "Reading is taking too long — please try again with a clearer photo." });
-        if (Date.now() - t0 > 12000 && !tick.said) { tick.said = 1; toast("✨ Still reading… handwriting takes a few more seconds"); } setTimeout(tick, 2000); }); }; setTimeout(tick, 2500); }); }
+        if (Date.now() - t0 > 12000 && !tick.said) { tick.said = 1; toast("✨ Still reading… handwriting takes a few more seconds"); } setTimeout(tick, 1200); }); }; setTimeout(tick, 1500); }); }
       if (!r || !r.ok || !r.pv || r.noFetch || op === "prod-shard") return r; return syncShards(r.pv).then(function (L) { r.prods = L; return r; }); });
   }
   // ---- item parts cache (IndexedDB) ----
@@ -1334,7 +1334,7 @@ html,body{background:#F4F6F2;min-height:100%}
   // kind: photo | voice | text; mode: sale | po
   function aiList(kind, mode, isS, add) {
     var go = function (body, heard0) { toast("✨ Reading…"); return K("read-order", Object.assign({ mode: mode }, body)).then(function (r) { if (!r.ok) { toast(r.error); return; } toast("🔎 Matching with your items…"); return resolveLines(r.items, isS).then(function (L) { aiReview(L, r.heard || heard0, add); }); }); };
-    if (kind === "photo") return pick("image/*", function (f) { shrink(f, 2200).then(function (u) { if (!u) return toast("Couldn't open the photo"); go({ images: [u] }); }); }, true);
+    if (kind === "photo") return pick("image/*", function (f) { shrink(f, 1600).then(function (u) { if (!u) return toast("Couldn't open the photo"); go({ images: [u] }); }); }, true);
     if (kind === "text") return sheet(mode === "po" ? "✍️ Type the order" : "✍️ Type / paste the list", "Any language — one item per line or one long sentence. Example: “2 kg cheeni, maida 250 gm, Tata salt 2, chana dal aadha kilo, Maggi 10”.", [["✨", "Read with AI", function (ov) { var t = V(ov, "atx"); if (t.trim().length < 2) { toast("Write the items"); return false; } go({ text: t }); }, "pri"]], '<div class="kf"><textarea id="atx" rows="7" placeholder="चीनी 2 किलो&#10;maida 250 gm&#10;Tata namak 2&#10;chana dal aadha kilo&#10;Maggi 10 packet"></textarea></div>');
     // 🎤 voice: record, then speech-to-text on the server (Hindi / English / mixed)
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return toast("Voice recording isn't available on this device — type the list instead.");

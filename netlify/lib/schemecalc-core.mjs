@@ -81,16 +81,17 @@ Use numbers only (no ₹ or % signs). Percent values like 100 mean 100%. If a va
 
 const OCR_ASK = "This is a vivo India scheme circular / poster (it may be a phone screenshot or photo). Transcribe ALL the text exactly: headings, dates, every table row (cells separated by |, keep merged cells by repeating them), examples, terms & conditions, and amounts with ₹. If a table is cut off at the edge, write what is visible. No commentary.";
 // Image → text. Groq's vision models change over time, so the list is read from Groq; Gemini is the fallback.
+const GEM_CACHE = { names: null, at: 0 };
 export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
   const ASK = prompt || OCR_ASK;
   const errs = [];
   const ask = async (label, fn) => { try { const t = await fn(); if (t && t.trim().length > 20) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
   // handwriting in Hindi / regional scripts: Gemini reads it far better, so it goes first when asked (and a key exists)
   if (opt && opt.prefer === "gemini" && env && env.GEMINI_API_KEY && !opt._g) {
-    const g = await readImages({}, env, images, fetchImpl, prompt, { _g: 1 });
+    const g = await readImages({}, env, images, fetchImpl, prompt, Object.assign({}, opt, { _g: 1 }));
     if (g.ok) return g; errs.push(g.error);
     if (!keys.groq) return { ok: false, error: errs.join(" | ") };
-    const q = await readImages(keys, {}, images, fetchImpl, prompt, { _g: 1 });
+    const q = await readImages(keys, {}, images, fetchImpl, prompt, Object.assign({}, opt, { _g: 1 }));
     return q.ok ? q : { ok: false, error: errs.concat([q.error]).join(" | ") };
   }
   // 1) Groq: only models it lists right now that can see images
@@ -117,11 +118,13 @@ export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
   // 2) Gemini: ask Google which models exist for this key (names change as models are retired)
   if (env && env.GEMINI_API_KEY) {
     let names = [];
-    try {
+    if (GEM_CACHE.names && Date.now() - GEM_CACHE.at < 6 * 3600e3) names = GEM_CACHE.names.slice();
+    else try {
       const r = await fetchImpl("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": env.GEMINI_API_KEY } });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) errs.push("Gemini list: " + r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
       names = (j.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini/i.test(m.name) && !/embed|tts|image-gen|imagen|live|audio|thinking-exp|learnlm|robotics|computer-use/i.test(m.name)).map((m) => m.name.replace(/^models\//, ""));
+      if (names.length) { GEM_CACHE.names = names.slice(); GEM_CACHE.at = Date.now(); }
     } catch (e) { errs.push("Gemini list: " + e.message); }
     const ver = (n) => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
     names.sort((a, b) => (/flash/.test(b) - /flash/.test(a)) || (/lite/.test(a) - /lite/.test(b)) || (ver(b) - ver(a)) || (/preview|exp/.test(a) - /preview|exp/.test(b)));
@@ -130,7 +133,11 @@ export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
     for (const m of pick) {
       const t = await ask("Gemini " + m, async () => {
         const parts = [{ text: ASK }].concat(images.slice(0, 5).map((u) => { const mm = /^data:(image\/[a-z]+);base64,(.+)$/.exec(u); return { inline_data: { mime_type: mm[1], data: mm[2] } }; }));
-        const r = await fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0, maxOutputTokens: 8000 } }) });
+        // fast mode (reading a shop list / pack): no long "thinking" — answers in seconds instead of half a minute
+        const think = opt && opt.fast ? (/gemini-2\.5/.test(m) ? { thinkingBudget: /pro/.test(m) ? 128 : 0 } : /gemini-3/.test(m) ? { thinkingLevel: "low" } : null) : null;
+        const call = (tc) => fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: Object.assign({ temperature: 0, maxOutputTokens: 8000 }, tc ? { thinkingConfig: tc } : {}, opt && opt.json ? { responseMimeType: "application/json" } : {}) }) });
+        let r = await call(think);
+        if (think && r.status === 400) r = await call(null);
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(r.status + " " + String((j.error && j.error.message) || "").slice(0, 80));
         return (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "";

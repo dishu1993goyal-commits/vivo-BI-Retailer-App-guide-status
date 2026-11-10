@@ -463,7 +463,7 @@ async function ownerOp(op, b, ctx) {
     let raw = null;
     if (imgs.length) {
       const keys = await aiKeys(store, ctx.env);
-      const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, `This photo is ${who}. It may be handwritten or printed, in Hindi (Devanagari), English, Hinglish (Hindi in English letters) or another Indian language (Punjabi, Gujarati, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Odia, Urdu). Read EVERY line carefully, letter by letter. Reply with ONLY JSON: ${shape}\n${LIST_RULES}`, { prefer: "gemini" });
+      const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, `This photo is ${who}. It may be handwritten or printed, in Hindi (Devanagari), English, Hinglish (Hindi in English letters) or another Indian language (Punjabi, Gujarati, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Odia, Urdu). Read EVERY line carefully, letter by letter. Reply with ONLY JSON: ${shape}\n${LIST_RULES}`, { prefer: "gemini", fast: true, json: true });
       if (!v.ok) return json(502, { ok: false, error: "Couldn't read the photo right now (" + String(v.error).slice(0, 160) + "). Try a clearer, straight photo in good light." });
       raw = parseLoose(v.text);
     } else {
@@ -528,7 +528,7 @@ async function ownerOp(op, b, ctx) {
     const imgs = (Array.isArray(b.images) ? b.images : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 4000000).slice(0, 2);
     if (!imgs.length) return json(400, { ok: false, error: "Take a photo of the pack." });
     const keys = await aiKeys(store, ctx.env);
-    const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, 'This is a photo of a packaged product sold in India. Read the printed label. Reply with ONLY JSON: {"name":"product name with brand and variant in English","brand":"","net":"net quantity e.g. 500 g / 1 L / 10 pcs","mrp":0,"barcode":"digits under the barcode if visible","category":"e.g. Biscuits, Dal, Oil, Soap"} — mrp = the number after "MRP" / "M.R.P." / "Max. Retail Price" (incl. of all taxes) in rupees; if several MRPs, the latest / not crossed out. 0 if you cannot see it. Never guess.', { prefer: "gemini" });
+    const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, 'This is a photo of a packaged product sold in India. Read the printed label. Reply with ONLY JSON: {"name":"product name with brand and variant in English","brand":"","net":"net quantity e.g. 500 g / 1 L / 10 pcs","mrp":0,"barcode":"digits under the barcode if visible","category":"e.g. Biscuits, Dal, Oil, Soap"} — mrp = the number after "MRP" / "M.R.P." / "Max. Retail Price" (incl. of all taxes) in rupees; if several MRPs, the latest / not crossed out. 0 if you cannot see it. Never guess.', { prefer: "gemini", fast: true, json: true });
     if (!v.ok) return json(502, { ok: false, error: "Couldn't read the pack (" + String(v.error).slice(0, 120) + ")." });
     const j = parseLoose(v.text) || {};
     return json(200, { ok: true, name: str(j.name, 90), brand: str(j.brand, 40), net: str(j.net, 30), mrp: num(j.mrp), bc: String(j.barcode || "").replace(/\D/g, "").slice(0, 14), cat: str(j.category, 40) });
