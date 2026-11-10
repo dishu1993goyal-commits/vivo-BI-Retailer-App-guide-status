@@ -116,7 +116,7 @@ html,body{background:#F4F6F2;min-height:100%}
   }
   function K(op, body) {
     body = Object.assign({ origin: location.origin }, body || {});
-    var go = MODE === "admin" ? api(Object.assign({ action: "kh-a-" + op, shop: SID }, body)) : post(Object.assign({ action: "kh-o-" + op, ktok: KA && KA.ktok }, body)).then(function (r) { if (r && r.loggedOut) { ls("kh-auth", null); KA = null; login(r.error); } return r; });
+    var go = MODE === "admin" ? api(Object.assign({ action: "kh-a-" + op, shop: SID }, body, { sid: SID })) : post(Object.assign({ action: "kh-o-" + op, ktok: KA && KA.ktok }, body)).then(function (r) { if (r && r.loggedOut) { ls("kh-auth", null); KA = null; login(r.error); } return r; });
     // big item lists come in parts: fetch only the parts that changed (kept on the phone), then hand the full list back as r.prods
     return go.then(function (r) {
       // slow AI reading runs in the background on the server: wait for it here (no 504 timeouts)

@@ -927,7 +927,8 @@ export async function khAdmin(b, ctx) {
     return json(200, { ok: true });
   }
   const m = /^kh-a-(.+)$/.exec(b.action); if (!m) return json(400, { ok: false, error: "Unknown action" });
-  const sid = cid(b.shop); if (!sid || !(await store.get(K.shop(sid)))) return json(404, { ok: false, error: "Shop not found." });
+  // shop id comes as b.sid (b.shop may carry the shop details being saved)
+  const sid = cid(b.sid || (typeof b.shop === "string" ? b.shop : "")); if (!sid || !(await store.get(K.shop(sid)))) return json(404, { ok: false, error: "Shop not found." });
   return ownerOp(m[1], b, Object.assign({}, ctx, { sid, by }));
 }
 
