@@ -36,6 +36,7 @@ html,body{background:#F4F6F2;min-height:100%}
 .av{width:38px;height:38px;border-radius:12px;background:var(--gl);color:var(--g);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none;font-size:15px}.av.d{background:#EEF2FF;color:#3730A3}
 .pl{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 7px;background:#EEF2FF;color:#3730A3;white-space:nowrap;vertical-align:middle}.pl.g{background:var(--gl);color:var(--g)}
 .pl.w{background:var(--al);color:var(--am)}
+.hchips{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px}.hchips button{position:relative;flex:0 0 auto;text-align:left;border:1.5px solid #D7DCD3;background:#fff;border-radius:13px;padding:7px 26px 7px 11px;cursor:pointer;max-width:170px}.hchips button b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hchips button small{display:block;font-size:11px;color:#6b7280;white-space:nowrap}.hchips button.on{border-color:#14532D;background:#E8F6EC;padding-right:11px;opacity:1;color:#14532D}.hchips button.on small{color:#14532D}.hchips button.nw{border-style:dashed;border-color:#9CC5A8;background:#F4FAF5;color:#14532D;padding-right:11px}.hchips button i{position:absolute;top:3px;right:5px;font-style:normal;font-size:12px;color:#9B1C1C;padding:2px 4px}.hbar{margin-bottom:10px}.hldb{border:1.5px solid #F59E0B;background:#FFFBEB}
 .hsb{display:grid;gap:8px}.hsb .l{font-size:11.5px;font-weight:800;opacity:.8}.hsb .v{font-size:21px;font-weight:900;letter-spacing:-.3px;margin-top:1px}.hsb .n{font-size:11.5px;opacity:.85;margin-top:1px;line-height:1.35}.hs1{background:linear-gradient(135deg,#14532D,#1F7A45);color:#fff;border-radius:16px;padding:12px 14px}.hs1 .v{font-size:27px}.hs2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.hs2>div{border-radius:14px;padding:10px 12px}.hp{background:#E8F6EC;color:#14532D}.hu{background:#FDECEC;color:#9B1C1C}.ho{background:#FFF4E0;color:#92400E}.hc{background:#EEF2FF;color:#3730A3}.hsh{display:flex;gap:6px;overflow-x:auto;margin:2px 0 8px}.hsh button{flex:0 0 auto;border:1px solid #D7DCD3;background:#fff;border-radius:99px;padding:6px 12px;font-weight:700;font-size:12.5px;cursor:pointer}.hsh button.on{background:#14532D;color:#fff;border-color:#14532D}.pl.r{background:var(--rl);color:var(--rd)}.pl.a{background:var(--al);color:var(--am)}.pl.k{background:#F3F4F6;color:#4b5563}
 .sg{display:flex;gap:5px;background:#fff;border-radius:13px;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:8px;overflow-x:auto}.sg button{flex:1;border:0;background:none;padding:9px 8px;border-radius:10px;font:700 13px inherit;color:#4b5563;cursor:pointer;white-space:nowrap}.sg button.on{background:var(--g);color:#fff}
 .in,.kf input,.kf select,.kf textarea{width:100%;border:1px solid #D7DCD3;border-radius:11px;padding:10px 11px;font-size:15px;background:#fff;color:#111}
@@ -328,7 +329,7 @@ html,body{background:#F4F6F2;min-height:100%}
       '<div class="hhg"><button data-go="recv"><small>⬇️ To collect</small><b>' + rs(recv) + "</b><i>" + (over > 0 ? rs(over) + " overdue" : "nothing late") + '</i></button><button data-go="pay"><small>⬆️ To pay</small><b>' + rs(pay) + "</b><i>" + (pover > 0 ? rs(pover) + " overdue" : rs(psoon) + " in 7 days") + '</i></button><button data-go="stock"><small>📦 Stock</small><b>' + rs(val) + "</b><i>" + live.length + " items</i></button></div></div>" +
       '<div class="qa2">' + [["sale", "🧾", "Sale bill", "c1"], ["scan", "📝", "Scan list → bill", "c6"], ["rcpt", "💰", "Got payment", "c5"], ["pay", "💸", "Paid", "c2"], ["pur", "📥", "Purchase", "c3"], ["bcode", "📷", "Barcode bill", "c7"], ["day", "🏪", "Counter sale", "c4"], ["more2", "⋯", "More", "c8"]].map(function (x) { return '<button data-q="' + x[0] + '"><b class="' + x[3] + '">' + x[1] + "</b>" + x[2] + "</button>"; }).join("") + "</div>" +
       '<div class="chips">' + [[odC.length, "r", "⏰ " + odC.length + " overdue", "recv"], [held.length, "r", "🚫 " + held.length + " credit stopped", "held"], [low.length, "a", "🔻 " + low.length + " low stock", "low"], [exp.length, "r", "⏳ " + exp.length + " expiring", "exp"], [pch.length, "a", "📈 " + pch.length + " price changes", "price"], [unack, "a", "✍️ " + unack + " not confirmed", "ack"], [1, "g", "⚙️ Rules " + (D.shop.rulesOn ? "on" : "off"), "rules"]].filter(function (x) { return x[0]; }).map(function (x) { return '<button class="' + x[1] + '" data-go="' + x[3] + '">' + x[2] + "</button>"; }).join("") + "</div>" +
-      '<div class="bx" id="hsbx"><h3><span>🧮 Today’s hisaab</span><button class="bt s l" id="hsbo">Open · any dates ›</button></h3><div id="hsbb"><div class="muted" style="font-size:12.5px">…</div></div></div>' +
+      '<div id="hldb"></div><div class="bx" id="hsbx"><h3><span>🧮 Today’s hisaab</span><button class="bt s l" id="hsbo">Open · any dates ›</button></h3><div id="hsbb"><div class="muted" style="font-size:12.5px">…</div></div></div>' +
       ((D.inbox || []).length ? '<div class="bx"><h3><span>🔔 New for you</span><button class="bt s l" id="hib">See all ' + D.inbox.length + "</button></h3>" + D.inbox.slice(0, 3).map(inboxRow).join("") + "</div>" : "") +
       '<div class="bx"><h3><span>📊 Last 7 days</span><small class="muted" id="wks"></small></h3><div class="wk" id="wk"><div class="muted" style="align-self:center;width:100%;text-align:center">…</div></div></div>' +
       (live.length < 30 ? '<div class="bx" style="border:2px dashed #B7D7C1"><h3><span>🚀 Set up your shop fast</span></h3><div style="font-size:13px;line-height:1.5;color:#374151">Pick from 1,100+ ready grocery, kirana & confectionery items with MRP and dealer price, import your stock and parties from Excel (sample files in More), and switch on the rules that remind customers for you.</div><div class="btr"><button class="bt" id="hcat">📚 Product catalogue</button><button class="bt l" id="hpar">👥 Add customers & distributors</button><button class="bt l" id="hsmp">📥 Sample Excel files</button></div></div>' : "") +
@@ -338,7 +339,7 @@ html,body{background:#F4F6F2;min-height:100%}
     [].forEach.call(kv.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var q = b.dataset.q; if (q === "sale" || q === "pur") docForm(q); else if (q === "scan") docForm("sale", null, null, null, null, { _scan: true }); else if (q === "bcode") docForm("sale", null, null, null, null, { _bc: true }); else if (q === "rcpt" || q === "pay") payForm(q); else if (q === "day") dayForm(TODAY); else if (q === "photo") billPhoto(); else newMenu(); }; });
     [].forEach.call(kv.querySelectorAll("[data-go]"), function (b) { b.onclick = function () { var g = b.dataset.go; if (g === "recv" || g === "held") { PSEG = "c"; go("parties"); } else if (g === "pay") { PSEG = "d"; go("parties"); } else if (g === "stock") report("stock"); else if (g === "low") { ISEG = "low"; go("items"); } else if (g === "exp") report("expiry"); else if (g === "price") priceView(); else if (g === "rules") rulesView(); else report("ack"); }; });
     wireLists(kv); if ($("hib")) $("hib").onclick = inbox; wireInbox(kv);
-    $("hsbo").onclick = function () { DBF = "all"; report("daybook"); };
+    $("hsbo").onclick = function () { DBF = "all"; report("daybook"); }; HELD = null; drawHeldBanner();
     $("aig").onclick = function () { aiInsights(this); }; if ($("hcat")) { $("hcat").onclick = catalog; $("hpar").onclick = partyImport; $("hsmp").onclick = samples; }
     K("report", { from: addDays(TODAY, -6), to: TODAY }).then(function (r) { if (!r.ok || !$("wk")) return; var days = {}; for (var i = 6; i >= 0; i--) days[addDays(TODAY, -i)] = 0; var cr = 0, rc = 0;
       r.days.forEach(function (x) { if (days[x.d] != null) days[x.d] += (x.cs || 0) + (x.us || 0) + (x.cd || 0); }); r.docs.forEach(function (d) { if (d.ty === "sale" && days[d.d] != null) days[d.d] += d.amt; if (d.d === TODAY) { if (d.ty === "sale") cr += d.amt; if (d.ty === "rcpt") rc += d.amt; } });
@@ -491,15 +492,44 @@ html,body{background:#F4F6F2;min-height:100%}
       sr.querySelector("[data-new]").onclick = function () { sr.style.display = "none"; var nm = inp.value; partyForm(null, k, function (p) { inp.value = pname(p); onPick(p); }); setTimeout(function () { var f = document.querySelectorAll(".full"); var last = f[f.length - 1]; if (last && last.querySelector("#pn")) last.querySelector("#pn").value = nm; }, 30); }; };
     inp.oninput = draw; inp.onfocus = draw; o.addEventListener("click", function (e) { if (!e.target.closest(".dd")) sr.style.display = "none"; });
   }
+  // ===== several customers at the counter: open sale bills kept side by side (saved on this phone) =====
+  var HELD = null;
+  function heldK() { return "kh-held-" + (MODE === "admin" ? "a:" + SID : (KA && KA.sid) || (D && D.shop && D.shop.id) || ""); }
+  function held() { if (!HELD) { try { HELD = JSON.parse(localStorage.getItem(heldK()) || "[]"); } catch (e) { HELD = []; } } return HELD; }
+  function heldSave() { try { localStorage.setItem(heldK(), JSON.stringify(HELD || [])); } catch (e) { } drawHeldBanner(); }
+  function heldTot(h) { return h.ao ? num(h.E.amt) : (h.E.items || []).reduce(function (s, i) { return s + (num(i.ta) > 0 ? num(i.ta) : num(i.q) * num(i.r)); }, 0); }
+  function itx(n) { return n + (n === 1 ? " item" : " items"); }
+  function heldName(h, k) { var p = h.pid && RM[h.pid]; return p ? (p.n || p.firm) : "Customer " + (k + 1); }
+  function heldOpen(id, done) { var L = held(), k = L.findIndex(function (h) { return h.id === id; }); if (k < 0) return; var h = L.splice(k, 1)[0]; heldSave();
+    docForm("sale", h.pid && RM[h.pid] || null, "c", done, null, Object.assign({}, h.E, { _hid: h.id, _ao: h.ao })); }
+  function heldDrop(id) { HELD = held().filter(function (h) { return h.id !== id; }); heldSave(); }
+  function drawHeldBanner() { var el = document.getElementById("hldb"); if (!el) return; var L = held();
+    el.innerHTML = L.length ? '<div class="bx hldb"><h3><span>🧾 ' + L.length + " bill" + (L.length > 1 ? "s" : "") + ' open — customers waiting</span><button class="bt s" id="hldn">➕ New bill</button></h3><div class="hchips">' + L.map(function (h, k) { return '<button data-ho="' + h.id + '"><b>' + esc(heldName(h, k)) + "</b><small>" + (h.ao ? "amount" : itx((h.E.items || []).length)) + " · " + rs(heldTot(h)) + "</small></button>"; }).join("") + "</div></div>" : "";
+    [].forEach.call(el.querySelectorAll("[data-ho]"), function (b) { b.onclick = function () { heldOpen(b.dataset.ho); }; });
+    var nb = el.querySelector("#hldn"); if (nb) nb.onclick = function () { docForm("sale"); }; }
+
   function docForm(ty, party, kind, done, edit, pre) {
     kind = kind || (ty === "sale" ? "c" : ty === "ret" ? "c" : "d");
     var E = edit ? JSON.parse(JSON.stringify(edit)) : Object.assign({ ty: ty, d: TODAY, items: [], disc: 0, oth: 0, rnd: 0, paid: 0, mode: "Cash", note: "", no: "" }, pre || {});
-    var P = party || null, isS = ty === "sale" || (ty === "ret" && kind === "c"), isPur = ty === "pur", amtOnly = edit ? !edit.items.length && ty !== "po" : false, photo = null, autoR = true;
+    var multi = ty === "sale" && !edit, myId = (pre && pre._hid) || "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ao0 = !!(pre && pre._ao); delete E._hid; delete E._ao;
+    var P = party || null, isS = ty === "sale" || (ty === "ret" && kind === "c"), isPur = ty === "pur", amtOnly = edit ? !edit.items.length && ty !== "po" : ao0, photo = null, autoR = true;
     var title = { sale: "🧾 Sale bill", pur: "📥 Purchase bill", po: "🛒 Order to distributor", ret: kind === "c" ? "↩️ Customer return" : "↩️ Return to distributor" }[ty] + (edit ? " (edit)" : "");
-    var o = full(title, '<div class="bx kf">' + partyPick(kind, P) + '<div class="g2"><div><label>Date</label><input type="date" id="dd" value="' + E.d + '"></div><div><label>' + (isPur ? "Distributor’s bill no." : "Number") + '</label><input id="dn" value="' + esc(E.no || "") + '" placeholder="' + (isPur ? "as on bill" : "auto") + '"></div></div></div>' +
+    var o = full(title, (multi ? '<div class="hbar" id="hbar"></div>' : "") + '<div class="bx kf">' + partyPick(kind, P) + '<div class="g2"><div><label>Date</label><input type="date" id="dd" value="' + E.d + '"></div><div><label>' + (isPur ? "Distributor’s bill no." : "Number") + '</label><input id="dn" value="' + esc(E.no || "") + '" placeholder="' + (isPur ? "as on bill" : "auto") + '"></div></div></div>' +
       (ty !== "po" ? '<div class="sg" style="margin-top:10px"><button data-m="i" class="' + (amtOnly ? "" : "on") + '">📦 With items</button><button data-m="a" class="' + (amtOnly ? "on" : "") + '">₹ Amount only</button></div>' : "") +
       '<div id="ibox"></div><div id="tbox"></div><div class="bx kf" id="xbox"></div><div style="height:80px"></div><div class="bar2">' + (ty === "po" ? '<button class="bt l" data-s="draft">Save draft</button><button class="bt" data-s="send">Save & send order</button>' : '<button class="bt l" data-s="final">Save</button><button class="bt" data-s="send">Save & send ✓</button>') + "</div>");
-    wirePartyPick(o, kind, function (p) { P = p; if (!edit) E.due = ""; drawX(); });
+    wirePartyPick(o, kind, function (p) { P = p; if (!edit) E.due = ""; drawX(); drawH(); });
+    // 🧾 open bills strip: switch customer without losing anything typed
+    function hasData() { return !!(P || num(E.amt) || E.items.some(function (i) { return i.p || String(i.n || "").trim(); })); }
+    function snap() { var dd = o.querySelector("#dd"), dn = o.querySelector("#dn"); if (dd) E.d = dd.value; if (dn) E.no = dn.value; return { id: myId, pid: P ? P.id : "", E: JSON.parse(JSON.stringify(E)), ao: amtOnly, t: Date.now() }; }
+    function park() { if (!multi || !hasData()) return false; held().push(snap()); heldSave(); return true; }
+    function drawH() { var hb = o.querySelector("#hbar"); if (!hb) return; var L = held(), me = snap();
+      hb.innerHTML = '<div class="hchips"><button class="on" disabled><b>✏️ ' + esc(P ? (P.n || P.firm) : "This customer") + "</b><small>" + (amtOnly ? "amount" : itx(E.items.length)) + " · " + rs(heldTot(me)) + "</small></button>" +
+        L.map(function (h, k) { return '<button data-hs="' + h.id + '"><b>' + esc(heldName(h, k)) + '</b><small>' + (h.ao ? "amount" : itx((h.E.items || []).length)) + " · " + rs(heldTot(h)) + '</small><i data-hx="' + h.id + '">✕</i></button>'; }).join("") +
+        '<button class="nw" data-hn="1"><b>➕ Another customer</b><small>keep this bill open</small></button></div>';
+      hb.querySelector("[data-hn]").onclick = function () { if (!hasData()) return toast("Start this bill first — or just use this one for the next customer"); park(); o.remove(); toast("🧾 Bill kept open — tap its tab to come back"); docForm("sale", null, "c", done); };
+      [].forEach.call(hb.querySelectorAll("[data-hs]"), function (b) { b.onclick = function (e) { if (e.target.dataset.hx) return; park(); o.remove(); heldOpen(b.dataset.hs, done); }; });
+      [].forEach.call(hb.querySelectorAll("[data-hx]"), function (x) { x.onclick = function (e) { e.stopPropagation(); if (confirm("Remove this open bill? Items typed in it will be lost.")) { heldDrop(x.dataset.hx); drawH(); } }; }); }
+    if (multi) o.querySelector("[data-back]").onclick = function () { if (park()) toast("🧾 Bill kept open — continue it from Home or any sale bill"); o.remove(); drawHeldBanner(); };
     [].forEach.call(o.querySelectorAll("[data-m]"), function (b) { b.onclick = function () { amtOnly = b.dataset.m === "a"; [].forEach.call(o.querySelectorAll("[data-m]"), function (x) { x.classList.toggle("on", x === b); }); drawI(); drawT(); }; });
     function rateFor(pr) { return isS ? (pr.sp || pr.mrp || pr.cost) : (pr.cost || 0); }
     function addLine(l) { var ex = l.p && E.items.find(function (i) { return i.p === l.p; }); if (ex) ex.q = Math.round((num(ex.q) + num(l.q)) * 1000) / 1000; else E.items.push({ p: l.p, n: l.n, u: l.u, q: l.q, fq: 0, r: l.r, mrp: l.mrp || 0, e: "", g: l.g || 0, w: l.w }); drawI(); drawT(); }
@@ -543,7 +573,7 @@ html,body{background:#F4F6F2;min-height:100%}
     }
     function lam(i) { return num(i.ta) > 0 ? num(i.ta) : num(i.q) * num(i.r); }
     function total() { if (amtOnly) return num(E.amt); var sub = E.items.reduce(function (s, i) { return s + lam(i); }, 0), t = sub - num(E.disc) + num(E.oth); E.rnd = autoR ? Math.round((Math.round(t) - t) * 100) / 100 : num(E.rnd); return Math.round((t + E.rnd) * 100) / 100; }
-    function drawT() {
+    function drawT() { if (multi) setTimeout(drawH, 0);
       var tb = o.querySelector("#tbox"); if (ty === "po") { tb.innerHTML = E.items.length ? '<div class="tot"><div class="gt"><span>Approx. value</span><span>' + rs2(total()) + "</span></div></div>" : ""; return; }
       var T = total(), sub = E.items.reduce(function (s, i) { return s + lam(i); }, 0);
       var prof = isS && !amtOnly ? E.items.reduce(function (s, i) { var pr = PM[i.p]; return s + (pr ? lam(i) - (pr.cost || 0) * num(i.q) : 0); }, 0) : null;
@@ -595,7 +625,7 @@ html,body{background:#F4F6F2;min-height:100%}
         if (!r.ok && r.hold) { if (confirm("🚫 " + r.error + "\n\nSave this bill on credit anyway?")) save(true); return; }
         if (!r.ok) return toast(r.error); setParty(r.party); setProds(r.prods); o.remove();
         var ru = (r.rules || []).filter(function (x) { return x.done; }); toast("✅ Saved" + (r.ruled ? " · ⚙️ " + r.ruled.join(", ") : "") + (ru.length ? " · ⚙️ " + ru.map(function (x) { return x.rule; }).join(", ") : ""));
-        if (b.dataset.s === "send") afterSave(P, r.doc); if (done) done(); else refreshTab(); }); };
+        if (b.dataset.s === "send") afterSave(P, r.doc); if (done) done(); else refreshTab(); if (multi && held().length) setTimeout(function () { toast("🧾 " + held().length + " more bill" + (held().length > 1 ? "s" : "") + " still open — see Home"); drawHeldBanner(); }, 1800); }); };
       save(false);
     }; });
   }
