@@ -113,7 +113,13 @@ html,body{background:#F4F6F2;min-height:100%}
     body = Object.assign({ origin: location.origin }, body || {});
     var go = MODE === "admin" ? api(Object.assign({ action: "kh-a-" + op, shop: SID }, body)) : post(Object.assign({ action: "kh-o-" + op, ktok: KA && KA.ktok }, body)).then(function (r) { if (r && r.loggedOut) { ls("kh-auth", null); KA = null; login(r.error); } return r; });
     // big item lists come in parts: fetch only the parts that changed (kept on the phone), then hand the full list back as r.prods
-    return go.then(function (r) { if (!r || !r.ok || !r.pv || r.noFetch || op === "prod-shard") return r; return syncShards(r.pv).then(function (L) { r.prods = L; return r; }); });
+    return go.then(function (r) {
+      // slow AI reading runs in the background on the server: wait for it here (no 504 timeouts)
+      if (r && r.ok && r.job && op !== "job-get") { var t0 = Date.now(), job = r.job; return new Promise(function (res) { var tick = function () { K("job-get", { job: job }).then(function (j) {
+        if (j && j.ok && j.done) return res(j.out || { ok: false, error: "No result" }); if (j && !j.ok && !/expired/.test(j.error || "")) return res(j);
+        if (Date.now() - t0 > 150000) return res({ ok: false, error: "Reading is taking too long — please try again with a clearer photo." });
+        if (Date.now() - t0 > 12000 && !tick.said) { tick.said = 1; toast("✨ Still reading… handwriting takes a few more seconds"); } setTimeout(tick, 2000); }); }; setTimeout(tick, 2500); }); }
+      if (!r || !r.ok || !r.pv || r.noFetch || op === "prod-shard") return r; return syncShards(r.pv).then(function (L) { r.prods = L; return r; }); });
   }
   // ---- item parts cache (IndexedDB) ----
   var SHC = {}, idbP = null;
@@ -931,6 +937,11 @@ html,body{background:#F4F6F2;min-height:100%}
       var res = items.map(function (it, i) {
         var sh = D.prods.filter(function (p) { return p.on !== false; }).map(function (p) { return { p: p, s: nameScore(it, p.n + " " + (p.br || "")) }; }).filter(function (x) { return x.s > 0.4; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 6);
         var ca = cat.map(function (c) { return { c: c, s: nameScore(it, c.n) }; }).filter(function (x) { return x.s > 0.4; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 5);
+        // packaged goods: never add a brand the customer didn't say / write (loose goods by weight may take any brand)
+        var said = toks((it.name || "") + " " + (it.hi || "") + " " + (it.written || "")), loose = it.unit === "kg" || it.unit === "L";
+        var brandOk = function (br, n) { if (loose) return true; var bt = toks(br || ""); if (!bt.length) { var tn = toks(n || ""), tw = toks(it.name || ""); bt = tn.filter(function (w) { return tw.indexOf(w) < 0; }).slice(0, 1); if (!bt.length || /\b(loose|local|generic)\b/i.test(n)) return true; return bt.some(function (b2) { return said.some(function (w) { return w === b2 || (w.length > 3 && b2.indexOf(w) === 0); }); }) || toks(n).length <= tw.length + 2; }
+          return bt.some(function (b2) { return said.some(function (w) { return w === b2 || (w.length > 3 && b2.length > 3 && (w.indexOf(b2) === 0 || b2.indexOf(w) === 0)); }); }); };
+        sh = sh.filter(function (y) { return brandOk(y.p.br, y.p.n); }); ca = ca.filter(function (y) { return brandOk(y.c.br, y.c.n); });
         var x = { it: it, sh: sh, ca: ca };
         if (sh[0] && sh[0].s >= 0.95 && (!sh[1] || sh[1].s < sh[0].s - 0.1)) x.p = sh[0].p;
         else if (sh.length || ca.length) need.push({ i: i, name: it.name, hi: it.hi, written: it.written, unit: it.unit, cands: sh.map(function (y) { return { k: "p:" + y.p.id, n: y.p.n + (y.p.u === "kg" ? " (loose, per kg)" : "") }; }).concat(ca.map(function (y) { return { k: "c:" + y.c.id, n: y.c.n + (y.c.u === "kg" ? " (loose, per kg)" : "") }; })) });
@@ -939,8 +950,10 @@ html,body{background:#F4F6F2;min-height:100%}
       return (need.length ? K("match-ai", { lines: need }) : Promise.resolve({ ok: true, picks: [] })).then(function (r) {
         var got = {}; if (r.ok) (r.picks || []).forEach(function (pk) { var x = res[pk.i]; if (!x) return; got[pk.i] = 1; if (!pk.k) return; if (pk.k.indexOf("p:") === 0) x.p = PM[pk.k.slice(2)]; else x.c = cat.find(function (c) { return c.id === pk.k.slice(2); }); });
         // lines AI didn't answer, or answered "none" while every written word is in one of my items: the simple match decides
-        need.forEach(function (n) { var x = res[n.i]; if (x.p || x.c) return; var strong = x.sh[0] && x.sh[0].s >= 0.9 && (!x.sh[1] || x.sh[1].s < x.sh[0].s - 0.05);
-          if (!got[n.i] || strong) { if (x.sh[0] && x.sh[0].s >= (got[n.i] ? 0.9 : 0.7)) x.p = x.sh[0].p; else if (!got[n.i] && x.ca[0] && x.ca[0].s >= 0.8) x.c = x.ca[0].c; } });
+        var allIn = function (it, tg) { var A = toks(it.name).filter(function (w) { return !/^(big|small|pack|rs)$/.test(w); }), T = toks(tg); return A.length > 0 && A.every(function (a) { return T.some(function (t2) { return a === t2 || (a.length > 3 && t2.length > 3 && (a.indexOf(t2) === 0 || t2.indexOf(a) === 0)); }); }); };
+        need.forEach(function (n) { var x = res[n.i]; if (x.p || x.c) return; var full = x.sh.filter(function (y) { return allIn(x.it, y.p.n + " " + (y.p.br || "")); });
+          var strong = (x.sh[0] && x.sh[0].s >= 0.9 && (!x.sh[1] || x.sh[1].s < x.sh[0].s - 0.05)) || (full.length === 1 && x.sh[0] && full[0].p === x.sh[0].p);
+          if (!got[n.i] || strong) { if (x.sh[0] && (strong || x.sh[0].s >= (got[n.i] ? 0.9 : 0.7))) x.p = x.sh[0].p; else if (!got[n.i] && x.ca[0] && x.ca[0].s >= 0.8) x.c = x.ca[0].c; } });
         return res.map(function (x) {
           var it = x.it, q = it.qty, conv = function (u, n) { if ((u === "pc" || u === "pkt") && (it.unit === "kg" || it.unit === "L")) { var pk = packKg(n); if (!pk) return null; var qq = q / pk; return Math.abs(qq - Math.round(qq)) < 0.02 && qq >= 0.98 ? Math.round(qq) : null; } return q; };
           var loose = function (n, per, mrp) { var pk = packKg(n); return { p: "", n: n.replace(/\s*\d+(?:\.\d+)?\s*(kg|kgs|g|gm|gms|l|ltr|ml)\b.*$/i, "").trim() + " (loose)", u: it.unit === "L" ? "L" : "kg", q: q, fq: 0, r: it.rate || Math.round(per / pk * 100) / 100, mrp: mrp ? Math.round(mrp / pk * 100) / 100 : 0, e: "", g: 0, w: it.written || it.name, src: "cat" }; };

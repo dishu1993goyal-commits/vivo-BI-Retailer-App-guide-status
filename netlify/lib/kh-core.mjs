@@ -262,9 +262,10 @@ async function sendWa(ctx, shop, to, text) {
 // ---------- one shop's books ----------
 // items are kept in shards of 2,500 (a shop can have 50,000+ items); only changed shards are written and re-sent
 const SH = 2500, MAXP = 60000, shKey = (sid, i) => "kh:prodsh:" + sid + ":" + i;
-async function books(store, sid) {
+async function books(store, sid, light) {
   const [shop, P, R] = await Promise.all([store.get(K.shop(sid)), store.get(K.prod(sid)), store.get(K.party(sid))]);
   let prods = [], orig = [], vers = [];
+  if (light) return { shop: shop ? cleanShop({}, shop) : null, prods: [], parties: (R && R.list) || [], _pv: (P && P.vers) || [], _light: true };
   if (P && P.shards != null) {
     const parts = await Promise.all(Array.from({ length: P.shards }, (_, i) => store.get(shKey(sid, i))));
     parts.forEach((x, i) => { const L = (x && x.list) || []; orig[i] = JSON.stringify(L); prods = prods.concat(L); }); vers = (P.vers || []).slice(0, P.shards);
@@ -295,9 +296,34 @@ function velocity(mv, months, today) {
   const days = Math.max(20, dIn + 30); Object.keys(v).forEach((k) => { v[k] = Math.round(v[k] / days * 1000) / 1000; }); return v;
 }
 
+// slow AI work (reading a photo / voice / pack) runs as a background job so the phone never sees a 504 timeout
+const JOB_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1 };
+const LIGHT_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1, "job-get": 1, "match-ai": 1, "i18n": 1, "i18n-get": 1, "prod-shard": 1 };
+export async function runKhJob(store, env, id, fetchImpl, askAIfn) {
+  const k = "kh:job:" + String(id).replace(/[^a-z0-9]/g, ""), j = await store.get(k); if (!j || j.status !== "running") return;
+  let out; try {
+    const res = await ownerOp(j.op, j.b, { store, t: Date.now(), sid: j.sid, by: j.by, env, aiFetch: fetchImpl, mailFetch: fetchImpl, waFetch: fetchImpl, askAI: askAIfn, bg: true });
+    out = await res.json();
+  } catch (e) { out = { ok: false, error: "Couldn't finish reading (" + String(e.message || e).slice(0, 120) + ")." }; }
+  await store.set(k, { status: "done", at: Date.now(), sid: j.sid, out });
+}
 async function ownerOp(op, b, ctx) {
   const { store, t, sid, by } = ctx, today = istDay(t);
-  const B = await books(store, sid); if (!B.shop) return json(404, { ok: false, error: "Shop not found." });
+  if (op === "job-get") {
+    const j = await store.get("kh:job:" + String(b.job || "").replace(/[^a-z0-9]/g, ""));
+    if (!j || j.sid !== sid) return json(404, { ok: false, error: "This reading has expired — try again." });
+    if (j.status === "done") return json(200, { ok: true, done: true, out: j.out });
+    return json(200, { ok: true, done: false, secs: Math.round((t - j.at) / 1000) });
+  }
+  if (JOB_OPS[op] && !ctx.bg && ((b.images && b.images.length) || b.audio) && (ctx.env.SITE_URL || ctx.env.URL)) {
+    const id = t.toString(36) + randomBytes(5).toString("hex");
+    await store.set("kh:job:" + id, { status: "running", at: t, sid, by, op, b: Object.assign({}, b, { ktok: undefined }) });
+    try { await (ctx.jobFetch || fetch)((ctx.env.SITE_URL || ctx.env.URL) + "/.netlify/functions/khread-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: id }) }); }
+    catch (e) { await store.set("kh:job:" + id, { status: "done", at: t, sid, out: { ok: false, error: "Couldn't start reading — try again." } }); }
+    return json(200, { ok: true, job: id });
+  }
+  if (op === "prod-shard") { const P = await store.get(K.prod(sid)), i = Math.max(0, Math.round(num(b.i))); if (!P || P.shards == null || i >= P.shards) return json(404, { ok: false, error: "No such part." }); const x = await store.get(shKey(sid, i)); return json(200, { ok: true, i, v: (P.vers || [])[i], list: (x && x.list) || [] }); }
+  const B = await books(store, sid, !!LIGHT_OPS[op]); if (!B.shop) return json(404, { ok: false, error: "Shop not found." });
   const { shop } = B, PM = Object.fromEntries(B.prods.map((p) => [p.id, p])), RM = Object.fromEntries(B.parties.map((p) => [p.id, p]));
   const saveProds = () => writeProds(store, sid, B, t);
   // big shops: send shard versions instead of every item; the page fetches only the shards that changed
@@ -314,7 +340,6 @@ async function ownerOp(op, b, ctx) {
     if (B._legacy && B.prods.length) await saveProds();
     return json(200, Object.assign({ ok: true, shop: shopOut(shop), parties: B.parties }, allP(), { inbox, today, todayDay: D.days[today] || null, month: D.days, vel: velocity(mv, months, today), modes: MODES, by }));
   }
-  if (op === "prod-shard") { const i = Math.max(0, Math.round(num(b.i))); if (i >= (B._pv || []).length) return json(404, { ok: false, error: "No such part." }); return json(200, { ok: true, i, v: B._pv[i], list: B.prods.slice(i * SH, (i + 1) * SH) }); }
   if (op === "shop-save") {
     const n = cleanShop(b.shop, shop); n.id = sid; await store.set(K.shop(sid), Object.assign({}, n, { pk: shop.pk }));
     const S = (await store.get(K.shops)) || { list: [] }, e = S.list.find((x) => x.id === sid); if (e) { e.name = n.name; e.owner = n.owner; e.city = n.city; e.state = n.state; await store.set(K.shops, S); }
@@ -470,7 +495,7 @@ async function ownerOp(op, b, ctx) {
     const L = (Array.isArray(b.lines) ? b.lines : []).slice(0, 80).map((x, i) => ({ i: num(x.i) || i, name: str(x.name, 90), hi: str(x.hi, 90), written: str(x.written, 90), unit: str(x.unit, 10), cands: (Array.isArray(x.cands) ? x.cands : []).slice(0, 8).map((c) => ({ k: str(c.k, 80), n: str(c.n, 100) })) })).filter((x) => x.cands.length);
     if (!L.length) return json(200, { ok: true, picks: [] });
     const facts = L.map((x) => `LINE ${x.i}: "${x.name}"${x.hi ? " / " + x.hi : ""}${x.written ? " (written: " + x.written + ")" : ""}${x.unit ? " [" + x.unit + "]" : ""}\n` + x.cands.map((c) => `  - ${c.k}: ${c.n}`).join("\n")).join("\n");
-    const r = await ctx.askAI(ctx.env, "Pick the matching product for each line.", facts, [], ctx.aiFetch, { system: `You match lines from an Indian kirana list to the shop's products. For each LINE choose the candidate key that is the SAME product (same item; same brand if a brand is written; for loose goods like sugar / dal / chana, a loose or any-brand candidate of that item is fine; pack size can differ only for loose goods). Hindi names: cheeni/चीनी = sugar, maida = refined flour, atta = wheat flour, besan = gram flour, suji/rava = semolina, chhole/kabuli chana = chickpeas, rajma = kidney beans, arhar/toor/tuvar = pigeon pea dal, masoor = red lentil, moong = green gram, urad = black gram, namak = salt, tel = oil, sarson = mustard, ghee, gud = jaggery, haldi = turmeric, mirch = chilli, dhaniya = coriander, jeera = cumin, chai patti = tea, sabun = soap, ande = eggs, doodh = milk, chawal = rice, poha = flattened rice, sabudana = sago. If no candidate is the same product, answer "". Reply with ONLY JSON: {"picks":[{"i":0,"k":"key or empty"}]}`, label: "MATCH", maxTokens: 1500, json: true, raw: true });
+    const r = await ctx.askAI(ctx.env, "Pick the matching product for each line.", facts, [], ctx.aiFetch, { system: `You match lines from an Indian kirana list to the shop's products. For each LINE choose the candidate key that is the SAME product (same item; same brand if a brand is written; for loose goods like sugar / dal / chana, a loose or any-brand candidate of that item is fine; pack size can differ only for loose goods). Hindi names: cheeni/चीनी = sugar, maida = refined flour, atta = wheat flour, besan = gram flour, suji/rava = semolina, chhole/kabuli chana = chickpeas, rajma = kidney beans, arhar/toor/tuvar = pigeon pea dal, masoor = red lentil, moong = green gram, urad = black gram, namak = salt, tel = oil, sarson = mustard, ghee, gud = jaggery, haldi = turmeric, mirch = chilli, dhaniya = coriander, jeera = cumin, chai patti = tea, sabun = soap, ande = eggs, doodh = milk, chawal = rice, poha = flattened rice, sabudana = sago. Brand rule: if the line does NOT mention a brand and the product is a packaged / branded item, answer "" (the shop bills it as written) — a brand may be picked only for loose goods sold by weight (atta, sugar, dal, rice…) or when the line names that brand. If no candidate is the same product, answer "". Reply with ONLY JSON: {"picks":[{"i":0,"k":"key or empty"}]}`, label: "MATCH", maxTokens: 1500, json: true, raw: true });
     const j = r.ok ? parseLoose(r.text) : null;
     return json(200, { ok: true, picks: j && Array.isArray(j.picks) ? j.picks.map((x) => ({ i: num(x.i), k: str(x.k, 80) })) : [] });
   }
@@ -757,7 +782,10 @@ async function deliver(ctx, shop, p, doc, s, origin, via, store, sid, kind, extr
 // ---------- ✨ reading lists: rules shared by photo / voice / typed text ----------
 const LIST_RULES = `Rules:
 - One entry per item. Keep every item line, even if unsure (give your best reading). Ignore totals, dates, shop names, phone numbers and doodles.
-- "name": the item in simple English as an Indian kirana shop calls it; keep brand and pack size if written (e.g. "Tata Salt 1 kg", "Maida", "Chana dal", "Kabuli chana (chhole)", "Sugar"). "hi": the same in Hindi (Devanagari). "written": exactly as written, in the original script.
+- "name": the item in simple English as an Indian kirana shop calls it. Keep a brand ONLY if it is written / spoken (e.g. "Parle-G", "Tata Salt 1 kg", "Harpic", "Clinic Plus"); NEVER add a brand that isn't there — "biscuit" stays "Biscuit", "atta" stays "Atta". "hi": the same in Hindi (Devanagari). "written": exactly as written, in the original script.
+- Quantity is often written BEFORE the item: "2 parle-G" = 2 Parle-G; "4 kg आटा" = Atta 4 kg; "1 Harpic" = 1 Harpic.
+- "5 वाले" / "10 wala" / "₹5 ka" after an item = the ₹5 / ₹10 pack: "4 बिस्कुट 5 वाले" → name "Biscuit (₹5 pack)", qty 4, unit "pc", amount 20. "बड़ा" / "bada" = big pack, "छोटा" / "chhota" = small pack — add "(big)" / "(small)" to the name.
+- Common Hindi grocery words: आटा atta (wheat flour), चीनी cheeni (sugar), बूरा boora (powdered sugar), खांड khand (unrefined sugar), राजमा rajma, चना दाल chana dal, अरहर / तूर arhar (toor dal), मसूर masoor dal, मूंग moong dal, उड़द urad dal, चावल rice, तेल oil, घी ghee, नमक salt, हल्दी turmeric, मिर्च chilli, धनिया coriander, जीरा cumin, साबुन soap, सर्फ़ detergent.
 - qty + unit = HOW MUCH is wanted. A weight / volume written with a loose item IS the amount: "maida 250gm" → qty 0.25, unit "kg" (NOT 250 pieces); "chana dal 250 g" → 0.25 kg; "chini 1/2 kilo" or "aadha kilo cheeni" → 0.5 kg; "chhole 1 kg" → 1 kg; "sarson tel 1 ltr" → 1 L; "doodh 500 ml" → 0.5 L. Always give grams as kg and ml as L (divide by 1000).
 - A plain count means pieces / packets: "maggi 10" → 10 pc; "parle g 5 pkt" → 5 pkt; "ande 1 darjan" → 12 pc.
 - If BOTH a pack size and a count are written ("tata salt 1kg x 2", "atta 5kg 1 bag", "surf 500g - 3"), keep the pack size in the name and qty = the count: name "Tata Salt 1 kg", qty 2, unit "pc".

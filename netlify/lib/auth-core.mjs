@@ -514,7 +514,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   if (b.action === "theme-get") return json(200, { ok: true, theme: cleanTheme(await store.get("config:theme")) });
   { const pub = await extrasPublic(b, store); if (pub) return pub; }
   if (/^sal-p-/.test(b.action)) return salPublic(b, { store, t });   // employee salary view: secure link + last 4 of mobile
-  if (/^kh-[op]-/.test(b.action)) return khPublic(b, { store, t, env, aiFetch, askAI, mailFetch, waFetch: mailFetch });   // shop owner (own login) + customers / distributors (secure link)
+  if (/^kh-[op]-/.test(b.action)) return khPublic(b, { store, t, env, aiFetch, askAI, mailFetch, waFetch: mailFetch, jobFetch });   // shop owner (own login) + customers / distributors (secure link)
   if (/^rtp-public/.test(b.action)) return rtpPublic(b, { store, t, pool, askAI, env, aiFetch });
   if (/^iub-p-/.test(b.action)) return iubPublic(b, { store, t, pool, env, mailFetch });   // finance partner's secure link (no login)   // retailer's read-only link (no login)
   const uKeyOf = (k) => `user:${app}:${k}`;
@@ -1032,7 +1032,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^store-/.test(b.action)) return storesAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^(phub|advis)-/.test(b.action)) return productsAction(b, surveyCtx());
     if (/^scha-/.test(b.action)) return schemeaiAction(b, surveyCtx());
-    if (/^kh-/.test(b.action)) return khAdmin(b, Object.assign(surveyCtx(), { mailFetch, waFetch: mailFetch }));
+    if (/^kh-/.test(b.action)) return khAdmin(b, Object.assign(surveyCtx(), { mailFetch, waFetch: mailFetch, jobFetch }));
     if (/^rp-/.test(b.action)) return rpayAction(b, Object.assign(surveyCtx(), { waFetch: mailFetch }));
     if (/^pln-/.test(b.action)) return plannerAction(b, surveyCtx());
     if (/^spol-/.test(b.action)) return spolAction(b, surveyCtx());
