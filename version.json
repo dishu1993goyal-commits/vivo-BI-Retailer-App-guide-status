@@ -1,10 +1,11 @@
 {
-  "versionCode": 33,
-  "versionName": "6.7",
+  "versionCode": 34,
+  "versionName": "6.8",
   "notes": [
-    "Fix: the microphone now works inside the app for App guide voice recording and the teleprompter",
-    "Presenter videos: D-ID, HeyGen (hand gestures) or a free AI model, chosen by HO in App guide → Presenter",
-    "Affordability: upload a PDF, photo, Excel or Word offer sheet and every offer is added automatically"
+    "New: Shop Khata can read bank / UPI payment SMS on this phone — turn it on in Khata → Import UPI SMS (it asks for SMS permission once)",
+    "A bill is marked paid by itself when the bank message arrives while its payment QR is open",
+    "Only bank credit / debit messages are read, on your phone — never OTPs or personal messages",
+    "Money debited can be added as a shop expense in one tap"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
