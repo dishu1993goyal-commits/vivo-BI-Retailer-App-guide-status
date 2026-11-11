@@ -4672,6 +4672,59 @@ public class MainActivity extends FragmentActivity {
             runOnUiThread(() -> Toast.makeText(MainActivity.this,
                     "Download failed, please try again", Toast.LENGTH_LONG).show());
         }
+
+        /** Shop Khata: send a bill (PDF / image) with its message straight to a WhatsApp chat. "1" = this app version can do it. */
+        @JavascriptInterface
+        public String canShareWa() { return "1"; }
+
+        @JavascriptInterface
+        public void shareWa(String base64, String rawName, String mime, String phone, String text) {
+            String name = rawName == null ? "" : rawName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+            if (name.isEmpty()) name = "bill.pdf";
+            final String type = mimeFor(name, mime);
+            try {
+                byte[] bytes = Base64.decode(base64, Base64.DEFAULT);
+                File dir = new File(getCacheDir(), "share");
+                if (!dir.exists()) dir.mkdirs();
+                File[] old = dir.listFiles();
+                if (old != null) for (File o : old) if (System.currentTimeMillis() - o.lastModified() > 86400000L) o.delete();
+                File f = new File(dir, name);
+                try (FileOutputStream os = new FileOutputStream(f)) { os.write(bytes); }
+                final Uri uri = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", f);
+                final String digits = phone == null ? "" : phone.replaceAll("\\D", "");
+                final String msg = text == null ? "" : text;
+                runOnUiThread(() -> {
+                    String[] pkgs = {"com.whatsapp", "com.whatsapp.w4b"};
+                    for (String pkg : pkgs) {
+                        try {
+                            Intent s = new Intent(Intent.ACTION_SEND);
+                            s.setType(type);
+                            s.setPackage(pkg);
+                            s.putExtra(Intent.EXTRA_STREAM, uri);
+                            if (!msg.isEmpty()) s.putExtra(Intent.EXTRA_TEXT, msg);
+                            if (digits.length() >= 10) s.putExtra("jid", (digits.length() == 10 ? "91" + digits : digits) + "@s.whatsapp.net");
+                            s.setClipData(android.content.ClipData.newRawUri(f.getName(), uri));
+                            s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                            startActivity(s);
+                            return;
+                        } catch (Throwable ignored) { }
+                    }
+                    try {
+                        Intent s = new Intent(Intent.ACTION_SEND);
+                        s.setType(type);
+                        s.putExtra(Intent.EXTRA_STREAM, uri);
+                        if (!msg.isEmpty()) s.putExtra(Intent.EXTRA_TEXT, msg);
+                        s.setClipData(android.content.ClipData.newRawUri(f.getName(), uri));
+                        s.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(Intent.createChooser(s, "Send bill"));
+                    } catch (Throwable t) {
+                        Toast.makeText(MainActivity.this, "Couldn't open WhatsApp", Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> Toast.makeText(MainActivity.this, "Couldn't share the bill: " + e.getMessage(), Toast.LENGTH_LONG).show());
+            }
+        }
     }
 
     private void afterSave(Uri uri, String name, String type) {
