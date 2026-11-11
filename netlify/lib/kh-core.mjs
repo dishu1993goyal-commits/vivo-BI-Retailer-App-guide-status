@@ -606,7 +606,7 @@ async function ownerOp(op, b, ctx) {
         const key = nm(i.n) + "|" + (i.u || "pc"); if (!nm(i.n)) continue;
         let pr = byKey[key];
         if (!pr) {
-          if (B.prods.length >= 6000) continue;
+          if (B.prods.length >= MAXP) continue;
           pr = cleanProd({ n: i.n, u: i.u || "pc", cat: "Quick items", sp: r2(i.r), mrp: i.mrp || 0, gst: i.g || 0, ns: 1 }, null); pr.qk = 1; pr.ns = 1;
           B.prods.push(pr); PM[pr.id] = pr; byKey[key] = pr; qnew.push(pr.n);
         } else if (pr.qk) priceSet(pr, "sp", r2(i.r), "sale bill", today);   // a saved quick item keeps the latest selling price
