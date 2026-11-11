@@ -141,7 +141,7 @@ function cleanDoc(x, o, party, shop) {
   return { id: o.id || nid(ty[0]), ty, no: str(x.no, 30) || o.no || "", d, items, sub, disc, oth, rnd, amt, paid, mode: MODES.includes(x.mode) ? x.mode : o.mode || (ty === "sale" || ty === "pur" ? "" : "Cash"),
     ref: str(x.ref, 60), note: str(x.note, 300), due: ty === "sale" || ty === "pur" || (ty === "adj" && amt > 0) ? day(x.due) || addD(d, party.days || 0) : "",
     against: (Array.isArray(x.against) ? x.against : []).map(cid).filter(Boolean).slice(0, 40), st: ["final", "draft", "pending"].includes(x.st) ? x.st : o.st || "final",
-    src: o.src || str(x.src, 10) || "owner", eta: day(x.eta), ack: o.ack || null, hist: o.hist || [], sent: o.sent || {}, photo: o.photo || !!x.photo, at: o.at || Date.now(), by: o.by || "", void: o.void || null };
+    src: o.src || str(x.src, 10) || "owner", eta: day(x.eta), ack: o.ack || null, hist: o.hist || [], sent: o.sent || {}, ...(o.sn ? { sn: o.sn } : {}), ...(o.rd ? { rd: o.rd } : {}), photo: o.photo || !!x.photo, at: o.at || Date.now(), by: o.by || "", void: o.void || null };
 }
 
 // ---------- ledger: running balance + which bills are still open (own payment first, then the rest oldest-first) ----------
@@ -552,8 +552,12 @@ async function ownerOp(op, b, ctx) {
     let raw = null;
     if (imgs.length) {
       const keys = await aiKeys(store, ctx.env);
-      const v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, `This photo is ${who}. It may be handwritten or printed, in Hindi (Devanagari), English, Hinglish (Hindi in English letters) or another Indian language (Punjabi, Gujarati, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Odia, Urdu). Read EVERY line carefully, letter by letter. Reply with ONLY JSON: ${shape}\n${LIST_RULES}`, { prefer: "gemini", fast: true, json: true });
-      if (!v.ok) return json(502, { ok: false, error: "Couldn't read the photo right now (" + String(v.error).slice(0, 160) + "). Try a clearer, straight photo in good light." });
+      const ASKP = `This photo is ${who}. It may be handwritten or printed, in Hindi (Devanagari), English, Hinglish (Hindi in English letters) or another Indian language (Punjabi, Gujarati, Marathi, Bengali, Tamil, Telugu, Kannada, Malayalam, Odia, Urdu). Read EVERY line carefully, letter by letter. Reply with ONLY JSON: ${shape}\n${LIST_RULES}`;
+      // 1) quick pass (no long thinking, 20 s limit). 2) if that gives no items, a careful pass with thinking, then Groq. An answer only counts if it has items.
+      const hasItems = (tx) => { const r0 = parseLoose(tx); return !!(r0 && Array.isArray(r0.items) && r0.items.some((x) => x && (x.name || x.hi || x.written))); };
+      let v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, ASKP, { prefer: "gemini", fast: true, json: true, accept: hasItems, timeout: 20000, maxModels: 2, noGroq: true });
+      if (!v.ok) { const e1 = v.error; v = await readImages(keys, ctx.env, imgs, ctx.aiFetch, ASKP + "\nThe handwriting may be hard to read — look again slowly and list every line you can make out, even if unsure.", { prefer: "gemini", json: true, accept: hasItems, timeout: 55000, maxModels: 2 }); if (!v.ok) v.error = e1 + " | " + v.error; }
+      if (!v.ok) return json(502, { ok: false, error: /empty answer/.test(String(v.error)) && !/\b(4\d\d|5\d\d)\b|too long/.test(String(v.error)) ? "No items could be read from this photo — take it straight from above, in good light, with the whole list inside." : "Couldn't read the photo right now (" + String(v.error).slice(0, 160) + "). Try again in a moment." });
       raw = parseLoose(v.text);
     } else {
       if (text.length < 2) return json(400, { ok: false, error: "Write or speak the items first." });
@@ -754,6 +758,7 @@ async function ownerOp(op, b, ctx) {
     const p = RM[cid(b.pid)]; if (!p) return json(404, { ok: false, error: "Not found" });
     const docs = await docsOf(p.id), L = refresh(p, docs), doc = b.id ? docs.find((x) => x.id === cid(b.id)) : null;
     const res = await deliver(ctx, shop, p, doc, L.s, origin, Array.isArray(b.via) ? b.via : [], store, sid, b.kind);
+    if (doc && !(Array.isArray(b.via) && b.via.length)) { const ds = ((await store.get(K.pt(sid, p.id))) || { list: [] }).list, d2 = ds.find((x) => x.id === doc.id); if (d2) { d2.sent = Object.assign({}, d2.sent, { man: t }); await store.set(K.pt(sid, p.id), { list: ds }); res.sent = d2.sent; } }
     await saveParties(); return json(200, Object.assign({ ok: true }, res));
   }
 
@@ -806,7 +811,7 @@ async function ownerOp(op, b, ctx) {
     const months = []; { let m = from.slice(0, 7); while (m <= to.slice(0, 7) && months.length < 25) { months.push(m); const d = new Date(m + "-01T00:00:00Z"); d.setUTCMonth(d.getUTCMonth() + 1); m = d.toISOString().slice(0, 7); } }
     const days = {}; await Promise.all(months.map(async (m) => { Object.assign(days, ((await store.get(K.day(sid, m))) || { days: {} }).days); }));
     const inR = (d) => d >= from && d <= to, docs = all.filter((d) => inR(d.d)), dd = Object.keys(days).filter(inR).sort();
-    return json(200, { ok: true, from, to, docs: docs.map((d) => ({ id: d.id, pid: d.pid, pk: d.pk, pn: d.pn, ty: d.ty, no: d.no, d: d.d, amt: d.amt, paid: d.paid, out: OUT[d.id] != null ? Math.max(0, OUT[d.id]) : undefined, mode: d.mode, items: d.items.map((i) => ({ p: i.p, n: i.n, q: i.q, r: i.r, amt: i.amt, c: i.c || 0 })) })), days: dd.map((k) => Object.assign({ d: k }, days[k])) });
+    return json(200, { ok: true, from, to, docs: docs.map((d) => ({ id: d.id, pid: d.pid, pk: d.pk, pn: d.pn, ty: d.ty, no: d.no, d: d.d, amt: d.amt, sn: d.sn || 0, rd: d.rd || 0, snt: d.sent && (d.sent.man || d.sent.wa || d.sent.mail) ? 1 : 0, ak: d.ack ? (d.ack.ok ? 1 : 2) : 0, paid: d.paid, out: OUT[d.id] != null ? Math.max(0, OUT[d.id]) : undefined, mode: d.mode, items: d.items.map((i) => ({ p: i.p, n: i.n, q: i.q, r: i.r, amt: i.amt, c: i.c || 0 })) })), days: dd.map((k) => Object.assign({ d: k }, days[k])) });
   }
   // ----- 📚 product catalogue: HO's updated price list + AI search of Indian retailer sites -----
   if (op === "catalog") { const c = await store.get("kh:catalog"); return json(200, { ok: true, rows: c ? c.rows : [], at: c ? c.at : 0, by: c ? c.by : "" }); }
@@ -1091,6 +1096,7 @@ export async function khPublic(b, ctx) {
   if (L.fails) { L.fails = 0; await store.set(K.link(tok), L); }
   const docs = ((await store.get(K.pt(L.sid, p.id))) || { list: [] }).list;
   const inbox = async (kind, text, extra) => { const I = (await store.get(K.inbox(L.sid))) || { list: [] }; I.list.unshift(Object.assign({ id: nid("n"), kind, pid: p.id, pn: p.n || p.firm, pk: p.k, text: String(text).slice(0, 300), at: t }, extra || {})); I.list = I.list.slice(0, 600); await store.set(K.inbox(L.sid), I); };
+  if (b.action === "kh-p-open" && !b.peek) { let ch = false; docs.forEach((d) => { if (!d.void && d.st === "final" && !d.sn) { d.sn = t; ch = true; } }); if (ch) await store.set(K.pt(L.sid, p.id), { list: docs }); }
   const nmK = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097f]+/g, " ").trim();
   const pubItem = (x) => ({ id: x.id, n: x.n, u: x.u || "pc", sp: x.sp || x.mrp || 0, mrp: x.mrp || 0, iu: x.iu || "", im: x.im ? 1 : 0 });
   if (b.action === "kh-p-cat") {   // 🛍 what the shop sells — names, pack, price and picture only (never cost or stock)
@@ -1113,6 +1119,7 @@ export async function khPublic(b, ctx) {
   }
   if (b.action === "kh-p-act") {
     const a = b.act, who = (p.n || p.firm) + " (via link)";
+    if (a === "seen") { const d = docs.find((x) => x.id === cid(b.id)); if (d && !d.void && d.st === "final" && !d.rd) { d.rd = t; if (!d.sn) d.sn = t; await store.set(K.pt(L.sid, p.id), { list: docs }); } return json(200, { ok: true }); }
     if (a === "order") {   // 🛒 customer's order from the link → a DRAFT sale bill the shop checks, prices and finalizes
       if (p.k !== "c" || shop.ordOn === false) return json(403, { ok: false, error: "Ordering is switched off for this shop." });
       const rows = (Array.isArray(b.items) ? b.items : []).slice(0, 80).map((i) => ({ p: cid(i.p), n: str(i.n, 90).trim(), q: Math.min(9999, Math.abs(qn(i.q)) || 1), u: str(i.u, 12) })).filter((i) => i.p || i.n);

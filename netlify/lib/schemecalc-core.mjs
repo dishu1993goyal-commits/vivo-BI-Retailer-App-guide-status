@@ -85,12 +85,16 @@ const GEM_CACHE = { names: null, at: 0 };
 export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
   const ASK = prompt || OCR_ASK;
   const errs = [];
-  const ask = async (label, fn) => { try { const t = await fn(); if (t && t.trim().length > 20) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
+  // opt.accept(text) → is this answer usable? (e.g. a list with at least one item) · opt.timeout ms per model · opt.maxModels · opt.noGroq
+  const good = (t) => (opt && opt.accept ? !!opt.accept(t) : t.trim().length > 20);
+  const limit = (pr) => (opt && opt.timeout ? Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error("took too long")), opt.timeout))]) : pr);
+  const ask = async (label, fn) => { try { const t = await limit(fn()); if (t && good(t)) return t; errs.push(label + ": empty answer"); } catch (e) { errs.push(label + ": " + e.message); } return null; };
+  const maxM = (opt && opt.maxModels) || 4;
   // handwriting in Hindi / regional scripts: Gemini reads it far better, so it goes first when asked (and a key exists)
   if (opt && opt.prefer === "gemini" && env && env.GEMINI_API_KEY && !opt._g) {
     const g = await readImages({}, env, images, fetchImpl, prompt, Object.assign({}, opt, { _g: 1 }));
     if (g.ok) return g; errs.push(g.error);
-    if (!keys.groq) return { ok: false, error: errs.join(" | ") };
+    if (!keys.groq || opt.noGroq) return { ok: false, error: errs.join(" | ") };
     const q = await readImages(keys, {}, images, fetchImpl, prompt, Object.assign({}, opt, { _g: 1 }));
     return q.ok ? q : { ok: false, error: errs.concat([q.error]).join(" | ") };
   }
@@ -101,7 +105,7 @@ export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
     // Image-capable models change often (Llama-4 Scout was retired Jul 2026; Qwen 3.x and Muse read images now).
     const isVis = (id) => /(llama-4|scout|maverick|vision|[-_/]vl|vl[-_]|llava|gemma-?3|pixtral|qwen.*(vl|omni)|qwen\/?qwen3\.\d|muse|kimi.*vl|glm.*v)/i.test(id) && !/guard|whisper|tts|embed|playai|orpheus|safeguard/i.test(id);
     const rank = (id) => (/qwen3\.\d/i.test(id) ? 0 : /muse/i.test(id) ? 1 : 2);
-    let vis = ids.filter(isVis).sort((a, b) => rank(a) - rank(b)).slice(0, 4);
+    let vis = ids.filter(isVis).sort((a, b) => rank(a) - rank(b)).slice(0, Math.min(4, maxM));
     if (!ids.length) vis = ["qwen/qwen3.8-27b", "qwen/qwen3.6-27b"];   // model list unreachable: try the known image models
     if (!vis.length) errs.push("Groq: no picture-reading model available right now");
     for (const m of vis) {
@@ -128,13 +132,13 @@ export async function readImages(keys, env, images, fetchImpl, prompt, opt) {
     } catch (e) { errs.push("Gemini list: " + e.message); }
     const ver = (n) => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(n); return m ? parseFloat(m[1]) : 0; };
     names.sort((a, b) => (/flash/.test(b) - /flash/.test(a)) || (/lite/.test(a) - /lite/.test(b)) || (ver(b) - ver(a)) || (/preview|exp/.test(a) - /preview|exp/.test(b)));
-    const pick = [...new Set([env.GEMINI_MODEL].filter(Boolean).concat(names))].slice(0, 4);
+    const pick = [...new Set([env.GEMINI_MODEL].filter(Boolean).concat(names))].slice(0, Math.min(4, maxM));
     if (!pick.length) errs.push("Gemini: no model available for this key");
     for (const m of pick) {
       const t = await ask("Gemini " + m, async () => {
         const parts = [{ text: ASK }].concat(images.slice(0, 5).map((u) => { const mm = /^data:(image\/[a-z]+);base64,(.+)$/.exec(u); return { inline_data: { mime_type: mm[1], data: mm[2] } }; }));
         // fast mode (reading a shop list / pack): no long "thinking" — answers in seconds instead of half a minute
-        const think = opt && opt.fast ? (/gemini-2\.5/.test(m) ? { thinkingBudget: /pro/.test(m) ? 128 : 0 } : /gemini-3/.test(m) ? { thinkingLevel: "low" } : null) : null;
+        const think = opt && opt.fast ? (/gemini-2\.5/.test(m) ? { thinkingBudget: /pro/.test(m) ? 128 : 0 } : ver(m) >= 3 ? { thinkingLevel: "low" } : null) : null;
         const call = (tc) => fetchImpl(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, { method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY }, body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: Object.assign({ temperature: 0, maxOutputTokens: 8000 }, tc ? { thinkingConfig: tc } : {}, opt && opt.json ? { responseMimeType: "application/json" } : {}) }) });
         let r = await call(think);
         if (think && r.status === 400) r = await call(null);
