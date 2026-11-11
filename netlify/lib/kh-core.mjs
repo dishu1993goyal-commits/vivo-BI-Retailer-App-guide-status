@@ -1099,6 +1099,18 @@ export async function khPublic(b, ctx) {
   if (b.action === "kh-p-open" && !b.peek) { let ch = false; docs.forEach((d) => { if (!d.void && d.st === "final" && !d.sn) { d.sn = t; ch = true; } }); if (ch) await store.set(K.pt(L.sid, p.id), { list: docs }); }
   const nmK = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097f]+/g, " ").trim();
   const pubItem = (x) => ({ id: x.id, n: x.n, u: x.u || "pc", sp: x.sp || x.mrp || 0, mrp: x.mrp || 0, iu: x.iu || "", im: x.im ? 1 : 0 });
+  if (b.action === "kh-p-read" || b.action === "kh-p-job") {   // 🎤 / ✍️ the customer speaks or types the whole list — read with the same AI as the shop's own list reading
+    if (p.k !== "c" || shop.ordOn === false) return json(403, { ok: false, error: "Ordering is switched off for this shop." });
+    const octx = Object.assign({}, ctx, { sid: L.sid, by: (p.n || p.firm) + " (via link)" });
+    if (b.action === "kh-p-job") return ownerOp("job-get", { job: cid(b.job) }, octx);
+    const rd = L.rd && L.rd.d === today ? L.rd : { d: today, n: 0 };
+    if (rd.n >= 25) return json(429, { ok: false, error: "Too many tries today — please type the items one by one." });
+    const audio = b.audio ? String(b.audio) : "", text = String(b.text || "").slice(0, 3000).trim();
+    if (audio && (audio.length > 1800000 || !/^data:audio\//.test(audio))) return json(400, { ok: false, error: "That recording is too long — keep it under a minute." });
+    if (!audio && text.length < 2) return json(400, { ok: false, error: "Say or write the items." });
+    rd.n++; L.rd = rd; await store.set(K.link(tok), L);
+    return ownerOp("list-read", audio ? { audio, mode: "sale" } : { text, mode: "sale" }, octx);
+  }
   if (b.action === "kh-p-cat") {   // 🛍 what the shop sells — names, pack, price and picture only (never cost or stock)
     if (p.k !== "c" || shop.ordOn === false) return json(403, { ok: false, error: "Ordering is switched off for this shop." });
     if (shop.catOn === false) return json(200, { ok: true, items: [], off: true });
@@ -1127,7 +1139,16 @@ export async function khPublic(b, ctx) {
       if (docs.filter((d) => d.st === "draft" && d.src === "link" && !d.void).length >= 5) return json(429, { ok: false, error: "You already have orders waiting with the shop — please wait for them to be billed." });
       const B2 = await books(store, L.sid, false), PM2 = Object.fromEntries(B2.prods.map((x) => [x.id, x])), byN = {};
       B2.prods.forEach((x) => { if (x.on !== false) { const k = nmK(x.n); if (!byN[k] || (x.sp && !byN[k].sp)) byN[k] = x; } });
-      const items = rows.map((i) => { const pr = PM2[i.p] || byN[nmK(i.n)]; return pr && pr.on !== false ? { p: pr.id, n: pr.n, u: pr.u, q: i.q, r: pr.sp || pr.mrp || 0, mrp: pr.mrp || 0, g: pr.gst || 0 } : { p: "", n: i.n, u: i.u || "pc", q: i.q, r: 0 }; }).filter((i) => i.n);
+      const un = (u) => { u = String(u || "").toLowerCase().trim(); return /^(l|ltr|litre|liter)s?$/.test(u) ? "l" : /^(g|gm|gms|gram|grams)$/.test(u) ? "g" : /^(kg|kgs|kilo)$/.test(u) ? "kg" : /^(pc|pcs|piece|pieces|no|nos)$/.test(u) ? "pc" : /^(dozen|dz|darjan)$/.test(u) ? "dozen" : u; };
+      const CONV = { "g>kg": 0.001, "kg>g": 1000, "ml>l": 0.001, "l>ml": 1000, "dozen>pc": 12 };
+      const loose = (n) => { const w = nmK(n).split(" ").filter(Boolean); if (!w.length) return null; const c = B2.prods.filter((x) => x.on !== false && w.every((k) => (" " + nmK(x.n) + " ").includes(" " + k + " "))); if (c.length === 1) return c[0]; const lo = c.filter((x) => /loose|khula/i.test(x.n)); return lo.length === 1 ? lo[0] : null; };
+      const items = rows.map((i) => {
+        const pr = PM2[i.p] || byN[nmK(i.n)] || (i.p ? null : loose(i.n));
+        if (pr && pr.on !== false) { const cu = un(i.u), pu = un(pr.u); let q = i.q, fit = !cu || cu === pu || !!PM2[i.p];
+          if (!fit && CONV[cu + ">" + pu]) { q = Math.round(i.q * CONV[cu + ">" + pu] * 1000) / 1000; fit = true; }
+          if (fit) return { p: pr.id, n: pr.n, u: pr.u, q, r: pr.sp || pr.mrp || 0, mrp: pr.mrp || 0, g: pr.gst || 0 }; }
+        return { p: "", n: i.n, u: i.u || "pc", q: i.q, r: 0 };
+      }).filter((i) => i.n);
       if (!items.length) return json(400, { ok: false, error: "Add at least one item." });
       const d = cleanDoc({ ty: "sale", items, st: "draft", note: b.note, d: today }, null, p, shop); d.src = "link"; d.by = who; d.ord = { at: t, n: items.length, open: items.filter((i) => !i.r).length };
       docs.push(d); await store.set(K.pt(L.sid, p.id), { list: docs });
