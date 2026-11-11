@@ -63,7 +63,7 @@ function cleanShop(x, o) {
     terms: g("terms", 400), days: x.days !== undefined ? Math.max(0, Math.min(365, Math.round(num(x.days)))) : o.days != null ? o.days : 30,
     ddays: x.ddays !== undefined ? Math.max(0, Math.min(365, Math.round(num(x.ddays)))) : o.ddays != null ? o.ddays : 15,
     lang: ["en", "hi"].includes(x.lang) ? x.lang : o.lang || "hi", margin: x.margin !== undefined ? Math.max(0, Math.min(500, num(x.margin))) : o.margin != null ? o.margin : 12,
-    gst: x.gst !== undefined ? !!x.gst : !!o.gst, qitems: x.qitems !== undefined ? !!x.qitems : o.qitems !== false, low: x.low !== undefined ? Math.max(0, qn(x.low)) : o.low != null ? o.low : 5, expWarn: x.expWarn !== undefined ? Math.max(1, Math.min(365, Math.round(num(x.expWarn)))) : o.expWarn || 30,
+    gst: x.gst !== undefined ? !!x.gst : !!o.gst, qitems: x.qitems !== undefined ? !!x.qitems : o.qitems !== false, ordOn: x.ordOn !== undefined ? !!x.ordOn : o.ordOn !== false, catOn: x.catOn !== undefined ? !!x.catOn : o.catOn !== false, low: x.low !== undefined ? Math.max(0, qn(x.low)) : o.low != null ? o.low : 5, expWarn: x.expWarn !== undefined ? Math.max(1, Math.min(365, Math.round(num(x.expWarn)))) : o.expWarn || 30,
     auto: { wa: x.auto ? !!x.auto.wa : !!(o.auto && o.auto.wa), mail: x.auto ? x.auto.mail !== false : !(o.auto && o.auto.mail === false) },
     seq: o.seq || { sale: 0, rcpt: 0, pay: 0, po: 0, ret: 0 }, pk: o.pk || null, created: o.created || 0, off: !!o.off,
     rules: x.rules !== undefined ? cleanRules(x.rules) : o.rules ? cleanRules(o.rules) : defaultRules(), rulesOn: x.rulesOn !== undefined ? x.rulesOn !== false : o.rulesOn !== false,
@@ -105,7 +105,7 @@ function cleanProd(x, o) {
   const g = (k, n) => (x[k] !== undefined ? str(x[k], n) : o[k] || ""), n = (k) => (x[k] !== undefined && x[k] !== "" ? num(x[k]) : o[k] || 0);
   return { id: o.id || cid(x.id) || nid("i"), n: g("n", 90), cat: g("cat", 40) || "General", br: g("br", 40), u: g("u", 12) || "pc", bc: g("bc", 40), hsn: g("hsn", 12),
     cost: n("cost"), mrp: n("mrp"), sp: n("sp"), gst: n("gst"), rol: x.rol !== undefined && x.rol !== "" ? qn(x.rol) : o.rol != null ? o.rol : null, pack: x.pack !== undefined ? qn(x.pack) : o.pack || 0,
-    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", ns: x.ns !== undefined ? (x.ns ? 1 : 0) : o.ns ? 1 : 0, qk: o.qk ? 1 : 0, stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
+    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", ns: x.ns !== undefined ? (x.ns ? 1 : 0) : o.ns ? 1 : 0, qk: o.qk ? 1 : 0, ...(o.im ? { im: o.im } : {}), ...(o.iu ? { iu: o.iu } : {}), ...(o.ix ? { ix: 1 } : {}), stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
 }
 // 📈 every change of cost / selling price / MRP is kept (newest first) — price drop & hike history
 const PF = { cost: "Cost", sp: "Selling", mrp: "MRP" };
@@ -265,6 +265,7 @@ async function sendWa(ctx, shop, to, text) {
 
 // ---------- one shop's books ----------
 // items are kept in shards of 2,500 (a shop can have 50,000+ items); only changed shards are written and re-sent
+const pimK = (sid, id) => "kh:pim:" + sid + ":" + id, IMG_RE = /^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/, IU_RE = /^https:\/\/images\.(openfoodfacts|openproductsfacts|openbeautyfacts)\.(org|net)\/[\w\-./]+\.(jpg|jpeg|png|webp)$/i;
 const SH = 2500, MAXP = 60000, shKey = (sid, i) => "kh:prodsh:" + sid + ":" + i;
 async function books(store, sid, light) {
   const [shop, P, R] = await Promise.all([store.get(K.shop(sid)), store.get(K.prod(sid)), store.get(K.party(sid))]);
@@ -302,7 +303,7 @@ function velocity(mv, months, today) {
 
 // slow AI work (reading a photo / voice / pack) runs as a background job so the phone never sees a 504 timeout
 const JOB_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1 };
-const LIGHT_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1, "job-get": 1, "match-ai": 1, "i18n": 1, "i18n-get": 1, "prod-shard": 1 };
+const LIGHT_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1, "job-get": 1, "match-ai": 1, "i18n": 1, "i18n-get": 1, "prod-shard": 1, "prod-imgs": 1 };
 export async function runKhJob(store, env, id, fetchImpl, askAIfn) {
   const k = "kh:job:" + String(id).replace(/[^a-z0-9]/g, ""), j = await store.get(k); if (!j || j.status !== "running") return;
   let out; try {
@@ -560,6 +561,20 @@ async function ownerOp(op, b, ctx) {
     }
     await store.set(K.party(sid), { list: B.parties, at: t }); return json(200, { ok: true, party: p });
   }
+  // 🖼 item pictures: a small thumbnail per item (own photo) or a web picture found from the barcode
+  if (op === "prod-img") {
+    const pr = PM[cid(b.id)]; if (!pr) return json(404, { ok: false, error: "Item not found." });
+    if (b.remove) { delete pr.im; delete pr.iu; pr.ix = 1; await store.delete(pimK(sid, pr.id)); }
+    else { const img = String(b.img || ""); if (!IMG_RE.test(img) || img.length > 60000) return json(400, { ok: false, error: "Photo is too large or not an image." }); await store.set(pimK(sid, pr.id), { img, at: t }); pr.im = t.toString(36); delete pr.iu; }
+    await saveProds(); return json(200, { ok: true, prod: pr, img: b.remove ? "" : String(b.img) });
+  }
+  if (op === "prod-imgs") { const ids = (Array.isArray(b.ids) ? b.ids : []).map(cid).filter(Boolean).slice(0, 60), imgs = {}; await Promise.all(ids.map(async (id) => { const x = await store.get(pimK(sid, id)); if (x && x.img) imgs[id] = x.img; })); return json(200, { ok: true, imgs }); }
+  if (op === "img-auto") {   // look up a pack picture on Open Food Facts for items that have a barcode and no picture yet
+    const ids = (Array.isArray(b.ids) ? b.ids : []).map(cid).filter(Boolean).slice(0, 12), done = [];
+    await Promise.all(ids.map(async (id) => { const pr = PM[id]; if (!pr || pr.im || pr.iu || pr.ix || !/^\d{8,14}$/.test(String(pr.bc || ""))) return; pr.ix = 1; done.push(pr);
+      for (const host of ["in.openfoodfacts.org", "world.openfoodfacts.org"]) { try { const r = await ctx.aiFetch(`https://${host}/api/v2/product/${pr.bc}.json?fields=image_front_small_url,image_small_url`, { headers: { "user-agent": "ShopKhata/1.0 (kirana billing)", accept: "application/json" } }); const j = r.ok ? await r.json().catch(() => null) : null, u = j && j.status === 1 && j.product && (j.product.image_front_small_url || j.product.image_small_url); if (IU_RE.test(String(u || ""))) { pr.iu = String(u).slice(0, 200); delete pr.ix; break; } } catch (e) { /* next host */ } } }));
+    if (done.length) await saveProds(); return json(200, { ok: true, prods: done });
+  }
   if (op === "party-photo-get") { const x = await store.get("kh:pimg:" + sid + ":" + cid(b.pid)); return json(200, { ok: true, img: x ? x.img : "" }); }
   // ----- parties -----
   if (op === "party-save") {
@@ -664,7 +679,7 @@ async function ownerOp(op, b, ctx) {
     const d = day(b.d) || today, m = d.slice(0, 7), D = (await store.get(K.day(sid, m))) || { days: {} }, x = D.days[d] || { cs: 0, us: 0, ex: [], bills: [], note: "" };
     if (b.cs !== undefined) x.cs = Math.max(0, num(b.cs)); if (b.us !== undefined) x.us = Math.max(0, num(b.us)); if (b.cd !== undefined) x.cd = Math.max(0, num(b.cd));
     if (Array.isArray(b.ex)) x.ex = b.ex.slice(0, 40).map((e) => ({ n: str(e.n, 60), a: num(e.a), m: MODES.includes(e.m) ? e.m : "Cash" })).filter((e) => e.n && e.a);
-    if (b.note !== undefined) x.note = str(b.note, 300); if (b.addUpi) x.us = r2((x.us || 0) + Math.max(0, num(b.addUpi)));
+    if (b.note !== undefined) x.note = str(b.note, 300); if (Array.isArray(b.addEx)) x.ex = (x.ex || []).concat(b.addEx.slice(0, 40).map((e) => ({ n: str(e.n, 60), a: Math.abs(num(e.a)), m: MODES.includes(e.m) ? e.m : "UPI" })).filter((e) => e.n && e.a)).slice(0, 40); if (b.addUpi) x.us = r2((x.us || 0) + Math.max(0, num(b.addUpi)));
     x.at = t; x.by = by; D.days[d] = x; await store.set(K.day(sid, m), D);
     await addLog(store, sid, t, by, `Day ${d}: cash ${rs(x.cs)}, UPI ${rs(x.us)}${x.ex.length ? ", expenses " + rs(x.ex.reduce((s, e) => s + e.a, 0)) : ""}`); return json(200, { ok: true, day: x });
   }
@@ -992,8 +1007,42 @@ export async function khPublic(b, ctx) {
   if (L.fails) { L.fails = 0; await store.set(K.link(tok), L); }
   const docs = ((await store.get(K.pt(L.sid, p.id))) || { list: [] }).list;
   const inbox = async (kind, text, extra) => { const I = (await store.get(K.inbox(L.sid))) || { list: [] }; I.list.unshift(Object.assign({ id: nid("n"), kind, pid: p.id, pn: p.n || p.firm, pk: p.k, text: String(text).slice(0, 300), at: t }, extra || {})); I.list = I.list.slice(0, 600); await store.set(K.inbox(L.sid), I); };
+  const nmK = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097f]+/g, " ").trim();
+  const pubItem = (x) => ({ id: x.id, n: x.n, u: x.u || "pc", sp: x.sp || x.mrp || 0, mrp: x.mrp || 0, iu: x.iu || "", im: x.im ? 1 : 0 });
+  if (b.action === "kh-p-cat") {   // 🛍 what the shop sells — names, pack, price and picture only (never cost or stock)
+    if (p.k !== "c" || shop.ordOn === false) return json(403, { ok: false, error: "Ordering is switched off for this shop." });
+    if (shop.catOn === false) return json(200, { ok: true, items: [], off: true });
+    const B2 = await books(store, L.sid, false), live = B2.prods.filter((x) => x.on !== false && (x.sp || x.mrp)), w = nmK(b.q).split(" ").filter(Boolean).slice(0, 6);
+    let out;
+    if (w.length) {
+      out = live.filter((x) => { const h = nmK(x.n + " " + (x.br || "") + " " + (x.cat || "")); return w.every((k) => h.includes(k)); });
+      const r = (x) => { const n = nmK(x.n); return (n.startsWith(w[0]) ? 0 : 2) + (x.im || x.iu ? 0 : 1) + n.length / 1000; };
+      out = out.sort((a, c) => r(a) - r(c)).slice(0, 30);
+    } else {
+      const months = lastMonths(today, 3), mv = await loadMv(store, L.sid, months), vel = velocity(mv, months, today), mine = {};
+      docs.filter((d) => d.ty === "sale" && !d.void && d.st === "final").forEach((d) => d.items.forEach((i) => { if (i.p) mine[i.p] = (mine[i.p] || 0) + 1; }));
+      out = live.filter((x) => mine[x.id] || vel[x.id] > 0).sort((a, c) => (mine[c.id] || 0) * 50 + (vel[c.id] || 0) - ((mine[a.id] || 0) * 50 + (vel[a.id] || 0))).slice(0, 40);
+      if (out.length < 24) { const have = new Set(out.map((x) => x.id)), rest = live.filter((x) => !have.has(x.id)); out = out.concat(rest.filter((x) => x.im || x.iu).slice(0, 24 - out.length)); if (out.length < 24) out = out.concat(rest.filter((x) => !(x.im || x.iu)).slice(0, 24 - out.length)); }
+    }
+    const items = out.map(pubItem); await Promise.all(items.map(async (x) => { if (x.im) { const g = await store.get(pimK(L.sid, x.id)); if (g && g.img) x.img = g.img; } }));
+    return json(200, { ok: true, items });
+  }
   if (b.action === "kh-p-act") {
     const a = b.act, who = (p.n || p.firm) + " (via link)";
+    if (a === "order") {   // 🛒 customer's order from the link → a DRAFT sale bill the shop checks, prices and finalizes
+      if (p.k !== "c" || shop.ordOn === false) return json(403, { ok: false, error: "Ordering is switched off for this shop." });
+      const rows = (Array.isArray(b.items) ? b.items : []).slice(0, 80).map((i) => ({ p: cid(i.p), n: str(i.n, 90).trim(), q: Math.min(9999, Math.abs(qn(i.q)) || 1), u: str(i.u, 12) })).filter((i) => i.p || i.n);
+      if (!rows.length) return json(400, { ok: false, error: "Add at least one item." });
+      if (docs.filter((d) => d.st === "draft" && d.src === "link" && !d.void).length >= 5) return json(429, { ok: false, error: "You already have orders waiting with the shop — please wait for them to be billed." });
+      const B2 = await books(store, L.sid, false), PM2 = Object.fromEntries(B2.prods.map((x) => [x.id, x])), byN = {};
+      B2.prods.forEach((x) => { if (x.on !== false) { const k = nmK(x.n); if (!byN[k] || (x.sp && !byN[k].sp)) byN[k] = x; } });
+      const items = rows.map((i) => { const pr = PM2[i.p] || byN[nmK(i.n)]; return pr && pr.on !== false ? { p: pr.id, n: pr.n, u: pr.u, q: i.q, r: pr.sp || pr.mrp || 0, mrp: pr.mrp || 0, g: pr.gst || 0 } : { p: "", n: i.n, u: i.u || "pc", q: i.q, r: 0 }; }).filter((i) => i.n);
+      if (!items.length) return json(400, { ok: false, error: "Add at least one item." });
+      const d = cleanDoc({ ty: "sale", items, st: "draft", note: b.note, d: today }, null, p, shop); d.src = "link"; d.by = who; d.ord = { at: t, n: items.length, open: items.filter((i) => !i.r).length };
+      docs.push(d); await store.set(K.pt(L.sid, p.id), { list: docs });
+      await inbox("order", `🛒 ${p.n || p.firm} ordered ${items.length} item${items.length > 1 ? "s" : ""}${d.amt ? " (about " + rs(d.amt) + ")" : ""}${d.ord.open ? " — " + d.ord.open + " need a price" : ""}${d.note ? " — " + d.note : ""}`, { doc: d.id, amt: d.amt });
+      return json(200, { ok: true, order: { id: d.id, n: items.length, amt: d.amt, open: d.ord.open } });
+    }
     if (a === "ack") {
       const d = docs.find((x) => x.id === cid(b.id) && !x.void && x.st === "final"); if (!d) return json(404, { ok: false, error: "Not found" });
       d.ack = { ok: b.ok !== false, at: t, by: who, note: str(b.note, 300) };
@@ -1018,7 +1067,8 @@ export async function khPublic(b, ctx) {
     } else return json(400, { ok: false, error: "Unknown action" });
   }
   const L2 = ledger(p, docs, today), keep = (d) => ({ id: d.id, ty: d.ty, no: d.no, d: d.d, due: d.due, amt: d.amt, paid: d.paid, mode: d.mode, ref: d.ref, note: d.note, st: d.st, ack: d.ack, void: d.void ? { why: d.void.why, at: d.void.at } : null, eta: d.eta, reply: d.reply, src: d.src,
-    items: d.items.map((i) => ({ n: i.n, q: i.q, fq: i.fq, u: i.u, r: i.r, amt: i.amt, sq: i.sq, sr: i.sr })), sub: d.sub, disc: d.disc, oth: d.oth, rnd: d.rnd, hist: (d.hist || []).length });
-  return json(200, { ok: true, shop: { name: shop.name, owner: shop.owner, ph: shop.ph, addr: shop.addr, city: shop.city, gstin: shop.gstin, upi: shop.upi, upiName: shop.upiName || shop.name, terms: shop.terms, lang: shop.lang },
+    items: d.items.map((i) => ({ p: i.p, n: i.n, q: i.q, fq: i.fq, u: i.u, r: i.r, amt: i.amt, sq: i.sq, sr: i.sr })), sub: d.sub, disc: d.disc, oth: d.oth, rnd: d.rnd, hist: (d.hist || []).length });
+  return json(200, { ok: true, shop: { name: shop.name, owner: shop.owner, ph: shop.ph, addr: shop.addr, city: shop.city, gstin: shop.gstin, upi: shop.upi, upiName: shop.upiName || shop.name, terms: shop.terms, lang: shop.lang, ordOn: p.k === "c" && shop.ordOn !== false, catOn: shop.catOn !== false },
+    orders: docs.filter((d) => d.st === "draft" && d.src === "link" && !d.void).map((d) => ({ id: d.id, at: (d.ord && d.ord.at) || d.at, n: d.items.length, amt: d.amt, items: d.items.map((i) => ({ n: i.n, q: i.q, u: i.u })) })),
     party: { n: p.n, firm: p.firm, k: p.k, conf: p.conf, days: p.days }, s: L2.s, bills: L2.bills, rows: L2.rows, docs: docs.filter((d) => d.st !== "draft").sort((a, c) => (a.d < c.d ? 1 : -1)).slice(0, 200).map(keep) });
 }
