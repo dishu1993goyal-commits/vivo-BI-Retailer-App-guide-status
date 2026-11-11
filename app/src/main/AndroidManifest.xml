@@ -58,6 +58,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="vivo-business-innovation-dashboard-22.netlify.app" android:path="/qr" />
+                <data android:scheme="https" android:host="vivo-business-innovation-dashboard-22.netlify.app" android:pathPrefix="/khata" />
             </intent-filter>
         </activity>
 

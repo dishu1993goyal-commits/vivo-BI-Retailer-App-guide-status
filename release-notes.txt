@@ -1,3 +1,3 @@
-New: Shop Khata can save a customer to your phone contacts (ask once) so the bill PDF opens straight in their WhatsApp chat
-Shop Khata sends the bill PDF after the WhatsApp message
-Shop Khata can read bank / UPI payment SMS on this phone — turn it on in Khata → Import UPI SMS
+Shop Khata links now open inside the app — so bank SMS reading and sending the bill PDF to WhatsApp work there
+Fixed: "Turn on" bank SMS reading did nothing when the khata was opened from the hub
+Shop Khata can save a customer to your phone contacts so the bill PDF opens in their WhatsApp chat

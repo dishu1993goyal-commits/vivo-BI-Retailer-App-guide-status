@@ -3110,6 +3110,19 @@ public class MainActivity extends FragmentActivity {
         unlocked = false;
         inAdminPage = false;
         inSurveyPage = true;
+        ensureSurveyWeb();
+        if (surveyWeb.getParent() != null) ((ViewGroup) surveyWeb.getParent()).removeView(surveyWeb);
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.parseColor("#F3F4F9"));
+        page.addView(profileHeaderBar(title, this::surveyBack));
+        page.addView(surveyWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
+        detachWebView();
+        setContentView(page);
+        surveyWeb.loadUrl(START_URL + file + "?v=" + System.currentTimeMillis() + (hash == null ? "#list" : hash));
+    }
+
+    private void ensureSurveyWeb() {
         if (surveyWeb == null) {
             surveyWeb = new WebView(this);
             WebSettings ws = surveyWeb.getSettings();
@@ -3165,15 +3178,30 @@ public class MainActivity extends FragmentActivity {
                 }
             });
         }
+    }
+
+    // ---------- Shop Khata links (khata.html — the shop's own login, or a customer's bill link) open inside the app ----------
+    // so the bank-SMS reader and "send bill PDF to WhatsApp" work; a vivo login is not needed for this page.
+    private boolean khataLink = false;
+    private void openKhataLink(Uri u) {
+        if (inPortal && portalWeb != null) { inPortal = false; try { portalWeb.destroy(); } catch (Throwable ignored) { } portalWeb = null; }
+        khataLink = true;
+        toolFromHub = false;
+        toolFile = "khata.html";
+        inProfile = true;
+        unlocked = false;
+        inAdminPage = false;
+        inSurveyPage = true;
+        ensureSurveyWeb();
         if (surveyWeb.getParent() != null) ((ViewGroup) surveyWeb.getParent()).removeView(surveyWeb);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.parseColor("#F3F4F9"));
-        page.addView(profileHeaderBar(title, this::surveyBack));
+        page.addView(profileHeaderBar("Shop Khata", this::surveyBack));
         page.addView(surveyWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
         detachWebView();
         setContentView(page);
-        surveyWeb.loadUrl(START_URL + file + "?v=" + System.currentTimeMillis() + (hash == null ? "#list" : hash));
+        surveyWeb.loadUrl(u.toString());
     }
 
     // Back inside the survey page first (editor → list), then leave it.
@@ -3183,6 +3211,11 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void closeSurveyPage() {
+        if (khataLink) {
+            khataLink = false; toolFile = null; inSurveyPage = false;
+            if (sessionToken() == null) { inProfile = false; showLoginScreen(null); return; }
+            openDashboard(); refreshNotify(); return;
+        }
         if (toolFromHub) { toolFromHub = false; showHub(); return; }
         toolFile = null;
         inSurveyPage = false;
@@ -3310,6 +3343,11 @@ public class MainActivity extends FragmentActivity {
     private void handleIntent(Intent intent) {
         if (intent == null) return;
         Uri data = intent.getData();
+        if (data != null && APP_HOST.equals(data.getHost()) && data.getPath() != null && data.getPath().startsWith("/khata")) {
+            intent.setData(null);
+            ui.postDelayed(() -> openKhataLink(data), 300);
+            return;
+        }
         if (data != null && APP_HOST.equals(data.getHost()) && "/qr".equals(data.getPath())) {
             intent.setData(null);
             ui.postDelayed(() -> handleQrText(data.toString()), 400);
@@ -4558,7 +4596,7 @@ public class MainActivity extends FragmentActivity {
         try {
             String u = w == null ? null : w.getUrl(); if (u == null) return false;
             Uri x = Uri.parse(u);
-            return "https".equals(x.getScheme()) && APP_HOST.equals(x.getHost()) && x.getPath() != null && x.getPath().startsWith("/khata");
+            return "https".equals(x.getScheme()) && APP_HOST.equals(x.getHost());
         } catch (Throwable t) { return false; }
     }
     private void smsRead(final WebView w, final double sinceMs, final int max) {
