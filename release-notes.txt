@@ -1,4 +1,4 @@
-New: Partner portals — open EMI, Upgrade, V-Shield and other partner websites inside the app (All tools → Partner portals)
-Save your partner login once on this phone — the app signs you in automatically next time
-Your partner passwords stay only on your phone, encrypted
-New tools: One-Page Studio, Personal mailer, App usability lab, Access control
+New: Shop Khata can read bank / UPI payment SMS on this phone — turn it on in Khata → Import UPI SMS (it asks for SMS permission once)
+A bill is marked paid by itself when the bank message arrives while its payment QR is open
+Only bank credit / debit messages are read, on your phone — never OTPs or personal messages
+Money debited can be added as a shop expense in one tap

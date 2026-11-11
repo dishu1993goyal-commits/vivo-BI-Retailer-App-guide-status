@@ -473,6 +473,11 @@ public class MainActivity extends FragmentActivity {
             geoCallback = null;
             if (!ok) Toast.makeText(this, tr("location_needed"), Toast.LENGTH_LONG).show();
         }
+        if (requestCode == SMS_PERM_REQUEST) {
+            WebView sw = pendingSmsWeb; pendingSmsWeb = null;
+            boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+            smsJs(sw, "{\"type\":\"perm\",\"ok\":" + ok + "}");
+        }
         if (requestCode == MIC_PERM_REQUEST && pendingSpeech != null) {
             String[] ps = pendingSpeech; pendingSpeech = null;
             boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
@@ -2707,6 +2712,7 @@ public class MainActivity extends FragmentActivity {
             ws.setDomStorageEnabled(true);
             adminWeb.addJavascriptInterface(new AdminBridge(), "BIApp");
             adminWeb.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
+            adminWeb.addJavascriptInterface(new SmsBridge(adminWeb), "BISms");
             adminWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -3108,6 +3114,7 @@ public class MainActivity extends FragmentActivity {
             surveyWeb.addJavascriptInterface(new DownloadBridge(), "AndroidDL");
             surveyWeb.addJavascriptInterface(new SpeechBridge(), "BISpeech");
             surveyWeb.addJavascriptInterface(new TtsBridge(), "BITTS");
+            surveyWeb.addJavascriptInterface(new SmsBridge(surveyWeb), "BISms");
             surveyWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -4250,6 +4257,7 @@ public class MainActivity extends FragmentActivity {
         webView.addJavascriptInterface(new AIBridge(), "BIAI");
         webView.addJavascriptInterface(new SpeechBridge(), "BISpeech");
         webView.addJavascriptInterface(new TtsBridge(), "BITTS");
+        webView.addJavascriptInterface(new SmsBridge(webView), "BISms");
 
         webView.setDownloadListener((url, userAgent, contentDisposition, mimeType, contentLength) -> {
             if (STATE_APP) {
@@ -4526,6 +4534,64 @@ public class MainActivity extends FragmentActivity {
             i.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
             speech.startListening(i);
         } catch (Throwable t) { speechJs("error", "aborted"); speechJs("end", ""); }
+    }
+    // ---- Shop Khata: bank / UPI payment SMS. Read on this phone only, only when the khata page asks, only after the user allows it.
+    //      Only messages from sender IDs (not personal numbers) that look like a bank credit / debit are passed on; OTPs are never read out. ----
+    private static final int SMS_PERM_REQUEST = 2105;
+    private static final java.util.regex.Pattern SMS_MONEY = java.util.regex.Pattern.compile("(?i)(rs\\.?|inr|\u20B9)\\s*[\\d,]+");
+    private static final java.util.regex.Pattern SMS_TXN = java.util.regex.Pattern.compile("(?i)\\b(credited|debited|received|deposited|paid|sent|transferred|withdrawn|upi|imps|neft)\\b");
+    private static final java.util.regex.Pattern SMS_SKIP = java.util.regex.Pattern.compile("(?i)(\\botp\\b|one[- ]time|verification code|\\bcvv\\b|will be debited|do not share)");
+    private static final java.util.regex.Pattern SMS_PERSONAL = java.util.regex.Pattern.compile("^\\+?[0-9 ]{8,}$");
+    private WebView pendingSmsWeb;
+    private void smsJs(final WebView w, final String json) {
+        ui.post(() -> { try { if (w != null) w.evaluateJavascript("window.__biSms&&window.__biSms(" + json.replace((char) 0x2028, ' ').replace((char) 0x2029, ' ') + ")", null); } catch (Throwable ignored) { } });
+    }
+    /** Only the app's own Shop Khata page may use the SMS bridge. Call on the UI thread. */
+    private boolean smsPageOk(WebView w) {
+        try {
+            String u = w == null ? null : w.getUrl(); if (u == null) return false;
+            Uri x = Uri.parse(u);
+            return "https".equals(x.getScheme()) && APP_HOST.equals(x.getHost()) && x.getPath() != null && x.getPath().startsWith("/khata");
+        } catch (Throwable t) { return false; }
+    }
+    private void smsRead(final WebView w, final double sinceMs, final int max) {
+        if (!smsPageOk(w)) return;
+        if (checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) { smsJs(w, "{\"type\":\"perm\",\"ok\":false}"); return; }
+        new Thread(() -> {
+            org.json.JSONArray out = new org.json.JSONArray();
+            long floor = System.currentTimeMillis() - 45L * 86400000L, since = Math.max((long) sinceMs, floor);
+            int lim = Math.max(1, Math.min(400, max));
+            android.database.Cursor c = null;
+            try {
+                c = getContentResolver().query(Uri.parse("content://sms/inbox"), new String[]{"_id", "address", "date", "body"}, "date > ?", new String[]{String.valueOf(since)}, "date DESC");
+                while (c != null && c.moveToNext() && out.length() < lim) {
+                    String addr = c.getString(1), body = c.getString(3);
+                    if (body == null || body.length() < 20 || body.length() > 700) continue;
+                    if (addr == null || SMS_PERSONAL.matcher(addr.trim()).matches()) continue;
+                    if (!SMS_MONEY.matcher(body).find() || !SMS_TXN.matcher(body).find() || SMS_SKIP.matcher(body).find()) continue;
+                    JSONObject o = new JSONObject();
+                    o.put("id", c.getLong(0)); o.put("a", addr); o.put("t", c.getLong(2)); o.put("b", body);
+                    out.put(o);
+                }
+            } catch (Throwable ignored) {
+            } finally { if (c != null) try { c.close(); } catch (Throwable ignored) { } }
+            smsJs(w, "{\"type\":\"sms\",\"list\":" + out.toString() + "}");
+        }).start();
+    }
+    private class SmsBridge {
+        private final WebView w;
+        SmsBridge(WebView w) { this.w = w; }
+        @JavascriptInterface public String version() { return "1"; }
+        @JavascriptInterface public String status() { return checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied"; }
+        @JavascriptInterface public void request() {
+            ui.post(() -> {
+                if (!smsPageOk(w)) return;
+                if (checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED) { smsJs(w, "{\"type\":\"perm\",\"ok\":true}"); return; }
+                pendingSmsWeb = w;
+                requestPermissions(new String[]{Manifest.permission.READ_SMS}, SMS_PERM_REQUEST);
+            });
+        }
+        @JavascriptInterface public void read(double sinceMs, int max) { ui.post(() -> smsRead(w, sinceMs, max)); }
     }
     private class SpeechBridge {
         @JavascriptInterface public void start(String lang, boolean partial) { ui.post(() -> startSpeech(lang, partial)); }
