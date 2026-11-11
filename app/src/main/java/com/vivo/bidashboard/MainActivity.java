@@ -473,6 +473,12 @@ public class MainActivity extends FragmentActivity {
             geoCallback = null;
             if (!ok) Toast.makeText(this, tr("location_needed"), Toast.LENGTH_LONG).show();
         }
+        if (requestCode == CONTACT_PERM_REQUEST) {
+            WebView cw = pendingSmsWeb; pendingSmsWeb = null;
+            boolean all = results.length > 0;
+            for (int gr : results) if (gr != PackageManager.PERMISSION_GRANTED) all = false;
+            smsJs(cw, "{\"type\":\"cperm\",\"ok\":" + all + "}");
+        }
         if (requestCode == SMS_PERM_REQUEST) {
             WebView sw = pendingSmsWeb; pendingSmsWeb = null;
             boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
@@ -4538,6 +4544,7 @@ public class MainActivity extends FragmentActivity {
     // ---- Shop Khata: bank / UPI payment SMS. Read on this phone only, only when the khata page asks, only after the user allows it.
     //      Only messages from sender IDs (not personal numbers) that look like a bank credit / debit are passed on; OTPs are never read out. ----
     private static final int SMS_PERM_REQUEST = 2105;
+    private static final int CONTACT_PERM_REQUEST = 2106;
     private static final java.util.regex.Pattern SMS_MONEY = java.util.regex.Pattern.compile("(?i)(rs\\.?|inr|\u20B9)\\s*[\\d,]+");
     private static final java.util.regex.Pattern SMS_TXN = java.util.regex.Pattern.compile("(?i)\\b(credited|debited|received|deposited|paid|sent|transferred|withdrawn|upi|imps|neft)\\b");
     private static final java.util.regex.Pattern SMS_SKIP = java.util.regex.Pattern.compile("(?i)(\\botp\\b|one[- ]time|verification code|\\bcvv\\b|will be debited|do not share)");
@@ -4592,6 +4599,58 @@ public class MainActivity extends FragmentActivity {
             });
         }
         @JavascriptInterface public void read(double sinceMs, int max) { ui.post(() -> smsRead(w, sinceMs, max)); }
+
+        // ---- customer -> phone contact (opt-in). WhatsApp opens a chat directly with a file only for numbers saved in the phone's contacts. ----
+        @JavascriptInterface public String contactStatus() {
+            return checkSelfPermission(Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+                    && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED ? "granted" : "denied";
+        }
+        @JavascriptInterface public void contactRequest() {
+            ui.post(() -> {
+                if (!smsPageOk(w)) return;
+                if ("granted".equals(contactStatus())) { smsJs(w, "{\"type\":\"cperm\",\"ok\":true}"); return; }
+                pendingSmsWeb = w;
+                requestPermissions(new String[]{Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS}, CONTACT_PERM_REQUEST);
+            });
+        }
+        /** Saves the customer as a phone contact unless the number is already there. Returns saved / exists / denied / badnumber / blocked / error. */
+        @JavascriptInterface public String saveContact(String name, String phone) {
+            android.database.Cursor c = null;
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> smsPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "blocked";
+                if (!"granted".equals(contactStatus())) return "denied";
+                String d = phone == null ? "" : phone.replaceAll("\\D", "");
+                if (d.length() == 10) d = "91" + d;
+                if (d.length() < 11 || d.length() > 15) return "badnumber";
+                String num = "+" + d;
+                String nm = name == null || name.trim().isEmpty() ? num : name.trim();
+                if (nm.length() > 60) nm = nm.substring(0, 60);
+                c = getContentResolver().query(Uri.withAppendedPath(android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(num)),
+                        new String[]{android.provider.ContactsContract.PhoneLookup._ID}, null, null, null);
+                if (c != null && c.moveToFirst()) return "exists";
+                java.util.ArrayList<android.content.ContentProviderOperation> ops = new java.util.ArrayList<>();
+                ops.add(android.content.ContentProviderOperation.newInsert(android.provider.ContactsContract.RawContacts.CONTENT_URI)
+                        .withValue(android.provider.ContactsContract.RawContacts.ACCOUNT_TYPE, null)
+                        .withValue(android.provider.ContactsContract.RawContacts.ACCOUNT_NAME, null).build());
+                ops.add(android.content.ContentProviderOperation.newInsert(android.provider.ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(android.provider.ContactsContract.Data.RAW_CONTACT_ID, 0)
+                        .withValue(android.provider.ContactsContract.Data.MIMETYPE, android.provider.ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE)
+                        .withValue(android.provider.ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, nm).build());
+                ops.add(android.content.ContentProviderOperation.newInsert(android.provider.ContactsContract.Data.CONTENT_URI)
+                        .withValueBackReference(android.provider.ContactsContract.Data.RAW_CONTACT_ID, 0)
+                        .withValue(android.provider.ContactsContract.Data.MIMETYPE, android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE)
+                        .withValue(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER, num)
+                        .withValue(android.provider.ContactsContract.CommonDataKinds.Phone.TYPE, android.provider.ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE).build());
+                getContentResolver().applyBatch(android.provider.ContactsContract.AUTHORITY, ops);
+                return "saved";
+            } catch (Throwable t) {
+                return "error";
+            } finally {
+                if (c != null) try { c.close(); } catch (Throwable ignored) { }
+            }
+        }
     }
     private class SpeechBridge {
         @JavascriptInterface public void start(String lang, boolean partial) { ui.post(() -> startSpeech(lang, partial)); }
