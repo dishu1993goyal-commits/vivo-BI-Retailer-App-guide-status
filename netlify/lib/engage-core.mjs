@@ -160,7 +160,7 @@ export async function engageAction(b, ctx) {
     const inM = (ts) => new Date(ts + 5.5 * 3600000).toISOString().slice(0, 7) === month;
     const P = {}, pk = (u) => (u.app + ":" + String(u.username).toLowerCase());
     const add = (u, k, n) => { if (!u || !u.username) return; const id = pk(u); const p = P[id] = P[id] || { user: { app: u.app, username: u.username, fullName: u.fullName, state: u.state || "" }, quiz: 0, visits: 0, practices: 0, likes: 0, points: 0 }; p[k] += n; };
-    (await listOf("qatt:")).filter((a) => inM(a.at)).forEach((a) => add(a.user, "quiz", a.score * 2 + (a.passed ? 5 : 0)));
+    (await listOf("qatt:")).filter((a) => inM(a.at)).forEach((a) => add(a.user, "quiz", a.lhPts != null ? a.lhPts : a.score * 2 + (a.passed ? 5 : 0)));   // Learning Hub lessons carry their own points
     (await listOf("wall:")).filter((w) => inM(w.createdAt)).forEach((w) => { add(w.by, "practices", 1); add(w.by, "likes", Object.keys(w.likes || {}).length); });
     const vks = (await store.list(`visit:${month.replace("-", "")}:`));
     (await pool(vks, 40, (k) => store.get(k))).filter((v) => v && v.status === "closed" && v.valid).forEach((v) => add(Object.assign({ state: v.state }, v.by), "visits", 1));

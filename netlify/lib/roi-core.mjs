@@ -81,6 +81,53 @@ export async function roiAction(b, ctx) {
     if (b.save !== false) { const id = str(b.id, 30).replace(/[^a-z0-9]/gi, "") || t.toString(36) + randomBytes(2).toString("hex"); const old = await store.get(`roi:${id}`); item = { id, input: inp, result: R, ai: null, by: old ? old.by : by, byState: myState || "HO", at: old ? old.at : t, updatedAt: t }; await store.set(`roi:${id}`, item); }
     return json(200, { ok: true, result: R, item });
   }
+  // ---------- 🔮 Scheme simulator: before launch — expected lift, cost, ROI for low / likely / high cases; after launch — forecast vs actual ----------
+  if (b.action === "roi-sim") {
+    const i = b.input || {}, inp = { name: str(i.name, 120), from: str(i.from, 10), to: str(i.to, 10), models: (i.models || []).map((m) => str(m, 60)).filter(Boolean).slice(0, 60), states: isHO ? (i.states || []).map((s) => str(s, 40)).filter(Boolean) : [myState],
+      payout: Math.max(0, Number(i.payout) || 0), eligPct: Math.max(1, Math.min(100, Number(i.eligPct) || 100)), fixed: Math.max(0, Number(i.fixed) || 0), marginPct: Math.max(0, Math.min(100, i.marginPct === "" || i.marginPct == null ? 10 : Number(i.marginPct) || 0)),
+      lifts: [Number(i.liftLow), Number(i.liftMid), Number(i.liftHigh)].map((x, k) => (isFinite(x) && i["lift" + ["Low", "Mid", "High"][k]] !== "" && i["lift" + ["Low", "Mid", "High"][k]] != null ? Math.max(-50, Math.min(300, x)) : [5, 15, 30][k])), notes: str(i.notes, 600) };
+    if (!inp.name) return json(400, { ok: false, error: "Name the scheme." });
+    if (!okDate(inp.from) || !okDate(inp.to) || inp.to < inp.from) return json(400, { ok: false, error: "Enter the planned start and end dates." });
+    if (!inp.models.length) return json(400, { ok: false, error: "Tick the scheme models." });
+    const len = (D(inp.to) - D(inp.from)) / 864e5 + 1, today = new Date(t + 19800000).toISOString().slice(0, 10);
+    // baseline = the latest same-length window of real sales that ends before the scheme starts (and not in the future)
+    const end = iso(Math.min(D(inp.from) - 864e5, D(today) - 864e5)), start = iso(D(end) - (len - 1) * 864e5);
+    const S = await loadSales(store, pool, { fromM: start.slice(0, 7), toM: end.slice(0, 7), states: inp.states.length ? inp.states : null });
+    if (!S.rows.length) return json(400, { ok: false, error: "No sell-out data for the weeks before this scheme. Upload sell-out in the “Sell-out data” tab first." });
+    const models = new Set(inp.models.map(nk)), isS = (r) => models.has(nk(r.mo)), B0 = sum(S.rows, start, end, isS);
+    if (!(B0.u > 0)) return json(400, { ok: false, error: "The scheme models have no sales in the baseline weeks (" + start + " to " + end + "), so there is nothing to project from." });
+    const asp = B0.v > 0 ? B0.v / B0.u : Math.max(0, Number(i.asp) || 0), mUnit = asp * inp.marginPct / 100, pay = inp.payout * inp.eligPct / 100;
+    const mk = (lift) => { const units = B0.u * (1 + lift / 100), extra = units - B0.u, cost = units * pay + inp.fixed, em = extra * mUnit; return { lift, units: r0(units), extra: r0(extra), cost: r0(cost), extraMargin: r0(em), net: r0(em - cost), roiPct: cost > 0 ? r1((em - cost) / cost * 100) : null, costPerExtra: extra > 0 ? r0(cost / extra) : null, costPctOfSales: units * asp > 0 ? r1(cost / (units * asp) * 100) : null }; };
+    const cases = inp.lifts.map(mk), be = mUnit > pay ? r1((B0.u * pay + inp.fixed) / (B0.u * (mUnit - pay)) * 100) : null;
+    // what similar past schemes actually delivered (saved ROI analyses)
+    const past = (await pool(await store.list("roi:"), 30, (k) => store.get(k))).filter((x) => x && x.result && x.result.upliftPct != null && (isHO || x.byState === myState)).map((x) => ({ name: x.input.name, uplift: x.result.upliftPct, roi: x.result.roiPct })).slice(0, 40);
+    const bySt = {}; S.rows.forEach((r) => { if (!isS(r)) return; const f = frac(r, start, end); if (f) bySt[r.st || "—"] = (bySt[r.st || "—"] || 0) + r.u * f; });
+    const R = { baseline: { from: start, to: end, units: r0(B0.u), days: len, asp: r0(asp), aspManual: !(B0.v > 0), source: S.source }, marginPerUnit: r0(mUnit), payoutPerUnit: r1(pay), cases, breakEvenLift: be, past: { n: past.length, avgUplift: past.length ? r1(past.reduce((a, x) => a + x.uplift, 0) / past.length) : null, items: past.slice(0, 8) },
+      byState: Object.keys(bySt).map((k) => ({ name: k, base: r0(bySt[k]), likely: r0(bySt[k] * (1 + inp.lifts[1] / 100)), cost: r0(bySt[k] * (1 + inp.lifts[1] / 100) * pay) })).sort((a, c) => c.base - a.base).slice(0, 40),
+      verdict: be == null ? "Payout per unit is more than the margin per unit — this scheme cannot pay for itself at any lift" : be <= inp.lifts[0] ? "Pays for itself even in the low case" : be <= inp.lifts[1] ? "Pays for itself in the likely case — not in the low case" : be <= inp.lifts[2] ? "Only pays for itself in the high case" : "Does not pay for itself in any of the three cases", tone: be == null ? "r" : be <= inp.lifts[0] ? "g" : be <= inp.lifts[1] ? "g" : be <= inp.lifts[2] ? "o" : "r" };
+    if (!(asp > 0)) return json(400, { ok: false, error: "The sell-out data has no sales value, so enter the average selling price (₹ per unit)." });
+    const id = str(b.id, 30).replace(/[^a-z0-9]/gi, "") || t.toString(36) + randomBytes(2).toString("hex"), old = await store.get(`roisim:${id}`);
+    const item = { id, input: inp, result: R, roiId: old ? old.roiId || "" : "", by: old ? old.by : by, byState: myState || "HO", at: old ? old.at : t, updatedAt: t };
+    await store.set(`roisim:${id}`, item); return json(200, { ok: true, item });
+  }
+  if (b.action === "roi-sim-list") {
+    const L = (await pool(await store.list("roisim:"), 30, (k) => store.get(k))).filter((x) => x && (isHO || x.byState === myState));
+    const out = await pool(L.sort((a, c) => c.updatedAt - a.updatedAt).slice(0, 60), 10, async (x) => { const act = x.roiId ? await store.get(`roi:${x.roiId}`) : null; return { id: x.id, name: x.input.name, from: x.input.from, to: x.input.to, likely: x.result.cases[1], breakEvenLift: x.result.breakEvenLift, tone: x.result.tone, verdict: x.result.verdict, by: x.by, actual: act ? { uplift: act.result.upliftPct, roi: act.result.roiPct, extra: act.result.units.extra, cost: act.result.cost.total } : null }; });
+    return json(200, { ok: true, items: out });
+  }
+  if (b.action === "roi-sim-get") { const x = await store.get(`roisim:${str(b.id, 30)}`); if (!x || !(isHO || x.byState === myState)) return json(404, { ok: false, error: "Not found." }); const act = x.roiId ? await store.get(`roi:${x.roiId}`) : null; return json(200, { ok: true, item: x, actual: act ? { id: act.id, uplift: act.result.upliftPct, roi: act.result.roiPct, units: act.result.units, cost: act.result.cost.total, costEst: !!act.result.cost.estimated, costPerExtra: act.result.costPerExtraUnit, verdict: act.result.verdict, tone: act.result.tone } : null }); }
+  if (b.action === "roi-sim-delete") { const x = await store.get(`roisim:${str(b.id, 30)}`); if (x && (isHO || x.by === by)) await store.delete(`roisim:${x.id}`); return json(200, { ok: true }); }
+  if (b.action === "roi-sim-measure") {   // the scheme has run — measure the real result with the same inputs and keep it next to the forecast
+    const x = await store.get(`roisim:${str(b.id, 30)}`); if (!x || !(isHO || x.byState === myState)) return json(404, { ok: false, error: "Not found." });
+    const today = new Date(t + 19800000).toISOString().slice(0, 10); if (x.input.from > today) return json(400, { ok: false, error: "This scheme hasn't started yet." });
+    const inp = { name: x.input.name, spol: "", from: x.input.from, to: x.input.to, models: x.input.models, states: x.input.states, cost: 0, otherCost: x.input.fixed, marginPct: x.input.marginPct, notes: x.input.notes };
+    let R = await analyse(store, pool, inp); if (R.error) return json(400, { ok: false, error: R.error });
+    // no payouts published under this scheme name yet → estimate the payout from the real units sold (same payout per unit as the simulation), and say so
+    if (!(R.cost.payouts > 0) && x.result.payoutPerUnit > 0) { inp.cost = Math.round(R.units.during * x.result.payoutPerUnit); inp.costEst = true; R = await analyse(store, pool, inp); if (R.error) return json(400, { ok: false, error: R.error }); R.cost.estimated = true; }
+    const rid = x.roiId || t.toString(36) + randomBytes(2).toString("hex"), old = await store.get(`roi:${rid}`);
+    await store.set(`roi:${rid}`, { id: rid, input: inp, result: R, ai: old ? old.ai : null, by: old ? old.by : by, byState: myState || "HO", at: old ? old.at : t, updatedAt: t, sim: x.id });
+    x.roiId = rid; await store.set(`roisim:${x.id}`, x); return json(200, { ok: true, roiId: rid });
+  }
   if (b.action === "roi-list") {
     const L = (await pool(await store.list("roi:"), 30, (k) => store.get(k))).filter((x) => x && (isHO || x.byState === myState || (x.input.states || []).some((s) => low(s) === low(myState))));
     return json(200, { ok: true, items: L.sort((a, c) => c.updatedAt - a.updatedAt).map((x) => ({ id: x.id, name: x.input.name, from: x.input.from, to: x.input.to, states: x.input.states, models: x.input.models.length, uplift: x.result.upliftPct, roi: x.result.roiPct, extra: x.result.units.extra, cost: x.result.cost.total, cpu: x.result.costPerExtraUnit, verdict: x.result.verdict, tone: x.result.tone, by: x.by, at: x.updatedAt, ai: !!x.ai })) });

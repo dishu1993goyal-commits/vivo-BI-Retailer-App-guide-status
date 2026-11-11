@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>New-launch tracker</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:20px;font-weight:800;margin-top:2px}.kt .s{font-size:11px;color:var(--mut);margin-top:2px}
+.kt.g .v{color:#13693F}.kt.r .v{color:#B42318}.kt.o .v{color:#9A5B00}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 4px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart{background:var(--card);border-radius:16px;padding:12px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.li{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 1px 7px rgba(20,24,51,.06);cursor:pointer}.li b{font-size:14.5px}.li .d{font-size:11.5px;color:var(--mut);margin-top:3px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#666}
+.bar{height:8px;border-radius:99px;background:#EEF0F6;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;border-radius:99px;background:#5B4CFF}.bar i.g{background:#0F8A55}.bar i.o{background:#F2A93B}.bar i.r{background:#E5484D}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:right;padding:7px 6px;white-space:nowrap}.tb th:first-child,.tb td:first-child{text-align:left}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;text-align:right;white-space:nowrap}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.ck{display:grid;grid-template-columns:1fr 70px 70px;gap:6px;align-items:center;margin-top:6px;font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🚀</span></div>
+  <h1>New-launch tracker</h1><p>For each launch: is every state ready — stock, display, demo, trained promoters — and is sell-out on plan in the first 30 days.</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), HO = false, MYST = "", CUR = null, DEF = [];
+  var tone = function (p) { return p == null ? "m" : p >= 90 ? "g" : p >= 60 ? "o" : "r"; }, pc = function (p) { return p == null ? "—" : p + "%"; };
+  window.__pageBack = function () { if (!CUR) return false; CUR = null; list(); return true; };
+  function list() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "lt-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      HO = r.isHO; MYST = r.myState; DEF = r.defCheck;
+      VIEW.innerHTML = (HO ? '<button class="btn pri block" id="nw">🚀 Set up a new launch</button>' : "") +
+        (r.items.length ? r.items.map(function (x) { return '<div class="li" data-id="' + x.id + '"><div class="row"><b style="flex:1">' + esc(x.model) + '</b><span class="pill ' + (x.status === "closed" ? "m" : x.dayN === 0 ? "" : x.dayN >= 30 ? "m" : "g") + '">' + (x.status === "closed" ? "closed" : x.dayN === 0 ? "launches " + dayLabel(x.date) : x.dayN >= 30 ? "30 days done" : "day " + x.dayN + " of 30") + '</span></div><div class="d">Launch ' + dayLabel(x.date) + " · " + x.states.length + " state" + (x.states.length > 1 ? "s" : "") + '</div><div class="g2" style="margin-top:8px"><div><div class="d">Readiness ' + pc(x.ready) + '</div><div class="bar"><i class="' + tone(x.ready) + '" style="width:' + (x.ready || 0) + '%"></i></div></div><div><div class="d">Sell-out ' + fmtN(x.sold) + (x.plan ? " / " + fmtN(x.plan) + " (" + pc(x.ach) + ")" : "") + '</div><div class="bar"><i class="' + tone(x.ach) + '" style="width:' + Math.min(100, x.ach || 0) + '%"></i></div></div></div></div>'; }).join("")
+          : '<div class="help">' + (HO ? "No launches yet. Set one up: model, launch date, states, 30-day sell-out plan per state and the readiness checklist. State teams then fill their numbers." : "No launches for your state yet.") + "</div>") +
+        '<div class="help"><b>Readiness</b> = average of the checklist items the state has filled (done ÷ total). <b>Sell-out</b> comes automatically from the sell-out data (Scheme ROI → Sell-out data) for the launch model, from launch day to day 30.</div>';
+      if ($("nw")) $("nw").onclick = function () { setup(null); };
+      [].forEach.call(VIEW.querySelectorAll("[data-id]"), function (d) { d.onclick = function () { CUR = d.dataset.id; show(); window.scrollTo(0, 0); }; });
+    });
+  }
+  function show() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "lt-get", id: CUR }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var X = r.item, S = X.states, mine = S.find(function (s) { return String(s.state).toLowerCase() === String(MYST || "").toLowerCase(); });
+      var h = '<div class="row" style="gap:6px"><button class="btn ghost sm" id="bk">← Launches</button><span style="flex:1"></span>' + (HO ? '<button class="btn sec sm" id="ed">✏️ Set-up</button>' : "") + '<button class="btn sec sm" id="xl">⬇ Excel</button></div>' +
+        '<div class="card" style="margin-top:8px"><h2 style="margin:0;font-size:20px">' + esc(X.model) + '</h2><div class="muted" style="font-size:12.5px">Launch ' + dayLabel(X.date) + " · " + (X.dayN === 0 ? "not launched yet" : "day " + Math.min(X.dayN, 30) + " of 30") + "</div></div>" +
+        '<div class="kp"><div class="kt ' + tone(X.ready) + '"><div class="l">Readiness</div><div class="v">' + pc(X.ready) + '</div><div class="s">across ' + S.length + ' states</div></div><div class="kt ' + tone(X.ach) + '"><div class="l">Sell-out vs plan</div><div class="v">' + pc(X.ach) + '</div><div class="s">' + fmtN(X.sold) + " of " + fmtN(X.plan) + '</div></div><div class="kt"><div class="l">States not started</div><div class="v">' + S.filter(function (s) { return s.ready == null; }).length + '</div><div class="s">no checklist yet</div></div></div>';
+      if (!X.hasSell) h += '<div class="help">No sell-out rows found yet for “' + esc(X.model) + "”" + (X.aliases.length ? " (or " + esc(X.aliases.join(", ")) + ")" : "") + ". Upload sell-out (Scheme ROI → Sell-out data) with this exact model name, or add the other spelling under Set-up → “also called”.</div>";
+      if (X.days.length > 1) h += '<div class="sh"><span>📈 Daily sell-out since launch</span></div><div class="chart">' + BICH.lines({ labels: X.days.map(function (d) { return dayLabel(d.d); }), series: [{ name: "Units", values: X.days.map(function (d) { return d.u; }), color: "#5B4CFF" }] }) + "</div>";
+      if (mine || HO) h += '<div class="sh"><span>✍️ ' + (HO ? "Update a state" : "Update " + esc(mine.state)) + '</span></div><div class="card">' + (HO ? '<select class="tx" id="ust">' + S.map(function (s) { return "<option>" + esc(s.state) + "</option>"; }).join("") + "</select>" : "") + '<div class="ck" style="font-weight:800;color:var(--mut);font-size:11px"><span>Checklist</span><span>Done</span><span>Total</span></div><div id="ucl"></div><label class="lb">Note (blockers, what you need from HO)</label><input class="tx" id="un" maxlength="300"><button class="btn pri block" id="usv" style="margin-top:10px">Save</button></div>';
+      h += '<div class="sh"><span>🗺️ State by state</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Ready</th>' + X.checklist.map(function (c) { return "<th>" + esc(c.label.replace(/^Stores with |^Promoters /, "")) + "</th>"; }).join("") + "<th>Sold</th><th>Plan</th><th>vs plan</th><th>Pace</th></tr>" +
+        S.slice().sort(function (a, b) { return (a.ready == null ? -1 : a.ready) - (b.ready == null ? -1 : b.ready); }).map(function (s) { return "<tr><td><b>" + esc(s.state) + '</b></td><td><span class="pill ' + tone(s.ready) + '">' + pc(s.ready) + "</span></td>" + s.items.map(function (i) { return "<td>" + (i.total ? i.done + "/" + i.total : "—") + "</td>"; }).join("") + "<td>" + fmtN(s.sold) + "</td><td>" + (s.plan ? fmtN(s.plan) : "—") + "</td><td>" + pc(s.ach) + '</td><td><span class="pill ' + tone(s.pace) + '">' + pc(s.pace) + "</span></td></tr>"; }).join("") + "</table></div>" +
+        '<div class="help"><b>Pace</b> = sell-out so far ÷ the plan expected by today (plan × days passed ÷ 30). 100% means exactly on plan.</div>';
+      var notes = S.filter(function (s) { return s.note; }); if (notes.length) h += '<div class="sh"><span>📝 Notes from states</span></div>' + notes.map(function (s) { return '<div class="li" style="cursor:default"><b>' + esc(s.state) + '</b><div class="d">' + esc(s.note) + " — " + esc(s.by) + ", " + dt(s.at) + "</div></div>"; }).join("");
+      VIEW.innerHTML = h;
+      $("bk").onclick = function () { window.__pageBack(); };
+      if ($("ed")) $("ed").onclick = function () { setup(Object.assign({}, X, { plan: r.plan || {}, states: S.map(function (s) { return s.state; }) })); };
+      $("xl").onclick = function () { download(xlsx([{ name: X.model.slice(0, 28), rows: [["State", "Readiness %"].concat(X.checklist.map(function (c) { return c.label + " (done/total)"; })).concat(["Sold", "30-day plan", "Achievement %", "Pace %", "Note", "Updated by"])].concat(S.map(function (s) { return [s.state, s.ready].concat(s.items.map(function (i) { return i.total ? i.done + "/" + i.total : ""; })).concat([s.sold, s.plan, s.ach, s.pace, s.note, s.by]); })) }]), "Launch_" + X.model.replace(/\W+/g, "_") + ".xlsx"); };
+      if ($("usv")) {
+        var fill = function () { var st = $("ust") ? $("ust").value : mine.state, s = S.find(function (y) { return y.state === st; }); $("ucl").innerHTML = s.items.map(function (i) { return '<div class="ck"><span>' + esc(i.label) + '</span><input class="tx" type="number" data-d="' + i.k + '" value="' + (i.total ? i.done : "") + '"><input class="tx" type="number" data-t="' + i.k + '" value="' + (i.total || "") + '"></div>'; }).join(""); $("un").value = s.note || ""; };
+        fill(); if ($("ust")) $("ust").onchange = fill;
+        $("usv").onclick = function () { var vals = {}; X.checklist.forEach(function (c) { vals[c.k] = { done: document.querySelector('[data-d="' + c.k + '"]').value, total: document.querySelector('[data-t="' + c.k + '"]').value }; });
+          api({ action: "lt-update", id: X.id, state: $("ust") ? $("ust").value : mine.state, vals: vals, note: $("un").value }).then(function (x) { if (!x.ok) return toast(x.error); toast("✅ Saved"); show(); }); };
+      }
+    });
+  }
+  function setup(L) {
+    L = L || { states: [], plan: {}, checklist: DEF.map(function (c) { return { k: c[0], label: c[1] }; }), aliases: [], status: "live" };
+    VIEW.innerHTML = '<div class="card"><label class="lb">Model</label><input class="tx" id="sm" value="' + esc(L.model || "") + '" placeholder="e.g. V60 5G"><label class="lb">Also called (other spellings in the sell-out data, comma separated)</label><input class="tx" id="sa" value="' + esc((L.aliases || []).join(", ")) + '">' +
+      '<div class="g2"><div><label class="lb">Launch date</label><input class="tx" type="date" id="sd" value="' + esc(L.date || "") + '"></div><div><label class="lb">Status</label><select class="tx" id="ss"><option value="live">Live</option><option value="closed"' + (L.status === "closed" ? " selected" : "") + ">Closed</option></select></div></div>" +
+      '<label class="lb">States and 30-day sell-out plan — one per line: <b>State, units</b></label><textarea class="tx" id="sp" style="min-height:140px" placeholder="Haryana, 1200&#10;Rajasthan, 900&#10;Delhi, 1500">' + esc(L.states.map(function (s) { return s + ", " + (L.plan[s] || ""); }).join("\n")) + "</textarea>" +
+      '<label class="lb">Readiness checklist — one per line (states fill done ÷ total for each)</label><textarea class="tx" id="sc" style="min-height:120px">' + esc(L.checklist.map(function (c) { return c.label; }).join("\n")) + "</textarea>" +
+      '<button class="btn pri block" id="sv" style="margin-top:12px">Save launch</button>' + (L.id ? '<button class="btn ghost block" id="dl" style="margin-top:6px;color:#B42318">Delete this launch</button>' : "") + '<button class="btn ghost block" id="cn" style="margin-top:6px">Cancel</button></div>';
+    $("cn").onclick = function () { if (CUR) show(); else list(); };
+    if ($("dl")) $("dl").onclick = function () { if (!confirm("Delete this launch and every state's numbers?")) return; api({ action: "lt-delete", id: L.id }).then(function () { CUR = null; list(); }); };
+    $("sv").onclick = function () { var states = [], plan = {}; $("sp").value.split("\n").forEach(function (ln) { var a = ln.split(/[,\t]/), s = (a[0] || "").trim(); if (!s) return; states.push(s); plan[s] = (a[1] || "").replace(/[^\d.]/g, ""); });
+      var old = {}; (L.checklist || []).forEach(function (c) { old[c.label] = c.k; });
+      api({ action: "lt-save", launch: { id: L.id, model: $("sm").value, aliases: $("sa").value, date: $("sd").value, status: $("ss").value, states: states, plan: plan, checklist: $("sc").value.split("\n").map(function (x) { x = x.trim(); return { label: x, k: old[x] || "" }; }).filter(function (c) { return c.label; }) } }).then(function (r) { if (!r.ok) return toast(r.error); toast("✅ Saved"); CUR = r.id; show(); }); };
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  list();
+})();
+</script>
+</body>
+</html>

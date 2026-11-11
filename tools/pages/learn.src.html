@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Learning Hub</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:20px;font-weight:800;margin-top:2px}.kt .s{font-size:11px;color:var(--mut);margin-top:2px}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 4px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.li{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 1px 7px rgba(20,24,51,.06);cursor:pointer}.li b{font-size:14px}.li .d{font-size:11.5px;color:var(--mut);margin-top:3px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.m{background:#F1F2F6;color:#666}
+.vid{position:relative;padding-top:56.25%;border-radius:14px;overflow:hidden;background:#000;margin-top:8px}.vid iframe,.vid video{position:absolute;inset:0;width:100%;height:100%;border:0}
+.pts{margin:8px 0 0;padding-left:20px;font-size:13.5px;line-height:1.7}
+.qq{background:var(--card);border-radius:14px;padding:12px;margin-top:8px;box-shadow:0 1px 7px rgba(20,24,51,.06)}.qq b{font-size:13.5px}.qq label{display:block;border:1.5px solid #DADDF0;border-radius:11px;padding:9px 10px;font-size:13px;margin-top:6px;cursor:pointer}.qq input{display:none}.qq label:has(input:checked){background:#EEF0FF;border-color:#5B4CFF;font-weight:700}
+.qq label.ok{background:#E6F4EA;border-color:#3CC07E}.qq label.no{background:#FDECEC;border-color:#E86A5F}
+.res{border-radius:18px;padding:16px;color:#fff;text-align:center;margin-top:10px}.res.g{background:linear-gradient(135deg,#0F8A55,#3CC07E)}.res.o{background:linear-gradient(135deg,#C97800,#F2A93B)}.res h2{margin:4px 0;font-size:26px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:7px 6px}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.qe{border:1px dashed #C9CEE6;border-radius:12px;padding:9px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎓</span></div>
+  <h1>Learning Hub</h1><p>2-minute lessons on new launches, the app and the dashboard. Pass the quiz, earn points and a certificate.</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "list", HO = false, CUR = null, TOPF = "", TOPICS = { launch: "🚀 New launch", app: "📱 Retailer app", dashboard: "📊 Dashboard", selling: "💬 Selling skills", process: "🔀 Process" };
+  window.__pageBack = function () { if (CUR) { CUR = null; draw(); return true; } if (TAB === "list") return false; TAB = "list"; draw(); return true; };
+  function draw() {
+    var tabs = [["list", "📚 Lessons"], ["rep", "📈 Progress"]]; if (HO) tabs.push(["new", "➕ Add lesson"]);
+    VIEW.innerHTML = '<div class="seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] && !CUR ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { CUR = null; TAB = b.dataset.t; draw(); }; });
+    if (CUR) return open(CUR);
+    ({ list: tList, rep: tRep, "new": function () { edit(null); } })[TAB]();
+  }
+  function embed(u) { u = String(u || ""); var m = /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,})/.exec(u); if (m) return '<div class="vid"><iframe src="https://www.youtube-nocookie.com/embed/' + m[1] + '?rel=0" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';
+    if (/\.(mp4|webm)(\?|$)/i.test(u)) return '<div class="vid"><video src="' + esc(u) + '" controls playsinline preload="metadata"></video></div>';
+    return u ? '<a class="btn sec block" style="margin-top:8px" href="' + esc(u) + '" target="_blank" rel="noopener">▶ Open the video</a>' : ""; }
+  function tList() {
+    api({ action: "lh-list" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var L = r.items, done = L.filter(function (x) { return x.mine.passed; }).length, live = L.filter(function (x) { return x.status === "live"; });
+      var show = L.filter(function (x) { return !TOPF || x.topic === TOPF; });
+      $("tp").innerHTML = '<div class="kp"><div class="kt"><div class="l">Lessons</div><div class="v">' + live.length + '</div><div class="s">available to you</div></div><div class="kt"><div class="l">Certified</div><div class="v" style="color:#13693F">' + done + '</div><div class="s">quizzes passed</div></div><div class="kt"><div class="l">To do</div><div class="v" style="color:#9A5B00">' + (live.length - done) + '</div><div class="s">not passed yet</div></div></div>' +
+        '<div class="seg" style="margin-top:10px;overflow-x:auto">' + [["", "All"]].concat(Object.keys(TOPICS).map(function (k) { return [k, TOPICS[k]]; })).map(function (t) { return '<button data-tf="' + t[0] + '" class="' + (TOPF === t[0] ? "on" : "") + '" style="white-space:nowrap">' + t[1] + "</button>"; }).join("") + "</div>" +
+        (show.length ? show.map(function (x) { var m = x.mine; return '<div class="li" data-id="' + x.id + '"><div class="row"><b style="flex:1">' + esc(x.title) + "</b>" + (x.status !== "live" ? '<span class="pill m">draft</span>' : m.passed ? '<span class="pill g">🎓 Certified ' + m.pct + "%</span>" : m.pct != null ? '<span class="pill o">' + m.pct + "% — retry</span>" : m.seen ? '<span class="pill">quiz pending</span>' : '<span class="pill">NEW</span>') + '</div><div class="d">' + (TOPICS[x.topic] || "") + (x.model ? " · " + esc(x.model) : "") + " · ⏱ " + x.mins + " min · " + x.nq + " questions · 🏅 " + x.pts + " pts</div></div>"; }).join("") : '<div class="help">' + (HO ? "No lessons yet — tap “Add lesson”. Paste a product note and AI drafts the key points and the quiz." : "No lessons here yet.") + "</div>") +
+        '<div class="help">Passing a quiz adds to your <b>Engage leaderboard</b> score and to <b>Rewards</b> points (if HO has switched on the “training quiz passed” rule).</div>';
+      [].forEach.call($("tp").querySelectorAll("[data-tf]"), function (b) { b.onclick = function () { TOPF = b.dataset.tf; tList(); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-id]"), function (d) { d.onclick = function () { CUR = d.dataset.id; draw(); window.scrollTo(0, 0); }; });
+    });
+  }
+  function open(id) {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "lh-get", id: id }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var L = r.lesson, m = r.mine, t0 = Date.now();
+      $("tp").innerHTML = '<div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="bk">← Lessons</button><span style="flex:1"></span>' + (HO ? '<button class="btn sec sm" id="ed">✏️ Edit</button><button class="btn ghost sm" id="dl">🗑</button>' : "") + "</div>" +
+        '<div class="card"><div class="d" style="font-size:11.5px;color:var(--mut)">' + (TOPICS[L.topic] || "") + (L.model ? " · " + esc(L.model) : "") + " · ⏱ " + L.mins + ' min</div><h2 style="margin:4px 0 0;font-size:19px">' + esc(L.title) + "</h2>" + embed(L.video) +
+        (L.points.length ? '<div class="sh" style="margin-top:12px"><span>🎯 Say this to the customer</span></div><ol class="pts">' + L.points.map(function (p) { return "<li>" + esc(p) + "</li>"; }).join("") + "</ol>" : "") + (L.body ? '<div style="font-size:13px;line-height:1.7;margin-top:10px;white-space:pre-wrap">' + esc(L.body) + "</div>" : "") + "</div>" +
+        (m ? '<div class="help">Your best score: <b>' + m.pct + "%</b> (" + m.score + "/" + m.total + ") · " + (m.passed ? "🎓 certified — certificate no. <b>" + esc(m.certNo) + "</b>" : "need " + L.passPct + "% to pass") + "</div>" : "") +
+        (L.questions.length ? '<div class="sh"><span>📝 Quiz — ' + L.questions.length + " questions, pass at " + L.passPct + '%</span></div><div id="qz">' + L.questions.map(function (q, i) { return '<div class="qq" data-q="' + i + '"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (o, k) { return '<label><input type="radio" name="q' + i + '" value="' + k + '">' + esc(o) + "</label>"; }).join("") + '<div class="why" style="font-size:12px;color:var(--mut);margin-top:6px"></div></div>'; }).join("") + '</div><button class="btn pri block" id="sub" style="margin-top:12px">Submit answers</button><div id="rs"></div>' : '<div class="help">No quiz on this lesson yet.</div>');
+      $("bk").onclick = function () { window.__pageBack(); };
+      if ($("ed")) $("ed").onclick = function () { edit(Object.assign({}, L, { questions: L.questions.map(function (q, i) { return { q: q.q, options: q.options, correct: r.lesson.answers[i].correct, why: r.lesson.answers[i].why }; }) })); };
+      if ($("dl")) $("dl").onclick = function () { if (!confirm("Delete this lesson and everyone's results for it?")) return; api({ action: "lh-delete", id: L.id }).then(function () { CUR = null; draw(); }); };
+      if ($("sub")) $("sub").onclick = function () {
+        var ans = L.questions.map(function (q, i) { var c = document.querySelector('input[name="q' + i + '"]:checked'); return c ? +c.value : -1; });
+        if (ans.indexOf(-1) >= 0) return toast("Answer every question");
+        var b = this; b.disabled = true;
+        api({ action: "lh-submit", id: L.id, answers: ans, secs: Math.round((Date.now() - t0) / 1000) }).then(function (x) { b.disabled = false; if (!x.ok) return toast(x.error);
+          x.review.forEach(function (q, i) { var box = document.querySelector('.qq[data-q="' + i + '"]'); [].forEach.call(box.querySelectorAll("label"), function (lb, k) { lb.classList.remove("ok", "no"); if (k === q.correct) lb.classList.add("ok"); else if (k === q.yours) lb.classList.add("no"); }); box.querySelector(".why").textContent = q.why || ""; });
+          $("rs").innerHTML = '<div class="res ' + (x.passed ? "g" : "o") + '"><div>' + (x.passed ? "🎓 Certified!" : "Not passed yet") + "</div><h2>" + x.pct + "%</h2><div>" + x.score + " of " + x.total + " correct · pass mark " + x.passPct + "%" + (x.passed ? "<br>Certificate no. <b>" + esc(x.certNo) + "</b> · +" + x.pts + " points" : "<br>Read the green answers above and try again") + "</div></div>";
+          b.textContent = x.passed ? "Try again for a better score" : "Try again"; $("rs").scrollIntoView({ behavior: "smooth", block: "center" }); });
+      };
+    });
+  }
+  function edit(L) {
+    L = L || { topic: "launch", mins: 2, passPct: 70, pts: 20, points: [], questions: [], states: [], status: "draft" };
+    var Q = (L.questions || []).map(function (q) { return { q: q.q, options: q.options.slice(), correct: q.correct, why: q.why || "" }; });
+    $("tp").innerHTML = '<div class="card"><div class="help" style="margin-top:0"><b>Fastest way:</b> paste the product note or feature text below and tap “AI: draft points & quiz”. Then check, fix and publish.</div>' +
+      '<label class="lb">Title</label><input class="tx" id="et" value="' + esc(L.title || "") + '" placeholder="e.g. V50 — camera in 2 minutes">' +
+      '<div class="g2"><div><label class="lb">Topic</label><select class="tx" id="eto">' + Object.keys(TOPICS).map(function (k) { return '<option value="' + k + '"' + (L.topic === k ? " selected" : "") + ">" + TOPICS[k] + "</option>"; }).join("") + '</select></div><div><label class="lb">Model (if a launch)</label><input class="tx" id="em" value="' + esc(L.model || "") + '"></div></div>' +
+      '<label class="lb">Video link (YouTube or .mp4, https)</label><input class="tx" id="ev" value="' + esc(L.video || "") + '" placeholder="https://youtu.be/…">' +
+      '<label class="lb">Source text for AI (product note, feature list, process steps)</label><textarea class="tx" id="es" style="min-height:90px" placeholder="Paste here…"></textarea><button class="btn sec block" id="eai" style="margin-top:6px">✨ AI: draft points & quiz</button>' +
+      '<label class="lb">Key points — one per line (what the promoter should say)</label><textarea class="tx" id="ep" style="min-height:110px">' + esc((L.points || []).join("\n")) + "</textarea>" +
+      '<label class="lb">Extra notes (optional)</label><textarea class="tx" id="eb" style="min-height:60px">' + esc(L.body || "") + "</textarea>" +
+      '<div class="sh"><span>📝 Quiz questions</span><button class="btn sec sm" id="eq">＋ Question</button></div><div id="eql"></div>' +
+      '<div class="g2"><div><label class="lb">Pass mark %</label><input class="tx" type="number" id="epp" value="' + esc(L.passPct) + '"></div><div><label class="lb">Minutes</label><input class="tx" type="number" id="emi" value="' + esc(L.mins) + '"></div></div>' +
+      '<div class="g2"><div><label class="lb">Points on passing</label><input class="tx" type="number" id="ept" value="' + esc(L.pts) + '"></div><div><label class="lb">States (comma separated, blank = all)</label><input class="tx" id="est" value="' + esc((L.states || []).join(", ")) + '"></div></div>' +
+      '<div class="g2" style="margin-top:12px"><button class="btn sec" id="sd">Save as draft</button><button class="btn pri" id="sl">Publish</button></div></div>';
+    var drawQ = function () { $("eql").innerHTML = Q.map(function (q, i) { return '<div class="qe"><input class="tx" data-qq="' + i + '" value="' + esc(q.q) + '" placeholder="Question ' + (i + 1) + '">' + [0, 1, 2, 3].map(function (k) { return '<div class="row" style="gap:6px;margin-top:5px"><input type="radio" name="c' + i + '" value="' + k + '"' + (q.correct === k ? " checked" : "") + ' title="correct answer"><input class="tx" data-qo="' + i + ":" + k + '" value="' + esc(q.options[k] || "") + '" placeholder="Option ' + (k + 1) + '"></div>'; }).join("") + '<input class="tx" data-qw="' + i + '" value="' + esc(q.why) + '" placeholder="Why this is right (shown after answering)" style="margin-top:5px"><div style="text-align:right;margin-top:4px"><a href="#" data-qx="' + i + '" style="color:#B42318;font-size:12px">remove</a></div></div>'; }).join("") || '<div class="muted" style="font-size:12.5px">No questions yet. Tick the round button next to the correct option.</div>';
+      [].forEach.call($("eql").querySelectorAll("[data-qx]"), function (a) { a.onclick = function (e) { e.preventDefault(); read(); Q.splice(+a.dataset.qx, 1); drawQ(); }; }); };
+    var read = function () { Q.forEach(function (q, i) { var e = document.querySelector('[data-qq="' + i + '"]'); if (!e) return; q.q = e.value; q.options = [0, 1, 2, 3].map(function (k) { return document.querySelector('[data-qo="' + i + ":" + k + '"]').value; }); var c = document.querySelector('input[name="c' + i + '"]:checked'); q.correct = c ? +c.value : 0; q.why = document.querySelector('[data-qw="' + i + '"]').value; }); };
+    drawQ();
+    $("eq").onclick = function () { read(); Q.push({ q: "", options: ["", "", "", ""], correct: 0, why: "" }); drawQ(); };
+    $("eai").onclick = function () { var b = this; b.disabled = true; b.textContent = "Drafting…"; api({ action: "lh-ai", title: $("et").value, text: $("es").value }).then(function (r) { b.disabled = false; b.textContent = "✨ AI: draft points & quiz"; if (!r.ok) return toast(r.error); if (!$("et").value) $("et").value = r.draft.title; $("ep").value = r.draft.points.join("\n"); Q = r.draft.questions; drawQ(); toast("✨ Drafted — please check every answer"); }); };
+    var save = function (status) { read(); var body = { id: L.id, title: $("et").value, topic: $("eto").value, model: $("em").value, video: $("ev").value.trim(), points: $("ep").value, body: $("eb").value, questions: Q.map(function (q) { return { q: q.q, options: q.options.filter(function (o) { return o.trim(); }), correct: q.correct, why: q.why }; }), passPct: $("epp").value, mins: $("emi").value, pts: $("ept").value, states: $("est").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean), status: status };
+      api({ action: "lh-save", lesson: body }).then(function (r) { if (!r.ok) return toast(r.error); toast(status === "live" ? "✅ Published" : "Saved as draft"); CUR = null; TAB = "list"; draw(); }); };
+    $("sd").onclick = function () { save("draft"); }; $("sl").onclick = function () { save("live"); };
+  }
+  function tRep() {
+    api({ action: "lh-report" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var T = function (h, rows) { return '<div class="tbw"><table class="tb"><tr>' + h.map(function (x) { return "<th>" + x + "</th>"; }).join("") + "</tr>" + rows.map(function (c) { return "<tr>" + c.map(function (x, i) { return "<td>" + (i ? "" : "<b>") + esc(x == null ? "—" : x) + (i ? "" : "</b>") + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>"; };
+      $("tp").innerHTML = (r.byLesson.length ? '<div class="sh"><span>📚 By lesson</span></div>' + T(["Lesson", "Opened", "Took quiz", "Certified", "Avg score"], r.byLesson.map(function (x) { return [x.title, x.opened, x.attempted, x.passed, x.avg == null ? "—" : x.avg + "%"]; })) : '<div class="help">No live lessons yet.</div>') +
+        (r.byState.length ? '<div class="sh"><span>🗺️ By state</span></div>' + T(["State", "Learners", "Certificates", "Avg score"], r.byState.map(function (x) { return [x.name, x.people, x.passed, x.avg + "%"]; })) : "") +
+        (r.people.length ? '<div class="sh"><span>🏅 Learners</span><button class="btn sec sm" id="xl">⬇ Excel</button></div>' + T(["Name", "State", "Quizzes taken", "Certified", "Avg score"], r.people.slice(0, 100).map(function (x) { return [x.name, x.state, x.done, x.passed, x.avg + "%"]; })) : '<div class="help">Nobody has taken a quiz yet.</div>');
+      if ($("xl")) $("xl").onclick = function () { download(xlsx([{ name: "Learners", rows: [["Name", "State", "Quizzes taken", "Certified", "Avg score %", "Last activity"]].concat(r.people.map(function (x) { return [x.name, x.state, x.done, x.passed, x.avg, dOnly(x.last)]; })) }, { name: "Lessons", rows: [["Lesson", "Opened", "Took quiz", "Certified", "Avg score %"]].concat(r.byLesson.map(function (x) { return [x.title, x.opened, x.attempted, x.passed, x.avg]; })) }, { name: "States", rows: [["State", "Learners", "Certificates", "Avg score %"]].concat(r.byState.map(function (x) { return [x.name, x.people, x.passed, x.avg]; })) }]), "Learning_progress.xlsx"); };
+    });
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  HO = AUTH.app === "admin"; draw();
+})();
+</script>
+</body>
+</html>

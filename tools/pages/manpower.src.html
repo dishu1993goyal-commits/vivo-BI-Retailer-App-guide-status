@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Promoter productivity & manpower planner</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:20px;font-weight:800;margin-top:2px}.kt .s{font-size:11px;color:var(--mut);margin-top:2px}
+.kt.g .v{color:#13693F}.kt.r .v{color:#B42318}.kt.o .v{color:#9A5B00}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 4px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart{background:var(--card);border-radius:16px;padding:12px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:right;padding:7px 6px;white-space:nowrap}.tb th:first-child,.tb td:first-child{text-align:left}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;text-align:right;white-space:nowrap}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#E6F4EA;color:#13693F;white-space:nowrap}.pill.r{background:#FDECEC;color:#B42318}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧑‍💼</span></div>
+  <h1>Promoter productivity & manpower planner</h1><p>Sales per promoter, counters with nobody, attrition — and where one more promoter pays back.</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "view", MONTHS = [], MONTH = "", HO = false, A = ls("mp-assume") || { cost: 18000, margin: 600, minUnits: 25 }, STF = "", DATA = null;
+  var inr = function (n) { n = Number(n) || 0; var a = Math.abs(n); return (n < 0 ? "−" : "") + "₹" + (a >= 1e5 ? (a / 1e5).toFixed(2) + " L" : Math.round(a).toLocaleString("en-IN")); };
+  function libXL() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  window.__pageBack = function () { if (TAB === "view") return false; TAB = "view"; draw(); return true; };
+  function draw() {
+    VIEW.innerHTML = '<div class="seg">' + [["view", "📊 Analysis"], ["up", "📥 Upload data"]].map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    (TAB === "up" ? tUp : tView)();
+  }
+  function T(head, rows) { return '<div class="tbw"><table class="tb"><tr>' + head.map(function (h) { return "<th>" + h + "</th>"; }).join("") + "</tr>" + rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td>" + (i ? c : "<b>" + c + "</b>") + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>"; }
+  function tView() {
+    if (!MONTHS.length) { $("tp").innerHTML = '<div class="help">No promoter data yet. Go to <b>Upload data</b>, download the sample Excel, fill one row per promoter for the month and upload it.</div>'; return; }
+    $("tp").innerHTML = '<div class="card" style="padding:10px 12px"><div class="g2"><div><label class="lb" style="margin-top:0">Month</label><select class="tx" id="vm">' + MONTHS.map(function (m) { return '<option' + (m === MONTH ? " selected" : "") + ">" + m + "</option>"; }).join("") + '</select></div><div><label class="lb" style="margin-top:0">State</label><select class="tx" id="vs"><option value="">All</option></select></div></div>' +
+      '<details style="margin-top:8px"><summary style="font-size:12.5px;font-weight:700;cursor:pointer">Assumptions for “where to add a promoter”</summary><div class="g3"><div><label class="lb">Promoter cost ₹ / month</label><input class="tx" type="number" id="ac" value="' + A.cost + '"></div><div><label class="lb">Margin ₹ / unit</label><input class="tx" type="number" id="am" value="' + A.margin + '"></div><div><label class="lb">Min store units</label><input class="tx" type="number" id="au" value="' + A.minUnits + '"></div></div><button class="btn sec sm" id="ar" style="margin-top:8px">Recalculate</button></details></div><div id="vz"><div class="loading"><div class="spin"></div></div></div>';
+    $("vm").onchange = function () { MONTH = this.value; STF = ""; tView(); };
+    $("ar").onclick = function () { A = { cost: +$("ac").value || 18000, margin: +$("am").value || 600, minUnits: +$("au").value || 25 }; ls("mp-assume", A); tView(); };
+    api({ action: "mp-view", month: MONTH, state: STF, cost: A.cost, margin: A.margin, minUnits: A.minUnits }).then(function (r) {
+      if (!r.ok) { $("vz").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      DATA = r; var K = r.kpi;
+      if (!STF) window.__mpStates = r.byState.map(function (s) { return s.name; });
+      $("vs").innerHTML = '<option value="">All</option>' + (window.__mpStates || []).map(function (s) { return "<option" + (s === STF ? " selected" : "") + ">" + esc(s) + "</option>"; }).join(""); $("vs").onchange = function () { STF = this.value; tView(); };
+      var pay = function (x) { return x.payback == null ? "—" : x.payback <= 1 ? '<span class="pill">pays back in month 1</span>' : x.payback <= 3 ? '<span class="pill">' + x.payback + " months</span>" : '<span class="pill r">' + x.payback + " months</span>"; };
+      $("vz").innerHTML = '<div class="kp"><div class="kt"><div class="l">Promoters</div><div class="v">' + fmtN(K.hc) + '</div><div class="s">' + K.active + " active · " + K.joined + " joined · " + K.left + ' left</div></div><div class="kt"><div class="l">Units per promoter</div><div class="v">' + K.perHead + '</div><div class="s">median ' + K.median + ' / month</div></div><div class="kt ' + (K.attr > 8 ? "r" : K.attr > 4 ? "o" : "g") + '"><div class="l">Attrition</div><div class="v">' + K.attr + '%</div><div class="s">left this month</div></div></div>' +
+        '<div class="kp"><div class="kt ' + (K.zero ? "r" : "g") + '"><div class="l">Zero-sale promoters</div><div class="v">' + K.zero + '</div><div class="s">no units this month</div></div><div class="kt"><div class="l">Counters with nobody</div><div class="v">' + (K.hasStores ? K.storesNoPromoter : "—") + '</div><div class="s">' + (K.hasStores ? "of " + fmtN(K.stores) + " stores" : "upload the Stores sheet") + '</div></div><div class="kt"><div class="l">Total units</div><div class="v">' + fmtN(K.units) + '</div><div class="s">by promoters</div></div></div>' +
+        '<div class="help">Units per promoter are scaled to a full month of 26 working days, so someone who joined mid-month is compared fairly. Middle half of promoters sell between <b>' + K.p25 + "</b> and <b>" + K.p75 + "</b> units a month.</div>" +
+        (r.byState.length > 1 ? '<div class="sh"><span>🗺️ By state — units per promoter</span></div><div class="chart">' + BICH.bars(r.byState.slice(0, 20).map(function (s) { return [s.name, s.perHead, s.hc + " promoters"]; }), { lw: 120 }) + "</div>" + T(["State", "Promoters", "Units", "Per promoter", "Median", "Zero-sale", "Attrition"], r.byState.map(function (s) { return [esc(s.name), s.hc, fmtN(s.units), s.perHead, s.median, s.zero, s.attr + "%"]; })) : "") +
+        '<div class="sh"><span>➕ Add a promoter here — counters with sales but nobody</span></div>' + (r.uncovered.length ? T(["Store", "State", "Units / month", "Extra units est.", "Net gain / month", "Payback"], r.uncovered.slice(0, 40).map(function (x) { return [esc(x.store) + (x.city ? '<br><span class="muted" style="font-weight:400">' + esc(x.city) + "</span>" : ""), esc(x.state), fmtN(x.units), "+" + x.extra, inr(x.gain), pay(x)]; })) + '<div class="help">Estimate: a promoter lifts a store with nobody by about 25%. Net gain = extra units × margin − promoter cost.</div>' : '<div class="help">' + (K.hasStores ? "No uncovered store sells " + r.assume.minUnits + "+ units a month." : "Upload the <b>Stores</b> sheet (all vivo counters with monthly units) to see counters that have sales but no promoter.") + "</div>") +
+        '<div class="sh"><span>➕ Add a second promoter — overloaded counters</span></div>' + (r.overload.length ? T(["Store", "State", "Promoters", "Units", "Per promoter", "Extra units est.", "Net gain", "Payback"], r.overload.slice(0, 30).map(function (x) { return [esc(x.store), esc(x.state), x.hc, fmtN(x.units), x.perHead, "+" + x.extra, inr(x.gain), pay(x)]; })) : '<div class="help">No counter is far above the normal load.</div>') +
+        '<div class="sh"><span>⚠️ Low productivity (worked 10+ days)</span></div>' + (r.low.length ? T(["Promoter", "Store", "State", "Units", "Days", "Per month"], r.low.slice(0, 40).map(function (x) { return [esc(x.name), esc(x.store), esc(x.state), x.units, x.days, x.rate]; })) + '<div class="help">Coach, move to a better counter, or review. Check stock and footfall at the store before judging the person.</div>' : '<div class="help">Nobody is far below the rest.</div>') +
+        '<div class="sh"><span>🏆 Top promoters</span></div>' + T(["Promoter", "Store", "State", "Units", "Days", "Per month"], r.top.map(function (x) { return [esc(x.name), esc(x.store), esc(x.state), x.units, x.days, x.rate]; })) +
+        '<button class="btn sec block" id="xl" style="margin-top:12px">⬇ Download Excel</button><div class="muted" style="font-size:11.5px;margin-top:8px">Uploaded by ' + esc(r.by) + ", " + dt(r.at) + "</div>";
+      $("xl").onclick = function () { var sh = function (name, head, L, f) { return { name: name, rows: [head].concat(L.map(f)) }; };
+        download(xlsx([sh("States", ["State", "Promoters", "Units", "Units per promoter", "Median", "Zero-sale", "Attrition %"], r.byState, function (s) { return [s.name, s.hc, s.units, s.perHead, s.median, s.zero, s.attr]; }), sh("Add promoter - uncovered", ["Store", "City", "State", "Units/month", "Extra units est.", "Net gain/month", "Payback months"], r.uncovered, function (x) { return [x.store, x.city, x.state, x.units, x.extra, x.gain, x.payback]; }), sh("Add promoter - overloaded", ["Store", "City", "State", "Promoters", "Units", "Per promoter", "Extra units est.", "Net gain", "Payback months"], r.overload, function (x) { return [x.store, x.city, x.state, x.hc, x.units, x.perHead, x.extra, x.gain, x.payback]; }), sh("Low productivity", ["Promoter", "Code", "Store", "State", "Units", "Days", "Per month"], r.low, function (x) { return [x.name, x.code, x.store, x.state, x.units, x.days, x.rate]; }), sh("Top promoters", ["Promoter", "Code", "Store", "State", "Units", "Days", "Per month"], r.top, function (x) { return [x.name, x.code, x.store, x.state, x.units, x.days, x.rate]; })]), "Promoter_productivity_" + r.month + ".xlsx"); };
+    });
+  }
+  var PH = ["Promoter code", "Promoter name", "Store code", "Store name", "State", "City", "Date of joining", "Date of leaving", "Units sold", "Sales value", "Days present"], SHD = ["Store code", "Store name", "State", "City", "Units sold (all, month)"];
+  function tUp() {
+    var now = istDay(Date.now()).slice(0, 7);
+    $("tp").innerHTML = '<div class="card"><div class="help" style="margin-top:0">One Excel file per month with two sheets:<br><b>Promoters</b> — one row per promoter: ' + PH.join(" · ") + '.<br><b>Stores</b> (optional but useful) — every vivo counter with its monthly units, so counters with no promoter can be found.' + (HO ? "" : "<br>Your upload replaces only <b>your state’s</b> rows for that month.") + '</div><button class="btn sec block" id="smp" style="margin-top:8px">⬇ Download sample Excel</button>' +
+      '<label class="lb">Month</label><input class="tx" type="month" id="um" value="' + now + '"><button class="btn pri block" id="upb" style="margin-top:10px">📥 Choose the Excel file</button><div id="ur"></div></div>' +
+      (MONTHS.length ? '<div class="sh"><span>Months uploaded</span></div>' + MONTHS.map(function (m) { return '<div class="card" style="padding:10px 12px;margin-top:6px"><div class="row"><b style="flex:1">' + m + "</b>" + (HO ? '<a href="#" data-dm="' + m + '" style="color:#B42318;font-size:12px">delete</a>' : "") + "</div></div>"; }).join("") : "");
+    $("smp").onclick = function () { download(xlsx([{ name: "Promoters", rows: [PH, ["VBA1001", "Ravi Kumar", "HR0231", "Shree Mobile, Sector 15", "Haryana", "Faridabad", "2025-03-10", "", 62, 1085000, 26], ["VBA1002", "Pooja Sharma", "HR0231", "Shree Mobile, Sector 15", "Haryana", "Faridabad", "2026-10-14", "", 18, 300000, 14], ["VBA1003", "Amit Singh", "HR0440", "City Telecom", "Haryana", "Gurugram", "2024-08-01", "2026-10-20", 9, 150000, 16]] }, { name: "Stores", rows: [SHD, ["HR0231", "Shree Mobile, Sector 15", "Haryana", "Faridabad", 96], ["HR0440", "City Telecom", "Haryana", "Gurugram", 22], ["HR0512", "New Gupta Mobiles", "Haryana", "Palwal", 48]] }]), "Promoter_data_sample.xlsx"); };
+    [].forEach.call($("tp").querySelectorAll("[data-dm]"), function (a) { a.onclick = function (e) { e.preventDefault(); if (!confirm("Delete all promoter data for " + a.dataset.dm + "?")) return; api({ action: "mp-delete", month: a.dataset.dm }).then(init); }; });
+    $("upb").onclick = function () { var month = $("um").value; if (!/^\d{4}-\d{2}$/.test(month)) return toast("Pick the month");
+      var i = document.createElement("input"); i.type = "file"; i.accept = ".xlsx,.xls,.csv"; i.onchange = function () { if (!i.files[0]) return; $("ur").innerHTML = '<div class="loading"><div class="spin"></div>Reading…</div>';
+        libXL().then(function () { return i.files[0].arrayBuffer(); }).then(function (buf) {
+          var wb = XLSX.read(buf, { type: "array", cellDates: true }), norm = function (s) { return String(s || "").toLowerCase().replace(/[^a-z]/g, ""); };
+          var dte = function (v) { if (v instanceof Date && !isNaN(v)) return new Date(v.getTime() + 19800000).toISOString().slice(0, 10); var s = String(v || "").trim(), m = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/.exec(s); if (m) return (m[3].length === 2 ? "20" + m[3] : m[3]) + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2); return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : ""; };
+          var read = function (ws, map) { var Aa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true }), hi = -1; for (var r = 0; r < Math.min(Aa.length, 15); r++) { var hs = Aa[r].map(norm); if (hs.some(function (h) { return /name/.test(h); }) && hs.some(function (h) { return /state/.test(h); })) { hi = r; break; } } if (hi < 0) return [];
+            var H = Aa[hi].map(norm), col = {}; Object.keys(map).forEach(function (k) { col[k] = H.findIndex(function (h) { return map[k].test(h); }); });
+            return Aa.slice(hi + 1).map(function (row) { var o = {}; Object.keys(col).forEach(function (k) { o[k] = col[k] >= 0 ? row[col[k]] : ""; }); return o; }); };
+          var ps = wb.SheetNames.find(function (n) { return /promot|vba|manpower/i.test(n); }) || wb.SheetNames[0], ss = wb.SheetNames.find(function (n) { return /store|counter|outlet/i.test(n) && n !== ps; });
+          var rows = read(wb.Sheets[ps], { code: /^(promoter|vba|emp)?(code|id)$/, name: /^(promoter|vba|emp|employee)?name$/, storeCode: /^(store|outlet|counter|dealer)(code|id)$/, store: /^(store|outlet|counter|dealer)name$|^store$/, state: /^state$/, city: /^city$|^town$/, doj: /joining|doj/, dol: /leaving|dol|exit|resign/, units: /^units?(sold)?$|^qty$|^sales?units?$/, value: /value|amount/, days: /days/ }).map(function (r) { r.doj = dte(r.doj); r.dol = dte(r.dol); return r; }).filter(function (r) { return r.name || r.code; });
+          var stores = ss ? read(wb.Sheets[ss], { storeCode: /^(store|outlet|counter|dealer)(code|id)$/, store: /^(store|outlet|counter|dealer)name$|^store$/, state: /^state$/, city: /^city$|^town$/, units: /units|qty/ }).filter(function (r) { return r.store || r.storeCode; }) : [];
+          if (!rows.length) { $("ur").innerHTML = '<div class="err">No promoter rows found. The first sheet needs the columns from the sample file (Promoter name, State, Units sold…).</div>'; return; }
+          $("ur").innerHTML = '<div class="help">Found <b>' + rows.length + "</b> promoters" + (stores.length ? " and <b>" + stores.length + "</b> stores" : " (no Stores sheet)") + " for <b>" + month + '</b>.</div><button class="btn pri block" id="ugo" style="margin-top:8px">Save ' + month + "</button>";
+          $("ugo").onclick = function () { var b = this; b.disabled = true; b.textContent = "Saving…"; api({ action: "mp-upload", month: month, rows: rows, stores: stores }).then(function (x) { if (!x.ok) { b.disabled = false; b.textContent = "Save"; return toast(x.error); } toast("✅ Saved " + x.rows + " promoters"); MONTH = month; TAB = "view"; init(); }); };
+        }).catch(function () { $("ur").innerHTML = '<div class="err">Could not read this file. Use the sample Excel format.</div>'; }); };
+      i.click(); };
+  }
+  function init() { api({ action: "mp-months" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } MONTHS = r.months; HO = r.isHO; if (MONTHS.indexOf(MONTH) < 0) MONTH = MONTHS[0] || ""; draw(); }); }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  init();
+})();
+</script>
+</body>
+</html>

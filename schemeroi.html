@@ -216,7 +216,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 </head>
 <body>
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📐</span></div>
-  <h1>Scheme ROI analyzer</h1><p>Which schemes really moved volume — and which only cost money. With an AI action plan.</p></div>
+  <h1>Scheme simulator & ROI</h1><p>Before launch: expected lift, cost and break-even. After: which schemes really moved volume — with an AI action plan.</p></div>
 <div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
 <script src="/bichart.js?v=1"></script>
 <script src="/sodata.js?v=1"></script>
@@ -399,17 +399,17 @@ td.n,th.n{text-align:right;white-space:nowrap}
     [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
     return ov;
   }
-  var VIEW = $("view"), TAB = "list", CUR = null, SCH = [], ME = {}, SUM = null;
+  var VIEW = $("view"), TAB = "sim", CUR = null, SCH = [], ME = {}, SUM = null;
   var inr = function (n) { n = Number(n) || 0; var a = Math.abs(n); return (n < 0 ? "−" : "") + "₹" + (a >= 1e7 ? (a / 1e7).toFixed(2) + " Cr" : a >= 1e5 ? (a / 1e5).toFixed(2) + " L" : Math.round(a).toLocaleString("en-IN")); };
   var nf = function (n) { return n == null ? "—" : Math.round(n).toLocaleString("en-IN"); }, pc = function (n) { return n == null ? "—" : (n > 0 ? "+" : "") + n + "%"; };
   var dd = function (d) { return d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" }) : ""; };
-  window.__pageBack = function () { if (TAB === "list" && !CUR) return false; CUR = null; TAB = "list"; draw(); return true; };
+  window.__pageBack = function () { if (SIMCUR) { SIMCUR = null; draw(); return true; } if (TAB === "list" && !CUR) return false; CUR = null; TAB = "list"; draw(); return true; };
   function draw() {
-    var tabs = [["list", "📊 Analyses"], ["new", "➕ New analysis"], ["data", "📥 Sell-out data"]];
+    var tabs = [["sim", "🔮 Simulate"], ["list", "📊 Results"], ["new", "➕ Measure"], ["data", "📥 Sell-out data"]];
     VIEW.innerHTML = '<div class="seg">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] && !CUR ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
-    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { CUR = null; TAB = b.dataset.t; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { CUR = null; SIMCUR = null; TAB = b.dataset.t; draw(); }; });
     if (CUR) return showResult(CUR);
-    ({ list: tList, "new": tNew, data: function () { SODATA.render($("tp"), { api: api, toast: toast, download: download, xlsx: xlsx, esc: esc, onChange: function () { SUM = null; } }); } })[TAB]();
+    ({ sim: tSim, list: tList, "new": tNew, data: function () { SODATA.render($("tp"), { api: api, toast: toast, download: download, xlsx: xlsx, esc: esc, onChange: function () { SUM = null; } }); } })[TAB]();
   }
   // ---------- leaderboard ----------
   function tList() {
@@ -422,6 +422,63 @@ td.n,th.n{text-align:right;white-space:nowrap}
       [].forEach.call($("tp").querySelectorAll("[data-id]"), function (d) { d.onclick = function () { api({ action: "roi-get", id: d.dataset.id }).then(function (x) { if (!x.ok) return toast(x.error); CUR = x.item; draw(); window.scrollTo(0, 0); }); }; });
       if ($("go1")) $("go1").onclick = function () { TAB = "new"; draw(); };
     });
+  }
+  // ---------- 🔮 simulator: before launch ----------
+  var SIMCUR = null;
+  function tSim() {
+    if (SIMCUR) return showSim(SIMCUR.item, SIMCUR.actual);
+    api({ action: "roi-sim-list" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var L = r.items;
+      $("tp").innerHTML = '<div class="help"><b>Before you launch a scheme:</b> enter the dates, models and payout. The simulator takes real sales of those models in the weeks just before, and shows units, cost and ROI for a low, likely and high lift — plus the lift the scheme needs just to pay for itself. After the scheme, tap <b>Measure actual</b> to put the real result next to the forecast.</div><button class="btn pri block" id="snew" style="margin-top:10px">🔮 Simulate a new scheme</button>' +
+        (L.length ? '<div class="sh"><span>Saved simulations</span></div>' + L.map(function (x) { return '<div class="li" data-sid="' + x.id + '"><div class="row"><b style="flex:1">' + esc(x.name) + '</b><span class="pill ' + x.tone + '">' + (x.breakEvenLift == null ? "can’t pay back" : "break-even +" + x.breakEvenLift + "%") + '</span></div><div class="d">' + dd(x.from) + " – " + dd(x.to) + " · likely +" + x.likely.lift + "% → " + nf(x.likely.extra) + " extra units, cost " + inr(x.likely.cost) + ", ROI " + pc(x.likely.roiPct) + (x.actual ? ' · <b style="color:#13693F">actual ' + pc(x.actual.uplift) + " lift, ROI " + pc(x.actual.roi) + "</b>" : "") + "</div></div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin:12px 2px">No simulations yet.</div>');
+      $("snew").onclick = function () { simForm(); };
+      [].forEach.call($("tp").querySelectorAll("[data-sid]"), function (d) { d.onclick = function () { api({ action: "roi-sim-get", id: d.dataset.sid }).then(function (x) { if (!x.ok) return toast(x.error); SIMCUR = x; tSim(); window.scrollTo(0, 0); }); }; });
+    });
+  }
+  function simForm(prefill) {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    Promise.all([api({ action: "roi-schemes" }), SUM ? Promise.resolve(SUM) : api({ action: "so-summary" })]).then(function (x) {
+      SCH = x[0].ok ? x[0].items : []; ME = x[0]; SUM = x[1];
+      var p = prefill || {}, models = SUM.models || [], states = SUM.states || [], L = p.lifts || [5, 15, 30];
+      $("tp").innerHTML = '<div class="card"><label class="lb">Planned scheme from Scheme policies (optional — fills the details)</label><select class="tx" id="ss"><option value="">— enter manually —</option>' + SCH.map(function (s2) { return '<option value="' + s2.id + '">' + esc(s2.title) + "</option>"; }).join("") + "</select>" +
+        '<label class="lb">Scheme name</label><input class="tx" id="sn" value="' + esc(p.name || "") + '"><div class="g2"><div><label class="lb">Planned start</label><input class="tx" type="date" id="sf" value="' + esc(p.from || "") + '"></div><div><label class="lb">Planned end</label><input class="tx" type="date" id="st" value="' + esc(p.to || "") + '"></div></div>' +
+        '<label class="lb">Scheme models</label><div class="chips" id="sm">' + (models.length ? models.map(function (m) { return '<label><input type="checkbox" value="' + esc(m) + '"' + ((p.models || []).some(function (y) { return nk(y) === nk(m); }) ? " checked" : "") + "><span>" + esc(m) + "</span></label>"; }).join("") : '<span class="muted" style="font-size:12px">Upload sell-out data first (Sell-out data tab).</span>') + "</div>" +
+        (ME.isHO ? '<label class="lb">States (none ticked = all)</label><div class="chips" id="sst">' + states.map(function (s2) { return '<label><input type="checkbox" value="' + esc(s2) + '"' + ((p.states || []).indexOf(s2) >= 0 ? " checked" : "") + "><span>" + esc(s2) + "</span></label>"; }).join("") + "</div>" : "") +
+        '<div class="g2"><div><label class="lb">Average payout per unit ₹</label><input class="tx" type="number" id="sp" value="' + esc(p.payout == null ? "" : p.payout) + '" placeholder="e.g. 300"></div><div><label class="lb">Units that earn the payout %</label><input class="tx" type="number" id="se" value="' + esc(p.eligPct == null ? 100 : p.eligPct) + '"></div></div>' +
+        '<div class="g2"><div><label class="lb">Other cost ₹ (gifts, POSM, events)</label><input class="tx" type="number" id="so" value="' + esc(p.fixed || "") + '"></div><div><label class="lb">Company margin on sales %</label><input class="tx" type="number" id="sg" value="' + esc(p.marginPct == null ? 10 : p.marginPct) + '"></div></div>' +
+        '<label class="lb">Expected lift in units % — low / likely / high</label><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><input class="tx" type="number" id="l0" value="' + esc(L[0]) + '"><input class="tx" type="number" id="l1" value="' + esc(L[1]) + '"><input class="tx" type="number" id="l2" value="' + esc(L[2]) + '"></div>' +
+        '<label class="lb">Average selling price ₹ (only if your sell-out data has no value column)</label><input class="tx" type="number" id="sa" value="">' +
+        '<button class="btn pri block" id="srun" style="margin-top:10px">🔮 Simulate</button><button class="btn ghost block" id="sbk" style="margin-top:6px">← Back</button></div>';
+      $("ss").onchange = function () { var s2 = SCH.find(function (y) { return y.id === $("ss").value; }); if (!s2) return; simForm({ name: s2.title, from: s2.from, to: s2.to, models: s2.models, states: s2.states, payout: $("sp").value, eligPct: $("se").value, fixed: $("so").value, marginPct: $("sg").value, lifts: [$("l0").value, $("l1").value, $("l2").value] }); };
+      $("sbk").onclick = function () { tSim(); };
+      $("srun").onclick = function () {
+        var g = function (id) { return [].map.call(document.querySelectorAll("#" + id + " input:checked"), function (i) { return i.value; }); };
+        var inp = { name: $("sn").value, from: $("sf").value, to: $("st").value, models: g("sm"), states: $("sst") ? g("sst") : [], payout: $("sp").value, eligPct: $("se").value, fixed: $("so").value, marginPct: $("sg").value, liftLow: $("l0").value, liftMid: $("l1").value, liftHigh: $("l2").value, asp: $("sa").value };
+        if (!inp.name) return toast("Name the scheme"); if (!inp.models.length) return toast("Tick the scheme models"); if (!(Number(inp.payout) > 0) && !(Number(inp.fixed) > 0)) return toast("Enter the payout per unit or the other cost");
+        var b = this; b.disabled = true; b.textContent = "Simulating…";
+        api({ action: "roi-sim", input: inp, id: p.id }).then(function (r) { b.disabled = false; b.textContent = "🔮 Simulate"; if (!r.ok) return toast(r.error); SIMCUR = { item: r.item, actual: null }; tSim(); window.scrollTo(0, 0); });
+      };
+    });
+  }
+  function showSim(item, actual) {
+    var R = item.result, I = item.input, B = R.baseline, C = R.cases, nm = ["Low", "Likely", "High"], today = new Date(Date.now() + 19800000).toISOString().slice(0, 10);
+    var html = '<div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="sb1">← Simulations</button><span style="flex:1"></span><button class="btn sec sm" id="sed">✏️ Change</button><button class="btn sec sm" id="sxl">⬇ Excel</button><button class="btn ghost sm" id="sdel">🗑</button></div>' +
+      '<div class="vd ' + R.tone + '"><div class="m">' + esc(I.name) + " · " + dd(I.from) + " – " + dd(I.to) + " · " + (I.states.length ? esc(I.states.join(", ")) : "All states") + "</div><h2>" + esc(R.verdict) + '</h2><div class="m">' + (R.breakEvenLift == null ? "Payout " + inr(R.payoutPerUnit) + " per unit is above the margin " + inr(R.marginPerUnit) + " per unit" : "Needs a lift of at least <b>+" + R.breakEvenLift + "%</b> to pay for itself") + "</div></div>" +
+      '<div class="kp">' + C.map(function (c, k) { return '<div class="kt ' + (c.net >= 0 ? "g" : "r") + '"><div class="l">' + nm[k] + " · +" + c.lift + '%</div><div class="v">' + pc(c.roiPct) + '</div><div class="s">' + nf(c.extra) + " extra units<br>cost " + inr(c.cost) + "<br>net " + inr(c.net) + "</div></div>"; }).join("") + "</div>" +
+      '<div class="tbw"><table class="tb"><tr><th>Case</th><th>Units</th><th>Extra units</th><th>Cost</th><th>Extra margin</th><th>Net</th><th>ROI</th><th>Cost / extra unit</th><th>Cost % of sales</th></tr>' + C.map(function (c, k) { return "<tr><td><b>" + nm[k] + " +" + c.lift + "%</b></td><td>" + nf(c.units) + "</td><td>" + nf(c.extra) + "</td><td>" + inr(c.cost) + "</td><td>" + inr(c.extraMargin) + '</td><td style="color:' + (c.net >= 0 ? "#13693F" : "#B42318") + '">' + inr(c.net) + "</td><td>" + pc(c.roiPct) + "</td><td>" + (c.costPerExtra == null ? "—" : inr(c.costPerExtra)) + "</td><td>" + (c.costPctOfSales == null ? "—" : c.costPctOfSales + "%") + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="help"><b>Baseline:</b> ' + nf(B.units) + " units of these models in " + B.days + " days (" + dd(B.from) + " – " + dd(B.to) + "), average price " + inr(B.asp) + (B.aspManual ? " (entered)" : "") + ". Margin " + I.marginPct + "% = " + inr(R.marginPerUnit) + " per unit; payout " + inr(R.payoutPerUnit) + " per unit" + (I.eligPct < 100 ? " (" + I.eligPct + "% of units earn it)" : "") + (I.fixed ? "; other cost " + inr(I.fixed) : "") + ". <b>The payout is paid on every unit sold, not only the extra ones</b> — that is why a small lift rarely pays back." +
+        (R.past.n ? "<br><b>Your past schemes:</b> " + R.past.n + " measured, average real lift " + pc(R.past.avgUplift) + " (" + R.past.items.slice(0, 4).map(function (x) { return esc(x.name) + " " + pc(x.uplift); }).join(", ") + "). Use this to judge whether your likely case is realistic." : "<br>No measured past schemes yet — once you measure a few, their real lift shows here to sanity-check the forecast.") + "</div>" +
+      (R.byState.length > 1 ? '<div class="sh"><span>🗺️ By state — likely case</span></div><div class="tbw"><table class="tb"><tr><th>State</th><th>Baseline units</th><th>Likely units</th><th>Likely cost</th></tr>' + R.byState.map(function (x) { return "<tr><td><b>" + esc(x.name) + "</b></td><td>" + nf(x.base) + "</td><td>" + nf(x.likely) + "</td><td>" + inr(x.cost) + "</td></tr>"; }).join("") + "</table></div>" : "") +
+      '<div class="sh"><span>📏 Forecast vs actual</span></div>' + (actual ? '<div class="tbw"><table class="tb"><tr><th></th><th>Forecast (likely)</th><th>Actual</th></tr><tr><td><b>Lift</b></td><td>+' + C[1].lift + "%</td><td><b>" + pc(actual.uplift) + "</b></td></tr><tr><td><b>Extra units</b></td><td>" + nf(C[1].extra) + "</td><td><b>" + nf(actual.units.extra) + "</b></td></tr><tr><td><b>Cost</b></td><td>" + inr(C[1].cost) + "</td><td><b>" + inr(actual.cost) + (actual.costEst ? " *" : "") + "</b></td></tr><tr><td><b>ROI</b></td><td>" + pc(C[1].roiPct) + "</td><td><b>" + pc(actual.roi) + '</b></td></tr></table></div>' + (actual.costEst ? '<div class="muted" style="font-size:11.5px;margin:5px 2px 0">* Estimated: actual units × payout per unit, because no retailer payouts have been published under this scheme name yet.</div>' : "") + '<div class="row" style="gap:6px;margin-top:8px"><span class="pill ' + actual.tone + '">' + esc(actual.verdict) + '</span><span style="flex:1"></span><button class="btn sec sm" id="sopen">Open full result</button><button class="btn ghost sm" id="smea">↻ Re-measure</button></div>'
+        : '<div class="muted" style="font-size:12.5px;margin:4px 2px">' + (I.from > today ? "The scheme starts on " + dd(I.from) + ". Come back once it is running or finished." : "The scheme has started. Measure the real lift and cost from the sell-out and payout data.") + '</div><button class="btn pri block" id="smea" style="margin-top:8px"' + (I.from > today ? " disabled" : "") + ">📏 Measure actual result</button>");
+    $("tp").innerHTML = html;
+    $("sb1").onclick = function () { SIMCUR = null; tSim(); };
+    $("sed").onclick = function () { SIMCUR = null; simForm(Object.assign({ id: item.id }, I)); };
+    $("sdel").onclick = function () { if (!confirm("Delete this simulation?")) return; api({ action: "roi-sim-delete", id: item.id }).then(function () { SIMCUR = null; tSim(); }); };
+    $("sxl").onclick = function () { download(xlsx([{ name: "Simulation", rows: [["Scheme", I.name], ["Period", I.from + " to " + I.to], ["States", I.states.join(", ") || "All"], ["Models", I.models.join(", ")], ["Baseline units", B.units], ["Baseline period", B.from + " to " + B.to], ["Avg selling price", B.asp], ["Margin %", I.marginPct], ["Payout per unit", R.payoutPerUnit], ["Other cost", I.fixed], ["Break-even lift %", R.breakEvenLift == null ? "cannot pay back" : R.breakEvenLift], ["Verdict", R.verdict], [], ["Case", "Lift %", "Units", "Extra units", "Cost", "Extra margin", "Net", "ROI %", "Cost per extra unit"]].concat(C.map(function (c, k) { return [nm[k], c.lift, c.units, c.extra, c.cost, c.extraMargin, c.net, c.roiPct, c.costPerExtra]; })).concat(actual ? [[], ["Actual lift %", actual.uplift], ["Actual extra units", actual.units.extra], ["Actual cost", actual.cost], ["Actual ROI %", actual.roi]] : []) }, { name: "By state", rows: [["State", "Baseline units", "Likely units", "Likely cost"]].concat(R.byState.map(function (x) { return [x.name, x.base, x.likely, x.cost]; })) }]), "Scheme_simulation_" + I.name.replace(/\W+/g, "_") + ".xlsx"); };
+    if ($("smea")) $("smea").onclick = function () { var b = this; b.disabled = true; b.textContent = "Measuring…"; api({ action: "roi-sim-measure", id: item.id }).then(function (r) { if (!r.ok) { b.disabled = false; b.textContent = "📏 Measure actual result"; return toast(r.error); } api({ action: "roi-sim-get", id: item.id }).then(function (x) { if (x.ok) { SIMCUR = x; tSim(); } }); }); };
+    if ($("sopen")) $("sopen").onclick = function () { api({ action: "roi-get", id: actual.id }).then(function (x) { if (!x.ok) return toast(x.error); SIMCUR = null; CUR = x.item; TAB = "list"; draw(); window.scrollTo(0, 0); }); };
   }
   // ---------- new analysis ----------
   function tNew(prefill) {

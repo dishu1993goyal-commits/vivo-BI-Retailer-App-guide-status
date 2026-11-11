@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Customer voice</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:20px;font-weight:800;margin-top:2px}.kt .s{font-size:11px;color:var(--mut);margin-top:2px}
+.kt.g .v{color:#13693F}.kt.r .v{color:#B42318}.kt.o .v{color:#9A5B00}
+.sh{font-size:13px;font-weight:800;margin:16px 2px 4px;display:flex;align-items:center;gap:6px}.sh span{flex:1}
+.chart{background:var(--card);border-radius:16px;padding:12px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.6}
+.li{background:var(--card);border-radius:14px;padding:11px 12px;margin-top:8px;box-shadow:0 1px 7px rgba(20,24,51,.06)}.li b{font-size:13.5px}.li .d{font-size:11.5px;color:var(--mut);margin-top:3px;line-height:1.5}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:right;padding:7px 6px;white-space:nowrap}.tb th:first-child,.tb td:first-child{text-align:left}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;text-align:right}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:6px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.qrc{text-align:center;background:#fff;border-radius:16px;padding:16px;margin-top:8px}
+@media print{body *{visibility:hidden}.prt,.prt *{visibility:visible}.prt{position:absolute;left:0;top:0;width:100%}}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">💬</span></div>
+  <h1>Customer voice</h1><p>A QR at each store: the customer rates the visit in 30 seconds. Unhappy customers reach the state team for a call-back.</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js?v=1"></script>
+<script src="/vendor/qrcode/qrcode.js"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "dash", HO = false, FROM = addDays(istDay(Date.now()), -29), TO = istDay(Date.now()), LF = "callback";
+  var stars = function (n) { return "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n); };
+  function qrSvg(text, px) { try { var q = qrcode(0, "M"); q.addData(text); q.make(); var n = q.getModuleCount(), c = px / n, s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + px + '" height="' + px + '" viewBox="0 0 ' + px + " " + px + '"><rect width="100%" height="100%" fill="#fff"/>'; for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) s += '<rect x="' + (k * c).toFixed(2) + '" y="' + (r * c).toFixed(2) + '" width="' + (c + 0.3).toFixed(2) + '" height="' + (c + 0.3).toFixed(2) + '"/>'; return s + "</svg>"; } catch (e) { return ""; } }
+  var link = function (code) { return location.origin + "/rate.html#s=" + code; };
+  window.__pageBack = function () { if (TAB === "dash") return false; TAB = "dash"; draw(); return true; };
+  function draw() {
+    VIEW.innerHTML = '<div class="seg">' + [["dash", "📊 Dashboard"], ["inbox", "📞 Call-backs & ratings"], ["qr", "🔳 Store QR codes"]].map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    ({ dash: tDash, inbox: tInbox, qr: tQr })[TAB]();
+  }
+  function filters() { return '<div class="card" style="padding:10px 12px"><div class="g2"><div><label class="lb" style="margin-top:0">From</label><input class="tx" type="date" id="ff" value="' + FROM + '"></div><div><label class="lb" style="margin-top:0">To</label><input class="tx" type="date" id="ft" value="' + TO + '"></div></div></div>'; }
+  function wireF(fn) { $("ff").onchange = function () { FROM = this.value; fn(); }; $("ft").onchange = function () { TO = this.value; fn(); }; }
+  function tDash() {
+    $("tp").innerHTML = filters() + '<div id="dz"><div class="loading"><div class="spin"></div></div></div>'; wireF(tDash);
+    api({ action: "cv-summary", from: FROM, to: TO }).then(function (r) {
+      if (!r.ok) { $("dz").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      HO = r.isHO;
+      if (!r.n) { $("dz").innerHTML = '<div class="help">No customer ratings in these dates. Create a QR for each store under <b>Store QR codes</b>, print it and place it at the billing counter (or paste the link in the bill message).</div>'; return; }
+      var T = function (h, rows) { return '<div class="tbw"><table class="tb"><tr>' + h.map(function (x) { return "<th>" + x + "</th>"; }).join("") + "</tr>" + rows.map(function (c) { return "<tr>" + c.map(function (x, i) { return "<td>" + (i ? x : "<b>" + x + "</b>") + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>"; };
+      $("dz").innerHTML = '<div class="kp"><div class="kt ' + (r.avg >= 4 ? "g" : r.avg >= 3 ? "o" : "r") + '"><div class="l">Average rating</div><div class="v">' + r.avg + ' ★</div><div class="s">' + r.n + ' ratings</div></div><div class="kt ' + (r.nps == null ? "" : r.nps >= 40 ? "g" : r.nps >= 0 ? "o" : "r") + '"><div class="l">Recommend score (NPS)</div><div class="v">' + (r.nps == null ? "—" : r.nps) + '</div><div class="s">promoters − detractors</div></div><div class="kt ' + (r.open ? "r" : "g") + '"><div class="l">Call-backs waiting</div><div class="v">' + r.open + '</div><div class="s">customers asked for a call</div></div></div>' +
+        '<div class="sh"><span>⭐ Ratings</span></div><div class="chart">' + BICH.bars([5, 4, 3, 2, 1].map(function (k) { return [k + " ★", r.dist[k - 1], Math.round(r.dist[k - 1] / r.n * 100) + "%", k >= 4 ? "#0F8A55" : k === 3 ? "#F2A93B" : "#E5484D"]; }), { lw: 50 }) + "</div>" +
+        (r.tags.length ? '<div class="sh"><span>🏷️ What customers ticked</span></div><div class="chart">' + BICH.bars(r.tags.map(function (t) { return [t.name, t.n, ""]; }), { lw: 150 }) + "</div>" : "") +
+        (r.byState.length > 1 ? '<div class="sh"><span>🗺️ By state</span></div>' + T(["State", "Ratings", "Average", "1–2 ★"], r.byState.map(function (s) { return [esc(s.name), s.n, s.avg + " ★", s.low]; })) : "") +
+        (r.worst.length ? '<div class="sh"><span>⚠️ Stores needing attention (3+ ratings)</span></div>' + T(["Store", "State", "Ratings", "Average", "1–2 ★"], r.worst.filter(function (s) { return s.avg < 4; }).map(function (s) { return [esc(s.store), esc(s.state), s.n, s.avg + " ★", s.low]; })) : "") +
+        (r.best.length ? '<div class="sh"><span>🏆 Best-rated stores</span></div>' + T(["Store", "State", "Ratings", "Average"], r.best.map(function (s) { return [esc(s.store), esc(s.state), s.n, s.avg + " ★"]; })) : "") +
+        (r.days.length > 1 ? '<div class="sh"><span>📈 Ratings per day</span></div><div class="chart">' + BICH.lines({ labels: r.days.map(function (d) { return dayLabel(d.d); }), series: [{ name: "Ratings", values: r.days.map(function (d) { return d.n; }), color: "#5B4CFF" }] }) + "</div>" : "") +
+        '<button class="btn sec block" id="xl" style="margin-top:12px">⬇ Download Excel</button>';
+      $("xl").onclick = function () { api({ action: "cv-list", from: FROM, to: TO }).then(function (x) { if (!x.ok) return toast(x.error); download(xlsx([{ name: "Ratings", rows: [["Date", "State", "City", "Store", "Rating", "Recommend 0-10", "Ticked", "Comment", "Model", "Call-back asked", "Name", "Mobile", "Status", "Team note"]].concat(x.items.map(function (e) { return [e.d, e.state, e.city, e.store, e.rating, e.nps == null ? "" : e.nps, (e.tags || []).join(", "), e.comment, e.model, e.callback ? "Yes" : "", e.name, e.phone, e.status === "done" ? "Closed" : e.status === "open" ? "Open" : "", e.note || ""]; })) }, { name: "States", rows: [["State", "Ratings", "Average", "1-2 star"]].concat(r.byState.map(function (s) { return [s.name, s.n, s.avg, s.low]; })) }]), "Customer_voice_" + FROM + "_to_" + TO + ".xlsx"); }); };
+    });
+  }
+  function tInbox() {
+    $("tp").innerHTML = filters() + '<div class="seg" style="margin-top:8px">' + [["callback", "📞 Call-backs waiting"], ["low", "1–2 ★"], ["all", "All"]].map(function (t) { return '<button data-lf="' + t[0] + '" class="' + (LF === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="dz"><div class="loading"><div class="spin"></div></div></div>'; wireF(tInbox);
+    [].forEach.call($("tp").querySelectorAll("[data-lf]"), function (b) { b.onclick = function () { LF = b.dataset.lf; tInbox(); }; });
+    api({ action: "cv-list", from: FROM, to: TO, filter: LF }).then(function (r) {
+      if (!r.ok) { $("dz").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("dz").innerHTML = r.items.length ? r.items.map(function (e) { return '<div class="li"><div class="row"><b style="flex:1">' + esc(e.store) + '</b><span class="pill ' + (e.rating >= 4 ? "g" : e.rating === 3 ? "o" : "r") + '">' + stars(e.rating) + '</span></div><div class="d">' + dt(e.at) + " · " + esc([e.city, e.state].filter(Boolean).join(", ")) + (e.model ? " · " + esc(e.model) : "") + (e.nps != null ? " · recommend " + e.nps + "/10" : "") + ((e.tags || []).length ? "<br>" + e.tags.map(esc).join(" · ") : "") + (e.comment ? "<br>“" + esc(e.comment) + "”" : "") +
+          (e.callback ? '<br>📞 <b>' + esc(e.name || "Customer") + '</b> · <a href="tel:' + esc(e.phone) + '">' + esc(e.phone) + "</a>" : "") + (e.status === "done" ? '<br><span class="pill g">closed</span> ' + esc(e.note || "") + " — " + esc(e.doneBy || "") : "") + "</div>" +
+          (e.status === "open" ? '<div class="row" style="gap:6px;margin-top:8px"><input class="tx" data-n="' + e.id + '" placeholder="What was done (e.g. called, issue solved)" style="flex:1"><button class="btn pri sm" data-done="' + e.id + '" data-d="' + e.d + '">Close</button></div>' : "") + "</div>"; }).join("") : '<div class="help">' + (LF === "callback" ? "No call-backs waiting. 🎉" : "Nothing here in these dates.") + "</div>";
+      [].forEach.call($("dz").querySelectorAll("[data-done]"), function (b) { b.onclick = function () { api({ action: "cv-done", id: b.dataset.done, d: b.dataset.d, note: document.querySelector('[data-n="' + b.dataset.done + '"]').value }).then(function (x) { if (!x.ok) return toast(x.error); toast("✅ Closed"); tInbox(); }); }; });
+    });
+  }
+  function tQr() {
+    api({ action: "cv-stores" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      HO = r.isHO;
+      $("tp").innerHTML = '<div class="card"><b>Add a store</b><div class="g2"><div><label class="lb">Store name</label><input class="tx" id="qs"></div><div><label class="lb">City</label><input class="tx" id="qc"></div></div>' + (HO ? '<label class="lb">State</label><input class="tx" id="qst">' : "") + '<button class="btn pri block" id="qa" style="margin-top:10px">Create QR</button><div class="help">Many stores at once: paste lines as <b>Store name, City' + (HO ? ", State" : "") + '</b> below.</div><textarea class="tx" id="qb" style="min-height:70px" placeholder="Shree Mobile, Faridabad' + (HO ? ", Haryana" : "") + '"></textarea><button class="btn sec block" id="qbb" style="margin-top:6px">Create for all lines</button></div><div id="qv"></div>' +
+        (r.items.length ? '<div class="sh"><span>Stores with a QR (' + r.items.length + ")</span></div>" + r.items.slice(0, 400).map(function (s) { return '<div class="li" style="cursor:pointer" data-code="' + s.code + '"><div class="row"><b style="flex:1">' + esc(s.store) + '</b><span class="pill">show QR</span></div><div class="d">' + esc([s.city, s.state].filter(Boolean).join(", ")) + "</div></div>"; }).join("") : '<div class="help">No store QR codes yet.</div>');
+      var showQr = function (s) { $("qv").innerHTML = '<div class="qrc prt"><div style="font-weight:800;font-size:17px">How was your visit today?</div><div class="muted" style="font-size:13px;margin-bottom:10px">' + esc(s.store) + (s.city ? ", " + esc(s.city) : "") + "</div>" + qrSvg(link(s.code), 230) + '<div style="font-size:13px;margin-top:10px">Scan with your phone camera · 30 seconds<br><b>आपका अनुभव कैसा रहा? स्कैन करें और बताएँ</b></div></div><div class="row" style="gap:6px;margin-top:8px"><button class="btn sec sm" id="qp" style="flex:1">🖨 Print</button><button class="btn sec sm" id="qcp" style="flex:1">🔗 Copy link</button><button class="btn ghost sm" id="qdl" style="color:#B42318">Delete</button></div>'; $("qv").scrollIntoView({ behavior: "smooth", block: "start" });
+        $("qp").onclick = function () { window.print(); }; $("qcp").onclick = function () { try { navigator.clipboard.writeText(link(s.code)); toast("Link copied"); } catch (e) { prompt("Copy this link", link(s.code)); } };
+        $("qdl").onclick = function () { if (!confirm("Delete this store's QR? The printed code will stop working.")) return; api({ action: "cv-store-delete", code: s.code }).then(tQr); }; };
+      [].forEach.call($("tp").querySelectorAll("[data-code]"), function (d) { d.onclick = function () { showQr(r.items.find(function (x) { return x.code === d.dataset.code; })); }; });
+      $("qa").onclick = function () { api({ action: "cv-store-save", store: { store: $("qs").value, city: $("qc").value, state: $("qst") ? $("qst").value : "" } }).then(function (x) { if (!x.ok) return toast(x.error); toast("✅ QR created"); tQr(); setTimeout(function () { var d = document.querySelector('[data-code="' + x.items[0].code + '"]'); if (d) d.click(); }, 500); }); };
+      $("qbb").onclick = function () { var L = $("qb").value.split("\n").map(function (ln) { var a = ln.split(/[,\t]/).map(function (x) { return x.trim(); }); return { store: a[0], city: a[1] || "", state: a[2] || "" }; }).filter(function (x) { return x.store; }); if (!L.length) return toast("Paste the store lines"); api({ action: "cv-store-save", stores: L }).then(function (x) { if (!x.ok) return toast(x.error); toast("✅ " + x.items.length + " QR codes created"); tQr(); }); };
+    });
+  }
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>
