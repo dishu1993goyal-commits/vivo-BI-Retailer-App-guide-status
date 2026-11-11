@@ -1,11 +1,11 @@
 {
-  "versionCode": 34,
-  "versionName": "6.8",
+  "versionCode": 35,
+  "versionName": "6.9",
   "notes": [
-    "New: Shop Khata can read bank / UPI payment SMS on this phone — turn it on in Khata → Import UPI SMS (it asks for SMS permission once)",
+    "New: Shop Khata sends the bill PDF together with the WhatsApp message, straight to the customer chat",
+    "Shop Khata can read bank / UPI payment SMS on this phone — turn it on in Khata → Import UPI SMS",
     "A bill is marked paid by itself when the bank message arrives while its payment QR is open",
-    "Only bank credit / debit messages are read, on your phone — never OTPs or personal messages",
-    "Money debited can be added as a shop expense in one tap"
+    "Only bank credit / debit messages are read, on your phone — never OTPs or personal messages"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
