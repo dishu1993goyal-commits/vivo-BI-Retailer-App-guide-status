@@ -105,7 +105,7 @@ function cleanProd(x, o) {
   const g = (k, n) => (x[k] !== undefined ? str(x[k], n) : o[k] || ""), n = (k) => (x[k] !== undefined && x[k] !== "" ? num(x[k]) : o[k] || 0);
   return { id: o.id || cid(x.id) || nid("i"), n: g("n", 90), cat: g("cat", 40) || "General", br: g("br", 40), u: g("u", 12) || "pc", bc: g("bc", 40), hsn: g("hsn", 12),
     cost: n("cost"), mrp: n("mrp"), sp: n("sp"), gst: n("gst"), rol: x.rol !== undefined && x.rol !== "" ? qn(x.rol) : o.rol != null ? o.rol : null, pack: x.pack !== undefined ? qn(x.pack) : o.pack || 0,
-    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", ns: x.ns !== undefined ? (x.ns ? 1 : 0) : o.ns ? 1 : 0, qk: o.qk ? 1 : 0, ...(o.im ? { im: o.im } : {}), ...(o.iu ? { iu: o.iu } : {}), ...(o.ix ? { ix: 1 } : {}), stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
+    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", ns: x.ns !== undefined ? (x.ns ? 1 : 0) : o.ns ? 1 : 0, qk: o.qk ? 1 : 0, ...(o.im ? { im: o.im } : {}), ...(o.iu ? { iu: o.iu } : {}), ...(o.ix ? { ix: 1 } : {}), ...(o.mrpSrc && x.mrp === undefined ? { mrpSrc: o.mrpSrc } : {}), stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
 }
 // 📈 every change of cost / selling price / MRP is kept (newest first) — price drop & hike history
 const PF = { cost: "Cost", sp: "Selling", mrp: "MRP" };
@@ -303,7 +303,82 @@ function velocity(mv, months, today) {
 
 // slow AI work (reading a photo / voice / pack) runs as a background job so the phone never sees a 504 timeout
 const JOB_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1 };
-const LIGHT_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1, "job-get": 1, "match-ai": 1, "i18n": 1, "i18n-get": 1, "prod-shard": 1, "prod-imgs": 1 };
+const LIGHT_OPS = { "read-order": 1, "list-read": 1, "pack-read": 1, "bill-read": 1, "job-get": 1, "match-ai": 1, "i18n": 1, "i18n-get": 1, "prod-shard": 1, "prod-imgs": 1, "db-sync": 1 };
+// ===== 🌐 public product database: Open Food Facts (India) pictures + names, Open Prices (INR) shelf prices =====
+// Built once and shared by all shops; fetched politely (their limit is 10 searches a minute), resumable across runs.
+const OFF_IMG = "https://images.openfoodfacts.org/images/products/", OFF_UA = { "user-agent": "ShopKhata/1.0 (kirana billing app; vivo-business-innovation-dashboard-22.netlify.app)", accept: "application/json" };
+const offKey = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097f]+/g, " ").trim().split(" ").filter(Boolean).sort().join(" ");
+const nap = (ms) => new Promise((r) => setTimeout(r, ms));
+async function offBuild(store, fetchImpl, env, until) {
+  const gap = Number(env.OFF_GAP_MS) || 6500, CH = 4000;
+  let M = (await store.get("kh:offdb:meta")) || { page: 0, count: 0, total: 0, done: false, at: 0, chunks: 0 };
+  if (M.done && Date.now() - M.at > 30 * 86400000) M = { page: 0, count: 0, total: 0, done: false, at: 0, chunks: 0 };   // refresh monthly
+  let fails = 0;
+  while (!M.done && Date.now() < until) {
+    const pg = M.page + 1; let j = null;
+    try { const r = await fetchImpl(`https://in.openfoodfacts.org/api/v2/search?fields=code,product_name,product_name_en,brands,quantity,image_front_small_url&page_size=1000&page=${pg}&sort_by=unique_scans_n`, { headers: OFF_UA }); j = r.ok ? await r.json().catch(() => null) : null; } catch (e) { j = null; }
+    if (!j || !Array.isArray(j.products)) { if (++fails >= 2) break; await nap(Math.min(gap * 2, 15000)); continue; }
+    fails = 0;
+    const ci = Math.floor(M.count / CH), C = (M.count % CH ? await store.get("kh:offdb:c" + ci) : null) || { m: {} };
+    let C2 = null, add = 0, cn = Object.keys(C.m).length;
+    for (const x of j.products) {
+      const code = String(x.code || "").replace(/\D/g, ""); if (code.length < 8 || code.length > 14) continue;
+      const img = IU_RE.test(String(x.image_front_small_url || "")) && String(x.image_front_small_url).startsWith(OFF_IMG) ? String(x.image_front_small_url).slice(OFF_IMG.length) : "";
+      const row = [str(x.product_name_en || x.product_name, 80), str(String(x.brands || "").split(",")[0], 30), str(x.quantity, 20), img];
+      if (!row[0] && !img) continue;
+      const isNew = !(code in C.m) && !(C2 && code in C2.m), tgt = code in C.m || cn < CH ? C : (C2 = C2 || { m: {} }); if (isNew) { add++; if (tgt === C) cn++; } tgt.m[code] = row;
+    }
+    await store.set("kh:offdb:c" + ci, C); if (C2) await store.set("kh:offdb:c" + (ci + 1), C2);
+    M.page = pg; M.count += add; M.total = num(j.count) || M.total; M.chunks = Math.floor(Math.max(0, M.count - 1) / CH) + 1; M.at = Date.now();
+    const size = num(j.page_size) || j.products.length || 1;
+    if (!j.products.length || pg * size >= (num(j.count) || 0) || pg >= 400) M.done = true;
+    await store.set("kh:offdb:meta", M);
+    if (!M.done) await nap(gap);
+  }
+  return M;
+}
+async function offPrices(store, fetchImpl, env, until) {
+  let P = (await store.get("kh:offpr")) || { at: 0, m: {}, page: 0, pages: 0, done: false };
+  if (P.done && Date.now() - P.at < 7 * 86400000) return P;
+  if (P.done) P = { at: 0, m: {}, page: 0, pages: 0, done: false };
+  const gap = Number(env.OFF_GAP_MS) ? Number(env.OFF_GAP_MS) : 1500; let fails = 0;
+  while (!P.done && Date.now() < until) {
+    const pg = P.page + 1; let j = null;
+    try { const r = await fetchImpl(`https://prices.openfoodfacts.org/api/v1/prices?currency=INR&size=100&page=${pg}&order_by=-date`, { headers: OFF_UA }); j = r.ok ? await r.json().catch(() => null) : null; } catch (e) { j = null; }
+    if (!j || !Array.isArray(j.items)) { if (++fails >= 2) break; await nap(3000); continue; }
+    fails = 0;
+    for (const x of j.items) { const code = String(x.product_code || "").replace(/\D/g, ""), pr = num(x.price_is_discounted && x.price_without_discount ? x.price_without_discount : x.price);
+      if (code.length < 8 || x.currency !== "INR" || !(pr > 0) || pr > 100000 || (x.price_is_discounted && !x.price_without_discount) || (x.price_per && x.price_per !== "UNIT")) continue;
+      if (!P.m[code]) P.m[code] = [r2(pr), String(x.date || "").slice(0, 10)]; }   // newest first, so the first one seen is the latest
+    P.page = pg; P.pages = num(j.pages) || P.pages; P.at = Date.now(); if (!j.items.length || pg >= P.pages || pg >= 150) P.done = true;
+    await store.set("kh:offpr", P); if (!P.done) await nap(gap);
+  }
+  return P;
+}
+async function dbSync(store, sid, ctx) {
+  const t0 = Date.now(), f = ctx.aiFetch || fetch, env = ctx.env || {}, quick = Number(env.OFF_GAP_MS) > 0 && Number(env.OFF_GAP_MS) < 500;
+  const M = await offBuild(store, f, env, t0 + (quick ? 20000 : 8.5 * 60000)), P = await offPrices(store, f, env, t0 + (quick ? 30000 : 11 * 60000));
+  // match this shop's items — the books are read only now and written straight back, so bills made meanwhile are not lost
+  const DB = {}, byName = {};
+  for (let i = 0; i < (M.chunks || 0); i++) { const C = await store.get("kh:offdb:c" + i); if (C && C.m) Object.assign(DB, C.m); }
+  Object.keys(DB).forEach((code) => { const r = DB[code]; if (r[3] && r[0]) { const k = offKey((r[0].toLowerCase().includes(String(r[1]).toLowerCase()) ? "" : r[1] + " ") + r[0] + " " + r[2]); if (k.split(" ").length >= 3 && !(k in byName)) byName[k] = code; else if (byName[k] !== code) byName[k] = ""; } });
+  const B = await books(store, sid, false); if (!B.shop) return json(404, { ok: false, error: "Shop not found." });
+  const today = istDay(Date.now()); let pics = 0, named = 0, mrps = 0, withBc = 0;
+  const codes = (bc) => { const c = String(bc || "").replace(/\D/g, ""); return c.length < 8 ? [] : [c, c.replace(/^0+/, ""), "0" + c, c.padStart(13, "0")]; };
+  for (const pr of B.prods) {
+    if (pr.on === false) continue;
+    const cs = codes(pr.bc); if (cs.length) withBc++;
+    const hit = cs.find((c) => DB[c]), ph = cs.find((c) => P.m && P.m[c]);
+    if (!pr.im && !pr.iu) {
+      if (hit && DB[hit][3]) { pr.iu = OFF_IMG + DB[hit][3]; delete pr.ix; pics++; }
+      else if (!cs.length) { const k = offKey(pr.n + (pr.br && !pr.n.toLowerCase().includes(String(pr.br).toLowerCase()) ? " " + pr.br : "")), c2 = k.split(" ").length >= 3 ? byName[k] : ""; if (c2 && DB[c2][3]) { pr.iu = OFF_IMG + DB[c2][3]; delete pr.ix; pics++; named++; } }
+    }
+    if (ph && !(pr.mrp > 0) && P.m[ph][0] >= (pr.sp || 0)) { priceSet(pr, "mrp", P.m[ph][0], "Open Prices", today); pr.mrpSrc = "op:" + P.m[ph][1]; mrps++; }
+  }
+  if (pics || mrps) await writeProds(store, sid, B, Date.now());
+  if (pics || mrps) await addLog(store, sid, Date.now(), ctx.by || "Owner", `Public product database: ${pics} pictures, ${mrps} MRPs filled`);
+  return json(200, Object.assign({ ok: true, db: M.count, dbTotal: M.total, dbDone: !!M.done, prices: Object.keys(P.m || {}).length, pricesDone: !!P.done, pics, named, mrps, withBc, items: B.prods.length, more: !M.done || !P.done, reached: M.count > 0 || M.page > 0 }, B.prods.length <= SH ? { prods: B.prods } : { pv: B._pv, pcount: B.prods.length }));
+}
 export async function runKhJob(store, env, id, fetchImpl, askAIfn) {
   const k = "kh:job:" + String(id).replace(/[^a-z0-9]/g, ""), j = await store.get(k); if (!j || j.status !== "running") return;
   let out; try {
@@ -326,6 +401,15 @@ async function ownerOp(op, b, ctx) {
     try { await (ctx.jobFetch || fetch)((ctx.env.SITE_URL || ctx.env.URL) + "/.netlify/functions/khread-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: id }) }); }
     catch (e) { await store.set("kh:job:" + id, { status: "done", at: t, sid, out: { ok: false, error: "Couldn't start reading — try again." } }); }
     return json(200, { ok: true, job: id });
+  }
+  if (op === "db-sync") {   // 🌐 fill pictures / MRP from the public product database — runs in the background (minutes)
+    if (ctx.bg) return dbSync(store, sid, ctx);
+    if (!(ctx.env.SITE_URL || ctx.env.URL)) return json(400, { ok: false, error: "Background jobs are not available here." });
+    const id = t.toString(36) + randomBytes(5).toString("hex");
+    await store.set("kh:job:" + id, { status: "running", at: t, sid, by, op, b: {} });
+    try { await (ctx.jobFetch || fetch)((ctx.env.SITE_URL || ctx.env.URL) + "/.netlify/functions/khread-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: id }) }); }
+    catch (e) { await store.set("kh:job:" + id, { status: "done", at: t, sid, out: { ok: false, error: "Couldn't start — try again." } }); }
+    return json(200, { ok: true, bgjob: id });
   }
   if (op === "prod-shard") { const P = await store.get(K.prod(sid)), i = Math.max(0, Math.round(num(b.i))); if (!P || P.shards == null || i >= P.shards) return json(404, { ok: false, error: "No such part." }); const x = await store.get(shKey(sid, i)); return json(200, { ok: true, i, v: (P.vers || [])[i], list: (x && x.list) || [] }); }
   const B = await books(store, sid, !!LIGHT_OPS[op]); if (!B.shop) return json(404, { ok: false, error: "Shop not found." });
