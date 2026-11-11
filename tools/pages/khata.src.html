@@ -1499,15 +1499,19 @@ html,body{background:#F4F6F2;min-height:100%}
   function htmlPdf(html, name) { toast("📄 Making PDF…"); return htmlPdfBlob(html).then(function (bl) { download(bl, name); }).catch(function (e) { toast("Couldn't make the PDF: " + (e && e.message || e)); }); }
   // 💬 WhatsApp: the message (with the link) AND the bill itself as a PDF, so the customer need not open the link
   function waBill(p, d, wa, text) {
-    if (!d || d.void || !(d.items && d.items.length || d.ty !== "po")) return waOpen(wa, text);
-    var name = ((d.no || TYN[d.ty] || "Bill") + "_" + pname(p)).replace(/[^\w\-]+/g, "_") + ".pdf", DL = window.AndroidDL, nat = false; try { nat = !!(DL && DL.shareWa && DL.canShareWa() === "1"); } catch (e) { }
-    toast("📄 Attaching the bill PDF…");
-    return htmlPdfBlob(docHtml(D.shop, p, d)).then(function (bl) {
-      if (nat) return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { try { DL.shareWa(String(fr.result).split(",")[1], name, "application/pdf", wa || "", text); } catch (e) { waOpen(wa, text); } res(); }; fr.readAsDataURL(bl); });
+    // Step 1 — the message with the link opens in the registered number's own chat (works for any number, saved or not).
+    waOpen(wa, text);
+    if (!d || d.void || !(d.items && d.items.length || d.ty !== "po")) return;
+    // Step 2 — the bill PDF. WhatsApp lets an app drop a file straight into a chat only for numbers saved in the phone's contacts;
+    // for others it shows its list, where this customer is now at the top because the message was just sent.
+    var name = ((d.no || TYN[d.ty] || "Bill") + "_" + pname(p)).replace(/[^\w\-]+/g, "_") + ".pdf", DL = window.AndroidDL, nat = false, BL = null; try { nat = !!(DL && DL.shareWa && DL.canShareWa() === "1"); } catch (e) { }
+    var ready = htmlPdfBlob(docHtml(D.shop, p, d)).then(function (bl) { BL = bl; return bl; }).catch(function () { return null; });
+    var send = function () { ready.then(function (bl) { if (!bl) return toast("Couldn't make the PDF — use Download PDF");
+      if (nat) { var fr = new FileReader(); fr.onload = function () { try { DL.shareWa(String(fr.result).split(",")[1], name, "application/pdf", wa || "", ""); } catch (e) { download(bl, name); } }; fr.readAsDataURL(bl); return; }
       var f = null; try { f = new File([bl], name, { type: "application/pdf" }); } catch (e) { }
-      if (f && navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f], text: text }).catch(function (e) { if (e && e.name === "AbortError") return; download(bl, name); toast("📄 Bill PDF saved — attach it in the WhatsApp chat"); setTimeout(function () { waOpen(wa, text); }, 1200); });
-      download(bl, name); toast("📄 Bill PDF saved to Downloads — attach it in the WhatsApp chat that opens"); setTimeout(function () { waOpen(wa, text); }, 1400);
-    }).catch(function () { waOpen(wa, text); });
+      if (f && navigator.canShare && navigator.canShare({ files: [f] })) return navigator.share({ files: [f] }).catch(function (e) { if (e && e.name === "AbortError") return; download(bl, name); toast("📄 Bill PDF saved to Downloads — attach it in the chat"); });
+      download(bl, name); toast("📄 Bill PDF saved to Downloads — attach it in " + pname(p) + "’s chat (📎)"); }); };
+    setTimeout(function () { sheet("📎 Step 2 — send the bill PDF", "Step 1: the message with the link is in " + pname(p) + "’s WhatsApp chat — tap send there. Then send the bill copy: if WhatsApp shows a list, " + pname(p) + " is at the top. (Save the customer’s number in your phone contacts and the PDF opens straight in their chat.)", [["📄", "Send bill PDF to " + pname(p), function () { send(); }, "pri"], ["✕", "Skip — message only", function () { }]]); }, 900);
   }
   // 👁 has the customer seen the bill? (their link was opened after the bill was made / they opened this bill)
   function seenTag(d, long) { if (!d || d.void || (d.st && d.st !== "final")) return ""; var snt = d.snt || (d.sent && (d.sent.man || d.sent.wa || d.sent.mail));
