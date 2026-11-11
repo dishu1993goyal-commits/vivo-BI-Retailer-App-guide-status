@@ -63,7 +63,7 @@ function cleanShop(x, o) {
     terms: g("terms", 400), days: x.days !== undefined ? Math.max(0, Math.min(365, Math.round(num(x.days)))) : o.days != null ? o.days : 30,
     ddays: x.ddays !== undefined ? Math.max(0, Math.min(365, Math.round(num(x.ddays)))) : o.ddays != null ? o.ddays : 15,
     lang: ["en", "hi"].includes(x.lang) ? x.lang : o.lang || "hi", margin: x.margin !== undefined ? Math.max(0, Math.min(500, num(x.margin))) : o.margin != null ? o.margin : 12,
-    gst: x.gst !== undefined ? !!x.gst : !!o.gst, low: x.low !== undefined ? Math.max(0, qn(x.low)) : o.low != null ? o.low : 5, expWarn: x.expWarn !== undefined ? Math.max(1, Math.min(365, Math.round(num(x.expWarn)))) : o.expWarn || 30,
+    gst: x.gst !== undefined ? !!x.gst : !!o.gst, qitems: x.qitems !== undefined ? !!x.qitems : o.qitems !== false, low: x.low !== undefined ? Math.max(0, qn(x.low)) : o.low != null ? o.low : 5, expWarn: x.expWarn !== undefined ? Math.max(1, Math.min(365, Math.round(num(x.expWarn)))) : o.expWarn || 30,
     auto: { wa: x.auto ? !!x.auto.wa : !!(o.auto && o.auto.wa), mail: x.auto ? x.auto.mail !== false : !(o.auto && o.auto.mail === false) },
     seq: o.seq || { sale: 0, rcpt: 0, pay: 0, po: 0, ret: 0 }, pk: o.pk || null, created: o.created || 0, off: !!o.off,
     rules: x.rules !== undefined ? cleanRules(x.rules) : o.rules ? cleanRules(o.rules) : defaultRules(), rulesOn: x.rulesOn !== undefined ? x.rulesOn !== false : o.rulesOn !== false,
@@ -105,7 +105,7 @@ function cleanProd(x, o) {
   const g = (k, n) => (x[k] !== undefined ? str(x[k], n) : o[k] || ""), n = (k) => (x[k] !== undefined && x[k] !== "" ? num(x[k]) : o[k] || 0);
   return { id: o.id || cid(x.id) || nid("i"), n: g("n", 90), cat: g("cat", 40) || "General", br: g("br", 40), u: g("u", 12) || "pc", bc: g("bc", 40), hsn: g("hsn", 12),
     cost: n("cost"), mrp: n("mrp"), sp: n("sp"), gst: n("gst"), rol: x.rol !== undefined && x.rol !== "" ? qn(x.rol) : o.rol != null ? o.rol : null, pack: x.pack !== undefined ? qn(x.pack) : o.pack || 0,
-    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
+    dist: x.dist !== undefined ? cid(x.dist) : o.dist || "", ns: x.ns !== undefined ? (x.ns ? 1 : 0) : o.ns ? 1 : 0, qk: o.qk ? 1 : 0, stk: o.stk != null ? o.stk : 0, lots: o.lots || [], ph: o.ph || [], lp: o.lp || "", ls: o.ls || "", prh: o.prh || [], on: x.on !== undefined ? x.on !== false : o.on !== false, at: Date.now() };
 }
 // 📈 every change of cost / selling price / MRP is kept (newest first) — price drop & hike history
 const PF = { cost: "Cost", sp: "Selling", mrp: "MRP" };
@@ -195,6 +195,10 @@ function applyStock(PM, mv, kind, doc, sign, today) {
     const pr = PM[it.p]; if (!pr) continue;
     const dl = stockDelta(kind, doc.ty, it) * sign; if (!dl) continue;
     touched.add(pr.id);
+    if (pr.ns) {   // ⚡ loose / unpackaged "quick" item: no stock count, but the sale is still remembered
+      if (doc.ty === "sale") { const ym0 = doc.d.slice(0, 7), m0 = mv[ym0] || (mv[ym0] = { p: {} }), mp0 = m0.p[pr.id] || (m0.p[pr.id] = { i: 0, o: 0 }); mp0.o = qn(mp0.o - dl); if (dl < 0 && (!pr.ls || doc.d > pr.ls)) pr.ls = doc.d; }
+      continue;
+    }
     pr.stk = qn((pr.stk || 0) + dl);
     const ym = doc.d.slice(0, 7), m = mv[ym] || (mv[ym] = { p: {} }), mp = m.p[pr.id] || (m.p[pr.id] = { i: 0, o: 0 });
     if (kind === "d" && doc.ty === "pur") {
@@ -356,7 +360,7 @@ async function ownerOp(op, b, ctx) {
     const x = b.item || {}, old = x.id ? PM[cid(x.id)] : null, n = cleanProd(x, old);
     if (!n.n) return json(400, { ok: false, error: "Item name is needed." });
     if (!old && B.prods.some((p) => p.on !== false && p.n.toLowerCase() === n.n.toLowerCase() && (p.u || "") === n.u)) return json(409, { ok: false, error: "An item with this name already exists." });
-    if (!old && x.stk) { n.stk = qn(x.stk); if (n.stk > 0) n.lots = [{ d: day(x.lp) || today, q: n.stk, c: n.cost, e: day(x.e), doc: "open" }]; }
+    if (!old && x.stk && !n.ns) { n.stk = qn(x.stk); if (n.stk > 0) n.lots = [{ d: day(x.lp) || today, q: n.stk, c: n.cost, e: day(x.e), doc: "open" }]; }
     if (old) { const nv = { cost: n.cost, sp: n.sp, mrp: n.mrp }; Object.keys(PF).forEach((f) => { n[f] = old[f]; }); Object.assign(old, n); Object.keys(PF).forEach((f) => priceSet(old, f, nv[f], "edit", today)); } else { B.prods.push(n); if (B.prods.length > 6000) return json(400, { ok: false, error: "Too many items (6,000 max)." }); }
     await saveProds();
     const sv = old || n; if (sv.bc && /^\d{8,14}$/.test(sv.bc) && sv.n) { const c0 = await store.get("kh:bc:" + sv.bc); if (!c0 || !c0.name || c0.src !== "shop") await store.set("kh:bc:" + sv.bc, { name: sv.n, brand: sv.br || "", qty: "", mrp: sv.mrp || 0, src: "shop", at: t }); }   // teach the shared barcode book
@@ -592,9 +596,26 @@ async function ownerOp(op, b, ctx) {
       if (p.hold) return json(409, { ok: false, hold: true, error: `Credit is stopped for ${pname0(p)}: ${p.hold.why}. Balance after this bill: ${rs(after)}.` });
       if (p.lim > 0 && after > p.lim + 0.5 && shop.rules.some((r) => r.on && r.trig === "limit" && r.who === "c" && r.acts.includes("block") && (!r.grp || r.grp === (p.grp || "")))) return json(409, { ok: false, hold: true, error: `This bill takes ${pname0(p)} to ${rs(after)} — above the credit limit of ${rs(p.lim)}.` });
     }
+    // 💾 items typed on a final sale bill that are not in the item list are saved (with this selling price) so the next bill can pick them
+    const qnew = [], qtouch = new Set();
+    if (n.ty === "sale" && n.st === "final" && shop.qitems !== false) {
+      const nm = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9\u0900-\u097f]+/g, " ").trim(), byKey = {};
+      B.prods.forEach((p) => { if (p.on !== false) { const k = nm(p.n) + "|" + (p.u || "pc"); if (!byKey[k] || (p.qk && !byKey[k].qk)) byKey[k] = p; } });
+      for (const i of n.items) {
+        if (PM[i.p] || !String(i.n || "").trim() || !(i.r > 0)) continue;
+        const key = nm(i.n) + "|" + (i.u || "pc"); if (!nm(i.n)) continue;
+        let pr = byKey[key];
+        if (!pr) {
+          if (B.prods.length >= 6000) continue;
+          pr = cleanProd({ n: i.n, u: i.u || "pc", cat: "Quick items", sp: r2(i.r), mrp: i.mrp || 0, gst: i.g || 0, ns: 1 }, null); pr.qk = 1; pr.ns = 1;
+          B.prods.push(pr); PM[pr.id] = pr; byKey[key] = pr; qnew.push(pr.n);
+        } else if (pr.qk) priceSet(pr, "sp", r2(i.r), "sale bill", today);   // a saved quick item keeps the latest selling price
+        i.p = pr.id; i.n = pr.n; i.u = pr.u; qtouch.add(pr.id);
+      }
+    }
     if (n.ty === "sale") n.items.forEach((i) => { const pr = PM[i.p]; i.c = pr ? pr.cost : 0; });
     const mv = await loadMv(store, sid, [...new Set([n.d.slice(0, 7), old ? old.d.slice(0, 7) : n.d.slice(0, 7)])]);
-    const touched = new Set();
+    const touched = new Set(qtouch);
     if (old && old.st === "final") { old._pid = p.id; applyStock(PM, mv, p.k, old, -1, today).forEach((x) => touched.add(x)); delete old._pid; }
     if (!n.no && (n.ty === "sale" || n.ty === "rcpt" || n.ty === "pay" || n.ty === "po" || n.ty === "ret")) { shop.seq[n.ty] = (shop.seq[n.ty] || 0) + 1; const pre = { sale: shop.pre, rcpt: "R", pay: "P", po: "PO", ret: "CN" }[n.ty]; n.no = pre + "-" + String(shop.seq[n.ty]).padStart(4, "0"); await store.set(K.shop(sid), Object.assign({}, shop)); }
     if (n.st === "final") { n._pid = p.id; applyStock(PM, mv, p.k, n, 1, today).forEach((x) => touched.add(x)); delete n._pid; }
@@ -604,7 +625,7 @@ async function ownerOp(op, b, ctx) {
     const L = refresh(p, docs);
     await store.set(K.pt(sid, p.id), { list: docs }); await saveParties(); if (touched.size) await saveProds(); await saveMv(store, sid, mv);
     await addLog(store, sid, t, by, `${old ? "Edited" : "New"} ${n.ty} ${n.no || ""} · ${p.n || p.firm} · ${rs(n.amt)}${n.st !== "final" ? " (" + n.st + ")" : ""}`);
-    const doc = old || n, out = { ok: true, doc, party: p, s: L.s, prods: [...touched].map((id) => PM[id]) };
+    const doc = old || n, out = { ok: true, doc, party: p, s: L.s, prods: [...touched].map((id) => PM[id]) }; if (qnew.length) out.qnew = qnew;
     if (doc.st === "final" && (b.send || (!old && (shop.auto.wa || shop.auto.mail)))) out.sent = await deliver(ctx, shop, p, doc, L.s, origin, b.send ? b.via : null, store, sid);
     if (!old && doc.st === "final") {   // ⚙️ instant rules: payment made / received, bill entered, credit limit crossed
       const trig = doc.ty === "rcpt" || doc.ty === "pay" ? "pay_done" : doc.ty === "sale" || doc.ty === "pur" ? "sale_done" : "";
@@ -722,7 +743,7 @@ async function ownerOp(op, b, ctx) {
     return json(200, { ok: true, bill: j });
   }
   if (op === "ai") {
-    const months = lastMonths(today, 3), mv = await loadMv(store, sid, months), vel = velocity(mv, months, today), live2 = B.prods.filter((p) => p.on !== false);
+    const months = lastMonths(today, 3), mv = await loadMv(store, sid, months), vel = velocity(mv, months, today), live2 = B.prods.filter((p) => p.on !== false && !p.ns);
     const val = live2.reduce((s, p) => s + Math.max(0, p.stk) * (p.cost || 0), 0), C = B.parties.filter((p) => p.k === "c" && p.on !== false), Dd = B.parties.filter((p) => p.k === "d" && p.on !== false);
     const low = live2.filter((p) => (vel[p.id] || 0) > 0 && p.stk <= Math.max(p.rol != null ? p.rol : shop.low, (vel[p.id] || 0) * 7)).sort((a, b) => (vel[b.id] || 0) - (vel[a.id] || 0)).slice(0, 30);
     const dead = live2.filter((p) => p.stk > 0 && !(vel[p.id] > 0) && p.lots.some((l) => diffD(today, l.d) > 60)).sort((a, b) => b.stk * b.cost - a.stk * a.cost).slice(0, 15);
