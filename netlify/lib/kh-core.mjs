@@ -226,6 +226,9 @@ function message(kind, shop, p, doc, s, link) {
     : (s.bal > 0.5 ? `${T.owe}: ${rs(s.bal)}` : T.clear);
   if (kind === "sale" || kind === "pur") {
     lines.push(`🧾 ${T.bill} ${doc.no ? "#" + doc.no + " " : ""}· ${dShow(doc.d)}`, `${T.total}: *${rs(doc.amt)}*` + (doc.items.length ? ` (${doc.items.length} ${T.items})` : ""));
+    // the full bill inside the message itself — the customer sees every item without opening a link or a file
+    if (doc.items.length) { lines.push("────────────"); doc.items.slice(0, 50).forEach((i, k) => lines.push(`${k + 1}. ${i.n} — ${i.q}${i.u ? " " + i.u : ""}${i.r ? " × " + rs(i.r) : ""} = *${rs(i.amt != null ? i.amt : i.q * i.r)}*`)); if (doc.items.length > 50) lines.push(`… +${doc.items.length - 50} ${T.items}`);
+      if (doc.disc) lines.push(`Discount: −${rs(doc.disc)}`); if (doc.oth) lines.push(`Other charges: ${rs(doc.oth)}`); lines.push("────────────", `${T.total}: *${rs(doc.amt)}*`); }
     if (doc.paid) lines.push(`${T.paidNow}: ${rs(doc.paid)}`);
     if (doc.amt - doc.paid > 0.5) lines.push(`${T.balBill}: ${rs(doc.amt - doc.paid)} · ${T.due} ${dShow(doc.due)}`);
     lines.push(balLine);
@@ -238,6 +241,7 @@ function message(kind, shop, p, doc, s, link) {
   } else if (kind === "remind") { lines.push(`🙏 ${T.remind}: ${balLine}` + (s.nextDue && s.over < 0.5 ? ` · ${T.due} ${dShow(s.nextDue)}` : "")); if (shop.upi && p.k === "c" && s.bal > 0) lines.push(`UPI: ${shop.upi}`); }
   else lines.push(`📒 ${T.stmt} · ${dShow(istDay(Date.now()))}`, balLine);
   if (link) lines.push("", `${T.view}: ${link}`);
+  if (link && doc && doc.id && /[#&]d=/.test(link) && kind === "sale" && doc.items.length) lines.push(`📄 PDF: ${link}&pdf=1`);
   lines.push("", `${T.thanks} 🙏`, `${shop.name}${shop.ph ? " · " + shop.ph : ""}`);
   return lines.join("\n");
 }
