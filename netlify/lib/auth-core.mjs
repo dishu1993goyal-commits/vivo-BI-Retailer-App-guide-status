@@ -994,6 +994,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       const en = await jr(engageAction({ action: "engage-notify" }, ctx));
       const ar = mods.autoreports ? await jr(autorepAction({ action: "autorep-notify" }, ctx)) : {};
       const ml = await jr(mailerAction({ action: "ml-notify" }, ctx));
+      const iubN = app === "admin" ? await jr(iubAction({ action: "iub-notify" }, Object.assign({}, ctx, { mailFetch }))) : {};
       let notices = 0, calSoon = 0, pinned = [];
       try {
         const td = new Date(t + 5.5 * 3600000).toISOString().slice(0, 10), soon = new Date(t + 5.5 * 3600000 + 3 * 864e5).toISOString().slice(0, 10);
@@ -1007,7 +1008,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
       let insAlerts = 0;
       try { const cs = await cachedSnapshot(store); if (cs) { const al = await alertsFor(store, pool, cs.snap, app, rec), seen = ((await store.get(`insseen:${app}:${key}`)) || { ids: [] }).ids; insAlerts = al.filter((x) => !seen.includes(x.id) && (app !== "admin" || x.sev === "high")).length; } } catch (e) { }
       return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
-        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, hoReports: ml.fresh || 0, insAlerts, notices, calSoon, pinned, geoReq });
+        disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, iub: iubN.n || 0, hoReports: ml.fresh || 0, insAlerts, notices, calSoon, pinned, geoReq });
     }
     if (b.action === "hub") return json(200, { ok: true, modules: await modulesFor(store, app, rec), app, role: roleOf(app, rec), master: !!rec.master, state: rec.state || "", name: rec.fullName });
     {

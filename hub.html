@@ -424,7 +424,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       ["wall", "💡", "Best practices", "wall", "t:engage.html#wall"], ["surveys", "📋", "Surveys", "surveys", "t:survey.html", function () { return N.surveys; }], ["chat", "✉️", "Messages", "chat", "t:chat.html", function () { return N.chat; }], ["rewards", "🎁", "Rewards & recognition", null, "t:rewards.html"], ["newsletter", "📰", "BI newsletter", null, "t:newsletter.html"]] },
     { id: "learn", icon: "📚", name: "Learn & help", sub: "Answers", col: "#FFF4E5", items: [
       ["learn", "🎓", "Learning Hub", null, "t:learn.html"], ["guide", "📘", "Guide & manual", null, "t:guide.html"], ["appguide", "🗣️", "App guide assistant", null, "t:appguide.html"], ["help", "❓", "FAQ & Ask AI", "help", "t:help.html#faq"], ["flows", "🔀", "Processes", "flows", "t:help.html#flows"], ["contacts", "☎️", "Escalation contacts", "contacts", "t:help.html#contacts"],
-      ["knowledge", "📖", "Knowledge", "knowledge", "t:knowledge.html"], ["schemes", "🧾", "Schemes & calculator", "schemes", "t:schemes.html"], ["schemecalc", "🧮", "Scheme payout calculator", null, "t:schemecalc.html"], ["schemepolicy", "📜", "Scheme policies", null, "t:schemepolicy.html"], ["schemeassist", "🎯", "Scheme assistant (AI)", null, "t:schemeassist.html"], ["retailerpay", "💼", "Retailer payouts", null, "t:retailerpay.html"], ["payplanner", "🎯", "Payout target planner", null, "t:payplanner.html"], ["retailerportal", "🏬", "Retailer portal", null, "t:retailerportal.html"], ["imeiunblock", "🔓", "IMEI unblock (finance rollback)", null, "t:imeiunblock.html"], ["schemeroi", "📐", "Scheme ROI analyzer", null, "t:schemeroi.html"], ["forecast", "🔮", "Demand forecast & allocation", null, "t:forecast.html"], ["compete", "🥊", "Competition analysis", null, "t:compete.html"]] },
+      ["knowledge", "📖", "Knowledge", "knowledge", "t:knowledge.html"], ["schemes", "🧾", "Schemes & calculator", "schemes", "t:schemes.html"], ["schemecalc", "🧮", "Scheme payout calculator", null, "t:schemecalc.html"], ["schemepolicy", "📜", "Scheme policies", null, "t:schemepolicy.html"], ["schemeassist", "🎯", "Scheme assistant (AI)", null, "t:schemeassist.html"], ["retailerpay", "💼", "Retailer payouts", null, "t:retailerpay.html"], ["payplanner", "🎯", "Payout target planner", null, "t:payplanner.html"], ["retailerportal", "🏬", "Retailer portal", null, "t:retailerportal.html"], ["imeiunblock", "🔓", "IMEI unblock (finance rollback)", null, "t:imeiunblock.html", function () { return N.iub; }], ["schemeroi", "📐", "Scheme ROI analyzer", null, "t:schemeroi.html"], ["forecast", "🔮", "Demand forecast & allocation", null, "t:forecast.html"], ["compete", "🥊", "Competition analysis", null, "t:compete.html"]] },
     { id: "support", icon: "🎧", name: "Support", sub: "Get help", col: "#FDECEC", items: [
       ["disputes", "⚖️", "Disputes", "disputes", "t:disputes.html", function () { return (N.disputes || {}).unread + (N.disputes || {}).assigned; }], ["support", "🎧", "Support desk", "support", "n:support", function () { return N.supportUnread; }],
       ["qr", "🔳", "Web login (QR)", null, "n:scanqr", null, "app"]] },
@@ -516,7 +516,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       if (r.ok) {
         MODS = r.modules || null;
         N = { hygiene: r.hygiene, autorep: r.autorep, quizNew: r.quizNew, pollNew: r.pollNew, disputes: r.disputes || {}, supportUnread: r.supportUnread, pwreq: r.pwreq,
-          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports, insAlerts: r.insAlerts, notices: r.notices, calSoon: r.calSoon, geoReq: r.geoReq };
+          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports, insAlerts: r.insAlerts, notices: r.notices, calSoon: r.calSoon, geoReq: r.geoReq, iub: r.iub };
         PINS = r.pinned || [];
       }
       api({ action: "me" }).then(function (m) {
@@ -529,7 +529,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   window.__custChanged = function () { if (!Q) draw(); };
   window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
-  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; N.hoReports = r.hoReports; N.insAlerts = r.insAlerts; N.notices = r.notices; N.calSoon = r.calSoon; N.geoReq = r.geoReq; PINS = r.pinned || PINS; if (!Q) draw(); } }); });
+  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; N.hoReports = r.hoReports; N.insAlerts = r.insAlerts; N.notices = r.notices; N.calSoon = r.calSoon; N.geoReq = r.geoReq; N.iub = r.iub; PINS = r.pinned || PINS; if (!Q) draw(); } }); });
   load();
 })();
 </script>

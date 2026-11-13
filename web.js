@@ -619,6 +619,8 @@
 
   // ---------- SESSION START ----------
   function startSession(fresh) {
+    // came from an e-mail link to a tool page while logged out → go back there after logging in (same site only)
+    try { var rt = store("biw-return"); if (rt && fresh) { store("biw-return", null); if (/^\/[a-z0-9_-]+\.html(\?[^#]*)?(#[\w=&-]*)?$/i.test(rt)) { location.href = rt; return; } } } catch (e) { }
     mount();
     var go = function () {
       if (AUTH.app === "state") {
