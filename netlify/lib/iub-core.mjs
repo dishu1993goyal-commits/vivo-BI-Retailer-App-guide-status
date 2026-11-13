@@ -41,6 +41,8 @@ async function cfgOf(store) {
   const c = (await store.get("iubcfg")) || { partners: DEFAULT_PARTNERS.map((n, i) => ({ id: "p" + (i + 1), name: n, emails: [], cc: [], token: randomBytes(16).toString("hex"), active: true, tatHours: 48 })), hoEmails: [], autoMail: true };
   c.hoCc = c.hoCc || []; if (c.mailState === undefined) c.mailState = true;
   if (!Array.isArray(c.vivoCols) || !c.vivoCols.length) c.vivoCols = [{ h: "IMEI", v: "imei" }];
+  if (!c.vivoUrl) c.vivoUrl = "https://in-transfer.vivo.xyz/login.htm";
+  if (c.vivoAuto === undefined) c.vivoAuto = true;
   return c;
 }
 const linkOf = (env, p) => (env.SITE_URL || "") + "/imeiunblock.html?p=" + p.token;
@@ -138,7 +140,7 @@ export async function iubAction(b, ctx) {
     let n = 0; (await allB()).forEach((x) => x.items.forEach((it) => { if (it.status === "ho_review" || AT_FINAL.includes(it.status) || it.status === "vivo_queue") n++; }));
     return json(200, { ok: true, n });
   }
-  if (b.action === "iub-me") return json(200, { ok: true, isHO, state: myState, statuses: IUB_STATUS, hoSet: !!cfg.hoEmails.length, partners: cfg.partners.filter((p) => p.active !== false).map((p) => ({ id: p.id, name: p.name, hasEmail: !!p.emails.length, tatHours: p.tatHours || 48 })), vivoCols: cfg.vivoCols });
+  if (b.action === "iub-me") return json(200, { ok: true, isHO, state: myState, statuses: IUB_STATUS, hoSet: !!cfg.hoEmails.length, partners: cfg.partners.filter((p) => p.active !== false).map((p) => ({ id: p.id, name: p.name, hasEmail: !!p.emails.length, tatHours: p.tatHours || 48 })), vivoCols: cfg.vivoCols, vivoUrl: cfg.vivoUrl, vivoAuto: cfg.vivoAuto !== false });
   if (b.action === "iub-cfg") {
     if (!isHO) return json(403, { ok: false, error: "Only HO admins manage the e-mail set-up." });
     if (b.save) {
@@ -147,6 +149,8 @@ export async function iubAction(b, ctx) {
       cfg.hoEmails = emails(c.hoEmails); cfg.hoCc = emails(c.hoCc); cfg.autoMail = c.autoMail !== false; cfg.mailState = c.mailState !== false;
       const vc = (Array.isArray(c.vivoCols) ? c.vivoCols : []).slice(0, 20).map((x) => ({ h: str(x.h, 60), v: VIVO_COL_SOURCES[x.v] ? x.v : "fixed", f: str(x.f, 80) })).filter((x) => x.h);
       if (vc.some((x) => x.v === "imei")) cfg.vivoCols = vc;
+      if (c.vivoUrl !== undefined) { const u = str(c.vivoUrl, 300); if (!/^https:\/\/[^\s/]+\.[^\s]+$/i.test(u)) return json(400, { ok: false, error: "The vivo portal link must start with https://" }); cfg.vivoUrl = u; }
+      if (c.vivoAuto !== undefined) cfg.vivoAuto = c.vivoAuto !== false;
       await saveCfg();
     }
     return json(200, { ok: true, sources: VIVO_COL_SOURCES, cfg: Object.assign({}, cfg, { partners: cfg.partners.map((p) => Object.assign({}, p, { link: linkOf(env, p) })) }) });
@@ -257,7 +261,7 @@ export async function iubAction(b, ctx) {
   if (b.action === "iub-runs") {
     if (!isHO) return hoOnly();
     const L = (await pool(await store.list("iubrun:"), 30, (k) => store.get(k))).filter(Boolean).sort((a, c) => c.at - a.at).slice(0, 60);
-    return json(200, { ok: true, runs: L.map((r) => ({ id: r.id, at: r.at, by: r.by, n: r.items.length, round: r.round.length, status: r.status, result: r.result, resAt: r.resAt, resBy: r.resBy, via: r.via, mailed: r.mailed, failed: r.failed || 0 })), vivoCols: cfg.vivoCols });
+    return json(200, { ok: true, runs: L.map((r) => ({ id: r.id, at: r.at, by: r.by, n: r.items.length, round: r.round.length, status: r.status, result: r.result, resAt: r.resAt, resBy: r.resBy, via: r.via, mailed: r.mailed, failed: r.failed || 0, msg: r.portalMsg || "" })), vivoCols: cfg.vivoCols, vivoUrl: cfg.vivoUrl, vivoAuto: cfg.vivoAuto !== false });
   }
   if (b.action === "iub-run-file") {   // the rows for the vivo portal's unblock Excel, in the configured column format
     if (!isHO) return hoOnly();
@@ -278,7 +282,7 @@ export async function iubAction(b, ctx) {
       const fail = allFail || failSet.has(it.imei); it.status = fail ? "vivo_failed" : "vivo_unblocked"; it.uAt = t; it.uBy = by + (b.via === "app" ? " (app)" : ""); it.uRemark = str(b.remark, 300) || (fail ? "vivo portal showed failure" : "");
       if (!fail) await store.delete(`iubopen:${it.imei}`); if (fail) bad++; else ok++; }
     for (const x of bm.values()) if (x) await store.set(`iubb:${x.id}`, x);
-    run.status = "done"; run.result = bad && ok ? "partial" : bad ? "failure" : "success"; run.failed = bad; run.resAt = t; run.resBy = by; run.via = b.via === "app" ? "app" : "manual";
+    run.status = "done"; run.result = bad && ok ? "partial" : bad ? "failure" : "success"; run.failed = bad; run.resAt = t; run.resBy = by; run.via = b.via === "app" ? "app" : "manual"; run.portalMsg = str(b.remark, 300);
     await store.set(`iubrun:${run.id}`, run);
     const mailed = await roundMails(run);
     return json(200, { ok: true, unblocked: ok, failed: bad, mailed });
