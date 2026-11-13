@@ -1,3 +1,1 @@
-Shop Khata links now open inside the app — so bank SMS reading and sending the bill PDF to WhatsApp work there
-Fixed: "Turn on" bank SMS reading did nothing when the khata was opened from the hub
-Shop Khata can save a customer to your phone contacts so the bill PDF opens in their WhatsApp chat
+IMEI unblock: the app can unblock the IMEIs on the vivo portal for HO — log in once (with the captcha), the app opens Unblock Imeis, attaches the IMEI file, presses Batch Unblock and records the result

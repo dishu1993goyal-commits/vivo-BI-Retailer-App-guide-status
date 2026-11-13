@@ -3036,6 +3036,198 @@ public class MainActivity extends FragmentActivity {
         showToolPage("portals.html", tr("all_tools"), "#list");
     }
 
+    // ---------- vivo portal IMEI unblock runner (IMEI unblock tool → final step) ----------
+    // HO logs in on the vivo portal themselves (user, password, captcha — the app never fills these).
+    // After that the app opens "Unblock Imeis", attaches the IMEI file, taps "Batch Unblock" and reads the pop-up.
+    private WebView vivoWeb;
+    private boolean inUnblock = false;
+    private View unblockPrev;
+    private WebView unblockFrom;
+    private JSONObject uJob;
+    private int uStep, uNav, uTick;
+    private String uSeen = "[]";
+    private boolean uDone;
+    private TextView uBanner;
+    private java.io.File uFile;
+    private String uJs;
+    private static final String UNBLOCK_DEF_URL = "https://in-transfer.vivo.xyz/login.htm";
+
+    private boolean unblockPageOk(WebView w) {
+        try { String u = w == null ? null : w.getUrl(); return smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && Uri.parse(u).getPath().startsWith("/imeiunblock"); }
+        catch (Throwable t) { return false; }
+    }
+    private SharedPreferences unblockPrefs() { return getSharedPreferences("iub_runs", MODE_PRIVATE); }
+    private String unblockScript() {
+        if (uJs != null) return uJs;
+        try (java.io.InputStream in = getAssets().open("vivo_unblock.js")) {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            uJs = bo.toString("UTF-8");
+        } catch (Throwable e) { uJs = ""; }
+        return uJs;
+    }
+    private void unblockBanner(String s, String color) {
+        if (uBanner == null) return;
+        uBanner.setText(s); uBanner.setBackgroundColor(Color.parseColor(color));
+    }
+
+    private class UnblockBridge {
+        private final WebView w;
+        UnblockBridge(WebView w) { this.w = w; }
+        @JavascriptInterface public String version() { return "1"; }
+        /** Starts the runner. Returns ok / blocked / busy / bad. */
+        @JavascriptInterface public String run(String id, String b64, String name, String url) {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> unblockPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "blocked";
+                if (inUnblock) return "busy";
+                if (id == null || !id.matches("[A-Za-z0-9_-]{1,24}") || b64 == null || b64.length() > 4_000_000) return "bad";
+                String u = url == null || url.trim().isEmpty() ? UNBLOCK_DEF_URL : url.trim();
+                if (!"https".equals(Uri.parse(u).getScheme())) return "bad";
+                String nm = name == null || !name.matches("[A-Za-z0-9 _.()-]{1,80}\\.xlsx") ? "IMEI_unblock.xlsx" : name;
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                java.io.File dir = new java.io.File(getCacheDir(), "share"); dir.mkdirs();
+                java.io.File f = new java.io.File(dir, nm);
+                try (java.io.FileOutputStream fo = new java.io.FileOutputStream(f)) { fo.write(bytes); }
+                JSONObject job = new JSONObject().put("id", id).put("b64", b64).put("name", nm).put("url", u);
+                ui.post(() -> showUnblock(w, job, f));
+                return "ok";
+            } catch (Throwable e) { return "bad"; }
+        }
+        /** Results the page has not acknowledged yet (e.g. the page was reloaded meanwhile). */
+        @JavascriptInterface public String pending() {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> unblockPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "[]";
+                org.json.JSONArray a = new org.json.JSONArray();
+                for (Object v : unblockPrefs().getAll().values()) try { a.put(new JSONObject(String.valueOf(v))); } catch (Throwable ignored) { }
+                return a.toString();
+            } catch (Throwable e) { return "[]"; }
+        }
+        @JavascriptInterface public void ack(String id) { if (id != null) unblockPrefs().edit().remove(id).apply(); }
+    }
+
+    private void showUnblock(WebView from, JSONObject job, java.io.File f) {
+        if (inUnblock) return;
+        inUnblock = true; uDone = false; uStep = 0; uNav = 0; uTick = 0; uSeen = "[]";
+        uJob = job; uFile = f; unblockFrom = from;
+        ViewGroup content = findViewById(android.R.id.content);
+        unblockPrev = content.getChildCount() > 0 ? content.getChildAt(0) : null;
+        if (unblockPrev != null) content.removeView(unblockPrev);
+        vivoWeb = new WebView(this);
+        WebSettings ws = vivoWeb.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        ws.setBuiltInZoomControls(true);
+        ws.setDisplayZoomControls(false);
+        ws.setJavaScriptCanOpenWindowsAutomatically(true);
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        ws.setUserAgentString(ws.getUserAgentString().replace("; wv", "").replace("Mobile ", ""));   // the portal is a desktop site
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(vivoWeb, true);
+        vivoWeb.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String s = request.getUrl().getScheme();
+                return !("http".equals(s) || "https".equals(s));
+            }
+            @Override public void onPageFinished(WebView view, String url) { super.onPageFinished(view, url); CookieManager.getInstance().flush(); }
+        });
+        vivoWeb.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onJsAlert(WebView view, String url, String message, android.webkit.JsResult result) {
+                if (uStep >= 2 && !uDone) { result.confirm(); unblockFinish("done", message); return true; }
+                return false;
+            }
+            @Override public boolean onJsConfirm(WebView view, String url, String message, android.webkit.JsResult result) {
+                if (uStep >= 1 && !uDone && !/*never confirm a logout*/ String.valueOf(message).toLowerCase().contains("logout")) { result.confirm(); return true; }
+                return false;
+            }
+            @Override public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                // "Choose File" on the unblock screen: hand over the IMEI file straight away
+                try {
+                    Uri u = androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", uFile);
+                    callback.onReceiveValue(new Uri[]{u});
+                    if (uStep == 0) { uStep = 1; unblockBanner("📎 IMEI file attached — pressing “Batch Unblock”…", "#E8F0FE"); }
+                } catch (Throwable e) { callback.onReceiveValue(null); }
+                return true;
+            }
+        });
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        LinearLayout bar = profileHeaderBar("🔓 vivo portal · unblock " + job.optString("id"), this::unblockAskClose);
+        page.addView(bar);
+        uBanner = new TextView(this);
+        uBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
+        uBanner.setTextColor(Color.parseColor("#111111"));
+        uBanner.setPadding(dp(14), dp(10), dp(14), dp(10));
+        page.addView(uBanner, new LinearLayout.LayoutParams(-1, -2));
+        unblockBanner("Opening the vivo portal…", "#E8F0FE");
+        page.addView(vivoWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(page);
+        vivoWeb.loadUrl(job.optString("url"));
+        ui.postDelayed(this::unblockTick, 2500);
+    }
+
+    private void unblockTick() {
+        if (!inUnblock || uDone || vivoWeb == null) return;
+        uTick++;
+        try {
+            JSONObject c = new JSONObject().put("st", uStep).put("name", uJob.optString("name")).put("nav", uNav).put("seen", new org.json.JSONArray(uSeen));
+            if (uStep == 0) c.put("b64", uJob.optString("b64"));
+            vivoWeb.evaluateJavascript(unblockScript() + "(" + c + ")", v -> {
+                try {
+                    if (v == null || "null".equals(v) || uDone) return;
+                    JSONObject r = new JSONObject(new org.json.JSONTokener(v).nextValue().toString());
+                    String s = r.optString("s"), msg = r.optString("msg");
+                    int st = r.optInt("st", uStep);
+                    if ("login".equals(s)) unblockBanner("🔑 Log in to the vivo portal: type the user ID, password and the captcha, then tap Login. The app takes over after that.", "#FFF4E5");
+                    else if ("nav".equals(s)) { uNav++; unblockBanner("➡ Opening Imeis Query → Unblock Imeis…", "#E8F0FE"); }
+                    else if ("lost".equals(s)) { uNav++; unblockBanner(uNav > 8 ? "Couldn't find “Unblock Imeis” — open Imeis Query → Unblock Imeis yourself; the app carries on from there." : "Looking for Imeis Query → Unblock Imeis…", uNav > 8 ? "#FFF4E5" : "#E8F0FE"); }
+                    else if ("chooser".equals(s)) unblockBanner("Tap “Choose File” once — the app attaches the IMEI file and carries on.", "#FFF4E5");
+                    else if ("file".equals(s)) unblockBanner("📎 IMEI file attached — pressing “Batch Unblock”…", "#E8F0FE");
+                    else if ("clicked".equals(s)) { uSeen = msg.isEmpty() ? "[]" : msg; uTick = 0; unblockBanner("⏳ Batch Unblock pressed — waiting for the portal's reply…", "#E8F0FE"); }
+                    else if ("result".equals(s)) { uStep = 3; unblockFinish("done", msg); return; }
+                    if (st == 2 && "wait".equals(s) && uTick > 60) { unblockBanner("The portal hasn't replied yet. If it shows a message, it will be read; or close and record the result yourself.", "#FFF4E5"); }
+                    uStep = st;
+                } catch (Throwable ignored) { }
+            });
+        } catch (Throwable ignored) { }
+        ui.postDelayed(this::unblockTick, uStep >= 1 ? 800 : 1200);
+    }
+
+    private void unblockFinish(String state, String text) {
+        if (uDone) return;
+        uDone = true;
+        final String id = uJob == null ? "" : uJob.optString("id");
+        try {
+            JSONObject r = new JSONObject().put("id", id).put("state", state).put("text", text == null ? "" : text).put("at", System.currentTimeMillis());
+            if ("done".equals(state)) unblockPrefs().edit().putString(id, r.toString()).apply();
+            unblockBanner("done".equals(state) ? "✅ The portal replied: " + text : "Closed", "#E6F4EA");
+            ui.postDelayed(() -> unblockClose(r), "done".equals(state) ? 1800 : 0);
+        } catch (Throwable e) { unblockClose(null); }
+    }
+    private void unblockAskClose() {
+        if (uDone) return;
+        new AlertDialog.Builder(this).setMessage(uStep >= 2 ? "Batch Unblock was already pressed. Close without reading the portal's reply? You can record the result yourself." : "Stop the vivo portal unblock?")
+                .setPositiveButton("Close", (d, w) -> unblockFinish("cancel", ""))
+                .setNegativeButton("Stay", null).show();
+    }
+    private void unblockClose(JSONObject r) {
+        inUnblock = false;
+        CookieManager.getInstance().flush();
+        if (vivoWeb != null) { try { vivoWeb.stopLoading(); vivoWeb.destroy(); } catch (Throwable ignored) { } vivoWeb = null; }
+        if (uFile != null) try { uFile.delete(); } catch (Throwable ignored) { }
+        uBanner = null;
+        if (unblockPrev != null) { if (unblockPrev.getParent() != null) ((ViewGroup) unblockPrev.getParent()).removeView(unblockPrev); setContentView(unblockPrev); }
+        unblockPrev = null;
+        final WebView w = unblockFrom; unblockFrom = null;
+        if (r != null && w != null) ui.postDelayed(() -> { try { if (unblockPageOk(w)) w.evaluateJavascript("window.__biUnblock&&window.__biUnblock(" + r.toString().replace((char) 0x2028, ' ').replace((char) 0x2029, ' ') + ")", null); } catch (Throwable ignored) { } }, 300);
+    }
+
     private void doNative(String name) {
         switch (name) {
             case "support": showSupportList("all"); break;
@@ -3134,6 +3326,7 @@ public class MainActivity extends FragmentActivity {
             surveyWeb.addJavascriptInterface(new SpeechBridge(), "BISpeech");
             surveyWeb.addJavascriptInterface(new TtsBridge(), "BITTS");
             surveyWeb.addJavascriptInterface(new SmsBridge(surveyWeb), "BISms");
+            surveyWeb.addJavascriptInterface(new UnblockBridge(surveyWeb), "BIUnblock");
             surveyWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -4856,6 +5049,7 @@ public class MainActivity extends FragmentActivity {
     @Override
     public void onBackPressed() {
         if (inLink) { super.onBackPressed(); return; }
+        if (inUnblock) { unblockAskClose(); return; }
         if (inPortal) { portalBack(); return; }
         if (inSurveyPage) {
             surveyBack();
