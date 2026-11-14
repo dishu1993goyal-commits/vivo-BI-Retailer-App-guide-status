@@ -10,7 +10,7 @@ const json = (status, body) => new Response(JSON.stringify(body), { status, head
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const ENVS = ["prod", "uat"];
 export const EAPI_ENDPOINTS = {
-  queryInstallment: { name: "Query Installment (GetIMEIInfoWithNoBlock_NEW)", fields: ["imei", "modelName", "companyName", "password", "dealerCode"] },
+  queryInstallment: { name: "Query Installment (GetIMEIInfoWithNoBlock_NEW)", fields: ["companyName", "password", "imei", "modelName", "dealerCode"] },
   processInstallment: { name: "Process Installment (GetIMEIInfo_NEW)", fields: ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"], changes: true },
   releaseInstallment: { name: "Release Installment (UpdateImeiInfo)", fields: ["companyName", "password", "imei"], changes: true },
 };
@@ -21,6 +21,9 @@ const DEF_ENV = {
 const sha = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
 const FMTS = ["compact|ok", "asis|ok", "sorted|ok", "compact|nobody", "compact|imeionly", "compact|secs", "compact|upper", "asis|nobody", "sorted|upper"];
+// vivo's gateway signs the body in this field order (confirmed by vivo IT) — keep it, whatever order the fields were typed in
+export const VIVO_ORDER = ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"];
+const vivoOrder = (o) => o && typeof o === "object" && !Array.isArray(o) ? VIVO_ORDER.filter((k) => k in o).concat(Object.keys(o).filter((k) => !VIVO_ORDER.includes(k))).reduce((a, k) => { a[k] = o[k]; return a; }, {}) : o;
 const sortKeys = (o) => Array.isArray(o) ? o.map(sortKeys) : o && typeof o === "object" ? Object.keys(o).sort().reduce((a, k) => { a[k] = sortKeys(o[k]); return a; }, {}) : o;
 // pasted from e-mail / WhatsApp: drop invisible characters (zero-width, non-breaking spaces, BOM) and outer spaces
 const cleanKey = (v) => String(v || "").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").replace(/\u00A0/g, " ").trim();
@@ -77,7 +80,7 @@ export async function emiApiAction(b, ctx) {
     const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted"].includes(ef[0]) ? ef[0] : "compact";
     let sig = str(b.sig, 20) || "ok";
     if (sig === "ok") sig = ["ok", "nobody", "imeionly", "secs", "upper", "query"].includes(ef[1]) ? ef[1] : "ok";
-    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : o); } catch (x) { } }
+    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : vivoOrder(o)); } catch (x) { } }
     let ts = t, secret = K.secret, inv = E.invoker, signed = raw, upper = false;
     if (sig === "nobody") signed = "";
     if (sig === "secs") ts = Math.floor(t / 1000);
