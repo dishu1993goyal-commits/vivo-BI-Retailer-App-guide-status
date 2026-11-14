@@ -163,7 +163,7 @@ async function docLink(store) { let l = await store.get("eapidoclink"); if (!l) 
 const docPub = (d) => ({ id: d.id, biz: d.biz, title: d.title, version: d.version, env: d.env, notes: d.notes, name: d.name, mime: d.mime, size: d.size, chunks: d.chunks, published: !!d.published, at: d.at, upd: d.upd, by: d.by });
 // the business-wise documents made by vivo BI (v1.0) are bundled with the function and added once, published
 const SEED = [["Installment", "Installment (EMI)"], ["Trade-in", "Trade-in"], ["Service-protection", "Service protection"], ["ABB-Buyback", "ABB (assured buyback)"], ["Student-authentication", "Student authentication"], ["Enterprise-discount", "Enterprise discount"]];
-const SEED_VER = "v1.1", SEED_FLAG = "eapidocseed2";   // a new SEED_VER replaces the earlier ready-made files (files HO uploaded are never touched)
+const SEED_VER = "v1.1", SEED_FLAG = "eapidocseed3";   // a new SEED_VER replaces the earlier ready-made files (files HO uploaded are never touched)
 async function seedDocs(store, t, env) {
   if (await store.get(SEED_FLAG)) return 0;
   const fs = await import("node:fs"), path = await import("node:path");
@@ -171,7 +171,7 @@ async function seedDocs(store, t, env) {
   const dirs = [env.SEED_DIR, here && path.join(here, "../seed/apidocs"), path.join(process.cwd(), "netlify/seed/apidocs"), path.join(process.cwd(), "../netlify/seed/apidocs"), "/var/task/netlify/seed/apidocs"].filter(Boolean);
   const dir = dirs.find((d) => { try { return fs.existsSync(path.join(d, "vivo_Installment_API_Documentation_" + SEED_VER + ".pdf")); } catch (e) { return false; } });
   if (!dir) return 0;
-  for (const k of await store.list("eapidoc:")) { const d = await store.get(k); if (d && d.seed && !d.seed.includes("_" + SEED_VER + ".")) { for (let i = 0; i < (d.chunks || 8); i++) await store.delete(`eapidocb:${d.id}:${i}`); await store.delete(k); } }
+  for (const k of await store.list("eapidoc:")) { const d = await store.get(k); if (d && d.seed) { for (let i = 0; i < (d.chunks || 8); i++) await store.delete(`eapidocb:${d.id}:${i}`); await store.delete(k); } }
   let n = 0;
   for (const [key, biz] of SEED) for (const [ext, mime, kind] of [["pdf", "application/pdf", "PDF"], ["docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Word"]]) {
     const name = `vivo_${key}_API_Documentation_${SEED_VER}.${ext}`; let buf; try { buf = fs.readFileSync(path.join(dir, name)); } catch (e) { continue; }
