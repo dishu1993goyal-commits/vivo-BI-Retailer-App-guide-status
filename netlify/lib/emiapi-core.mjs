@@ -114,7 +114,7 @@ export async function emiApiAction(b, ctx) {
       code: res && res.code, errorCode: res && res.errorCode || "", message: res && res.message || "", success: res ? !!res.success : null,
       processStatus: d.processStatus === undefined ? null : d.processStatus, errorMessage: d.errorMessage || "", traceId: res && res.traceId || "" };
     await store.set("eapilog:" + log.id, log);
-    return json(200, { ok: true, call: log, headers: rh, sent: { url, headers: { "Content-Type": "application/json", gwSignature: headers.gwSignature ? log.sigShown : "(not sent)" } } });
+    return json(200, { ok: true, call: log, headers: rh, rawFull: raw, sent: { url, headers: { "Content-Type": "application/json", gwSignature: headers.gwSignature ? log.sigShown : "(not sent)" } } });
   }
 
   if (b.action === "eapi-fmt") {   // save the signature format that the gateway accepted
