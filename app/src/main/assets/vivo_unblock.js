@@ -59,8 +59,31 @@
     }
 
     // ---- login screen: HO logs in; nothing is filled here ----
-    var pw = docs().some(function (d) { return [].some.call(d.querySelectorAll("input[type=password]"), vis); });
-    if (pw && c.st < 2) return out(c.st, "login");
+    // Saved user ID + password (kept encrypted on this phone) are filled in; the captcha is always typed by HO.
+    var pwd = null;
+    docs().forEach(function (d) { if (!pwd) pwd = [].filter.call(d.querySelectorAll("input[type=password]"), vis)[0] || null; });
+    if (pwd && c.st < 2) {
+      var D0 = pwd.ownerDocument, W0 = D0.defaultView || window;
+      var ins = [].filter.call(D0.querySelectorAll("input"), function (e) { return vis(e) && /^(text|email|tel|number|)$/i.test(e.type || ""); });
+      var isCap = function (e) { return /captcha|verif|vcode|valid|check.?code|auth.?code|验证/i.test([e.name, e.id, e.placeholder, e.className].join(" ")); };
+      var user = null, cap = null;
+      ins.forEach(function (e) {
+        var before = pwd.compareDocumentPosition(e) & 2;   // e comes before the password box
+        if (isCap(e)) cap = cap || e; else if (before) user = e; else if (!cap) cap = e;
+      });
+      function setv(el, v) {
+        var d = Object.getOwnPropertyDescriptor(W0.HTMLInputElement.prototype, "value");
+        d.set.call(el, v);
+        ["input", "change", "keyup"].forEach(function (t) { el.dispatchEvent(new W0.Event(t, { bubbles: true })); });
+      }
+      var filled = false;
+      if (c.fill && user && pwd) {
+        if (!user.value) { setv(user, c.fill.u); filled = true; }
+        if (!pwd.value) { setv(pwd, c.fill.p); filled = true; }
+        if (filled && cap) { try { cap.focus(); } catch (e) { } }
+      }
+      return JSON.stringify({ st: c.st, s: "login", filled: filled, cap: !!cap, u: user ? user.value : "", p: pwd.value || "" });
+    }
 
     // ---- after "Batch Unblock": read the pop-up ----
     if (c.st >= 2) {

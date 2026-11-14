@@ -3050,6 +3050,47 @@ public class MainActivity extends FragmentActivity {
     private TextView uBanner;
     private java.io.File uFile;
     private String uJs;
+    private JSONObject uCred;          // saved portal user ID + password (encrypted on this phone), for this portal host only
+    private String uHost = "", uTypedU = "", uTypedP = "";
+    private boolean uOnLogin, uAsked;
+    private String uCredId() { return "vivo_unblock|" + uHost; }
+    private String uCookieId() { return "vivo_unblock_ck|" + uHost; }
+    private boolean uSameHost() { try { String h = vivoWeb == null ? null : Uri.parse(vivoWeb.getUrl()).getHost(); return h != null && h.equalsIgnoreCase(uHost); } catch (Throwable e) { return false; } }
+    // Session cookies die when the app restarts; keep the portal's login cookies (encrypted) so a still-valid session is reused.
+    private void unblockKeepCookies() {
+        try {
+            String u = vivoWeb == null ? null : vivoWeb.getUrl(); if (u == null || !uSameHost()) return;
+            String ck = CookieManager.getInstance().getCookie(u);
+            if (ck != null && !ck.trim().isEmpty()) portalSave(uCookieId(), ck, u);
+        } catch (Throwable ignored) { }
+    }
+    private void unblockRestoreCookies(String url) {
+        try {
+            CookieManager cm = CookieManager.getInstance();
+            String now = cm.getCookie(url);
+            JSONObject k = portalLoad(uCookieId()); if (k == null) return;
+            String at = k.optString("p", url); if (!uHost.equalsIgnoreCase(Uri.parse(at).getHost())) return;
+            String cur = cm.getCookie(at);
+            if ((now != null && !now.trim().isEmpty()) || (cur != null && !cur.trim().isEmpty())) return;   // the app still has its live cookies
+            for (String kv : k.optString("u").split(";\\s*")) if (kv.contains("=")) cm.setCookie(at, kv.trim() + "; Max-Age=1209600; Secure");
+            cm.flush();
+        } catch (Throwable ignored) { }
+    }
+    private void unblockAskSave() {
+        if (uAsked || uTypedU.isEmpty() || uTypedP.isEmpty()) return;
+        if (uCred != null && uTypedU.equals(uCred.optString("u")) && uTypedP.equals(uCred.optString("p"))) return;
+        uAsked = true;
+        final String u = uTypedU, pw = uTypedP;
+        new AlertDialog.Builder(this).setTitle("Remember the vivo portal login?")
+                .setMessage("Save user ID “" + u + "” and its password on this phone? Next time the app fills them in and you only type the captcha.\n\nThey are kept encrypted on this phone only and filled only into " + uHost + ". They are never sent to the vivo BI servers.")
+                .setPositiveButton("Save", (d, w) -> { if (portalSave(uCredId(), u, pw)) { uCred = portalLoad(uCredId()); Toast.makeText(this, "Saved on this phone", Toast.LENGTH_SHORT).show(); } })
+                .setNegativeButton("Not now", null).show();
+    }
+    private void unblockForget() {
+        new AlertDialog.Builder(this).setMessage("Forget the saved vivo portal user ID and password on this phone?")
+                .setPositiveButton("Forget", (d, w) -> { portalPrefs().edit().remove(portalPrefKey(uCredId())).remove(portalPrefKey(uCookieId())).apply(); uCred = null; Toast.makeText(this, "Forgotten", Toast.LENGTH_SHORT).show(); })
+                .setNegativeButton("Keep", null).show();
+    }
     private static final String UNBLOCK_DEF_URL = "https://in-transfer.vivo.xyz/login.htm";
 
     private boolean unblockPageOk(WebView w) {
@@ -3113,6 +3154,8 @@ public class MainActivity extends FragmentActivity {
         if (inUnblock) return;
         inUnblock = true; uDone = false; uStep = 0; uNav = 0; uTick = 0; uSeen = "[]";
         uJob = job; uFile = f; unblockFrom = from;
+        uHost = String.valueOf(Uri.parse(job.optString("url")).getHost()).toLowerCase();
+        uCred = portalLoad(uCredId()); uTypedU = ""; uTypedP = ""; uOnLogin = false; uAsked = false;
         ViewGroup content = findViewById(android.R.id.content);
         unblockPrev = content.getChildCount() > 0 ? content.getChildAt(0) : null;
         if (unblockPrev != null) content.removeView(unblockPrev);
@@ -3165,9 +3208,11 @@ public class MainActivity extends FragmentActivity {
         uBanner.setTextColor(Color.parseColor("#111111"));
         uBanner.setPadding(dp(14), dp(10), dp(14), dp(10));
         page.addView(uBanner, new LinearLayout.LayoutParams(-1, -2));
+        uBanner.setOnClickListener(v -> { if (uOnLogin && uCred != null) unblockForget(); });
         unblockBanner("Opening the vivo portal…", "#E8F0FE");
         page.addView(vivoWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
         setContentView(page);
+        unblockRestoreCookies(job.optString("url"));
         vivoWeb.loadUrl(job.optString("url"));
         ui.postDelayed(this::unblockTick, 2500);
     }
@@ -3178,13 +3223,20 @@ public class MainActivity extends FragmentActivity {
         try {
             JSONObject c = new JSONObject().put("st", uStep).put("name", uJob.optString("name")).put("nav", uNav).put("seen", new org.json.JSONArray(uSeen));
             if (uStep == 0) c.put("b64", uJob.optString("b64"));
+            if (uCred != null && uStep == 0 && uSameHost()) c.put("fill", new JSONObject().put("u", uCred.optString("u")).put("p", uCred.optString("p")));
             vivoWeb.evaluateJavascript(unblockScript() + "(" + c + ")", v -> {
                 try {
                     if (v == null || "null".equals(v) || uDone) return;
                     JSONObject r = new JSONObject(new org.json.JSONTokener(v).nextValue().toString());
                     String s = r.optString("s"), msg = r.optString("msg");
                     int st = r.optInt("st", uStep);
-                    if ("login".equals(s)) unblockBanner("🔑 Log in to the vivo portal: type the user ID, password and the captcha, then tap Login. The app takes over after that.", "#FFF4E5");
+                    if ("login".equals(s)) {
+                        uOnLogin = true;
+                        if (!r.optString("u").isEmpty() && !r.optString("p").isEmpty()) { uTypedU = r.optString("u"); uTypedP = r.optString("p"); }
+                        if (uCred != null) unblockBanner("🔑 User ID and password filled in — just type the captcha and tap Login. The app takes over after that.  (Tap here to forget the saved login.)", "#FFF4E5");
+                        else unblockBanner("🔑 Log in to the vivo portal: type the user ID, password and the captcha, then tap Login. The app can remember the user ID and password for next time.", "#FFF4E5");
+                    } else if (uOnLogin) { uOnLogin = false; unblockKeepCookies(); unblockAskSave(); }
+                    if ("login".equals(s)) { /* handled above */ }
                     else if ("nav".equals(s)) { uNav++; unblockBanner("➡ Opening Imeis Query → Unblock Imeis…", "#E8F0FE"); }
                     else if ("lost".equals(s)) { uNav++; unblockBanner(uNav > 8 ? "Couldn't find “Unblock Imeis” — open Imeis Query → Unblock Imeis yourself; the app carries on from there." : "Looking for Imeis Query → Unblock Imeis…", uNav > 8 ? "#FFF4E5" : "#E8F0FE"); }
                     else if ("chooser".equals(s)) unblockBanner("Tap “Choose File” once — the app attaches the IMEI file and carries on.", "#FFF4E5");
@@ -3218,6 +3270,7 @@ public class MainActivity extends FragmentActivity {
     }
     private void unblockClose(JSONObject r) {
         inUnblock = false;
+        if (!uOnLogin) unblockKeepCookies();
         CookieManager.getInstance().flush();
         if (vivoWeb != null) { try { vivoWeb.stopLoading(); vivoWeb.destroy(); } catch (Throwable ignored) { } vivoWeb = null; }
         if (uFile != null) try { uFile.delete(); } catch (Throwable ignored) { }
