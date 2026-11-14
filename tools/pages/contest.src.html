@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photo contest</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}@media(max-width:560px){.g2,.g3{grid-template-columns:1fr}}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}.pill.y{background:#FFF3C4;color:#7A5A00}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55;white-space:pre-wrap}
+.ok{background:#E6F4EA;color:#13693F}.no{background:#FDECEC;color:#8E1C1C}
+.phs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.ph{position:relative;border-radius:12px;overflow:hidden;background:#EEF0F6;aspect-ratio:1}
+.ph img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.ph b{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px}
+.ph i{position:absolute;left:0;right:0;bottom:0;font-style:normal;font-size:10.5px;padding:3px 5px;color:#fff;background:rgba(0,0,0,.5)}
+.ph.bad{outline:3px solid #E5484D}
+.drop{border:2px dashed #C9CDEA;border-radius:14px;padding:16px;text-align:center;font-size:13px;color:var(--ink2);cursor:pointer;background:#FAFBFF}
+.ent{display:flex;gap:10px}.ent .th{display:flex;gap:4px;flex:none}.ent .th img,.ent .th span{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#EEF0F6;display:block;cursor:zoom-in}
+.sc{min-width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;flex:none;background:#F1F2F6;color:#555}
+.sc.s{background:#E6F4EA;color:#13693F}.sc.p{background:#FFF4E5;color:#8A5300}.sc.w{background:#FDECEC;color:#B42318}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}@media(max-width:560px){.kp{grid-template-columns:repeat(2,1fr)}}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:21px;font-weight:800;margin-top:2px}
+.q{border-top:1px solid #EEF0F6;padding-top:8px;margin-top:8px}
+.board .r{display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid #EEF0F6}.board .r:first-child{border-top:0}.board .m{font-size:24px}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;display:flex;align-items:center;justify-content:center}.viewer img{max-width:96vw;max-height:88vh}.viewer b{position:absolute;top:14px;right:16px;color:#fff;font-size:26px;cursor:pointer}
+.stchk{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 8px;max-height:200px;overflow:auto;font-size:12.5px;background:#FAFBFF;border-radius:10px;padding:6px 8px}
+.big{font-size:42px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📸</span></div>
+  <h1 id="h1">Photo contest</h1><p id="hp">Click · upload · win</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), K = (new URLSearchParams(location.search).get("k") || "").replace(/[^a-f0-9]/g, "");
+  var ST = { uploading: "Upload not finished", submitted: "Submitted", eligible: "Eligible — next round", not_eligible: "Not eligible", round2: "In the final round", winner: "Winner 🏆", runner: "Runner-up", special: "Special mention", rejected: "Not selected" };
+  var ST_C = { uploading: "m", submitted: "", eligible: "g", not_eligible: "r", round2: "o", winner: "y", runner: "y", special: "y", rejected: "m" };
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; };
+  var dtl = function (t) { if (!t) return ""; var d = new Date(t - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+  function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", k: K }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection — try again" }; }); }
+  function viewer(src) { var v = document.createElement("div"); v.className = "viewer"; v.innerHTML = '<img src="' + src + '"><b>✕</b>'; v.onclick = function () { v.remove(); }; document.body.appendChild(v); }
+  var scC = function (s) { return s == null ? "" : s >= 70 ? "s" : s >= 50 ? "p" : "w"; };
+
+  // ---------- photos: read, check against the rules, shrink for upload ----------
+  function readPhoto(file) {
+    return new Promise(function (res) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var ow = im.naturalWidth, oh = im.naturalHeight;
+        var mk = function (max, q) { var s = Math.min(1, max / Math.max(ow, oh)), cv = document.createElement("canvas"); cv.width = Math.round(ow * s); cv.height = Math.round(oh * s); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); return { d: cv.toDataURL("image/jpeg", q).split(",")[1], w: cv.width, h: cv.height }; };
+        var big = mk(1600, 0.85); if (big.d.length > 1600000) big = mk(1280, 0.78);
+        var th = mk(320, 0.72);
+        res({ ok: true, name: file.name, size: file.size, ow: ow, oh: oh, big: big, th: th, prev: "data:image/jpeg;base64," + th.d });
+        URL.revokeObjectURL(url);
+      };
+      im.onerror = function () { res({ ok: false, name: file.name }); };
+      im.src = url;
+    });
+  }
+  function photoIssue(p, C) {
+    if (!p.ok) return "Not a photo we can read";
+    var sh = Math.min(p.ow, p.oh);
+    if (C.photos.minPx && sh < C.photos.minPx) return "Too small (" + p.ow + "×" + p.oh + "); needs at least " + C.photos.minPx + " px";
+    if (C.photos.orient === "portrait" && p.oh <= p.ow) return "Needs a portrait (upright) photo";
+    if (C.photos.orient === "landscape" && p.ow <= p.oh) return "Needs a landscape (wide) photo";
+    if (C.photos.orient === "square" && Math.abs(p.ow - p.oh) / Math.max(p.ow, p.oh) > 0.08) return "Needs a square photo";
+    return "";
+  }
+
+  // ======================= PUBLIC LINK =======================
+  var PC = null, PH = [], ME = null;
+  function pub() {
+    papi({ action: "pc-p-info" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">📸</div>' + esc(r.error) + "</div>"; return; }
+      PC = r.c; STATES_ALL = r.states || []; $("h1").textContent = PC.title; $("hp").textContent = PC.end ? (r.open ? "Entries close " + when(PC.end) : PC.status === "results" ? "Results are out!" : "Entries closed") : "vivo photo contest";
+      var H = "";
+      if (r.board) H += '<div class="card" style="margin-top:4px"><h3 style="margin:0 0 6px">🏆 Results</h3>' + (r.resultsMsg ? '<div class="help">' + esc(r.resultsMsg) + "</div>" : "") + '<div class="board">' + (r.board.length ? r.board.map(function (x, i) { return '<div class="r"><span class="m">' + (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🎖️") + '</span><div style="flex:1"><b>' + esc(x.name) + '</b><div class="muted" style="font-size:12px">' + esc(x.state) + " · " + esc(x.status) + (x.award ? " · " + esc(x.award) : "") + "</div></div></div>"; }).join("") : '<div class="muted">Results will appear here.</div>') + "</div></div>";
+      H += '<div class="card" style="margin-top:10px">' + (PC.desc ? '<div style="font-size:14px;line-height:1.55;white-space:pre-wrap">' + esc(PC.desc) + "</div>" : "") +
+        '<div class="g2" style="margin-top:8px">' + (PC.photos.accept || PC.photos.model ? '<div class="help ok">✅ <b>Accepted</b>\n' + esc([PC.photos.model ? "Must show: " + PC.photos.model : "", PC.photos.accept].filter(Boolean).join("\n")) + "</div>" : "") + (PC.photos.reject ? '<div class="help no">🚫 <b>Not accepted</b>\n' + esc(PC.photos.reject) + "</div>" : "") + "</div>" +
+        '<div class="help">📷 ' + (PC.photos.min === PC.photos.max ? PC.photos.min : PC.photos.min + "–" + PC.photos.max) + " photo(s)" + (PC.photos.orient !== "any" ? " · " + PC.photos.orient : "") + (PC.photos.minPx ? " · at least " + PC.photos.minPx + " px" : "") + (PC.criteria.length ? "\n🏅 Judged on: " + PC.criteria.map(function (x) { return x.name + " (" + x.weight + "%)"; }).join(", ") : "") + (PC.end ? "\n⏰ Last date: " + when(PC.end) : "") + "</div>" +
+        (PC.rules ? '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;font-size:13px">Rules</summary><div class="help">' + esc(PC.rules) + "</div></details>" : "") + "</div>";
+      H += '<div class="card" style="margin-top:10px"><b>' + (r.board ? "🎁 See my result" : "🔎 Already took part? See / change my entry") + '</b><div class="g2" style="margin-top:6px"><input class="tx" id="me_e" placeholder="Employee ID"><input class="tx" id="me_p" placeholder="Mobile number" inputmode="tel"></div><button class="btn sec" id="me_go" style="width:100%;margin-top:8px">Check</button><div id="me_out"></div></div>';
+      if (r.open) H += '<div id="form"></div>';
+      VIEW.innerHTML = H;
+      $("me_go").onclick = function () { papi({ action: "pc-p-me", empId: $("me_e").value, phone: $("me_p").value }).then(function (x) {
+        if (!x.ok) { $("me_out").innerHTML = '<div class="help no">' + esc(x.error) + "</div>"; return; }
+        var e = x.e, aw = /^(winner|runner|special)$/.test(e.status);
+        $("me_out").innerHTML = '<div class="help ' + (aw ? "ok" : "") + '" style="margin-top:10px">' + (aw ? "🎉 <b>Congratulations, " + esc(e.name) + "!</b>\n" : "<b>" + esc(e.name) + "</b>\n") + "Status: <b>" + esc(e.statusName) + "</b>" + (e.award ? "\n🎁 Award: <b>" + esc(e.award) + "</b>" : "") + (e.voucher ? '\n🎟️ Your voucher code: <b class="fx" style="font-size:15px;user-select:all">' + esc(e.voucher) + "</b>" : "") + "\nSubmitted " + when(e.at) + " · " + e.photos + " photo(s)</div>" + (x.canEdit ? '<button class="btn ghost sm" id="me_ed" style="margin-top:6px">✏️ Change my entry</button>' : "");
+        if ($("me_ed")) $("me_ed").onclick = function () { ME = Object.assign({ empId: $("me_e").value, phone: $("me_p").value }, e); form(); $("form").scrollIntoView({ behavior: "smooth" }); };
+      }); };
+      if (r.open) form();
+    });
+  }
+  function form() {
+    var C = PC, A = ME || {}; PH = [];
+    var q = function (x) { var v = (A.answers || {})[x.id] || ""; var lab = '<label class="lb">' + esc(x.q) + (x.req ? " *" : "") + "</label>";
+      if (x.type === "long") return lab + '<textarea class="tx" data-q="' + x.id + '" rows="3">' + esc(v) + "</textarea>";
+      if (x.type === "choice") return lab + '<select class="tx" data-q="' + x.id + '"><option value="">Choose…</option>' + x.options.map(function (o) { return "<option" + (o === v ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
+      return lab + '<input class="tx" data-q="' + x.id + '" value="' + esc(v) + '"' + (x.type === "number" ? ' inputmode="decimal"' : "") + ">"; };
+    $("form").innerHTML = '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 4px">' + (ME ? "✏️ Change my entry" : "📝 Take part") + "</h3>" + (ME ? '<div class="muted" style="font-size:12px">Your new entry replaces the old one — add your photos again.</div>' : "") +
+      '<div class="g2"><div><label class="lb">Full name *</label><input class="tx" id="f_n" value="' + esc(A.name || "") + '"></div><div><label class="lb">Employee ID *</label><input class="tx" id="f_e" value="' + esc(A.empId || "") + '"' + (ME ? " readonly" : "") + "></div>" +
+      (C.ask.phone ? '<div><label class="lb">Mobile *</label><input class="tx" id="f_p" inputmode="tel" value="' + esc(A.phone || "") + '"' + (ME ? " readonly" : "") + "></div>" : "") +
+      '<div><label class="lb">State *</label><select class="tx" id="f_s"><option value="">Choose…</option>' + (C.states.length ? C.states : STATES_ALL).map(function (s) { return "<option" + (s === A.state ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" +
+      (C.ask.designation ? '<div><label class="lb">Designation</label><input class="tx" id="f_d" value="' + esc(A.designation || "") + '"></div>' : "") + (C.ask.store ? '<div><label class="lb">Store / location</label><input class="tx" id="f_st" value="' + esc(A.store || "") + '"></div>' : "") + (C.ask.email ? '<div><label class="lb">E-mail</label><input class="tx" id="f_m" inputmode="email" value="' + esc(A.email || "") + '"></div>' : "") + "</div>" +
+      C.questions.map(q).join("") +
+      '<label class="lb">Your photos * (' + (C.photos.min === C.photos.max ? C.photos.min : C.photos.min + "–" + C.photos.max) + ')</label><div class="drop" id="f_dr">📷 Tap to add photos</div><input type="file" id="f_f" accept="image/*" multiple hidden><div class="phs" id="f_ph"></div>' +
+      '<input id="f_hp" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">' +
+      '<label class="tg" style="margin-top:10px;font-size:12.5px"><input type="checkbox" id="f_ok"><i></i><span>These are my own photos, and vivo may use them in internal and social posts with credit to me.</span></label>' +
+      '<button class="btn pri" id="f_go" style="width:100%;margin-top:12px">🚀 Submit my entry</button><div id="f_st2" class="muted" style="text-align:center;font-size:12.5px;margin-top:6px"></div></div>';
+    var drawPh = function () { $("f_ph").innerHTML = PH.map(function (p, i) { var bad = photoIssue(p, C); return '<div class="ph' + (bad ? " bad" : "") + '"><img src="' + (p.prev || "") + '" data-v="' + i + '"><b data-x="' + i + '">✕</b><i>' + (bad ? "⚠️ " + esc(bad) : p.ow + "×" + p.oh) + "</i></div>"; }).join("");
+      [].forEach.call($("f_ph").querySelectorAll("[data-x]"), function (b) { b.onclick = function () { PH.splice(+b.dataset.x, 1); drawPh(); }; });
+      [].forEach.call($("f_ph").querySelectorAll("[data-v]"), function (im) { im.onclick = function () { viewer(im.src); }; });
+      $("f_dr").textContent = PH.length >= C.photos.max ? "✓ " + PH.length + " photo(s) added" : "📷 Tap to add photos (" + PH.length + " of " + C.photos.max + ")"; };
+    $("f_dr").onclick = function () { if (PH.length >= C.photos.max) return toast("You can add up to " + C.photos.max + " photo(s)"); $("f_f").click(); };
+    $("f_f").onchange = function () { var fs = [].slice.call($("f_f").files, 0, C.photos.max - PH.length); $("f_dr").textContent = "Reading photos…"; Promise.all(fs.map(readPhoto)).then(function (L) { PH = PH.concat(L); $("f_f").value = ""; drawPh(); }); };
+    drawPh();
+    $("f_go").onclick = function () {
+      if (!$("f_ok").checked) return toast("Please tick the confirmation");
+      if (PH.length < C.photos.min) return toast("Add at least " + C.photos.min + " photo(s)");
+      var bad = PH.map(function (p) { return photoIssue(p, C); }).filter(Boolean); if (bad.length) return toast(bad[0]);
+      var ans = {}; [].forEach.call($("form").querySelectorAll("[data-q]"), function (i) { ans[i.dataset.q] = i.value; });
+      var d = { name: $("f_n").value, state: $("f_s").value, designation: $("f_d") ? $("f_d").value : "", store: $("f_st") ? $("f_st").value : "", email: $("f_m") ? $("f_m").value : "", answers: ans };
+      var b = $("f_go"); b.disabled = true; $("f_st2").textContent = "Sending your details…";
+      papi({ action: "pc-p-submit", d: d, empId: $("f_e").value, phone: $("f_p") ? $("f_p").value : "", nPhotos: PH.length, hp: $("f_hp").value }).then(function (r) {
+        if (!r.ok) { b.disabled = false; $("f_st2").textContent = ""; return toast(r.error); }
+        var i = 0, fail = 0;
+        (function next() {
+          if (i >= PH.length) {
+            $("form").innerHTML = '<div class="card" style="margin-top:10px"><div class="big">🎉</div><h3 style="text-align:center;margin:4px 0">Entry submitted!</h3><div class="muted" style="text-align:center;font-size:13px">Thank you, ' + esc(d.name) + ". Check this link after " + (C.end ? when(C.end) : "the contest closes") + " for the results — use your employee ID and mobile number.</div></div>";
+            $("form").scrollIntoView({ behavior: "smooth" }); return;
+          }
+          var p = PH[i]; $("f_st2").textContent = "Uploading photo " + (i + 1) + " of " + PH.length + "…";
+          papi({ action: "pc-p-photo", eid: r.eid, up: r.up, data: p.big.d, thumb: p.th.d, w: p.big.w, h: p.big.h, ow: p.ow, oh: p.oh, name: p.name, size: p.size, mime: "image/jpeg" }).then(function (x) {
+            if (!x.ok) { if (++fail > 2) { b.disabled = false; $("f_st2").textContent = ""; return toast(x.error + " — tap Submit again"); } return setTimeout(next, 1200); }
+            fail = 0; i++; next();
+          });
+        })();
+      });
+    };
+  }
+
+  // ======================= HO =======================
+  var CL = null, CUR = null, ENT = null, TH = {}, FIL = { st: "", state: "", q: "" };
+  function ho() {
+    if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+    $("h1").textContent = "Photo contests"; $("hp").textContent = "Set up · share one link · AI-score · pick winners · announce";
+    list();
+  }
+  function list() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pc-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      CL = r; STATES_ALL = r.states;
+      VIEW.innerHTML = '<button class="btn pri" id="nw" style="width:100%">＋ New contest</button>' + (r.rows.length ? r.rows.map(function (c) { return '<div class="card" style="margin-top:10px;cursor:pointer" data-c="' + c.id + '"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + esc(c.title) + '</b><span class="pill ' + ({ open: "g", draft: "m", closed: "o", results: "y" }[c.status] || "") + '">' + ({ open: "Open", draft: "Draft", closed: "Closed", results: "Results out" }[c.status] || c.status) + '</span></div><div class="muted" style="font-size:12px;margin-top:3px">' + c.entries + " entr" + (c.entries === 1 ? "y" : "ies") + (c.end ? " · closes " + when(c.end) : "") + "</div></div>"; }).join("") : '<div class="card empty" style="margin-top:10px">No contests yet.</div>');
+      $("nw").onclick = function () { edit(null); };
+      [].forEach.call(VIEW.querySelectorAll("[data-c]"), function (d) { d.onclick = function () { openC(d.dataset.c); }; });
+    });
+  }
+  var STATES_ALL = [];
+  function openC(id) {
+    api({ action: "pc-get", id: id }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.c; CUR.link = r.link; entries(); });
+  }
+  function head(active) {
+    var c = CUR;
+    return '<div class="row" style="gap:6px;align-items:center"><button class="btn ghost sm" id="bk">← All contests</button><span class="sp"></span><span class="pill ' + ({ open: "g", draft: "m", closed: "o", results: "y" }[c.status] || "") + '">' + ({ open: "Open", draft: "Draft", closed: "Closed", results: "Results out" }[c.status]) + "</span></div>" +
+      '<div class="card" style="margin-top:8px"><b style="font-size:16px">' + esc(c.title) + '</b><div class="help fx" style="word-break:break-all;white-space:normal">' + esc(c.link) + '</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sec sm" id="lc">📋 Copy link</button><button class="btn ghost sm" id="lw">WhatsApp</button><a class="btn ghost sm" href="' + esc(c.link) + '" target="_blank">👁 Open</a>' +
+      (c.status === "draft" || c.status === "closed" ? '<button class="btn pri sm" data-ss="open">▶ Open entries</button>' : "") + (c.status === "open" ? '<button class="btn ghost sm" data-ss="closed">⏸ Close entries</button>' : "") + "</div></div>" +
+      '<div class="seg" style="margin-top:10px"><button data-tb="e" class="' + (active === "e" ? "on" : "") + '">📸 Entries</button><button data-tb="s" class="' + (active === "s" ? "on" : "") + '">⚙️ Set-up</button></div><div id="tp"></div>';
+  }
+  function wireHead() {
+    $("bk").onclick = list;
+    $("lc").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(CUR.link) : Promise.reject()).then(function () { toast("Link copied"); }, function () { prompt("Copy the link", CUR.link); }); };
+    $("lw").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent("📸 " + CUR.title + (CUR.end ? " — last date " + when(CUR.end) : "") + "\nTake part here: " + CUR.link), "_blank"); };
+    [].forEach.call(VIEW.querySelectorAll("[data-ss]"), function (b) { b.onclick = function () { api({ action: "pc-save", id: CUR.id, c: CUR, status: b.dataset.ss }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.c; CUR.link = r.link; toast(b.dataset.ss === "open" ? "Entries are open" : "Entries closed"); entries(); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { if (b.dataset.tb === "s") edit(CUR); else entries(); }; });
+  }
+
+  // ---------- contest set-up ----------
+  function edit(c0) {
+    var c = c0 ? JSON.parse(JSON.stringify(c0)) : { title: "", desc: "", rules: "", start: 0, end: 0, states: [], ask: { phone: true, email: false, store: false, designation: true }, photos: { min: 1, max: 3, minPx: 1080, orient: "any", accept: "", reject: "Screenshots, downloaded or advertisement images, photos of a screen, heavily filtered or edited photos, photos with another brand's phone as the hero", model: "" }, questions: [], criteria: [{ name: "Creativity", weight: 30, hint: "" }, { name: "Photo quality (focus, light, composition)", weight: 30, hint: "" }, { name: "vivo phone / brand clearly shown", weight: 25, hint: "" }, { name: "Fits the theme", weight: 15, hint: "" }], cutoff: 60, answersWeight: 0, resultsMsg: "", showBoard: true };
+    if (c0) { VIEW.innerHTML = head("s"); wireHead(); } else VIEW.innerHTML = '<button class="btn ghost sm" id="bk2">← All contests</button><div id="tp"></div>';
+    if ($("bk2")) $("bk2").onclick = list;
+    var tg = function (id, on, label) { return '<label class="tg" style="margin-top:6px;font-size:13px"><input type="checkbox" id="' + id + '"' + (on ? " checked" : "") + "><i></i><span>" + label + "</span></label>"; };
+    $("tp").innerHTML = '<div class="card" style="margin-top:10px"><b>1 · About the contest</b><label class="lb">Title *</label><input class="tx" id="e_t" value="' + esc(c.title) + '" placeholder="e.g. Best shot on the vivo V60"><label class="lb">What should people do?</label><textarea class="tx" id="e_d" rows="3" placeholder="e.g. Click your best photo with the new vivo V60 — night shots, portraits, festive moments…">' + esc(c.desc) + '</textarea><label class="lb">Rules (optional)</label><textarea class="tx" id="e_r" rows="3">' + esc(c.rules) + '</textarea>' +
+      '<div class="g2"><div><label class="lb">Entries open from</label><input class="tx" type="datetime-local" id="e_s" value="' + dtl(c.start) + '"></div><div><label class="lb">Last date & time</label><input class="tx" type="datetime-local" id="e_e" value="' + dtl(c.end) + '"></div></div>' +
+      '<label class="lb">Who can take part (states) — none ticked = all states</label><div class="stchk">' + STATES_ALL.map(function (s) { return '<label><input type="checkbox" data-st="' + esc(s) + '"' + (c.states.indexOf(s) >= 0 ? " checked" : "") + "> " + esc(s) + "</label>"; }).join("") + "</div>" +
+      '<label class="lb">Ask participants for</label>' + tg("a_p", c.ask.phone, "Mobile number (needed to see the result / voucher)") + tg("a_d", c.ask.designation, "Designation") + tg("a_s", c.ask.store, "Store / location") + tg("a_m", c.ask.email, "E-mail (winners get an e-mail)") + "</div>" +
+      '<div class="card" style="margin-top:10px"><b>2 · Photos — what is acceptable</b><div class="g3"><div><label class="lb">Min photos</label><input class="tx" id="p_mi" inputmode="numeric" value="' + c.photos.min + '"></div><div><label class="lb">Max photos</label><input class="tx" id="p_ma" inputmode="numeric" value="' + c.photos.max + '"></div><div><label class="lb">Min size (px, short side)</label><input class="tx" id="p_px" inputmode="numeric" value="' + (c.photos.minPx || "") + '" placeholder="e.g. 1080"></div></div>' +
+      '<div class="g2"><div><label class="lb">Orientation</label><select class="tx" id="p_o">' + [["any", "Any"], ["portrait", "Portrait (upright)"], ["landscape", "Landscape (wide)"], ["square", "Square"]].map(function (o) { return '<option value="' + o[0] + '"' + (c.photos.orient === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Must feature (phone model / product)</label><input class="tx" id="p_m" value="' + esc(c.photos.model) + '" placeholder="e.g. vivo V60"></div></div>' +
+      '<label class="lb">✅ Acceptable / eligible photos</label><textarea class="tx" id="p_a" rows="3" placeholder="e.g. Shot on the vivo V60 by the participant · the phone or its camera result is the hero · real customers or store moments">' + esc(c.photos.accept) + '</textarea><label class="lb">🚫 Not acceptable</label><textarea class="tx" id="p_r" rows="2">' + esc(c.photos.reject) + "</textarea>" +
+      '<div class="muted" style="font-size:11.5px;margin-top:4px">Size and orientation are checked on the phone before upload. AI checks the rest when you score entries.</div></div>' +
+      '<div class="card" style="margin-top:10px"><b>3 · Questions</b><div id="qs"></div><button class="btn ghost sm" id="qa" style="margin-top:8px">＋ Question</button></div>' +
+      '<div class="card" style="margin-top:10px"><b>4 · Judging</b><div class="muted" style="font-size:12px;margin-top:2px">AI scores every entry on these criteria (0–10 each, weighted to 0–100).</div><div id="cr"></div><button class="btn ghost sm" id="ca" style="margin-top:6px">＋ Criterion</button>' +
+      '<div class="g2"><div><label class="lb">Eligible for next round at score ≥</label><input class="tx" id="j_c" inputmode="numeric" value="' + c.cutoff + '"></div><div><label class="lb">Weight of the answers (% of score, 0 = photos only)</label><input class="tx" id="j_a" inputmode="numeric" value="' + c.answersWeight + '"></div></div></div>' +
+      '<div class="card" style="margin-top:10px"><b>5 · Results page</b><label class="lb">Message shown with the results</label><textarea class="tx" id="r_m" rows="2" placeholder="e.g. Winners get their vouchers below. Thank you all for taking part!">' + esc(c.resultsMsg) + "</textarea>" + tg("r_b", c.showBoard, "Show the winners list (names, state, award) on the link") + "</div>" +
+      '<div class="row" style="gap:8px;margin-top:12px"><button class="btn pri" id="sv" style="flex:1">💾 Save</button>' + (!c0 || c0.status === "draft" ? '<button class="btn sec" id="svo">▶ Save & open entries</button>' : "") + "</div>" + (c0 ? '<button class="btn ghost sm" id="del" style="margin-top:14px;color:#B42318">🗑 Delete this contest and all entries</button>' : "");
+    var drawQ = function () { $("qs").innerHTML = c.questions.map(function (q, i) { return '<div class="q"><div class="row" style="gap:6px"><input class="tx" data-qq="' + i + '" value="' + esc(q.q) + '" placeholder="Question" style="flex:1"><button class="btn ghost sm" data-qx="' + i + '">🗑</button></div><div class="g2" style="margin-top:6px"><select class="tx" data-qt="' + i + '">' + [["text", "Short answer"], ["long", "Long answer"], ["choice", "Choose one"], ["number", "Number"]].map(function (o) { return '<option value="' + o[0] + '"' + (q.type === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><label class="tg" style="font-size:12.5px"><input type="checkbox" data-qr="' + i + '"' + (q.req !== false ? " checked" : "") + "><i></i><span>Required</span></label></div>" + (q.type === "choice" ? '<input class="tx" data-qo="' + i + '" style="margin-top:6px" value="' + esc((q.options || []).join(", ")) + '" placeholder="Options, comma separated">' : "") + "</div>"; }).join("") || '<div class="muted" style="font-size:12px;margin-top:4px">No questions — add e.g. “Which phone did you shoot with?”, “Tell us the story behind your photo”.</div>';
+      [].forEach.call($("qs").querySelectorAll("[data-qq]"), function (x) { x.oninput = function () { c.questions[+x.dataset.qq].q = x.value; }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qt]"), function (x) { x.onchange = function () { c.questions[+x.dataset.qt].type = x.value; drawQ(); }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qr]"), function (x) { x.onchange = function () { c.questions[+x.dataset.qr].req = x.checked; }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qo]"), function (x) { x.oninput = function () { c.questions[+x.dataset.qo].options = x.value.split(","); }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qx]"), function (x) { x.onclick = function () { c.questions.splice(+x.dataset.qx, 1); drawQ(); }; }); };
+    var drawCr = function () { var tot = c.criteria.reduce(function (a, x) { return a + (+x.weight || 0); }, 0); $("cr").innerHTML = c.criteria.map(function (x, i) { return '<div class="row" style="gap:6px;margin-top:6px"><input class="tx" data-cn="' + i + '" value="' + esc(x.name) + '" style="flex:2" placeholder="Criterion"><input class="tx" data-cw="' + i + '" value="' + x.weight + '" style="width:70px" inputmode="numeric"><span class="muted" style="align-self:center">%</span><button class="btn ghost sm" data-cx="' + i + '">🗑</button></div>'; }).join("") + '<div class="muted" style="font-size:11.5px;margin-top:4px">Total ' + tot + "%" + (tot !== 100 ? " — the score is scaled, so it doesn't have to be 100" : "") + "</div>";
+      [].forEach.call($("cr").querySelectorAll("[data-cn]"), function (x) { x.oninput = function () { c.criteria[+x.dataset.cn].name = x.value; }; });
+      [].forEach.call($("cr").querySelectorAll("[data-cw]"), function (x) { x.onchange = function () { c.criteria[+x.dataset.cw].weight = +x.value || 0; drawCr(); }; });
+      [].forEach.call($("cr").querySelectorAll("[data-cx]"), function (x) { x.onclick = function () { c.criteria.splice(+x.dataset.cx, 1); drawCr(); }; }); };
+    drawQ(); drawCr();
+    $("qa").onclick = function () { c.questions.push({ q: "", type: "text", req: true, options: [] }); drawQ(); };
+    $("ca").onclick = function () { c.criteria.push({ name: "", weight: 10, hint: "" }); drawCr(); };
+    var collect = function () {
+      c.title = $("e_t").value; c.desc = $("e_d").value; c.rules = $("e_r").value;
+      c.start = $("e_s").value ? new Date($("e_s").value).getTime() : 0; c.end = $("e_e").value ? new Date($("e_e").value).getTime() : 0;
+      c.states = [].filter.call($("tp").querySelectorAll("[data-st]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.st; });
+      c.ask = { phone: $("a_p").checked, designation: $("a_d").checked, store: $("a_s").checked, email: $("a_m").checked };
+      c.photos = { min: +$("p_mi").value || 1, max: +$("p_ma").value || 1, minPx: +$("p_px").value || 0, orient: $("p_o").value, model: $("p_m").value, accept: $("p_a").value, reject: $("p_r").value };
+      c.cutoff = +$("j_c").value || 0; c.answersWeight = +$("j_a").value || 0; c.resultsMsg = $("r_m").value; c.showBoard = $("r_b").checked;
+      if (c.photos.max < c.photos.min) c.photos.max = c.photos.min;
+      return c;
+    };
+    var save = function (status) {
+      if (!$("e_t").value.trim()) return toast("Give the contest a title");
+      api({ action: "pc-save", id: c0 ? c0.id : "", c: collect(), status: status || "" }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.c; CUR.link = r.link; toast(status === "open" ? "Saved — entries are open. Share the link!" : "Saved"); entries(); });
+    };
+    $("sv").onclick = function () { save(); }; if ($("svo")) $("svo").onclick = function () { save("open"); };
+    if ($("del")) $("del").onclick = function () { sheet("Delete “" + c0.title + "”?", "All entries and photos are deleted for good.", [["🗑", "Delete", function () { api({ action: "pc-delete", id: c0.id }).then(function (r) { if (!r.ok) return toast(r.error); toast("Deleted"); list(); }); }, "danger"], ["", "Cancel", function () { }]]); };
+  }
+
+  // ---------- entries: AI score, mark, export, announce ----------
+  var tot = function (e) { return e.hoScore != null && e.hoScore !== "" ? +e.hoScore : e.ai ? e.ai.total : null; };
+  function entries() {
+    VIEW.innerHTML = head("e"); wireHead();
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pc-entries", cid: CUR.id }).then(function (r) { if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ENT = r.rows; CUR = Object.assign(r.c, { link: CUR.link }); drawE(); });
+  }
+  function loadThumbs(ids) {
+    ids = ids.filter(function (id) { return !TH[id]; });
+    var chunks = []; for (var i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    return chunks.reduce(function (p, ch) { return p.then(function () { return api({ action: "pc-thumbs", cid: CUR.id, ids: ch }).then(function (r) { if (r.ok) Object.keys(r.thumbs).forEach(function (k) { TH[k] = r.thumbs[k]; }); }); }); }, Promise.resolve());
+  }
+  function drawE() {
+    var L = ENT.filter(function (e) { if (FIL.st && e.status !== FIL.st) return false; if (FIL.state && e.state !== FIL.state) return false; var q = FIL.q.toLowerCase(); if (q && (e.name + " " + e.empId + " " + e.store).toLowerCase().indexOf(q) < 0) return false; return true; });
+    var done = ENT.filter(function (e) { return e.status !== "uploading"; }), scored = done.filter(function (e) { return e.ai; }), unscored = done.length - scored.length;
+    var states = []; ENT.forEach(function (e) { if (states.indexOf(e.state) < 0) states.push(e.state); });
+    $("tp").innerHTML = '<div class="kp"><div class="kt"><div class="l">Entries</div><div class="v">' + done.length + '</div></div><div class="kt"><div class="l">AI-scored</div><div class="v">' + scored.length + '</div></div><div class="kt"><div class="l">Eligible (≥ ' + CUR.cutoff + ')</div><div class="v">' + ENT.filter(function (e) { return /^(eligible|round2|winner|runner|special)$/.test(e.status); }).length + '</div></div><div class="kt"><div class="l">Awarded</div><div class="v">' + ENT.filter(function (e) { return /^(winner|runner|special)$/.test(e.status); }).length + "</div></div></div>" +
+      '<div class="card" style="margin-top:10px"><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn pri sm" id="ai"' + (unscored ? "" : " disabled") + ">🤖 AI-score " + unscored + ' new</button><button class="btn ghost sm" id="top">🏆 Pick top N…</button><button class="btn ghost sm" id="xl">⬇ Excel with photos</button><button class="btn sec sm" id="pub">📣 Announce results</button></div><div id="aist" class="muted" style="font-size:12px;margin-top:4px"></div>' +
+      '<div class="g3" style="margin-top:8px"><input class="tx" id="fq" placeholder="Search name / ID" value="' + esc(FIL.q) + '"><select class="tx" id="fs"><option value="">All statuses</option>' + Object.keys(ST).map(function (k) { return '<option value="' + k + '"' + (FIL.st === k ? " selected" : "") + ">" + esc(ST[k]) + "</option>"; }).join("") + '</select><select class="tx" id="fst"><option value="">All states</option>' + states.map(function (s) { return "<option" + (FIL.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div></div>" +
+      (L.length ? L.map(function (e, i) {
+        var s = tot(e);
+        return '<div class="card" style="margin-top:8px" data-e="' + e.id + '"><div class="ent"><div class="sc ' + scC(s) + '">' + (s == null ? "–" : s) + '</div><div style="flex:1;min-width:0"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + (i + 1) + ". " + esc(e.name) + '</b><span class="pill ' + (ST_C[e.status] || "") + '">' + esc(ST[e.status] || e.status) + '</span></div><div class="muted" style="font-size:12px">' + esc([e.empId, e.designation, e.store, e.state].filter(Boolean).join(" · ")) + " · " + when(e.at) + (e.edits ? " · edited" : "") + "</div>" +
+          '<div class="th" style="margin-top:6px">' + e.photos.map(function (p) { return TH[p] ? '<img src="data:image/jpeg;base64,' + TH[p].d + '" data-big="' + p + '">' : '<span data-big="' + p + '"></span>'; }).join("") + "</div>" +
+          (CUR.questions.length ? '<div style="font-size:12px;margin-top:6px">' + CUR.questions.map(function (q) { return "<b>" + esc(q.q) + ":</b> " + esc((e.answers || {})[q.id] || "—"); }).join("<br>") + "</div>" : "") +
+          (e.ai ? '<div class="help" style="margin-top:6px;white-space:normal">🤖 ' + e.ai.total + "/100 · " + Object.keys(e.ai.per).map(function (k) { return esc(k) + " " + e.ai.per[k]; }).join(" · ") + (e.ai.looksCopied ? ' · <b style="color:#B42318">looks copied / screenshot</b>' : "") + (!e.ai.vivoVisible ? " · no vivo visible" : "") + (!e.ai.acceptable ? ' · <b style="color:#B42318">not acceptable</b>' : "") + "<br>" + esc(e.ai.comment) + "</div>" : "") +
+          '<div class="g3" style="margin-top:6px"><select class="tx" data-ms="' + e.id + '">' + Object.keys(ST).filter(function (k) { return k !== "uploading"; }).map(function (k) { return '<option value="' + k + '"' + (e.status === k ? " selected" : "") + ">" + esc(ST[k]) + "</option>"; }).join("") + '</select><input class="tx" data-mh="' + e.id + '" placeholder="Judge score (overrides AI)" inputmode="numeric" value="' + (e.hoScore == null ? "" : e.hoScore) + '"><input class="tx" data-ma="' + e.id + '" placeholder="Award (e.g. ₹2,000 voucher)" value="' + esc(e.award || "") + '"></div>' +
+          '<div class="g2" style="margin-top:6px"><input class="tx" data-mv="' + e.id + '" placeholder="Voucher code (shown only to them)" value="' + esc(e.voucher || "") + '"><div class="row" style="gap:6px"><button class="btn ghost sm" data-rs="' + e.id + '">🤖 ' + (e.ai ? "Re-score" : "AI score") + '</button><button class="btn pri sm" data-sv="' + e.id + '" style="flex:1">Save</button></div></div>' + (e.seenResult ? '<div class="muted" style="font-size:11px;margin-top:4px">👀 Saw the result ' + when(e.seenResult) + "</div>" : "") + "</div></div></div>";
+      }).join("") : '<div class="card empty" style="margin-top:10px">' + (ENT.length ? "No entries match." : "No entries yet — share the link.") + "</div>");
+    $("fq").oninput = function () { FIL.q = $("fq").value; var p = $("fq").selectionStart; drawE(); $("fq").focus(); try { $("fq").setSelectionRange(p, p); } catch (e) { } };
+    $("fs").onchange = function () { FIL.st = $("fs").value; drawE(); }; $("fst").onchange = function () { FIL.state = $("fst").value; drawE(); };
+    [].forEach.call($("tp").querySelectorAll("[data-big]"), function (im) { im.onclick = function () { api({ action: "pc-img", cid: CUR.id, id: im.dataset.big }).then(function (r) { if (r.ok) viewer("data:" + r.mime + ";base64," + r.data); }); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-sv]"), function (b) { b.onclick = function () { var id = b.dataset.sv; api({ action: "pc-mark", cid: CUR.id, updates: [{ eid: id, status: $("tp").querySelector('[data-ms="' + id + '"]').value, hoScore: $("tp").querySelector('[data-mh="' + id + '"]').value, award: $("tp").querySelector('[data-ma="' + id + '"]').value, voucher: $("tp").querySelector('[data-mv="' + id + '"]').value }] }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); entries(); }); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-rs]"), function (b) { b.onclick = function () { b.disabled = true; b.textContent = "Scoring…"; api({ action: "pc-ai", cid: CUR.id, eid: b.dataset.rs }).then(function (r) { if (!r.ok) { b.disabled = false; b.textContent = "🤖 Try again"; return toast(r.error); } entries(); }); }; });
+    $("ai").onclick = function () {
+      var todo = ENT.filter(function (e) { return e.status !== "uploading" && !e.ai; }), i = 0, ok = 0; $("ai").disabled = true;
+      (function next() { if (i >= todo.length) { toast(ok + " of " + todo.length + " scored"); entries(); return; } var e = todo[i++]; $("aist").textContent = "AI is judging " + i + " of " + todo.length + ": " + e.name + "…"; api({ action: "pc-ai", cid: CUR.id, eid: e.id }).then(function (r) { if (r.ok) ok++; next(); }); })();
+    };
+    $("top").onclick = function () {
+      sheet("Pick the top entries", "Ranked by judge score, else AI score. Only entries that are not marked Not eligible / Not selected.", [["🏆", "Apply", function () {
+        var n = +$("tn").value || 0, st = $("tst").value, aw = $("taw").value;
+        var R = ENT.filter(function (e) { return e.status !== "uploading" && tot(e) != null && !/^(not_eligible|rejected)$/.test(e.status); }).sort(function (a, b) { return tot(b) - tot(a); }).slice(0, n);
+        if (!R.length) return toast("No scored entries yet");
+        api({ action: "pc-mark", cid: CUR.id, updates: R.map(function (e) { var u = { eid: e.id, status: st }; if (aw) u.award = aw; return u; }) }).then(function (r) { toast(r.ok ? r.n + " marked " + ST[st] : r.error); entries(); });
+      }, "pri"], ["", "Cancel", function () { }]], '<div class="g3"><div><label class="lb">How many</label><input class="tx" id="tn" value="3" inputmode="numeric"></div><div><label class="lb">Mark as</label><select class="tx" id="tst"><option value="round2">' + ST.round2 + '</option><option value="winner">' + ST.winner + '</option><option value="runner">' + ST.runner + '</option><option value="special">' + ST.special + '</option><option value="eligible">' + ST.eligible + '</option></select></div><div><label class="lb">Award (optional)</label><input class="tx" id="taw"></div></div>');
+    };
+    $("pub").onclick = function () {
+      var aw = ENT.filter(function (e) { return /^(winner|runner|special)$/.test(e.status); });
+      sheet("Announce the results?", aw.length + " awarded entr" + (aw.length === 1 ? "y" : "ies") + ". The contest link will show the results; each person sees their own award and voucher after entering their employee ID and mobile.", [["📣", "Announce", function () { api({ action: "pc-notify", cid: CUR.id, mail: $("pm") && $("pm").checked }).then(function (r) { if (!r.ok) return toast(r.error); toast("Results are live" + (r.sent ? " · " + r.sent + " e-mail(s) sent" : "")); entries(); }); }, "pri"], ["", "Cancel", function () { }]],
+        CUR.ask.email ? '<label class="tg" style="font-size:13px"><input type="checkbox" id="pm" checked><i></i><span>Also e-mail each winner (the e-mail has no voucher code — they see it on the link)</span></label>' : "");
+    };
+    $("xl").onclick = exportXl;
+    var need = []; L.forEach(function (e) { e.photos.forEach(function (p) { if (!TH[p]) need.push(p); }); });
+    if (need.length) loadThumbs(need.slice(0, 300)).then(function () { [].forEach.call($("tp").querySelectorAll("span[data-big]"), function (s) { var t = TH[s.dataset.big]; if (t) { var im = document.createElement("img"); im.src = "data:image/jpeg;base64," + t.d; im.dataset.big = s.dataset.big; im.onclick = s.onclick; s.replaceWith(im); } }); });
+  }
+
+  // ---------- Excel with the photos inside the rows ----------
+  function exportXl() {
+    var L = ENT.filter(function (e) { return e.status !== "uploading"; });
+    if (!L.length) return toast("No entries yet");
+    var all = []; L.forEach(function (e) { e.photos.forEach(function (p) { all.push(p); }); });
+    toast("Preparing Excel with " + all.length + " photo(s)…");
+    Promise.all([loadThumbs(all), new Promise(function (res) { if (window.JSZip) return res(); var s = document.createElement("script"); s.src = "/vendor/jszip.min.js"; s.onload = res; s.onerror = res; document.head.appendChild(s); })]).then(function () {
+      if (!window.JSZip) return toast("Couldn't load the Excel writer");
+      var maxP = Math.max.apply(null, L.map(function (e) { return e.photos.length; }).concat([1]));
+      var crit = CUR.criteria.map(function (x) { return x.name; });
+      var hdr = ["#", "Name", "Employee ID", "State", "Designation", "Store", "Mobile", "E-mail", "Submitted"].concat(CUR.questions.map(function (q) { return q.q; })).concat(["Final score", "AI score"]).concat(crit.map(function (x) { return "AI · " + x; })).concat(["AI comment", "Judge score", "Status", "Award", "Voucher"]);
+      var firstPhotoCol = hdr.length; for (var i = 0; i < maxP; i++) hdr.push("Photo " + (i + 1));
+      var sorted = L.slice().sort(function (a, b) { return (tot(b) == null ? -1 : tot(b)) - (tot(a) == null ? -1 : tot(a)); });
+      var rows = sorted.map(function (e, i) { return [i + 1, e.name, e.empId, e.state, e.designation, e.store, e.phone, e.email, when(e.at)].concat(CUR.questions.map(function (q) { return (e.answers || {})[q.id] || ""; })).concat([tot(e) == null ? "" : tot(e), e.ai ? e.ai.total : ""]).concat(crit.map(function (x) { return e.ai && e.ai.per[x] != null ? e.ai.per[x] : ""; })).concat([e.ai ? e.ai.comment : "", e.hoScore == null ? "" : e.hoScore, ST[e.status] || e.status, e.award || "", e.voucher || ""]); });
+      var xe = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ""); };
+      var col = function (n) { var s = ""; n++; while (n) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+      var PW = 150, PHt = 112;   // photo box in px
+      var sx = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" xSplit="2" topLeftCell="C2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><cols>';
+      hdr.forEach(function (h, i) { var w = i >= firstPhotoCol ? 22 : i === 0 ? 5 : Math.min(40, Math.max(10, String(h).length + 2)); sx += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; });
+      sx += "</cols><sheetData>";
+      [hdr].concat(rows).forEach(function (r, ri) {
+        sx += '<row r="' + (ri + 1) + '"' + (ri ? ' ht="' + Math.round(PHt * 0.75 + 8) + '" customHeight="1"' : "") + ">";
+        r.forEach(function (v, ci) { if (v === "" || v == null) return; var ref = col(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : ' s="2"'; sx += typeof v === "number" ? '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>" : '<c r="' + ref + '" t="inlineStr"' + st + '><is><t xml:space="preserve">' + xe(v) + "</t></is></c>"; });
+        sx += "</row>";
+      });
+      sx += '</sheetData><drawing r:id="rId1"/></worksheet>';
+      var z = new JSZip(), dr = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">', drel = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">', n = 0;
+      sorted.forEach(function (e, ri) {
+        e.photos.forEach(function (p, pi) {
+          var t = TH[p]; if (!t) return; n++;
+          z.file("xl/media/image" + n + ".jpeg", t.d, { base64: true });
+          var s = Math.min((PW - 8) / (t.w || PW), (PHt - 8) / (t.h || PHt)), cx = Math.round((t.w || PW) * s * 9525), cy = Math.round((t.h || PHt) * s * 9525);
+          dr += '<xdr:oneCellAnchor><xdr:from><xdr:col>' + (firstPhotoCol + pi) + "</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>" + (ri + 1) + '</xdr:row><xdr:rowOff>38100</xdr:rowOff></xdr:from><xdr:ext cx="' + cx + '" cy="' + cy + '"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="' + (n + 1) + '" name="' + xe(e.name + " photo " + (pi + 1)) + '"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId' + n + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>';
+          drel += '<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image' + n + '.jpeg"/>';
+        });
+      });
+      dr += "</xdr:wsDr>"; drel += "</Relationships>";
+      z.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
+      z.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+      z.file("xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Entries" sheetId="1" r:id="rId1"/></sheets></workbook>');
+      z.file("xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+      z.file("xl/styles.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>');
+      z.file("xl/worksheets/sheet1.xml", sx);
+      z.file("xl/worksheets/_rels/sheet1.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+      z.file("xl/drawings/drawing1.xml", dr); z.file("xl/drawings/_rels/drawing1.xml.rels", drel);
+      z.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }).then(function (b) { download(b, CUR.title.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_") + "_entries.xlsx"); });
+    });
+  }
+
+  if (K) pub(); else ho();
+})();
+</script>
+</body>
+</html>

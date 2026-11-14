@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Photo contest</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}@media(max-width:560px){.g2,.g3{grid-template-columns:1fr}}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}.pill.y{background:#FFF3C4;color:#7A5A00}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55;white-space:pre-wrap}
+.ok{background:#E6F4EA;color:#13693F}.no{background:#FDECEC;color:#8E1C1C}
+.phs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.ph{position:relative;border-radius:12px;overflow:hidden;background:#EEF0F6;aspect-ratio:1}
+.ph img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.ph b{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px}
+.ph i{position:absolute;left:0;right:0;bottom:0;font-style:normal;font-size:10.5px;padding:3px 5px;color:#fff;background:rgba(0,0,0,.5)}
+.ph.bad{outline:3px solid #E5484D}
+.drop{border:2px dashed #C9CDEA;border-radius:14px;padding:16px;text-align:center;font-size:13px;color:var(--ink2);cursor:pointer;background:#FAFBFF}
+.ent{display:flex;gap:10px}.ent .th{display:flex;gap:4px;flex:none}.ent .th img,.ent .th span{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#EEF0F6;display:block;cursor:zoom-in}
+.sc{min-width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;flex:none;background:#F1F2F6;color:#555}
+.sc.s{background:#E6F4EA;color:#13693F}.sc.p{background:#FFF4E5;color:#8A5300}.sc.w{background:#FDECEC;color:#B42318}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}@media(max-width:560px){.kp{grid-template-columns:repeat(2,1fr)}}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:21px;font-weight:800;margin-top:2px}
+.q{border-top:1px solid #EEF0F6;padding-top:8px;margin-top:8px}
+.board .r{display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid #EEF0F6}.board .r:first-child{border-top:0}.board .m{font-size:24px}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;display:flex;align-items:center;justify-content:center}.viewer img{max-width:96vw;max-height:88vh}.viewer b{position:absolute;top:14px;right:16px;color:#fff;font-size:26px;cursor:pointer}
+.stchk{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 8px;max-height:200px;overflow:auto;font-size:12.5px;background:#FAFBFF;border-radius:10px;padding:6px 8px}
+.big{font-size:42px;text-align:center}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=2"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📸</span></div>
+  <h1 id="h1">Photo contest</h1><p id="hp">Click · upload · win</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), K = (new URLSearchParams(location.search).get("k") || "").replace(/[^a-f0-9]/g, "");
+  var ST = { uploading: "Upload not finished", submitted: "Submitted", eligible: "Eligible — next round", not_eligible: "Not eligible", round2: "In the final round", winner: "Winner 🏆", runner: "Runner-up", special: "Special mention", rejected: "Not selected" };
+  var ST_C = { uploading: "m", submitted: "", eligible: "g", not_eligible: "r", round2: "o", winner: "y", runner: "y", special: "y", rejected: "m" };
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; };
+  var dtl = function (t) { if (!t) return ""; var d = new Date(t - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+  function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", k: K }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection — try again" }; }); }
+  function viewer(src) { var v = document.createElement("div"); v.className = "viewer"; v.innerHTML = '<img src="' + src + '"><b>✕</b>'; v.onclick = function () { v.remove(); }; document.body.appendChild(v); }
+  var scC = function (s) { return s == null ? "" : s >= 70 ? "s" : s >= 50 ? "p" : "w"; };
+
+  // ---------- photos: read, check against the rules, shrink for upload ----------
+  function readPhoto(file) {
+    return new Promise(function (res) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var ow = im.naturalWidth, oh = im.naturalHeight;
+        var mk = function (max, q) { var s = Math.min(1, max / Math.max(ow, oh)), cv = document.createElement("canvas"); cv.width = Math.round(ow * s); cv.height = Math.round(oh * s); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); return { d: cv.toDataURL("image/jpeg", q).split(",")[1], w: cv.width, h: cv.height }; };
+        var big = mk(1600, 0.85); if (big.d.length > 1600000) big = mk(1280, 0.78);
+        var th = mk(320, 0.72);
+        res({ ok: true, name: file.name, size: file.size, ow: ow, oh: oh, big: big, th: th, prev: "data:image/jpeg;base64," + th.d });
+        URL.revokeObjectURL(url);
+      };
+      im.onerror = function () { res({ ok: false, name: file.name }); };
+      im.src = url;
+    });
+  }
+  function photoIssue(p, C) {
+    if (!p.ok) return "Not a photo we can read";
+    var sh = Math.min(p.ow, p.oh);
+    if (C.photos.minPx && sh < C.photos.minPx) return "Too small (" + p.ow + "×" + p.oh + "); needs at least " + C.photos.minPx + " px";
+    if (C.photos.orient === "portrait" && p.oh <= p.ow) return "Needs a portrait (upright) photo";
+    if (C.photos.orient === "landscape" && p.ow <= p.oh) return "Needs a landscape (wide) photo";
+    if (C.photos.orient === "square" && Math.abs(p.ow - p.oh) / Math.max(p.ow, p.oh) > 0.08) return "Needs a square photo";
+    return "";
+  }
+
+  // ======================= PUBLIC LINK =======================
+  var PC = null, PH = [], ME = null;
+  function pub() {
+    papi({ action: "pc-p-info" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">📸</div>' + esc(r.error) + "</div>"; return; }
+      PC = r.c; STATES_ALL = r.states || []; $("h1").textContent = PC.title; $("hp").textContent = PC.end ? (r.open ? "Entries close " + when(PC.end) : PC.status === "results" ? "Results are out!" : "Entries closed") : "vivo photo contest";
+      var H = "";
+      if (r.board) H += '<div class="card" style="margin-top:4px"><h3 style="margin:0 0 6px">🏆 Results</h3>' + (r.resultsMsg ? '<div class="help">' + esc(r.resultsMsg) + "</div>" : "") + '<div class="board">' + (r.board.length ? r.board.map(function (x, i) { return '<div class="r"><span class="m">' + (i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "🎖️") + '</span><div style="flex:1"><b>' + esc(x.name) + '</b><div class="muted" style="font-size:12px">' + esc(x.state) + " · " + esc(x.status) + (x.award ? " · " + esc(x.award) : "") + "</div></div></div>"; }).join("") : '<div class="muted">Results will appear here.</div>') + "</div></div>";
+      H += '<div class="card" style="margin-top:10px">' + (PC.desc ? '<div style="font-size:14px;line-height:1.55;white-space:pre-wrap">' + esc(PC.desc) + "</div>" : "") +
+        '<div class="g2" style="margin-top:8px">' + (PC.photos.accept || PC.photos.model ? '<div class="help ok">✅ <b>Accepted</b>\n' + esc([PC.photos.model ? "Must show: " + PC.photos.model : "", PC.photos.accept].filter(Boolean).join("\n")) + "</div>" : "") + (PC.photos.reject ? '<div class="help no">🚫 <b>Not accepted</b>\n' + esc(PC.photos.reject) + "</div>" : "") + "</div>" +
+        '<div class="help">📷 ' + (PC.photos.min === PC.photos.max ? PC.photos.min : PC.photos.min + "–" + PC.photos.max) + " photo(s)" + (PC.photos.orient !== "any" ? " · " + PC.photos.orient : "") + (PC.photos.minPx ? " · at least " + PC.photos.minPx + " px" : "") + (PC.criteria.length ? "\n🏅 Judged on: " + PC.criteria.map(function (x) { return x.name + " (" + x.weight + "%)"; }).join(", ") : "") + (PC.end ? "\n⏰ Last date: " + when(PC.end) : "") + "</div>" +
+        (PC.rules ? '<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:700;font-size:13px">Rules</summary><div class="help">' + esc(PC.rules) + "</div></details>" : "") + "</div>";
+      H += '<div class="card" style="margin-top:10px"><b>' + (r.board ? "🎁 See my result" : "🔎 Already took part? See / change my entry") + '</b><div class="g2" style="margin-top:6px"><input class="tx" id="me_e" placeholder="Employee ID"><input class="tx" id="me_p" placeholder="Mobile number" inputmode="tel"></div><button class="btn sec" id="me_go" style="width:100%;margin-top:8px">Check</button><div id="me_out"></div></div>';
+      if (r.open) H += '<div id="form"></div>';
+      VIEW.innerHTML = H;
+      $("me_go").onclick = function () { papi({ action: "pc-p-me", empId: $("me_e").value, phone: $("me_p").value }).then(function (x) {
+        if (!x.ok) { $("me_out").innerHTML = '<div class="help no">' + esc(x.error) + "</div>"; return; }
+        var e = x.e, aw = /^(winner|runner|special)$/.test(e.status);
+        $("me_out").innerHTML = '<div class="help ' + (aw ? "ok" : "") + '" style="margin-top:10px">' + (aw ? "🎉 <b>Congratulations, " + esc(e.name) + "!</b>\n" : "<b>" + esc(e.name) + "</b>\n") + "Status: <b>" + esc(e.statusName) + "</b>" + (e.award ? "\n🎁 Award: <b>" + esc(e.award) + "</b>" : "") + (e.voucher ? '\n🎟️ Your voucher code: <b class="fx" style="font-size:15px;user-select:all">' + esc(e.voucher) + "</b>" : "") + "\nSubmitted " + when(e.at) + " · " + e.photos + " photo(s)</div>" + (x.canEdit ? '<button class="btn ghost sm" id="me_ed" style="margin-top:6px">✏️ Change my entry</button>' : "");
+        if ($("me_ed")) $("me_ed").onclick = function () { ME = Object.assign({ empId: $("me_e").value, phone: $("me_p").value }, e); form(); $("form").scrollIntoView({ behavior: "smooth" }); };
+      }); };
+      if (r.open) form();
+    });
+  }
+  function form() {
+    var C = PC, A = ME || {}; PH = [];
+    var q = function (x) { var v = (A.answers || {})[x.id] || ""; var lab = '<label class="lb">' + esc(x.q) + (x.req ? " *" : "") + "</label>";
+      if (x.type === "long") return lab + '<textarea class="tx" data-q="' + x.id + '" rows="3">' + esc(v) + "</textarea>";
+      if (x.type === "choice") return lab + '<select class="tx" data-q="' + x.id + '"><option value="">Choose…</option>' + x.options.map(function (o) { return "<option" + (o === v ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
+      return lab + '<input class="tx" data-q="' + x.id + '" value="' + esc(v) + '"' + (x.type === "number" ? ' inputmode="decimal"' : "") + ">"; };
+    $("form").innerHTML = '<div class="card" style="margin-top:10px"><h3 style="margin:0 0 4px">' + (ME ? "✏️ Change my entry" : "📝 Take part") + "</h3>" + (ME ? '<div class="muted" style="font-size:12px">Your new entry replaces the old one — add your photos again.</div>' : "") +
+      '<div class="g2"><div><label class="lb">Full name *</label><input class="tx" id="f_n" value="' + esc(A.name || "") + '"></div><div><label class="lb">Employee ID *</label><input class="tx" id="f_e" value="' + esc(A.empId || "") + '"' + (ME ? " readonly" : "") + "></div>" +
+      (C.ask.phone ? '<div><label class="lb">Mobile *</label><input class="tx" id="f_p" inputmode="tel" value="' + esc(A.phone || "") + '"' + (ME ? " readonly" : "") + "></div>" : "") +
+      '<div><label class="lb">State *</label><select class="tx" id="f_s"><option value="">Choose…</option>' + (C.states.length ? C.states : STATES_ALL).map(function (s) { return "<option" + (s === A.state ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" +
+      (C.ask.designation ? '<div><label class="lb">Designation</label><input class="tx" id="f_d" value="' + esc(A.designation || "") + '"></div>' : "") + (C.ask.store ? '<div><label class="lb">Store / location</label><input class="tx" id="f_st" value="' + esc(A.store || "") + '"></div>' : "") + (C.ask.email ? '<div><label class="lb">E-mail</label><input class="tx" id="f_m" inputmode="email" value="' + esc(A.email || "") + '"></div>' : "") + "</div>" +
+      C.questions.map(q).join("") +
+      '<label class="lb">Your photos * (' + (C.photos.min === C.photos.max ? C.photos.min : C.photos.min + "–" + C.photos.max) + ')</label><div class="drop" id="f_dr">📷 Tap to add photos</div><input type="file" id="f_f" accept="image/*" multiple hidden><div class="phs" id="f_ph"></div>' +
+      '<input id="f_hp" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">' +
+      '<label class="tg" style="margin-top:10px;font-size:12.5px"><input type="checkbox" id="f_ok"><i></i><span>These are my own photos, and vivo may use them in internal and social posts with credit to me.</span></label>' +
+      '<button class="btn pri" id="f_go" style="width:100%;margin-top:12px">🚀 Submit my entry</button><div id="f_st2" class="muted" style="text-align:center;font-size:12.5px;margin-top:6px"></div></div>';
+    var drawPh = function () { $("f_ph").innerHTML = PH.map(function (p, i) { var bad = photoIssue(p, C); return '<div class="ph' + (bad ? " bad" : "") + '"><img src="' + (p.prev || "") + '" data-v="' + i + '"><b data-x="' + i + '">✕</b><i>' + (bad ? "⚠️ " + esc(bad) : p.ow + "×" + p.oh) + "</i></div>"; }).join("");
+      [].forEach.call($("f_ph").querySelectorAll("[data-x]"), function (b) { b.onclick = function () { PH.splice(+b.dataset.x, 1); drawPh(); }; });
+      [].forEach.call($("f_ph").querySelectorAll("[data-v]"), function (im) { im.onclick = function () { viewer(im.src); }; });
+      $("f_dr").textContent = PH.length >= C.photos.max ? "✓ " + PH.length + " photo(s) added" : "📷 Tap to add photos (" + PH.length + " of " + C.photos.max + ")"; };
+    $("f_dr").onclick = function () { if (PH.length >= C.photos.max) return toast("You can add up to " + C.photos.max + " photo(s)"); $("f_f").click(); };
+    $("f_f").onchange = function () { var fs = [].slice.call($("f_f").files, 0, C.photos.max - PH.length); $("f_dr").textContent = "Reading photos…"; Promise.all(fs.map(readPhoto)).then(function (L) { PH = PH.concat(L); $("f_f").value = ""; drawPh(); }); };
+    drawPh();
+    $("f_go").onclick = function () {
+      if (!$("f_ok").checked) return toast("Please tick the confirmation");
+      if (PH.length < C.photos.min) return toast("Add at least " + C.photos.min + " photo(s)");
+      var bad = PH.map(function (p) { return photoIssue(p, C); }).filter(Boolean); if (bad.length) return toast(bad[0]);
+      var ans = {}; [].forEach.call($("form").querySelectorAll("[data-q]"), function (i) { ans[i.dataset.q] = i.value; });
+      var d = { name: $("f_n").value, state: $("f_s").value, designation: $("f_d") ? $("f_d").value : "", store: $("f_st") ? $("f_st").value : "", email: $("f_m") ? $("f_m").value : "", answers: ans };
+      var b = $("f_go"); b.disabled = true; $("f_st2").textContent = "Sending your details…";
+      papi({ action: "pc-p-submit", d: d, empId: $("f_e").value, phone: $("f_p") ? $("f_p").value : "", nPhotos: PH.length, hp: $("f_hp").value }).then(function (r) {
+        if (!r.ok) { b.disabled = false; $("f_st2").textContent = ""; return toast(r.error); }
+        var i = 0, fail = 0;
+        (function next() {
+          if (i >= PH.length) {
+            $("form").innerHTML = '<div class="card" style="margin-top:10px"><div class="big">🎉</div><h3 style="text-align:center;margin:4px 0">Entry submitted!</h3><div class="muted" style="text-align:center;font-size:13px">Thank you, ' + esc(d.name) + ". Check this link after " + (C.end ? when(C.end) : "the contest closes") + " for the results — use your employee ID and mobile number.</div></div>";
+            $("form").scrollIntoView({ behavior: "smooth" }); return;
+          }
+          var p = PH[i]; $("f_st2").textContent = "Uploading photo " + (i + 1) + " of " + PH.length + "…";
+          papi({ action: "pc-p-photo", eid: r.eid, up: r.up, data: p.big.d, thumb: p.th.d, w: p.big.w, h: p.big.h, ow: p.ow, oh: p.oh, name: p.name, size: p.size, mime: "image/jpeg" }).then(function (x) {
+            if (!x.ok) { if (++fail > 2) { b.disabled = false; $("f_st2").textContent = ""; return toast(x.error + " — tap Submit again"); } return setTimeout(next, 1200); }
+            fail = 0; i++; next();
+          });
+        })();
+      });
+    };
+  }
+
+  // ======================= HO =======================
+  var CL = null, CUR = null, ENT = null, TH = {}, FIL = { st: "", state: "", q: "" };
+  function ho() {
+    if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+    $("h1").textContent = "Photo contests"; $("hp").textContent = "Set up · share one link · AI-score · pick winners · announce";
+    list();
+  }
+  function list() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pc-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      CL = r; STATES_ALL = r.states;
+      VIEW.innerHTML = '<button class="btn pri" id="nw" style="width:100%">＋ New contest</button>' + (r.rows.length ? r.rows.map(function (c) { return '<div class="card" style="margin-top:10px;cursor:pointer" data-c="' + c.id + '"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + esc(c.title) + '</b><span class="pill ' + ({ open: "g", draft: "m", closed: "o", results: "y" }[c.status] || "") + '">' + ({ open: "Open", draft: "Draft", closed: "Closed", results: "Results out" }[c.status] || c.status) + '</span></div><div class="muted" style="font-size:12px;margin-top:3px">' + c.entries + " entr" + (c.entries === 1 ? "y" : "ies") + (c.end ? " · closes " + when(c.end) : "") + "</div></div>"; }).join("") : '<div class="card empty" style="margin-top:10px">No contests yet.</div>');
+      $("nw").onclick = function () { edit(null); };
+      [].forEach.call(VIEW.querySelectorAll("[data-c]"), function (d) { d.onclick = function () { openC(d.dataset.c); }; });
+    });
+  }
+  var STATES_ALL = [];
+  function openC(id) {
+    api({ action: "pc-get", id: id }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.c; CUR.link = r.link; entries(); });
+  }
+  function head(active) {
+    var c = CUR;
+    return '<div class="row" style="gap:6px;align-items:center"><button class="btn ghost sm" id="bk">← All contests</button><span class="sp"></span><span class="pill ' + ({ open: "g", draft: "m", closed: "o", results: "y" }[c.status] || "") + '">' + ({ open: "Open", draft: "Draft", closed: "Closed", results: "Results out" }[c.status]) + "</span></div>" +
+      '<div class="card" style="margin-top:8px"><b style="font-size:16px">' + esc(c.title) + '</b><div class="help fx" style="word-break:break-all;white-space:normal">' + esc(c.link) + '</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sec sm" id="lc">📋 Copy link</button><button class="btn ghost sm" id="lw">WhatsApp</button><a class="btn ghost sm" href="' + esc(c.link) + '" target="_blank">👁 Open</a>' +
+      (c.status === "draft" || c.status === "closed" ? '<button class="btn pri sm" data-ss="open">▶ Open entries</button>' : "") + (c.status === "open" ? '<button class="btn ghost sm" data-ss="closed">⏸ Close entries</button>' : "") + "</div></div>" +
+      '<div class="seg" style="margin-top:10px"><button data-tb="e" class="' + (active === "e" ? "on" : "") + '">📸 Entries</button><button data-tb="s" class="' + (active === "s" ? "on" : "") + '">⚙️ Set-up</button></div><div id="tp"></div>';
+  }
+  function wireHead() {
+    $("bk").onclick = list;
+    $("lc").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(CUR.link) : Promise.reject()).then(function () { toast("Link copied"); }, function () { prompt("Copy the link", CUR.link); }); };
+    $("lw").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent("📸 " + CUR.title + (CUR.end ? " — last date " + when(CUR.end) : "") + "\nTake part here: " + CUR.link), "_blank"); };
+    [].forEach.call(VIEW.querySelectorAll("[data-ss]"), function (b) { b.onclick = function () { api({ action: "pc-save", id: CUR.id, c: CUR, status: b.dataset.ss }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.c; CUR.link = r.link; toast(b.dataset.ss === "open" ? "Entries are open" : "Entries closed"); entries(); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { if (b.dataset.tb === "s") edit(CUR); else entries(); }; });
+  }
+
+  // ---------- contest set-up ----------
+  function edit(c0) {
+    var c = c0 ? JSON.parse(JSON.stringify(c0)) : { title: "", desc: "", rules: "", start: 0, end: 0, states: [], ask: { phone: true, email: false, store: false, designation: true }, photos: { min: 1, max: 3, minPx: 1080, orient: "any", accept: "", reject: "Screenshots, downloaded or advertisement images, photos of a screen, heavily filtered or edited photos, photos with another brand's phone as the hero", model: "" }, questions: [], criteria: [{ name: "Creativity", weight: 30, hint: "" }, { name: "Photo quality (focus, light, composition)", weight: 30, hint: "" }, { name: "vivo phone / brand clearly shown", weight: 25, hint: "" }, { name: "Fits the theme", weight: 15, hint: "" }], cutoff: 60, answersWeight: 0, resultsMsg: "", showBoard: true };
+    if (c0) { VIEW.innerHTML = head("s"); wireHead(); } else VIEW.innerHTML = '<button class="btn ghost sm" id="bk2">← All contests</button><div id="tp"></div>';
+    if ($("bk2")) $("bk2").onclick = list;
+    var tg = function (id, on, label) { return '<label class="tg" style="margin-top:6px;font-size:13px"><input type="checkbox" id="' + id + '"' + (on ? " checked" : "") + "><i></i><span>" + label + "</span></label>"; };
+    $("tp").innerHTML = '<div class="card" style="margin-top:10px"><b>1 · About the contest</b><label class="lb">Title *</label><input class="tx" id="e_t" value="' + esc(c.title) + '" placeholder="e.g. Best shot on the vivo V60"><label class="lb">What should people do?</label><textarea class="tx" id="e_d" rows="3" placeholder="e.g. Click your best photo with the new vivo V60 — night shots, portraits, festive moments…">' + esc(c.desc) + '</textarea><label class="lb">Rules (optional)</label><textarea class="tx" id="e_r" rows="3">' + esc(c.rules) + '</textarea>' +
+      '<div class="g2"><div><label class="lb">Entries open from</label><input class="tx" type="datetime-local" id="e_s" value="' + dtl(c.start) + '"></div><div><label class="lb">Last date & time</label><input class="tx" type="datetime-local" id="e_e" value="' + dtl(c.end) + '"></div></div>' +
+      '<label class="lb">Who can take part (states) — none ticked = all states</label><div class="stchk">' + STATES_ALL.map(function (s) { return '<label><input type="checkbox" data-st="' + esc(s) + '"' + (c.states.indexOf(s) >= 0 ? " checked" : "") + "> " + esc(s) + "</label>"; }).join("") + "</div>" +
+      '<label class="lb">Ask participants for</label>' + tg("a_p", c.ask.phone, "Mobile number (needed to see the result / voucher)") + tg("a_d", c.ask.designation, "Designation") + tg("a_s", c.ask.store, "Store / location") + tg("a_m", c.ask.email, "E-mail (winners get an e-mail)") + "</div>" +
+      '<div class="card" style="margin-top:10px"><b>2 · Photos — what is acceptable</b><div class="g3"><div><label class="lb">Min photos</label><input class="tx" id="p_mi" inputmode="numeric" value="' + c.photos.min + '"></div><div><label class="lb">Max photos</label><input class="tx" id="p_ma" inputmode="numeric" value="' + c.photos.max + '"></div><div><label class="lb">Min size (px, short side)</label><input class="tx" id="p_px" inputmode="numeric" value="' + (c.photos.minPx || "") + '" placeholder="e.g. 1080"></div></div>' +
+      '<div class="g2"><div><label class="lb">Orientation</label><select class="tx" id="p_o">' + [["any", "Any"], ["portrait", "Portrait (upright)"], ["landscape", "Landscape (wide)"], ["square", "Square"]].map(function (o) { return '<option value="' + o[0] + '"' + (c.photos.orient === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Must feature (phone model / product)</label><input class="tx" id="p_m" value="' + esc(c.photos.model) + '" placeholder="e.g. vivo V60"></div></div>' +
+      '<label class="lb">✅ Acceptable / eligible photos</label><textarea class="tx" id="p_a" rows="3" placeholder="e.g. Shot on the vivo V60 by the participant · the phone or its camera result is the hero · real customers or store moments">' + esc(c.photos.accept) + '</textarea><label class="lb">🚫 Not acceptable</label><textarea class="tx" id="p_r" rows="2">' + esc(c.photos.reject) + "</textarea>" +
+      '<div class="muted" style="font-size:11.5px;margin-top:4px">Size and orientation are checked on the phone before upload. AI checks the rest when you score entries.</div></div>' +
+      '<div class="card" style="margin-top:10px"><b>3 · Questions</b><div id="qs"></div><button class="btn ghost sm" id="qa" style="margin-top:8px">＋ Question</button></div>' +
+      '<div class="card" style="margin-top:10px"><b>4 · Judging</b><div class="muted" style="font-size:12px;margin-top:2px">AI scores every entry on these criteria (0–10 each, weighted to 0–100).</div><div id="cr"></div><button class="btn ghost sm" id="ca" style="margin-top:6px">＋ Criterion</button>' +
+      '<div class="g2"><div><label class="lb">Eligible for next round at score ≥</label><input class="tx" id="j_c" inputmode="numeric" value="' + c.cutoff + '"></div><div><label class="lb">Weight of the answers (% of score, 0 = photos only)</label><input class="tx" id="j_a" inputmode="numeric" value="' + c.answersWeight + '"></div></div></div>' +
+      '<div class="card" style="margin-top:10px"><b>5 · Results page</b><label class="lb">Message shown with the results</label><textarea class="tx" id="r_m" rows="2" placeholder="e.g. Winners get their vouchers below. Thank you all for taking part!">' + esc(c.resultsMsg) + "</textarea>" + tg("r_b", c.showBoard, "Show the winners list (names, state, award) on the link") + "</div>" +
+      '<div class="row" style="gap:8px;margin-top:12px"><button class="btn pri" id="sv" style="flex:1">💾 Save</button>' + (!c0 || c0.status === "draft" ? '<button class="btn sec" id="svo">▶ Save & open entries</button>' : "") + "</div>" + (c0 ? '<button class="btn ghost sm" id="del" style="margin-top:14px;color:#B42318">🗑 Delete this contest and all entries</button>' : "");
+    var drawQ = function () { $("qs").innerHTML = c.questions.map(function (q, i) { return '<div class="q"><div class="row" style="gap:6px"><input class="tx" data-qq="' + i + '" value="' + esc(q.q) + '" placeholder="Question" style="flex:1"><button class="btn ghost sm" data-qx="' + i + '">🗑</button></div><div class="g2" style="margin-top:6px"><select class="tx" data-qt="' + i + '">' + [["text", "Short answer"], ["long", "Long answer"], ["choice", "Choose one"], ["number", "Number"]].map(function (o) { return '<option value="' + o[0] + '"' + (q.type === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><label class="tg" style="font-size:12.5px"><input type="checkbox" data-qr="' + i + '"' + (q.req !== false ? " checked" : "") + "><i></i><span>Required</span></label></div>" + (q.type === "choice" ? '<input class="tx" data-qo="' + i + '" style="margin-top:6px" value="' + esc((q.options || []).join(", ")) + '" placeholder="Options, comma separated">' : "") + "</div>"; }).join("") || '<div class="muted" style="font-size:12px;margin-top:4px">No questions — add e.g. “Which phone did you shoot with?”, “Tell us the story behind your photo”.</div>';
+      [].forEach.call($("qs").querySelectorAll("[data-qq]"), function (x) { x.oninput = function () { c.questions[+x.dataset.qq].q = x.value; }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qt]"), function (x) { x.onchange = function () { c.questions[+x.dataset.qt].type = x.value; drawQ(); }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qr]"), function (x) { x.onchange = function () { c.questions[+x.dataset.qr].req = x.checked; }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qo]"), function (x) { x.oninput = function () { c.questions[+x.dataset.qo].options = x.value.split(","); }; });
+      [].forEach.call($("qs").querySelectorAll("[data-qx]"), function (x) { x.onclick = function () { c.questions.splice(+x.dataset.qx, 1); drawQ(); }; }); };
+    var drawCr = function () { var tot = c.criteria.reduce(function (a, x) { return a + (+x.weight || 0); }, 0); $("cr").innerHTML = c.criteria.map(function (x, i) { return '<div class="row" style="gap:6px;margin-top:6px"><input class="tx" data-cn="' + i + '" value="' + esc(x.name) + '" style="flex:2" placeholder="Criterion"><input class="tx" data-cw="' + i + '" value="' + x.weight + '" style="width:70px" inputmode="numeric"><span class="muted" style="align-self:center">%</span><button class="btn ghost sm" data-cx="' + i + '">🗑</button></div>'; }).join("") + '<div class="muted" style="font-size:11.5px;margin-top:4px">Total ' + tot + "%" + (tot !== 100 ? " — the score is scaled, so it doesn't have to be 100" : "") + "</div>";
+      [].forEach.call($("cr").querySelectorAll("[data-cn]"), function (x) { x.oninput = function () { c.criteria[+x.dataset.cn].name = x.value; }; });
+      [].forEach.call($("cr").querySelectorAll("[data-cw]"), function (x) { x.onchange = function () { c.criteria[+x.dataset.cw].weight = +x.value || 0; drawCr(); }; });
+      [].forEach.call($("cr").querySelectorAll("[data-cx]"), function (x) { x.onclick = function () { c.criteria.splice(+x.dataset.cx, 1); drawCr(); }; }); };
+    drawQ(); drawCr();
+    $("qa").onclick = function () { c.questions.push({ q: "", type: "text", req: true, options: [] }); drawQ(); };
+    $("ca").onclick = function () { c.criteria.push({ name: "", weight: 10, hint: "" }); drawCr(); };
+    var collect = function () {
+      c.title = $("e_t").value; c.desc = $("e_d").value; c.rules = $("e_r").value;
+      c.start = $("e_s").value ? new Date($("e_s").value).getTime() : 0; c.end = $("e_e").value ? new Date($("e_e").value).getTime() : 0;
+      c.states = [].filter.call($("tp").querySelectorAll("[data-st]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.st; });
+      c.ask = { phone: $("a_p").checked, designation: $("a_d").checked, store: $("a_s").checked, email: $("a_m").checked };
+      c.photos = { min: +$("p_mi").value || 1, max: +$("p_ma").value || 1, minPx: +$("p_px").value || 0, orient: $("p_o").value, model: $("p_m").value, accept: $("p_a").value, reject: $("p_r").value };
+      c.cutoff = +$("j_c").value || 0; c.answersWeight = +$("j_a").value || 0; c.resultsMsg = $("r_m").value; c.showBoard = $("r_b").checked;
+      if (c.photos.max < c.photos.min) c.photos.max = c.photos.min;
+      return c;
+    };
+    var save = function (status) {
+      if (!$("e_t").value.trim()) return toast("Give the contest a title");
+      api({ action: "pc-save", id: c0 ? c0.id : "", c: collect(), status: status || "" }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.c; CUR.link = r.link; toast(status === "open" ? "Saved — entries are open. Share the link!" : "Saved"); entries(); });
+    };
+    $("sv").onclick = function () { save(); }; if ($("svo")) $("svo").onclick = function () { save("open"); };
+    if ($("del")) $("del").onclick = function () { sheet("Delete “" + c0.title + "”?", "All entries and photos are deleted for good.", [["🗑", "Delete", function () { api({ action: "pc-delete", id: c0.id }).then(function (r) { if (!r.ok) return toast(r.error); toast("Deleted"); list(); }); }, "danger"], ["", "Cancel", function () { }]]); };
+  }
+
+  // ---------- entries: AI score, mark, export, announce ----------
+  var tot = function (e) { return e.hoScore != null && e.hoScore !== "" ? +e.hoScore : e.ai ? e.ai.total : null; };
+  function entries() {
+    VIEW.innerHTML = head("e"); wireHead();
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "pc-entries", cid: CUR.id }).then(function (r) { if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ENT = r.rows; CUR = Object.assign(r.c, { link: CUR.link }); drawE(); });
+  }
+  function loadThumbs(ids) {
+    ids = ids.filter(function (id) { return !TH[id]; });
+    var chunks = []; for (var i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+    return chunks.reduce(function (p, ch) { return p.then(function () { return api({ action: "pc-thumbs", cid: CUR.id, ids: ch }).then(function (r) { if (r.ok) Object.keys(r.thumbs).forEach(function (k) { TH[k] = r.thumbs[k]; }); }); }); }, Promise.resolve());
+  }
+  function drawE() {
+    var L = ENT.filter(function (e) { if (FIL.st && e.status !== FIL.st) return false; if (FIL.state && e.state !== FIL.state) return false; var q = FIL.q.toLowerCase(); if (q && (e.name + " " + e.empId + " " + e.store).toLowerCase().indexOf(q) < 0) return false; return true; });
+    var done = ENT.filter(function (e) { return e.status !== "uploading"; }), scored = done.filter(function (e) { return e.ai; }), unscored = done.length - scored.length;
+    var states = []; ENT.forEach(function (e) { if (states.indexOf(e.state) < 0) states.push(e.state); });
+    $("tp").innerHTML = '<div class="kp"><div class="kt"><div class="l">Entries</div><div class="v">' + done.length + '</div></div><div class="kt"><div class="l">AI-scored</div><div class="v">' + scored.length + '</div></div><div class="kt"><div class="l">Eligible (≥ ' + CUR.cutoff + ')</div><div class="v">' + ENT.filter(function (e) { return /^(eligible|round2|winner|runner|special)$/.test(e.status); }).length + '</div></div><div class="kt"><div class="l">Awarded</div><div class="v">' + ENT.filter(function (e) { return /^(winner|runner|special)$/.test(e.status); }).length + "</div></div></div>" +
+      '<div class="card" style="margin-top:10px"><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn pri sm" id="ai"' + (unscored ? "" : " disabled") + ">🤖 AI-score " + unscored + ' new</button><button class="btn ghost sm" id="top">🏆 Pick top N…</button><button class="btn ghost sm" id="xl">⬇ Excel with photos</button><button class="btn sec sm" id="pub">📣 Announce results</button></div><div id="aist" class="muted" style="font-size:12px;margin-top:4px"></div>' +
+      '<div class="g3" style="margin-top:8px"><input class="tx" id="fq" placeholder="Search name / ID" value="' + esc(FIL.q) + '"><select class="tx" id="fs"><option value="">All statuses</option>' + Object.keys(ST).map(function (k) { return '<option value="' + k + '"' + (FIL.st === k ? " selected" : "") + ">" + esc(ST[k]) + "</option>"; }).join("") + '</select><select class="tx" id="fst"><option value="">All states</option>' + states.map(function (s) { return "<option" + (FIL.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div></div>" +
+      (L.length ? L.map(function (e, i) {
+        var s = tot(e);
+        return '<div class="card" style="margin-top:8px" data-e="' + e.id + '"><div class="ent"><div class="sc ' + scC(s) + '">' + (s == null ? "–" : s) + '</div><div style="flex:1;min-width:0"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + (i + 1) + ". " + esc(e.name) + '</b><span class="pill ' + (ST_C[e.status] || "") + '">' + esc(ST[e.status] || e.status) + '</span></div><div class="muted" style="font-size:12px">' + esc([e.empId, e.designation, e.store, e.state].filter(Boolean).join(" · ")) + " · " + when(e.at) + (e.edits ? " · edited" : "") + "</div>" +
+          '<div class="th" style="margin-top:6px">' + e.photos.map(function (p) { return TH[p] ? '<img src="data:image/jpeg;base64,' + TH[p].d + '" data-big="' + p + '">' : '<span data-big="' + p + '"></span>'; }).join("") + "</div>" +
+          (CUR.questions.length ? '<div style="font-size:12px;margin-top:6px">' + CUR.questions.map(function (q) { return "<b>" + esc(q.q) + ":</b> " + esc((e.answers || {})[q.id] || "—"); }).join("<br>") + "</div>" : "") +
+          (e.ai ? '<div class="help" style="margin-top:6px;white-space:normal">🤖 ' + e.ai.total + "/100 · " + Object.keys(e.ai.per).map(function (k) { return esc(k) + " " + e.ai.per[k]; }).join(" · ") + (e.ai.looksCopied ? ' · <b style="color:#B42318">looks copied / screenshot</b>' : "") + (!e.ai.vivoVisible ? " · no vivo visible" : "") + (!e.ai.acceptable ? ' · <b style="color:#B42318">not acceptable</b>' : "") + "<br>" + esc(e.ai.comment) + "</div>" : "") +
+          '<div class="g3" style="margin-top:6px"><select class="tx" data-ms="' + e.id + '">' + Object.keys(ST).filter(function (k) { return k !== "uploading"; }).map(function (k) { return '<option value="' + k + '"' + (e.status === k ? " selected" : "") + ">" + esc(ST[k]) + "</option>"; }).join("") + '</select><input class="tx" data-mh="' + e.id + '" placeholder="Judge score (overrides AI)" inputmode="numeric" value="' + (e.hoScore == null ? "" : e.hoScore) + '"><input class="tx" data-ma="' + e.id + '" placeholder="Award (e.g. ₹2,000 voucher)" value="' + esc(e.award || "") + '"></div>' +
+          '<div class="g2" style="margin-top:6px"><input class="tx" data-mv="' + e.id + '" placeholder="Voucher code (shown only to them)" value="' + esc(e.voucher || "") + '"><div class="row" style="gap:6px"><button class="btn ghost sm" data-rs="' + e.id + '">🤖 ' + (e.ai ? "Re-score" : "AI score") + '</button><button class="btn pri sm" data-sv="' + e.id + '" style="flex:1">Save</button></div></div>' + (e.seenResult ? '<div class="muted" style="font-size:11px;margin-top:4px">👀 Saw the result ' + when(e.seenResult) + "</div>" : "") + "</div></div></div>";
+      }).join("") : '<div class="card empty" style="margin-top:10px">' + (ENT.length ? "No entries match." : "No entries yet — share the link.") + "</div>");
+    $("fq").oninput = function () { FIL.q = $("fq").value; var p = $("fq").selectionStart; drawE(); $("fq").focus(); try { $("fq").setSelectionRange(p, p); } catch (e) { } };
+    $("fs").onchange = function () { FIL.st = $("fs").value; drawE(); }; $("fst").onchange = function () { FIL.state = $("fst").value; drawE(); };
+    [].forEach.call($("tp").querySelectorAll("[data-big]"), function (im) { im.onclick = function () { api({ action: "pc-img", cid: CUR.id, id: im.dataset.big }).then(function (r) { if (r.ok) viewer("data:" + r.mime + ";base64," + r.data); }); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-sv]"), function (b) { b.onclick = function () { var id = b.dataset.sv; api({ action: "pc-mark", cid: CUR.id, updates: [{ eid: id, status: $("tp").querySelector('[data-ms="' + id + '"]').value, hoScore: $("tp").querySelector('[data-mh="' + id + '"]').value, award: $("tp").querySelector('[data-ma="' + id + '"]').value, voucher: $("tp").querySelector('[data-mv="' + id + '"]').value }] }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); entries(); }); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-rs]"), function (b) { b.onclick = function () { b.disabled = true; b.textContent = "Scoring…"; api({ action: "pc-ai", cid: CUR.id, eid: b.dataset.rs }).then(function (r) { if (!r.ok) { b.disabled = false; b.textContent = "🤖 Try again"; return toast(r.error); } entries(); }); }; });
+    $("ai").onclick = function () {
+      var todo = ENT.filter(function (e) { return e.status !== "uploading" && !e.ai; }), i = 0, ok = 0; $("ai").disabled = true;
+      (function next() { if (i >= todo.length) { toast(ok + " of " + todo.length + " scored"); entries(); return; } var e = todo[i++]; $("aist").textContent = "AI is judging " + i + " of " + todo.length + ": " + e.name + "…"; api({ action: "pc-ai", cid: CUR.id, eid: e.id }).then(function (r) { if (r.ok) ok++; next(); }); })();
+    };
+    $("top").onclick = function () {
+      sheet("Pick the top entries", "Ranked by judge score, else AI score. Only entries that are not marked Not eligible / Not selected.", [["🏆", "Apply", function () {
+        var n = +$("tn").value || 0, st = $("tst").value, aw = $("taw").value;
+        var R = ENT.filter(function (e) { return e.status !== "uploading" && tot(e) != null && !/^(not_eligible|rejected)$/.test(e.status); }).sort(function (a, b) { return tot(b) - tot(a); }).slice(0, n);
+        if (!R.length) return toast("No scored entries yet");
+        api({ action: "pc-mark", cid: CUR.id, updates: R.map(function (e) { var u = { eid: e.id, status: st }; if (aw) u.award = aw; return u; }) }).then(function (r) { toast(r.ok ? r.n + " marked " + ST[st] : r.error); entries(); });
+      }, "pri"], ["", "Cancel", function () { }]], '<div class="g3"><div><label class="lb">How many</label><input class="tx" id="tn" value="3" inputmode="numeric"></div><div><label class="lb">Mark as</label><select class="tx" id="tst"><option value="round2">' + ST.round2 + '</option><option value="winner">' + ST.winner + '</option><option value="runner">' + ST.runner + '</option><option value="special">' + ST.special + '</option><option value="eligible">' + ST.eligible + '</option></select></div><div><label class="lb">Award (optional)</label><input class="tx" id="taw"></div></div>');
+    };
+    $("pub").onclick = function () {
+      var aw = ENT.filter(function (e) { return /^(winner|runner|special)$/.test(e.status); });
+      sheet("Announce the results?", aw.length + " awarded entr" + (aw.length === 1 ? "y" : "ies") + ". The contest link will show the results; each person sees their own award and voucher after entering their employee ID and mobile.", [["📣", "Announce", function () { api({ action: "pc-notify", cid: CUR.id, mail: $("pm") && $("pm").checked }).then(function (r) { if (!r.ok) return toast(r.error); toast("Results are live" + (r.sent ? " · " + r.sent + " e-mail(s) sent" : "")); entries(); }); }, "pri"], ["", "Cancel", function () { }]],
+        CUR.ask.email ? '<label class="tg" style="font-size:13px"><input type="checkbox" id="pm" checked><i></i><span>Also e-mail each winner (the e-mail has no voucher code — they see it on the link)</span></label>' : "");
+    };
+    $("xl").onclick = exportXl;
+    var need = []; L.forEach(function (e) { e.photos.forEach(function (p) { if (!TH[p]) need.push(p); }); });
+    if (need.length) loadThumbs(need.slice(0, 300)).then(function () { [].forEach.call($("tp").querySelectorAll("span[data-big]"), function (s) { var t = TH[s.dataset.big]; if (t) { var im = document.createElement("img"); im.src = "data:image/jpeg;base64," + t.d; im.dataset.big = s.dataset.big; im.onclick = s.onclick; s.replaceWith(im); } }); });
+  }
+
+  // ---------- Excel with the photos inside the rows ----------
+  function exportXl() {
+    var L = ENT.filter(function (e) { return e.status !== "uploading"; });
+    if (!L.length) return toast("No entries yet");
+    var all = []; L.forEach(function (e) { e.photos.forEach(function (p) { all.push(p); }); });
+    toast("Preparing Excel with " + all.length + " photo(s)…");
+    Promise.all([loadThumbs(all), new Promise(function (res) { if (window.JSZip) return res(); var s = document.createElement("script"); s.src = "/vendor/jszip.min.js"; s.onload = res; s.onerror = res; document.head.appendChild(s); })]).then(function () {
+      if (!window.JSZip) return toast("Couldn't load the Excel writer");
+      var maxP = Math.max.apply(null, L.map(function (e) { return e.photos.length; }).concat([1]));
+      var crit = CUR.criteria.map(function (x) { return x.name; });
+      var hdr = ["#", "Name", "Employee ID", "State", "Designation", "Store", "Mobile", "E-mail", "Submitted"].concat(CUR.questions.map(function (q) { return q.q; })).concat(["Final score", "AI score"]).concat(crit.map(function (x) { return "AI · " + x; })).concat(["AI comment", "Judge score", "Status", "Award", "Voucher"]);
+      var firstPhotoCol = hdr.length; for (var i = 0; i < maxP; i++) hdr.push("Photo " + (i + 1));
+      var sorted = L.slice().sort(function (a, b) { return (tot(b) == null ? -1 : tot(b)) - (tot(a) == null ? -1 : tot(a)); });
+      var rows = sorted.map(function (e, i) { return [i + 1, e.name, e.empId, e.state, e.designation, e.store, e.phone, e.email, when(e.at)].concat(CUR.questions.map(function (q) { return (e.answers || {})[q.id] || ""; })).concat([tot(e) == null ? "" : tot(e), e.ai ? e.ai.total : ""]).concat(crit.map(function (x) { return e.ai && e.ai.per[x] != null ? e.ai.per[x] : ""; })).concat([e.ai ? e.ai.comment : "", e.hoScore == null ? "" : e.hoScore, ST[e.status] || e.status, e.award || "", e.voucher || ""]); });
+      var xe = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ""); };
+      var col = function (n) { var s = ""; n++; while (n) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+      var PW = 150, PHt = 112;   // photo box in px
+      var sx = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" xSplit="2" topLeftCell="C2" activePane="bottomRight" state="frozen"/></sheetView></sheetViews><cols>';
+      hdr.forEach(function (h, i) { var w = i >= firstPhotoCol ? 22 : i === 0 ? 5 : Math.min(40, Math.max(10, String(h).length + 2)); sx += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; });
+      sx += "</cols><sheetData>";
+      [hdr].concat(rows).forEach(function (r, ri) {
+        sx += '<row r="' + (ri + 1) + '"' + (ri ? ' ht="' + Math.round(PHt * 0.75 + 8) + '" customHeight="1"' : "") + ">";
+        r.forEach(function (v, ci) { if (v === "" || v == null) return; var ref = col(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : ' s="2"'; sx += typeof v === "number" ? '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>" : '<c r="' + ref + '" t="inlineStr"' + st + '><is><t xml:space="preserve">' + xe(v) + "</t></is></c>"; });
+        sx += "</row>";
+      });
+      sx += '</sheetData><drawing r:id="rId1"/></worksheet>';
+      var z = new JSZip(), dr = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">', drel = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">', n = 0;
+      sorted.forEach(function (e, ri) {
+        e.photos.forEach(function (p, pi) {
+          var t = TH[p]; if (!t) return; n++;
+          z.file("xl/media/image" + n + ".jpeg", t.d, { base64: true });
+          var s = Math.min((PW - 8) / (t.w || PW), (PHt - 8) / (t.h || PHt)), cx = Math.round((t.w || PW) * s * 9525), cy = Math.round((t.h || PHt) * s * 9525);
+          dr += '<xdr:oneCellAnchor><xdr:from><xdr:col>' + (firstPhotoCol + pi) + "</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>" + (ri + 1) + '</xdr:row><xdr:rowOff>38100</xdr:rowOff></xdr:from><xdr:ext cx="' + cx + '" cy="' + cy + '"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="' + (n + 1) + '" name="' + xe(e.name + " photo " + (pi + 1)) + '"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId' + n + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>';
+          drel += '<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image' + n + '.jpeg"/>';
+        });
+      });
+      dr += "</xdr:wsDr>"; drel += "</Relationships>";
+      z.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
+      z.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+      z.file("xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Entries" sheetId="1" r:id="rId1"/></sheets></workbook>');
+      z.file("xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+      z.file("xl/styles.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>');
+      z.file("xl/worksheets/sheet1.xml", sx);
+      z.file("xl/worksheets/_rels/sheet1.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+      z.file("xl/drawings/drawing1.xml", dr); z.file("xl/drawings/_rels/drawing1.xml.rels", drel);
+      z.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }).then(function (b) { download(b, CUR.title.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_") + "_entries.xlsx"); });
+    });
+  }
+
+  if (K) pub(); else ho();
+})();
+</script>
+</body>
+</html>

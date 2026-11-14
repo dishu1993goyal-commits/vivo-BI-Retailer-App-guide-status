@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Market survey</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:560px){.g2{grid-template-columns:1fr}}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55;white-space:pre-wrap}
+.opts{display:flex;flex-wrap:wrap;gap:6px}.opts label{border:1px solid #DADDF0;border-radius:99px;padding:7px 12px;font-size:13px;cursor:pointer;background:#fff}.opts input{display:none}.opts label:has(input:checked){background:#2B33A6;color:#fff;border-color:#2B33A6}
+.phs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.phs .ph{position:relative;width:76px;height:76px;border-radius:10px;overflow:hidden;background:#EEF0F6}.phs img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}.phs b{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border-radius:99px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer}
+.add{width:76px;height:76px;border:2px dashed #C9CDEA;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;background:#FAFBFF}
+.loc{border-radius:12px;padding:9px 12px;font-size:12.5px;margin-top:10px;background:#FFF4E5;color:#6B4100}.loc.ok{background:#E6F4EA;color:#13693F}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}@media(max-width:560px){.kp{grid-template-columns:repeat(2,1fr)}}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:21px;font-weight:800;margin-top:2px}
+.bar{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:5px}.bar span:first-child{flex:0 0 38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar i{flex:1;height:10px;background:#EEF0FF;border-radius:99px;overflow:hidden;display:block}.bar i u{display:block;height:100%;background:#4D5BF9;border-radius:99px}.bar b{flex:0 0 64px;text-align:right}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px}
+.q{border-top:1px solid #EEF0F6;padding-top:8px;margin-top:8px}
+.th{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}.th img,.th span{width:58px;height:58px;border-radius:9px;object-fit:cover;background:#EEF0F6;display:block;cursor:zoom-in}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:14px;padding:12px;margin-top:10px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.viewer{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99;display:flex;align-items:center;justify-content:center}.viewer img{max-width:96vw;max-height:88vh}
+.stchk{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 8px;max-height:180px;overflow:auto;font-size:12.5px;background:#FAFBFF;border-radius:10px;padding:6px 8px}
+.tpl{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.tpl button{border:1px solid #DADDF0;background:#fff;border-radius:14px;padding:12px;text-align:left;cursor:pointer;font:inherit}.tpl b{display:block;font-size:13.5px}.tpl small{color:var(--mut);font-size:11.5px}
+.big{font-size:42px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧭</span></div>
+  <h1 id="h1">Market survey</h1><p id="hp">Field surveys by web link · photos · location · AI summary</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), K = (new URLSearchParams(location.search).get("k") || "").replace(/[^a-f0-9]/g, ""), STATES = [], TYPES = {};
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; };
+  var dtl = function (t) { if (!t) return ""; var d = new Date(t - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+  function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", k: K }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection — try again" }; }); }
+  function viewer(src) { var v = document.createElement("div"); v.className = "viewer"; v.innerHTML = '<img src="' + src + '">'; v.onclick = function () { v.remove(); }; document.body.appendChild(v); }
+  function readPhoto(file) {
+    return new Promise(function (res) {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () { var ow = im.naturalWidth, oh = im.naturalHeight; var mk = function (max, q) { var s = Math.min(1, max / Math.max(ow, oh)), cv = document.createElement("canvas"); cv.width = Math.round(ow * s); cv.height = Math.round(oh * s); cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height); return { d: cv.toDataURL("image/jpeg", q).split(",")[1], w: cv.width, h: cv.height }; };
+        var big = mk(1400, 0.82); if (big.d.length > 1600000) big = mk(1100, 0.75); var th = mk(320, 0.72); res({ ok: true, big: big, th: th, prev: "data:image/jpeg;base64," + th.d }); URL.revokeObjectURL(url); };
+      im.onerror = function () { res({ ok: false }); }; im.src = url;
+    });
+  }
+
+  // ======================= PUBLIC: fill the survey (once per store / visit) =======================
+  var S = null, GPS = null, PH = {};
+  function pub() {
+    papi({ action: "ms-p-info" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🧭</div>' + esc(r.error) + "</div>"; return; }
+      S = r.s; STATES = r.states; $("h1").textContent = S.title; $("hp").textContent = r.live ? (S.end ? "Open till " + when(S.end) : "vivo market survey") : "This survey is closed";
+      if (!r.live) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>This survey is closed. Thank you!</div>'; return; }
+      form();
+    });
+  }
+  function getGps() {
+    if (!S.ask.gps || !navigator.geolocation) return;
+    $("loc").className = "loc"; $("loc").textContent = "📍 Getting your location…";
+    navigator.geolocation.getCurrentPosition(function (p) { GPS = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }; $("loc").className = "loc ok"; $("loc").textContent = "📍 Location captured (±" + Math.round(p.coords.accuracy) + " m)"; },
+      function () { GPS = null; $("loc").className = "loc"; $("loc").innerHTML = "📍 Location not shared" + (S.ask.gpsReq ? " — <b>needed for this survey</b>" : "") + '. <a href="#" id="relo">Try again</a>'; if ($("relo")) $("relo").onclick = function (e) { e.preventDefault(); getGps(); }; }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
+  }
+  function form(keep) {
+    keep = keep || {}; PH = {};
+    var A = S.ask;
+    var qh = function (q) {
+      var lab = '<label class="lb">' + esc(q.q) + (q.req ? " *" : "") + "</label>";
+      if (q.type === "long") return lab + '<textarea class="tx" data-q="' + q.id + '" rows="3"></textarea>';
+      if (q.type === "choice" || q.type === "yesno") return lab + '<div class="opts">' + (q.type === "yesno" ? ["Yes", "No"] : q.options).map(function (o) { return '<label><input type="radio" name="' + q.id + '" value="' + esc(o) + '"><span>' + esc(o) + "</span></label>"; }).join("") + "</div>";
+      if (q.type === "multi") return lab + '<div class="opts">' + q.options.map(function (o) { return '<label><input type="checkbox" name="' + q.id + '" value="' + esc(o) + '"><span>' + esc(o) + "</span></label>"; }).join("") + "</div>";
+      if (q.type === "rating") return lab + '<div class="opts">' + [1, 2, 3, 4, 5].map(function (o) { return '<label><input type="radio" name="' + q.id + '" value="' + o + '"><span>' + "★".repeat(o) + "</span></label>"; }).join("") + "</div>";
+      if (q.type === "photo") return lab + '<div class="phs" id="ph_' + q.id + '"></div><input type="file" accept="image/*" capture="environment" data-pf="' + q.id + '" hidden>';
+      return lab + '<input class="tx" data-q="' + q.id + '"' + (q.type === "number" || q.type === "price" ? ' inputmode="decimal" placeholder="' + (q.type === "price" ? "₹" : "") + '"' : "") + ">";
+    };
+    var groups = [], cur = null; S.questions.forEach(function (q) { if (!cur || (q.group && q.group !== cur.g)) { cur = { g: q.group || "", qs: [] }; groups.push(cur); } cur.qs.push(q); });
+    VIEW.innerHTML = (S.desc ? '<div class="card"><div style="font-size:13.5px;line-height:1.55;white-space:pre-wrap">' + esc(S.desc) + "</div></div>" : "") +
+      '<div class="card" style="margin-top:10px"><b>About you & the store</b><div class="g2"><div><label class="lb">Your name *</label><input class="tx" id="f_n" value="' + esc(keep.name || "") + '"></div>' + (A.phone ? '<div><label class="lb">Your mobile *</label><input class="tx" id="f_p" inputmode="tel" value="' + esc(keep.phone || "") + '"></div>' : "") + (A.empId ? '<div><label class="lb">Employee ID</label><input class="tx" id="f_e" value="' + esc(keep.empId || "") + '"></div>' : "") +
+      '<div><label class="lb">State *</label><select class="tx" id="f_s"><option value="">Choose…</option>' + (S.states.length ? S.states : STATES).map(function (s) { return "<option" + (s === keep.state ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select></div>" + (A.city ? '<div><label class="lb">City / town</label><input class="tx" id="f_c" value="' + esc(keep.city || "") + '"></div>' : "") + (A.store ? '<div><label class="lb">Store / retailer name *</label><input class="tx" id="f_st"></div>' : "") + "</div>" + (A.gps ? '<div class="loc" id="loc">📍 Location</div>' : "") + "</div>" +
+      groups.map(function (g) { return '<div class="card" style="margin-top:10px">' + (g.g ? "<b>" + esc(g.g) + "</b>" : "") + g.qs.map(qh).join("") + "</div>"; }).join("") +
+      '<input id="f_hp" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true"><button class="btn pri" id="f_go" style="width:100%;margin-top:12px">📤 Submit</button><div id="f_st2" class="muted" style="text-align:center;font-size:12.5px;margin-top:6px"></div>';
+    var drawPh = function (qid) { var q = S.questions.filter(function (x) { return x.id === qid; })[0], L = PH[qid] || []; $("ph_" + qid).innerHTML = L.map(function (p, i) { return '<div class="ph"><img src="' + p.prev + '"><b data-rx="' + qid + ":" + i + '">✕</b></div>'; }).join("") + (L.length < (q.max || 1) ? '<div class="add" data-add="' + qid + '">📷</div>' : "");
+      [].forEach.call($("ph_" + qid).querySelectorAll("[data-rx]"), function (b) { b.onclick = function () { var p = b.dataset.rx.split(":"); PH[p[0]].splice(+p[1], 1); drawPh(p[0]); }; });
+      [].forEach.call($("ph_" + qid).querySelectorAll("img"), function (im) { im.onclick = function () { viewer(im.src); }; });
+      [].forEach.call($("ph_" + qid).querySelectorAll("[data-add]"), function (a) { a.onclick = function () { VIEW.querySelector('[data-pf="' + qid + '"]').click(); }; }); };
+    S.questions.forEach(function (q) { if (q.type === "photo") drawPh(q.id); });
+    [].forEach.call(VIEW.querySelectorAll("[data-pf]"), function (inp) { inp.onchange = function () { var f = inp.files[0]; inp.value = ""; if (!f) return; readPhoto(f).then(function (p) { if (!p.ok) return toast("Couldn't read that photo"); (PH[inp.dataset.pf] = PH[inp.dataset.pf] || []).push(p); drawPh(inp.dataset.pf); }); }; });
+    getGps();
+    $("f_go").onclick = function () {
+      var ans = {}; S.questions.forEach(function (q) {
+        if (q.type === "photo") ans[q.id] = (PH[q.id] || []).length;
+        else if (q.type === "multi") ans[q.id] = [].map.call(VIEW.querySelectorAll('input[name="' + q.id + '"]:checked'), function (i) { return i.value; });
+        else if (["choice", "yesno", "rating"].indexOf(q.type) >= 0) { var c = VIEW.querySelector('input[name="' + q.id + '"]:checked'); ans[q.id] = c ? c.value : ""; }
+        else ans[q.id] = VIEW.querySelector('[data-q="' + q.id + '"]').value;
+      });
+      var d = { name: $("f_n").value, phone: $("f_p") ? $("f_p").value : "", empId: $("f_e") ? $("f_e").value : "", state: $("f_s").value, city: $("f_c") ? $("f_c").value : "", store: $("f_st") ? $("f_st").value : "", gps: GPS, answers: ans };
+      var b = $("f_go"); b.disabled = true; $("f_st2").textContent = "Sending…";
+      papi({ action: "ms-p-submit", d: d, hp: $("f_hp").value }).then(function (r) {
+        if (!r.ok) { b.disabled = false; $("f_st2").textContent = ""; return toast(r.error); }
+        var list = []; S.questions.forEach(function (q) { (PH[q.id] || []).forEach(function (p) { list.push({ q: q.id, p: p }); }); });
+        var i = 0, fail = 0;
+        (function next() {
+          if (i >= list.length) {
+            VIEW.innerHTML = '<div class="card"><div class="big">✅</div><h3 style="text-align:center;margin:4px 0">Thank you — saved</h3><div class="muted" style="text-align:center;font-size:13px">' + esc(d.store || "Your response") + " is recorded.</div><button class=\"btn pri\" id=\"nx\" style=\"width:100%;margin-top:14px\">➕ Next store</button></div>";
+            $("nx").onclick = function () { form({ name: d.name, phone: d.phone, empId: d.empId, state: d.state, city: d.city }); window.scrollTo(0, 0); }; window.scrollTo(0, 0); return;
+          }
+          var x = list[i]; $("f_st2").textContent = "Uploading photo " + (i + 1) + " of " + list.length + "…";
+          papi({ action: "ms-p-photo", rid: r.rid, up: r.up, qid: x.q, data: x.p.big.d, thumb: x.p.th.d, w: x.p.big.w, h: x.p.big.h }).then(function (y) { if (!y.ok) { if (++fail > 2) { b.disabled = false; return toast(y.error); } return setTimeout(next, 1200); } fail = 0; i++; next(); });
+        })();
+      });
+    };
+  }
+
+  // ======================= HO =======================
+  var CUR = null, RES = null, TH = {}, FS = "";
+  var TPL = {
+    price: { title: "Competitor price & offer check", desc: "Visit the store and note today's selling prices and offers. One response per store.", questions: [
+      { q: "vivo model checked", type: "text", group: "vivo" }, { q: "vivo best price (₹)", type: "price", group: "vivo" }, { q: "vivo offer running", type: "multi", options: ["Cashback", "No-cost EMI", "Exchange bonus", "Free gift", "None"], group: "vivo" },
+      { q: "Main competitor brand", type: "choice", options: ["Samsung", "Oppo", "Realme", "Xiaomi", "OnePlus", "Apple", "Other"], group: "Competition" }, { q: "Competitor model", type: "text", group: "Competition" }, { q: "Competitor best price (₹)", type: "price", group: "Competition" }, { q: "Competitor offer details", type: "long", req: false, group: "Competition" },
+      { q: "Photo of the price tag / offer standee", type: "photo", max: 2, group: "Proof" }] },
+    display: { title: "Store display audit", desc: "Check the vivo display at the counter and click photos.", questions: [
+      { q: "vivo demo phones on the counter", type: "number" }, { q: "All demo phones working?", type: "yesno" }, { q: "Branding present", type: "multi", options: ["Glow sign", "Counter branding", "Standee", "Dangler", "Shop board", "None"] },
+      { q: "vivo share of counter space", type: "choice", options: ["Most", "Equal", "Less", "None"] }, { q: "Display condition", type: "rating" }, { q: "Counter photo", type: "photo", max: 3 }, { q: "Remarks", type: "long", req: false }] },
+    customer: { title: "Customer feedback at store", desc: "Ask walk-in customers a few quick questions.", questions: [
+      { q: "Customer age group", type: "choice", options: ["Under 25", "25–35", "35–50", "50+"] }, { q: "Budget (₹)", type: "price" }, { q: "Brands considered", type: "multi", options: ["vivo", "Samsung", "Oppo", "Realme", "Xiaomi", "Apple", "Other"] },
+      { q: "Bought vivo?", type: "yesno" }, { q: "Why / why not?", type: "long" }, { q: "Will use EMI?", type: "yesno" }] },
+  };
+  function ho() {
+    if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+    $("h1").textContent = "Market surveys"; list();
+  }
+  function list() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "ms-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      STATES = r.states; TYPES = r.types;
+      VIEW.innerHTML = '<div class="card"><b>➕ New survey</b><div class="tpl">' + [["price", "💰 Competitor price check", "Prices, offers, photo of the tag"], ["display", "🏪 Store display audit", "Demo phones, branding, photos"], ["customer", "🗣️ Customer feedback", "Budget, brands, why bought"], ["blank", "📝 Blank survey", "Build your own"]].map(function (x) { return '<button data-tpl="' + x[0] + '"><b>' + x[1] + "</b><small>" + x[2] + "</small></button>"; }).join("") + "</div></div>" +
+        r.rows.map(function (s) { return '<div class="card" style="margin-top:10px;cursor:pointer" data-s="' + s.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + esc(s.title) + '</b><span class="pill ' + ({ live: "g", draft: "m", closed: "o" }[s.status]) + '">' + ({ live: "Live", draft: "Draft", closed: "Closed" }[s.status]) + '</span></div><div class="muted" style="font-size:12px;margin-top:3px">' + s.n + " response(s)" + (s.end ? " · till " + when(s.end) : "") + "</div></div>"; }).join("");
+      [].forEach.call(VIEW.querySelectorAll("[data-tpl]"), function (b) { b.onclick = function () { var t = TPL[b.dataset.tpl]; edit(null, t ? JSON.parse(JSON.stringify(t)) : null); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-s]"), function (d) { d.onclick = function () { api({ action: "ms-get", id: d.dataset.s }).then(function (x) { if (!x.ok) return toast(x.error); CUR = x.s; CUR.link = x.link; results(); }); }; });
+    });
+  }
+  function head(tab) {
+    var s = CUR;
+    VIEW.innerHTML = '<div class="row" style="gap:6px;align-items:center"><button class="btn ghost sm" id="bk">← All surveys</button><span class="sp"></span><span class="pill ' + ({ live: "g", draft: "m", closed: "o" }[s.status]) + '">' + ({ live: "Live", draft: "Draft", closed: "Closed" }[s.status]) + "</span></div>" +
+      '<div class="card" style="margin-top:8px"><b style="font-size:16px">' + esc(s.title) + '</b><div class="help fx" style="word-break:break-all;white-space:normal">' + esc(s.link) + '</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sec sm" id="lc">📋 Copy link</button><button class="btn ghost sm" id="lw">WhatsApp</button><a class="btn ghost sm" href="' + esc(s.link) + '" target="_blank">👁 Open</a>' + (s.status !== "live" ? '<button class="btn pri sm" data-ss="live">▶ Go live</button>' : '<button class="btn ghost sm" data-ss="closed">⏸ Close</button>') + "</div></div>" +
+      '<div class="seg" style="margin-top:10px"><button data-tb="r" class="' + (tab === "r" ? "on" : "") + '">📊 Results</button><button data-tb="e" class="' + (tab === "e" ? "on" : "") + '">✏️ Questions</button></div><div id="tp"></div>';
+    $("bk").onclick = list;
+    $("lc").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(s.link) : Promise.reject()).then(function () { toast("Link copied"); }, function () { prompt("Copy the link", s.link); }); };
+    $("lw").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent("🧭 " + s.title + " — please fill this for every store you visit: " + s.link), "_blank"); };
+    [].forEach.call(VIEW.querySelectorAll("[data-ss]"), function (b) { b.onclick = function () { api({ action: "ms-save", id: s.id, s: s, status: b.dataset.ss }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.s; CUR.link = r.link; toast(b.dataset.ss === "live" ? "Survey is live — share the link" : "Survey closed"); results(); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { if (b.dataset.tb === "e") edit(CUR); else results(); }; });
+  }
+  function edit(s0, tpl) {
+    var s = s0 ? JSON.parse(JSON.stringify(s0)) : Object.assign({ title: "", desc: "", end: 0, states: [], ask: { phone: true, empId: true, store: true, city: true, gps: true, gpsReq: false }, questions: [] }, tpl || {});
+    s.questions = s.questions.map(function (q) { return Object.assign({ req: true, options: [] }, q); });
+    if (s0) head("e"); else { VIEW.innerHTML = '<button class="btn ghost sm" id="bk2">← All surveys</button><div id="tp"></div>'; $("bk2").onclick = list; }
+    var tg = function (id, on, l) { return '<label class="tg" style="margin-top:6px;font-size:13px"><input type="checkbox" id="' + id + '"' + (on ? " checked" : "") + "><i></i><span>" + l + "</span></label>"; };
+    $("tp").innerHTML = '<div class="card" style="margin-top:10px"><label class="lb" style="margin-top:0">Title *</label><input class="tx" id="e_t" value="' + esc(s.title) + '"><label class="lb">Instructions for the field team</label><textarea class="tx" id="e_d" rows="2">' + esc(s.desc) + '</textarea><label class="lb">Open till (optional)</label><input class="tx" type="datetime-local" id="e_e" value="' + dtl(s.end) + '">' +
+      '<label class="lb">States — none ticked = all</label><div class="stchk">' + STATES.map(function (x) { return '<label><input type="checkbox" data-st="' + esc(x) + '"' + (s.states.indexOf(x) >= 0 ? " checked" : "") + "> " + esc(x) + "</label>"; }).join("") + "</div>" +
+      '<label class="lb">Ask for</label>' + tg("a_p", s.ask.phone, "Mobile") + tg("a_e", s.ask.empId, "Employee ID") + tg("a_s", s.ask.store, "Store / retailer name") + tg("a_c", s.ask.city, "City") + tg("a_g", s.ask.gps, "Location (GPS)") + tg("a_gr", s.ask.gpsReq, "Location is required") + "</div>" +
+      '<div class="card" style="margin-top:10px"><b>Questions</b><div id="qs"></div><button class="btn ghost sm" id="qa" style="margin-top:8px">＋ Question</button></div>' +
+      '<div class="row" style="gap:8px;margin-top:12px"><button class="btn pri" id="sv" style="flex:1">💾 Save</button>' + (!s0 || s0.status !== "live" ? '<button class="btn sec" id="svl">▶ Save & go live</button>' : "") + "</div>" + (s0 ? '<button class="btn ghost sm" id="del" style="margin-top:14px;color:#B42318">🗑 Delete survey and all responses</button>' : "");
+    var drawQ = function () {
+      $("qs").innerHTML = s.questions.map(function (q, i) { return '<div class="q"><div class="row" style="gap:6px"><input class="tx" data-qq="' + i + '" value="' + esc(q.q) + '" placeholder="Question" style="flex:1"><button class="btn ghost sm" data-up="' + i + '">↑</button><button class="btn ghost sm" data-qx="' + i + '">🗑</button></div><div class="g2" style="margin-top:6px"><select class="tx" data-qt="' + i + '">' + Object.keys(TYPES).map(function (k) { return '<option value="' + k + '"' + (q.type === k ? " selected" : "") + ">" + esc(TYPES[k]) + "</option>"; }).join("") + '</select><div class="row" style="gap:6px"><input class="tx" data-qg="' + i + '" value="' + esc(q.group || "") + '" placeholder="Section (optional)" style="flex:1"><label class="tg" style="font-size:12px"><input type="checkbox" data-qr="' + i + '"' + (q.req !== false ? " checked" : "") + "><i></i><span>Req.</span></label></div></div>" +
+        (q.type === "choice" || q.type === "multi" ? '<input class="tx" data-qo="' + i + '" style="margin-top:6px" value="' + esc((q.options || []).join(", ")) + '" placeholder="Options, comma separated">' : "") + (q.type === "photo" ? '<div class="row" style="gap:6px;margin-top:6px;align-items:center"><span class="muted" style="font-size:12px">Up to</span><input class="tx" data-qm="' + i + '" value="' + (q.max || 1) + '" style="width:60px" inputmode="numeric"><span class="muted" style="font-size:12px">photo(s)</span></div>' : "") + "</div>"; }).join("") || '<div class="muted" style="font-size:12px;margin-top:4px">No questions yet.</div>';
+      var on = function (sel, fn) { [].forEach.call($("qs").querySelectorAll(sel), fn); };
+      on("[data-qq]", function (x) { x.oninput = function () { s.questions[+x.dataset.qq].q = x.value; }; });
+      on("[data-qg]", function (x) { x.oninput = function () { s.questions[+x.dataset.qg].group = x.value; }; });
+      on("[data-qt]", function (x) { x.onchange = function () { s.questions[+x.dataset.qt].type = x.value; drawQ(); }; });
+      on("[data-qr]", function (x) { x.onchange = function () { s.questions[+x.dataset.qr].req = x.checked; }; });
+      on("[data-qo]", function (x) { x.oninput = function () { s.questions[+x.dataset.qo].options = x.value.split(","); }; });
+      on("[data-qm]", function (x) { x.oninput = function () { s.questions[+x.dataset.qm].max = +x.value || 1; }; });
+      on("[data-qx]", function (x) { x.onclick = function () { s.questions.splice(+x.dataset.qx, 1); drawQ(); }; });
+      on("[data-up]", function (x) { x.onclick = function () { var i = +x.dataset.up; if (i > 0) { var t = s.questions[i]; s.questions[i] = s.questions[i - 1]; s.questions[i - 1] = t; drawQ(); } }; });
+    };
+    drawQ();
+    $("qa").onclick = function () { s.questions.push({ q: "", type: "text", req: true, options: [] }); drawQ(); };
+    var save = function (status) {
+      s.title = $("e_t").value; s.desc = $("e_d").value; s.end = $("e_e").value ? new Date($("e_e").value).getTime() : 0;
+      s.states = [].filter.call($("tp").querySelectorAll("[data-st]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.st; });
+      s.ask = { phone: $("a_p").checked, empId: $("a_e").checked, store: $("a_s").checked, city: $("a_c").checked, gps: $("a_g").checked, gpsReq: $("a_gr").checked };
+      if (!s.title.trim()) return toast("Give the survey a title");
+      api({ action: "ms-save", id: s0 ? s0.id : "", s: s, status: status || "" }).then(function (r) { if (!r.ok) return toast(r.error); CUR = r.s; CUR.link = r.link; toast(status === "live" ? "Live — share the link" : "Saved"); results(); });
+    };
+    $("sv").onclick = function () { save(); }; if ($("svl")) $("svl").onclick = function () { save("live"); };
+    if ($("del")) $("del").onclick = function () { sheet("Delete “" + s0.title + "”?", "All responses and photos are deleted for good.", [["🗑", "Delete", function () { api({ action: "ms-delete", id: s0.id }).then(function (r) { if (!r.ok) return toast(r.error); list(); }); }, "danger"], ["", "Cancel", function () { }]]); };
+  }
+  function loadThumbs(ids) {
+    ids = ids.filter(function (id) { return !TH[id]; }); var ch = []; for (var i = 0; i < ids.length; i += 30) ch.push(ids.slice(i, i + 30));
+    return ch.reduce(function (p, c) { return p.then(function () { return api({ action: "ms-thumbs", sid: CUR.id, ids: c }).then(function (r) { if (r.ok) Object.keys(r.thumbs).forEach(function (k) { TH[k] = r.thumbs[k]; }); }); }); }, Promise.resolve());
+  }
+  function results() {
+    head("r"); $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "ms-results", sid: CUR.id }).then(function (r) { if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } RES = r.rows; CUR = Object.assign(r.s, { link: CUR.link }); drawR(); });
+  }
+  function drawR() {
+    var R = RES.filter(function (x) { return !FS || x.state === FS; }), qs = CUR.questions;
+    var stS = {}; RES.forEach(function (x) { stS[x.state] = 1; });
+    var stores = {}; R.forEach(function (x) { stores[(x.store || "").toLowerCase()] = 1; });
+    var sum = qs.map(function (q) {
+      var vals = R.map(function (x) { return { v: (x.answers || {})[q.id], st: x.state }; }).filter(function (x) { return x.v !== undefined && x.v !== "" && !(Array.isArray(x.v) && !x.v.length); });
+      var h = '<div class="card" style="margin-top:8px"><b style="font-size:13.5px">' + esc(q.q) + '</b><span class="muted" style="font-size:11.5px"> · ' + vals.length + " answer(s)</span>";
+      if (["choice", "multi", "yesno", "rating"].indexOf(q.type) >= 0) { var c = {}; vals.forEach(function (x) { (Array.isArray(x.v) ? x.v : [x.v]).forEach(function (o) { c[o] = (c[o] || 0) + 1; }); }); h += Object.keys(c).sort(function (a, b) { return c[b] - c[a]; }).map(function (k) { var p = Math.round((c[k] * 100) / (vals.length || 1)); return '<div class="bar"><span>' + esc(q.type === "rating" ? "★".repeat(+k) : k) + '</span><i><u style="width:' + p + '%"></u></i><b>' + c[k] + " · " + p + "%</b></div>"; }).join(""); if (q.type === "rating" && vals.length) h += '<div class="muted" style="font-size:12px;margin-top:4px">Average ' + (vals.reduce(function (a, x) { return a + +x.v; }, 0) / vals.length).toFixed(1) + " / 5</div>"; }
+      else if (q.type === "number" || q.type === "price") { var n = vals.map(function (x) { return +x.v; }).filter(function (x) { return !isNaN(x); }); if (n.length) { var by = {}; vals.forEach(function (x) { (by[x.st] = by[x.st] || []).push(+x.v); }); var f = function (v) { return (q.type === "price" ? "₹" : "") + Math.round(v).toLocaleString("en-IN"); };
+        h += '<div class="g2" style="margin-top:6px;font-size:13px"><div>Average <b>' + f(n.reduce(function (a, b) { return a + b; }, 0) / n.length) + "</b></div><div>Range <b>" + f(Math.min.apply(null, n)) + " – " + f(Math.max.apply(null, n)) + "</b></div></div>" + (Object.keys(by).length > 1 ? '<table class="tb" style="margin-top:6px"><tr><th>State</th><th>Avg</th><th>Min</th><th>Max</th><th>n</th></tr>' + Object.keys(by).sort().map(function (k) { var a = by[k]; return "<tr><td>" + esc(k) + "</td><td>" + f(a.reduce(function (x, y) { return x + y; }, 0) / a.length) + "</td><td>" + f(Math.min.apply(null, a)) + "</td><td>" + f(Math.max.apply(null, a)) + "</td><td>" + a.length + "</td></tr>"; }).join("") + "</table>" : ""); } }
+      else if (q.type === "photo") h += '<div class="muted" style="font-size:12px;margin-top:4px">' + vals.reduce(function (a, x) { return a + x.v.length; }, 0) + " photo(s) — see the responses below</div>";
+      else h += vals.slice(0, 5).map(function (x) { return '<div style="font-size:12.5px;margin-top:4px">“' + esc(String(x.v).slice(0, 200)) + '” <span class="muted">— ' + esc(x.st) + "</span></div>"; }).join("") + (vals.length > 5 ? '<div class="muted" style="font-size:11.5px;margin-top:4px">+' + (vals.length - 5) + " more in Excel</div>" : "");
+      return h + "</div>";
+    }).join("");
+    var nPh = R.reduce(function (a, x) { return a + (x.photos || []).length; }, 0);
+    $("tp").innerHTML = '<div class="kp"><div class="kt"><div class="l">Responses</div><div class="v">' + R.length + '</div></div><div class="kt"><div class="l">Stores</div><div class="v">' + Object.keys(stores).length + '</div></div><div class="kt"><div class="l">States</div><div class="v">' + Object.keys(stS).length + '</div></div><div class="kt"><div class="l">Photos</div><div class="v">' + nPh + "</div></div></div>" +
+      '<div class="card" style="margin-top:10px"><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn pri sm" id="ai">🤖 AI summary</button><button class="btn ghost sm" id="xl">⬇ Excel with photos</button><span class="sp"></span><select class="tx" id="fs" style="width:auto;padding:6px 10px"><option value="">All states</option>' + Object.keys(stS).sort().map(function (x) { return "<option" + (FS === x ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + "</select></div>" + (CUR.ai ? '<div class="ai">' + esc(CUR.ai.text) + '<div class="muted" style="font-size:11px;margin-top:6px">AI summary of ' + CUR.ai.n + " responses · " + when(CUR.ai.at) + "</div></div>" : "") + "</div>" +
+      (R.length ? '<div class="sh" style="margin-top:14px"><span><b>Summary</b></span></div>' + sum + '<div class="sh" style="margin-top:14px"><span><b>Responses</b></span></div>' + R.slice(0, 150).map(function (x) {
+        return '<div class="card" style="margin-top:8px"><div class="row" style="gap:6px"><b style="flex:1">' + esc(x.store || "—") + '</b><span class="muted" style="font-size:11.5px">' + when(x.at) + '</span></div><div class="muted" style="font-size:12px">' + esc([x.city, x.state].filter(Boolean).join(", ")) + " · by " + esc(x.name) + (x.empId ? " (" + esc(x.empId) + ")" : "") + (x.gps ? ' · <a href="https://www.google.com/maps?q=' + x.gps.lat + "," + x.gps.lng + '" target="_blank" rel="noopener">📍 map</a>' : "") + "</div>" +
+          '<div style="font-size:12.5px;margin-top:5px">' + qs.filter(function (q) { return q.type !== "photo"; }).map(function (q) { var v = (x.answers || {})[q.id]; return v === "" || v == null || (Array.isArray(v) && !v.length) ? "" : "<b>" + esc(q.q) + ":</b> " + esc(Array.isArray(v) ? v.join(", ") : q.type === "price" ? "₹" + (+v).toLocaleString("en-IN") : v); }).filter(Boolean).join("<br>") + "</div>" +
+          ((x.photos || []).length ? '<div class="th">' + x.photos.map(function (p) { return TH[p] ? '<img src="data:image/jpeg;base64,' + TH[p].d + '" data-big="' + p + '">' : '<span data-big="' + p + '"></span>'; }).join("") + "</div>" : "") + "</div>";
+      }).join("") + (R.length > 150 ? '<div class="muted" style="text-align:center;font-size:12px;margin-top:8px">Showing the latest 150 — all are in Excel.</div>' : "") : '<div class="card empty" style="margin-top:10px">No responses yet — share the link.</div>');
+    $("fs").onchange = function () { FS = $("fs").value; drawR(); };
+    $("ai").onclick = function () { var b = $("ai"); b.disabled = true; b.textContent = "Reading the results…"; api({ action: "ms-ai", sid: CUR.id }).then(function (x) { if (!x.ok) { b.disabled = false; b.textContent = "🤖 AI summary"; return toast(x.error); } CUR.ai = x.ai; drawR(); }); };
+    var bind = function () { [].forEach.call($("tp").querySelectorAll("[data-big]"), function (im) { im.onclick = function () { api({ action: "ms-img", sid: CUR.id, id: im.dataset.big }).then(function (r) { if (r.ok) viewer("data:image/jpeg;base64," + r.data); }); }; }); };
+    bind();
+    $("xl").onclick = exportXl;
+    var need = []; R.slice(0, 150).forEach(function (x) { (x.photos || []).forEach(function (p) { if (!TH[p]) need.push(p); }); });
+    if (need.length) loadThumbs(need).then(function () { [].forEach.call($("tp").querySelectorAll("span[data-big]"), function (s) { var t = TH[s.dataset.big]; if (t) { var im = document.createElement("img"); im.src = "data:image/jpeg;base64," + t.d; im.dataset.big = s.dataset.big; s.replaceWith(im); } }); bind(); });
+  }
+  // Excel: one row per response, photos placed in the row
+  function exportXl() {
+    var R = RES.filter(function (x) { return !FS || x.state === FS; }); if (!R.length) return toast("No responses yet");
+    var qs = CUR.questions, pq = qs.filter(function (q) { return q.type === "photo"; }), all = [];
+    R.forEach(function (x) { all = all.concat(x.photos || []); });
+    toast("Preparing Excel…");
+    Promise.all([loadThumbs(all), new Promise(function (res) { if (window.JSZip) return res(); var s = document.createElement("script"); s.src = "/vendor/jszip.min.js"; s.onload = res; s.onerror = res; document.head.appendChild(s); })]).then(function () {
+      if (!window.JSZip) return toast("Couldn't load the Excel writer");
+      var slots = []; pq.forEach(function (q) { for (var i = 0; i < (q.max || 1); i++) slots.push({ q: q, i: i, h: q.q + ((q.max || 1) > 1 ? " " + (i + 1) : "") }); });
+      var hdr = ["When", "Name", "Mobile", "Employee ID", "State", "City", "Store", "Latitude", "Longitude", "Map"].concat(qs.filter(function (q) { return q.type !== "photo"; }).map(function (q) { return q.q; }));
+      var pc0 = hdr.length; slots.forEach(function (s) { hdr.push("📷 " + s.h); });
+      var rows = R.map(function (x) { return [when(x.at), x.name, x.phone, x.empId, x.state, x.city, x.store, x.gps ? x.gps.lat : "", x.gps ? x.gps.lng : "", x.gps ? "https://www.google.com/maps?q=" + x.gps.lat + "," + x.gps.lng : ""].concat(qs.filter(function (q) { return q.type !== "photo"; }).map(function (q) { var v = (x.answers || {})[q.id]; return Array.isArray(v) ? v.join(", ") : v == null ? "" : v; })); });
+      var xe = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ""); };
+      var col = function (n) { var s = ""; n++; while (n) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+      var PW = 150, PHt = 112, hasPh = slots.length > 0;
+      var sx = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>';
+      hdr.forEach(function (h, i) { var w = i >= pc0 ? 22 : Math.min(40, Math.max(10, String(h).length + 2)); sx += '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; });
+      sx += "</cols><sheetData>";
+      [hdr].concat(rows).forEach(function (r, ri) {
+        sx += '<row r="' + (ri + 1) + '"' + (ri && hasPh ? ' ht="' + Math.round(PHt * 0.75 + 8) + '" customHeight="1"' : "") + ">";
+        r.forEach(function (v, ci) { if (v === "" || v == null) return; var ref = col(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : ' s="2"'; sx += typeof v === "number" ? '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>" : '<c r="' + ref + '" t="inlineStr"' + st + '><is><t xml:space="preserve">' + xe(v) + "</t></is></c>"; });
+        sx += "</row>";
+      });
+      sx += "</sheetData>" + (hasPh ? '<drawing r:id="rId1"/>' : "") + "</worksheet>";
+      var z = new JSZip(), dr = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">', drel = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">', n = 0;
+      R.forEach(function (x, ri) {
+        slots.forEach(function (sl, si) {
+          var p = ((x.answers || {})[sl.q.id] || [])[sl.i], t = p && TH[p]; if (!t) return; n++;
+          z.file("xl/media/image" + n + ".jpeg", t.d, { base64: true });
+          var s = Math.min((PW - 8) / (t.w || PW), (PHt - 8) / (t.h || PHt)), cx = Math.round((t.w || PW) * s * 9525), cy = Math.round((t.h || PHt) * s * 9525);
+          dr += "<xdr:oneCellAnchor><xdr:from><xdr:col>" + (pc0 + si) + "</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>" + (ri + 1) + '</xdr:row><xdr:rowOff>38100</xdr:rowOff></xdr:from><xdr:ext cx="' + cx + '" cy="' + cy + '"/><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="' + (n + 1) + '" name="Photo ' + n + '"/><xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId' + n + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic><xdr:clientData/></xdr:oneCellAnchor>';
+          drel += '<Relationship Id="rId' + n + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image' + n + '.jpeg"/>';
+        });
+      });
+      dr += "</xdr:wsDr>"; drel += "</Relationships>";
+      z.file("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + (hasPh ? '<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>' : "") + "</Types>");
+      z.file("_rels/.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+      z.file("xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Responses" sheetId="1" r:id="rId1"/></sheets></workbook>');
+      z.file("xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+      z.file("xl/styles.xml", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>');
+      z.file("xl/worksheets/sheet1.xml", sx);
+      if (hasPh) { z.file("xl/worksheets/_rels/sheet1.xml.rels", '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>'); z.file("xl/drawings/drawing1.xml", dr); z.file("xl/drawings/_rels/drawing1.xml.rels", drel); }
+      z.generateAsync({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }).then(function (b) { download(b, CUR.title.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_") + "_responses.xlsx"); });
+    });
+  }
+
+  if (K) pub(); else ho();
+})();
+</script>
+</body>
+</html>

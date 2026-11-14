@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Promoter referrals & hiring</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:560px){.g2{grid-template-columns:1fr}}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:7px 6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;vertical-align:top}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}@media(max-width:560px){.kp{grid-template-columns:repeat(2,1fr)}}
+.kt{background:var(--card);border-radius:15px;padding:11px;box-shadow:0 2px 10px rgba(20,24,51,.06);cursor:pointer}.kt .l{font-size:11px;color:var(--mut);font-weight:700}.kt .v{font-size:21px;font-weight:800;margin-top:2px}
+.cand{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.sc{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;flex:none;background:#F1F2F6;color:#555}
+.sc.s{background:#E6F4EA;color:#13693F}.sc.g{background:#EEF0FF;color:#2B33A6}.sc.p{background:#FFF4E5;color:#8A5300}.sc.w{background:#FDECEC;color:#B42318}
+.ai{background:linear-gradient(135deg,#F4F2FF,#EEF6FF);border-radius:14px;padding:12px;margin-top:10px;font-size:13px;line-height:1.55}
+.ai ul{margin:4px 0 6px;padding-left:18px}
+.stg{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.stg button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12px inherit;cursor:pointer}.stg button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.drop{border:2px dashed #C9CDEA;border-radius:14px;padding:14px;text-align:center;font-size:13px;color:var(--ink2);cursor:pointer;background:#FAFBFF}
+.big{font-size:42px;text-align:center}
+.join{display:block;text-align:center;background:#13693F;color:#fff;border-radius:14px;padding:14px;font-weight:800;text-decoration:none;margin-top:12px;font-size:16px}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧑‍💼</span></div>
+  <h1 id="h1">Promoter referrals & hiring</h1><p id="hp">Refer good people for vivo’s ground team · HR screens with AI · online interview</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), Q = new URLSearchParams(location.search), RT = (Q.get("r") || "").replace(/[^a-f0-9]/g, ""), CT = (Q.get("c") || "").replace(/[^a-f0-9]/g, "");
+  var ME = null, TAB = "refer", ROWS = null, F = { state: "", role: "", stage: "open", q: "" };
+  try { var h0 = location.hash.replace("#", ""); if (/^(refer|mine|cands|pipe|cfg)$/.test(h0)) TAB = h0; if (/^c=/.test(h0)) { TAB = "cands"; F.open = h0.slice(2); } } catch (e) { }
+  var ST_C = { new: "", shortlisted: "o", interview: "o", selected: "g", joined: "g", hold: "m", rejected: "r", withdrawn: "m" };
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : ""; };
+  function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state" }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection" }; }); }
+  function loadLib(src, test) { return test() ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
+  var scC = function (s) { return s == null ? "" : s >= 75 ? "s" : s >= 60 ? "g" : s >= 45 ? "p" : "w"; };
+
+  // ---------- CV: read the text in the browser (PDF / Word) so AI can judge it, then upload in pieces ----------
+  function cvText(file) {
+    var n = file.name.toLowerCase();
+    if (/\.pdf$/.test(n) || file.type === "application/pdf") return loadLib("/vendor/pdf.js", function () { return window.pdfjsLib; }).then(function () { var pj = window.pdfjsLib; pj.GlobalWorkerOptions.workerSrc = "/vendor/pdf.worker.js"; return file.arrayBuffer().then(function (buf) { return pj.getDocument({ data: buf }).promise; }); }).then(function (doc) {
+      var out = [], i = 1; return (function next() { if (i > Math.min(doc.numPages, 6)) return out.join("\n"); return doc.getPage(i++).then(function (p) { return p.getTextContent(); }).then(function (tc) { out.push(tc.items.map(function (x) { return x.str; }).join(" ")); return next(); }); })();
+    }).catch(function () { return ""; });
+    if (/\.docx$/.test(n)) return loadLib("/vendor/jszip.min.js", function () { return window.JSZip; }).then(function () { return JSZip.loadAsync(file); }).then(function (z) { var f = z.file("word/document.xml"); return f ? f.async("string") : ""; }).then(function (x) { return String(x).replace(/<\/w:p>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"); }).catch(function () { return ""; });
+    return Promise.resolve("");
+  }
+  function sendCv(file, send) {
+    if (!file) return Promise.resolve({ ok: true });
+    if (file.size > 3 * 1024 * 1024) return Promise.resolve({ ok: false, error: "The CV must be under 3 MB" });
+    return cvText(file).then(function (text) {
+      return new Promise(function (res) { var fr = new FileReader(); fr.onload = function () { res(String(fr.result).split(",")[1] || ""); }; fr.readAsDataURL(file); }).then(function (b64) {
+        var P = 1400000, parts = []; for (var i = 0; i < b64.length; i += P) parts.push(b64.slice(i, i + P)); if (!parts.length) parts = [""];
+        var n = 0;
+        return (function next() {
+          if (n >= parts.length) return { ok: true };
+          var last = n === parts.length - 1, body = { n: n, total: parts.length, data: parts[n] };
+          if (last) Object.assign(body, { fname: file.name, mime: file.type || "", size: file.size, text: text.slice(0, 16000) });
+          return send(body).then(function (r) { if (!r.ok) return r; n++; return next(); });
+        })();
+      });
+    });
+  }
+
+  // ---------- referral form (used in the app/portal and on the open link) ----------
+  function referForm(roles, states, pub, defState) {
+    return '<div class="card">' + (pub ? '<b>About you (the referrer)</b><div class="g2"><div><label class="lb">Your name *</label><input class="tx" id="rn"></div><div><label class="lb">Your mobile</label><input class="tx" id="rp" inputmode="tel"></div><div><label class="lb">Employee ID (if any)</label><input class="tx" id="re"></div></div><div class="sh" style="margin-top:14px"><span><b>Candidate</b></span></div>' : '<b>Candidate</b>') +
+      '<div class="g2"><div><label class="lb">Full name *</label><input class="tx" id="cn"></div><div><label class="lb">Mobile *</label><input class="tx" id="cp" inputmode="tel" placeholder="10 digits"></div>' +
+      '<div><label class="lb">E-mail (for interview invite)</label><input class="tx" id="ce" inputmode="email"></div><div><label class="lb">Role *</label><select class="tx" id="cr">' + roles.map(function (r) { return '<option value="' + r.id + '">' + esc(r.name) + "</option>"; }).join("") + "</select></div>" +
+      '<div><label class="lb">State *</label><select class="tx" id="cs"><option value="">Choose…</option>' + states.map(function (s) { return "<option" + (s === defState ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select></div><div><label class="lb">City / area</label><input class="tx" id="cc"></div>' +
+      '<div><label class="lb">Experience (years)</label><input class="tx" id="cx" inputmode="decimal" placeholder="0"></div><div><label class="lb">Current / last job</label><input class="tx" id="cj" placeholder="e.g. Promoter at XYZ Mobiles"></div>' +
+      '<div><label class="lb">Education</label><input class="tx" id="cd" placeholder="e.g. 12th, B.Com"></div><div><label class="lb">Languages</label><input class="tx" id="cl" placeholder="e.g. Hindi, English, Bhojpuri"></div></div>' +
+      '<label class="lb">Why are you referring them?</label><textarea class="tx" id="cno" rows="2" placeholder="e.g. Sold 40 phones/month at a Samsung counter, very good with customers"></textarea>' +
+      '<label class="lb">CV / resume (PDF, Word or photo · up to 3 MB)</label><div class="drop" id="cvd">📎 Tap to attach the CV</div><input type="file" id="cvf" accept=".pdf,.docx,.doc,image/*" hidden>' +
+      '<label class="tg" style="margin-top:10px;font-size:12.5px"><input type="checkbox" id="cok"><i></i><span>The candidate agreed that I share their details and CV with vivo HR</span></label>' +
+      '<input id="hp_" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">' +
+      '<button class="btn pri" id="go" style="width:100%;margin-top:12px">📨 Send referral</button><div id="gost" class="muted" style="font-size:12px;margin-top:6px;text-align:center"></div></div>';
+  }
+  function wireForm(submit) {
+    var file = null;
+    $("cvd").onclick = function () { $("cvf").click(); };
+    $("cvf").onchange = function () { file = $("cvf").files[0] || null; $("cvd").innerHTML = file ? "📄 " + esc(file.name) + " · " + Math.round(file.size / 1024) + " KB <small>(tap to change)</small>" : "📎 Tap to attach the CV"; if (file && file.size > 3 * 1024 * 1024) { toast("The CV must be under 3 MB"); file = null; } };
+    $("go").onclick = function () {
+      if (!$("cok").checked) return toast("Please confirm the candidate agreed");
+      var c = { name: $("cn").value, phone: $("cp").value, email: $("ce").value, role: $("cr").value, state: $("cs").value, city: $("cc").value, exp: $("cx").value, current: $("cj").value, edu: $("cd").value, langs: $("cl").value, notes: $("cno").value };
+      if ($("rn")) { c.refName = $("rn").value; c.refPhone = $("rp").value; c.refEmp = $("re").value; }
+      var b = $("go"); b.disabled = true; $("gost").textContent = "Sending…";
+      submit(c, file, $("hp_").value).then(function (r) {
+        b.disabled = false; $("gost").textContent = "";
+        if (!r.ok) return toast(r.error || "Couldn't send");
+        VIEW.querySelector(".card").innerHTML = '<div class="big">🙌</div><h3 style="text-align:center;margin:6px 0">Thank you — referral sent</h3><div class="muted" style="text-align:center;font-size:13px">' + esc(c.name) + " is now with the " + esc(c.state) + " HR team." + (r.cvErr ? "<br>⚠️ The CV didn't upload: " + esc(r.cvErr) : "") + '</div><button class="btn sec" id="again" style="width:100%;margin-top:14px">➕ Refer someone else</button>';
+        $("again").onclick = function () { location.reload(); };
+      });
+    };
+  }
+
+  // ======================= public: referral link =======================
+  function pubRefer() {
+    $("h1").textContent = "Refer a candidate to vivo"; $("hp").textContent = "For vivo promoter and ground-team roles · your referral goes straight to the state HR team";
+    papi({ action: "hr-p-info", r: RT }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      VIEW.innerHTML = referForm(r.roles, r.states, true, "");
+      wireForm(function (c, file, hp) {
+        return papi({ action: "hr-p-refer", r: RT, c: c, hp: hp }).then(function (x) {
+          if (!x.ok || !file) return x;
+          return sendCv(file, function (body) { return papi(Object.assign({ action: "hr-p-cv", r: RT, id: x.id, up: x.up }, body)); }).then(function (u) { return u.ok ? x : Object.assign({}, x, { cvErr: u.error }); });
+        });
+      });
+    });
+  }
+  // ======================= public: the candidate's own status link =======================
+  function pubStatus() {
+    $("h1").textContent = "Your vivo application"; $("hp").textContent = "Status and interview details";
+    papi({ action: "hr-p-status", c: CT }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      var iv = r.iv, soon = iv && Date.now() > iv.at - 20 * 60e3 && Date.now() < iv.at + (iv.mins + 30) * 60e3;
+      VIEW.innerHTML = '<div class="card"><div class="muted" style="font-size:12px">Hello</div><h2 style="margin:2px 0 6px">' + esc(r.name) + '</h2><div style="font-size:13px">' + esc(r.role) + " · " + esc(r.state) + '</div><div style="margin-top:12px"><span class="pill ' + (ST_C[r.stage] || "") + '" style="font-size:13px;padding:5px 12px">' + esc(r.stageName) + "</span></div>" +
+        (iv ? '<div class="help" style="margin-top:14px">🗓️ <b>Online interview: ' + when(iv.at) + "</b> (about " + iv.mins + " minutes)<br>Use a phone or laptop with a camera, in a quiet place. Open the link a few minutes early and allow the camera and microphone.</div>" + '<a class="join" href="' + esc(iv.link) + '" target="_blank" rel="noopener">' + (soon ? "🎥 Join the interview now" : "🎥 Interview link (opens at the time)") + "</a>" : "") + "</div>";
+    });
+  }
+
+  // ======================= staff (app / portal) =======================
+  function staff() {
+    if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+    api({ action: "hr-me" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ME = r; if (!ME.isHR && /^(cands|pipe|cfg)$/.test(TAB)) TAB = "refer"; if (ME.isHR && !location.hash) TAB = "cands"; draw(); });
+  }
+  function draw() {
+    var tabs = [["refer", "➕ Refer"], ["mine", "📋 My referrals"]].concat(ME.isHR ? [["cands", "🧑‍💼 Candidates"], ["pipe", "📊 Pipeline"]] : []).concat(ME.isHO ? [["cfg", "⚙️ Set-up"]] : []);
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; try { history.replaceState(null, "", "#" + TAB); } catch (e) { } draw(); }; });
+    ({ refer: tRefer, mine: tMine, cands: tCands, pipe: tPipe, cfg: tCfg })[TAB]();
+  }
+  function tRefer() {
+    $("tp").innerHTML = '<div class="help" style="margin-top:10px">Know someone who would sell vivo phones well? Refer them here. The state HR team sees the referral at once, checks the CV with AI and calls the good ones for an online interview. You can follow the status under 📋 My referrals.</div>' + referForm(ME.roles, ME.states, false, ME.myState);
+    wireForm(function (c, file) {
+      return api({ action: "hr-refer", c: c }).then(function (x) {
+        if (!x.ok || !file) return x;
+        return sendCv(file, function (body) { return api(Object.assign({ action: "hr-cv", id: x.id }, body)); }).then(function (u) { return u.ok ? x : Object.assign({}, x, { cvErr: u.error }); });
+      });
+    });
+  }
+  function tMine() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "hr-my" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("tp").innerHTML = r.rows.length ? '<div class="tbw"><table class="tb"><tr><th>Candidate</th><th>Status</th></tr>' + r.rows.map(function (x) { return "<tr><td><b>" + esc(x.name) + '</b><br><small class="muted">' + esc(x.role) + " · " + esc(x.state) + " · " + when(x.at) + (x.cv ? "" : " · no CV") + '</small></td><td><span class="pill ' + (ST_C[x.stage] || "") + '">' + esc(x.stageName) + "</span></td></tr>"; }).join("") + "</table></div>" : '<div class="card empty" style="margin-top:10px">You haven’t referred anyone yet.</div>';
+    });
+  }
+
+  // ---------- HR: candidates ----------
+  function loadRows() { return api({ action: "hr-list" }).then(function (r) { if (r.ok) ROWS = r.rows; return r; }); }
+  function filtered() {
+    var q = F.q.trim().toLowerCase();
+    return (ROWS || []).filter(function (x) {
+      if (F.state && x.state !== F.state) return false; if (F.role && x.role !== F.role) return false;
+      if (F.stage === "open" && !/^(new|shortlisted|interview|selected|hold)$/.test(x.stage)) return false;
+      if (F.stage && F.stage !== "open" && F.stage !== "all" && x.stage !== F.stage) return false;
+      if (q && (x.name + " " + x.phone + " " + x.city + " " + x.current + " " + x.ref.name).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    }).sort(function (a, b) { return F.sort === "new" ? b.at - a.at : ((b.ai ? b.ai.score : -1) - (a.ai ? a.ai.score : -1)) || b.at - a.at; });
+  }
+  function tCands() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    loadRows().then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      drawCands();
+      if (F.open) { var id = F.open; F.open = ""; openCand(id); }
+    });
+  }
+  function drawCands() {
+    var L = filtered(), noAi = L.filter(function (x) { return !x.ai; }).length;
+    var stOpt = [["open", "Open"], ["all", "All"]].concat(Object.keys(ME.stages).map(function (k) { return [k, ME.stages[k]]; }));
+    $("tp").innerHTML = '<div class="card" style="margin-top:10px"><div class="g2"><input class="tx" id="fq" placeholder="Search name, mobile, city, referrer" value="' + esc(F.q) + '"><select class="tx" id="fs">' + stOpt.map(function (s) { return '<option value="' + s[0] + '"' + (F.stage === s[0] ? " selected" : "") + ">" + esc(s[1]) + "</option>"; }).join("") + "</select>" +
+      '<select class="tx" id="fst"><option value="">All my states</option>' + ME.hrStates.map(function (s) { return "<option" + (F.state === s ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><select class="tx" id="fr"><option value="">All roles</option>' + ME.roles.map(function (x) { return '<option value="' + x.id + '"' + (F.role === x.id ? " selected" : "") + ">" + esc(x.name) + "</option>"; }).join("") + "</select></div>" +
+      '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn pri sm" id="aiall"' + (noAi ? "" : " disabled") + '>🤖 AI-screen ' + noAi + ' new</button><button class="btn ghost sm" id="srt">' + (F.sort === "new" ? "Sort: newest" : "Sort: AI score") + '</button><button class="btn ghost sm" id="xl">⬇ Excel</button><span class="sp"></span><span class="muted" style="font-size:12px">' + L.length + " candidate(s)</span></div><div id=\"aist\" class=\"muted\" style=\"font-size:12px\"></div></div>" +
+      (L.length ? L.map(function (x) {
+        return '<div class="card cand" data-id="' + x.id + '" style="margin-top:8px"><div class="sc ' + scC(x.ai && x.ai.score) + '">' + (x.ai ? x.ai.score : "–") + '</div><div style="flex:1;min-width:0"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + esc(x.name) + '</b><span class="pill ' + (ST_C[x.stage] || "") + '">' + esc(ME.stages[x.stage]) + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + esc(x.roleName) + " · " + esc([x.city, x.state].filter(Boolean).join(", ")) + " · " + x.exp + " yr" + (x.cv ? "" : " · <b>no CV</b>") + "</div>" +
+          (x.ai ? '<div style="font-size:12.5px;margin-top:4px">' + esc(x.ai.summary) + "</div>" : "") + (x.iv && x.stage === "interview" ? '<div style="font-size:12px;margin-top:4px">🗓️ Interview ' + when(x.iv.at) + "</div>" : "") + '<div class="muted" style="font-size:11px;margin-top:3px">Referred by ' + esc(x.ref.name || "—") + (x.ref.via === "link" ? " (link)" : "") + " · " + when(x.at) + "</div></div></div>";
+      }).join("") : '<div class="card empty" style="margin-top:10px">No candidates here.</div>');
+    $("fq").oninput = function () { F.q = $("fq").value; var p = $("fq").selectionStart; drawCands(); $("fq").focus(); try { $("fq").setSelectionRange(p, p); } catch (e) { } };
+    $("fs").onchange = function () { F.stage = $("fs").value; drawCands(); }; $("fst").onchange = function () { F.state = $("fst").value; drawCands(); }; $("fr").onchange = function () { F.role = $("fr").value; drawCands(); };
+    $("srt").onclick = function () { F.sort = F.sort === "new" ? "" : "new"; drawCands(); };
+    [].forEach.call($("tp").querySelectorAll("[data-id]"), function (c) { c.onclick = function () { openCand(c.dataset.id); }; });
+    $("aiall").onclick = function () {
+      var todo = L.filter(function (x) { return !x.ai; }), i = 0, ok = 0; $("aiall").disabled = true;
+      (function next() {
+        if (i >= todo.length) { toast(ok + " of " + todo.length + " screened"); loadRows().then(drawCands); return; }
+        var x = todo[i++]; $("aist").textContent = "AI is reading " + i + " of " + todo.length + ": " + x.name + "…";
+        api({ action: "hr-ai", id: x.id }).then(function (r) { if (r.ok) { ok++; x.ai = r.ai; } next(); });
+      })();
+    };
+    $("xl").onclick = function () {
+      download(xlsx([{ name: "Candidates", rows: [["ID", "Referred on", "Name", "Mobile", "E-mail", "Role", "State", "City", "Experience (yr)", "Current / last job", "Education", "Languages", "Stage", "AI score", "AI fit", "AI summary", "Interview", "Interview result", "Referred by", "Referrer mobile", "Referrer emp ID", "Via", "CV"]].concat(L.map(function (x) { return [x.id, when(x.at), x.name, x.phone, x.email, x.roleName, x.state, x.city, x.exp, x.current, x.edu, x.langs, ME.stages[x.stage], x.ai ? x.ai.score : "", x.ai ? x.ai.fit : "", x.ai ? x.ai.summary : "", x.iv ? when(x.iv.at) : "", x.iv ? x.iv.result || "" : "", x.ref.name, x.ref.phone || "", x.ref.empId || "", x.ref.via === "link" ? "Referral link" : "App / portal", x.cv ? x.cv.name : ""]; })) }]), "Candidates.xlsx");
+    };
+  }
+  function openCand(id) {
+    api({ action: "hr-get", id: id }).then(function (r) {
+      if (!r.ok) return toast(r.error);
+      var c = r.c, ai = c.ai;
+      var body = '<div style="font-size:13px;line-height:1.6"><b>' + esc(c.roleName) + "</b> · " + esc([c.city, c.state].filter(Boolean).join(", ")) + "<br>📞 <a href=\"tel:" + c.phone + '">' + c.phone + "</a>" + (c.email ? " · ✉️ " + esc(c.email) : "") + "<br>" + c.exp + " yr · " + esc(c.current || "—") + " · " + esc(c.edu || "") + (c.langs ? " · " + esc(c.langs) : "") +
+        (c.notes ? '<div class="help">💬 ' + esc(c.ref.name || "Referrer") + ": " + esc(c.notes) + "</div>" : "") + "</div>" +
+        '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">' + (c.cv ? '<button class="btn ghost sm" id="cvdl">📄 Open CV</button>' : '<span class="muted" style="font-size:12px">No CV uploaded</span>') + '<button class="btn ghost sm" id="slk">🔗 Copy candidate status link</button></div>' +
+        '<div class="ai" id="aib">' + aiHtml(ai) + "</div>" +
+        '<div class="lb" style="margin-top:12px">Stage</div><div class="stg">' + Object.keys(ME.stages).map(function (k) { return '<button data-sg="' + k + '" class="' + (c.stage === k ? "on" : "") + '">' + esc(ME.stages[k]) + "</button>"; }).join("") + "</div>" +
+        '<div class="lb" style="margin-top:12px">🎥 Online interview</div>' + (c.iv ? '<div class="help">🗓️ <b>' + when(c.iv.at) + "</b> · " + c.iv.mins + ' min · by ' + esc(c.iv.by) + '<br><a href="' + esc(c.iv.link) + '" target="_blank" rel="noopener">' + esc(c.iv.link) + "</a></div>" : "") +
+        '<div class="g2"><input class="tx" type="datetime-local" id="ivt"><select class="tx" id="ivm"><option value="20">20 min</option><option value="30">30 min</option><option value="45">45 min</option></select></div><input class="tx" id="ivl" style="margin-top:6px" placeholder="Meeting link (leave blank: the app makes a free video-call link)">' +
+        '<div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn pri sm" id="ivb">' + (c.iv ? "Change interview" : "📅 Book interview") + "</button>" + (c.iv ? '<a class="btn sec sm" href="' + esc(c.iv.link) + '" target="_blank" rel="noopener">🎥 Join now</a><button class="btn ghost sm" id="ivwa">WhatsApp invite</button><button class="btn ghost sm" id="ivx">Cancel</button>' : "") + "</div>" +
+        '<div class="lb" style="margin-top:12px">Note / interview feedback</div><textarea class="tx" id="nt" rows="2"></textarea><label class="tg" style="margin-top:6px;font-size:12.5px"><input type="checkbox" id="tell"' + (c.email ? "" : " disabled") + '><i></i><span>E-mail the candidate when I mark Shortlisted / Selected / Not selected / Joined</span></label>' +
+        '<details style="margin-top:10px"><summary class="muted" style="font-size:12px;cursor:pointer">History</summary>' + c.hist.slice().reverse().map(function (h) { return '<div style="font-size:12px;margin-top:4px">' + when(h.at) + " · <b>" + esc(ME.stages[h.stage] || h.stage) + "</b> · " + esc(h.by || "") + (h.note ? " — " + esc(h.note) : "") + "</div>"; }).join("") + "</details>";
+      sheet(c.name + " · " + c.id, "Referred by " + (c.ref.name || "—") + " · " + when(c.at), [], body);
+      var reload = function () { loadRows().then(function () { if (TAB === "cands") drawCands(); }); };
+      var bindAi = function () { var b = $("airun"); if (b) b.onclick = function () { b.disabled = true; b.textContent = "AI is reading the CV…"; api({ action: "hr-ai", id: c.id }).then(function (x) { if (!x.ok) { b.disabled = false; b.textContent = "🤖 Try again"; return toast(x.error); } c.ai = x.ai; $("aib").innerHTML = aiHtml(x.ai); bindAi(); reload(); }); }; };
+      bindAi();
+      if ($("cvdl")) $("cvdl").onclick = function () { api({ action: "hr-cv-file", id: c.id }).then(function (x) { if (!x.ok) return toast(x.error); var bin = atob(x.data), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); download(new Blob([u], { type: x.mime }), x.name); }); };
+      $("slk").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(r.statusLink) : Promise.reject()).then(function () { toast("Status link copied"); }, function () { prompt("Copy the link", r.statusLink); }); };
+      [].forEach.call(document.querySelectorAll("[data-sg]"), function (b) { b.onclick = function () { api({ action: "hr-stage", id: c.id, stage: b.dataset.sg, note: $("nt").value, tell: $("tell").checked, rating: c.iv ? undefined : undefined }).then(function (x) { if (!x.ok) return toast(x.error); [].forEach.call(document.querySelectorAll("[data-sg]"), function (y) { y.classList.toggle("on", y === b); }); toast("Marked " + ME.stages[x.stage] + (x.mailed && x.mailed.ok ? " · candidate e-mailed" : "")); $("nt").value = ""; reload(); }); }; });
+      var wa = function (text, phone) { var u = "https://wa.me/91" + phone + "?text=" + encodeURIComponent(text); try { if (window.AndroidDL && AndroidDL.shareWa) { location.href = u; return; } } catch (e) { } window.open(u, "_blank"); };
+      $("ivb").onclick = function () {
+        var v = $("ivt").value; if (!v) return toast("Choose the date and time");
+        api({ action: "hr-iv", id: c.id, at: new Date(v).getTime(), mins: +$("ivm").value, link: $("ivl").value.trim() }).then(function (x) {
+          if (!x.ok) return toast(x.error);
+          toast("Interview booked" + (x.mailed && x.mailed.ok ? " · invite e-mailed" : ""));
+          document.querySelector(".ov") && document.querySelector(".ov").remove();
+          sheet("Interview booked ✅", when(x.iv.at) + " · " + x.iv.mins + " min", [["💬", "Send WhatsApp invite", function () { wa(x.wa, x.phone); }, "pri"], ["🎥", "Open the meeting", function () { window.open(x.iv.link, "_blank"); }], ["", "Close", function () { }]], '<div class="help" style="word-break:break-all">' + esc(x.iv.link) + "</div>" + (x.mailed && x.mailed.ok ? '<div class="muted" style="font-size:12px;margin-top:6px">The candidate got an e-mail invite with this link.</div>' : '<div class="muted" style="font-size:12px;margin-top:6px">No e-mail sent' + (c.email ? "" : " (no candidate e-mail)") + " — send the WhatsApp invite.</div>"));
+          reload();
+        });
+      };
+      if ($("ivx")) $("ivx").onclick = function () { api({ action: "hr-iv", id: c.id, cancel: true }).then(function () { toast("Interview cancelled"); document.querySelector(".ov") && document.querySelector(".ov").remove(); reload(); }); };
+      if ($("ivwa")) $("ivwa").onclick = function () { wa("Hello " + c.name + ", your vivo interview for " + c.roleName + " is on " + when(c.iv.at) + ". Join here: " + c.iv.link + "  (status: " + r.statusLink + ")", c.phone); };
+    });
+  }
+  function aiHtml(ai) {
+    if (!ai) return '<b>🤖 AI screening</b><div class="muted" style="font-size:12.5px;margin:4px 0 8px">AI reads the CV and the referral against the role’s job description and gives a fit score with reasons. It is a helper — HR decides.</div><button class="btn pri sm" id="airun">🤖 Screen with AI</button>';
+    return '<div class="row" style="gap:10px;align-items:center"><div class="sc ' + scC(ai.score) + '" style="width:54px;height:54px;font-size:19px">' + ai.score + '</div><div style="flex:1"><b>' + esc((ai.fit || "").replace(/^./, function (m) { return m.toUpperCase(); })) + " fit</b>" + (ai.suggestedRole ? '<div class="muted" style="font-size:12px">Best matching role: ' + esc(ai.suggestedRole) + "</div>" : "") + "</div></div>" +
+      '<div style="margin-top:6px">' + esc(ai.summary) + "</div>" + (ai.noCv ? '<div class="muted" style="font-size:12px">⚠️ Judged without a readable CV.</div>' : "") +
+      (ai.strengths.length ? "<b>Strengths</b><ul>" + ai.strengths.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul>" : "") +
+      (ai.concerns.length ? "<b>Check in the interview</b><ul>" + ai.concerns.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul>" : "") +
+      (ai.questions.length ? "<b>Questions to ask</b><ul>" + ai.questions.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul>" : "") +
+      '<button class="btn ghost sm" id="airun">↻ Screen again</button>';
+  }
+  function tPipe() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    loadRows().then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var cnt = {}; ROWS.forEach(function (x) { cnt[x.stage] = (cnt[x.stage] || 0) + 1; });
+      var bySt = {}; ROWS.forEach(function (x) { var o = bySt[x.state] = bySt[x.state] || { n: 0, iv: 0, sel: 0, join: 0, sc: [] }; o.n++; if (x.stage === "interview") o.iv++; if (x.stage === "selected") o.sel++; if (x.stage === "joined") o.join++; if (x.ai) o.sc.push(x.ai.score); });
+      var byRef = {}; ROWS.forEach(function (x) { var k = x.ref.name || "—"; var o = byRef[k] = byRef[k] || { n: 0, good: 0 }; o.n++; if (/^(selected|joined)$/.test(x.stage)) o.good++; });
+      $("tp").innerHTML = '<div class="kp">' + [["new", "New"], ["shortlisted", "Shortlisted"], ["interview", "Interviews"], ["selected", "Selected"], ["joined", "Joined"], ["hold", "On hold"], ["rejected", "Not selected"]].map(function (k) { return '<div class="kt" data-st="' + k[0] + '"><div class="l">' + k[1] + '</div><div class="v">' + (cnt[k[0]] || 0) + "</div></div>"; }).join("") + '<div class="kt"><div class="l">Total referrals</div><div class="v">' + ROWS.length + "</div></div></div>" +
+        '<div class="tbw"><table class="tb"><tr><th>State</th><th>Referrals</th><th>Interviews</th><th>Selected</th><th>Joined</th><th>Avg AI</th></tr>' + Object.keys(bySt).sort(function (a, b) { return bySt[b].n - bySt[a].n; }).map(function (s) { var o = bySt[s]; return "<tr><td>" + esc(s) + "</td><td>" + o.n + "</td><td>" + o.iv + "</td><td>" + o.sel + "</td><td>" + o.join + "</td><td>" + (o.sc.length ? Math.round(o.sc.reduce(function (a, b) { return a + b; }, 0) / o.sc.length) : "–") + "</td></tr>"; }).join("") + "</table></div>" +
+        '<div class="sh" style="margin-top:14px"><span><b>🏅 Top referrers</b></span></div><div class="tbw"><table class="tb"><tr><th>Referrer</th><th>Referred</th><th>Selected / joined</th></tr>' + Object.keys(byRef).sort(function (a, b) { return byRef[b].good - byRef[a].good || byRef[b].n - byRef[a].n; }).slice(0, 15).map(function (k) { return "<tr><td>" + esc(k) + "</td><td>" + byRef[k].n + "</td><td>" + byRef[k].good + "</td></tr>"; }).join("") + "</table></div>";
+      [].forEach.call($("tp").querySelectorAll("[data-st]"), function (k) { k.onclick = function () { F.stage = k.dataset.st; TAB = "cands"; draw(); }; });
+    });
+  }
+  function tCfg() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "hr-cfg" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var C = r.cfg, link = location.origin + "/hire.html?r=" + C.link.token;
+      var hrOf = function (s) { var h = C.hr.filter(function (x) { return x.state === s; })[0]; return h ? h.emails.join(", ") : ""; };
+      $("tp").innerHTML = '<div class="card" style="margin-top:10px"><b>🔗 Open referral link</b><div class="muted" style="font-size:12px;margin-top:3px">For market sales team members without the app. Anyone with the link can refer; they don’t see any other part of the tool.</div><div class="help fx" style="word-break:break-all">' + esc(link) + '</div><div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn pri sm" id="lcp">📋 Copy</button><button class="btn ghost sm" id="lwa">WhatsApp</button><button class="btn ghost sm" id="lnew">↻ New link (old one stops)</button></div><label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="lon"' + (C.link.on ? " checked" : "") + '><i></i><span>Link is open</span></label></div>' +
+        '<div class="card" style="margin-top:10px"><b>👥 State HR team</b><div class="muted" style="font-size:12px;margin-top:3px">E-mail IDs per state. They get new referrals by e-mail, and when they log in with this e-mail they see and manage their state’s candidates.</div><div class="tbw"><table class="tb">' + ME.states.map(function (s) { return '<tr><td style="white-space:nowrap;font-weight:700">' + esc(s) + '</td><td><input class="tx" data-hs="' + esc(s) + '" value="' + esc(hrOf(s)) + '" placeholder="hr1@vivo.com, hr2@vivo.com" style="padding:6px 8px;font-size:12.5px"></td></tr>'; }).join("") + "</table></div>" +
+        '<label class="lb">HO HR (CC on every referral)</label><input class="tx" id="hoh" value="' + esc(C.hoHr.join(", ")) + '"><label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="cml"' + (C.mail !== false ? " checked" : "") + '><i></i><span>E-mail HR about new referrals</span></label></div>' +
+        '<div class="card" style="margin-top:10px"><b>🧾 Roles & job descriptions</b><div class="muted" style="font-size:12px;margin-top:3px">AI scores each candidate against the job description of the role. Write what matters: experience, skills, language, location, timings.</div><div id="rl"></div><button class="btn ghost sm" id="radd" style="margin-top:6px">＋ Role</button></div>' +
+        '<button class="btn pri" id="sv" style="width:100%;margin-top:12px">💾 Save set-up</button>';
+      var roles = C.roles.slice();
+      var drawRoles = function () { $("rl").innerHTML = roles.map(function (x, i) { return '<div style="border-top:1px solid #EEF0F6;padding-top:8px;margin-top:8px"><div class="row" style="gap:6px"><input class="tx" data-rn="' + i + '" value="' + esc(x.name) + '" style="flex:1"><button class="btn ghost sm" data-rx="' + i + '">🗑</button></div><textarea class="tx" data-rj="' + i + '" rows="3" style="margin-top:6px">' + esc(x.jd) + "</textarea></div>"; }).join("");
+        [].forEach.call($("rl").querySelectorAll("[data-rn]"), function (i) { i.oninput = function () { roles[+i.dataset.rn].name = i.value; }; });
+        [].forEach.call($("rl").querySelectorAll("[data-rj]"), function (i) { i.oninput = function () { roles[+i.dataset.rj].jd = i.value; }; });
+        [].forEach.call($("rl").querySelectorAll("[data-rx]"), function (b) { b.onclick = function () { roles.splice(+b.dataset.rx, 1); drawRoles(); }; }); };
+      drawRoles();
+      $("radd").onclick = function () { roles.push({ id: "", name: "", jd: "" }); drawRoles(); };
+      $("lcp").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { toast("Link copied"); }, function () { prompt("Copy the link", link); }); };
+      $("lwa").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent("Know someone who would be a great vivo promoter? Refer them here (CV upload, takes 2 minutes): " + link), "_blank"); };
+      var save = function (extra) {
+        var hr = []; [].forEach.call($("tp").querySelectorAll("[data-hs]"), function (i) { if (i.value.trim()) hr.push({ state: i.dataset.hs, emails: i.value }); });
+        return api({ action: "hr-cfg", save: true, cfg: Object.assign({ roles: roles, hr: hr, hoHr: $("hoh").value, mail: $("cml").checked, linkOn: $("lon").checked }, extra || {}) }).then(function (x) { if (!x.ok) return toast(x.error); toast("Saved"); tCfg(); });
+      };
+      $("lnew").onclick = function () { sheet("Make a new referral link?", "The current link stops working at once.", [["↻", "New link", function () { save({ newLink: true }); }, "danger"], ["", "Cancel", function () { }]]); };
+      $("sv").onclick = function () { save(); };
+    });
+  }
+
+  if (RT) pubRefer(); else if (CT) pubStatus(); else staff();
+})();
+</script>
+</body>
+</html>
