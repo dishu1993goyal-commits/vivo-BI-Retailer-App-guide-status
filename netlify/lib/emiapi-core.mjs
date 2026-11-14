@@ -9,10 +9,17 @@ import { createHash, randomBytes } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const ENVS = ["prod", "uat"];
+// All vivo IMEI business APIs (POST /retail-emi/business/<name>). fields = vivo's signing order (docFields = order printed in the document, if different); opt = optional; bool = true/false
 export const EAPI_ENDPOINTS = {
-  queryInstallment: { name: "Query Installment (GetIMEIInfoWithNoBlock_NEW)", fields: ["companyName", "password", "imei", "modelName", "dealerCode"] },
-  processInstallment: { name: "Process Installment (GetIMEIInfo_NEW)", fields: ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"], changes: true },
-  releaseInstallment: { name: "Release Installment (UpdateImeiInfo)", fields: ["companyName", "password", "imei"], changes: true },
+  queryInstallment: { biz: "Installment (EMI)", name: "Query Installment (GetIMEIInfoWithNoBlock_NEW)", desc: "Query the installment status and details of an IMEI. Checks model match, the company's agency rights and the store (incl. cross-store rules) like Process Installment does.", fields: ["companyName", "password", "imei", "modelName", "dealerCode"] },
+  processInstallment: { biz: "Installment (EMI)", name: "Process Installment (GetIMEIInfo_NEW)", desc: "Apply an installment (EMI) for an IMEI — flags the IMEI.", fields: ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"], changes: true },
+  releaseInstallment: { biz: "Installment (EMI)", name: "Release Installment (UpdateImeiInfo)", desc: "Release (unflag) an existing installment on an IMEI.", fields: ["companyName", "password", "imei"], changes: true },
+  queryTradeIn: { biz: "Trade-in", name: "Query Trade-In (GetIMEIInfoWithNoBlock_NEW)", desc: "Check whether an IMEI already has an active trade-in record. specialBusinessList returns pending special discounts (5 = student, 6 = corporate).", fields: ["companyName", "password", "imei", "modelName", "dealerCode"], docFields: ["imei", "modelName", "companyName", "password", "dealerCode"], opt: ["dealerCode"] },
+  processTradeIn: { biz: "Trade-in", name: "Process Trade-In (Flag02)", desc: "Apply a trade-in — non-retail channel, cross-store check skipped.", fields: ["companyName", "password", "imei", "oldPhoneBrand", "oldPhoneModel", "modelName", "dealerCode"], opt: ["oldPhoneBrand", "oldPhoneModel", "dealerCode"], changes: true },
+  processTradeInRetail: { biz: "Trade-in", name: "Process Trade-In Retail (GetImeiInfo_Retailer)", desc: "Apply a trade-in — retail channel, cross-store sales check applied.", fields: ["companyName", "password", "imei", "oldPhoneBrand", "oldPhoneModel", "modelName", "dealerCode"], opt: ["oldPhoneBrand", "oldPhoneModel", "dealerCode"], changes: true },
+  processServiceProtection: { biz: "Service protection", name: "Process Service Protection (GetIMEIActivation)", desc: "Apply service protection (service plan) on an IMEI. erpCode is no longer accepted.", fields: ["companyName", "password", "imei", "dealerCode", "plan"], opt: ["dealerCode", "plan"], changes: true },
+  processBuyback: { biz: "ABB (assured buyback)", name: "Process Buyback (GetImeiSoldStatus)", desc: "Apply buyback (ABB) for an IMEI.", fields: ["companyName", "password", "imei", "modelName"], docFields: ["companyName", "password", "modelName", "imei"], changes: true },
+  studentAuthentication: { biz: "Student authentication", name: "Student Authentication", desc: "Authenticate a student for the student discount. isRocketIdAuthenticated (true / false) is required.", fields: ["imei", "isRocketIdAuthenticated"], bool: ["isRocketIdAuthenticated"], changes: true },
 };
 const DEF_ENV = {
   prod: { url: "https://in-vwork.vivo.xyz/gw/04", invoker: "emi-company-consumer", company: "Benow" },
@@ -20,10 +27,11 @@ const DEF_ENV = {
 };
 const sha = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
-const FMTS = ["compact|ok", "asis|ok", "sorted|ok", "compact|nobody", "compact|imeionly", "compact|secs", "compact|upper", "asis|nobody", "sorted|upper"];
+const FMTS = ["compact|ok", "doc|ok", "asis|ok", "sorted|ok", "compact|nobody", "compact|imeionly", "compact|secs", "compact|upper", "asis|nobody", "sorted|upper"];
 // vivo's gateway signs the body in this field order (confirmed by vivo IT) — keep it, whatever order the fields were typed in
-export const VIVO_ORDER = ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"];
+export const VIVO_ORDER = ["companyName", "password", "imei", "oldPhoneBrand", "oldPhoneModel", "modelName", "scheme", "financeAmount", "dealerCode", "plan", "isRocketIdAuthenticated"];
 const vivoOrder = (o) => o && typeof o === "object" && !Array.isArray(o) ? VIVO_ORDER.filter((k) => k in o).concat(Object.keys(o).filter((k) => !VIVO_ORDER.includes(k))).reduce((a, k) => { a[k] = o[k]; return a; }, {}) : o;
+const docOrder = (o, ep) => { const F = (EAPI_ENDPOINTS[ep] || {}).docFields || (EAPI_ENDPOINTS[ep] || {}).fields || []; return o && typeof o === "object" && !Array.isArray(o) ? F.filter((k) => k in o).concat(Object.keys(o).filter((k) => !F.includes(k))).reduce((a, k) => { a[k] = o[k]; return a; }, {}) : o; };
 const sortKeys = (o) => Array.isArray(o) ? o.map(sortKeys) : o && typeof o === "object" ? Object.keys(o).sort().reduce((a, k) => { a[k] = sortKeys(o[k]); return a; }, {}) : o;
 // pasted from e-mail / WhatsApp: drop invisible characters (zero-width, non-breaking spaces, BOM) and outer spaces
 const cleanKey = (v) => String(v || "").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").replace(/\u00A0/g, " ").trim();
@@ -55,7 +63,7 @@ export async function emiApiAction(b, ctx) {
         const base = x.base || {};
         const old = cfg.envs[e] || {};
         cfg.envs[e] = { url, invoker: str(x.invoker, 120), company: str(x.company, 120), fmt: FMTS.includes(x.fmt) ? x.fmt : (old.fmt || "compact|ok"),
-          base: { imei: str(base.imei, 20), model: str(base.model, 80), dealer: str(base.dealer, 60), scheme: str(base.scheme, 80), amount: str(base.amount, 20) } };
+          base: { imei: str(base.imei, 20), model: str(base.model, 80), dealer: str(base.dealer, 60), scheme: str(base.scheme, 80), amount: str(base.amount, 20), oldBrand: str(base.oldBrand, 60), oldModel: str(base.oldModel, 80), plan: str(base.plan, 80) } };
         const k = (b.keys || {})[e] || {};
         keys[e] = keys[e] || {};
         if (typeof k.secret === "string" && cleanKey(k.secret)) keys[e].secret = cleanKey(k.secret).slice(0, 300);
@@ -77,10 +85,10 @@ export async function emiApiAction(b, ctx) {
     let raw = String(b.raw == null ? "" : b.raw).slice(0, 20000);
     raw = raw.replace(/\{\{\s*companyName\s*\}\}/g, jsonEsc(E.company || "")).replace(/\{\{\s*password\s*\}\}/g, jsonEsc(K.password || ""));
     // body layout + how the signature is built. "ok" = this environment's saved format (found with "Find the right signature").
-    const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted"].includes(ef[0]) ? ef[0] : "compact";
+    const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted", "doc"].includes(ef[0]) ? ef[0] : "compact";
     let sig = str(b.sig, 20) || "ok";
     if (sig === "ok") sig = ["ok", "nobody", "imeionly", "secs", "upper", "query"].includes(ef[1]) ? ef[1] : "ok";
-    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : vivoOrder(o)); } catch (x) { } }
+    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : bodyMode === "doc" ? docOrder(o, ep) : vivoOrder(o)); } catch (x) { } }
     let ts = t, secret = K.secret, inv = E.invoker, signed = raw, upper = false;
     if (sig === "nobody") signed = "";
     if (sig === "secs") ts = Math.floor(t / 1000);
@@ -139,6 +147,80 @@ export async function emiApiAction(b, ctx) {
   if (b.action === "eapi-log-clear") {
     for (const k of await store.list("eapilog:")) await store.delete(k);
     return json(200, { ok: true });
+  }
+  if (/^eapi-doc/.test(b.action)) return docAction(b, ctx, by);
+  return json(400, { ok: false, error: "Unknown action" });
+}
+
+// ======================= API documents (business-wise) + partner link =======================
+//   eapidoc:<id>        { id, biz, title, version, env, notes, name, mime, size, chunks, published, at, by, upd, done }
+//   eapidocb:<id>:<n>   { d: base64 piece ≤ 1.4 MB }
+//   eapidoclink         { token, on, ref }   — read-only partner page: published documents + the English API reference
+export const DOC_BIZ = ["Installment (EMI)", "Trade-in", "Service protection", "ABB (assured buyback)", "Student authentication", "All businesses / general"];
+const DOC_MIME = /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|application\/msword|application\/vnd\.ms-excel|text\/plain|application\/json|application\/zip|image\/(png|jpeg))$/;
+async function docLink(store) { let l = await store.get("eapidoclink"); if (!l) { l = { token: randomBytes(12).toString("hex"), on: false, ref: true }; await store.set("eapidoclink", l); } return l; }
+const docPub = (d) => ({ id: d.id, biz: d.biz, title: d.title, version: d.version, env: d.env, notes: d.notes, name: d.name, mime: d.mime, size: d.size, chunks: d.chunks, published: !!d.published, at: d.at, upd: d.upd, by: d.by });
+async function docAction(b, ctx, by) {
+  const { store, t, pool, env = {} } = ctx;
+  if (b.action === "eapi-doc-list") {
+    const L = (await pool(await store.list("eapidoc:"), 20, (k) => store.get(k))).filter((d) => d && d.done).sort((x, y) => (y.upd || y.at) - (x.upd || x.at)).map(docPub);
+    const l = await docLink(store);
+    return json(200, { ok: true, rows: L, biz: DOC_BIZ, link: { on: l.on, ref: l.ref !== false, url: (env.SITE_URL || "") + "/emiapi.html?d=" + l.token } });
+  }
+  if (b.action === "eapi-doc-up") {   // file in pieces; the last piece carries the details
+    const n = Math.max(0, Math.floor(+b.n || 0)), total = Math.max(1, Math.min(8, Math.floor(+b.total || 1))), data = String(b.data || "");
+    if (!/^[A-Za-z0-9+/=]*$/.test(data) || data.length > 1500000 || n >= total) return json(400, { ok: false, error: "That file piece is too big" });
+    let id = str(b.id, 20).replace(/[^A-Za-z0-9]/g, "");
+    if (!id) { if (n !== 0) return json(400, { ok: false, error: "Start the upload again" }); id = "D" + t.toString(36).toUpperCase() + randomBytes(2).toString("hex"); await store.set("eapidoc:" + id, { id, at: t, by, done: false }); }
+    const d = await store.get("eapidoc:" + id); if (!d) return json(404, { ok: false, error: "Document not found" });
+    const replacing = d.done && n === 0;
+    await store.set(`eapidocb:${id}:${n}`, { d: data });
+    if (n === total - 1) {
+      const old = d.chunks || 0;
+      Object.assign(d, { name: str(b.name, 140) || "document", mime: DOC_MIME.test(b.mime) ? b.mime : "application/octet-stream", size: Math.round(+b.size || 0), chunks: total, upd: t, done: true, ver: (d.ver || 0) + (d.done ? 1 : 0) });
+      for (let i = total; i < old; i++) await store.delete(`eapidocb:${id}:${i}`);
+      if (!replacing && b.meta) Object.assign(d, cleanDocMeta(b.meta, d));
+      await store.set("eapidoc:" + id, d);
+    }
+    return json(200, { ok: true, id });
+  }
+  if (b.action === "eapi-doc-save") {
+    const d = await store.get("eapidoc:" + str(b.id, 20)); if (!d || !d.done) return json(404, { ok: false, error: "Document not found" });
+    Object.assign(d, cleanDocMeta(b.meta || {}, d), { upd: t, updBy: by }); await store.set("eapidoc:" + d.id, d);
+    return json(200, { ok: true, d: docPub(d) });
+  }
+  if (b.action === "eapi-doc-file") {
+    const d = await store.get("eapidoc:" + str(b.id, 20)); if (!d || !d.done) return json(404, { ok: false, error: "Document not found" });
+    const n = Math.max(0, Math.min(d.chunks - 1, Math.floor(+b.n || 0))), p = await store.get(`eapidocb:${d.id}:${n}`);
+    return json(200, { ok: true, n, total: d.chunks, data: (p && p.d) || "", name: d.name, mime: d.mime });
+  }
+  if (b.action === "eapi-doc-del") {
+    const d = await store.get("eapidoc:" + str(b.id, 20)); if (!d) return json(404, { ok: false, error: "Document not found" });
+    for (let i = 0; i < (d.chunks || 8); i++) await store.delete(`eapidocb:${d.id}:${i}`);
+    await store.delete("eapidoc:" + d.id); return json(200, { ok: true });
+  }
+  if (b.action === "eapi-doc-link") {
+    const l = await docLink(store);
+    if (b.on !== undefined) l.on = !!b.on; if (b.ref !== undefined) l.ref = !!b.ref; if (b.renew) l.token = randomBytes(12).toString("hex");
+    await store.set("eapidoclink", l);
+    return json(200, { ok: true, link: { on: l.on, ref: l.ref !== false, url: (env.SITE_URL || "") + "/emiapi.html?d=" + l.token } });
+  }
+  return json(400, { ok: false, error: "Unknown action" });
+}
+function cleanDocMeta(m, d) {
+  return { biz: DOC_BIZ.includes(m.biz) ? m.biz : d.biz || DOC_BIZ[0], title: str(m.title, 140) || d.title || d.name || "API document", version: str(m.version, 40), env: ["", "uat", "prod", "both"].includes(m.env) ? m.env : d.env || "", notes: String(m.notes == null ? d.notes || "" : m.notes).slice(0, 1500), published: m.published === undefined ? !!d.published : !!m.published };
+}
+// partner page (no login): only published documents + the English API reference
+export async function emiDocPublic(b, ctx) {
+  const { store, pool } = ctx;
+  const l = await store.get("eapidoclink");
+  if (!l || !l.on || String(b.d || "").replace(/[^a-f0-9]/g, "") !== l.token) return json(403, { ok: false, error: "This document link is closed. Ask vivo for the current link." });
+  const pubs = (await pool(await store.list("eapidoc:"), 20, (k) => store.get(k))).filter((d) => d && d.done && d.published);
+  if (b.action === "eapi-p-docs") return json(200, { ok: true, rows: pubs.sort((x, y) => (y.upd || y.at) - (x.upd || x.at)).map((d) => { const o = docPub(d); delete o.by; return o; }), biz: DOC_BIZ, ref: l.ref !== false, endpoints: l.ref !== false ? EAPI_ENDPOINTS : null });
+  if (b.action === "eapi-p-doc") {
+    const d = pubs.find((x) => x.id === String(b.id || "")); if (!d) return json(404, { ok: false, error: "Document not found" });
+    const n = Math.max(0, Math.min(d.chunks - 1, Math.floor(+b.n || 0))), p = await store.get(`eapidocb:${d.id}:${n}`);
+    return json(200, { ok: true, n, total: d.chunks, data: (p && p.d) || "", name: d.name, mime: d.mime });
   }
   return json(400, { ok: false, error: "Unknown action" });
 }

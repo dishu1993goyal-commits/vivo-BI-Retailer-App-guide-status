@@ -402,7 +402,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     return ov;
   }
   var VIEW = $("view"), TAB = "test", CFG = null, KEYS = {}, EPS = {}, ENV = "uat", EP = "queryInstallment", FORM = {}, LAST = null, RESULTS = [];
-  try { var h0 = location.hash.replace("#", ""); if (/^(test|cases|log|codes|cfg)$/.test(h0)) TAB = h0; } catch (e) { }
+  try { var h0 = location.hash.replace("#", ""); if (/^(test|cases|log|ref|docs|codes|cfg)$/.test(h0)) TAB = h0; } catch (e) { }
   try { ENV = localStorage.getItem("eapi-env") || "uat"; } catch (e) { }
 
   // ---- vivo's error list (API document, 14.10.26) ----
@@ -432,9 +432,9 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     ["INSUFFICIENT_PERMISSION", "User does not have permission", "You do not Have Permission to Perform This Action"]
   ];
   var CMAP = {}; CODES.forEach(function (c) { CMAP[c[0]] = c; });
-  var FLD = { companyName: "Company name", password: "Password", imei: "IMEI", modelName: "Model name", scheme: "Scheme", financeAmount: "Finance amount", dealerCode: "Dealer code" };
+  var FLD = { companyName: "Company name", password: "Password", imei: "IMEI", modelName: "Model name", scheme: "Scheme", financeAmount: "Finance amount", dealerCode: "Dealer code", oldPhoneBrand: "Old phone brand", oldPhoneModel: "Old phone model", plan: "Service plan", isRocketIdAuthenticated: "RocketId authenticated" };
   var SIGS = [["ok", "✅ Correct signature"], ["none", "No gwSignature header"], ["badsecret", "Wrong secret"], ["badinvoker", "Wrong invoker name"], ["oldts", "Old timestamp (15 min ago)"], ["futurets", "Future timestamp (+15 min)"], ["tamper", "Body changed after signing"], ["garbage", "Garbage signature text"], ["imeionly", "Sign only the IMEI (alt. reading of the doc)"]];
-  var FMTS = [["compact|ok", "Compact JSON in vivo’s field order, signed as sent (standard)"], ["asis|ok", "Body exactly as typed (with spaces / line breaks)"], ["sorted|ok", "Compact JSON with keys in A→Z order"], ["compact|nobody", "Signature without the body (secret + timestamp)"], ["compact|imeionly", "Signature over the IMEI only"], ["compact|secs", "Timestamp in seconds instead of milliseconds"], ["compact|upper", "SHA-256 hash in capital letters"], ["asis|nobody", "Body as typed, signature without the body"], ["sorted|upper", "Keys A→Z, hash in capitals"]];
+  var FMTS = [["compact|ok", "Compact JSON in vivo’s field order, signed as sent (standard)"], ["doc|ok", "Compact JSON in the document’s field order for each API"], ["asis|ok", "Body exactly as typed (with spaces / line breaks)"], ["sorted|ok", "Compact JSON with keys in A→Z order"], ["compact|nobody", "Signature without the body (secret + timestamp)"], ["compact|imeionly", "Signature over the IMEI only"], ["compact|secs", "Timestamp in seconds instead of milliseconds"], ["compact|upper", "SHA-256 hash in capital letters"], ["asis|nobody", "Body as typed, signature without the body"], ["sorted|upper", "Keys A→Z, hash in capitals"]];
   var fpTxt = function (f) { return f ? '<div class="muted" style="font-size:11.5px;margin-top:3px">Saved: <b>' + f.len + " characters</b>, starts <b class=\"fx\">" + esc(f.head) + "</b>…ends <b class=\"fx\">" + esc(f.tail) + "</b>" + (f.odd ? ' · <b style="color:#B42318">contains a space or unusual character — re-paste it</b>' : "") + "</div>" : ""; };
   var fmtName = function (f) { var x = FMTS.filter(function (y) { return y[0] === f; })[0]; return x ? x[1] : f; };
   var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", second: "2-digit" }) : ""; };
@@ -456,13 +456,82 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
   // ---- build the JSON body (doc field order); {{companyName}} / {{password}} are filled on the server from Set-up ----
   function baseVals() {
     var b = (CFG.envs[ENV] || {}).base || {};
-    return { companyName: "{{companyName}}", password: "{{password}}", imei: b.imei || "", modelName: b.model || "", scheme: b.scheme || "", financeAmount: b.amount || "", dealerCode: b.dealer || "" };
+    return { companyName: "{{companyName}}", password: "{{password}}", imei: b.imei || "", modelName: b.model || "", scheme: b.scheme || "", financeAmount: b.amount || "", dealerCode: b.dealer || "", oldPhoneBrand: b.oldBrand || "", oldPhoneModel: b.oldModel || "", plan: b.plan || "", isRocketIdAuthenticated: "true" };
   }
+  function bizList(P) { P = P || EPS; var L = []; Object.keys(P).forEach(function (k) { if (L.indexOf(P[k].biz) < 0) L.push(P[k].biz); }); return L; }
   function bodyOf(ep, vals, omit) {
-    var o = {}; (EPS[ep].fields || []).forEach(function (f) { if (!(omit || []).includes(f)) o[f] = vals[f] == null ? "" : String(vals[f]); });
+    var o = {}; (EPS[ep].fields || []).forEach(function (f) { if ((omit || []).includes(f)) return; var v = vals[f] == null ? "" : vals[f]; o[f] = (EPS[ep].bool || []).includes(f) && /^(true|false)$/.test(String(v)) ? String(v) === "true" : String(v); });
     return JSON.stringify(o, null, 2);
   }
 
+  // ======================= 📂 business-wise API documents (HO) + partner link =======================
+  var fsize = function (n) { return n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB"; };
+  var ENVN = { "": "", uat: "UAT", prod: "Production", both: "UAT + Production" };
+  function getFile(call, name) {   // fetch the pieces and save
+    var parts = [], n = 0, total = 1;
+    return (function next() {
+      if (n >= total) { var bin = atob(parts.join("")), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); download(new Blob([u], { type: mime }), name || fname); return Promise.resolve(); }
+      return call(n).then(function (r) { if (!r.ok) { toast(r.error); return; } parts.push(r.data); total = r.total; mime = r.mime; fname = r.name; n++; return next(); });
+    })();
+    var mime, fname;
+  }
+  function tDocs() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "eapi-doc-list" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var L = r.rows, LK = r.link;
+      $("tp").innerHTML = '<div class="card" style="margin-top:10px"><b>🔗 Partner documents link</b><div class="muted" style="font-size:12px;margin-top:3px">A read-only page for finance / trade-in partners with only the documents you publish' + (LK.ref ? " and the English API reference" : "") + '. Nothing else in the tool is visible.</div><div class="help fx" style="word-break:break-all;white-space:normal">' + esc(LK.url) + '</div><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn sec sm" id="dlc">📋 Copy</button><button class="btn ghost sm" id="dlw">WhatsApp</button><a class="btn ghost sm" href="' + esc(LK.url) + '" target="_blank">👁 Open</a><button class="btn ghost sm" id="dln">↻ New link</button></div>' +
+        '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="dlon"' + (LK.on ? " checked" : "") + '><i></i><span>Link is open</span></label><label class="tg" style="margin-top:4px;font-size:13px"><input type="checkbox" id="dlref"' + (LK.ref ? " checked" : "") + "><i></i><span>Also show the English API reference (all " + Object.keys(EPS).length + " APIs)</span></label></div>" +
+        '<div class="card" style="margin-top:10px"><b>⬆ Add a document</b><div class="g2"><div><label class="lb">Business</label><select class="tx" id="db">' + r.biz.map(function (x) { return "<option>" + esc(x) + "</option>"; }).join("") + '</select></div><div><label class="lb">Title</label><input class="tx" id="dt" placeholder="e.g. vivo IMEI Business API document"></div><div><label class="lb">Version / date</label><input class="tx" id="dv" placeholder="e.g. v2.0 · 14 Oct 2026"></div><div><label class="lb">Environment</label><select class="tx" id="de"><option value="">—</option><option value="uat">UAT</option><option value="prod">Production</option><option value="both">UAT + Production</option></select></div></div><label class="lb">Notes (what changed)</label><textarea class="tx" id="dn" rows="2"></textarea>' +
+        '<label class="lb">File (PDF, Word, Excel, Postman JSON… up to 8 MB)</label><input type="file" id="df" class="tx"><label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="dp"><i></i><span>Publish on the partner link</span></label><button class="btn pri" id="dup" style="width:100%;margin-top:10px">⬆ Save document</button><div id="dst" class="muted" style="font-size:12px;text-align:center;margin-top:4px"></div></div>' +
+        (L.length ? r.biz.filter(function (g) { return L.some(function (d) { return d.biz === g; }); }).map(function (g) { return '<div class="sec" style="margin-top:14px"><span>' + esc(g) + "</span></div>" + L.filter(function (d) { return d.biz === g; }).map(function (d) {
+          return '<div class="card" style="margin-top:8px"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">📄 ' + esc(d.title) + '</b><span class="pill ' + (d.published ? "g" : "m") + '">' + (d.published ? "Published" : "Saved") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + esc([d.version, ENVN[d.env], d.name, fsize(d.size), "updated " + when(d.upd || d.at), d.by].filter(Boolean).join(" · ")) + "</div>" + (d.notes ? '<div style="font-size:12.5px;margin-top:4px;white-space:pre-wrap">' + esc(d.notes) + "</div>" : "") +
+            '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn sec sm" data-dd="' + d.id + '">⬇ Download</button><button class="btn ghost sm" data-dpub="' + d.id + '">' + (d.published ? "Unpublish" : "📢 Publish") + '</button><button class="btn ghost sm" data-ded="' + d.id + '">✏️ Edit</button><button class="btn ghost sm" data-drep="' + d.id + '">↻ New version of the file</button><button class="btn ghost sm" data-ddel="' + d.id + '" style="color:#B42318">🗑</button></div></div>'; }).join(""); }).join("") : '<div class="card empty" style="margin-top:10px">No documents yet — add vivo’s API documents business-wise above.</div>') + '<input type="file" id="drf" hidden>';
+      var link = function (o) { api(Object.assign({ action: "eapi-doc-link" }, o)).then(function (x) { if (!x.ok) return toast(x.error); toast("Saved"); tDocs(); }); };
+      $("dlc").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(LK.url) : Promise.reject()).then(function () { toast("Link copied"); }, function () { prompt("Copy the link", LK.url); }); };
+      $("dlw").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent("vivo IMEI Business API documents: " + LK.url), "_blank"); };
+      $("dlon").onchange = function () { link({ on: $("dlon").checked }); }; $("dlref").onchange = function () { link({ ref: $("dlref").checked }); };
+      $("dln").onclick = function () { sheet("Make a new partner link?", "The current link stops working at once.", [["↻", "New link", function () { link({ renew: true }); }, "danger"], ["", "Cancel", function () { }]]); };
+      var upload = function (file, id, meta, btn, st) {
+        if (!file) return toast("Choose a file");
+        if (file.size > 8 * 1048576) return toast("The file must be under 8 MB");
+        if (btn) btn.disabled = true;
+        var fr = new FileReader(); fr.onload = function () {
+          var b64 = String(fr.result).split(",")[1] || "", P = 1400000, parts = []; for (var i = 0; i < b64.length; i += P) parts.push(b64.slice(i, i + P)); if (!parts.length) parts = [""];
+          var n = 0;
+          (function next() {
+            if (n >= parts.length) { if (btn) btn.disabled = false; toast("Saved"); tDocs(); return; }
+            if (st) st.textContent = "Uploading " + (n + 1) + " of " + parts.length + "…";
+            var body = { action: "eapi-doc-up", id: id || "", n: n, total: parts.length, data: parts[n] };
+            if (n === parts.length - 1) Object.assign(body, { name: file.name, mime: file.type, size: file.size, meta: meta });
+            api(body).then(function (x) { if (!x.ok) { if (btn) btn.disabled = false; return toast(x.error); } id = x.id; n++; next(); });
+          })();
+        }; fr.readAsDataURL(file);
+      };
+      $("dup").onclick = function () { var f = $("df").files[0]; upload(f, "", { biz: $("db").value, title: $("dt").value || (f && f.name.replace(/\.[^.]+$/, "")), version: $("dv").value, env: $("de").value, notes: $("dn").value, published: $("dp").checked }, $("dup"), $("dst")); };
+      var byId = function (id) { return L.filter(function (d) { return d.id === id; })[0]; };
+      [].forEach.call($("tp").querySelectorAll("[data-dd]"), function (b) { b.onclick = function () { getFile(function (n) { return api({ action: "eapi-doc-file", id: b.dataset.dd, n: n }); }); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-dpub]"), function (b) { b.onclick = function () { var d = byId(b.dataset.dpub); api({ action: "eapi-doc-save", id: d.id, meta: Object.assign({}, d, { published: !d.published }) }).then(function (x) { if (!x.ok) return toast(x.error); toast(x.d.published ? "Published on the partner link" : "Unpublished"); tDocs(); }); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-ddel]"), function (b) { b.onclick = function () { var d = byId(b.dataset.ddel); sheet("Delete “" + d.title + "”?", "The file is removed for good.", [["🗑", "Delete", function () { api({ action: "eapi-doc-del", id: d.id }).then(function () { tDocs(); }); }, "danger"], ["", "Cancel", function () { }]]); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-drep]"), function (b) { b.onclick = function () { var inp = $("drf"); inp.onchange = function () { upload(inp.files[0], b.dataset.drep, null, b, null); }; inp.click(); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-ded]"), function (b) { b.onclick = function () { var d = byId(b.dataset.ded);
+        sheet("Edit document", d.name, [["💾", "Save", function () { api({ action: "eapi-doc-save", id: d.id, meta: { biz: $("eb").value, title: $("et").value, version: $("ev").value, env: $("ee").value, notes: $("en").value, published: $("ep2").checked } }).then(function (x) { if (!x.ok) return toast(x.error); toast("Saved"); tDocs(); }); }, "pri"], ["", "Cancel", function () { }]],
+          '<label class="lb">Business</label><select class="tx" id="eb">' + r.biz.map(function (x) { return "<option" + (x === d.biz ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + '</select><label class="lb">Title</label><input class="tx" id="et" value="' + esc(d.title) + '"><label class="lb">Version / date</label><input class="tx" id="ev" value="' + esc(d.version || "") + '"><label class="lb">Environment</label><select class="tx" id="ee">' + [["", "—"], ["uat", "UAT"], ["prod", "Production"], ["both", "UAT + Production"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (d.env || "") ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><label class="lb">Notes</label><textarea class="tx" id="en" rows="3">' + esc(d.notes || "") + '</textarea><label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="ep2"' + (d.published ? " checked" : "") + "><i></i><span>Published on the partner link</span></label>"); }; });
+    });
+  }
+  // ======================= partner documents page (?d=…, no login) =======================
+  function partnerDocs(tk) {
+    var pp = function (body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", d: tk }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection" }; }); };
+    document.querySelector(".hero h1").textContent = "vivo IMEI Business APIs"; document.querySelector(".hero p").textContent = "Documents and API reference for partners";
+    pp({ action: "eapi-p-docs" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      var L = r.rows;
+      VIEW.innerHTML = (L.length ? r.biz.filter(function (g) { return L.some(function (d) { return d.biz === g; }); }).map(function (g) { return '<div class="sec" style="margin-top:12px"><span>' + esc(g) + "</span></div>" + L.filter(function (d) { return d.biz === g; }).map(function (d) {
+          return '<div class="card" style="margin-top:8px"><b>📄 ' + esc(d.title) + '</b><div class="muted" style="font-size:12px;margin-top:2px">' + esc([d.version, ENVN[d.env], fsize(d.size), "updated " + when(d.upd || d.at)].filter(Boolean).join(" · ")) + "</div>" + (d.notes ? '<div style="font-size:12.5px;margin-top:4px;white-space:pre-wrap">' + esc(d.notes) + "</div>" : "") + '<button class="btn pri sm" data-pd="' + d.id + '" style="margin-top:8px">⬇ Download</button></div>'; }).join(""); }).join("") : '<div class="card empty">No documents are published yet.</div>') +
+        (r.ref && r.endpoints ? '<div class="sec" style="margin-top:16px"><span>📘 API reference (English)</span></div>' + refHtml(r.endpoints, "", false) : "");
+      [].forEach.call(VIEW.querySelectorAll("[data-pd]"), function (b) { b.onclick = function () { b.disabled = true; getFile(function (n) { return pp({ action: "eapi-p-doc", id: b.dataset.pd, n: n }); }).then(function () { b.disabled = false; }); }; });
+    });
+  }
   function start() {
     if (!AUTH || !AUTH.token) {
       try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { }
@@ -477,26 +546,26 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     });
   }
   function draw() {
-    var tabs = [["test", "🧪 Send a request"], ["cases", "✅ Test cases"], ["log", "📜 History"], ["codes", "📚 Error codes"], ["cfg", "⚙️ Set-up"]];
+    var tabs = [["test", "🧪 Send a request"], ["cases", "✅ Test cases"], ["log", "📜 History"], ["ref", "📘 API reference"], ["docs", "📂 Documents"], ["codes", "📚 Error codes"], ["cfg", "⚙️ Set-up"]];
     VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div>' +
-      (TAB !== "cfg" && TAB !== "codes" ? '<div class="envs" style="margin-top:10px"><button data-env="uat" class="uat ' + (ENV === "uat" ? "on" : "") + '">🧪 UAT' + (KEYS.uat.secret ? "" : " · not set up") + '</button><button data-env="prod" class="prod ' + (ENV === "prod" ? "on" : "") + '">🔴 Production' + (KEYS.prod.secret ? "" : " · not set up") + "</button></div>" : "") + '<div id="tp"></div>';
+      (TAB !== "cfg" && TAB !== "codes" && TAB !== "ref" && TAB !== "docs" ? '<div class="envs" style="margin-top:10px"><button data-env="uat" class="uat ' + (ENV === "uat" ? "on" : "") + '">🧪 UAT' + (KEYS.uat.secret ? "" : " · not set up") + '</button><button data-env="prod" class="prod ' + (ENV === "prod" ? "on" : "") + '">🔴 Production' + (KEYS.prod.secret ? "" : " · not set up") + "</button></div>" : "") + '<div id="tp"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; try { history.replaceState(null, "", "#" + TAB); } catch (e) { } draw(); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-env]"), function (b) { b.onclick = function () { ENV = b.dataset.env; FORM = {}; try { localStorage.setItem("eapi-env", ENV); } catch (e) { } draw(); }; });
-    ({ test: tTest, cases: tCases, log: tLog, codes: tCodes, cfg: tCfg })[TAB]();
+    ({ test: tTest, cases: tCases, log: tLog, codes: tCodes, ref: tRef, docs: tDocs, cfg: tCfg })[TAB]();
   }
 
   // ======================= single request =======================
   function tTest() {
     var E = CFG.envs[ENV], fields = EPS[EP].fields;
-    if (!FORM.ep || FORM.ep !== EP) { var bv = baseVals(); FORM = { ep: EP, vals: bv, on: {}, sig: FORM.sig || "ok", raw: null }; fields.forEach(function (f) { FORM.on[f] = true; }); }
-    $("tp").innerHTML = '<div class="card"><label class="lb" style="margin-top:0">API</label><select class="tx" id="ep">' + Object.keys(EPS).map(function (k) { return '<option value="' + k + '"' + (k === EP ? " selected" : "") + ">" + esc(EPS[k].name) + "</option>"; }).join("") + "</select>" +
+    if (!FORM.ep || FORM.ep !== EP) { var bv = baseVals(); FORM = { ep: EP, vals: bv, on: {}, sig: FORM.sig || "ok", raw: null }; fields.forEach(function (f) { FORM.on[f] = !((EPS[EP].opt || []).includes(f) && !bv[f]); }); }
+    $("tp").innerHTML = '<div class="card"><label class="lb" style="margin-top:0">API</label><select class="tx" id="ep">' + bizList().map(function (g) { return '<optgroup label="' + esc(g) + '">' + Object.keys(EPS).filter(function (k) { return EPS[k].biz === g; }).map(function (k) { return '<option value="' + k + '"' + (k === EP ? " selected" : "") + ">" + esc(EPS[k].name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + "</select>" + '<div class="muted" style="font-size:12px;margin-top:5px">' + esc(EPS[EP].desc || "") + "</div>" +
       '<div class="fx" style="font-size:11.5px;color:var(--mut);margin-top:6px;word-break:break-all">POST ' + esc((E.url || "(URL not set)") + "/retail-emi/business/" + EP) + "</div>" +
-      (EPS[EP].changes ? '<div class="warn">⚠️ <b>' + (EP === "processInstallment" ? "Process" : "Release") + "</b> changes the IMEI's EMI status" + (ENV === "prod" ? " <b>on Production</b>" : "") + ". Use a test IMEI.</div>" : "") +
+      (EPS[EP].changes ? '<div class="warn">⚠️ This API <b>changes the IMEI’s status</b> in vivo’s system' + (ENV === "prod" ? " <b>on Production</b>" : "") + ". Use a test IMEI.</div>" : "") +
       '<div class="sec"><span>Request parameters</span><small class="muted">untick = leave the field out</small></div>' +
       fields.map(function (f) {
         var v = FORM.vals[f], ph = /^\{\{/.test(v);
-        return '<div class="fr' + (FORM.on[f] ? "" : " off") + '"><input type="checkbox" data-on="' + f + '"' + (FORM.on[f] ? " checked" : "") + '><label>' + esc(FLD[f]) + "</label>" +
-          (ph ? '<div class="chip"><span>From Set-up: <b>' + (f === "password" ? (KEYS[ENV].password ? "•••••• saved" : "not saved!") : esc(E.company || "not saved!")) + '</b></span><a data-ov="' + f + '">change</a></div>' : '<input class="tx" data-v="' + f + '" value="' + esc(v) + '"' + (f === "password" ? ' type="text" autocomplete="off"' : "") + ">") + "</div>";
+        return '<div class="fr' + (FORM.on[f] ? "" : " off") + '"><input type="checkbox" data-on="' + f + '"' + (FORM.on[f] ? " checked" : "") + '><label>' + esc(FLD[f] || f) + ((EPS[EP].opt || []).includes(f) ? ' <small class="muted">optional</small>' : "") + "</label>" +
+          ((EPS[EP].bool || []).includes(f) ? '<select class="tx" data-v="' + f + '"><option' + (v === "true" ? " selected" : "") + '>true</option><option' + (v === "false" ? " selected" : "") + ">false</option></select>" : ph ? '<div class="chip"><span>From Set-up: <b>' + (f === "password" ? (KEYS[ENV].password ? "•••••• saved" : "not saved!") : esc(E.company || "not saved!")) + '</b></span><a data-ov="' + f + '">change</a></div>' : '<input class="tx" data-v="' + f + '" value="' + esc(v) + '"' + (f === "password" ? ' type="text" autocomplete="off"' : "") + ">") + "</div>";
       }).join("") +
       '<label class="lb">Signature (gwSignature header)</label><select class="tx" id="sig">' + SIGS.map(function (s) { return '<option value="' + s[0] + '"' + (FORM.sig === s[0] ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select>" +
       '<div class="sec"><span>Body (JSON)</span><button class="btn ghost sm" id="rawb">' + (FORM.raw != null ? "↺ Back to the fields" : "✏️ Edit raw JSON") + "</button></div>" +
@@ -506,14 +575,14 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     $("ep").onchange = function () { EP = $("ep").value; FORM = {}; tTest(); };
     $("sig").onchange = function () { FORM.sig = $("sig").value; };
     [].forEach.call($("tp").querySelectorAll("[data-on]"), function (c) { c.onchange = function () { FORM.on[c.dataset.on] = c.checked; c.parentNode.classList.toggle("off", !c.checked); refresh(); }; });
-    [].forEach.call($("tp").querySelectorAll("[data-v]"), function (i) { i.oninput = function () { FORM.vals[i.dataset.v] = i.value; refresh(); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-v]"), function (i) { i.oninput = i.onchange = function () { FORM.vals[i.dataset.v] = i.value; refresh(); }; });
     [].forEach.call($("tp").querySelectorAll("[data-ov]"), function (a) { a.onclick = function () { FORM.vals[a.dataset.ov] = ""; tTest(); }; });
     $("rawb").onclick = function () { FORM.raw = FORM.raw != null ? null : currentRaw(); tTest(); };
     if ($("raw")) $("raw").oninput = function () { FORM.raw = $("raw").value; };
     $("pm").onclick = postman;
     $("send").onclick = function () {
       var go = function () { send(EP, currentRaw(), FORM.sig, "Manual", $("send")).then(function (r) { if (r) { LAST = r; showOut(r); } }); };
-      if (EPS[EP].changes && ENV === "prod") sheet("Send to Production?", (EP === "processInstallment" ? "Process Installment flags this IMEI for EMI" : "Release Installment unflags this IMEI") + " on vivo's live system.", [["▶", "Yes, send", go, "danger"], ["", "Cancel", function () { }]]);
+      if (EPS[EP].changes && ENV === "prod") sheet("Send to Production?", EPS[EP].name.split(" (")[0] + " changes this IMEI’s status on vivo’s live system.", [["▶", "Yes, send", go, "danger"], ["", "Cancel", function () { }]]);
       else go();
     };
     refresh();
@@ -561,10 +630,10 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       var body = r.rawFull != null ? r.rawFull : c.req;
       if (!withPw && pwJ) body = body.split('"password":"' + pwJ + '"').join('"password":"••••••"');
       var url = r.sent.url || c.url, inv = c.inv || "", js = JSON.stringify;
-      if (CD === "py") return ["# vivo EMI Business API — " + envName(c.env) + " · " + c.ep, "# pip install requests", "import base64, hashlib, time, requests", "", "URL = " + js(url), "INVOKER = " + js(inv), 'SECRET = "YOUR_SECRET"   # from vivo IT — never share it', "# keep the fields in this order: companyName, password, imei, modelName, scheme, financeAmount, dealerCode", "BODY = " + js(body) + "   # sent exactly as signed", "", "ts = str(int(time.time() * 1000))", 'sign = base64.b64encode(INVOKER.encode()).decode() + "@#" + ts + "@#" + hashlib.sha256((SECRET + ts + BODY).encode("utf-8")).hexdigest()', 'r = requests.post(URL, data=BODY.encode("utf-8"), headers={"Content-Type": "application/json", "gwSignature": sign}, timeout=20)', "print(r.status_code, r.text)"].join("\n");
-      if (CD === "js") return ["// vivo EMI Business API — " + envName(c.env) + " · " + c.ep + "  (Node.js 18+)", 'const crypto = require("crypto");', "", "const URL = " + js(url) + ";", "const INVOKER = " + js(inv) + ";", 'const SECRET = "YOUR_SECRET"; // from vivo IT — never share it', "// keep the fields in this order: companyName, password, imei, modelName, scheme, financeAmount, dealerCode", "const BODY = " + js(body) + "; // sent exactly as signed", "", "const ts = String(Date.now());", 'const sign = Buffer.from(INVOKER).toString("base64") + "@#" + ts + "@#" + crypto.createHash("sha256").update(SECRET + ts + BODY, "utf8").digest("hex");', 'fetch(URL, { method: "POST", headers: { "Content-Type": "application/json", gwSignature: sign }, body: BODY })', "  .then(async (r) => console.log(r.status, await r.text()));"].join("\n");
-      if (CD === "java") return ["// vivo EMI Business API — " + envName(c.env) + " · " + c.ep + "  (Java 11+)", "import java.net.URI; import java.net.http.*; import java.nio.charset.StandardCharsets; import java.security.MessageDigest; import java.util.Base64;", "", "public class VivoEmiApi {", "  public static void main(String[] a) throws Exception {", "    String url = " + js(url) + ";", "    String invoker = " + js(inv) + ";", '    String secret = "YOUR_SECRET"; // from vivo IT — never share it', "    // keep the fields in this order: companyName, password, imei, modelName, scheme, financeAmount, dealerCode", "    String body = " + js(body) + "; // sent exactly as signed", "    String ts = String.valueOf(System.currentTimeMillis());", "    byte[] h = MessageDigest.getInstance(\"SHA-256\").digest((secret + ts + body).getBytes(StandardCharsets.UTF_8));", "    StringBuilder hex = new StringBuilder(); for (byte b : h) hex.append(String.format(\"%02x\", b));", "    String sign = Base64.getEncoder().encodeToString(invoker.getBytes(StandardCharsets.UTF_8)) + \"@#\" + ts + \"@#\" + hex;", "    HttpRequest req = HttpRequest.newBuilder(URI.create(url)).header(\"Content-Type\", \"application/json\").header(\"gwSignature\", sign)", "        .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();", "    HttpResponse<String> res = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());", "    System.out.println(res.statusCode() + \" \" + res.body());", "  }", "}"].join("\n");
-      if (CD === "php") return ["<?php", "// vivo EMI Business API — " + envName(c.env) + " · " + c.ep, "$url = " + js(url) + ";", "$invoker = " + js(inv) + ";", '$secret = "YOUR_SECRET"; // from vivo IT — never share it', "// keep the fields in this order: companyName, password, imei, modelName, scheme, financeAmount, dealerCode", "$body = " + "'" + body.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'" + "; // sent exactly as signed", "$ts = (string) round(microtime(true) * 1000);", '$sign = base64_encode($invoker) . "@#" . $ts . "@#" . hash("sha256", $secret . $ts . $body);', "$ch = curl_init($url);", 'curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Content-Type: application/json", "gwSignature: " . $sign]]);', "$res = curl_exec($ch);", 'echo curl_getinfo($ch, CURLINFO_HTTP_CODE) . " " . $res;'].join("\n");
+      if (CD === "py") return ["# vivo EMI Business API — " + envName(c.env) + " · " + c.ep, "# pip install requests", "import base64, hashlib, time, requests", "", "URL = " + js(url), "INVOKER = " + js(inv), 'SECRET = "YOUR_SECRET"   # from vivo IT — never share it', "# keep the fields in this order (the gateway checks the signature against it)", "BODY = " + js(body) + "   # sent exactly as signed", "", "ts = str(int(time.time() * 1000))", 'sign = base64.b64encode(INVOKER.encode()).decode() + "@#" + ts + "@#" + hashlib.sha256((SECRET + ts + BODY).encode("utf-8")).hexdigest()', 'r = requests.post(URL, data=BODY.encode("utf-8"), headers={"Content-Type": "application/json", "gwSignature": sign}, timeout=20)', "print(r.status_code, r.text)"].join("\n");
+      if (CD === "js") return ["// vivo EMI Business API — " + envName(c.env) + " · " + c.ep + "  (Node.js 18+)", 'const crypto = require("crypto");', "", "const URL = " + js(url) + ";", "const INVOKER = " + js(inv) + ";", 'const SECRET = "YOUR_SECRET"; // from vivo IT — never share it', "// keep the fields in this order (the gateway checks the signature against it)", "const BODY = " + js(body) + "; // sent exactly as signed", "", "const ts = String(Date.now());", 'const sign = Buffer.from(INVOKER).toString("base64") + "@#" + ts + "@#" + crypto.createHash("sha256").update(SECRET + ts + BODY, "utf8").digest("hex");', 'fetch(URL, { method: "POST", headers: { "Content-Type": "application/json", gwSignature: sign }, body: BODY })', "  .then(async (r) => console.log(r.status, await r.text()));"].join("\n");
+      if (CD === "java") return ["// vivo EMI Business API — " + envName(c.env) + " · " + c.ep + "  (Java 11+)", "import java.net.URI; import java.net.http.*; import java.nio.charset.StandardCharsets; import java.security.MessageDigest; import java.util.Base64;", "", "public class VivoEmiApi {", "  public static void main(String[] a) throws Exception {", "    String url = " + js(url) + ";", "    String invoker = " + js(inv) + ";", '    String secret = "YOUR_SECRET"; // from vivo IT — never share it', "    // keep the fields in this order (the gateway checks the signature against it)", "    String body = " + js(body) + "; // sent exactly as signed", "    String ts = String.valueOf(System.currentTimeMillis());", "    byte[] h = MessageDigest.getInstance(\"SHA-256\").digest((secret + ts + body).getBytes(StandardCharsets.UTF_8));", "    StringBuilder hex = new StringBuilder(); for (byte b : h) hex.append(String.format(\"%02x\", b));", "    String sign = Base64.getEncoder().encodeToString(invoker.getBytes(StandardCharsets.UTF_8)) + \"@#\" + ts + \"@#\" + hex;", "    HttpRequest req = HttpRequest.newBuilder(URI.create(url)).header(\"Content-Type\", \"application/json\").header(\"gwSignature\", sign)", "        .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();", "    HttpResponse<String> res = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());", "    System.out.println(res.statusCode() + \" \" + res.body());", "  }", "}"].join("\n");
+      if (CD === "php") return ["<?php", "// vivo EMI Business API — " + envName(c.env) + " · " + c.ep, "$url = " + js(url) + ";", "$invoker = " + js(inv) + ";", '$secret = "YOUR_SECRET"; // from vivo IT — never share it', "// keep the fields in this order (the gateway checks the signature against it)", "$body = " + "'" + body.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'" + "; // sent exactly as signed", "$ts = (string) round(microtime(true) * 1000);", '$sign = base64_encode($invoker) . "@#" . $ts . "@#" . hash("sha256", $secret . $ts . $body);', "$ch = curl_init($url);", 'curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Content-Type: application/json", "gwSignature: " . $sign]]);', "$res = curl_exec($ch);", 'echo curl_getinfo($ch, CURLINFO_HTTP_CODE) . " " . $res;'].join("\n");
       return ["vivo EMI Business API — request report", "Environment: " + envName(c.env) + "   API: " + c.ep + "   Time: " + new Date(c.at).toLocaleString("en-IN"), "Result: " + verdict(c).t + "   HTTP " + (c.status || "no reply") + "   " + c.ms + " ms" + (c.traceId ? "   traceId " + c.traceId : ""), "", "— Request —", "POST " + url, "Content-Type: application/json", "gwSignature: " + (c.sigFull || r.sent.headers.gwSignature), "  invokerName: " + inv + "   timestamp: " + (c.ts || "") + "   format: " + fmtName(c.fmt || "compact|ok"), "", body, "", "— Response —", (function () { try { return JSON.stringify(JSON.parse(c.resp), null, 2); } catch (e) { return c.resp || c.err || "(empty)"; } })(), "", "— cURL —", curl(withPw)].join("\n");
     };
     var drawCode = function () { $("codev").textContent = code($("shpw") && $("shpw").checked); };
@@ -603,8 +672,19 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
   // ======================= test cases =======================
   function cases() {
     var Q = "queryInstallment", P = "processInstallment", R = "releaseInstallment", bv = baseVals();
-    var mk = function (id, grp, name, ep, vals, omit, sig, expect, raw) { return { id: id, grp: grp, name: name, ep: ep, raw: raw != null ? raw : bodyOf(ep, Object.assign({}, bv, vals || {}), omit), sig: sig || "ok", expect: expect }; };
-    var miss = function (ep, f, g) { return mk(ep.slice(0, 1).toUpperCase() + "-miss-" + f, g, "Missing " + FLD[f] + " → CHECK_PARAM_MISSING", ep, null, [f], "ok", ["CHECK_PARAM_MISSING"]); };
+    var mk = function (id, grp, name, ep, vals, omit, sig, expect, raw) { var v = Object.assign({}, bv, vals || {}), om = (omit || []).concat((EPS[ep].opt || []).filter(function (f) { return !v[f]; })); return { id: id, grp: grp, name: name, ep: ep, raw: raw != null ? raw : bodyOf(ep, v, om), sig: sig || "ok", expect: expect }; };
+    var SC = { queryInstallment: "QI", processInstallment: "PI", releaseInstallment: "RI", queryTradeIn: "QT", processTradeIn: "PT", processTradeInRetail: "PR", processServiceProtection: "SP", processBuyback: "BB", studentAuthentication: "SA" };
+    var miss = function (ep, f, g) { return mk((SC[ep] || ep) + "-miss-" + f, g, "Missing " + (FLD[f] || f) + " → CHECK_PARAM_MISSING", ep, null, [f], "ok", ["CHECK_PARAM_MISSING"]); };
+    var QT = "queryTradeIn", PT = "processTradeIn", PR = "processTradeInRetail", SPp = "processServiceProtection", BB = "processBuyback", SA = "studentAuthentication";
+    var REQ = function (ep) { return EPS[ep].fields.filter(function (f) { return (EPS[ep].opt || []).indexOf(f) < 0; }); };
+    var checks = function (ep, g) {   // validation-only checks for one API: every required field missing + wrong company / IMEI / model
+      var o = REQ(ep).map(function (f) { return miss(ep, f, g); }), F = EPS[ep].fields;
+      if (F.indexOf("companyName") >= 0) o.push(mk(SC[ep] + "-company", g, "Wrong company name → COMPANY_NAME_IS_NOT_EXISTS", ep, { companyName: "NoSuchPartner" }, null, "ok", ["COMPANY_NAME_IS_NOT_EXISTS"]));
+      if (F.indexOf("password") >= 0) o.push(mk(SC[ep] + "-password", g, "Wrong password → rejected", ep, { password: "wrong-password-123" }, null, "ok", "fail"));
+      o.push(mk(SC[ep] + "-imei-unknown", g, "IMEI not in vivo's system → rejected", ep, { imei: badIm }, null, "ok", ["BI_IMEI_NOT_EXIST", "IMEI_BUSINESS_NOT_EXIST"]));
+      if (F.indexOf("modelName") >= 0) o.push(mk(SC[ep] + "-model", g, "Model doesn't match the IMEI → rejected", ep, { modelName: "vivo X999 Test" }, null, "ok", ["IMEI_MODEL_NOT_MATCH_MODEL", "IMEI_MODEL_NOT_IN_EMI_PRODUCT", "EMI_PRODUCT_NOT_EXIST", "AGENCY_PERMISSION_NOT_EXIST", "IMEI_PRODUCT_NOT_IN_AGENCY_PERMISSION"]));
+      return o;
+    };
     var badIm = bv.imei ? bv.imei.slice(0, 14) + ((+bv.imei.slice(14) + 1) % 10) : "111111111111111";
     var L = [
       mk("Q1", "Query", "Valid request → success", Q, null, null, "ok", "success"),
@@ -629,13 +709,29 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       mk("P-imei-unknown", "Process — validation only", "IMEI not in vivo's system → BI_IMEI_NOT_EXIST", P, { imei: badIm }, null, "ok", ["BI_IMEI_NOT_EXIST"]),
       miss(R, "imei", "Release — validation only"), miss(R, "password", "Release — validation only"),
       mk("R-imei-unknown", "Release — validation only", "IMEI not in vivo's system → rejected", R, { imei: badIm }, null, "ok", "fail"),
+      mk("QT1", "Trade-in — query", "Valid request → success", QT, null, null, "ok", "success")
+    ].concat(checks(QT, "Trade-in — query"), [
+      mk("QT-dealer", "Trade-in — query", "Another dealer's code → Invalid Dealer Code", QT, { dealerCode: "ZZ0000000" }, null, "ok", ["IMEI_NOT_BELONG_DEALER", "CHOOSE_STORE_RETAILER_DIFFERENT_IMEI_RETAILER"])
+    ], checks(PT, "Trade-in — process (validation only)"), checks(PR, "Trade-in retail — process (validation only)"), checks(SPp, "Service protection (validation only)"), checks(BB, "ABB / buyback (validation only)"), [
+      miss(SA, "imei", "Student authentication (validation only)"), miss(SA, "isRocketIdAuthenticated", "Student authentication (validation only)"),
+      mk("SA-text", "Student authentication (validation only)", "isRocketIdAuthenticated sent as text \"yes\" → rejected", SA, { isRocketIdAuthenticated: "yes" }, null, "ok", "fail"),
+      mk("SA-imei-unknown", "Student authentication (validation only)", "IMEI not in vivo's system → rejected", SA, { imei: badIm }, null, "ok", "fail"),
+      // live flows: these change the test IMEI's status — run only on a test IMEI
+      mk("LT1", "Live — trade-in (changes the test IMEI)", "Process trade-in → success", PT, null, null, "ok", "success"),
+      mk("LT2", "Live — trade-in (changes the test IMEI)", "Process it again → already processed", PT, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING", "BUSINESS_MUTEX_CONFLICT"]),
+      mk("LT3", "Live — trade-in (changes the test IMEI)", "Query trade-in → shows it", QT, null, null, "ok", "success"),
+      mk("LS1", "Live — service protection (changes the test IMEI)", "Process service protection → success", SPp, null, null, "ok", "success"),
+      mk("LS2", "Live — service protection (changes the test IMEI)", "Process it again → already processed", SPp, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING", "BUSINESS_MUTEX_CONFLICT"]),
+      mk("LB1", "Live — ABB / buyback (changes the test IMEI)", "Process buyback → success", BB, null, null, "ok", "success"),
+      mk("LA1", "Live — student authentication (changes the test IMEI)", "Authenticate student (true) → success", SA, { isRocketIdAuthenticated: "true" }, null, "ok", "success"),
+      mk("LA2", "Live — student authentication (changes the test IMEI)", "Query installment → specialBusinessList shows 5", Q, null, null, "ok", "success"),
       // live flow: changes the test IMEI's EMI status — run only on a test IMEI
-      mk("L1", "Live flow (changes the test IMEI)", "Process the test IMEI → success", P, null, null, "ok", "success"),
-      mk("L2", "Live flow (changes the test IMEI)", "Process it again → already processed", P, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING"]),
-      mk("L3", "Live flow (changes the test IMEI)", "Query it → success, shows the installment", Q, null, null, "ok", "success"),
-      mk("L4", "Live flow (changes the test IMEI)", "Release it → success", R, null, null, "ok", "success"),
-      mk("L5", "Live flow (changes the test IMEI)", "Release it again → already released", R, null, null, "ok", ["BUSINESS_ALREADY_RELEASED", "BUSINESS_TYPE_ALREADY_RELEASE", "BUSINESS_NOT_EXIST"])
-    ];
+      mk("L1", "Live — installment (changes the test IMEI)", "Process the test IMEI → success", P, null, null, "ok", "success"),
+      mk("L2", "Live — installment (changes the test IMEI)", "Process it again → already processed", P, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING"]),
+      mk("L3", "Live — installment (changes the test IMEI)", "Query it → success, shows the installment", Q, null, null, "ok", "success"),
+      mk("L4", "Live — installment (changes the test IMEI)", "Release it → success", R, null, null, "ok", "success"),
+      mk("L5", "Live — installment (changes the test IMEI)", "Release it again → already released", R, null, null, "ok", ["BUSINESS_ALREADY_RELEASED", "BUSINESS_TYPE_ALREADY_RELEASE", "BUSINESS_NOT_EXIST"])
+    ]);
     return L;
   }
   function judge(cs, c) {
@@ -659,7 +755,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn pri" id="run"' + (missing.length ? " disabled" : "") + '>▶ Run selected</button><button class="btn ghost sm" id="sall">Select all checks</button><button class="btn ghost sm" id="snone">Clear</button><button class="btn ghost sm" id="xl">⬇ Excel report</button></div><div id="prog" class="muted" style="font-size:12px;margin-top:6px"></div></div>' +
       groups.map(function (g) {
         var live = /^Live/.test(g);
-        return '<div class="sec"><span>' + esc(g) + "</span></div>" + (live ? '<div class="warn">These <b>really process and release</b> the test IMEI' + (ENV === "prod" ? " on <b>Production</b>" : "") + ". They run in order. Use an IMEI kept for testing; L4 releases it again at the end.</div>" : "") +
+        return '<div class="sec"><span>' + esc(g) + "</span></div>" + (live ? '<div class="warn">These <b>really change</b> the test IMEI' + (ENV === "prod" ? " on <b>Production</b>" : "") + ". They run in order." + (/installment/.test(g) ? " L4 releases it again at the end." : " <b>There is no API to undo this</b> — the IMEI stays marked, so use an IMEI kept only for testing, preferably on UAT.") + "</div>" : "") +
           '<div class="tbw"><table class="tb case">' + L.filter(function (c) { return c.grp === g; }).map(function (c) {
             var r = resOf(c.id), j = r ? judge(c, r.call) : null;
             return '<tr><td><input type="checkbox" data-c="' + c.id + '"' + (SEL[c.id] ? " checked" : "") + '></td><td><b>' + esc(c.name) + '</b><br><small class="muted">' + esc(EPS[c.ep].name.split(" (")[0]) + " · expects " + esc(c.expect === "success" ? "success" : c.expect === "fail" ? "a failure" : c.expect.join(" / ")) + "</small>" +
@@ -687,7 +783,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
           send(cs.ep, cs.raw, cs.sig, cs.id + " · " + cs.name).then(function (r) { if (r) RESULTS.push({ cs: cs, call: r.call, env: ENV, sent: r.sent }); setTimeout(next, 250); });
         })();
       };
-      if (live) sheet("Run the live flow on " + envName(ENV) + "?", "L1–L5 really process and then release IMEI " + esc(((CFG.envs[ENV].base || {}).imei) || "") + ". Only do this with an IMEI kept for testing.", [["▶", "Yes, run", go, ENV === "prod" ? "danger" : "pri"], ["", "Cancel", function () { }]]);
+      if (live) sheet("Run the live flow on " + envName(ENV) + "?", "The ticked live cases really change IMEI " + (((CFG.envs[ENV].base || {}).imei) || "") + ". Trade-in, service protection, buyback and student authentication can’t be undone by API. Only do this with an IMEI kept for testing.", [["▶", "Yes, run", go, ENV === "prod" ? "danger" : "pri"], ["", "Cancel", function () { }]]);
       else go();
     };
   }
@@ -707,6 +803,20 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
   }
 
   // ======================= error codes =======================
+  // English version of vivo's IMEI Business API document (14 Oct 2026, translated from the Chinese/English original)
+  var FDESC = { companyName: "Company name (partner)", password: "Password — sent as plain text, MD5-hashed by vivo's server", imei: "Device IMEI (IMEI 1)", modelName: "Device model name", scheme: "Installment scheme", financeAmount: "Finance (loan) amount", dealerCode: "Dealer / retailer (store) code as in vivo vWork", oldPhoneBrand: "Old phone brand", oldPhoneModel: "Old phone model", plan: "Service plan", isRocketIdAuthenticated: "Whether RocketId authentication passed (true / false)" };
+  var UPD = { processInstallment: "scheme and financeAmount are now required — missing → CHECK_PARAM_MISSING.", queryInstallment: "Breaking change: modelName and dealerCode are now required. The query is validated like Process Installment (model match, company agency rights, store ownership incl. cross-store rules). specialBusinessList returns pending special discounts (5 = student, 6 = corporate).", processTradeIn: "New optional field dealerCode.", processTradeInRetail: "New optional field dealerCode.", queryTradeIn: "modelName is now required. specialBusinessList returns pending special discounts (5 = student, 6 = corporate).", processServiceProtection: "erpCode removed — the server no longer accepts it; remove it from requests.", studentAuthentication: "isRocketIdAuthenticated is now required — missing → parameter check error." };
+  function tRef() { $("tp").innerHTML = refHtml(EPS, (CFG.envs[ENV] || {}).url, true); [].forEach.call($("tp").querySelectorAll("[data-try]"), function (b) { b.onclick = function () { EP = b.dataset.try; FORM = {}; TAB = "test"; draw(); }; }); }
+  function refHtml(EPS, baseUrl, tryBtn) {
+    var E = { url: baseUrl };
+    return '<div class="card" style="margin-top:10px;font-size:13px;line-height:1.6"><b style="font-size:15px">IMEI Business API — English reference</b><div class="muted" style="font-size:12px">Retail EMI system · document dated 14 Oct 2026 · all APIs: POST, JSON in and out, base path <span class="fx">/retail-emi/business</span></div>' +
+      '<div class="help" style="white-space:normal"><b>Authentication</b> — every request carries the header <span class="fx">gwSignature</span> = Base64(invokerName) + "@#" + timestamp (ms) + "@#" + SHA256Hex(secret + timestamp + body). invokerName and secret are given by vivo offline. <b>Keep the body fields in vivo’s order</b> (as listed below) — the gateway checks the signature against it.</div>' +
+      '<div class="help" style="white-space:normal"><b>Response</b> — <span class="fx">code</span> 200 = success, 30000 = failure · <span class="fx">errorCode</span> business error code on failure · <span class="fx">message</span> · <span class="fx">success</span> true/false · <span class="fx">traceId</span> · <span class="fx">data</span>: imei, imei2, model, processStatus (true = done), specialBusinessList (5 = student discount, 6 = corporate discount), errorMessage.</div></div>' +
+      bizList(EPS).map(function (g) { return '<div class="sec" style="margin-top:14px"><span>' + esc(g) + "</span></div>" + Object.keys(EPS).filter(function (k) { return EPS[k].biz === g; }).map(function (k) { var x = EPS[k];
+        return '<div class="card" style="margin-top:8px"><b>' + esc(x.name) + '</b><div class="fx" style="font-size:11.5px;color:var(--mut);word-break:break-all">POST ' + esc((E.url || "{baseUrl}") + "/retail-emi/business/" + k) + '</div><div style="font-size:13px;margin-top:4px">' + esc(x.desc) + "</div>" + (UPD[k] ? '<div class="warn" style="font-size:12px">🆕 ' + esc(UPD[k]) + "</div>" : "") +
+          '<div class="tbw"><table class="tb"><tr><th>Field (in order)</th><th>Type</th><th>Required</th><th>Meaning</th></tr>' + x.fields.map(function (f) { return '<tr><td class="fx">' + f + "</td><td>" + ((x.bool || []).indexOf(f) >= 0 ? "Boolean" : "String") + "</td><td>" + ((x.opt || []).indexOf(f) >= 0 ? "No" : "<b>Yes</b>") + "</td><td>" + esc(FDESC[f] || "") + "</td></tr>"; }).join("") + "</table></div>" +
+          (tryBtn ? '<button class="btn ghost sm" data-try="' + k + '" style="margin-top:8px">🧪 Try it</button>' : "") + "</div>"; }).join(""); }).join("");
+  }
   function tCodes() {
     $("tp").innerHTML = '<div class="help" style="margin-top:10px">vivo’s error list from the API document. The tester shows the partner-facing message whenever a reply carries one of these codes.</div><div class="tbw"><table class="tb"><tr><th>#</th><th>errorCode</th><th>Meaning</th><th>Partner sees</th></tr>' + CODES.map(function (c, i) { return "<tr><td>" + (i + 1) + '</td><td class="fx" style="font-size:11px">' + c[0] + "</td><td>" + esc(c[1]) + "</td><td>" + esc(c[2]) + "</td></tr>"; }).join("") + "</table></div>";
   }
@@ -720,7 +830,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
         '<div><label class="lb">Company name</label><input class="tx" data-k="' + e + '.company" value="' + esc(E.company) + '"></div>' +
         '<div><label class="lb">Company password ' + (K.password ? '<span class="pill g">saved ✓</span>' : '<span class="pill r">not saved</span>') + '</label><input class="tx" type="password" autocomplete="new-password" data-s="' + e + '.password" placeholder="' + (K.password ? "leave blank to keep" : "partner password") + '">' + fpTxt(K.pfp) + '</div></div>' +
         '<label class="lb">Signature format</label><select class="tx" data-k="' + e + '.fmt">' + FMTS.map(function (f) { return '<option value="' + f[0] + '"' + ((E.fmt || "compact|ok") === f[0] ? " selected" : "") + ">" + esc(f[1]) + "</option>"; }).join("") + '</select><div class="muted" style="font-size:11.5px;margin-top:3px">Leave on standard. If the gateway says “check sign is not pass”, use 🔍 Find the right signature format on the test screen.</div>' +
-        '<div class="sec"><span>Valid test data (used by Test cases)</span></div><div class="g2"><div><label class="lb">Test IMEI</label><input class="tx fx" data-k="' + e + '.base.imei" value="' + esc(b.imei || "") + '" inputmode="numeric"></div><div><label class="lb">Its model name</label><input class="tx" data-k="' + e + '.base.model" value="' + esc(b.model || "") + '"></div><div><label class="lb">Its dealer code</label><input class="tx" data-k="' + e + '.base.dealer" value="' + esc(b.dealer || "") + '"></div><div><label class="lb">Scheme</label><input class="tx" data-k="' + e + '.base.scheme" value="' + esc(b.scheme || "") + '"></div><div><label class="lb">Finance amount</label><input class="tx" data-k="' + e + '.base.amount" value="' + esc(b.amount || "") + '" inputmode="decimal"></div></div>' +
+        '<div class="sec"><span>Valid test data (used by Test cases)</span></div><div class="g2"><div><label class="lb">Test IMEI</label><input class="tx fx" data-k="' + e + '.base.imei" value="' + esc(b.imei || "") + '" inputmode="numeric"></div><div><label class="lb">Its model name</label><input class="tx" data-k="' + e + '.base.model" value="' + esc(b.model || "") + '"></div><div><label class="lb">Its dealer code</label><input class="tx" data-k="' + e + '.base.dealer" value="' + esc(b.dealer || "") + '"></div><div><label class="lb">Scheme</label><input class="tx" data-k="' + e + '.base.scheme" value="' + esc(b.scheme || "") + '"></div><div><label class="lb">Finance amount</label><input class="tx" data-k="' + e + '.base.amount" value="' + esc(b.amount || "") + '" inputmode="decimal"></div><div><label class="lb">Old phone brand (trade-in)</label><input class="tx" data-k="' + e + '.base.oldBrand" value="' + esc(b.oldBrand || "") + '" placeholder="e.g. Samsung"></div><div><label class="lb">Old phone model (trade-in)</label><input class="tx" data-k="' + e + '.base.oldModel" value="' + esc(b.oldModel || "") + '" placeholder="e.g. Galaxy M31"></div><div><label class="lb">Service plan (service protection)</label><input class="tx" data-k="' + e + '.base.plan" value="' + esc(b.plan || "") + '"></div></div>' +
         ((K.secret || K.password) ? '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" data-clear="' + e + '"><i></i><span>Delete the saved secret and password</span></label>' : "") + "</div>";
     };
     $("tp").innerHTML = '<div class="help" style="margin-top:10px">🔒 The secret and the company password are kept on the server and are never shown again — not on this screen, not in History, not in exports. Requests are signed on the server and sent to vivo’s gateway from there. Only HO admins can open this tool.</div>' + box("uat") + box("prod") +
@@ -754,17 +864,18 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       "pm.request.headers.upsert({ key: 'gwSignature', value: inv + '@#' + ts + '@#' + hash });"
     ];
     var test = ["pm.test('HTTP 200', () => pm.response.to.have.status(200));", "const r = pm.response.json();", "pm.test('success', () => pm.expect(r.success && r.code === 200 && !r.errorCode, r.errorCode + ' ' + r.message).to.be.true);"];
-    var tpl = { companyName: "{{companyName}}", password: "{{password}}", imei: "{{imei}}", modelName: "{{modelName}}", scheme: "{{scheme}}", financeAmount: "{{financeAmount}}", dealerCode: "{{dealerCode}}" };
+    var tpl = { companyName: "{{companyName}}", password: "{{password}}", imei: "{{imei}}", modelName: "{{modelName}}", scheme: "{{scheme}}", financeAmount: "{{financeAmount}}", dealerCode: "{{dealerCode}}", oldPhoneBrand: "{{oldPhoneBrand}}", oldPhoneModel: "{{oldPhoneModel}}", plan: "{{plan}}", isRocketIdAuthenticated: "true" };
     var col = {
       info: { name: "vivo EMI Business API (" + envName(ENV) + ")", schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json", description: "Signed automatically by the collection's pre-request script. Fill 'secret' and 'password' in the collection variables. Keep the body fields in this order: companyName, password, imei, modelName, scheme, financeAmount, dealerCode — the gateway checks the signature against that order." },
       event: [{ listen: "prerequest", script: { type: "text/javascript", exec: pre } }, { listen: "test", script: { type: "text/javascript", exec: test } }],
-      variable: [["baseUrl", E.url], ["invokerName", E.invoker], ["secret", ""], ["companyName", E.company], ["password", ""], ["imei", b.imei || ""], ["modelName", b.model || ""], ["dealerCode", b.dealer || ""], ["scheme", b.scheme || ""], ["financeAmount", b.amount || ""]].map(function (x) { return { key: x[0], value: x[1] || "" }; }),
-      item: Object.keys(EPS).map(function (ep) { return { name: EPS[ep].name, request: { method: "POST", header: [{ key: "Content-Type", value: "application/json" }], url: { raw: "{{baseUrl}}/retail-emi/business/" + ep, host: ["{{baseUrl}}"], path: ["retail-emi", "business", ep] }, body: { mode: "raw", raw: bodyOf(ep, tpl), options: { raw: { language: "json" } } } } }; })
+      variable: [["baseUrl", E.url], ["invokerName", E.invoker], ["secret", ""], ["companyName", E.company], ["password", ""], ["imei", b.imei || ""], ["modelName", b.model || ""], ["dealerCode", b.dealer || ""], ["scheme", b.scheme || ""], ["financeAmount", b.amount || ""], ["oldPhoneBrand", b.oldBrand || ""], ["oldPhoneModel", b.oldModel || ""], ["plan", b.plan || ""]].map(function (x) { return { key: x[0], value: x[1] || "" }; }),
+      item: bizList().map(function (g) { return { name: g, item: Object.keys(EPS).filter(function (ep) { return EPS[ep].biz === g; }).map(function (ep) { return { name: EPS[ep].name, request: { method: "POST", header: [{ key: "Content-Type", value: "application/json" }], url: { raw: "{{baseUrl}}/retail-emi/business/" + ep, host: ["{{baseUrl}}"], path: ["retail-emi", "business", ep] }, body: { mode: "raw", raw: JSON.stringify(JSON.parse(bodyOf(ep, tpl))), options: { raw: { language: "json" } } }, description: EPS[ep].desc } }; }) }; })
     };
     download(new Blob([JSON.stringify(col, null, 2)], { type: "application/json" }), "vivo_EMI_API_" + envName(ENV) + ".postman_collection.json");
   }
 
-  start();
+  var DTK = (new URLSearchParams(location.search).get("d") || "").replace(/[^a-f0-9]/g, "");
+  if (DTK) partnerDocs(DTK); else start();
 })();
 </script>
 </body>

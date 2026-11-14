@@ -34,7 +34,7 @@ import { plannerAction } from "./planner-core.mjs";
 import { spolAction } from "./spol-core.mjs";
 import { rtpAction, rtpPublic } from "./rtp-core.mjs";
 import { iubAction, iubPublic } from "./iub-core.mjs";
-import { emiApiAction } from "./emiapi-core.mjs";
+import { emiApiAction, emiDocPublic } from "./emiapi-core.mjs";
 import { hrAction, hrPublic } from "./hr-core.mjs";
 import { pcAction, pcPublic } from "./pc-core.mjs";
 import { msAction, msPublic } from "./ms-core.mjs";
@@ -522,6 +522,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   if (/^cv-p-/.test(b.action)) return bixPublic(b, { store, t, env });   // customer rating page (QR at the store) — no login
   if (/^kh-[op]-/.test(b.action)) return khPublic(b, { store, t, env, aiFetch, askAI, mailFetch, waFetch: mailFetch, jobFetch });   // shop owner (own login) + customers / distributors (secure link)
   if (/^rtp-public/.test(b.action)) return rtpPublic(b, { store, t, pool, askAI, env, aiFetch });
+  if (/^eapi-p-/.test(b.action)) return emiDocPublic(b, { store, t, pool });   // API documents partner page (no login)
   if (/^hr-p-/.test(b.action)) return hrPublic(b, { store, t, pool, env, mailFetch });   // referral link (no login) + candidate status link
   if (/^pc-p-/.test(b.action)) return pcPublic(b, { store, t, pool, env, mailFetch });   // photo contest link (no login)
   if (/^ms-p-/.test(b.action)) return msPublic(b, { store, t, pool, env });   // market survey link (no login)
