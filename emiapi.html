@@ -572,7 +572,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       '<label class="lb">Signature (gwSignature header)</label><select class="tx" id="sig">' + SIGS.map(function (s) { return '<option value="' + s[0] + '"' + (FORM.sig === s[0] ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select>" +
       '<div class="sec"><span>Body (JSON)</span><button class="btn ghost sm" id="rawb">' + (FORM.raw != null ? "↺ Back to the fields" : "✏️ Edit raw JSON") + "</button></div>" +
       (FORM.raw != null ? '<textarea class="code" id="raw" spellcheck="false">' + esc(FORM.raw) + "</textarea>" : '<div class="code" id="bodyv"></div>') +
-      '<div class="row" style="gap:8px;margin-top:10px"><button class="btn pri" id="send" style="flex:1">▶ Send to ' + envName(ENV) + '</button><button class="btn ghost" id="pm" title="Postman collection">⬇ Postman</button></div></div><div id="out"></div>';
+      '<div class="row" style="gap:8px;margin-top:10px"><button class="btn pri" id="send" style="flex:1">▶ Send to ' + envName(ENV) + '</button><button class="btn ghost" id="pm" title="Postman collection">⬇ Postman</button></div><button class="btn ghost sm" id="routes" style="margin-top:8px;width:100%">🧭 Check which APIs are open on ' + envName(ENV) + '</button><div id="routeOut"></div></div><div id="out"></div>';
     var refresh = function () { if ($("bodyv")) $("bodyv").textContent = currentRaw(); };
     $("ep").onchange = function () { EP = $("ep").value; FORM = {}; tTest(); };
     $("sig").onchange = function () { FORM.sig = $("sig").value; };
@@ -582,6 +582,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     $("rawb").onclick = function () { FORM.raw = FORM.raw != null ? null : currentRaw(); tTest(); };
     if ($("raw")) $("raw").oninput = function () { FORM.raw = $("raw").value; };
     $("pm").onclick = postman;
+    $("routes").onclick = routeCheck;
     $("send").onclick = function () {
       var go = function () { send(EP, currentRaw(), FORM.sig, "Manual", $("send")).then(function (r) { if (r) { LAST = r; showOut(r); } }); };
       if (EPS[EP].changes && ENV === "prod") sheet("Send to Production?", EPS[EP].name.split(" (")[0] + " changes this IMEI’s status on vivo’s live system.", [["▶", "Yes, send", go, "danger"], ["", "Cancel", function () { }]]);
@@ -649,6 +650,21 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     $("cpm").onclick = function () { copy(curl(false)); };
   }
 
+  // Which APIs does this environment's gateway actually have? Each API gets an empty body {} — safe: nothing can be
+  // processed without an IMEI. 404 = the API is not opened on this gateway; any other answer = it is there.
+  function routeCheck() {
+    var b = $("routes"), L = Object.keys(EPS), out = [], i = 0; b.disabled = true;
+    var draw2 = function (done) {
+      $("routeOut").innerHTML = '<div class="tbw"><table class="tb"><tr><th>API</th><th>On ' + envName(ENV) + "</th></tr>" + out.map(function (x) { var c = x.c, st = c.err ? ["o", "no reply"] : c.status === 404 ? ["r", "❌ not opened (404)"] : c.signFail ? ["o", "signature refused (403)"] : ["g", "✅ open"]; return "<tr><td>" + esc(EPS[x.ep].name) + '</td><td style="white-space:nowrap"><span class="pill ' + st[0] + '">' + st[1] + "</span></td></tr>"; }).join("") + "</table></div>" +
+        (done ? (out.some(function (x) { return x.c.status === 404; }) ? '<div class="warn">The ❌ APIs are not published on vivo’s ' + envName(ENV) + ' gateway for this invoker. Nothing to change in the tool — ask vivo IT to open them (send them this list).</div>' : '<div class="help">All APIs answer on ' + envName(ENV) + ".</div>") : '<div class="muted" style="font-size:12px;margin-top:4px">Checking ' + (i + 1) + " of " + L.length + "…</div>");
+    };
+    (function next() {
+      if (i >= L.length) { b.disabled = false; return draw2(true); }
+      draw2(false);
+      api({ action: "eapi-call", env: ENV, ep: L[i], raw: "{}", sig: "ok", label: "Route check" }).then(function (x) { if (x.ok) out.push({ ep: L[i], c: x.call }); i++; next(); });
+    })();
+  }
+
   // Try each known variant of the signature once and keep the one the gateway accepts
   function probe(ep, raw) {
     var b = $("probe"); b.disabled = true; var out = [], i = 0;
@@ -676,7 +692,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
   function cases() {
     var Q = "queryInstallment", P = "processInstallment", R = "releaseInstallment", bv = baseVals();
     var mk = function (id, grp, name, ep, vals, omit, sig, expect, raw) { var v = Object.assign({}, bv, vals || {}), om = (omit || []).concat((EPS[ep].opt || []).filter(function (f) { return !v[f]; })); return { id: id, grp: grp, name: name, ep: ep, raw: raw != null ? raw : bodyOf(ep, v, om), sig: sig || "ok", expect: expect }; };
-    var SC = { queryInstallment: "QI", processInstallment: "PI", releaseInstallment: "RI", queryTradeIn: "QT", processTradeIn: "PT", processTradeInRetail: "PR", processServiceProtection: "SP", processBuyback: "BB", studentAuthentication: "SA" };
+    var SC = { queryInstallment: "QI", processInstallment: "PI", releaseInstallment: "RI", queryTradeIn: "QT", processTradeIn: "PT", processTradeInRetail: "PR", processServiceProtection: "SP", processBuyback: "BB", studentAuthentication: "SA", enterpriseDiscount: "ED" };
     var miss = function (ep, f, g) { return mk((SC[ep] || ep) + "-miss-" + f, g, "Missing " + (FLD[f] || f) + " → CHECK_PARAM_MISSING", ep, null, [f], "ok", ["CHECK_PARAM_MISSING"]); };
     var QT = "queryTradeIn", PT = "processTradeIn", PR = "processTradeInRetail", SPp = "processServiceProtection", BB = "processBuyback", SA = "studentAuthentication";
     var REQ = function (ep) { return EPS[ep].fields.filter(function (f) { return (EPS[ep].opt || []).indexOf(f) < 0; }); };
@@ -719,6 +735,10 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       miss(SA, "imei", "Student authentication (validation only)"), miss(SA, "isRocketIdAuthenticated", "Student authentication (validation only)"),
       mk("SA-text", "Student authentication (validation only)", "isRocketIdAuthenticated sent as text \"yes\" → rejected", SA, { isRocketIdAuthenticated: "yes" }, null, "ok", "fail"),
       mk("SA-imei-unknown", "Student authentication (validation only)", "IMEI not in vivo's system → rejected", SA, { imei: badIm }, null, "ok", "fail"),
+      miss("enterpriseDiscount", "imei", "Enterprise discount (validation only)"),
+      mk("ED-imei-unknown", "Enterprise discount (validation only)", "IMEI not in vivo's system → rejected", "enterpriseDiscount", { imei: badIm }, null, "ok", "fail"),
+      mk("LE1", "Live — enterprise discount (changes the test IMEI)", "Apply enterprise discount → success", "enterpriseDiscount", null, null, "ok", "success"),
+      mk("LE2", "Live — enterprise discount (changes the test IMEI)", "Query installment → specialBusinessList shows 6", Q, null, null, "ok", "answered"),
       // live flows: these change the test IMEI's status — run only on a test IMEI
       mk("LT1", "Live — trade-in (changes the test IMEI)", "Process trade-in → success", PT, null, null, "ok", "success"),
       mk("LT2", "Live — trade-in (changes the test IMEI)", "Process it again → already processed", PT, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING", "BUSINESS_MUTEX_CONFLICT"]),

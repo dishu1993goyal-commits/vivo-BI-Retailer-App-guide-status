@@ -20,6 +20,7 @@ export const EAPI_ENDPOINTS = {
   processServiceProtection: { biz: "Service protection", name: "Process Service Protection (GetIMEIActivation)", desc: "Apply service protection (service plan) on an IMEI. erpCode is no longer accepted.", fields: ["companyName", "password", "imei", "dealerCode", "plan"], opt: ["dealerCode", "plan"], changes: true },
   processBuyback: { biz: "ABB (assured buyback)", name: "Process Buyback (GetImeiSoldStatus)", desc: "Apply buyback (ABB) for an IMEI.", fields: ["companyName", "password", "imei", "modelName"], docFields: ["companyName", "password", "modelName", "imei"], changes: true },
   studentAuthentication: { biz: "Student authentication", name: "Student Authentication", desc: "Authenticate a student for the student discount. isRocketIdAuthenticated (true / false) is required.", fields: ["imei", "isRocketIdAuthenticated"], bool: ["isRocketIdAuthenticated"], changes: true },
+  enterpriseDiscount: { biz: "Enterprise discount", name: "Enterprise Discount", desc: "Apply the enterprise (corporate) discount on an IMEI. After success the query APIs return 6 in specialBusinessList.", fields: ["imei"], changes: true },
 };
 const DEF_ENV = {
   prod: { url: "https://in-vwork.vivo.xyz/gw/04", invoker: "emi-company-consumer", company: "Benow" },
@@ -156,29 +157,31 @@ export async function emiApiAction(b, ctx) {
 //   eapidoc:<id>        { id, biz, title, version, env, notes, name, mime, size, chunks, published, at, by, upd, done }
 //   eapidocb:<id>:<n>   { d: base64 piece ≤ 1.4 MB }
 //   eapidoclink         { token, on, ref }   — read-only partner page: published documents + the English API reference
-export const DOC_BIZ = ["Installment (EMI)", "Trade-in", "Service protection", "ABB (assured buyback)", "Student authentication", "All businesses / general"];
+export const DOC_BIZ = ["Installment (EMI)", "Trade-in", "Service protection", "ABB (assured buyback)", "Student authentication", "Enterprise discount", "All businesses / general"];
 const DOC_MIME = /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|application\/msword|application\/vnd\.ms-excel|text\/plain|application\/json|application\/zip|image\/(png|jpeg))$/;
 async function docLink(store) { let l = await store.get("eapidoclink"); if (!l) { l = { token: randomBytes(12).toString("hex"), on: false, ref: true }; await store.set("eapidoclink", l); } return l; }
 const docPub = (d) => ({ id: d.id, biz: d.biz, title: d.title, version: d.version, env: d.env, notes: d.notes, name: d.name, mime: d.mime, size: d.size, chunks: d.chunks, published: !!d.published, at: d.at, upd: d.upd, by: d.by });
 // the business-wise documents made by vivo BI (v1.0) are bundled with the function and added once, published
-const SEED = [["Installment", "Installment (EMI)"], ["Trade-in", "Trade-in"], ["Service-protection", "Service protection"], ["ABB-Buyback", "ABB (assured buyback)"], ["Student-authentication", "Student authentication"]];
+const SEED = [["Installment", "Installment (EMI)"], ["Trade-in", "Trade-in"], ["Service-protection", "Service protection"], ["ABB-Buyback", "ABB (assured buyback)"], ["Student-authentication", "Student authentication"], ["Enterprise-discount", "Enterprise discount"]];
+const SEED_VER = "v1.1", SEED_FLAG = "eapidocseed2";   // a new SEED_VER replaces the earlier ready-made files (files HO uploaded are never touched)
 async function seedDocs(store, t, env) {
-  if (await store.get("eapidocseed1")) return 0;
+  if (await store.get(SEED_FLAG)) return 0;
   const fs = await import("node:fs"), path = await import("node:path");
   let here = ""; try { here = path.dirname(new URL(import.meta.url).pathname); } catch (e) { }
   const dirs = [env.SEED_DIR, here && path.join(here, "../seed/apidocs"), path.join(process.cwd(), "netlify/seed/apidocs"), path.join(process.cwd(), "../netlify/seed/apidocs"), "/var/task/netlify/seed/apidocs"].filter(Boolean);
-  const dir = dirs.find((d) => { try { return fs.existsSync(path.join(d, "vivo_Installment_API_Documentation_v1.0.pdf")); } catch (e) { return false; } });
+  const dir = dirs.find((d) => { try { return fs.existsSync(path.join(d, "vivo_Installment_API_Documentation_" + SEED_VER + ".pdf")); } catch (e) { return false; } });
   if (!dir) return 0;
+  for (const k of await store.list("eapidoc:")) { const d = await store.get(k); if (d && d.seed && !d.seed.includes("_" + SEED_VER + ".")) { for (let i = 0; i < (d.chunks || 8); i++) await store.delete(`eapidocb:${d.id}:${i}`); await store.delete(k); } }
   let n = 0;
   for (const [key, biz] of SEED) for (const [ext, mime, kind] of [["pdf", "application/pdf", "PDF"], ["docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Word"]]) {
-    const name = `vivo_${key}_API_Documentation_v1.0.${ext}`; let buf; try { buf = fs.readFileSync(path.join(dir, name)); } catch (e) { continue; }
+    const name = `vivo_${key}_API_Documentation_${SEED_VER}.${ext}`; let buf; try { buf = fs.readFileSync(path.join(dir, name)); } catch (e) { continue; }
     const b64s = buf.toString("base64"), parts = []; for (let i = 0; i < b64s.length; i += 1400000) parts.push(b64s.slice(i, i + 1400000));
     const id = "D" + (t + n).toString(36).toUpperCase() + randomBytes(2).toString("hex");
     for (let i = 0; i < parts.length; i++) await store.set(`eapidocb:${id}:${i}`, { d: parts[i] });
-    await store.set("eapidoc:" + id, { id, at: t + n, upd: t + n, by: "vivo BI team", done: true, seed: name, name, mime, size: buf.length, chunks: parts.length, biz, title: biz.replace(/ \(.*\)/, (m) => m) + " API Documentation (" + kind + ")", version: "v1.0 · 15 Nov 2026", env: "both", notes: "UAT and Production endpoints, gwSignature authentication, request fields in vivo's order, sample requests / responses, error scenarios and a UAT testing checklist.", published: true });
+    await store.set("eapidoc:" + id, { id, at: t + n, upd: t + n, by: "vivo BI team", done: true, seed: name, name, mime, size: buf.length, chunks: parts.length, biz, title: biz.replace(/ \(.*\)/, (m) => m) + " API Documentation (" + kind + ")", version: SEED_VER + " · 15 Nov 2026", env: "both", notes: "UAT and Production endpoints, gwSignature authentication, request fields in vivo's order, success rule (code 200 + processStatus true), sample requests / responses, error scenarios, UAT vs Production differences and a UAT testing checklist.", published: true });
     n++;
   }
-  await store.set("eapidocseed1", { at: t, n });
+  await store.set(SEED_FLAG, { at: t, n });
   return n;
 }
 async function docAction(b, ctx, by) {
