@@ -434,6 +434,8 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
   var CMAP = {}; CODES.forEach(function (c) { CMAP[c[0]] = c; });
   var FLD = { companyName: "Company name", password: "Password", imei: "IMEI", modelName: "Model name", scheme: "Scheme", financeAmount: "Finance amount", dealerCode: "Dealer code" };
   var SIGS = [["ok", "✅ Correct signature"], ["none", "No gwSignature header"], ["badsecret", "Wrong secret"], ["badinvoker", "Wrong invoker name"], ["oldts", "Old timestamp (15 min ago)"], ["futurets", "Future timestamp (+15 min)"], ["tamper", "Body changed after signing"], ["garbage", "Garbage signature text"], ["imeionly", "Sign only the IMEI (alt. reading of the doc)"]];
+  var FMTS = [["compact|ok", "Compact JSON, signed exactly as sent (standard)"], ["asis|ok", "Body exactly as typed (with spaces / line breaks)"], ["sorted|ok", "Compact JSON with keys in A→Z order"], ["compact|nobody", "Signature without the body (secret + timestamp)"], ["compact|imeionly", "Signature over the IMEI only"], ["compact|secs", "Timestamp in seconds instead of milliseconds"], ["compact|upper", "SHA-256 hash in capital letters"], ["asis|nobody", "Body as typed, signature without the body"], ["sorted|upper", "Keys A→Z, hash in capitals"]];
+  var fmtName = function (f) { var x = FMTS.filter(function (y) { return y[0] === f; })[0]; return x ? x[1] : f; };
   var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", second: "2-digit" }) : ""; };
   var envName = function (e) { return e === "prod" ? "Production" : "UAT"; };
 
@@ -535,12 +537,37 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     $("out").innerHTML = '<div class="card res ' + (v.ok ? "ok" : v.fail ? "bad" : "") + '" style="margin-top:10px"><div class="row" style="align-items:center;gap:8px"><span class="big">' + (v.ok ? "✅" : "❌") + " " + esc(v.t) + '</span><span class="sp"></span><span class="pill m">' + (c.status ? "HTTP " + c.status : "no reply") + " · " + c.ms + " ms</span></div>" +
       (c.err ? '<div class="warn">' + esc(c.err) + "<br><small>If this keeps happening, vivo's gateway may only accept calls from approved IP addresses — ask vivo IT to allow this tool's server, or test on UAT.</small></div>" : "") +
       '<div class="kv">' + [["code", c.code], ["success", c.success], ["errorCode", c.errorCode], ["message", c.message], ["processStatus", c.processStatus], ["errorMessage", c.errorMessage], ["traceId", c.traceId]].filter(function (x) { return x[1] !== null && x[1] !== undefined && x[1] !== ""; }).map(function (x) { return "<b>" + x[0] + '</b><span class="fx" style="word-break:break-all">' + esc(String(x[1])) + "</span>"; }).join("") + "</div>" +
+      (c.signFail && c.sig === "ok" || c.signFail && !/^(none|badsecret|badinvoker|oldts|futurets|tamper|garbage)$/.test(c.sig) ? '<div class="warn">🔐 <b>The gateway rejected the signature.</b> Either the format differs slightly from the document, or the secret / invoker name for ' + envName(ENV) + ' is not the one the gateway has.<div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="probe">🔍 Find the right signature format</button></div><div id="probeOut"></div></div>' : "") +
       (pm ? '<div class="help"><b>Partner will see:</b> ' + esc(pm) + '<br><small class="muted">' + esc(CMAP[c.errorCode][1]) + "</small></div>" : c.errorCode ? '<div class="warn">errorCode <b>' + esc(c.errorCode) + "</b> is not in vivo's error list in the API document.</div>" : "") +
       '<div class="sec"><span>Response</span><button class="btn ghost sm" id="cpr">📋 Copy</button></div><div class="code">' + esc(pretty || "(empty)") + "</div>" +
       '<div class="sec"><span>Request sent</span><button class="btn ghost sm" id="cpc">📋 Copy as cURL</button></div><div class="code">POST ' + esc(r.sent.url) + "\nContent-Type: application/json\ngwSignature: " + esc(r.sent.headers.gwSignature) + "\n\n" + esc(c.req) + '</div><div class="muted" style="font-size:11px;margin-top:4px">The password and the full signature are hidden here; the secret never leaves the server.</div></div>';
     var copy = function (s) { (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(function () { toast("Copied"); }, function () { toast("Couldn't copy"); }); };
     $("cpr").onclick = function () { copy(pretty); };
+    if ($("probe")) $("probe").onclick = function () { probe(c.ep, r.rawSent || currentRaw()); };
     $("cpc").onclick = function () { copy("curl -X POST '" + r.sent.url + "' \\\n  -H 'Content-Type: application/json' \\\n  -H 'gwSignature: <signature>' \\\n  -d '" + c.req.replace(/'/g, "'\\''") + "'"); };
+  }
+
+  // Try each known variant of the signature once and keep the one the gateway accepts
+  function probe(ep, raw) {
+    var b = $("probe"); b.disabled = true; var out = [], i = 0;
+    var show = function (done) {
+      var okF = out.filter(function (x) { return !x.c.signFail && !x.c.err; })[0];
+      $("probeOut").innerHTML = '<table class="tb" style="margin-top:8px;background:#fff;border-radius:10px">' + out.map(function (x) { return "<tr><td>" + esc(fmtName(x.f)) + '</td><td style="text-align:right;white-space:nowrap"><span class="pill ' + (x.c.err ? "o" : x.c.signFail ? "r" : "g") + '">' + (x.c.err ? "no reply" : x.c.signFail ? "rejected" : "✓ accepted") + "</span></td></tr>"; }).join("") + "</table>" +
+        (!done ? '<div class="muted" style="font-size:12px;margin-top:6px">Trying ' + (i + 1) + " of " + FMTS.length + "…</div>" :
+          okF ? '<div style="margin-top:8px"><b>✅ The gateway accepts: ' + esc(fmtName(okF.f)) + '</b><br><button class="btn pri sm" id="useF" style="margin-top:6px">Use this for ' + envName(ENV) + "</button></div>" :
+          '<div style="margin-top:8px;line-height:1.5"><b>No format was accepted</b> — so the signature method is fine and the <b>secret or invoker name</b> for ' + envName(ENV) + " doesn’t match what the gateway has. UAT and Production usually have <b>different secrets</b>.<br>• Re-paste the " + envName(ENV) + " secret in ⚙️ Set-up (copy it straight from the e-mail, no spaces).<br>• Ask vivo IT to confirm the " + envName(ENV) + " invoker name and secret, and whether this tool’s server must be allowed on their side.</div>");
+      if ($("useF")) $("useF").onclick = function () { api({ action: "eapi-fmt", env: ENV, fmt: okF.f }).then(function (x) { if (!x.ok) return toast(x.error); CFG = x.cfg; toast("Saved — all requests on " + envName(ENV) + " now use this format"); FORM.sig = "ok"; $("send").click(); }); };
+    };
+    (function next() {
+      if (i >= FMTS.length) { b.disabled = false; return show(true); }
+      show(false);
+      var f = FMTS[i][0];
+      api({ action: "eapi-call", env: ENV, ep: ep, raw: raw, sig: "ok", fmt: f, label: "Signature check · " + fmtName(f) }).then(function (x) {
+        if (x.ok) out.push({ f: f, c: x.call }); i++;
+        if (x.ok && !x.call.signFail && !x.call.err) { i = FMTS.length; }   // stop at the first one that works
+        next();
+      });
+    })();
   }
 
   // ======================= test cases =======================
@@ -662,6 +689,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
         '<div><label class="lb">Secret ' + (K.secret ? '<span class="pill g">saved ✓</span>' : '<span class="pill r">not saved</span>') + '</label><input class="tx" type="password" autocomplete="new-password" data-s="' + e + '.secret" placeholder="' + (K.secret ? "leave blank to keep" : "paste the gateway secret") + '"></div>' +
         '<div><label class="lb">Company name</label><input class="tx" data-k="' + e + '.company" value="' + esc(E.company) + '"></div>' +
         '<div><label class="lb">Company password ' + (K.password ? '<span class="pill g">saved ✓</span>' : '<span class="pill r">not saved</span>') + '</label><input class="tx" type="password" autocomplete="new-password" data-s="' + e + '.password" placeholder="' + (K.password ? "leave blank to keep" : "partner password") + '"></div></div>' +
+        '<label class="lb">Signature format</label><select class="tx" data-k="' + e + '.fmt">' + FMTS.map(function (f) { return '<option value="' + f[0] + '"' + ((E.fmt || "compact|ok") === f[0] ? " selected" : "") + ">" + esc(f[1]) + "</option>"; }).join("") + '</select><div class="muted" style="font-size:11.5px;margin-top:3px">Leave on standard. If the gateway says “check sign is not pass”, use 🔍 Find the right signature format on the test screen.</div>' +
         '<div class="sec"><span>Valid test data (used by Test cases)</span></div><div class="g2"><div><label class="lb">Test IMEI</label><input class="tx fx" data-k="' + e + '.base.imei" value="' + esc(b.imei || "") + '" inputmode="numeric"></div><div><label class="lb">Its model name</label><input class="tx" data-k="' + e + '.base.model" value="' + esc(b.model || "") + '"></div><div><label class="lb">Its dealer code</label><input class="tx" data-k="' + e + '.base.dealer" value="' + esc(b.dealer || "") + '"></div><div><label class="lb">Scheme</label><input class="tx" data-k="' + e + '.base.scheme" value="' + esc(b.scheme || "") + '"></div><div><label class="lb">Finance amount</label><input class="tx" data-k="' + e + '.base.amount" value="' + esc(b.amount || "") + '" inputmode="decimal"></div></div>' +
         ((K.secret || K.password) ? '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" data-clear="' + e + '"><i></i><span>Delete the saved secret and password</span></label>' : "") + "</div>";
     };

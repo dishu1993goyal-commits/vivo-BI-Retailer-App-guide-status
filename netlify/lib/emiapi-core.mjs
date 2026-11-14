@@ -20,6 +20,8 @@ const DEF_ENV = {
 };
 const sha = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
+const FMTS = ["compact|ok", "asis|ok", "sorted|ok", "compact|nobody", "compact|imeionly", "compact|secs", "compact|upper", "asis|nobody", "sorted|upper"];
+const sortKeys = (o) => Array.isArray(o) ? o.map(sortKeys) : o && typeof o === "object" ? Object.keys(o).sort().reduce((a, k) => { a[k] = sortKeys(o[k]); return a; }, {}) : o;
 const jsonEsc = (s) => JSON.stringify(String(s)).slice(1, -1);
 
 async function cfgOf(store) {
@@ -44,12 +46,13 @@ export async function emiApiAction(b, ctx) {
         const url = str(x.url, 300).replace(/\/+$/, "");
         if (url && !/^https?:\/\/[^\s/]+[^\s]*$/i.test(url)) return json(400, { ok: false, error: "The " + (e === "prod" ? "Production" : "UAT") + " URL must start with https://" });
         const base = x.base || {};
-        cfg.envs[e] = { url, invoker: str(x.invoker, 120), company: str(x.company, 120),
+        const old = cfg.envs[e] || {};
+        cfg.envs[e] = { url, invoker: str(x.invoker, 120), company: str(x.company, 120), fmt: FMTS.includes(x.fmt) ? x.fmt : (old.fmt || "compact|ok"),
           base: { imei: str(base.imei, 20), model: str(base.model, 80), dealer: str(base.dealer, 60), scheme: str(base.scheme, 80), amount: str(base.amount, 20) } };
         const k = (b.keys || {})[e] || {};
         keys[e] = keys[e] || {};
-        if (typeof k.secret === "string" && k.secret) keys[e].secret = k.secret.slice(0, 300);
-        if (typeof k.password === "string" && k.password) keys[e].password = k.password.slice(0, 200);
+        if (typeof k.secret === "string" && k.secret.trim()) keys[e].secret = k.secret.trim().slice(0, 300);
+        if (typeof k.password === "string" && k.password.trim()) keys[e].password = k.password.trim().slice(0, 200);
         if (k.clear) keys[e] = {};
       }
       await store.set("eapicfg", cfg); await store.set("eapikeys", keys);
@@ -66,16 +69,23 @@ export async function emiApiAction(b, ctx) {
     // {{companyName}} / {{password}} are filled from Set-up, so the password never has to be typed on the test screen
     let raw = String(b.raw == null ? "" : b.raw).slice(0, 20000);
     raw = raw.replace(/\{\{\s*companyName\s*\}\}/g, jsonEsc(E.company || "")).replace(/\{\{\s*password\s*\}\}/g, jsonEsc(K.password || ""));
-    // signature (deliberately broken variants for negative tests)
-    const sig = str(b.sig, 20) || "ok";
-    let ts = t, secret = K.secret, inv = E.invoker, signed = raw;
+    // body layout + how the signature is built. "ok" = this environment's saved format (found with "Find the right signature").
+    const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted"].includes(ef[0]) ? ef[0] : "compact";
+    let sig = str(b.sig, 20) || "ok";
+    if (sig === "ok") sig = ["ok", "nobody", "imeionly", "secs", "upper", "query"].includes(ef[1]) ? ef[1] : "ok";
+    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : o); } catch (x) { } }
+    let ts = t, secret = K.secret, inv = E.invoker, signed = raw, upper = false;
+    if (sig === "nobody") signed = "";
+    if (sig === "secs") ts = Math.floor(t / 1000);
+    if (sig === "upper") upper = true;
     if (sig === "oldts") ts = t - 15 * 60000;
     if (sig === "futurets") ts = t + 15 * 60000;
     if (sig === "badsecret") secret = K.secret + "x";
     if (sig === "badinvoker") inv = "unknown-invoker";
     if (sig === "tamper") signed = raw + " ";
     if (sig === "imeionly") { try { signed = String(JSON.parse(raw).imei || ""); } catch (x) { signed = ""; } }
-    const gw = b64(inv) + "@#" + ts + "@#" + sha(secret + ts + signed);
+    const hash = upper ? sha(secret + ts + signed).toUpperCase() : sha(secret + ts + signed);
+    const gw = b64(inv) + "@#" + ts + "@#" + hash;
     const headers = { "Content-Type": "application/json" };
     if (sig !== "none") headers.gwSignature = sig === "garbage" ? "not-a-signature" : gw;
     const url = E.url + "/retail-emi/business/" + ep;
@@ -92,13 +102,20 @@ export async function emiApiAction(b, ctx) {
     const mask = (s) => K.password ? String(s).split(jsonEsc(K.password)).join("••••••") : String(s);
     const d = (res && res.data) || {};
     const log = { id: t.toString(36) + randomBytes(2).toString("hex"), at: t, by, env: e, ep, label: str(b.label, 120), sig, url, status, ms, err,
-      req: mask(raw), sigShown: b64(inv) + "@#" + ts + "@#" + sha(secret + ts + signed).slice(0, 12) + "…", resp: mask(text).slice(0, 12000),
+      req: mask(raw), sigShown: b64(inv) + "@#" + ts + "@#" + hash.slice(0, 12) + "…", fmt: bodyMode + "|" + sig,
+      signFail: status === 403 || /sign\s+is\s+not\s+pass|check\s+sign|signature/i.test(text) && !(res && res.code === 200), resp: mask(text).slice(0, 12000),
       code: res && res.code, errorCode: res && res.errorCode || "", message: res && res.message || "", success: res ? !!res.success : null,
       processStatus: d.processStatus === undefined ? null : d.processStatus, errorMessage: d.errorMessage || "", traceId: res && res.traceId || "" };
     await store.set("eapilog:" + log.id, log);
     return json(200, { ok: true, call: log, headers: rh, sent: { url, headers: { "Content-Type": "application/json", gwSignature: headers.gwSignature ? log.sigShown : "(not sent)" } } });
   }
 
+  if (b.action === "eapi-fmt") {   // save the signature format that the gateway accepted
+    const e = ENVS.includes(b.env) ? b.env : "uat";
+    if (!FMTS.includes(b.fmt)) return json(400, { ok: false, error: "Unknown format" });
+    cfg.envs[e].fmt = b.fmt; await store.set("eapicfg", cfg);
+    return json(200, { ok: true, cfg, keys: keyInfo() });
+  }
   if (b.action === "eapi-log") {
     const ks = (await store.list("eapilog:")).sort().reverse().slice(0, 200);
     const rows = (await Promise.all(ks.map((k) => store.get(k)))).filter(Boolean).sort((a, b2) => b2.at - a.at);
