@@ -24,7 +24,7 @@ const hashOf = (s) => createHash("sha1").update(String(s)).digest("hex").slice(0
 const CATS_AI = ["App feature request", "App issue", "Scheme & payout", "Stock & supply", "Pricing & margin", "Competition", "Training", "Other"];
 const istDay = (t) => new Date(t + 19800000).toISOString().slice(0, 10);
 const ymOf = (t) => new Date(t + 19800000).toISOString().slice(0, 7).replace("-", "");
-export const TOOL_IDS = ["khata", "salary", "brandmat", "tl", "tlv", "tlp", "tlb", "tlr", "tli", "tlk", "tls", "tld", "hygcheck", "sheetjoin", "targetsplit", "mailer", "faces", "reviewdeck", "insights", "business", "myday", "deckstudio", "access", "pmail", "applab", "portals", "rewards", "newsletter", "appguide", "geolocate", "storelocator", "producthub", "recommend", "schemeassist", "retailerpay", "payplanner", "schemepolicy", "retailerportal", "imeiunblock", "schemeroi", "forecast", "compete", "manuals", "learn", "lostsale", "launch", "manpower", "voice"];
+export const TOOL_IDS = ["emiapi", "khata", "salary", "brandmat", "tl", "tlv", "tlp", "tlb", "tlr", "tli", "tlk", "tls", "tld", "hygcheck", "sheetjoin", "targetsplit", "mailer", "faces", "reviewdeck", "insights", "business", "myday", "deckstudio", "access", "pmail", "applab", "portals", "rewards", "newsletter", "appguide", "geolocate", "storelocator", "producthub", "recommend", "schemeassist", "retailerpay", "payplanner", "schemepolicy", "retailerportal", "imeiunblock", "schemeroi", "forecast", "compete", "manuals", "learn", "lostsale", "launch", "manpower", "voice"];
 //   tluse:<yyyymmdd>:<ownerKey>  { by, state, app, tools: { tlv: { opens, acts, saves, last } } }   usage per user per day
 
 export async function toolsAction(b, ctx) {

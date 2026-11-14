@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>EMI API tester</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:560px){.g2{grid-template-columns:1fr}}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:7px 6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:7px 6px;vertical-align:top}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:9px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.fx{font-family:ui-monospace,Menlo,Consolas,monospace}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:#0F1530;color:#DDE3FF;border-radius:12px;padding:10px 12px;white-space:pre-wrap;word-break:break-all;max-height:360px;overflow:auto;margin-top:6px}
+textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;box-sizing:border-box}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12px;margin-top:8px;line-height:1.55}
+.warn{background:#FFF4E5;color:#6B4100;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.5}
+.envs{display:flex;gap:6px}.envs button{flex:1;border:1px solid #DADDF0;background:#fff;border-radius:12px;padding:9px;font-weight:800;font-size:13px;cursor:pointer}.envs button.on.prod{background:#FDECEC;border-color:#E9A5A5;color:#8E1C1C}.envs button.on.uat{background:#E6F4EA;border-color:#9BD3B0;color:#13693F}
+.fr{display:grid;grid-template-columns:22px 118px 1fr;gap:6px;align-items:center;margin-top:6px}.fr label{font-size:12.5px;font-weight:700}.fr .tx{padding:8px 10px;font-size:13px}
+.fr.off .tx,.fr.off label{opacity:.4}
+.chip{font-size:11.5px;color:#3346C9;background:#EEF0FF;border-radius:8px;padding:6px 9px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.chip a{color:#3346C9;font-weight:700;cursor:pointer}
+.res{border-left:5px solid #9AA3C7}.res.ok{border-left-color:#13693F}.res.bad{border-left-color:#B42318}
+.big{font-size:20px;font-weight:900}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:3px 8px;font-size:12.5px;margin-top:8px}.kv b{color:var(--mut);font-weight:700}
+.case td:first-child{width:22px}
+.sec{font-size:13px;font-weight:800;margin:14px 2px 4px;display:flex;gap:6px;align-items:center}.sec span{flex:1}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧪</span></div>
+  <h1>EMI API tester</h1><p>Test vivo's EMI Business APIs (query · process · release) before partners integrate — like Postman, signed for you</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "test", CFG = null, KEYS = {}, EPS = {}, ENV = "uat", EP = "queryInstallment", FORM = {}, LAST = null, RESULTS = [];
+  try { var h0 = location.hash.replace("#", ""); if (/^(test|cases|log|codes|cfg)$/.test(h0)) TAB = h0; } catch (e) { }
+  try { ENV = localStorage.getItem("eapi-env") || "uat"; } catch (e) { }
+
+  // ---- vivo's error list (API document, 14.10.26) ----
+  var CODES = [
+    ["ACTIVATION_TIME_ERROR", "Abnormal activation time", "Handset already sold"],
+    ["ACTIVATION_TIME_EXPIRED", "Exceeded the activation time which can be processed", "This handset is no longer eligible for this Business."],
+    ["AGENCY_PERMISSION_NOT_EXIST", "Permission configuration of the first generation model does not exist", "This model is not eligible for this offer"],
+    ["BI_IMEI_NOT_EXIST", "BI serial number does not exist", "IMEI number is incorrect"],
+    ["BUSINESS_ALREADY_RELEASED", "Business has been unbundled, please do not repeat the operation", "IMEI already unflagged & Eligible for EMI"],
+    ["BUSINESS_IS_PROCESSING", "Business is in progress", "Handset already sold"],
+    ["BUSINESS_MUTEX_CONFLICT", "Services are mutually exclusive and cannot be processed", "Offer not applicable"],
+    ["BUSINESS_NOT_EXIST", "Cancellation failed; transaction has not yet been processed", "IMEI is not eligible for unblocking request"],
+    ["BUSINESS_PROCESS_CODE_INVALID", "Process configuration verification error", "Invalid business process code. Please verify the request configuration with the business partner."],
+    ["BUSINESS_TYPE_ALREADY_EXIST", "Service already exists; please do not process it again", "Handset already sold"],
+    ["BUSINESS_TYPE_ALREADY_RELEASE", "Current business has been unbound", "IMEI already unflagged & Eligible for EMI"],
+    ["CHECK_PARAM_MISSING", "Missing parameter {0}", "Required information is missing: {0}. Please complete and submit the request again."],
+    ["CHOOSE_STORE_RETAILER_DIFFERENT_IMEI_RETAILER", "IMEI belongs to a different retailer", "Invalid Dealer Code"],
+    ["COMPANY_NAME_IS_NOT_EXISTS", "Company name does not exist", "Invalid business partner credentials"],
+    ["EMI_PRODUCT_NOT_EXIST", "Product configuration not available", "This model is not configured. Please contact the finance partner or vivo Business team."],
+    ["IMEI_BUSINESS_NOT_EXIST", "Current IMEI business has not been processed", "This IMEI is eligible for EMI/Upgrade Business"],
+    ["IMEI_IN_BLACK_LIST", "IMEI is in blacklist configuration", "IMEI already Blacklisted"],
+    ["IMEI_MODEL_NOT_IN_EMI_PRODUCT", "IMEI model is not configured as an installment product", "This model is not eligible for this business"],
+    ["IMEI_MODEL_NOT_MATCH_MODEL", "Serial number mismatch", "Model Name and IMEI Mismatch"],
+    ["IMEI_NOT_BELONG_DEALER", "IMEI does not belong to the current store/retailer", "Invalid Dealer Code"],
+    ["IMEI_NOT_IN_RETAIL_OR_STORE", "IMEI is not in the store/retailer's warehouse", "Please check the IMEI stock in system and contact with business partner"],
+    ["IMEI_PRODUCT_NOT_IN_AGENCY_PERMISSION", "IMEI model is not in the corresponding permission configuration", "This model is not configured. Please contact the finance partner or vivo Business team."],
+    ["INSUFFICIENT_PERMISSION", "User does not have permission", "You do not Have Permission to Perform This Action"]
+  ];
+  var CMAP = {}; CODES.forEach(function (c) { CMAP[c[0]] = c; });
+  var FLD = { companyName: "Company name", password: "Password", imei: "IMEI", modelName: "Model name", scheme: "Scheme", financeAmount: "Finance amount", dealerCode: "Dealer code" };
+  var SIGS = [["ok", "✅ Correct signature"], ["none", "No gwSignature header"], ["badsecret", "Wrong secret"], ["badinvoker", "Wrong invoker name"], ["oldts", "Old timestamp (15 min ago)"], ["futurets", "Future timestamp (+15 min)"], ["tamper", "Body changed after signing"], ["garbage", "Garbage signature text"], ["imeionly", "Sign only the IMEI (alt. reading of the doc)"]];
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", second: "2-digit" }) : ""; };
+  var envName = function (e) { return e === "prod" ? "Production" : "UAT"; };
+
+  // what a reply means
+  function verdict(c) {
+    if (!c) return { k: "m", t: "—" };
+    if (c.err) return { k: "r", t: "Not reached", fail: true, net: true };
+    var ok = c.status >= 200 && c.status < 300 && c.code === 200 && c.success === true && !c.errorCode;
+    return ok ? { k: "g", t: "Success" + (c.processStatus === false ? " · processStatus false" : ""), ok: true } : { k: "r", t: "Failure" + (c.errorCode ? " · " + c.errorCode : c.status && c.status !== 200 ? " · HTTP " + c.status : c.code ? " · code " + c.code : ""), fail: true };
+  }
+  function partnerMsg(c) {
+    var x = CMAP[c && c.errorCode]; if (!x) return "";
+    var p = ((c.message || c.errorMessage || "").match(/missing\s+(?:parameter|param|field)?s?\s*:?\s*\[?([A-Za-z]+)/i) || [])[1] || "{0}";
+    return x[2].replace("{0}", p);
+  }
+
+  // ---- build the JSON body (doc field order); {{companyName}} / {{password}} are filled on the server from Set-up ----
+  function baseVals() {
+    var b = (CFG.envs[ENV] || {}).base || {};
+    return { companyName: "{{companyName}}", password: "{{password}}", imei: b.imei || "", modelName: b.model || "", scheme: b.scheme || "", financeAmount: b.amount || "", dealerCode: b.dealer || "" };
+  }
+  function bodyOf(ep, vals, omit) {
+    var o = {}; (EPS[ep].fields || []).forEach(function (f) { if (!(omit || []).includes(f)) o[f] = vals[f] == null ? "" : String(vals[f]); });
+    return JSON.stringify(o, null, 2);
+  }
+
+  function start() {
+    if (!AUTH || !AUTH.token) {
+      try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { }
+      VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div class="muted" style="margin:6px 0 12px">HO admins only.</div><a class="btn pri" href="/">Log in</a></div>'; return;
+    }
+    api({ action: "eapi-cfg" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      CFG = r.cfg; KEYS = r.keys; EPS = r.endpoints;
+      if (!KEYS[ENV].secret && KEYS.prod.secret && !KEYS.uat.secret) ENV = "prod";
+      if (!KEYS.prod.secret && !KEYS.uat.secret) TAB = "cfg";
+      draw();
+    });
+  }
+  function draw() {
+    var tabs = [["test", "🧪 Send a request"], ["cases", "✅ Test cases"], ["log", "📜 History"], ["codes", "📚 Error codes"], ["cfg", "⚙️ Set-up"]];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div>' +
+      (TAB !== "cfg" && TAB !== "codes" ? '<div class="envs" style="margin-top:10px"><button data-env="uat" class="uat ' + (ENV === "uat" ? "on" : "") + '">🧪 UAT' + (KEYS.uat.secret ? "" : " · not set up") + '</button><button data-env="prod" class="prod ' + (ENV === "prod" ? "on" : "") + '">🔴 Production' + (KEYS.prod.secret ? "" : " · not set up") + "</button></div>" : "") + '<div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; try { history.replaceState(null, "", "#" + TAB); } catch (e) { } draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-env]"), function (b) { b.onclick = function () { ENV = b.dataset.env; FORM = {}; try { localStorage.setItem("eapi-env", ENV); } catch (e) { } draw(); }; });
+    ({ test: tTest, cases: tCases, log: tLog, codes: tCodes, cfg: tCfg })[TAB]();
+  }
+
+  // ======================= single request =======================
+  function tTest() {
+    var E = CFG.envs[ENV], fields = EPS[EP].fields;
+    if (!FORM.ep || FORM.ep !== EP) { var bv = baseVals(); FORM = { ep: EP, vals: bv, on: {}, sig: FORM.sig || "ok", raw: null }; fields.forEach(function (f) { FORM.on[f] = true; }); }
+    $("tp").innerHTML = '<div class="card"><label class="lb" style="margin-top:0">API</label><select class="tx" id="ep">' + Object.keys(EPS).map(function (k) { return '<option value="' + k + '"' + (k === EP ? " selected" : "") + ">" + esc(EPS[k].name) + "</option>"; }).join("") + "</select>" +
+      '<div class="fx" style="font-size:11.5px;color:var(--mut);margin-top:6px;word-break:break-all">POST ' + esc((E.url || "(URL not set)") + "/retail-emi/business/" + EP) + "</div>" +
+      (EPS[EP].changes ? '<div class="warn">⚠️ <b>' + (EP === "processInstallment" ? "Process" : "Release") + "</b> changes the IMEI's EMI status" + (ENV === "prod" ? " <b>on Production</b>" : "") + ". Use a test IMEI.</div>" : "") +
+      '<div class="sec"><span>Request parameters</span><small class="muted">untick = leave the field out</small></div>' +
+      fields.map(function (f) {
+        var v = FORM.vals[f], ph = /^\{\{/.test(v);
+        return '<div class="fr' + (FORM.on[f] ? "" : " off") + '"><input type="checkbox" data-on="' + f + '"' + (FORM.on[f] ? " checked" : "") + '><label>' + esc(FLD[f]) + "</label>" +
+          (ph ? '<div class="chip"><span>From Set-up: <b>' + (f === "password" ? (KEYS[ENV].password ? "•••••• saved" : "not saved!") : esc(E.company || "not saved!")) + '</b></span><a data-ov="' + f + '">change</a></div>' : '<input class="tx" data-v="' + f + '" value="' + esc(v) + '"' + (f === "password" ? ' type="text" autocomplete="off"' : "") + ">") + "</div>";
+      }).join("") +
+      '<label class="lb">Signature (gwSignature header)</label><select class="tx" id="sig">' + SIGS.map(function (s) { return '<option value="' + s[0] + '"' + (FORM.sig === s[0] ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select>" +
+      '<div class="sec"><span>Body (JSON)</span><button class="btn ghost sm" id="rawb">' + (FORM.raw != null ? "↺ Back to the fields" : "✏️ Edit raw JSON") + "</button></div>" +
+      (FORM.raw != null ? '<textarea class="code" id="raw" spellcheck="false">' + esc(FORM.raw) + "</textarea>" : '<div class="code" id="bodyv"></div>') +
+      '<div class="row" style="gap:8px;margin-top:10px"><button class="btn pri" id="send" style="flex:1">▶ Send to ' + envName(ENV) + '</button><button class="btn ghost" id="pm" title="Postman collection">⬇ Postman</button></div></div><div id="out"></div>';
+    var refresh = function () { if ($("bodyv")) $("bodyv").textContent = currentRaw(); };
+    $("ep").onchange = function () { EP = $("ep").value; FORM = {}; tTest(); };
+    $("sig").onchange = function () { FORM.sig = $("sig").value; };
+    [].forEach.call($("tp").querySelectorAll("[data-on]"), function (c) { c.onchange = function () { FORM.on[c.dataset.on] = c.checked; c.parentNode.classList.toggle("off", !c.checked); refresh(); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-v]"), function (i) { i.oninput = function () { FORM.vals[i.dataset.v] = i.value; refresh(); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-ov]"), function (a) { a.onclick = function () { FORM.vals[a.dataset.ov] = ""; tTest(); }; });
+    $("rawb").onclick = function () { FORM.raw = FORM.raw != null ? null : currentRaw(); tTest(); };
+    if ($("raw")) $("raw").oninput = function () { FORM.raw = $("raw").value; };
+    $("pm").onclick = postman;
+    $("send").onclick = function () {
+      var go = function () { send(EP, currentRaw(), FORM.sig, "Manual", $("send")).then(function (r) { if (r) { LAST = r; showOut(r); } }); };
+      if (EPS[EP].changes && ENV === "prod") sheet("Send to Production?", (EP === "processInstallment" ? "Process Installment flags this IMEI for EMI" : "Release Installment unflags this IMEI") + " on vivo's live system.", [["▶", "Yes, send", go, "danger"], ["", "Cancel", function () { }]]);
+      else go();
+    };
+    refresh();
+    if (LAST && LAST.call.ep === EP && LAST.call.env === ENV) showOut(LAST);
+  }
+  function currentRaw() {
+    if (FORM.raw != null) return FORM.raw;
+    var omit = EPS[EP].fields.filter(function (f) { return !FORM.on[f]; });
+    return bodyOf(EP, FORM.vals, omit);
+  }
+  function send(ep, raw, sig, label, btn) {
+    if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = "Sending…"; }
+    return api({ action: "eapi-call", env: ENV, ep: ep, raw: raw, sig: sig || "ok", label: label || "" }).then(function (r) {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset.t; }
+      if (!r.ok) { toast(r.error); return null; }
+      return r;
+    });
+  }
+  function showOut(r) {
+    var c = r.call, v = verdict(c), pm = partnerMsg(c), pretty = c.resp;
+    try { pretty = JSON.stringify(JSON.parse(c.resp), null, 2); } catch (e) { }
+    $("out").innerHTML = '<div class="card res ' + (v.ok ? "ok" : v.fail ? "bad" : "") + '" style="margin-top:10px"><div class="row" style="align-items:center;gap:8px"><span class="big">' + (v.ok ? "✅" : "❌") + " " + esc(v.t) + '</span><span class="sp"></span><span class="pill m">' + (c.status ? "HTTP " + c.status : "no reply") + " · " + c.ms + " ms</span></div>" +
+      (c.err ? '<div class="warn">' + esc(c.err) + "<br><small>If this keeps happening, vivo's gateway may only accept calls from approved IP addresses — ask vivo IT to allow this tool's server, or test on UAT.</small></div>" : "") +
+      '<div class="kv">' + [["code", c.code], ["success", c.success], ["errorCode", c.errorCode], ["message", c.message], ["processStatus", c.processStatus], ["errorMessage", c.errorMessage], ["traceId", c.traceId]].filter(function (x) { return x[1] !== null && x[1] !== undefined && x[1] !== ""; }).map(function (x) { return "<b>" + x[0] + '</b><span class="fx" style="word-break:break-all">' + esc(String(x[1])) + "</span>"; }).join("") + "</div>" +
+      (pm ? '<div class="help"><b>Partner will see:</b> ' + esc(pm) + '<br><small class="muted">' + esc(CMAP[c.errorCode][1]) + "</small></div>" : c.errorCode ? '<div class="warn">errorCode <b>' + esc(c.errorCode) + "</b> is not in vivo's error list in the API document.</div>" : "") +
+      '<div class="sec"><span>Response</span><button class="btn ghost sm" id="cpr">📋 Copy</button></div><div class="code">' + esc(pretty || "(empty)") + "</div>" +
+      '<div class="sec"><span>Request sent</span><button class="btn ghost sm" id="cpc">📋 Copy as cURL</button></div><div class="code">POST ' + esc(r.sent.url) + "\nContent-Type: application/json\ngwSignature: " + esc(r.sent.headers.gwSignature) + "\n\n" + esc(c.req) + '</div><div class="muted" style="font-size:11px;margin-top:4px">The password and the full signature are hidden here; the secret never leaves the server.</div></div>';
+    var copy = function (s) { (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(function () { toast("Copied"); }, function () { toast("Couldn't copy"); }); };
+    $("cpr").onclick = function () { copy(pretty); };
+    $("cpc").onclick = function () { copy("curl -X POST '" + r.sent.url + "' \\\n  -H 'Content-Type: application/json' \\\n  -H 'gwSignature: <signature>' \\\n  -d '" + c.req.replace(/'/g, "'\\''") + "'"); };
+  }
+
+  // ======================= test cases =======================
+  function cases() {
+    var Q = "queryInstallment", P = "processInstallment", R = "releaseInstallment", bv = baseVals();
+    var mk = function (id, grp, name, ep, vals, omit, sig, expect, raw) { return { id: id, grp: grp, name: name, ep: ep, raw: raw != null ? raw : bodyOf(ep, Object.assign({}, bv, vals || {}), omit), sig: sig || "ok", expect: expect }; };
+    var miss = function (ep, f, g) { return mk(ep.slice(0, 1).toUpperCase() + "-miss-" + f, g, "Missing " + FLD[f] + " → CHECK_PARAM_MISSING", ep, null, [f], "ok", ["CHECK_PARAM_MISSING"]); };
+    var badIm = bv.imei ? bv.imei.slice(0, 14) + ((+bv.imei.slice(14) + 1) % 10) : "111111111111111";
+    var L = [
+      mk("Q1", "Query", "Valid request → success", Q, null, null, "ok", "success"),
+      miss(Q, "imei", "Query"), miss(Q, "modelName", "Query"), miss(Q, "companyName", "Query"), miss(Q, "password", "Query"), miss(Q, "dealerCode", "Query"),
+      mk("Q-blank-imei", "Query", "Blank IMEI → CHECK_PARAM_MISSING", Q, { imei: "" }, null, "ok", ["CHECK_PARAM_MISSING"]),
+      mk("Q-company", "Query", "Wrong company name → COMPANY_NAME_IS_NOT_EXISTS", Q, { companyName: "NoSuchPartner" }, null, "ok", ["COMPANY_NAME_IS_NOT_EXISTS"]),
+      mk("Q-password", "Query", "Wrong password → rejected", Q, { password: "wrong-password-123" }, null, "ok", "fail"),
+      mk("Q-imei-unknown", "Query", "IMEI not in vivo's system → BI_IMEI_NOT_EXIST", Q, { imei: badIm }, null, "ok", ["BI_IMEI_NOT_EXIST"]),
+      mk("Q-imei-short", "Query", "14-digit IMEI → rejected", Q, { imei: (bv.imei || "11111111111111").slice(0, 14) }, null, "ok", "fail"),
+      mk("Q-model", "Query", "Model doesn't match the IMEI → IMEI_MODEL_NOT_MATCH_MODEL", Q, { modelName: "vivo X999 Test" }, null, "ok", ["IMEI_MODEL_NOT_MATCH_MODEL", "IMEI_MODEL_NOT_IN_EMI_PRODUCT", "EMI_PRODUCT_NOT_EXIST"]),
+      mk("Q-dealer", "Query", "Another dealer's code → Invalid Dealer Code", Q, { dealerCode: "ZZ0000000" }, null, "ok", ["IMEI_NOT_BELONG_DEALER", "CHOOSE_STORE_RETAILER_DIFFERENT_IMEI_RETAILER"]),
+      mk("G-nosig", "Gateway signature", "No gwSignature header → rejected", Q, null, null, "none", "fail"),
+      mk("G-secret", "Gateway signature", "Signed with a wrong secret → rejected", Q, null, null, "badsecret", "fail"),
+      mk("G-invoker", "Gateway signature", "Wrong invoker name → rejected", Q, null, null, "badinvoker", "fail"),
+      mk("G-old", "Gateway signature", "Timestamp 15 min old → rejected (replay)", Q, null, null, "oldts", "fail"),
+      mk("G-tamper", "Gateway signature", "Body changed after signing → rejected", Q, null, null, "tamper", "fail"),
+      mk("G-garbage", "Gateway signature", "Garbage signature → rejected", Q, null, null, "garbage", "fail"),
+      mk("B-empty", "Body", "Empty body → rejected", Q, null, null, "ok", "fail", ""),
+      mk("B-bad", "Body", "Broken JSON → rejected", Q, null, null, "ok", "fail", '{"imei": "' + (bv.imei || "") + '", '),
+      miss(P, "scheme", "Process — validation only"), miss(P, "financeAmount", "Process — validation only"), miss(P, "dealerCode", "Process — validation only"), miss(P, "modelName", "Process — validation only"),
+      mk("P-company", "Process — validation only", "Wrong company name → COMPANY_NAME_IS_NOT_EXISTS", P, { companyName: "NoSuchPartner" }, null, "ok", ["COMPANY_NAME_IS_NOT_EXISTS"]),
+      mk("P-imei-unknown", "Process — validation only", "IMEI not in vivo's system → BI_IMEI_NOT_EXIST", P, { imei: badIm }, null, "ok", ["BI_IMEI_NOT_EXIST"]),
+      miss(R, "imei", "Release — validation only"), miss(R, "password", "Release — validation only"),
+      mk("R-imei-unknown", "Release — validation only", "IMEI not in vivo's system → rejected", R, { imei: badIm }, null, "ok", "fail"),
+      // live flow: changes the test IMEI's EMI status — run only on a test IMEI
+      mk("L1", "Live flow (changes the test IMEI)", "Process the test IMEI → success", P, null, null, "ok", "success"),
+      mk("L2", "Live flow (changes the test IMEI)", "Process it again → already processed", P, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING"]),
+      mk("L3", "Live flow (changes the test IMEI)", "Query it → success, shows the installment", Q, null, null, "ok", "success"),
+      mk("L4", "Live flow (changes the test IMEI)", "Release it → success", R, null, null, "ok", "success"),
+      mk("L5", "Live flow (changes the test IMEI)", "Release it again → already released", R, null, null, "ok", ["BUSINESS_ALREADY_RELEASED", "BUSINESS_TYPE_ALREADY_RELEASE", "BUSINESS_NOT_EXIST"])
+    ];
+    return L;
+  }
+  function judge(cs, c) {
+    var v = verdict(c);
+    if (v.net) return { k: "o", t: "Not reached" };
+    if (cs.expect === "success") return v.ok ? { k: "g", t: "PASS" } : { k: "r", t: "FAIL" };
+    if (cs.expect === "fail") return v.fail ? { k: "g", t: "PASS" } : { k: "r", t: "FAIL — accepted" };
+    if (v.ok) return { k: "r", t: "FAIL — accepted" };
+    return cs.expect.indexOf(c.errorCode) >= 0 ? { k: "g", t: "PASS" } : { k: "o", t: "CHECK — other error" };
+  }
+  var SEL = null;
+  function tCases() {
+    var b = (CFG.envs[ENV] || {}).base || {}, L = cases();
+    if (!SEL) { SEL = {}; L.forEach(function (c) { SEL[c.id] = !/^L/.test(c.id); }); }
+    var groups = []; L.forEach(function (c) { if (groups.indexOf(c.grp) < 0) groups.push(c.grp); });
+    var resOf = function (id) { return RESULTS.filter(function (x) { return x.cs.id === id && x.env === ENV; }).slice(-1)[0]; };
+    var missing = ["imei", "model", "dealer"].filter(function (k) { return !b[k]; });
+    $("tp").innerHTML = '<div class="card"><b>Valid test data · ' + envName(ENV) + '</b><div class="muted" style="font-size:12px;margin-top:3px">Every case starts from these values and breaks one thing. Change them in ⚙️ Set-up.</div><div class="kv">' +
+      [["IMEI", b.imei], ["Model name", b.model], ["Dealer code", b.dealer], ["Scheme", b.scheme], ["Finance amount", b.amount], ["Company name", CFG.envs[ENV].company]].map(function (x) { return "<b>" + x[0] + '</b><span class="fx">' + (x[1] ? esc(x[1]) : '<span style="color:#B42318">not set</span>') + "</span>"; }).join("") + "</div>" +
+      (missing.length ? '<div class="warn">Add a valid test IMEI, its model and its dealer code in Set-up first.</div>' : "") +
+      '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn pri" id="run"' + (missing.length ? " disabled" : "") + '>▶ Run selected</button><button class="btn ghost sm" id="sall">Select all checks</button><button class="btn ghost sm" id="snone">Clear</button><button class="btn ghost sm" id="xl">⬇ Excel report</button></div><div id="prog" class="muted" style="font-size:12px;margin-top:6px"></div></div>' +
+      groups.map(function (g) {
+        var live = /^Live/.test(g);
+        return '<div class="sec"><span>' + esc(g) + "</span></div>" + (live ? '<div class="warn">These <b>really process and release</b> the test IMEI' + (ENV === "prod" ? " on <b>Production</b>" : "") + ". They run in order. Use an IMEI kept for testing; L4 releases it again at the end.</div>" : "") +
+          '<div class="tbw"><table class="tb case">' + L.filter(function (c) { return c.grp === g; }).map(function (c) {
+            var r = resOf(c.id), j = r ? judge(c, r.call) : null;
+            return '<tr><td><input type="checkbox" data-c="' + c.id + '"' + (SEL[c.id] ? " checked" : "") + '></td><td><b>' + esc(c.name) + '</b><br><small class="muted">' + esc(EPS[c.ep].name.split(" (")[0]) + " · expects " + esc(c.expect === "success" ? "success" : c.expect === "fail" ? "a failure" : c.expect.join(" / ")) + "</small>" +
+              (r ? '<br><small>Got: <b>' + esc(verdict(r.call).t) + "</b>" + (r.call.message ? " — " + esc(r.call.message) : "") + "</small>" : "") + '</td><td style="text-align:right;white-space:nowrap">' + (j ? '<span class="pill ' + j.k + '">' + j.t + '</span><br><a class="muted" style="font-size:11px;cursor:pointer" data-see="' + c.id + '">view</a>' : "") + "</td></tr>";
+          }).join("") + "</table></div>";
+      }).join("");
+    [].forEach.call($("tp").querySelectorAll("[data-c]"), function (i) { i.onchange = function () { SEL[i.dataset.c] = i.checked; }; });
+    [].forEach.call($("tp").querySelectorAll("[data-see]"), function (a) { a.onclick = function () { var r = resOf(a.dataset.see); if (r) { LAST = r; EP = r.call.ep; FORM = {}; TAB = "test"; draw(); } }; });
+    $("sall").onclick = function () { L.forEach(function (c) { SEL[c.id] = !/^L/.test(c.id); }); tCases(); };
+    $("snone").onclick = function () { SEL = {}; L.forEach(function (c) { SEL[c.id] = false; }); tCases(); };
+    $("xl").onclick = function () {
+      var rows = RESULTS.filter(function (x) { return x.env === ENV; });
+      if (!rows.length) return toast("Run some cases first");
+      download(xlsx([{ name: "EMI API tests", rows: [["Case", "Group", "Test", "API", "Expected", "Result", "HTTP", "code", "errorCode", "message", "Partner-facing message", "ms", "When", "Request (password hidden)", "Response"]].concat(rows.map(function (x) { var c = x.call; return [x.cs.id, x.cs.grp, x.cs.name, x.cs.ep, x.cs.expect === "success" ? "success" : x.cs.expect === "fail" ? "failure" : x.cs.expect.join(" / "), judge(x.cs, c).t, c.status, c.code == null ? "" : c.code, c.errorCode, c.message, partnerMsg(c), c.ms, when(c.at), c.req, c.resp]; })) }]), "EMI_API_tests_" + envName(ENV) + ".xlsx");
+    };
+    $("run").onclick = function () {
+      var todo = L.filter(function (c) { return SEL[c.id]; });
+      if (!todo.length) return toast("Tick at least one case");
+      var live = todo.some(function (c) { return /^L/.test(c.id); });
+      var go = function () {
+        var i = 0, btn = $("run"); btn.disabled = true;
+        (function next() {
+          if (i >= todo.length) { btn.disabled = false; var mine = RESULTS.slice(-todo.length), p = mine.filter(function (x) { return judge(x.cs, x.call).t === "PASS"; }).length; toast(p + " of " + todo.length + " passed"); tCases(); return; }
+          var cs = todo[i++]; $("prog").textContent = "Running " + i + " of " + todo.length + ": " + cs.name;
+          send(cs.ep, cs.raw, cs.sig, cs.id + " · " + cs.name).then(function (r) { if (r) RESULTS.push({ cs: cs, call: r.call, env: ENV, sent: r.sent }); setTimeout(next, 250); });
+        })();
+      };
+      if (live) sheet("Run the live flow on " + envName(ENV) + "?", "L1–L5 really process and then release IMEI " + esc(((CFG.envs[ENV].base || {}).imei) || "") + ". Only do this with an IMEI kept for testing.", [["▶", "Yes, run", go, ENV === "prod" ? "danger" : "pri"], ["", "Cancel", function () { }]]);
+      else go();
+    };
+  }
+
+  // ======================= history =======================
+  function tLog() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "eapi-log" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      var rows = r.rows.filter(function (x) { return x.env === ENV; });
+      $("tp").innerHTML = '<div class="row" style="gap:6px;margin-top:10px"><span class="muted" style="flex:1;font-size:12px">' + rows.length + " call(s) on " + envName(ENV) + ' · last 200 kept</span><button class="btn ghost sm" id="lx">⬇ Excel</button><button class="btn ghost sm" id="lc">🗑 Clear all</button></div>' +
+        (rows.length ? '<div class="tbw"><table class="tb"><tr><th>When</th><th>API · test</th><th>Result</th></tr>' + rows.map(function (x, i) { var v = verdict(x); return '<tr data-i="' + i + '" style="cursor:pointer"><td style="white-space:nowrap">' + when(x.at) + '<br><small class="muted">' + esc(x.by) + "</small></td><td>" + esc(x.ep) + "<br><small class=\"muted\">" + esc(x.label || "") + (x.sig !== "ok" ? " · sig: " + esc(x.sig) : "") + '</small></td><td><span class="pill ' + v.k + '">' + esc(v.t) + "</span><br><small class=\"muted\">" + (x.status || "—") + " · " + x.ms + " ms</small></td></tr>"; }).join("") + "</table></div>" : '<div class="card empty" style="margin-top:10px">No calls yet.</div>');
+      [].forEach.call($("tp").querySelectorAll("[data-i]"), function (tr) { tr.onclick = function () { var x = rows[+tr.dataset.i]; LAST = { call: x, sent: { url: x.url, headers: { gwSignature: x.sig === "none" ? "(not sent)" : x.sigShown } } }; EP = x.ep; FORM = {}; TAB = "test"; draw(); }; });
+      $("lx").onclick = function () { download(xlsx([{ name: "EMI API calls", rows: [["When", "By", "Env", "API", "Test", "Signature", "HTTP", "ms", "code", "success", "errorCode", "message", "processStatus", "traceId", "Request (password hidden)", "Response"]].concat(rows.map(function (x) { return [when(x.at), x.by, envName(x.env), x.ep, x.label, x.sig, x.status, x.ms, x.code == null ? "" : x.code, x.success == null ? "" : String(x.success), x.errorCode, x.message, x.processStatus == null ? "" : String(x.processStatus), x.traceId, x.req, x.resp]; })) }]), "EMI_API_calls.xlsx"); };
+      $("lc").onclick = function () { sheet("Clear the call history?", "All saved calls (both environments) are removed.", [["🗑", "Clear", function () { api({ action: "eapi-log-clear" }).then(function () { tLog(); }); }, "danger"], ["", "Cancel", function () { }]]); };
+    });
+  }
+
+  // ======================= error codes =======================
+  function tCodes() {
+    $("tp").innerHTML = '<div class="help" style="margin-top:10px">vivo’s error list from the API document. The tester shows the partner-facing message whenever a reply carries one of these codes.</div><div class="tbw"><table class="tb"><tr><th>#</th><th>errorCode</th><th>Meaning</th><th>Partner sees</th></tr>' + CODES.map(function (c, i) { return "<tr><td>" + (i + 1) + '</td><td class="fx" style="font-size:11px">' + c[0] + "</td><td>" + esc(c[1]) + "</td><td>" + esc(c[2]) + "</td></tr>"; }).join("") + "</table></div>";
+  }
+
+  // ======================= set-up =======================
+  function tCfg() {
+    var box = function (e) {
+      var E = CFG.envs[e], b = E.base || {}, K = KEYS[e];
+      return '<div class="card" style="margin-top:10px"><b>' + (e === "prod" ? "🔴 Production" : "🧪 UAT") + '</b><div class="g2"><div><label class="lb">Gateway URL</label><input class="tx" data-k="' + e + '.url" value="' + esc(E.url) + '" placeholder="https://…/gw/04"></div><div><label class="lb">Invoker name</label><input class="tx" data-k="' + e + '.invoker" value="' + esc(E.invoker) + '"></div>' +
+        '<div><label class="lb">Secret ' + (K.secret ? '<span class="pill g">saved ✓</span>' : '<span class="pill r">not saved</span>') + '</label><input class="tx" type="password" autocomplete="new-password" data-s="' + e + '.secret" placeholder="' + (K.secret ? "leave blank to keep" : "paste the gateway secret") + '"></div>' +
+        '<div><label class="lb">Company name</label><input class="tx" data-k="' + e + '.company" value="' + esc(E.company) + '"></div>' +
+        '<div><label class="lb">Company password ' + (K.password ? '<span class="pill g">saved ✓</span>' : '<span class="pill r">not saved</span>') + '</label><input class="tx" type="password" autocomplete="new-password" data-s="' + e + '.password" placeholder="' + (K.password ? "leave blank to keep" : "partner password") + '"></div></div>' +
+        '<div class="sec"><span>Valid test data (used by Test cases)</span></div><div class="g2"><div><label class="lb">Test IMEI</label><input class="tx fx" data-k="' + e + '.base.imei" value="' + esc(b.imei || "") + '" inputmode="numeric"></div><div><label class="lb">Its model name</label><input class="tx" data-k="' + e + '.base.model" value="' + esc(b.model || "") + '"></div><div><label class="lb">Its dealer code</label><input class="tx" data-k="' + e + '.base.dealer" value="' + esc(b.dealer || "") + '"></div><div><label class="lb">Scheme</label><input class="tx" data-k="' + e + '.base.scheme" value="' + esc(b.scheme || "") + '"></div><div><label class="lb">Finance amount</label><input class="tx" data-k="' + e + '.base.amount" value="' + esc(b.amount || "") + '" inputmode="decimal"></div></div>' +
+        ((K.secret || K.password) ? '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" data-clear="' + e + '"><i></i><span>Delete the saved secret and password</span></label>' : "") + "</div>";
+    };
+    $("tp").innerHTML = '<div class="help" style="margin-top:10px">🔒 The secret and the company password are kept on the server and are never shown again — not on this screen, not in History, not in exports. Requests are signed on the server and sent to vivo’s gateway from there. Only HO admins can open this tool.</div>' + box("uat") + box("prod") +
+      '<div class="row" style="gap:8px;margin-top:12px"><button class="btn pri" id="save" style="flex:1">💾 Save set-up</button><button class="btn ghost" id="pm2">⬇ Postman collection</button></div>';
+    $("pm2").onclick = postman;
+    $("save").onclick = function () {
+      var c = JSON.parse(JSON.stringify(CFG)), k = { prod: {}, uat: {} };
+      [].forEach.call($("tp").querySelectorAll("[data-k]"), function (i) { var p = i.dataset.k.split("."), o = c.envs[p[0]]; if (p[1] === "base") { o.base = o.base || {}; o.base[p[2]] = i.value.trim(); } else o[p[1]] = i.value.trim(); });
+      [].forEach.call($("tp").querySelectorAll("[data-s]"), function (i) { var p = i.dataset.s.split("."); if (i.value) k[p[0]][p[1]] = i.value; });
+      [].forEach.call($("tp").querySelectorAll("[data-clear]"), function (i) { if (i.checked) k[i.dataset.clear].clear = true; });
+      api({ action: "eapi-cfg", save: true, cfg: c, keys: k }).then(function (r) { if (!r.ok) return toast(r.error); CFG = r.cfg; KEYS = r.keys; FORM = {}; toast("Saved"); tCfg(); });
+    };
+  }
+
+  // ---- Postman collection (no secrets inside: fill secret + password in Postman's variables) ----
+  function postman() {
+    var E = CFG.envs[ENV], b = E.base || {};
+    var pre = [
+      "// vivo gateway signature: Base64(invokerName) + '@#' + timestamp + '@#' + SHA256Hex(secret + timestamp + body)",
+      "const ts = Date.now().toString();",
+      "const body = pm.request.body && pm.request.body.raw ? pm.variables.replaceIn(pm.request.body.raw) : '';",
+      "const inv = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(pm.variables.get('invokerName')));",
+      "const hash = CryptoJS.SHA256(pm.variables.get('secret') + ts + body).toString(CryptoJS.enc.Hex);",
+      "pm.request.headers.upsert({ key: 'gwSignature', value: inv + '@#' + ts + '@#' + hash });"
+    ];
+    var test = ["pm.test('HTTP 200', () => pm.response.to.have.status(200));", "const r = pm.response.json();", "pm.test('success', () => pm.expect(r.success && r.code === 200 && !r.errorCode, r.errorCode + ' ' + r.message).to.be.true);"];
+    var tpl = { companyName: "{{companyName}}", password: "{{password}}", imei: "{{imei}}", modelName: "{{modelName}}", scheme: "{{scheme}}", financeAmount: "{{financeAmount}}", dealerCode: "{{dealerCode}}" };
+    var col = {
+      info: { name: "vivo EMI Business API (" + envName(ENV) + ")", schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json", description: "Signed automatically by the collection's pre-request script. Fill 'secret' and 'password' in the collection variables." },
+      event: [{ listen: "prerequest", script: { type: "text/javascript", exec: pre } }, { listen: "test", script: { type: "text/javascript", exec: test } }],
+      variable: [["baseUrl", E.url], ["invokerName", E.invoker], ["secret", ""], ["companyName", E.company], ["password", ""], ["imei", b.imei || ""], ["modelName", b.model || ""], ["dealerCode", b.dealer || ""], ["scheme", b.scheme || ""], ["financeAmount", b.amount || ""]].map(function (x) { return { key: x[0], value: x[1] || "" }; }),
+      item: Object.keys(EPS).map(function (ep) { return { name: EPS[ep].name, request: { method: "POST", header: [{ key: "Content-Type", value: "application/json" }], url: { raw: "{{baseUrl}}/retail-emi/business/" + ep, host: ["{{baseUrl}}"], path: ["retail-emi", "business", ep] }, body: { mode: "raw", raw: bodyOf(ep, tpl), options: { raw: { language: "json" } } } } }; })
+    };
+    download(new Blob([JSON.stringify(col, null, 2)], { type: "application/json" }), "vivo_EMI_API_" + envName(ENV) + ".postman_collection.json");
+  }
+
+  start();
+})();
+</script>
+</body>
+</html>
