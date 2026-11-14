@@ -209,6 +209,33 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .bd{position:absolute;top:2px;right:calc(50% - 34px);min-width:18px;height:18px;border-radius:99px;background:#E53935;color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid #fff}
 .quick .bd{right:12px}
 .empty2{text-align:center;color:var(--mut);padding:24px 8px;font-size:14px}
+.hh{position:sticky;top:0;z-index:20;background:var(--bg,#F3F4F9);margin:0 -12px;padding:8px 12px 6px;border-radius:0 0 16px 16px;box-shadow:0 6px 12px -10px rgba(20,24,51,.25)}
+.hsearch .qx{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#E7E9F5;border-radius:99px;width:26px;height:26px;cursor:pointer;color:#555}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;border:1px solid #DFE2F3;background:var(--card);border-radius:99px;padding:6px 11px;font:600 12.5px inherit;color:var(--ink);cursor:pointer;white-space:nowrap}
+.chips button.on{background:#2B33A6;border-color:#2B33A6;color:#fff}
+.chips .vw{margin-left:auto;background:#F1F2F6}
+section.cat{scroll-margin-top:120px}
+.cat h3 .sp{flex:1}.cat h3 small{margin-left:4px}.cat h3[data-coll]{cursor:pointer;user-select:none}.cat.shut{padding-bottom:4px}.cat.shut h3{margin-bottom:4px}
+.cv{font-style:normal;color:var(--mut);font-size:13px}
+.lnk{border:0;background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:5px 10px;font:700 12px inherit;cursor:pointer}
+.mine{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 6px}
+@media(min-width:620px){.mine{grid-template-columns:repeat(6,1fr)}}
+.it .st,.rw .st{position:absolute;top:0;right:4px;font-style:normal;font-size:16px;color:#B9BED6;cursor:pointer;padding:2px}
+.it .st.on,.rw .st.on{color:#F5A623}
+.pills{display:flex;flex-wrap:wrap;gap:6px;padding:0 2px 4px}
+.pills button{border:0;background:#F3F4FD;border-radius:12px;padding:8px 11px;font:600 12.5px inherit;color:var(--ink);cursor:pointer}
+.pills button b{background:#E53935;color:#fff;border-radius:99px;padding:0 6px;margin-left:3px;font-size:11px}
+.lst{display:flex;flex-direction:column}
+.rw{display:flex;align-items:center;gap:11px;padding:8px 6px;border-radius:12px;cursor:pointer;position:relative}
+.rw+.rw{border-top:1px solid #F0F1F7}
+.rw:hover{background:#F6F7FD}
+.rw .ic3{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+.rw .nm{flex:1;min-width:0}.rw .nm b{display:block;font-size:13.5px;font-weight:650}.rw .nm small{color:var(--mut);font-size:11.5px}
+.rw .bd{position:static;border:0;margin-right:26px}
+.rw .st{position:static;font-size:19px;padding:4px}
+.note{border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;cursor:pointer}.note div{color:var(--ink2);margin-top:2px}
+.it .ic3{width:48px;height:48px;font-size:23px}
 .pill{display:inline-flex;gap:6px;align-items:center;background:rgba(255,255,255,.16);border-radius:99px;padding:4px 10px;font-size:12px;margin-top:8px}
 </style>
 <script src="theme.js?v=8"></script>
@@ -471,7 +498,6 @@ td.n,th.n{text-align:right;white-space:nowrap}
     if (kind === "t:") location.href = file + "?v=" + Date.now() + hash;
     else toast("Open this from the app menu.");
   }
-  function bd(fn) { var n = fn ? +fn() || 0 : 0; return n > 0 ? '<b class="bd">' + (n > 99 ? "99+" : n) + "</b>" : ""; }
   function visible(it, cat) {
     if (it[6] === "app" && !IN_APP) return false;
     if (it[6] === "master" && !(window.CUST && CUST.master)) return false;
@@ -482,54 +508,162 @@ td.n,th.n{text-align:right;white-space:nowrap}
     if (window.BIACCESS && !BIACCESS.ok("tool:" + it[0])) return false;
     return true;
   }
-  function draw() {
-    var q = Q.trim().toLowerCase();
-    var html = '<div class="hsearch"><input class="tx" id="q" placeholder="Find a tool — e.g. visits, quiz, dispute" value="' + esc(Q) + '" autocomplete="off"></div>';
-    if (!q && PINS.length) html += PINS.slice(0, 3).map(function (p) { return '<div data-pin="1" style="background:' + (p.level === "urgent" ? "#FDECEC" : p.level === "important" ? "#FFF4E5" : "#EEF0FF") + ';border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;cursor:pointer"><b>' + (p.level === "urgent" ? "🚨 " : p.level === "important" ? "⚠️ " : "📌 ") + esc(p.title) + "</b>" + (p.body ? '<div style="color:var(--ink2);margin-top:2px">' + esc(p.body.slice(0, 140)) + (p.body.length > 140 ? "…" : "") + "</div>" : "") + "</div>"; }).join("");
-    if (!q && N.geoReq) html += '<div data-geo="1" style="background:#E7F7EF;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;cursor:pointer"><b>📡 HO asked to see your location</b><div style="color:var(--ink2);margin-top:2px">Tap to approve or decline — nothing is shared unless you allow it.</div></div>';
-    var qOff = function (x) { if (!window.BIACCESS) return false; var hit = null; CATS.forEach(function (c) { c.items.forEach(function (it) { if (it[4] === x[3]) hit = it; }); }); return hit && !BIACCESS.ok("tool:" + hit[0]); };
-    if (!q) html += '<div class="quick">' + QUICK.map(function (x, i) { if (qOff(x)) return ""; return '<button data-q="' + i + '"><i style="background:' + x[2] + '">' + x[0] + "</i>" + esc(x[1]) + bd(x[4]) + "</button>"; }).join("") + "</div>";
-    var any = false;
-    CATS.forEach(function (c) {
-      var items = c.items.concat(customItems(c.id)).filter(function (it) { return visible(it, c) && (!q || (it[2] + " " + c.name).toLowerCase().indexOf(q) >= 0); });
-      if (!items.length) return; any = true;
-      html += '<div class="cat"><h3><span>' + c.icon + "</span>" + esc(c.name) + "</h3><div class=\"grid\">" + items.map(function (it) {
-        return '<button class="it" data-t="' + esc(it[4]) + '" data-l="' + esc(it[2]) + '"><div class="ic3" style="background:' + c.col + '">' + it[1] + "</div><span>" + esc(it[2]) + "</span>" + bd(it[5]) + "</button>";
-      }).join("") + "</div></div>";
-    });
-    if (!any) html += '<div class="empty2">No tool matches “' + esc(Q) + "”.</div>";
-    var keepY = window.scrollY; VIEW.innerHTML = html; if (keepY) window.scrollTo(0, keepY);
-    if (RESTORE != null) { var ry = RESTORE; RESTORE = null; [0, 120, 450, 1000].forEach(function (ms) { setTimeout(function () { if (Math.abs(window.scrollY - ry) > 4) window.scrollTo(0, ry); }, ms); }); }
-    var qi = $("q"); qi.oninput = function () { Q = qi.value; var p = qi.selectionStart; draw(); var n = $("q"); n.focus(); try { n.setSelectionRange(p, p); } catch (e) { } };
-    [].forEach.call(VIEW.querySelectorAll(".it"), function (b) { b.onclick = function () { open(b.dataset.t, b.dataset.l); }; });
-    [].forEach.call(VIEW.querySelectorAll("[data-geo]"), function (b) { b.onclick = function () { open("t:geolocate.html#respond", "Location request"); }; });
-    [].forEach.call(VIEW.querySelectorAll("[data-pin]"), function (b) { b.onclick = function () { open("t:calendar.html#board", "Notice board"); }; });
-    [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function () { var x = QUICK[+b.dataset.q]; open(x[3], x[1]); }; });
+  // ======================= new hub: instant from cache · sticky search + category chips · My tools · Needs you · Recent =======================
+  var UK = String((AUTH && (AUTH.app + ":" + AUTH.username)) || "anon").toLowerCase();
+  var LS = { get: function (k, d) { try { var v = JSON.parse(localStorage.getItem(k + ":" + UK) || "null"); return v == null ? d : v; } catch (e) { return d; } }, set: function (k, v) { try { localStorage.setItem(k + ":" + UK, JSON.stringify(v)); } catch (e) { } } };
+  var VIEWM = LS.get("bi-hub-view", "grid"), COLL = LS.get("bi-hub-coll", {}), EDIT = false, ACT = "";
+  var FAV = LS.get("bi-hub-fav", null), REC = LS.get("bi-hub-rec", []);
+  // a visible tool, flattened: { t:target, l:label, ic, cat, cn, col, b:badgeFn, id }
+  var IDX = [];
+  function index() {
+    IDX = [];
+    CATS.forEach(function (c) { c.items.concat(customItems(c.id)).forEach(function (it) { if (visible(it, c)) IDX.push({ t: it[4], l: it[2], ic: it[1], cat: c.id, cn: c.name, col: c.col, b: it[5], id: it[0] }); }); });
+    return IDX;
   }
+  var byT = function (t) { for (var i = 0; i < IDX.length; i++) if (IDX[i].t === t) return IDX[i]; return null; };
+  function favList() {
+    if (!FAV) FAV = QUICK.map(function (x) { return x[3]; });
+    return FAV.map(function (t) { var x = byT(t); if (x) return x; var q = QUICK.filter(function (y) { return y[3] === t; })[0]; return q ? { t: t, l: q[1], ic: q[0], col: q[2] + "22", b: q[4], cat: "", cn: "" } : null; }).filter(Boolean);
+  }
+  function toggleFav(t) {
+    favList(); var i = FAV.indexOf(t);
+    if (i >= 0) FAV.splice(i, 1); else FAV.push(t);
+    LS.set("bi-hub-fav", FAV); draw();
+    toast(i >= 0 ? "Removed from My tools" : "Added to My tools ⭐");
+  }
+  var nB = function (x) { return x && x.b ? +x.b() || 0 : 0; };
+  function bd(fn) { var n = fn ? +fn() || 0 : 0; return n > 0 ? '<b class="bd">' + (n > 99 ? "99+" : n) + "</b>" : ""; }
+  function tile(x, star) {
+    var fav = FAV && FAV.indexOf(x.t) >= 0;
+    return '<button class="it" data-t="' + esc(x.t) + '" data-l="' + esc(x.l) + '"><div class="ic3" style="background:' + (x.col || "#EEF0FF") + '">' + x.ic + "</div><span>" + esc(x.l) + "</span>" + bd(x.b) + (star ? '<i class="st' + (fav ? " on" : "") + '" data-star="' + esc(x.t) + '">' + (fav ? "★" : "☆") + "</i>" : "") + "</button>";
+  }
+  function row(x, sub) {
+    var fav = FAV && FAV.indexOf(x.t) >= 0;
+    return '<div class="rw" data-t="' + esc(x.t) + '" data-l="' + esc(x.l) + '"><div class="ic3" style="background:' + (x.col || "#EEF0FF") + '">' + x.ic + '</div><div class="nm"><b>' + esc(x.l) + "</b>" + (sub ? "<small>" + esc(sub) + "</small>" : "") + "</div>" + bd(x.b) + '<i class="st' + (fav ? " on" : "") + '" data-star="' + esc(x.t) + '" title="My tools">' + (fav ? "★" : "☆") + "</i></div>";
+  }
+  function score(x, q) {
+    var l = x.l.toLowerCase(), words = (l + " " + x.id).split(/[^a-z0-9]+/);
+    if (l.indexOf(q) === 0) return 4;
+    if (words.some(function (w) { return w.indexOf(q) === 0; })) return 3;
+    if (l.indexOf(q) >= 0 || x.id.indexOf(q) >= 0) return 2;
+    if (x.cn.toLowerCase().indexOf(q) >= 0) return 1;
+    var parts = q.split(/\s+/).filter(Boolean); if (parts.length > 1 && parts.every(function (p) { return (l + " " + x.cn.toLowerCase()).indexOf(p) >= 0; })) return 1.5;
+    return 0;
+  }
+  // header (search + chips) is built once; only #hb is redrawn
+  function shell() {
+    VIEW.innerHTML = '<div class="hh" id="hh"><div class="hsearch"><input class="tx" id="q" placeholder="Search ' + IDX.length + ' tools — e.g. visits, quiz, IMEI" autocomplete="off" enterkeyhint="go"><button id="qx" class="qx" aria-label="Clear">✕</button></div><div class="chips" id="chips"></div></div><div id="hb"></div>';
+    var qi = $("q");
+    qi.oninput = function () { Q = qi.value; draw(); };
+    qi.onkeydown = function (e) { if (e.key === "Enter") { var f = VIEW.querySelector("#hb [data-t]"); if (f) open(f.dataset.t, f.dataset.l); } };
+    $("qx").onclick = function () { Q = ""; qi.value = ""; draw(); qi.focus(); };
+  }
+  var IO = null;
+  function draw() {
+    index();
+    if (!$("hb")) shell();
+    var q = Q.trim().toLowerCase(), H = "";
+    $("qx").style.display = q ? "" : "none";
+    if (q) {
+      var hits = IDX.map(function (x) { return { x: x, s: score(x, q) }; }).filter(function (h) { return h.s > 0; }).sort(function (a, b) { return b.s - a.s || a.x.l.localeCompare(b.x.l); });
+      var seen = {}; hits = hits.filter(function (h) { if (seen[h.x.t]) return false; seen[h.x.t] = 1; return true; });
+      $("chips").innerHTML = '<span class="muted" style="font-size:12px;padding:6px 2px">' + hits.length + " match" + (hits.length === 1 ? "" : "es") + (hits.length ? " · Enter opens the first" : "") + "</span>";
+      H = hits.length ? '<div class="lst">' + hits.map(function (h) { return row(h.x, h.x.cn); }).join("") + "</div>" : '<div class="empty2">No tool matches “' + esc(Q) + "”.<br><small>Try a shorter word.</small></div>";
+      $("hb").innerHTML = H; wire(); return;
+    }
+    var fav = favList(), need = IDX.filter(function (x) { return nB(x) > 0; }), seenN = {}; need = need.filter(function (x) { if (seenN[x.t]) return false; seenN[x.t] = 1; return true; });
+    var rec = REC.map(byT).filter(Boolean).filter(function (x) { return !FAV || FAV.indexOf(x.t) < 0; }).slice(0, 8);
+    var cats = CATS.map(function (c) { var its = IDX.filter(function (x) { return x.cat === c.id; }); return { c: c, its: its }; }).filter(function (g) { return g.its.length; });
+    var chips = [["mine", "⭐ My tools"]].concat(need.length ? [["need", "🔔 Needs you · " + need.length]] : []).concat(rec.length ? [["recent", "🕘 Recent"]] : []).concat(cats.map(function (g) { return ["c-" + g.c.id, g.c.icon + " " + g.c.name]; }));
+    $("chips").innerHTML = chips.map(function (c) { return '<button data-go="' + c[0] + '" class="' + (ACT === c[0] ? "on" : "") + '">' + esc(c[1]) + "</button>"; }).join("") + '<button class="vw" id="vw" title="Grid / list">' + (VIEWM === "grid" ? "☰ List" : "▦ Grid") + "</button>";
+    PINS.slice(0, 3).forEach(function (p) { H += '<div data-pin="1" class="note" style="background:' + (p.level === "urgent" ? "#FDECEC" : p.level === "important" ? "#FFF4E5" : "#EEF0FF") + '"><b>' + (p.level === "urgent" ? "🚨 " : p.level === "important" ? "⚠️ " : "📌 ") + esc(p.title) + "</b>" + (p.body ? "<div>" + esc(p.body.slice(0, 140)) + (p.body.length > 140 ? "…" : "") + "</div>" : "") + "</div>"; });
+    if (N.geoReq) H += '<div data-geo="1" class="note" style="background:#E7F7EF"><b>📡 HO asked to see your location</b><div>Tap to approve or decline — nothing is shared unless you allow it.</div></div>';
+    H += '<section class="cat" id="s-mine"><h3><span>⭐</span>My tools<small>' + (EDIT ? "tap ☆ on any tool to add / remove" : "") + '</small><span class="sp"></span><button class="lnk" id="edit">' + (EDIT ? "✓ Done" : "✏️ Edit") + "</button></h3>" +
+      (fav.length ? '<div class="mine">' + fav.map(function (x) { return tile(x, EDIT); }).join("") + "</div>" : '<div class="muted" style="font-size:12.5px;padding:2px 4px 6px">Tap ✏️ Edit, then ☆ on the tools you use most.</div>') + "</section>";
+    if (need.length) H += '<section class="cat" id="s-need"><h3><span>🔔</span>Needs you<small>' + need.length + " tool" + (need.length > 1 ? "s" : "") + " waiting</small></h3><div class=\"pills\">" + need.map(function (x) { return '<button data-t="' + esc(x.t) + '" data-l="' + esc(x.l) + '">' + x.ic + " " + esc(x.l) + ' <b>' + nB(x) + "</b></button>"; }).join("") + "</div></section>";
+    if (rec.length) H += '<section class="cat" id="s-recent"><h3><span>🕘</span>Recent</h3><div class="pills">' + rec.map(function (x) { return '<button data-t="' + esc(x.t) + '" data-l="' + esc(x.l) + '">' + x.ic + " " + esc(x.l) + "</button>"; }).join("") + "</div></section>";
+    cats.forEach(function (g) {
+      var shut = !!COLL[g.c.id];
+      H += '<section class="cat' + (shut ? " shut" : "") + '" id="s-c-' + g.c.id + '"><h3 data-coll="' + g.c.id + '"><span>' + g.c.icon + "</span>" + esc(g.c.name) + "<small>" + g.its.length + '</small><span class="sp"></span><i class="cv">' + (shut ? "▸" : "▾") + "</i></h3>" +
+        (shut ? "" : VIEWM === "list" ? '<div class="lst">' + g.its.map(function (x) { return row(x); }).join("") + "</div>" : '<div class="grid">' + g.its.map(function (x) { return tile(x, EDIT); }).join("") + "</div>") + "</section>";
+    });
+    var keepY = window.scrollY; $("hb").innerHTML = H; if (keepY) window.scrollTo(0, keepY);
+    if (RESTORE != null) { var ry = RESTORE; RESTORE = null; [0, 120, 450].forEach(function (ms) { setTimeout(function () { if (Math.abs(window.scrollY - ry) > 4) window.scrollTo(0, ry); }, ms); }); }
+    wire();
+    [].forEach.call($("chips").querySelectorAll("[data-go]"), function (b) { b.onclick = function () { var s = $("s-" + b.dataset.go); if (!s) return; var id = b.dataset.go.replace(/^c-/, ""); if (COLL[id]) { delete COLL[id]; LS.set("bi-hub-coll", COLL); draw(); s = $("s-" + b.dataset.go); } window.scrollTo({ top: s.getBoundingClientRect().top + window.scrollY - $("hh").offsetHeight - 6, behavior: "smooth" }); setAct(b.dataset.go); }; });
+    $("vw").onclick = function () { VIEWM = VIEWM === "grid" ? "list" : "grid"; LS.set("bi-hub-view", VIEWM); draw(); };
+    $("edit").onclick = function () { EDIT = !EDIT; draw(); };
+    [].forEach.call($("hb").querySelectorAll("[data-coll]"), function (h) { h.onclick = function () { var id = h.dataset.coll; if (COLL[id]) delete COLL[id]; else COLL[id] = 1; LS.set("bi-hub-coll", COLL); draw(); }; });
+    spy();
+  }
+  function setAct(id) { if (ACT === id) return; ACT = id; [].forEach.call($("chips").querySelectorAll("[data-go]"), function (b) { var on = b.dataset.go === id; b.classList.toggle("on", on); if (on && b.scrollIntoView) { var c = $("chips"); c.scrollTo({ left: Math.max(0, b.offsetLeft - 12), behavior: "smooth" }); } }); }
+  function spy() {
+    if (IO) IO.disconnect();
+    if (!window.IntersectionObserver) return;
+    var top = ($("hh") ? $("hh").offsetHeight : 100) + 10;
+    IO = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) setAct(e.target.id.slice(2)); }); }, { rootMargin: "-" + top + "px 0px -70% 0px" });
+    [].forEach.call($("hb").querySelectorAll("section[id^=s-]"), function (s) { IO.observe(s); });
+  }
+  function wire() {
+    var press = null;
+    [].forEach.call($("hb").querySelectorAll("[data-t]"), function (b) {
+      b.onclick = function (e) {
+        var st = e.target.closest && e.target.closest("[data-star]");
+        if (st) { e.stopPropagation(); toggleFav(st.dataset.star); return; }
+        if (EDIT && b.classList.contains("it")) { toggleFav(b.dataset.t); return; }
+        if (press === "long") { press = null; return; }
+        open(b.dataset.t, b.dataset.l);
+      };
+      // long-press a tool = add / remove from My tools
+      var tm; b.addEventListener("touchstart", function () { press = null; tm = setTimeout(function () { press = "long"; try { navigator.vibrate && navigator.vibrate(15); } catch (e) { } toggleFav(b.dataset.t); }, 550); }, { passive: true });
+      ["touchend", "touchmove", "touchcancel"].forEach(function (ev) { b.addEventListener(ev, function () { clearTimeout(tm); }, { passive: true }); });
+      b.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+    });
+    [].forEach.call($("hb").querySelectorAll("[data-geo]"), function (b) { b.onclick = function () { open("t:geolocate.html#respond", "Location request"); }; });
+    [].forEach.call($("hb").querySelectorAll("[data-pin]"), function (b) { b.onclick = function () { open("t:calendar.html#board", "Notice board"); }; });
+  }
+  // remember recently opened tools
+  var open0 = open;
+  open = function (t, l) { REC = [t].concat(REC.filter(function (x) { return x !== t; })).slice(0, 12); LS.set("bi-hub-rec", REC); return open0(t, l); };
+
   var CTN = {};   // approvals waiting / responses sent back, per custom tool
   function ctNotify() { api({ action: "ct-notify" }).then(function (r) { if (r.ok) { var ch = JSON.stringify(r.tools) !== JSON.stringify(CTN); CTN = r.tools; if (ch && !Q) draw(); } }); }
   if (window.BIACCESS) BIACCESS.onChange(function () { draw(); });
+  function applyNotify(r) {
+    MODS = r.modules || MODS;
+    N = { hygiene: r.hygiene, autorep: r.autorep, quizNew: r.quizNew, pollNew: r.pollNew, disputes: r.disputes || {}, supportUnread: r.supportUnread, pwreq: r.pwreq,
+      surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports, insAlerts: r.insAlerts, notices: r.notices, calSoon: r.calSoon, geoReq: r.geoReq, iub: r.iub };
+    PINS = r.pinned || [];
+  }
+  function hello(name, sub) { if (name) $("h1").textContent = "Hi " + String(name).split(" ")[0] + " 👋"; if (sub) $("h2").textContent = sub; }
+  function refresh() {
+    api({ action: "notify" }).then(function (r) {
+      if (!r.ok) return;
+      var before = JSON.stringify([N, MODS, PINS]); applyNotify(r);
+      var c = LS.get("bi-hub-cache", {}); c.r = r; c.at = Date.now(); LS.set("bi-hub-cache", c);
+      if (JSON.stringify([N, MODS, PINS]) !== before && !Q) draw();
+    });
+  }
   function load() {
     if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
-    ctNotify();
-    api({ action: "notify" }).then(function (r) {
-      if (r.ok) {
-        MODS = r.modules || null;
-        N = { hygiene: r.hygiene, autorep: r.autorep, quizNew: r.quizNew, pollNew: r.pollNew, disputes: r.disputes || {}, supportUnread: r.supportUnread, pwreq: r.pwreq,
-          surveys: r.surveys && (ADMIN ? r.surveys.newResponses : r.surveys.pending), chat: r.chat && r.chat.unread, matrix: r.matrix && r.matrix.pending ? 1 : 0, hoReports: r.hoReports, insAlerts: r.insAlerts, notices: r.notices, calSoon: r.calSoon, geoReq: r.geoReq, iub: r.iub };
-        PINS = r.pinned || [];
-      }
-      api({ action: "me" }).then(function (m) {
-        var p = (m && m.profile) || {};
-        $("h1").textContent = "Hi " + String(p.fullName || AUTH.username).split(" ")[0] + " 👋";
-        $("h2").textContent = p.master ? "Master admin · all tools + Studio" : ADMIN ? "HO admin · all tools" : "State BI · " + (p.state || "");
-      });
-      draw();
+    // 1) draw at once from what this phone/browser saw last time; 2) refresh badges and modules in the background
+    var c = LS.get("bi-hub-cache", {});
+    if (c.r) applyNotify(c.r);
+    hello(c.name || AUTH.username, c.sub);
+    draw();
+    try { if (!Q && !RESTORE) $("q").blur(); } catch (e) { }
+    refresh(); ctNotify();
+    api({ action: "me" }).then(function (m) {
+      var p = (m && m.profile) || {}; if (!m || !m.ok) return;
+      var sub = p.master ? "Master admin · all tools + Studio" : ADMIN ? "HO admin · all tools" : "State BI · " + (p.state || "");
+      hello(p.fullName || AUTH.username, sub);
+      var cc = LS.get("bi-hub-cache", {}); cc.name = p.fullName || AUTH.username; cc.sub = sub; LS.set("bi-hub-cache", cc);
     });
   }
   window.__custChanged = function () { if (!Q) draw(); };
-  window.__pageBack = function () { if (Q) { Q = ""; draw(); return true; } return false; };
-  window.addEventListener("focus", function () { if (AUTH) ctNotify(); if (AUTH) api({ action: "notify" }).then(function (r) { if (r.ok) { N.disputes = r.disputes || {}; N.hygiene = r.hygiene; N.autorep = r.autorep; N.quizNew = r.quizNew; N.pollNew = r.pollNew; N.supportUnread = r.supportUnread; N.hoReports = r.hoReports; N.insAlerts = r.insAlerts; N.notices = r.notices; N.calSoon = r.calSoon; N.geoReq = r.geoReq; N.iub = r.iub; PINS = r.pinned || PINS; if (!Q) draw(); } }); });
+  window.__pageBack = function () { if (EDIT) { EDIT = false; draw(); return true; } if (Q) { Q = ""; $("q").value = ""; draw(); return true; } return false; };
+  var lastF = 0;
+  window.addEventListener("focus", function () { if (!AUTH || Date.now() - lastF < 20000) return; lastF = Date.now(); ctNotify(); refresh(); });
   load();
 })();
 </script>

@@ -979,35 +979,33 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     // Everything the apps / web need for badges and notifications, in one call.
     if (b.action === "notify") {
       const ctx = surveyCtx();
-      const sv = await surveyAction({ action: "survey-notify" }, ctx);
-      const su = await (await supportAction({ action: "support-unread" }, { store, t, app, rec, key })).json();
-      const chat = await chatAction({ action: "chat-notify" }, ctx);
-      const matrix = await matrixAction({ action: "matrix-notify" }, ctx);
-      let pwreq = 0;
-      if (app === "admin" && store.list) {
-        const ks = await store.list("pwreq:");
-        pwreq = (await pool(ks, 40, (k) => store.get(k))).filter((q) => q && q.status === "pending" && !(q.app === app && q.key === key)).length;
-      }
       const jr = async (p) => { try { return await (await p).json(); } catch (e) { return {}; } };
+      const safe = async (p, d) => { try { return await p; } catch (e) { return d; } };
+      // every part is independent: run them side by side (the hub waits for the slowest one, not for the sum)
       const mods = await modulesFor(store, app, rec);
-      const dp = mods.disputes ? await jr(disputeAction({ action: "disp-notify" }, ctx)) : {};
-      const hy = mods.hygiene ? await jr(hygieneAction({ action: "hyg-notify" }, ctx)) : {};
-      const en = await jr(engageAction({ action: "engage-notify" }, ctx));
-      const ar = mods.autoreports ? await jr(autorepAction({ action: "autorep-notify" }, ctx)) : {};
-      const ml = await jr(mailerAction({ action: "ml-notify" }, ctx));
-      const iubN = app === "admin" ? await jr(iubAction({ action: "iub-notify" }, Object.assign({}, ctx, { mailFetch }))) : {};
-      let notices = 0, calSoon = 0, pinned = [];
-      try {
+      const [sv, su, chat, matrix, pwreq, dp, hy, en, ar, ml, iubN] = await Promise.all([
+        safe(surveyAction({ action: "survey-notify" }, ctx), {}),
+        safe((async () => (await supportAction({ action: "support-unread" }, { store, t, app, rec, key })).json())(), {}),
+        safe(chatAction({ action: "chat-notify" }, ctx), {}),
+        safe(matrixAction({ action: "matrix-notify" }, ctx), {}),
+        safe((async () => { if (!(app === "admin" && store.list)) return 0; const ks = await store.list("pwreq:"); return (await pool(ks, 40, (k) => store.get(k))).filter((q) => q && q.status === "pending" && !(q.app === app && q.key === key)).length; })(), 0),
+        mods.disputes ? jr(disputeAction({ action: "disp-notify" }, ctx)) : {},
+        mods.hygiene ? jr(hygieneAction({ action: "hyg-notify" }, ctx)) : {},
+        jr(engageAction({ action: "engage-notify" }, ctx)),
+        mods.autoreports ? jr(autorepAction({ action: "autorep-notify" }, ctx)) : {},
+        jr(mailerAction({ action: "ml-notify" }, ctx)),
+        app === "admin" ? jr(iubAction({ action: "iub-notify" }, Object.assign({}, ctx, { mailFetch }))) : {},
+      ]);
+      let notices = 0, calSoon = 0, pinned = [], geoReq = 0, insAlerts = 0;
+      await Promise.all([(async () => { try {
         const td = new Date(t + 5.5 * 3600000).toISOString().slice(0, 10), soon = new Date(t + 5.5 * 3600000 + 3 * 864e5).toISOString().slice(0, 10);
         const nseen = ((await store.get(`noticeseen:${app}:${key}`)) || { ids: [] }).ids;
         const ns = (await pool(await store.list("notice:"), 30, (k) => store.get(k))).filter((n) => n && (app === "admin" || !n.states || !n.states.length || n.states.includes(rec.state)) && (!n.from || n.from <= td) && (!n.to || n.to >= td));
         notices = ns.filter((n) => !nseen.includes(n.id)).length; pinned = ns.filter((n) => n.pin).sort((x, y) => y.at - x.at).slice(0, 3).map((n) => ({ id: n.id, title: n.title, body: n.body, level: n.level }));
         calSoon = (await pool(await store.list("calev:"), 30, (k) => store.get(k))).filter((e) => e && (app === "admin" || !e.states || !e.states.length || e.states.includes(rec.state)) && e.date >= td && e.date <= soon).length;
-      } catch (e) { }
-      let geoReq = 0;
-      try { geoReq = (await pool(await store.list("geoq:"), 40, (k) => store.get(k))).filter((q) => q && q.to.app === app && q.to.key === key && q.status === "pending" && q.exp > t).length; } catch (e) { }
-      let insAlerts = 0;
-      try { const cs = await cachedSnapshot(store); if (cs) { const al = await alertsFor(store, pool, cs.snap, app, rec), seen = ((await store.get(`insseen:${app}:${key}`)) || { ids: [] }).ids; insAlerts = al.filter((x) => !seen.includes(x.id) && (app !== "admin" || x.sev === "high")).length; } } catch (e) { }
+      } catch (e) { } })(), (async () => {
+      try { geoReq = (await pool(await store.list("geoq:"), 40, (k) => store.get(k))).filter((q) => q && q.to.app === app && q.to.key === key && q.status === "pending" && q.exp > t).length; } catch (e) { } })(), (async () => {
+      try { const cs = await cachedSnapshot(store); if (cs) { const al = await alertsFor(store, pool, cs.snap, app, rec), seen = ((await store.get(`insseen:${app}:${key}`)) || { ids: [] }).ids; insAlerts = al.filter((x) => !seen.includes(x.id) && (app !== "admin" || x.sev === "high")).length; } } catch (e) { } })()]);
       return json(200, { ok: true, surveys: sv, supportUnread: su.unread || 0, chat, matrix, pwreq, modules: mods,
         disputes: { unread: dp.unread || 0, assigned: dp.assignedOpen || 0, breached: dp.breached || 0 }, hygiene: hy.pending || 0, quizNew: mods.quiz ? en.quizNew || 0 : 0, pollNew: mods.polls ? en.pollNew || 0 : 0, autorep: ar.fresh || 0, iub: iubN.n || 0, hoReports: ml.fresh || 0, insAlerts, notices, calSoon, pinned, geoReq });
     }
