@@ -6,6 +6,16 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# ready-made API documents, read by the auth function (EMI API tester → Documents); not served as pages
+[functions.auth]
+  included_files = ["netlify/seed/apidocs/*"]
+
+[[redirects]]
+  from = "/netlify/seed/*"
+  to = "/index.html"
+  status = 404
+  force = true
+
 # Always check for a newer assistant.js (apps also add a fresh ?v= on each page load).
 [[headers]]
   for = "/assistant.js"

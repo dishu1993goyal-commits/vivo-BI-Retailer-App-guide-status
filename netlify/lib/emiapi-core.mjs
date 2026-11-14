@@ -11,9 +11,9 @@ const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
 const ENVS = ["prod", "uat"];
 // All vivo IMEI business APIs (POST /retail-emi/business/<name>). fields = vivo's signing order (docFields = order printed in the document, if different); opt = optional; bool = true/false
 export const EAPI_ENDPOINTS = {
-  queryInstallment: { biz: "Installment (EMI)", name: "Query Installment (GetIMEIInfoWithNoBlock_NEW)", desc: "Query the installment status and details of an IMEI. Checks model match, the company's agency rights and the store (incl. cross-store rules) like Process Installment does.", fields: ["companyName", "password", "imei", "modelName", "dealerCode"] },
-  processInstallment: { biz: "Installment (EMI)", name: "Process Installment (GetIMEIInfo_NEW)", desc: "Apply an installment (EMI) for an IMEI — flags the IMEI.", fields: ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"], changes: true },
-  releaseInstallment: { biz: "Installment (EMI)", name: "Release Installment (UpdateImeiInfo)", desc: "Release (unflag) an existing installment on an IMEI.", fields: ["companyName", "password", "imei"], changes: true },
+  queryInstallment: { biz: "Installment (EMI)", name: "Query Installment (GetIMEIInfoWithNoBlock_NEW)", desc: "VALIDATION ONLY — checks whether the IMEI can take an installment (model match, the company's agency rights, the store incl. cross-store rules). Nothing is blocked.", fields: ["companyName", "password", "imei", "modelName", "dealerCode"] },
+  processInstallment: { biz: "Installment (EMI)", name: "Process Installment (GetIMEIInfo_NEW)", desc: "VALIDATION + BLOCKING — validates the IMEI and, on success, blocks it for this partner's installment (EMI).", fields: ["companyName", "password", "imei", "modelName", "scheme", "financeAmount", "dealerCode"], changes: true },
+  releaseInstallment: { biz: "Installment (EMI)", name: "Release Installment (UpdateImeiInfo)", desc: "UNBLOCK — releases (unblocks) an IMEI blocked by Process Installment, e.g. after loan closure or cancellation.", fields: ["companyName", "password", "imei"], changes: true },
   queryTradeIn: { biz: "Trade-in", name: "Query Trade-In (GetIMEIInfoWithNoBlock_NEW)", desc: "Check whether an IMEI already has an active trade-in record. specialBusinessList returns pending special discounts (5 = student, 6 = corporate).", fields: ["companyName", "password", "imei", "modelName", "dealerCode"], docFields: ["imei", "modelName", "companyName", "password", "dealerCode"], opt: ["dealerCode"] },
   processTradeIn: { biz: "Trade-in", name: "Process Trade-In (Flag02)", desc: "Apply a trade-in — non-retail channel, cross-store check skipped.", fields: ["companyName", "password", "imei", "oldPhoneBrand", "oldPhoneModel", "modelName", "dealerCode"], opt: ["oldPhoneBrand", "oldPhoneModel", "dealerCode"], changes: true },
   processTradeInRetail: { biz: "Trade-in", name: "Process Trade-In Retail (GetImeiInfo_Retailer)", desc: "Apply a trade-in — retail channel, cross-store sales check applied.", fields: ["companyName", "password", "imei", "oldPhoneBrand", "oldPhoneModel", "modelName", "dealerCode"], opt: ["oldPhoneBrand", "oldPhoneModel", "dealerCode"], changes: true },
@@ -160,9 +160,31 @@ export const DOC_BIZ = ["Installment (EMI)", "Trade-in", "Service protection", "
 const DOC_MIME = /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.(wordprocessingml\.document|spreadsheetml\.sheet|presentationml\.presentation)|application\/msword|application\/vnd\.ms-excel|text\/plain|application\/json|application\/zip|image\/(png|jpeg))$/;
 async function docLink(store) { let l = await store.get("eapidoclink"); if (!l) { l = { token: randomBytes(12).toString("hex"), on: false, ref: true }; await store.set("eapidoclink", l); } return l; }
 const docPub = (d) => ({ id: d.id, biz: d.biz, title: d.title, version: d.version, env: d.env, notes: d.notes, name: d.name, mime: d.mime, size: d.size, chunks: d.chunks, published: !!d.published, at: d.at, upd: d.upd, by: d.by });
+// the business-wise documents made by vivo BI (v1.0) are bundled with the function and added once, published
+const SEED = [["Installment", "Installment (EMI)"], ["Trade-in", "Trade-in"], ["Service-protection", "Service protection"], ["ABB-Buyback", "ABB (assured buyback)"], ["Student-authentication", "Student authentication"]];
+async function seedDocs(store, t, env) {
+  if (await store.get("eapidocseed1")) return 0;
+  const fs = await import("node:fs"), path = await import("node:path");
+  let here = ""; try { here = path.dirname(new URL(import.meta.url).pathname); } catch (e) { }
+  const dirs = [env.SEED_DIR, here && path.join(here, "../seed/apidocs"), path.join(process.cwd(), "netlify/seed/apidocs"), path.join(process.cwd(), "../netlify/seed/apidocs"), "/var/task/netlify/seed/apidocs"].filter(Boolean);
+  const dir = dirs.find((d) => { try { return fs.existsSync(path.join(d, "vivo_Installment_API_Documentation_v1.0.pdf")); } catch (e) { return false; } });
+  if (!dir) return 0;
+  let n = 0;
+  for (const [key, biz] of SEED) for (const [ext, mime, kind] of [["pdf", "application/pdf", "PDF"], ["docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Word"]]) {
+    const name = `vivo_${key}_API_Documentation_v1.0.${ext}`; let buf; try { buf = fs.readFileSync(path.join(dir, name)); } catch (e) { continue; }
+    const b64s = buf.toString("base64"), parts = []; for (let i = 0; i < b64s.length; i += 1400000) parts.push(b64s.slice(i, i + 1400000));
+    const id = "D" + (t + n).toString(36).toUpperCase() + randomBytes(2).toString("hex");
+    for (let i = 0; i < parts.length; i++) await store.set(`eapidocb:${id}:${i}`, { d: parts[i] });
+    await store.set("eapidoc:" + id, { id, at: t + n, upd: t + n, by: "vivo BI team", done: true, seed: name, name, mime, size: buf.length, chunks: parts.length, biz, title: biz.replace(/ \(.*\)/, (m) => m) + " API Documentation (" + kind + ")", version: "v1.0 · 15 Nov 2026", env: "both", notes: "UAT and Production endpoints, gwSignature authentication, request fields in vivo's order, sample requests / responses, error scenarios and a UAT testing checklist.", published: true });
+    n++;
+  }
+  await store.set("eapidocseed1", { at: t, n });
+  return n;
+}
 async function docAction(b, ctx, by) {
   const { store, t, pool, env = {} } = ctx;
   if (b.action === "eapi-doc-list") {
+    try { await seedDocs(store, t, env); } catch (e) { }
     const L = (await pool(await store.list("eapidoc:"), 20, (k) => store.get(k))).filter((d) => d && d.done).sort((x, y) => (y.upd || y.at) - (x.upd || x.at)).map(docPub);
     const l = await docLink(store);
     return json(200, { ok: true, rows: L, biz: DOC_BIZ, link: { on: l.on, ref: l.ref !== false, url: (env.SITE_URL || "") + "/emiapi.html?d=" + l.token } });

@@ -80,8 +80,10 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
   function verdict(c) {
     if (!c) return { k: "m", t: "—" };
     if (c.err) return { k: "r", t: "Not reached", fail: true, net: true };
-    var ok = c.status >= 200 && c.status < 300 && c.code === 200 && c.success === true && !c.errorCode;
-    return ok ? { k: "g", t: "Success" + (c.processStatus === false ? " · processStatus false" : ""), ok: true } : { k: "r", t: "Failure" + (c.errorCode ? " · " + c.errorCode : c.status && c.status !== 200 ? " · HTTP " + c.status : c.code ? " · code " + c.code : ""), fail: true };
+    // vivo's rule: success = code 200 AND data.processStatus true. code 200 with processStatus false (or missing) is a failure.
+    var ok = c.processStatus === true && (c.code == null || String(c.code) === "200");
+    if (ok) return { k: "g", t: "Success · processStatus true", ok: true };
+    return { k: "r", t: "Failure" + (c.errorCode ? " · " + c.errorCode : c.status && c.status !== 200 ? " · HTTP " + c.status : String(c.code) === "200" ? " · processStatus " + (c.processStatus === false ? "false" : "missing") : c.code ? " · code " + c.code : ""), fail: true };
   }
   function partnerMsg(c) {
     var x = CMAP[c && c.errorCode]; if (!x) return "";
@@ -243,6 +245,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     $("out").innerHTML = '<div class="card res ' + (v.ok ? "ok" : v.fail ? "bad" : "") + '" style="margin-top:10px"><div class="row" style="align-items:center;gap:8px"><span class="big">' + (v.ok ? "✅" : "❌") + " " + esc(v.t) + '</span><span class="sp"></span><span class="pill m">' + (c.status ? "HTTP " + c.status : "no reply") + " · " + c.ms + " ms</span></div>" +
       (c.err ? '<div class="warn">' + esc(c.err) + "<br><small>If this keeps happening, vivo's gateway may only accept calls from approved IP addresses — ask vivo IT to allow this tool's server, or test on UAT.</small></div>" : "") +
       '<div class="kv">' + [["code", c.code], ["success", c.success], ["errorCode", c.errorCode], ["message", c.message], ["processStatus", c.processStatus], ["errorMessage", c.errorMessage], ["traceId", c.traceId]].filter(function (x) { return x[1] !== null && x[1] !== undefined && x[1] !== ""; }).map(function (x) { return "<b>" + x[0] + '</b><span class="fx" style="word-break:break-all">' + esc(String(x[1])) + "</span>"; }).join("") + "</div>" +
+      (c.status === 404 ? '<div class="warn">🧭 <b>The gateway says this API isn’t there (“PAGE NOT FOUND”).</b> The base URL and the signature are working — other APIs answer on the same address — so <b>' + esc(c.ep) + "</b> is not yet opened on vivo’s " + envName(c.env) + " gateway (or not for invoker <b>" + esc(c.inv || "") + "</b>). Ask vivo IT to publish <span class=\"fx\">/retail-emi/business/" + esc(c.ep) + "</span> on " + envName(c.env) + " and allow it for this invoker. Tap 🔎 below → Copy details for vivo IT to send them the request.</div>" : "") +
       (c.signFail && c.sig === "ok" || c.signFail && !/^(none|badsecret|badinvoker|oldts|futurets|tamper|garbage)$/.test(c.sig) ? '<div class="warn">🔐 <b>The gateway rejected the signature.</b> Either the format differs slightly from the document, or the secret / invoker name for ' + envName(ENV) + ' is not the one the gateway has.<div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="probe">🔍 Find the right signature format</button></div><div id="probeOut"></div></div>' : "") +
       (pm ? '<div class="help"><b>Partner will see:</b> ' + esc(pm) + '<br><small class="muted">' + esc(CMAP[c.errorCode][1]) + "</small></div>" : c.errorCode ? '<div class="warn">errorCode <b>' + esc(c.errorCode) + "</b> is not in vivo's error list in the API document.</div>" : "") +
       '<div class="sec"><span>Response</span><button class="btn ghost sm" id="cpr">📋 Copy</button></div><div class="code">' + esc(pretty || "(empty)") + "</div>" +
@@ -323,7 +326,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     };
     var badIm = bv.imei ? bv.imei.slice(0, 14) + ((+bv.imei.slice(14) + 1) % 10) : "111111111111111";
     var L = [
-      mk("Q1", "Query", "Valid request → success", Q, null, null, "ok", "success"),
+      mk("Q1", "Query", "Valid request → answered without an error (processStatus true only if the IMEI has an installment)", Q, null, null, "ok", "answered"),
       miss(Q, "imei", "Query"), miss(Q, "modelName", "Query"), miss(Q, "companyName", "Query"), miss(Q, "password", "Query"), miss(Q, "dealerCode", "Query"),
       mk("Q-blank-imei", "Query", "Blank IMEI → CHECK_PARAM_MISSING", Q, { imei: "" }, null, "ok", ["CHECK_PARAM_MISSING"]),
       mk("Q-company", "Query", "Wrong company name → COMPANY_NAME_IS_NOT_EXISTS", Q, { companyName: "NoSuchPartner" }, null, "ok", ["COMPANY_NAME_IS_NOT_EXISTS"]),
@@ -345,7 +348,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       mk("P-imei-unknown", "Process — validation only", "IMEI not in vivo's system → BI_IMEI_NOT_EXIST", P, { imei: badIm }, null, "ok", ["BI_IMEI_NOT_EXIST"]),
       miss(R, "imei", "Release — validation only"), miss(R, "password", "Release — validation only"),
       mk("R-imei-unknown", "Release — validation only", "IMEI not in vivo's system → rejected", R, { imei: badIm }, null, "ok", "fail"),
-      mk("QT1", "Trade-in — query", "Valid request → success", QT, null, null, "ok", "success")
+      mk("QT1", "Trade-in — query", "Valid request → answered without an error (processStatus true only if the IMEI has a trade-in)", QT, null, null, "ok", "answered")
     ].concat(checks(QT, "Trade-in — query"), [
       mk("QT-dealer", "Trade-in — query", "Another dealer's code → Invalid Dealer Code", QT, { dealerCode: "ZZ0000000" }, null, "ok", ["IMEI_NOT_BELONG_DEALER", "CHOOSE_STORE_RETAILER_DIFFERENT_IMEI_RETAILER"])
     ], checks(PT, "Trade-in — process (validation only)"), checks(PR, "Trade-in retail — process (validation only)"), checks(SPp, "Service protection (validation only)"), checks(BB, "ABB / buyback (validation only)"), [
@@ -360,7 +363,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       mk("LS2", "Live — service protection (changes the test IMEI)", "Process it again → already processed", SPp, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING", "BUSINESS_MUTEX_CONFLICT"]),
       mk("LB1", "Live — ABB / buyback (changes the test IMEI)", "Process buyback → success", BB, null, null, "ok", "success"),
       mk("LA1", "Live — student authentication (changes the test IMEI)", "Authenticate student (true) → success", SA, { isRocketIdAuthenticated: "true" }, null, "ok", "success"),
-      mk("LA2", "Live — student authentication (changes the test IMEI)", "Query installment → specialBusinessList shows 5", Q, null, null, "ok", "success"),
+      mk("LA2", "Live — student authentication (changes the test IMEI)", "Query installment → specialBusinessList shows 5", Q, null, null, "ok", "answered"),
       // live flow: changes the test IMEI's EMI status — run only on a test IMEI
       mk("L1", "Live — installment (changes the test IMEI)", "Process the test IMEI → success", P, null, null, "ok", "success"),
       mk("L2", "Live — installment (changes the test IMEI)", "Process it again → already processed", P, null, null, "ok", ["BUSINESS_TYPE_ALREADY_EXIST", "BUSINESS_IS_PROCESSING"]),
@@ -371,6 +374,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     return L;
   }
   function judge(cs, c) {
+    if (cs.expect === "answered") { var vv = verdict(c); if (vv.net) return { k: "o", t: "Not reached" }; return String(c.code) === "200" && !c.errorCode && c.status < 300 ? { k: "g", t: "PASS" } : { k: "r", t: "FAIL" }; }
     var v = verdict(c);
     if (v.net) return { k: "o", t: "Not reached" };
     if (cs.expect === "success") return v.ok ? { k: "g", t: "PASS" } : { k: "r", t: "FAIL" };
@@ -394,7 +398,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
         return '<div class="sec"><span>' + esc(g) + "</span></div>" + (live ? '<div class="warn">These <b>really change</b> the test IMEI' + (ENV === "prod" ? " on <b>Production</b>" : "") + ". They run in order." + (/installment/.test(g) ? " L4 releases it again at the end." : " <b>There is no API to undo this</b> — the IMEI stays marked, so use an IMEI kept only for testing, preferably on UAT.") + "</div>" : "") +
           '<div class="tbw"><table class="tb case">' + L.filter(function (c) { return c.grp === g; }).map(function (c) {
             var r = resOf(c.id), j = r ? judge(c, r.call) : null;
-            return '<tr><td><input type="checkbox" data-c="' + c.id + '"' + (SEL[c.id] ? " checked" : "") + '></td><td><b>' + esc(c.name) + '</b><br><small class="muted">' + esc(EPS[c.ep].name.split(" (")[0]) + " · expects " + esc(c.expect === "success" ? "success" : c.expect === "fail" ? "a failure" : c.expect.join(" / ")) + "</small>" +
+            return '<tr><td><input type="checkbox" data-c="' + c.id + '"' + (SEL[c.id] ? " checked" : "") + '></td><td><b>' + esc(c.name) + '</b><br><small class="muted">' + esc(EPS[c.ep].name.split(" (")[0]) + " · expects " + esc(c.expect === "success" ? "success (processStatus true)" : c.expect === "answered" ? "code 200, no error" : c.expect === "fail" ? "a failure" : c.expect.join(" / ")) + "</small>" +
               (r ? '<br><small>Got: <b>' + esc(verdict(r.call).t) + "</b>" + (r.call.message ? " — " + esc(r.call.message) : "") + "</small>" : "") + '</td><td style="text-align:right;white-space:nowrap">' + (j ? '<span class="pill ' + j.k + '">' + j.t + '</span><br><a class="muted" style="font-size:11px;cursor:pointer" data-see="' + c.id + '">view</a>' : "") + "</td></tr>";
           }).join("") + "</table></div>";
       }).join("");
@@ -405,7 +409,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     $("xl").onclick = function () {
       var rows = RESULTS.filter(function (x) { return x.env === ENV; });
       if (!rows.length) return toast("Run some cases first");
-      download(xlsx([{ name: "EMI API tests", rows: [["Case", "Group", "Test", "API", "Expected", "Result", "HTTP", "code", "errorCode", "message", "Partner-facing message", "ms", "When", "Request (password hidden)", "Response"]].concat(rows.map(function (x) { var c = x.call; return [x.cs.id, x.cs.grp, x.cs.name, x.cs.ep, x.cs.expect === "success" ? "success" : x.cs.expect === "fail" ? "failure" : x.cs.expect.join(" / "), judge(x.cs, c).t, c.status, c.code == null ? "" : c.code, c.errorCode, c.message, partnerMsg(c), c.ms, when(c.at), c.req, c.resp]; })) }]), "EMI_API_tests_" + envName(ENV) + ".xlsx");
+      download(xlsx([{ name: "EMI API tests", rows: [["Case", "Group", "Test", "API", "Expected", "Result", "HTTP", "code", "errorCode", "message", "Partner-facing message", "ms", "When", "Request (password hidden)", "Response"]].concat(rows.map(function (x) { var c = x.call; return [x.cs.id, x.cs.grp, x.cs.name, x.cs.ep, x.cs.expect === "success" ? "success (processStatus true)" : x.cs.expect === "answered" ? "code 200, no error" : x.cs.expect === "fail" ? "failure" : x.cs.expect.join(" / "), judge(x.cs, c).t, c.status, c.code == null ? "" : c.code, c.errorCode, c.message, partnerMsg(c), c.ms, when(c.at), c.req, c.resp]; })) }]), "EMI_API_tests_" + envName(ENV) + ".xlsx");
     };
     $("run").onclick = function () {
       var todo = L.filter(function (c) { return SEL[c.id]; });
@@ -447,7 +451,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     var E = { url: baseUrl };
     return '<div class="card" style="margin-top:10px;font-size:13px;line-height:1.6"><b style="font-size:15px">IMEI Business API — English reference</b><div class="muted" style="font-size:12px">Retail EMI system · document dated 14 Oct 2026 · all APIs: POST, JSON in and out, base path <span class="fx">/retail-emi/business</span></div>' +
       '<div class="help" style="white-space:normal"><b>Authentication</b> — every request carries the header <span class="fx">gwSignature</span> = Base64(invokerName) + "@#" + timestamp (ms) + "@#" + SHA256Hex(secret + timestamp + body). invokerName and secret are given by vivo offline. <b>Keep the body fields in vivo’s order</b> (as listed below) — the gateway checks the signature against it.</div>' +
-      '<div class="help" style="white-space:normal"><b>Response</b> — <span class="fx">code</span> 200 = success, 30000 = failure · <span class="fx">errorCode</span> business error code on failure · <span class="fx">message</span> · <span class="fx">success</span> true/false · <span class="fx">traceId</span> · <span class="fx">data</span>: imei, imei2, model, processStatus (true = done), specialBusinessList (5 = student discount, 6 = corporate discount), errorMessage.</div></div>' +
+      '<div class="help" style="white-space:normal"><b>Installment flow</b> — Query Installment = validation only · Process Installment = validation + blocking · Release Installment = unblock.</div><div class="help" style="white-space:normal"><b>Response</b> — <b>success only when <span class="fx">code</span> = 200 AND <span class="fx">data.processStatus</span> = true</b>; code 200 with processStatus false (or missing) is a failure; 30000 = business failure · <span class="fx">errorCode</span> business error code on failure · <span class="fx">message</span> · <span class="fx">success</span> true/false · <span class="fx">traceId</span> · <span class="fx">data</span>: imei, imei2, model, processStatus (true = done), specialBusinessList — special discount business codes on the IMEI: <b>5 = student discount</b>, <b>6 = enterprise (corporate) discount</b>; errorMessage.</div></div>' +
       bizList(EPS).map(function (g) { return '<div class="sec" style="margin-top:14px"><span>' + esc(g) + "</span></div>" + Object.keys(EPS).filter(function (k) { return EPS[k].biz === g; }).map(function (k) { var x = EPS[k];
         return '<div class="card" style="margin-top:8px"><b>' + esc(x.name) + '</b><div class="fx" style="font-size:11.5px;color:var(--mut);word-break:break-all">POST ' + esc((E.url || "{baseUrl}") + "/retail-emi/business/" + k) + '</div><div style="font-size:13px;margin-top:4px">' + esc(x.desc) + "</div>" + (UPD[k] ? '<div class="warn" style="font-size:12px">🆕 ' + esc(UPD[k]) + "</div>" : "") +
           '<div class="tbw"><table class="tb"><tr><th>Field (in order)</th><th>Type</th><th>Required</th><th>Meaning</th></tr>' + x.fields.map(function (f) { return '<tr><td class="fx">' + f + "</td><td>" + ((x.bool || []).indexOf(f) >= 0 ? "Boolean" : "String") + "</td><td>" + ((x.opt || []).indexOf(f) >= 0 ? "No" : "<b>Yes</b>") + "</td><td>" + esc(FDESC[f] || "") + "</td></tr>"; }).join("") + "</table></div>" +
@@ -499,7 +503,7 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
       "const hash = CryptoJS.SHA256(pm.variables.get('secret') + ts + body).toString(CryptoJS.enc.Hex);",
       "pm.request.headers.upsert({ key: 'gwSignature', value: inv + '@#' + ts + '@#' + hash });"
     ];
-    var test = ["pm.test('HTTP 200', () => pm.response.to.have.status(200));", "const r = pm.response.json();", "pm.test('success', () => pm.expect(r.success && r.code === 200 && !r.errorCode, r.errorCode + ' ' + r.message).to.be.true);"];
+    var test = ["pm.test('HTTP 200', () => pm.response.to.have.status(200));", "const r = pm.response.json();", "pm.test('success = code 200 + processStatus true', () => pm.expect(String(r.code) === '200' && r.data && r.data.processStatus === true, (r.errorCode || '') + ' ' + (r.message || (r.data && r.data.errorMessage) || 'processStatus ' + (r.data && r.data.processStatus))).to.be.true);"];
     var tpl = { companyName: "{{companyName}}", password: "{{password}}", imei: "{{imei}}", modelName: "{{modelName}}", scheme: "{{scheme}}", financeAmount: "{{financeAmount}}", dealerCode: "{{dealerCode}}", oldPhoneBrand: "{{oldPhoneBrand}}", oldPhoneModel: "{{oldPhoneModel}}", plan: "{{plan}}", isRocketIdAuthenticated: "true" };
     var col = {
       info: { name: "vivo EMI Business API (" + envName(ENV) + ")", schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json", description: "Signed automatically by the collection's pre-request script. Fill 'secret' and 'password' in the collection variables. Keep the body fields in this order: companyName, password, imei, modelName, scheme, financeAmount, dealerCode — the gateway checks the signature against that order." },
