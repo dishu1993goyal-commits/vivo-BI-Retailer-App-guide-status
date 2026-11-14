@@ -22,6 +22,8 @@ const sha = (s) => createHash("sha256").update(s, "utf8").digest("hex");
 const b64 = (s) => Buffer.from(s, "utf8").toString("base64");
 const FMTS = ["compact|ok", "asis|ok", "sorted|ok", "compact|nobody", "compact|imeionly", "compact|secs", "compact|upper", "asis|nobody", "sorted|upper"];
 const sortKeys = (o) => Array.isArray(o) ? o.map(sortKeys) : o && typeof o === "object" ? Object.keys(o).sort().reduce((a, k) => { a[k] = sortKeys(o[k]); return a; }, {}) : o;
+// pasted from e-mail / WhatsApp: drop invisible characters (zero-width, non-breaking spaces, BOM) and outer spaces
+const cleanKey = (v) => String(v || "").replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").replace(/\u00A0/g, " ").trim();
 const jsonEsc = (s) => JSON.stringify(String(s)).slice(1, -1);
 
 async function cfgOf(store) {
@@ -36,7 +38,9 @@ export async function emiApiAction(b, ctx) {
   if (app !== "admin") return json(403, { ok: false, error: "The EMI API tester is for HO admins only." });
   const by = rec.fullName || rec.username || "";
   const cfg = await cfgOf(store), keys = (await store.get("eapikeys")) || {};
-  const keyInfo = () => Object.fromEntries(ENVS.map((e) => [e, { secret: !!(keys[e] && keys[e].secret), password: !!(keys[e] && keys[e].password) }]));
+  // a "fingerprint" so HO can check the saved value is the right one without it ever being shown
+  const fp = (v) => v ? { len: [...v].length, head: [...v].slice(0, 2).join(""), tail: [...v].slice(-2).join(""), odd: /[^\x21-\x7E]/.test(v) } : null;
+  const keyInfo = () => Object.fromEntries(ENVS.map((e) => [e, { secret: !!(keys[e] && keys[e].secret), password: !!(keys[e] && keys[e].password), sfp: fp(keys[e] && keys[e].secret), pfp: fp(keys[e] && keys[e].password) }]));
 
   if (b.action === "eapi-cfg") {
     if (b.save) {
@@ -51,8 +55,8 @@ export async function emiApiAction(b, ctx) {
           base: { imei: str(base.imei, 20), model: str(base.model, 80), dealer: str(base.dealer, 60), scheme: str(base.scheme, 80), amount: str(base.amount, 20) } };
         const k = (b.keys || {})[e] || {};
         keys[e] = keys[e] || {};
-        if (typeof k.secret === "string" && k.secret.trim()) keys[e].secret = k.secret.trim().slice(0, 300);
-        if (typeof k.password === "string" && k.password.trim()) keys[e].password = k.password.trim().slice(0, 200);
+        if (typeof k.secret === "string" && cleanKey(k.secret)) keys[e].secret = cleanKey(k.secret).slice(0, 300);
+        if (typeof k.password === "string" && cleanKey(k.password)) keys[e].password = cleanKey(k.password).slice(0, 200);
         if (k.clear) keys[e] = {};
       }
       await store.set("eapicfg", cfg); await store.set("eapikeys", keys);
@@ -102,7 +106,7 @@ export async function emiApiAction(b, ctx) {
     const mask = (s) => K.password ? String(s).split(jsonEsc(K.password)).join("••••••") : String(s);
     const d = (res && res.data) || {};
     const log = { id: t.toString(36) + randomBytes(2).toString("hex"), at: t, by, env: e, ep, label: str(b.label, 120), sig, url, status, ms, err,
-      req: mask(raw), sigShown: b64(inv) + "@#" + ts + "@#" + hash.slice(0, 12) + "…", fmt: bodyMode + "|" + sig,
+      req: mask(raw), sigShown: b64(inv) + "@#" + ts + "@#" + hash.slice(0, 12) + "…", fmt: bodyMode + "|" + sig, sigFull: headers.gwSignature || "", ts, inv, bodyBytes: Buffer.byteLength(raw, "utf8"), signedBytes: Buffer.byteLength(signed, "utf8"),
       signFail: status === 403 || /sign\s+is\s+not\s+pass|check\s+sign|signature/i.test(text) && !(res && res.code === 200), resp: mask(text).slice(0, 12000),
       code: res && res.code, errorCode: res && res.errorCode || "", message: res && res.message || "", success: res ? !!res.success : null,
       processStatus: d.processStatus === undefined ? null : d.processStatus, errorMessage: d.errorMessage || "", traceId: res && res.traceId || "" };
@@ -115,6 +119,14 @@ export async function emiApiAction(b, ctx) {
     if (!FMTS.includes(b.fmt)) return json(400, { ok: false, error: "Unknown format" });
     cfg.envs[e].fmt = b.fmt; await store.set("eapicfg", cfg);
     return json(200, { ok: true, cfg, keys: keyInfo() });
+  }
+  if (b.action === "eapi-sigcalc") {   // check the signature maths against an example from vivo IT, using the saved secret
+    const e = ENVS.includes(b.env) ? b.env : "uat", E = cfg.envs[e], K = keys[e] || {};
+    if (!K.secret) return json(400, { ok: false, error: "No secret saved for " + (e === "prod" ? "Production" : "UAT") });
+    const ts = String(b.ts || "").replace(/\D/g, "").slice(0, 16) || String(t);
+    const body = String(b.body == null ? "" : b.body).slice(0, 20000).replace(/\{\{\s*password\s*\}\}/g, jsonEsc(K.password || "")).replace(/\{\{\s*companyName\s*\}\}/g, jsonEsc(E.company || ""));
+    const inv = str(b.invoker, 120) || E.invoker, h = sha(K.secret + ts + body);
+    return json(200, { ok: true, ts, hash: h, gw: b64(inv) + "@#" + ts + "@#" + h, invB64: b64(inv), bodyBytes: Buffer.byteLength(body, "utf8") });
   }
   if (b.action === "eapi-log") {
     const ks = (await store.list("eapilog:")).sort().reverse().slice(0, 200);
