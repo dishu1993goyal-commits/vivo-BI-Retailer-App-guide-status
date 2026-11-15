@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Agile BI SQL helper</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12px inherit;cursor:pointer;color:var(--ink);text-align:left}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.code{font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px 12px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin-top:8px;max-height:420px}
+.code .k{color:#8FA0FF;font-weight:700}.code .s{color:#7CF5C3}.code .n{color:#FFD23F}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.step{display:flex;gap:10px;margin-top:10px}.step i{flex:0 0 26px;height:26px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 13px/26px inherit;text-align:center;font-style:normal}.step div{flex:1;font-size:13px;line-height:1.55}
+.zh{background:#EEF0FF;border-radius:6px;padding:0 5px;font-weight:700;white-space:nowrap}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧮</span></div>
+  <h1>Agile BI SQL helper</h1><p>Say what you want to see — get the SQL to paste into Agile BI</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"><div class="loading"><div class="spin"></div>Loading…</div></div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), D = null, TAB = "ask", OUT = null, HIST = [], PICK = {}, LASTQ = "", IDEAS = null;
+  var TABS = [["ask", "✨ Write SQL"], ["tables", "📚 Tables"], ["guide", "🧭 How to use Agile BI"], ["saved", "⭐ Saved"]];
+  var copy = function (t, msg) { var ok = function () { toast(msg || "Copied"); }; try { navigator.clipboard.writeText(t).then(ok, function () { fall(t); ok(); }); } catch (e) { fall(t); ok(); } };
+  function fall(t) { var a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) { } a.remove(); }
+  var KW = /\b(select|from|where|group by|order by|having|limit|left join|right join|inner join|join|on|as|and|or|not|in|is|null|case|when|then|else|end|distinct|count|sum|avg|min|max|with|union all|union|between|like|desc|asc|date_format|date_trunc|ifnull|round)\b/gi;
+  function hl(sql) { return esc(sql).replace(/('[^']*')/g, '<span class="s">$1</span>').replace(KW, function (m) { return '<span class="k">' + m.toUpperCase() + "</span>"; }); }
+  var known = function () { return D.tables.filter(function (t) { return t.cols.length; }); };
+  function load(keep) { api({ action: "sq-get" }).then(function (r) { if (!r.ok) { $("tabs").innerHTML = ""; VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>' + esc(r.error || "Not available") + "</b></div>"; return; } D = r; if (!keep && !known().length) TAB = "tables"; draw(); }); }
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + (t[0] === "tables" ? " " + known().length + "/" + D.tables.length : "") + "</button>"; }).join("");
+    [].forEach.call($("tabs").querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    ({ ask: ask, tables: tables, guide: guide, saved: saved })[TAB]();
+  }
+
+  // ---------------- write SQL ----------------
+  var EX = ["Monthly sell-out quantity by state for the last 6 months", "Top 20 retailers by sales quantity this month", "Model-wise activation count for last 30 days", "Stores with no sale in the last 30 days", "Inbound vs outbound quantity by agency this month", "Competitor brand share by state from competitor reports", "Number of active stores and retailers by state", "Price list of all current products with material codes"];
+  function ask() {
+    var k = known();
+    VIEW.innerHTML = (k.length ? "" : '<div class="help w"><b>One-time set-up needed.</b> The AI must know the column names of your tables before it can write correct SQL. Open <b>📚 Tables</b> and add them (5–10 minutes, once).</div>') +
+      '<div class="card"><b>What do you want to see?</b><textarea class="tx" id="q" rows="3" style="margin-top:6px" placeholder="e.g. Monthly sell-out quantity by state and model for the last 6 months">' + esc(LASTQ) + '</textarea><div class="muted" style="font-size:12px;margin-top:8px">Tables to use (leave all off = AI chooses):</div><div class="chips" id="pk">' + D.tables.map(function (t) { return '<button data-p="' + t.name + '" class="' + (PICK[t.name] ? "on" : "") + '"' + (t.cols.length ? "" : ' style="opacity:.55"') + ">" + esc(t.en) + (t.cols.length ? "" : " ⚠") + "</button>"; }).join("") + '</div><div class="bar2"><button class="btn pri" id="go" style="flex:2">✨ Write the SQL</button><button class="btn ghost" id="idea" style="flex:1">💡 Ideas</button></div><div class="chips" id="ex"></div></div>' +
+      '<div id="out"></div><div class="card" style="margin-top:12px"><b>Already have a query?</b><div class="bar2"><button class="btn ghost" id="fix" style="flex:1">🩹 Fix an error</button><button class="btn ghost" id="exp" style="flex:1">📖 Explain a query</button></div></div>';
+    var exs = function () { $("ex").innerHTML = (IDEAS || EX.map(function (e) { return { ask: e }; })).map(function (e, i) { return '<button data-e="' + i + '">' + esc(e.title ? e.title + " — " + e.ask : e.ask) + "</button>"; }).join(""); [].forEach.call($("ex").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { $("q").value = (IDEAS || EX.map(function (e) { return { ask: e }; }))[+b.dataset.e].ask; window.scrollTo(0, 0); }; }); };
+    exs();
+    [].forEach.call($("pk").querySelectorAll("[data-p]"), function (b) { b.onclick = function () { PICK[b.dataset.p] = !PICK[b.dataset.p]; b.classList.toggle("on"); }; });
+    $("go").onclick = function () { var q = $("q").value.trim(); if (q.length < 6) return toast("Describe what you want to see"); LASTQ = q; HIST = []; run({ mode: "write", q: q }, $("go")); };
+    $("idea").onclick = function () { if (!k.length) return toast("Add table columns first (📚 Tables)"); $("idea").disabled = true; api({ action: "sq-ai", mode: "ideas" }).then(function (r) { $("idea").disabled = false; if (!r.ok) return toast(r.error); IDEAS = r.ideas; exs(); toast("Ideas from your tables are below"); }); };
+    $("fix").onclick = function () { sheet("🩹 Fix an error", "Paste the query and the error Agile BI showed", [["🩹", "Fix it", function () { var s = $("fs").value.trim(); if (!s) { toast("Paste the SQL"); return false; } run({ mode: "fix", sql: s, err: $("fe").value }); }, "pri"]], '<label class="lb">SQL</label><textarea class="tx" id="fs" rows="5">' + esc(OUT && OUT.sql || "") + '</textarea><label class="lb">Error message, or what is wrong with the result</label><textarea class="tx" id="fe" rows="3" placeholder="Paste the red error text from Agile BI"></textarea>'); };
+    $("exp").onclick = function () { sheet("📖 Explain a query", "", [["📖", "Explain", function () { var s = $("es").value.trim(); if (!s) { toast("Paste the SQL"); return false; } api({ action: "sq-ai", mode: "explain", sql: s }).then(function (r) { if (!r.ok) return toast(r.error); sheet("In plain English", "", [["", "OK", function () { }]], '<div class="help">' + esc(r.out.explain) + (r.out.checks.length ? "<br><br><b>Check:</b><br>• " + r.out.checks.map(esc).join("<br>• ") : "") + "</div>"); }); }, "pri"]], '<textarea class="tx" id="es" rows="7" placeholder="select …"></textarea>'); };
+    if (OUT) showOut();
+  }
+  function run(body, btn) {
+    var tabs = Object.keys(PICK).filter(function (k) { return PICK[k]; });
+    if (btn) btn.disabled = true; $("out").innerHTML = '<div class="card" style="margin-top:12px"><div class="loading"><div class="spin"></div>Writing the SQL…</div></div>';
+    api(Object.assign({ action: "sq-ai", tables: tabs, history: HIST }, body)).then(function (r) { if (btn) btn.disabled = false; if (!r.ok) { $("out").innerHTML = ""; return toast(r.error); } OUT = r.out; if (body.q) HIST.push({ q: body.q, a: (OUT.sql || "").slice(0, 1100) }); showOut(); try { $("out").scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { } });
+  }
+  function showOut() {
+    var o = OUT, name = function (n) { var t = D.tables.filter(function (x) { return x.name === n; })[0]; return t ? t.en : n; };
+    var need = o.need && o.need.length ? '<div class="help w"><b>Column names needed first</b><br>To write this correctly I need the columns of: <b>' + o.need.map(name).map(esc).join(", ") + '</b>.<br>Open 📚 Tables and add them — then ask again.' + (o.sql ? "<br>The query below may contain guessed column names — don't rely on it yet." : "") + '</div><div class="bar2"><button class="btn sec" id="toT">📚 Add the columns</button></div>' : "";
+    $("out").innerHTML = '<div class="card" style="margin-top:12px"><b>' + esc(o.title || "Your query") + "</b>" + need + (o.sql ? '<div class="code" id="sqlc">' + hl(o.sql) + '</div><div class="bar2"><button class="btn pri" id="cp" style="flex:2">📋 Copy SQL</button><button class="btn ghost" id="sv" style="flex:1">⭐ Save</button></div>' +
+      (o.explain ? '<div class="help"><b>What it does</b><br>' + esc(o.explain) + "</div>" : "") + (o.chart ? '<div class="help"><b>Chart to build</b><br>' + esc(o.chart) + "</div>" : "") + (o.checks && o.checks.length ? '<div class="help w"><b>Please check</b><br>• ' + o.checks.map(esc).join("<br>• ") + "</div>" : "") +
+      '<div class="help"><b>Next in Agile BI</b><br>Data set → Create → Create dataset → connection <b>Starrocks_pro</b> → <b>Custom SQL</b> → paste → ▶ Run query → Read data → name it → Save. Full steps are in 🧭.</div>' +
+      '<label class="lb">Change something?</label><div class="bar2" style="margin-top:0"><input class="tx" id="ch" placeholder="e.g. add model name, only Bihar, last 3 months" style="flex:1"><button class="btn sec" id="chg">Update</button></div>' : (need ? "" : '<div class="help w">' + esc(o.explain || "No query came back — try wording it differently.") + "</div>")) + "</div>";
+    if ($("toT")) $("toT").onclick = function () { TAB = "tables"; draw(); };
+    if (!o.sql) return;
+    $("cp").onclick = function () { copy(o.sql, "SQL copied — paste it in Agile BI"); };
+    $("sv").onclick = function () { api({ action: "sq-save", title: o.title || LASTQ, sql: o.sql, note: o.explain }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); api({ action: "sq-get" }).then(function (x) { if (x.ok) D = x; }); }); };
+    $("chg").onclick = function () { var c = $("ch").value.trim(); if (c.length < 3) return toast("Say what to change"); run({ mode: "write", q: "Change the previous query: " + c + ". Original request: " + LASTQ.slice(0, 300) }, $("chg")); };
+  }
+
+  // ---------------- tables & columns ----------------
+  function tables() {
+    var allQ = "select table_name, column_name, data_type, column_comment\nfrom information_schema.columns\nwhere table_schema = '" + D.db + "'\norder by table_name, ordinal_position";
+    VIEW.innerHTML = '<div class="card"><b>Teach the tool your columns (one time)</b><div class="muted" style="font-size:12.5px;margin-top:3px">Without the real column names any SQL would be a guess. Two ways — try A first.</div>' +
+      '<div class="step"><i>A</i><div><b>All 14 tables in one go.</b> In Agile BI create a dataset with Custom SQL, paste this query and run it. Copy the whole result (or download it) and bring it here with <b>Paste / upload columns</b>.<div class="code">' + hl(allQ) + '</div><button class="btn ghost sm" id="cpa" style="margin-top:6px">📋 Copy this query</button></div></div>' +
+      '<div class="step"><i>B</i><div><b>If A is blocked — one table at a time.</b> Tap a table below → copy its test query → run it in Agile BI → copy the result with its header row (or the names shown under Field settings) → paste here.</div></div>' +
+      '<div class="bar2"><button class="btn pri" id="imp" style="flex:1">📥 Paste / upload columns</button></div></div>' +
+      D.tables.map(function (t, i) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-tb="' + i + '"><div class="row" style="gap:6px"><b style="flex:1">' + esc(t.en) + '</b><span class="pill ' + (t.cols.length ? "g" : "o") + '">' + (t.cols.length ? t.cols.length + " columns" : "columns not added") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px;word-break:break-all">' + esc(D.db + "." + t.name) + " · " + esc(t.zh) + '</div><div style="font-size:12.5px;margin-top:2px">' + esc(t.about) + "</div></div>"; }).join("");
+    $("cpa").onclick = function () { copy(allQ, "Query copied — run it in Agile BI"); };
+    $("imp").onclick = function () { importCols(""); };
+    [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (c) { c.onclick = function () { oneTable(D.tables[+c.dataset.tb]); }; });
+  }
+  function oneTable(t) {
+    var q = "select * from " + D.db + "." + t.name + " limit 100";
+    sheet(t.en, D.db + "." + t.name, [["📋", "Copy test query", function () { copy(q, "Copied — run it in Agile BI"); return false; }, "pri"], ["📥", "Add / replace columns", function () { importCols(t.name); }]].concat(t.cols.length ? [["✨", "Write SQL on this table", function () { PICK = {}; PICK[t.name] = true; TAB = "ask"; draw(); }], ["🗑", "Remove saved columns", function () { var s = {}; s[t.name] = []; api({ action: "sq-cols", sets: s }).then(function () { load(true); }); }, "danger"]] : []),
+      '<div class="code">' + hl(q) + "</div>" + (t.cols.length ? '<div style="max-height:300px;overflow:auto;margin-top:10px"><table class="tb"><tr><th>Column</th><th>Type</th><th>Meaning</th></tr>' + t.cols.map(function (c) { return "<tr><td><b>" + esc(c.n) + "</b></td><td>" + esc(c.t) + "</td><td>" + esc(c.c) + "</td></tr>"; }).join("") + "</table></div>" : '<div class="help w">Columns not added yet.</div>'));
+  }
+  function grid(text) { var L = String(text).replace(/\r/g, "").split("\n").filter(function (l) { return l.trim(); }); var sep = L.some(function (l) { return l.indexOf("\t") >= 0; }) ? /\t/ : L.some(function (l) { return l.indexOf("|") >= 0; }) ? /\s*\|\s*/ : L.every(function (l) { return l.indexOf(",") >= 0; }) ? /,/ : /\s{2,}/; return L.map(function (l) { return l.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split(sep).map(function (c) { return c.trim().replace(/^"|"$/g, ""); }); }).filter(function (r) { return !r.every(function (c) { return /^[-+=]*$/.test(c); }); }); }
+  function readCols(A, table) {   // → { table: [{n,t,c}] } from an information_schema / DESC result, or from a "select *" result with its header row
+    var sets = {}, H = (A[0] || []).map(function (h) { return String(h).toLowerCase().replace(/[\s`]/g, ""); }), ix = function (re) { return H.findIndex(function (h) { return re.test(h); }); };
+    var ci = ix(/^(column_name|columnname|field|字段名?|原名|originalname)$/), ti = ix(/^(table_name|tablename|table)$/), yi = ix(/^(data_type|column_type|type|fieldtype|字段类型)$/), mi = ix(/^(column_comment|comment|alias|别名|注释)$/);
+    var id = function (s) { return /^[A-Za-z_]\w*$/.test(s); };
+    if (ci >= 0) { A.slice(1).forEach(function (r) { var tb = (ti >= 0 ? String(r[ti] || "") : table).toLowerCase().replace(/^.*\./, ""), n = String(r[ci] || ""); if (!tb || !id(n)) return; (sets[tb] = sets[tb] || []).push({ n: n, t: yi >= 0 ? String(r[yi] || "") : "", c: mi >= 0 ? String(r[mi] || "") : "" }); }); return sets; }
+    if (!table) return sets;
+    var head = A[0] || [];
+    if (head.length > 1 && head.filter(id).length >= head.length * 0.8) {   // header row + sample rows
+      sets[table] = head.map(function (h, i) { if (!id(h)) return null; var v = A.slice(1, 40).map(function (r) { return r[i]; }).filter(function (x) { return x != null && x !== "" && !/^null$/i.test(x); }), n = v.length || 1; return { n: h, t: !v.length ? "" : v.filter(function (x) { return /^\d{4}-\d{2}-\d{2}/.test(x); }).length / n > 0.8 ? "date" : v.filter(function (x) { return /^-?[\d.]+$/.test(x); }).length / n > 0.8 && !/code|id$|imei|phone|mobile|pin/i.test(h) ? "number" : "text", c: "" }; }).filter(Boolean);
+    } else {   // just a list of names, optionally "name  type  meaning"
+      sets[table] = A.map(function (r) { return id(r[0]) ? { n: r[0], t: r[1] && /^[a-z]+(\(\d+(,\d+)?\))?$/i.test(r[1]) ? r[1] : "", c: r[2] || (r[1] && !/^[a-z]+(\(\d+(,\d+)?\))?$/i.test(r[1]) ? r[1] : "") } : null; }).filter(Boolean);
+    }
+    return sets;
+  }
+  function importCols(table) {
+    sheet("📥 Add columns", "Paste the result from Agile BI, or upload the downloaded file", [["💾", "Read & save", function () {
+      var tb = $("it").value, text = $("ip").value;
+      var done = function (A) { var sets = readCols(A, tb), names = Object.keys(sets).filter(function (k) { return sets[k].length && D.tables.some(function (t) { return t.name === k; }); }); if (!names.length) { toast(tb ? "Couldn't find column names in that" : "Choose which table this is, or paste the all-tables result"); return; } var send = {}; names.forEach(function (k) { send[k] = sets[k]; }); api({ action: "sq-cols", sets: send }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved columns for " + r.saved + " table(s)"); load(true); }); };
+      var f = $("if").files[0];
+      if (f) { var go = function () { f.arrayBuffer().then(function (buf) { var wb = XLSX.read(buf, { type: "array", raw: false }), ws = wb.Sheets[wb.SheetNames[0]]; done(XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false }).map(function (r) { return r.map(String); })); }).catch(function () { toast("Couldn't read that file"); }); }; if (window.XLSX) go(); else { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = go; document.head.appendChild(s); } return; }
+      if (!text.trim()) { toast("Paste something or choose a file"); return false; }
+      done(grid(text));
+    }, "pri"]], '<label class="lb">Which table? (not needed for the all-tables result)</label><select class="tx" id="it"><option value="">— all tables / detect —</option>' + D.tables.map(function (t) { return '<option value="' + t.name + '"' + (t.name === table ? " selected" : "") + ">" + esc(t.en) + "</option>"; }).join("") + '</select><label class="lb">Paste here</label><textarea class="tx" id="ip" rows="6" placeholder="Any of these works:&#10;• the all-tables result (table_name, column_name, data_type, column_comment)&#10;• a select * result with its header row&#10;• just the column names, one per line"></textarea><label class="lb">…or upload Excel / CSV</label><input type="file" id="if" accept=".xlsx,.xls,.csv">');
+  }
+
+  // ---------------- guide ----------------
+  function guide() {
+    var z = function (zh, en) { return '<span class="zh">' + zh + "</span> " + en; }, st = function (n, h) { return '<div class="step"><i>' + n + "</i><div>" + h + "</div></div>"; };
+    VIEW.innerHTML = '<div class="card"><b>The idea in one minute</b><div style="font-size:13px;line-height:1.6;margin-top:4px">Agile BI works like Power BI in three layers:<br><b>1. Table</b> — raw data kept by IT (your 14 tables).<br><b>2. Dataset</b> — a saved question on those tables. The question is written in <b>SQL</b>. This is the only place SQL is needed.<br><b>3. Dashboard</b> — charts and number tiles built on a dataset by choosing fields; no SQL.<br>So the routine is: ask this tool for the SQL → paste it into a dataset → build charts on it.</div></div>' +
+      '<div class="card" style="margin-top:10px"><b>A · Create a dataset</b>' +
+      st(1, "Open Agile BI. At the top left, open the space list " + z("空间列表", "") + " and choose <b>vivo India BI(Sales)</b> (not " + z("个人空间", "Personal space") + ").") +
+      st(2, "Left menu → " + z("数据集", "Data set") + ".") +
+      st(3, "Tap " + z("创建", "Create") + " → " + z("创建数据集", "Create dataset") + ". (" + z("创建文件夹", "Create folder") + " only makes a folder.)") +
+      st(4, z("数据连接", "Data connection") + " → choose <b>Starrocks_pro_印度代理</b>. The other choices — " + z("本地上传", "local upload") + ", " + z("api数据源", "API") + ", " + z("vivo文档", "vivo docs") + " — are for other sources.") +
+      st(5, z("数据集类型", "Dataset type") + " → select " + z("自定义SQL", "Custom SQL") + " (not " + z("数据库表", "Database table") + ").") +
+      st(6, "Paste the SQL from this tool into the box. First test: <span class=\"zh\">select * from app_vwork_indwarehouse.ta_vk_vbm_query_detail limit 100</span>") +
+      st(7, "Press " + z("运行查询", "▶ Run query") + ", then " + z("读取数据", "Read data") + ". The fields appear under " + z("字段设置", "Field settings") + "; rows under " + z("数据预览", "Data preview") + ".") +
+      st(8, "In Field settings, check each field: " + z("维度列", "Dimension") + " = text or date you group by (state, model, month); " + z("指标列", "Index / measure") + " = numbers you add up (quantity, value). Fix the " + z("字段类型", "Field type") + " if a number shows as " + z("文本", "Text") + ". " + z("别名", "Alias") + " is the display name.") +
+      st(9, "Type a name at the top and press " + z("保存", "Save") + ". " + z("查询缓存", "Cached time") + " (e.g. 3 hours) is how long results are reused before the query runs again.") + "</div>" +
+      '<div class="card" style="margin-top:10px"><b>B · Build a dashboard on it</b>' +
+      st(1, "Left menu → " + z("我的看板", "My Dashboard") + " → create a new dashboard.") +
+      st(2, "Add a chart and choose your dataset as its data.") +
+      st(3, "Drag a <b>dimension</b> (e.g. state) and a <b>measure</b> (e.g. quantity) into the chart, pick the chart type, save.") +
+      '<div class="help w">I have only seen the dataset screens you shared, not the dashboard builder, so part B is the general pattern — button names may differ. Send a screenshot of that screen and the steps can be made exact.</div></div>' +
+      '<div class="card" style="margin-top:10px"><b>Good habits</b><div style="font-size:13px;line-height:1.65;margin-top:4px">• Start every new table with <b>limit 100</b> to look at it before writing bigger queries.<br>• Let the SQL do the heavy work (group by month / state / model) so the dataset is small and the dashboard is fast.<br>• Always limit the dates (e.g. last 6 months) on the big sales tables.<br>• One dataset per subject (sales, stock movement, competitors) is easier than one giant dataset.<br>• If Agile BI shows a red error, copy it into <b>🩹 Fix an error</b> here.<br>• Compare the first numbers with a report you trust before sharing a dashboard.</div></div>' +
+      '<div class="card" style="margin-top:10px"><b>SQL in 6 words</b><div class="code">' + hl("select  state, sum(qty) as total_qty     -- which columns, and what to add up\nfrom    app_vwork_indwarehouse.some_table  -- which table\nwhere   sale_date >= '2026-10-01'          -- which rows\ngroup by state                             -- one row per state\norder by total_qty desc                    -- biggest first\nlimit   20                                 -- only the top 20") + '</div><div class="muted" style="font-size:12px;margin-top:6px">Example only — the column names here are made up.</div></div>';
+  }
+
+  // ---------------- saved ----------------
+  function saved() {
+    VIEW.innerHTML = D.saved.length ? D.saved.map(function (s, i) { return '<div class="card" style="margin-top:8px"><div class="row" style="gap:6px"><b style="flex:1">' + esc(s.title) + '</b><span class="muted" style="font-size:11.5px">' + new Date(s.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + '</span></div><div class="code" style="max-height:130px">' + hl(s.sql) + '</div><div class="bar2"><button class="btn pri sm" data-c="' + i + '">📋 Copy</button><button class="btn ghost sm" data-o="' + i + '">✏️ Open</button><button class="btn ghost sm" data-x="' + i + '">🗑</button></div></div>'; }).join("") : '<div class="card empty"><div class="big">⭐</div><b>No saved queries yet</b><div class="muted" style="margin-top:4px">Write one and tap Save.</div></div>';
+    var on = function (a, fn) { [].forEach.call(VIEW.querySelectorAll("[data-" + a + "]"), function (b) { b.onclick = function () { fn(D.saved[+b.dataset[a]]); }; }); };
+    on("c", function (s) { copy(s.sql, "SQL copied"); }); on("o", function (s) { OUT = { title: s.title, sql: s.sql, explain: s.note, checks: [], need: [] }; LASTQ = s.title; TAB = "ask"; draw(); });
+    on("x", function (s) { api({ action: "sq-del", id: s.id }).then(function () { load(true); }); });
+  }
+  if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; }
+  else load();
+})();
+</script>
+</body>
+</html>

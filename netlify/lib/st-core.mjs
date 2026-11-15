@@ -66,7 +66,7 @@ export async function stAction(b, ctx) {
     else if (mode === "design") q = `Write copy for a ${str(b.kindName, 40) || "poster"}. Reply JSON: {"headline":"max 6 words","sub":"max 12 words","body":"max 22 words","cta":"max 4 words","badge":"max 3 words"}. Brief: ${p}`;
     else if (mode === "board") q = `Break this goal into a task board. Reply JSON: {"title":"…","cards":[{"title":"short task","desc":"one line","prio":"high|med|low","label":"one word area","days":number of days from today it is due}]} with 8-14 tasks in a sensible order. Goal: ${p}`;
     else return J(400, { ok: false, error: "Unknown AI mode" });
-    const r = await askAI(env, q, data || p, [], aiFetch, { system: sys, label: mode === "insights" || mode === "widgets" ? "DATA" : "BRIEF", json: mode !== "insights", maxTokens: max });
+    const r = await askAI(env, "Follow the instructions and answer now.", data || p, [], aiFetch, { system: sys + "\n\nINSTRUCTIONS: " + q, label: mode === "insights" || mode === "widgets" ? "DATA" : "BRIEF", json: mode !== "insights", maxTokens: max });
     if (!r.ok) return J(502, { ok: false, error: r.error || "AI didn't answer — try again." });
     if (mode === "insights") return J(200, { ok: true, text: String(r.text).slice(0, 3000) });
     const j = parse(r.text); if (!j) return J(502, { ok: false, error: "The AI answer wasn't readable — try again." });
