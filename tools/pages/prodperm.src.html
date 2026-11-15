@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Product permissions (vivo portal)</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12.5px inherit;cursor:pointer;color:var(--ink)}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}.tb td.n{text-align:right;white-space:nowrap}
+.kp{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.kp div{background:#F7F8FC;border-radius:12px;padding:8px;text-align:center}.kp b{display:block;font-size:19px}.kp span{font-size:11px;color:var(--mut)}
+.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin-top:8px}
+.bm{display:inline-block;background:#4D5BF9;color:#fff;border-radius:10px;padding:9px 14px;font-weight:700;text-decoration:none;cursor:grab}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">✅</span></div>
+  <h1>Product permissions</h1><p>vivo portal · many partner roles × many models in one go</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {};
+  var lines = function (v) { var seen = {}; return String(v || "").split(/[\n,;]+/).map(function (x) { return x.replace(/\s+/g, " ").trim(); }).filter(function (x) { var k = x.toLowerCase(); if (!x || seen[k]) return false; seen[k] = 1; return true; }); };
+  var b64 = function (s) { return btoa(unescape(encodeURIComponent(s))); }, unb64 = function (s) { return decodeURIComponent(escape(atob(s))); };
+  try { JOBS = JSON.parse(localStorage.getItem("pp-jobs") || "{}"); } catch (e) { }
+  var keepJob = function (j) { JOBS[j.id] = { roles: j.roles, models: j.models, dry: j.dry, at: Date.now() }; var ks = Object.keys(JOBS).sort(function (a, b) { return JOBS[b].at - JOBS[a].at; }); ks.slice(12).forEach(function (k) { delete JOBS[k]; }); try { localStorage.setItem("pp-jobs", JSON.stringify(JOBS)); } catch (e) { } };
+
+  function load() {
+    api({ action: "pp-get" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>' + esc(r.error || "Not available") + "</b></div>"; return; }
+      CFG = r.cfg; RUNS = r.runs; draw(); pending();
+    });
+  }
+  function draw() {
+    var where = PB ? '<div class="help"><b>How it works here (Admin app)</b><br>1. Tap <b>Check only</b> first — it only counts what would be ticked, nothing changes.<br>2. Tap <b>Set permissions</b>. The vivo portal opens inside the app; type the captcha and log in.<br>3. The app then does the ticking: role → Set Product Permission → search model → tick each product → tick all states. Keep the app open.<br>4. When it finishes you come back here with the result.</div>'
+      : '<div class="help"><b>On a computer (Chrome / Edge)</b><br>1. One time: drag this button to your bookmarks bar → <a class="bm" id="bm" href="#">✅ vivo BI permissions</a><br>2. Fill roles and models above and tap <b>Check only</b> or <b>Set permissions</b> — a job code is copied.<br>3. Open the vivo portal, log in, click the bookmark and paste the job code. A small box shows the progress.<br>4. When it finishes, press <b>Copy result</b> in that box and paste it here with <b>Paste result</b>.<br><span class="muted">On a phone, use the Admin app (update to version 7.4) — there it is a single tap.</span></div>';
+    VIEW.innerHTML = '<div class="card"><b>1 · Partner roles</b><div class="muted" style="font-size:12.5px">One per line, exactly as in the portal\'s Role Name column (e.g. hdfc, paytm).</div><textarea class="tx" id="ro" rows="4" style="margin-top:6px" placeholder="hdfc&#10;paytm&#10;bajajnew">' + esc((CFG.lastRoles || []).join("\n")) + '</textarea>' + (CFG.roles.length ? '<div class="muted" style="font-size:12px;margin-top:6px">Roles read from the portal last time — tap to add or remove:</div><div class="chips" id="rc"></div>' : '<div class="muted" style="font-size:12px;margin-top:6px">After the first run, the portal\'s role names appear here as tap-to-pick buttons.</div>') +
+      '<b style="display:block;margin-top:14px">2 · Models</b><div class="muted" style="font-size:12.5px">One per line — what you would type in the portal\'s TypeName search (e.g. V70).</div><textarea class="tx" id="mo" rows="4" style="margin-top:6px" placeholder="V70&#10;Y500&#10;T5 Pro">' + esc((CFG.lastModels || []).join("\n")) + '</textarea>' +
+      '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ex"' + (CFG.exact ? " checked" : "") + '><i></i><span>Exact model only — “V70” will not include V70 Elite, V70 FE …</span></label><div class="muted" style="font-size:12px;margin-top:4px" id="exh"></div>' +
+      '<div class="bar2"><button class="btn sec" id="dry" style="flex:1">🔍 Check only</button><button class="btn pri" id="go" style="flex:1">✅ Set permissions</button></div><div class="muted" style="font-size:12px;margin-top:6px" id="cnt"></div></div>' + where +
+      '<div class="help">🔒 It only <b>adds</b> ticks — a box that is already ticked is never touched, so nothing is removed. For every product it ticks <b>all</b> states. The captcha is always typed by you.</div>' +
+      (PB ? "" : '<div class="bar2"><button class="btn ghost" id="paste" style="flex:1">📋 Paste result</button></div>') + '<div id="res"></div>' +
+      '<div class="sh" style="margin-top:16px"><span><b>History</b></span></div>' + (RUNS.length ? RUNS.map(function (r) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-run="' + r.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + new Date(r.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + '</b><span class="pill ' + (r.dry ? "m" : r.state === "done" && !r.failed ? "g" : r.state === "done" ? "o" : "r") + '">' + (r.dry ? "Check only" : r.state === "done" ? (r.failed ? "Done · " + r.failed + " problem(s)" : "Done") : r.state === "stopped" ? "Stopped" : "Error") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + r.roles + " role(s) × " + r.models + " model(s) · " + r.ticked + (r.dry ? " to tick" : " ticked") + " · " + esc(r.by) + "</div></div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:8px">No runs yet.</div>');
+    var ro = $("ro"), mo = $("mo");
+    var chips = function () { var rc = $("rc"); if (!rc) return; var cur = lines(ro.value).map(function (x) { return x.toLowerCase(); }); rc.innerHTML = CFG.roles.map(function (r, i) { return '<button data-r="' + i + '" class="' + (cur.indexOf(r.toLowerCase()) >= 0 ? "on" : "") + '">' + esc(r) + "</button>"; }).join(""); [].forEach.call(rc.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { var r = CFG.roles[+b.dataset.r], L = lines(ro.value), i = L.map(function (x) { return x.toLowerCase(); }).indexOf(r.toLowerCase()); if (i >= 0) L.splice(i, 1); else L.push(r); ro.value = L.join("\n"); upd(); }; }); };
+    var upd = function () { var a = lines(ro.value).length, b = lines(mo.value).length; $("cnt").textContent = a && b ? a + " role(s) × " + b + " model(s) = " + a * b + " searches. Roughly 3 seconds per product variant that needs a tick." : ""; $("exh").textContent = $("ex").checked ? "" : "Now: “V70” ticks every product whose name contains V70 — same as searching V70 and ticking the whole list."; chips(); };
+    ro.oninput = mo.oninput = $("ex").onchange = upd; upd();
+    $("dry").onclick = function () { start(true); }; $("go").onclick = function () { start(false); };
+    if ($("paste")) $("paste").onclick = pasteResult;
+    if ($("bm")) { $("bm").href = bookmarklet(); $("bm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar (don't click it here)"); }; }
+    [].forEach.call(VIEW.querySelectorAll("[data-run]"), function (c) { c.onclick = function () { api({ action: "pp-run", id: c.dataset.run }).then(function (r) { if (!r.ok) return toast(r.error); show(r.run, true); }); }; });
+  }
+  function bookmarklet() {
+    var src = location.origin + "/vivo_perm.js";
+    return "javascript:(function(){if(!/vivo/i.test(location.hostname)){alert('Open the vivo portal first, log in, then click this bookmark.');return;}var c=prompt('Paste the job code from the BI tool');if(!c)return;var j;try{j=JSON.parse(decodeURIComponent(escape(atob(c.replace(/^BIJOB:/,'').trim()))));}catch(e){alert('That is not a job code. Copy it again from the BI tool.');return;}j.panel=true;var go=function(){window.__biPermRun(j);};if(window.__biPermRun)return go();var s=document.createElement('script');s.src='" + src + "?t='+Date.now();s.onload=go;s.onerror=function(){alert('Could not load the helper. Use the Admin app instead.');};document.body.appendChild(s);})()";
+  }
+  function start(dry) {
+    var roles = lines($("ro").value), models = lines($("mo").value), exact = $("ex").checked;
+    if (!roles.length || !models.length) return toast("Add at least one role and one model");
+    if (roles.length > 80 || models.length > 200) return toast("Too many — up to 80 roles and 200 models in one run");
+    var job = { id: "P" + Date.now().toString(36).toUpperCase(), roles: roles, models: models, exact: exact, dry: !!dry };
+    var run = function () {
+      api({ action: "pp-draft", roles: roles, models: models, exact: exact }); keepJob(job);
+      if (PB) { var r = PB.run(JSON.stringify(job), ""); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start the run"); return; }
+      var code = "BIJOB:" + b64(JSON.stringify(job));
+      var done = function () { sheet("Job code copied", "", [["", "OK", function () { }]], '<div class="help">1. Open the vivo portal and log in.<br>2. Click the <b>✅ vivo BI permissions</b> bookmark.<br>3. Paste the code (Ctrl+V) and press OK.<br>4. When it finishes: <b>Copy result</b> → come back → <b>Paste result</b>.</div><textarea class="tx" rows="3" readonly style="margin-top:8px;font-size:11px">' + esc(code) + "</textarea>"); };
+      try { navigator.clipboard.writeText(code).then(done, done); } catch (e) { done(); }
+    };
+    if (dry) return run();
+    sheet("Set permissions on the vivo portal?", roles.length + " role(s) × " + models.length + " model(s)", [["✅", "Yes, start", run, "pri"]], '<div class="help"><b>Roles:</b> ' + esc(roles.join(", ")) + "<br><b>Models:</b> " + esc(models.join(", ")) + (exact ? "<br>Exact model names only." : "<br>Every product whose name contains the model text.") + "<br>All states are ticked for each product. This changes the live portal; to undo, untick by hand on the portal.</div>");
+  }
+  function record(id, status) {
+    var j = JOBS[id] || {};
+    return api({ action: "pp-log", id: id, status: status, roles: j.roles || [], models: j.models || [], dry: !!j.dry }).then(function (r) { if (!r.ok) { toast(r.error); return null; } if (r.run.roles.length && status.roles && status.roles.length) CFG.roles = status.roles; return r.run; });
+  }
+  function pending() {   // results the app kept while this page was closed
+    if (!PB) return; var L = [];
+    try { L = JSON.parse(PB.pending() || "[]"); } catch (e) { }
+    L.sort(function (a, b) { return a.at - b.at; });
+    var next = function (last) { var x = L.shift(); if (!x) { if (last) api({ action: "pp-get" }).then(function (r) { if (r.ok) { CFG = r.cfg; RUNS = r.runs; draw(); show(last); } }); return; } var st = null; try { st = JSON.parse(x.status); } catch (e) { } if (!st || !st.res) { try { PB.ack(x.id); } catch (e) { } return next(last); } record(x.id, st).then(function (run) { if (run) { try { PB.ack(x.id); } catch (e) { } } next(run || last); }); };
+    next(null);
+  }
+  window.__biPermDone = pending;
+  function pasteResult() {
+    sheet("Paste result", "From the box on the vivo portal → Copy result", [["📥", "Save result", function () { var m = /BIPERM:([A-Za-z0-9_-]+):([A-Za-z0-9+\/=]+)/.exec($("pr").value.replace(/\s+/g, "")), st = null; if (m) try { st = JSON.parse(unb64(m[2])); } catch (e) { } if (!st) { toast("That doesn't look like a result — copy it again"); return false; } record(m[1], st).then(function (run) { if (run) api({ action: "pp-get" }).then(function (r) { if (r.ok) { CFG = r.cfg; RUNS = r.runs; draw(); show(run); } }); }); }, "pri"]], '<textarea class="tx" id="pr" rows="5" placeholder="BIPERM:…"></textarea>');
+  }
+  function show(run, scroll) {
+    var R = run.res, sum = function (k) { return R.reduce(function (a, x) { return a + (x[k] || 0); }, 0); }, bad = R.filter(function (x) { return x.failed || (!x.found && !x.failed); });
+    var head = run.dry ? "🔍 Check only — nothing was changed" : run.state === "done" ? "✅ Finished" : run.state === "stopped" ? "⏸ Stopped before the end" : "⚠ Stopped with an error";
+    $("res").innerHTML = '<div class="card" style="margin-top:12px"><b>' + head + '</b>' + (run.state === "err" && run.msg ? '<div style="color:#B42318;font-size:12.5px;margin-top:4px">' + esc(run.msg) + "</div>" : "") + '<div class="kp"><div><b>' + sum("found") + "</b><span>products found</span></div><div><b style=\"color:#13693F\">" + sum("ticked") + "</b><span>" + (run.dry ? "to tick" : "ticked now") + "</span></div><div><b>" + sum("already") + '</b><span>already ticked</span></div><div><b style="color:' + (sum("failed") ? "#B42318" : "inherit") + '">' + sum("failed") + "</b><span>problems</span></div></div>" +
+      (bad.length ? '<div class="help" style="background:#FFF4E5"><b>Needs a look</b><br>' + bad.slice(0, 30).map(function (x) { return "• " + esc(x.role) + " · " + esc(x.model) + " — " + esc(x.note || "nothing found"); }).join("<br>") + "</div>" : "") +
+      '<div style="overflow:auto;margin-top:10px"><table class="tb"><tr><th>Role</th><th>Model</th><th>Found</th><th>' + (run.dry ? "To tick" : "Ticked") + "</th><th>Already</th><th>Problems</th></tr>" + R.map(function (x) { return "<tr><td>" + esc(x.role) + "</td><td>" + esc(x.model) + '</td><td class="n">' + x.found + '</td><td class="n">' + x.ticked + '</td><td class="n">' + x.already + '</td><td class="n"' + (x.failed ? ' style="color:#B42318;font-weight:700"' : "") + ">" + x.failed + "</td></tr>"; }).join("") + '</table></div><div class="bar2"><button class="btn ghost sm" id="rx">⬇ Excel</button><button class="btn ghost sm" id="rl">📜 Step log</button>' + (run.state !== "done" && !run.dry ? '<button class="btn sec sm" id="rr">▶ Run the rest again</button>' : "") + (run.dry && sum("ticked") ? '<button class="btn pri sm" id="rr2">✅ Now set these</button>' : "") + '</div><div id="rlog"></div></div>';
+    $("rx").onclick = function () { download(xlsx([{ name: "Result", rows: [["Role", "Model searched", "Products found", run.dry ? "To tick" : "Ticked now", "Already ticked", "Problems", "States ticked", "Note", "Products"]].concat(R.map(function (x) { return [x.role, x.model, x.found, x.ticked, x.already, x.failed, x.states, x.note, (x.names || []).join(", ")]; })) }]), "Product_permissions_" + run.id + ".xlsx"); };
+    $("rl").onclick = function () { $("rlog").innerHTML = $("rlog").innerHTML ? "" : '<div class="code">' + esc((run.log || []).join("\n") || "No log") + "</div>"; };
+    var again = function () { $("ro").value = run.roles.join("\n"); $("mo").value = run.models.join("\n"); $("ro").oninput(); window.scrollTo(0, 0); toast("Roles and models filled in — tap Set permissions. Ticked ones are skipped."); };
+    if ($("rr")) $("rr").onclick = again; if ($("rr2")) $("rr2").onclick = again;
+    if (scroll !== false) try { $("res").scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { }
+  }
+  if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; }
+  else load();
+})();
+</script>
+</body>
+</html>
