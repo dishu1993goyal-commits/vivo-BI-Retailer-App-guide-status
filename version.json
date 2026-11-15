@@ -1,8 +1,8 @@
 {
-  "versionCode": 40,
-  "versionName": "7.4",
+  "versionCode": 41,
+  "versionName": "7.5",
   "notes": [
-    "New (HO): set product permissions on the vivo portal for many partner roles and models in one go — you log in with the captcha, the app does the ticking and brings back the result"
+    "Product permissions (vivo portal): fixed “Search button not found” — the app now finds the portal's Search button next to the TypeName box"
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
