@@ -73,6 +73,15 @@ window.__biPermRun = function (c) {
     });
     return best ? (best.closest("a,button") || best) : null;
   }
+  function nearBtn(re, d, ref) {   // the visible button with this label that sits closest to a field (wherever it is in the page's code), never one inside a pop-up window
+    var rr = ref.getBoundingClientRect(), best = null, bd = 1e9;
+    [].forEach.call(d.querySelectorAll("a,button,input[type=button],input[type=submit],span,div,td"), function (e) {
+      var t = txt(e); if (t.length > 20 || !re.test(t) || !vis(e) || e.closest(".window,.datagrid-view,.pagination")) return;
+      var r = e.getBoundingClientRect(), dist = Math.abs((r.top + r.bottom) / 2 - (rr.top + rr.bottom) / 2) * 3 + Math.abs((r.left + r.right) / 2 - (rr.left + rr.right) / 2) / 4;
+      if (dist < bd - 0.5 || (best && best.contains(e) && dist < bd + 40)) { bd = Math.min(bd, dist); best = e; }
+    });
+    return best ? (best.closest("a,button") || best) : null;
+  }
   function setv(el, v) {
     var w = el.ownerDocument.defaultView || W, d = Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value");
     try { el.focus(); } catch (e) { }
@@ -207,9 +216,9 @@ window.__biPermRun = function (c) {
     if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
     if (!inp) { x.note = "Search box “TypeName” not found"; x.failed = 1; return x; }
     setv(inp, model); await sleep(200);
-    var sb = find(/^search$/i, g.d, inp); if (!sb || sb.closest(".window")) { x.note = "Search button not found"; x.failed = 1; return x; }
+    var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp); if (!sb) { var seen = {}; [].forEach.call(g.d.querySelectorAll("a,button,input[type=button]"), function (e) { var t = txt(e); if (t && t.length < 20 && vis(e)) seen[t] = 1; }); x.note = "Search button not found. Buttons seen: " + Object.keys(seen).slice(0, 25).join(" | "); x.failed = 1; return x; }
     tap(sb); await settle(); await sleep(400);
-    var key = norm(model), match = function (r) { var n = norm(r.cell("typename")); return c.exact ? n.replace(/[(（].*$/, "") === key : n.indexOf(key) >= 0; };
+    var key = norm(model), match = function (r) { var n = norm(r.cell("typename")); return c.exact ? (n === key || n.replace(/[(（].*$/, "") === key) : n.indexOf(key) >= 0; };
     await until(function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); return !rr.length || rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); }, 9000);
     await biggestPage(prodGrid); await firstPage(prodGrid);
     var seen = {};
