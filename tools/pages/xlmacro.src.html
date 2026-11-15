@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Excel macro builder</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55}
+.warn{background:#FFF4E5;color:#6B4100;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.5}
+.msg{max-width:88%;border-radius:16px;padding:10px 13px;font-size:13.5px;line-height:1.5;margin-top:8px;white-space:pre-wrap}
+.msg.u{margin-left:auto;background:#4D5BF9;color:#fff;border-bottom-right-radius:5px}.msg.a{background:var(--card);box-shadow:0 2px 10px rgba(20,24,51,.06);border-bottom-left-radius:5px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:7px 12px;font:600 12.5px inherit;cursor:pointer;color:var(--ink)}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.blk{display:flex;gap:10px;align-items:flex-start}.blk .ic{width:42px;height:42px;border-radius:13px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:5px 6px;vertical-align:top}
+.tb input{width:100%;border:1px solid #E1E4F2;border-radius:8px;padding:6px 8px;font:inherit;font-size:12.5px;box-sizing:border-box}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:#0F1530;color:#DDE3FF;border-radius:12px;padding:10px 12px;white-space:pre;overflow:auto;max-height:55vh}
+.send{display:flex;gap:8px;align-items:flex-end;margin-top:10px}.send textarea{flex:1}
+.big{font-size:40px;text-align:center}
+.sel{outline:3px solid #4D5BF9}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧮</span></div>
+  <h1>Excel macro builder</h1><p>Say what you need → get a macro-enabled Excel file with sample data and one-click buttons</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "ai", BLOCKS = [], CHAT = [], PLAN = null, BUILT = null, BUSY = false, PICK = {}, ANS = {};
+  var IDEAS = ["Dashboard from my daily sell-out data, by state and model", "Rename 200 invoice PDFs from a list of new names", "Split dealer payout data into one file per state and e-mail each to its state head", "Send payout statements to dealers by e-mail with the PDF attached", "WhatsApp a scheme message to a list of retailers", "Merge all state Excel files in a folder into one sheet", "Print 40 Excel reports in one go or save them all as PDF", "Open, refresh and save all my report files every morning", "Clean raw data: extra spaces, text numbers, duplicates"];
+  function start() {
+    if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+    api({ action: "xm-blocks" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } BLOCKS = r.blocks; draw(); });
+  }
+  var blk = function (id) { return BLOCKS.filter(function (b) { return b.id === id; })[0] || { name: id, icon: "🧩", desc: "" }; };
+  function draw() {
+    var tabs = [["ai", "✨ Build with AI"], ["ready", "📦 Ready templates"], ["mine", "📁 My templates"], ["how", "❓ How it works"]];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    ({ ai: tAi, ready: tReady, mine: tMine, how: tHow })[TAB]();
+  }
+
+  // ======================= ✨ AI =======================
+  function tAi() {
+    var H = "";
+    if (!CHAT.length) H += '<div class="card" style="margin-top:10px"><b>What should the Excel file do?</b><div class="muted" style="font-size:12.5px;margin-top:3px">Describe it in your own words. If something is unclear I’ll ask one or two short questions, then build the file.</div><div class="chips">' + IDEAS.map(function (x, i) { return '<button data-idea="' + i + '">' + esc(x) + "</button>"; }).join("") + "</div></div>";
+    H += '<div id="chat">' + CHAT.map(function (m) { return m.hide ? "" : '<div class="msg ' + (m.role === "ai" ? "a" : "u") + '">' + esc(m.show || m.text) + "</div>"; }).join("") + "</div>";
+    H += '<div id="ask"></div><div id="plan"></div>';
+    H += '<div class="send"><textarea class="tx" id="in" rows="2" placeholder="' + (CHAT.length ? "Answer, or say what to change…" : "e.g. I paste daily sell-out data; I want a dashboard by state and model, and one file per state mailed to the state head") + '"></textarea><button class="btn pri" id="go">➤</button></div>' + (CHAT.length ? '<button class="btn ghost sm" id="new" style="margin-top:8px">＋ Start a new template</button>' : "");
+    $("tp").innerHTML = H;
+    [].forEach.call($("tp").querySelectorAll("[data-idea]"), function (b) { b.onclick = function () { $("in").value = IDEAS[+b.dataset.idea]; say(); }; });
+    $("go").onclick = say;
+    $("in").onkeydown = function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) say(); };
+    if ($("new")) $("new").onclick = function () { CHAT = []; PLAN = null; BUILT = null; ANS = {}; tAi(); };
+    if (PLAN) showPlan();
+    var last = CHAT[CHAT.length - 1]; if (last && last.ask) showAsk(last.ask);
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+  function say(text) {
+    if (BUSY) return;
+    var t = typeof text === "string" ? text : $("in").value.trim(); if (!t) return;
+    CHAT.push({ role: "user", text: t });
+    BUSY = true; tAi();
+    $("ask").innerHTML = '<div class="msg a"><span class="spin" style="display:inline-block;width:14px;height:14px;vertical-align:-2px"></span> Thinking…</div>';
+    var msgs = CHAT.map(function (m) { return { role: m.role, text: m.text }; });
+    api({ action: "xm-chat", messages: msgs }).then(function (r) {
+      BUSY = false;
+      if (!r.ok) { CHAT.push({ role: "ai", text: "⚠️ " + (r.error || "Something went wrong") }); return tAi(); }
+      if (r.ask) { CHAT.push({ role: "ai", text: "? " + r.ask.map(function (q) { return q.q; }).join(" | "), show: "A couple of quick questions:", ask: r.ask }); ANS = {}; return tAi(); }
+      PLAN = r.plan; BUILT = null;
+      CHAT.push({ role: "ai", text: "PLAN " + JSON.stringify({ title: PLAN.title, blocks: PLAN.blocks, settings: PLAN.settings, dataCols: PLAN.data ? PLAN.data.cols : null, custom: PLAN.custom.map(function (c) { return c.name; }) }), show: "Here is the template I’d build 👇  Check it, change any setting, then download. You can also tell me what to change." + (r.blocked && r.blocked.length ? "\n(I left out a custom macro that used commands this tool doesn’t allow: " + r.blocked.join(", ") + ".)" : "") });
+      tAi();
+    });
+  }
+  function showAsk(qs) {
+    $("ask").innerHTML = '<div class="card" style="margin-top:8px">' + qs.map(function (q, i) { return '<div style="margin-top:' + (i ? 12 : 0) + 'px"><b style="font-size:13.5px">' + esc(q.q) + '</b><div class="chips">' + q.options.map(function (o) { return '<button data-q="' + i + '" data-o="' + esc(o) + '" class="' + (ANS[i] === o ? "on" : "") + '">' + esc(o) + "</button>"; }).join("") + "</div></div>"; }).join("") + '<button class="btn pri sm" id="ansgo" style="margin-top:12px">Continue ➤</button><div class="muted" style="font-size:11.5px;margin-top:4px">Or type your own answer below.</div></div>';
+    [].forEach.call($("ask").querySelectorAll("[data-q]"), function (b) { b.onclick = function () { ANS[+b.dataset.q] = b.dataset.o; showAsk(qs); }; });
+    $("ansgo").onclick = function () { var parts = qs.map(function (q, i) { return ANS[i] ? q.q + " → " + ANS[i] : ""; }).filter(Boolean); var extra = $("in").value.trim(); if (!parts.length && !extra) return toast("Pick an answer or type one"); say(parts.concat(extra ? [extra] : []).join("\n")); };
+  }
+  function showPlan() {
+    var p = PLAN, allSet = [];
+    p.blocks.forEach(function (id) { /* settings come back from the build */ });
+    $("plan").innerHTML = '<div class="card" style="margin-top:10px;border:2px solid #C9CDEA"><div class="row" style="gap:8px;align-items:center"><b style="font-size:16px;flex:1">📗 ' + esc(p.title) + '</b><span class="pill g">.xlsm</span></div>' + (p.desc ? '<div class="muted" style="font-size:12.5px;margin-top:3px">' + esc(p.desc) + "</div>" : "") +
+      p.blocks.map(function (id) { var b = blk(id); return '<div class="blk" style="margin-top:10px"><div class="ic">' + b.icon + '</div><div style="flex:1"><b style="font-size:13.5px">' + esc(b.name) + '</b><div class="muted" style="font-size:12px">Buttons: ' + esc((b.macros || []).join(" · ")) + "</div></div></div>"; }).join("") +
+      (p.custom.length ? p.custom.map(function (c) { return '<div class="blk" style="margin-top:10px"><div class="ic">✨</div><div style="flex:1"><b style="font-size:13.5px">' + esc(c.label) + ' <span class="pill o">AI-written macro</span></b><div class="muted" style="font-size:12px">' + (c.blocked ? "Left out — it used commands this tool doesn’t allow." : esc(c.help || "Custom step written for this template. Test it on a copy of your data first.")) + "</div></div></div>"; }).join("") : "") +
+      (p.data ? '<div class="help">🧾 Sample data on sheet <b>' + esc(p.data.sheet) + "</b>: " + esc(p.data.cols.map(function (c) { return c[0]; }).join(", ")) + " · " + p.data.rows.length + " sample rows</div>" : "") +
+      '<div id="built"></div><div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn pri" id="dl" style="flex:1">⬇ Download the Excel file</button><button class="btn ghost" id="sv">💾 Save</button></div></div>';
+    $("dl").onclick = function () { build(false, true); };
+    $("sv").onclick = function () { build(true, false); };
+    build(false, false);
+  }
+  function build(save, dl) {
+    var b = $("dl"); if (b) b.disabled = true;
+    api({ action: "xm-build", plan: PLAN, save: save, chat: CHAT.map(function (m) { return { role: m.role, text: m.text }; }) }).then(function (r) {
+      if (b) b.disabled = false;
+      if (!r.ok) return toast(r.error);
+      BUILT = r; PLAN = r.plan;
+      if (save) toast("Saved to My templates");
+      if (dl) getFile(r);
+      if ($("built")) {
+        $("built").innerHTML = '<div class="lb" style="margin-top:12px">Sheets</div><div style="font-size:12.5px">' + r.sheets.map(function (s) { return '<span class="pill" style="margin:2px 3px 2px 0">' + esc(s) + "</span>"; }).join("") + '</div><div class="lb">Settings (you can also change these later in the file)</div><div style="overflow-x:auto"><table class="tb">' + r.settings.map(function (s, i) { return '<tr><td style="white-space:nowrap;font-weight:700">' + esc(s[0]) + '</td><td style="min-width:150px"><input data-set="' + esc(s[0]) + '" value="' + esc(s[1]) + '"></td><td class="muted" style="font-size:11.5px">' + esc(s[2] || "") + "</td></tr>"; }).join("") + '</table></div><div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="vb">👁 See the VBA code</button><button class="btn ghost sm" id="cp">📋 Copy VBA</button></div>';
+        [].forEach.call($("built").querySelectorAll("[data-set]"), function (i) { i.onchange = function () { PLAN.settings = PLAN.settings || {}; PLAN.settings[i.dataset.set] = i.value; BUILT = null; }; });
+        $("vb").onclick = function () { sheet("VBA code in this file", r.macros.length + " button(s) · Alt+F11 in Excel shows the same code", [["", "Close", function () { }]], '<div class="code">' + esc(r.vba) + "</div>"); };
+        $("cp").onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(r.vba) : Promise.reject()).then(function () { toast("VBA copied"); }, function () { toast("Couldn't copy"); }); };
+      }
+    });
+  }
+  function getFile(r) {
+    var bin = atob(r.b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    download(new Blob([u], { type: "application/vnd.ms-excel.sheet.macroEnabled.12" }), r.name);
+    sheet("📗 " + r.name, "Downloading…", [["", "OK", function () { }]], '<div class="help"><b>To use it on your computer</b><br>1. Open the file in Excel (Windows).<br>2. Click <b>Enable Content</b> in the yellow bar.<br>3. If Excel shows a red bar “macros have been blocked”: close the file → right-click it → <b>Properties</b> → tick <b>Unblock</b> → OK → open again.<br>4. Replace the sample data, check the Settings sheet, click a button on the Start sheet.</div>');
+  }
+
+  // ======================= 📦 ready templates =======================
+  function tReady() {
+    var n = Object.keys(PICK).filter(function (k) { return PICK[k]; }).length;
+    $("tp").innerHTML = '<div class="help" style="margin-top:10px">Tested macros, ready to use. Tap <b>Get file</b> for one, or tick up to 4 and combine them into one Excel file.</div>' +
+      BLOCKS.map(function (b) { return '<div class="card' + (PICK[b.id] ? " sel" : "") + '" style="margin-top:8px"><div class="blk"><div class="ic">' + b.icon + '</div><div style="flex:1;min-width:0"><b>' + esc(b.name) + '</b><div class="muted" style="font-size:12.5px;margin-top:2px">' + esc(b.desc) + '</div><div style="font-size:12px;margin-top:5px">Buttons: ' + esc(b.macros.join(" · ")) + '</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" data-one="' + b.id + '">⬇ Get file</button><button class="btn ghost sm" data-pick="' + b.id + '">' + (PICK[b.id] ? "✓ Added" : "＋ Combine") + "</button></div></div></div></div>"; }).join("") +
+      (n ? '<div style="position:sticky;bottom:12px;margin-top:12px"><button class="btn pri" id="comb" style="width:100%;box-shadow:0 8px 24px rgba(20,24,51,.25)">⬇ Build one file with ' + n + " template" + (n > 1 ? "s" : "") + "</button></div>" : "");
+    [].forEach.call($("tp").querySelectorAll("[data-one]"), function (b) { b.onclick = function () { PLAN = { blocks: [b.dataset.one] }; quick(b); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-pick]"), function (b) { b.onclick = function () { var id = b.dataset.pick; if (!PICK[id] && Object.keys(PICK).filter(function (k) { return PICK[k]; }).length >= 4) return toast("Up to 4 in one file"); PICK[id] = !PICK[id]; tReady(); }; });
+    if ($("comb")) $("comb").onclick = function () { var ids = Object.keys(PICK).filter(function (k) { return PICK[k]; }); PLAN = { title: ids.map(function (i) { return blk(i).name.split(" (")[0]; }).join(" + ").slice(0, 78), blocks: ids }; quick($("comb")); };
+  }
+  function quick(btn) { btn.disabled = true; api({ action: "xm-build", plan: PLAN }).then(function (r) { btn.disabled = false; if (!r.ok) return toast(r.error); getFile(r); }); }
+
+  // ======================= 📁 mine =======================
+  function tMine() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "xm-list" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("tp").innerHTML = r.rows.length ? r.rows.map(function (x, i) { return '<div class="card" style="margin-top:8px"><b>📗 ' + esc(x.title) + '</b><div class="muted" style="font-size:12px;margin-top:2px">' + esc(x.blocks.map(function (b) { return blk(b).name; }).join(" · ")) + " · " + new Date(x.at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + '</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" data-g="' + i + '">⬇ Download</button><button class="btn ghost sm" data-e="' + i + '">✏️ Change with AI</button><button class="btn ghost sm" data-d="' + i + '" style="color:#B42318">🗑</button></div></div>'; }).join("") : '<div class="card empty" style="margin-top:10px">Nothing saved yet. Build a template and tap 💾 Save.</div>';
+      [].forEach.call($("tp").querySelectorAll("[data-g]"), function (b) { b.onclick = function () { PLAN = r.rows[+b.dataset.g].plan; quick(b); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { var x = r.rows[+b.dataset.e]; PLAN = x.plan; CHAT = x.chat.length ? x.chat.map(function (m) { return { role: m.role, text: m.text, hide: /^PLAN /.test(m.text), show: /^\? /.test(m.text) ? "(questions)" : null }; }) : [{ role: "user", text: "Template: " + x.title }]; TAB = "ai"; draw(); }; });
+      [].forEach.call($("tp").querySelectorAll("[data-d]"), function (b) { b.onclick = function () { api({ action: "xm-del", id: r.rows[+b.dataset.d].id }).then(tMine); }; });
+    });
+  }
+  function tHow() {
+    $("tp").innerHTML = '<div class="card" style="margin-top:10px;font-size:13.5px;line-height:1.65"><b>What you get</b><br>A macro-enabled Excel file (<span class="fx">.xlsm</span>) with:<br>• a <b>Start</b> sheet with steps and one-click buttons<br>• your data sheet(s) filled with sample rows — replace them with your raw data, keep the header row<br>• a <b>Settings</b> sheet (folders, column names, send mode…) so nothing is hidden in code<br>• a <b>Log</b> sheet that records every run</div>' +
+      '<div class="card" style="margin-top:10px;font-size:13.5px;line-height:1.65"><b>Opening it</b><br>1. Open in Excel on Windows and click <b>Enable Content</b>.<br>2. Files downloaded from the internet may show a red bar “Microsoft has blocked macros”. Close the file, right-click it → <b>Properties</b> → tick <b>Unblock</b> → OK, and open it again. (Or keep your macro files in a Trusted Location: File → Options → Trust Center.)<br>3. Macros run in Excel for Windows. Phones and Excel Online can open the file but not run macros.</div>' +
+      '<div class="card" style="margin-top:10px;font-size:13.5px;line-height:1.65"><b>Good to know</b><br>• The standard macros are written and checked by vivo BI — AI only chooses and sets them up. A step marked <span class="pill o">AI-written macro</span> was written for your request: test it on a copy first.<br>• E-mail uses Outlook on your computer. “Display” mode opens each mail for you to check; “Send” sends straight away.<br>• WhatsApp opens each chat with the message ready; you press Send. WhatsApp does not allow sending or attaching files automatically.<br>• Rename, split and backup never delete anything.</div>';
+  }
+  start();
+})();
+</script>
+</body>
+</html>
