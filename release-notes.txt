@@ -1,1 +1,1 @@
-vivo portal unblock: the app can remember the portal user ID and password (encrypted, on this phone only) and fills them in — HO only types the captcha; a still-valid portal login is reused
+New (HO): set product permissions on the vivo portal for many partner roles and models in one go — you log in with the captcha, the app does the ticking and brings back the result

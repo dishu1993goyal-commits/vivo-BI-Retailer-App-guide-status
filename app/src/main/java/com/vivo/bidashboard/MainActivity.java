@@ -3122,7 +3122,7 @@ public class MainActivity extends FragmentActivity {
                 java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> unblockPageOk(w));
                 ui.post(page);
                 if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "blocked";
-                if (inUnblock) return "busy";
+                if (inUnblock || inPerm) return "busy";
                 if (id == null || !id.matches("[A-Za-z0-9_-]{1,24}") || b64 == null || b64.length() > 4_000_000) return "bad";
                 String u = url == null || url.trim().isEmpty() ? UNBLOCK_DEF_URL : url.trim();
                 if (!"https".equals(Uri.parse(u).getScheme())) return "bad";
@@ -3281,6 +3281,181 @@ public class MainActivity extends FragmentActivity {
         if (r != null && w != null) ui.postDelayed(() -> { try { if (unblockPageOk(w)) w.evaluateJavascript("window.__biUnblock&&window.__biUnblock(" + r.toString().replace((char) 0x2028, ' ').replace((char) 0x2029, ' ') + ")", null); } catch (Throwable ignored) { } }, 300);
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // vivo portal · Set Product Permission for many partner roles × many models (HO). HO logs in (types the captcha);
+    // the app then presses the same buttons a person would. The steps live in assets/vivo_perm.js.
+    private boolean inPerm = false, pDone, pStop;
+    private JSONObject pJob;
+    private String pJs, pLast = "";
+    private int pTick;
+    private boolean permPageOk(WebView w) {
+        try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && Uri.parse(u).getPath().startsWith("/prodperm"); }
+        catch (Throwable t) { return false; }
+    }
+    private SharedPreferences permPrefs() { return getSharedPreferences("perm_runs", MODE_PRIVATE); }
+    private String permScript() {
+        if (pJs != null) return pJs;
+        try (java.io.InputStream in = getAssets().open("vivo_perm.js")) {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            pJs = bo.toString("UTF-8");
+        } catch (Throwable e) { pJs = ""; }
+        return pJs;
+    }
+    private class PermBridge {
+        private final WebView w;
+        PermBridge(WebView w) { this.w = w; }
+        @JavascriptInterface public String version() { return "1"; }
+        /** Starts the runner. job = {id, roles[], models[], exact, dry}. Returns ok / blocked / busy / bad. */
+        @JavascriptInterface public String run(String job, String url) {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> permPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "blocked";
+                if (inPerm || inUnblock) return "busy";
+                if (job == null || job.length() > 200_000) return "bad";
+                JSONObject j = new JSONObject(job);
+                if (!j.optString("id").matches("[A-Za-z0-9_-]{1,24}") || j.optJSONArray("roles") == null || j.optJSONArray("models") == null) return "bad";
+                String u = url == null || url.trim().isEmpty() ? UNBLOCK_DEF_URL : url.trim();
+                if (!"https".equals(Uri.parse(u).getScheme())) return "bad";
+                j.put("url", u);
+                ui.post(() -> showPerm(w, j));
+                return "ok";
+            } catch (Throwable e) { return "bad"; }
+        }
+        @JavascriptInterface public String pending() {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> permPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "[]";
+                org.json.JSONArray a = new org.json.JSONArray();
+                for (Object v : permPrefs().getAll().values()) try { a.put(new JSONObject(String.valueOf(v))); } catch (Throwable ignored) { }
+                return a.toString();
+            } catch (Throwable e) { return "[]"; }
+        }
+        @JavascriptInterface public void ack(String id) { if (id != null) permPrefs().edit().remove(id).apply(); }
+    }
+    private void showPerm(WebView from, JSONObject job) {
+        if (inPerm || inUnblock) return;
+        inPerm = true; pDone = false; pStop = false; pTick = 0; pLast = "";
+        pJob = job; unblockFrom = from;
+        uHost = String.valueOf(Uri.parse(job.optString("url")).getHost()).toLowerCase();
+        uCred = portalLoad(uCredId()); uTypedU = ""; uTypedP = ""; uOnLogin = false; uAsked = false;
+        ViewGroup content = findViewById(android.R.id.content);
+        unblockPrev = content.getChildCount() > 0 ? content.getChildAt(0) : null;
+        if (unblockPrev != null) content.removeView(unblockPrev);
+        vivoWeb = new WebView(this);
+        WebSettings ws = vivoWeb.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        ws.setBuiltInZoomControls(true);
+        ws.setDisplayZoomControls(false);
+        ws.setJavaScriptCanOpenWindowsAutomatically(true);
+        ws.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        ws.setUserAgentString(ws.getUserAgentString().replace("; wv", "").replace("Mobile ", ""));   // the portal is a desktop site
+        CookieManager.getInstance().setAcceptCookie(true);
+        CookieManager.getInstance().setAcceptThirdPartyCookies(vivoWeb, true);
+        vivoWeb.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String s = request.getUrl().getScheme();
+                return !("http".equals(s) || "https".equals(s));
+            }
+            @Override public void onPageFinished(WebView view, String url) { super.onPageFinished(view, url); CookieManager.getInstance().flush(); }
+        });
+        vivoWeb.setWebChromeClient(new WebChromeClient() {
+            @Override public boolean onJsAlert(WebView view, String url, String message, android.webkit.JsResult result) {
+                if (uOnLogin || pDone) return false;
+                result.confirm(); unblockBanner("The portal says: " + message, "#FFF4E5"); return true;   // a plain message must not block the run
+            }
+        });
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(Color.WHITE);
+        page.addView(profileHeaderBar((job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
+        uBanner = new TextView(this);
+        uBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
+        uBanner.setTextColor(Color.parseColor("#111111"));
+        uBanner.setPadding(dp(14), dp(10), dp(14), dp(10));
+        page.addView(uBanner, new LinearLayout.LayoutParams(-1, -2));
+        uBanner.setOnClickListener(v -> {
+            if (uOnLogin && uCred != null) unblockForget();
+            else if (pDone && inPerm) permClose();
+        });
+        unblockBanner("Opening the vivo portal…", "#E8F0FE");
+        page.addView(vivoWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
+        setContentView(page);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        unblockRestoreCookies(job.optString("url"));
+        vivoWeb.loadUrl(job.optString("url"));
+        ui.postDelayed(this::permTick, 2500);
+    }
+    private void permTick() {
+        if (!inPerm || pDone || vivoWeb == null) return;
+        pTick++;
+        try {
+            JSONObject c = new JSONObject(pJob.toString());
+            c.remove("url");
+            if (pStop) c.put("stop", true);
+            if (uCred != null && uSameHost()) c.put("fill", new JSONObject().put("u", uCred.optString("u")).put("p", uCred.optString("p")));
+            String js = "(function(){try{if(!window.__biPermRun){" + permScript() + "}return window.__biPermRun(" + c + ");}catch(e){return JSON.stringify({s:'wait',msg:String(e&&e.message||e)});}})()";
+            vivoWeb.evaluateJavascript(js, v -> {
+                try {
+                    if (v == null || "null".equals(v) || pDone || !inPerm) return;
+                    String raw = new org.json.JSONTokener(v).nextValue().toString();
+                    JSONObject r = new JSONObject(raw);
+                    String s = r.optString("s"), msg = r.optString("msg");
+                    if ("login".equals(s)) {
+                        uOnLogin = true;
+                        if (!r.optString("u").isEmpty() && !r.optString("p").isEmpty()) { uTypedU = r.optString("u"); uTypedP = r.optString("p"); }
+                        if (uCred != null) unblockBanner("🔑 User ID and password filled in — just type the captcha and tap Log In. The app takes over after that.  (Tap here to forget the saved login.)", "#FFF4E5");
+                        else unblockBanner("🔑 Log in to the vivo portal: type the user ID, password and the captcha, then tap Log In. The app can remember the user ID and password for next time.", "#FFF4E5");
+                        return;
+                    }
+                    if (uOnLogin) { uOnLogin = false; unblockKeepCookies(); unblockAskSave(); }
+                    if ("wait".equals(s)) return;
+                    pLast = raw;
+                    if ("run".equals(s)) unblockBanner((pStop ? "Stopping after this product…  " : "⏳ " + r.optInt("pct") + "%  ·  ") + msg + (pStop ? "" : "\nKeep the app open. Don't touch the portal while it works."), "#E8F0FE");
+                    else if ("done".equals(s)) permFinish("done", "✅ " + msg + "  Tap here to see the result.", "#E6F4EA");
+                    else if ("stopped".equals(s)) permFinish("stopped", "Stopped. Tap here to see what was done.", "#FFF4E5");
+                    else if ("err".equals(s) || "busy".equals(s)) permFinish("err", "⚠ " + msg + "\nTap here to go back to the result.", "#FDECEC");
+                } catch (Throwable ignored) { }
+            });
+        } catch (Throwable ignored) { }
+        ui.postDelayed(this::permTick, 1500);
+    }
+    private void permFinish(String state, String banner, String color) {
+        if (pDone) return;
+        pDone = true;
+        try {
+            String id = pJob.optString("id");
+            permPrefs().edit().putString(id, new JSONObject().put("id", id).put("state", state).put("status", pLast).put("at", System.currentTimeMillis()).toString()).apply();
+        } catch (Throwable ignored) { }
+        unblockBanner(banner, color);
+        if ("done".equals(state)) ui.postDelayed(() -> { if (inPerm && pDone) permClose(); }, 2500);
+    }
+    private void permAskClose() {
+        if (pDone || uOnLogin || pLast.isEmpty()) { if (!pDone) permFinish("stopped", "Closed", "#FFF4E5"); permClose(); return; }
+        if (pStop) { new AlertDialog.Builder(this).setMessage("Close now without waiting for the current product to finish?").setPositiveButton("Close now", (d, w) -> { permFinish("stopped", "Closed", "#FFF4E5"); permClose(); }).setNegativeButton("Wait", null).show(); return; }
+        new AlertDialog.Builder(this).setMessage("Stop setting product permissions? What is already ticked stays ticked; the rest is left as it is.")
+                .setPositiveButton("Stop", (d, w) -> { pStop = true; unblockBanner("Stopping after this product…", "#FFF4E5"); })
+                .setNegativeButton("Carry on", null).show();
+    }
+    private void permClose() {
+        if (!inPerm) return;
+        inPerm = false;
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        if (!uOnLogin) unblockKeepCookies();
+        CookieManager.getInstance().flush();
+        if (vivoWeb != null) { try { vivoWeb.stopLoading(); vivoWeb.destroy(); } catch (Throwable ignored) { } vivoWeb = null; }
+        uBanner = null;
+        if (unblockPrev != null) { if (unblockPrev.getParent() != null) ((ViewGroup) unblockPrev.getParent()).removeView(unblockPrev); setContentView(unblockPrev); }
+        unblockPrev = null;
+        final WebView w = unblockFrom; unblockFrom = null;
+        if (w != null) ui.postDelayed(() -> { try { if (permPageOk(w)) w.evaluateJavascript("window.__biPermDone&&window.__biPermDone()", null); } catch (Throwable ignored) { } }, 300);
+    }
+
     private void doNative(String name) {
         switch (name) {
             case "support": showSupportList("all"); break;
@@ -3380,6 +3555,7 @@ public class MainActivity extends FragmentActivity {
             surveyWeb.addJavascriptInterface(new TtsBridge(), "BITTS");
             surveyWeb.addJavascriptInterface(new SmsBridge(surveyWeb), "BISms");
             surveyWeb.addJavascriptInterface(new UnblockBridge(surveyWeb), "BIUnblock");
+            surveyWeb.addJavascriptInterface(new PermBridge(surveyWeb), "BIPerm");
             surveyWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -5103,6 +5279,7 @@ public class MainActivity extends FragmentActivity {
     public void onBackPressed() {
         if (inLink) { super.onBackPressed(); return; }
         if (inUnblock) { unblockAskClose(); return; }
+        if (inPerm) { permAskClose(); return; }
         if (inPortal) { portalBack(); return; }
         if (inSurveyPage) {
             surveyBack();
