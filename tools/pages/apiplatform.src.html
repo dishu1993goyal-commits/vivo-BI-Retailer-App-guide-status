@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>API platform</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:560px){.g2{grid-template-columns:1fr}}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.55}
+.warn{background:#FFF4E5;color:#6B4100;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.5}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.tbw{overflow-x:auto;background:var(--card);border-radius:14px;margin-top:8px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.fx{font-family:ui-monospace,Menlo,Consolas,monospace}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;background:#0F1530;color:#DDE3FF;border-radius:12px;padding:10px 12px;white-space:pre-wrap;word-break:break-all;overflow:auto;max-height:340px;margin-top:6px}
+.key{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;background:#E6F4EA;color:#0E4F2F;border-radius:12px;padding:12px;word-break:break-all;user-select:all}
+.fr{display:grid;grid-template-columns:1.3fr 1fr auto auto;gap:6px;align-items:center;margin-top:6px}.fr .tx{padding:7px 9px;font-size:13px}
+.chk{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 8px;font-size:12.5px;background:#FAFBFF;border-radius:10px;padding:6px 8px;max-height:180px;overflow:auto}
+.m{display:inline-block;font:800 10.5px ui-monospace,monospace;border-radius:6px;padding:2px 6px;color:#fff;margin-right:6px}.m.GET{background:#13693F}.m.POST{background:#2B33A6}.m.PUT{background:#8A5300}.m.DELETE{background:#B42318}
+.sec{font-size:13px;font-weight:800;margin:14px 2px 4px}
+.big{font-size:40px;text-align:center}
+.bar{display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:8px}.bar i{flex:1;background:#4D5BF9;border-radius:3px 3px 0 0;min-height:2px;display:block}
+@media print{.hero,.noprint,.seg{display:none!important}.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}.code{max-height:none}}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔌</span></div>
+  <h1 id="h1">API platform</h1><p id="hp">Publish our data as APIs for partners · keys · permissions · auto documentation</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "eps", D = null, DT = (new URLSearchParams(location.search).get("d") || "").replace(/[^a-f0-9]/g, "");
+  var when = function (t) { return t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—"; };
+  var copy = function (s, m) { (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(function () { toast(m || "Copied"); }, function () { prompt("Copy", s); }); };
+  var EX = { text: "sample text", number: 123, date: "2026-11-15", boolean: true };
+  var exRow = function (ep, withMeta) { var o = {}; if (withMeta && ep.kind === "dataset") o.id = "mhzk3a1f9c2d"; ep.fields.forEach(function (f) { o[f.name] = f.name === "state" ? "Bihar" : f.name === "imei" ? "861297057682577" : /lat$/.test(f.name) ? 25.61 : /lng$/.test(f.name) ? 85.13 : f.name === "at" ? 1794700000000 : EX[f.type]; }); if (withMeta && ep.kind === "dataset") { o.createdAt = 1794700000000; o.updatedAt = 1794700000000; } return o; };
+
+  // ---------- documentation (used by the admin preview and the partner link) ----------
+  function methodsOf(ep) { var p = ep.perm || { r: 1, w: 1, d: 1 }, M = []; if (p.r) M.push(["GET", "/" + ep.slug, "List rows"], ["GET", "/" + ep.slug + "/{id}", "One row"]); if (ep.kind === "dataset") { if (p.w) M.push(["POST", "/" + ep.slug, "Create 1–100 rows"], ["PUT", "/" + ep.slug + "/{id}", "Update a row"]); if (p.d) M.push(["DELETE", "/" + ep.slug + "/{id}", "Delete a row"]); } return M; }
+  function docsHtml(r) {
+    var B = r.base, c = r.client;
+    var H = '<div class="card"><b style="font-size:17px">vivo BI API — documentation for ' + esc(c.name) + "</b>" + (c.org ? '<div class="muted" style="font-size:12.5px">' + esc(c.org) + "</div>" : "") +
+      '<div class="tbw" style="box-shadow:none"><table class="tb"><tr><td><b>Base URL</b></td><td class="fx">' + esc(B) + '</td></tr><tr><td><b>Format</b></td><td>JSON over HTTPS (UTF-8)</td></tr><tr><td><b>Your key</b></td><td class="fx">' + esc(c.keyHint || "") + " <span class=\"muted\">(given to you separately — keep it secret)</span></td></tr><tr><td><b>Rate limit</b></td><td>" + c.rate + " requests a minute</td></tr>" + (c.states.length ? "<tr><td><b>Data scope</b></td><td>" + esc(c.states.join(", ")) + "</td></tr>" : "") + (c.expires ? "<tr><td><b>Key valid till</b></td><td>" + when(c.expires) + "</td></tr>" : "") + "<tr><td><b>Generated</b></td><td>" + new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + '</td></tr></table></div><div class="row noprint" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn pri sm" id="dpr">🖨 Print / save as PDF</button><button class="btn ghost sm" id="doa">⬇ OpenAPI (JSON)</button><button class="btn ghost sm" id="dpm">⬇ Postman collection</button></div></div>' +
+      '<div class="sec">1 · Authentication</div><div class="card">Send your API key in the <span class="fx">X-API-Key</span> header of every request (or <span class="fx">Authorization: Bearer &lt;key&gt;</span>). Call it from your server, never from a web page or app where others could read the key.<div class="code">curl -H "X-API-Key: YOUR_KEY" ' + esc(B) + '</div>This returns the list of endpoints your key can use.</div>' +
+      '<div class="sec">2 · Responses and errors</div><div class="card">Every reply is JSON with <span class="fx">ok</span> true or false. Lists also carry <span class="fx">count</span>, <span class="fx">total</span> and <span class="fx">next</span> (pass it as <span class="fx">cursor</span> to get the next page).<div class="tbw" style="box-shadow:none"><table class="tb"><tr><th>HTTP</th><th>Meaning</th></tr><tr><td>200 / 201</td><td>Success</td></tr><tr><td>400</td><td>Bad request — the <span class="fx">error</span> text says which field</td></tr><tr><td>401</td><td>API key missing or wrong</td></tr><tr><td>403</td><td>Key switched off, expired, or not allowed to do this</td></tr><tr><td>404</td><td>Unknown endpoint or row</td></tr><tr><td>405</td><td>Method not allowed (e.g. writing to a read-only endpoint)</td></tr><tr><td>429</td><td>Rate limit reached — wait a minute</td></tr></table></div><div class="code">{"ok":false,"error":"Field \\"qty\\" must be a number"}</div></div>' +
+      '<div class="sec">3 · List parameters (GET)</div><div class="card"><div class="tbw" style="box-shadow:none"><table class="tb"><tr><th>Parameter</th><th>Use</th></tr><tr><td class="fx">limit</td><td>Rows per page, 1–500 (default 100)</td></tr><tr><td class="fx">cursor</td><td>The <span class="fx">next</span> value from the previous page</td></tr><tr><td class="fx">since</td><td>Only rows created / changed on or after this date (YYYY-MM-DD) or millisecond timestamp</td></tr><tr><td class="fx">&lt;field&gt;=value</td><td>Exact match on any field of the endpoint, e.g. <span class="fx">state=Bihar</span></td></tr></table></div>Newest rows come first.</div>' +
+      '<div class="sec">4 · Endpoints</div>' + (r.endpoints.length ? r.endpoints.map(function (ep) {
+        var M = methodsOf(ep), row = exRow(ep, true), body = exRow(ep, false);
+        return '<div class="card" style="margin-top:8px"><b style="font-size:15px">' + esc(ep.name) + '</b> <span class="pill ' + (ep.kind === "dataset" ? "o" : "") + '">' + (ep.kind === "dataset" ? "read / write" : "read only") + "</span>" + (ep.desc ? '<div class="muted" style="font-size:12.5px;margin-top:2px">' + esc(ep.desc) + "</div>" : "") +
+          '<div style="margin-top:8px">' + M.map(function (m) { return '<div style="margin-top:4px"><span class="m ' + m[0] + '">' + m[0] + '</span><span class="fx" style="font-size:12.5px">' + esc("/api/v1" + m[1]) + '</span> <span class="muted" style="font-size:12px">— ' + m[2] + "</span></div>"; }).join("") + "</div>" +
+          '<div class="tbw" style="box-shadow:none"><table class="tb"><tr><th>Field</th><th>Type</th>' + (ep.kind === "dataset" ? "<th>Required</th>" : "") + "<th>Meaning</th></tr>" + ep.fields.map(function (f) { return '<tr><td class="fx">' + esc(f.name) + "</td><td>" + f.type + "</td>" + (ep.kind === "dataset" ? "<td>" + (f.req ? "<b>Yes</b>" : "No") + "</td>" : "") + "<td>" + esc(f.desc || "") + "</td></tr>"; }).join("") + (ep.kind === "dataset" ? '<tr><td class="fx">id, createdAt, updatedAt</td><td>text / ms</td><td>—</td><td>Set by the server</td></tr>' : "") + "</table></div>" +
+          (M.some(function (m) { return m[0] === "GET"; }) ? '<div class="lb">Example — list</div><div class="code">curl -H "X-API-Key: YOUR_KEY" "' + esc(B + "/" + ep.slug + "?limit=50" + (ep.fields.some(function (f) { return f.name === "state"; }) ? "&state=Bihar" : "")) + '"\n\n' + esc(JSON.stringify({ ok: true, count: 1, total: 1, next: null, data: [row] }, null, 1)) + "</div>" : "") +
+          (M.some(function (m) { return m[0] === "POST"; }) ? '<div class="lb">Example — create</div><div class="code">curl -X POST -H "X-API-Key: YOUR_KEY" -H "Content-Type: application/json" \\\n  -d \'' + esc(JSON.stringify(body)) + "' \\\n  " + esc(B + "/" + ep.slug) + "\n\n" + esc(JSON.stringify({ ok: true, count: 1, data: row }, null, 1)) + '</div><div class="muted" style="font-size:12px;margin-top:4px">Send up to 100 rows at once as <span class="fx">{"rows":[{…},{…}]}</span>. PUT takes only the fields you want to change.</div>' : "") + "</div>";
+      }).join("") : '<div class="card empty">No endpoints are opened for this key yet.</div>');
+    return H;
+  }
+  function wireDocs(r) {
+    $("dpr").onclick = function () { window.print(); };
+    $("doa").onclick = function () {
+      var paths = {}, sch = {};
+      r.endpoints.forEach(function (ep) {
+        var props = {}; ep.fields.forEach(function (f) { props[f.name] = { type: f.type === "number" ? "number" : f.type === "boolean" ? "boolean" : "string", description: f.desc || "" }; }); sch[ep.slug] = { type: "object", properties: props, required: ep.fields.filter(function (f) { return f.req; }).map(function (f) { return f.name; }) };
+        methodsOf(ep).forEach(function (m) { var p = m[1]; paths[p] = paths[p] || {}; paths[p][m[0].toLowerCase()] = Object.assign({ summary: ep.name + " — " + m[2], responses: { "200": { description: "OK" }, "401": { description: "Invalid key" } } }, /\{id\}/.test(p) ? { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }] } : {}, m[0] === "POST" || m[0] === "PUT" ? { requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/" + ep.slug } } } } } : {}); });
+      });
+      download(new Blob([JSON.stringify({ openapi: "3.0.3", info: { title: "vivo BI API — " + r.client.name, version: "1.0" }, servers: [{ url: r.base }], security: [{ ApiKey: [] }], components: { securitySchemes: { ApiKey: { type: "apiKey", in: "header", name: "X-API-Key" } }, schemas: sch }, paths: paths }, null, 2)], { type: "application/json" }), "vivo_BI_API_openapi.json");
+    };
+    $("dpm").onclick = function () {
+      download(new Blob([JSON.stringify({ info: { name: "vivo BI API — " + r.client.name, schema: "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" }, variable: [{ key: "baseUrl", value: r.base }, { key: "apiKey", value: "" }], auth: { type: "apikey", apikey: [{ key: "key", value: "X-API-Key" }, { key: "value", value: "{{apiKey}}" }, { key: "in", value: "header" }] },
+        item: r.endpoints.map(function (ep) { return { name: ep.name, item: methodsOf(ep).map(function (m) { return { name: m[2], request: Object.assign({ method: m[0], header: m[0] === "POST" || m[0] === "PUT" ? [{ key: "Content-Type", value: "application/json" }] : [], url: "{{baseUrl}}" + m[1].replace("{id}", ":id") }, m[0] === "POST" || m[0] === "PUT" ? { body: { mode: "raw", raw: JSON.stringify(exRow(ep, false), null, 2) } } : {}) }; }) }; }) }, null, 2)], { type: "application/json" }), "vivo_BI_API.postman_collection.json");
+    };
+  }
+  function publicDocs() {
+    $("h1").textContent = "vivo BI API"; $("hp").textContent = "Documentation";
+    fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify({ app: "state", action: "oa-p-docs", d: DT }) }).then(function (r) { return r.json(); }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; }
+      VIEW.innerHTML = docsHtml(r); wireDocs(r);
+    });
+  }
+
+  // ======================= HO =======================
+  function start() {
+    if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.hash)); } catch (e) { } VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+    load();
+  }
+  function load() { api({ action: "oa-list" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div>' + esc(r.error) + "</div>"; return; } D = r; draw(); }); }
+  function draw() {
+    var tabs = [["eps", "🧩 Endpoints"], ["cls", "🔑 Clients & keys"], ["use", "📈 Usage"], ["how", "❓ How it works"]];
+    VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div class="help fx" style="word-break:break-all">Base URL: ' + esc(D.base) + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    ({ eps: tEps, cls: tCls, use: tUse, how: tHow })[TAB]();
+  }
+  function tEps() {
+    $("tp").innerHTML = '<div class="row" style="gap:8px;margin-top:10px"><button class="btn pri" id="ns" style="flex:1">＋ Share a tool’s data</button><button class="btn sec" id="nd" style="flex:1">＋ New dataset (read / write)</button></div>' +
+      (D.endpoints.length ? D.endpoints.map(function (e, i) { var n = D.clients.filter(function (c) { return c.perms[e.slug]; }).length; return '<div class="card" style="margin-top:8px"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + esc(e.name) + '</b><span class="pill ' + (e.kind === "dataset" ? "o" : "") + '">' + (e.kind === "dataset" ? "dataset" : "from " + esc((D.sources.filter(function (s) { return s.id === e.source; })[0] || {}).tool || "")) + "</span>" + (e.active ? "" : '<span class="pill r">off</span>') + '</div><div class="fx muted" style="font-size:12px;margin-top:2px">/api/v1/' + esc(e.slug) + '</div><div class="muted" style="font-size:12px;margin-top:2px">' + e.fields.length + " field(s) · " + n + " client(s) can use it</div>" + '<div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" data-ee="' + i + '">✏️ Edit</button><button class="btn ghost sm" data-et="' + i + '">▶ Try it</button></div></div>'; }).join("") : '<div class="card empty" style="margin-top:10px">No endpoints yet. Share a tool’s data (read-only), or make a dataset partners can write to.</div>');
+    $("ns").onclick = function () { editEp(null, "source"); }; $("nd").onclick = function () { editEp(null, "dataset"); };
+    [].forEach.call($("tp").querySelectorAll("[data-ee]"), function (b) { b.onclick = function () { editEp(D.endpoints[+b.dataset.ee]); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-et]"), function (b) { b.onclick = function () { tryEp(D.endpoints[+b.dataset.et]); }; });
+  }
+  function editEp(e0, kind) {
+    var e = e0 ? JSON.parse(JSON.stringify(e0)) : { kind: kind, name: "", desc: "", source: D.sources[0].id, fields: kind === "dataset" ? [{ name: "", type: "text", req: true, desc: "" }] : [], active: true };
+    var isSrc = e.kind === "source";
+    $("tp").innerHTML = '<button class="btn ghost sm" id="bk" style="margin-top:10px">← Endpoints</button><div class="card" style="margin-top:8px"><b>' + (e0 ? "Edit endpoint" : isSrc ? "Share a tool’s data (read-only)" : "New dataset") + '</b><label class="lb">Name</label><input class="tx" id="en" value="' + esc(e.name) + '" placeholder="' + (isSrc ? "e.g. Store directory" : "e.g. Partner leads") + '">' + (e0 ? '<div class="fx muted" style="font-size:12px;margin-top:3px">/api/v1/' + esc(e.slug) + "</div>" : "") + '<label class="lb">What it is (shown in the documentation)</label><input class="tx" id="ed" value="' + esc(e.desc) + '">' +
+      (isSrc ? '<label class="lb">Data from</label><select class="tx" id="es"' + (e0 ? " disabled" : "") + ">" + D.sources.map(function (s) { return '<option value="' + s.id + '"' + (s.id === e.source ? " selected" : "") + ">" + esc(s.tool + " — " + s.name) + "</option>"; }).join("") + '</select><label class="lb">Fields partners can see</label><div id="ef"></div><div class="muted" style="font-size:11.5px;margin-top:4px">Only these reviewed fields can be shared from this tool. Names of staff, phone numbers of users, photos and internal notes are never exposed.</div>' : '<label class="lb">Fields</label><div id="ef"></div><button class="btn ghost sm" id="fa" style="margin-top:6px">＋ Field</button>') +
+      '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ea"' + (e.active ? " checked" : "") + '><i></i><span>Endpoint is on</span></label><div class="row" style="gap:8px;margin-top:12px"><button class="btn pri" id="sv" style="flex:1">💾 Save</button>' + (e0 ? '<button class="btn ghost" id="del" style="color:#B42318">🗑</button>' : "") + "</div></div>";
+    $("bk").onclick = draw;
+    var drawF = function () {
+      if (isSrc) { var S = D.sources.filter(function (s) { return s.id === (e0 ? e.source : $("es").value); })[0], on = e.fields.map(function (f) { return f.name || f; }); $("ef").innerHTML = '<div class="chk">' + S.fields.map(function (f) { return '<label title="' + esc(f.desc) + '"><input type="checkbox" data-sf="' + f.name + '"' + (!e0 && !on.length || on.indexOf(f.name) >= 0 ? " checked" : "") + "> " + esc(f.name) + ' <span class="muted">' + esc(f.desc) + "</span></label>"; }).join("") + "</div>"; }
+      else { $("ef").innerHTML = e.fields.map(function (f, i) { return '<div class="fr"><input class="tx" data-fn="' + i + '" value="' + esc(f.name) + '" placeholder="fieldName"><select class="tx" data-ft="' + i + '">' + D.types.map(function (t) { return "<option" + (t === f.type ? " selected" : "") + ">" + t + "</option>"; }).join("") + '</select><label style="font-size:12px;white-space:nowrap"><input type="checkbox" data-fq="' + i + '"' + (f.req ? " checked" : "") + '> required</label><button class="btn ghost sm" data-fx="' + i + '">🗑</button></div>'; }).join("");
+        var on2 = function (s, fn) { [].forEach.call($("ef").querySelectorAll(s), fn); };
+        on2("[data-fn]", function (x) { x.oninput = function () { e.fields[+x.dataset.fn].name = x.value; }; }); on2("[data-ft]", function (x) { x.onchange = function () { e.fields[+x.dataset.ft].type = x.value; }; }); on2("[data-fq]", function (x) { x.onchange = function () { e.fields[+x.dataset.fq].req = x.checked; }; }); on2("[data-fx]", function (x) { x.onclick = function () { e.fields.splice(+x.dataset.fx, 1); drawF(); }; }); }
+    };
+    drawF();
+    if ($("es")) $("es").onchange = function () { e.fields = []; drawF(); };
+    if ($("fa")) $("fa").onclick = function () { e.fields.push({ name: "", type: "text", req: false, desc: "" }); drawF(); };
+    $("sv").onclick = function () {
+      e.name = $("en").value; e.desc = $("ed").value; e.active = $("ea").checked;
+      if (isSrc) { if (!e0) e.source = $("es").value; e.fields = [].filter.call($("ef").querySelectorAll("[data-sf]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.sf; }); }
+      api({ action: "oa-ep-save", ep: e, create: !e0 }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved — now give a client access under 🔑 Clients & keys"); load(); });
+    };
+    if ($("del")) $("del").onclick = function () { sheet("Delete “" + e0.name + "”?", e0.kind === "dataset" ? "All rows in this dataset are deleted too, and partners lose access at once." : "Partners lose access at once.", [["🗑", "Delete", function () { api({ action: "oa-ep-del", slug: e0.slug }).then(function (r) { if (!r.ok) return toast(r.error); load(); }); }, "danger"], ["", "Cancel", function () { }]]); };
+  }
+  function tryEp(e) {
+    api({ action: "oa-try", slug: e.slug }).then(function (r) { if (!r.ok) return toast(r.error); sheet("▶ " + e.name, "GET /api/v1/" + e.slug + " — what a client with full access gets (first 20 rows)", [["", "Close", function () { }]], '<div class="code">' + esc(JSON.stringify(r.body, null, 1)) + "</div>"); });
+  }
+  function tCls() {
+    $("tp").innerHTML = '<button class="btn pri" id="nc" style="width:100%;margin-top:10px">＋ New client (partner / website)</button>' + (D.clients.length ? D.clients.map(function (c, i) { var eps = Object.keys(c.perms); return '<div class="card" style="margin-top:8px"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + esc(c.name) + '</b><span class="pill ' + (c.active ? (c.expires && Date.now() > c.expires ? "r" : "g") : "r") + '">' + (c.active ? (c.expires && Date.now() > c.expires ? "expired" : "active") : "off") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + esc([c.org, c.contact].filter(Boolean).join(" · ")) + '</div><div class="fx" style="font-size:12px;margin-top:4px">Key ' + esc(c.keyHint) + '</div><div class="muted" style="font-size:12px;margin-top:2px">' + eps.length + " endpoint(s)" + (c.states.length ? " · " + c.states.length + " state(s)" : " · all states") + " · " + c.rate + "/min · last used " + when(c.lastAt) + '</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn ghost sm" data-ce="' + i + '">✏️ Edit & permissions</button><button class="btn ghost sm" data-cd="' + i + '">📄 Documentation</button><button class="btn ghost sm" data-cl="' + i + '">🔗 Copy docs link</button></div></div>'; }).join("") : '<div class="card empty" style="margin-top:10px">No clients yet.</div>');
+    $("nc").onclick = function () { editCl(null); };
+    [].forEach.call($("tp").querySelectorAll("[data-ce]"), function (b) { b.onclick = function () { editCl(D.clients[+b.dataset.ce]); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-cl]"), function (b) { b.onclick = function () { copy(location.origin + "/apiplatform.html?d=" + D.clients[+b.dataset.cl].docToken, "Documentation link copied"); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-cd]"), function (b) { b.onclick = function () { window.open("/apiplatform.html?d=" + D.clients[+b.dataset.cd].docToken, "_blank"); }; });
+  }
+  function editCl(c0) {
+    var c = c0 ? JSON.parse(JSON.stringify(c0)) : { name: "", org: "", contact: "", active: true, perms: {}, states: [], rate: 60, expires: 0 };
+    var dv = c.expires ? new Date(c.expires - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10) : "";
+    $("tp").innerHTML = '<button class="btn ghost sm" id="bk" style="margin-top:10px">← Clients</button><div class="card" style="margin-top:8px"><b>' + (c0 ? "Edit client" : "New client") + '</b><div class="g2"><div><label class="lb">Name *</label><input class="tx" id="cn" value="' + esc(c.name) + '" placeholder="e.g. Benow integration"></div><div><label class="lb">Company</label><input class="tx" id="co" value="' + esc(c.org) + '"></div><div><label class="lb">Contact (e-mail / phone)</label><input class="tx" id="cc" value="' + esc(c.contact) + '"></div><div><label class="lb">Requests per minute</label><input class="tx" id="cr" inputmode="numeric" value="' + c.rate + '"></div><div><label class="lb">Key valid till (empty = no end)</label><input class="tx" type="date" id="cx" value="' + dv + '"></div></div>' +
+      '<label class="lb">Permissions</label>' + (D.endpoints.length ? '<div class="tbw" style="box-shadow:none"><table class="tb"><tr><th>Endpoint</th><th>Read</th><th>Write</th><th>Delete</th><th>See others’ rows</th></tr>' + D.endpoints.map(function (e) { var p = c.perms[e.slug] || {}, ds = e.kind === "dataset"; return "<tr><td><b>" + esc(e.name) + '</b><br><span class="fx muted" style="font-size:11px">/' + esc(e.slug) + '</span></td><td><input type="checkbox" data-p="' + e.slug + '.r"' + (p.r ? " checked" : "") + '></td><td>' + (ds ? '<input type="checkbox" data-p="' + e.slug + '.w"' + (p.w ? " checked" : "") + ">" : "—") + "</td><td>" + (ds ? '<input type="checkbox" data-p="' + e.slug + '.d"' + (p.d ? " checked" : "") + ">" : "—") + "</td><td>" + (ds ? '<input type="checkbox" data-p="' + e.slug + '.all"' + (p.all ? " checked" : "") + ">" : "—") + "</td></tr>"; }).join("") + '</table></div><div class="muted" style="font-size:11.5px;margin-top:4px">On a dataset a client can change or delete only the rows it created, unless “See others’ rows” is ticked.</div>' : '<div class="warn">Make an endpoint first (🧩 Endpoints).</div>') +
+      '<label class="lb">Data scope — states (none ticked = all states)</label><div class="chk">' + D.states.map(function (s) { return '<label><input type="checkbox" data-st="' + esc(s) + '"' + (c.states.indexOf(s) >= 0 ? " checked" : "") + "> " + esc(s) + "</label>"; }).join("") + "</div>" +
+      '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ca"' + (c.active ? " checked" : "") + '><i></i><span>Key is active</span></label><div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn pri" id="sv" style="flex:1">💾 Save' + (c0 ? "" : " & create key") + "</button>" + (c0 ? '<button class="btn ghost" id="rk">🔄 New key</button><button class="btn ghost" id="del" style="color:#B42318">🗑</button>' : "") + "</div></div>";
+    $("bk").onclick = draw;
+    var save = function (newKey) {
+      c.name = $("cn").value; c.org = $("co").value; c.contact = $("cc").value; c.rate = +$("cr").value || 60; c.active = $("ca").checked; c.expires = $("cx").value ? new Date($("cx").value + "T23:59:59").getTime() : 0;
+      c.states = [].filter.call($("tp").querySelectorAll("[data-st]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.st; });
+      c.perms = {}; [].forEach.call($("tp").querySelectorAll("[data-p]"), function (x) { var p = x.dataset.p.split("."); if (x.checked) { c.perms[p[0]] = c.perms[p[0]] || {}; c.perms[p[0]][p[1]] = true; } });
+      api({ action: "oa-cl-save", client: c, newKey: !!newKey }).then(function (r) {
+        if (!r.ok) return toast(r.error);
+        if (r.newKey) sheet("🔑 API key for " + r.client.name, "Copy it now — it is shown only this once.", [["📋", "Copy key", function () { copy(r.newKey, "Key copied"); }, "pri"], ["🔗", "Copy documentation link", function () { copy(r.docs, "Link copied"); }], ["", "Done", function () { }]], '<div class="key">' + esc(r.newKey) + '</div><div class="warn">Send the key to the partner through a safe channel (not a group chat). We store only a fingerprint of it, so it can’t be shown again — if it is lost, make a new key.</div>');
+        else toast("Saved");
+        load();
+      });
+    };
+    $("sv").onclick = function () { save(false); };
+    if ($("rk")) $("rk").onclick = function () { sheet("Make a new key?", "The current key stops working at once.", [["🔄", "New key", function () { save(true); }, "danger"], ["", "Cancel", function () { }]]); };
+    if ($("del")) $("del").onclick = function () { sheet("Delete " + c0.name + "?", "Its key stops working at once.", [["🗑", "Delete", function () { api({ action: "oa-cl-del", id: c0.id }).then(function () { load(); }); }, "danger"], ["", "Cancel", function () { }]]); };
+  }
+  function tUse() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "oa-usage" }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("tp").innerHTML = D.clients.length ? D.clients.map(function (c) { var u = (r.usage[c.id] || []).slice().reverse(), tot = u.reduce(function (a, x) { return a + x.n; }, 0), err = u.reduce(function (a, x) { return a + x.err; }, 0), mx = Math.max.apply(null, u.map(function (x) { return x.n; }).concat([1])), by = {}; u.forEach(function (x) { Object.keys(x.by || {}).forEach(function (k) { by[k] = (by[k] || 0) + x.by[k]; }); });
+        return '<div class="card" style="margin-top:8px"><div class="row"><b style="flex:1">' + esc(c.name) + '</b><span class="muted" style="font-size:12px">last 14 days</span></div><div style="font-size:13px;margin-top:4px"><b>' + tot + "</b> calls · " + err + " errors · last used " + when(c.lastAt) + '</div><div class="bar">' + u.map(function (x) { return '<i title="' + x.d + ": " + x.n + '" style="height:' + Math.round(x.n * 100 / mx) + '%"></i>'; }).join("") + '</div><div class="muted" style="font-size:11.5px;margin-top:4px">' + esc(Object.keys(by).map(function (k) { return (k === "-" ? "(list)" : "/" + k) + " " + by[k]; }).join(" · ") || "No calls yet") + "</div></div>"; }).join("") : '<div class="card empty" style="margin-top:10px">No clients yet.</div>';
+    });
+  }
+  function tHow() {
+    $("tp").innerHTML = '<div class="card" style="margin-top:10px;font-size:13.5px;line-height:1.65"><b>3 steps</b><br>1. <b>🧩 Endpoints</b> — choose what to publish. “Share a tool’s data” gives partners a read-only view of chosen fields (store directory, IMEI unblock status, lost sales, launches, market survey responses). “New dataset” makes a table with your own fields that partners can also write to — e.g. leads, stock or claims a partner sends us.<br>2. <b>🔑 Clients & keys</b> — one client per partner or website: tick the endpoints (read / write / delete), limit it to states if needed, set a rate limit and an end date. The API key is shown once.<br>3. <b>📄 Documentation</b> — made automatically for each client with only its endpoints: fields, examples, errors, OpenAPI and Postman files. Share the documentation link; send the key separately.</div>' +
+      '<div class="card" style="margin-top:10px;font-size:13.5px;line-height:1.65"><b>Safety</b><br>• Only HO admins can open this tool, create keys or change permissions.<br>• Keys are stored as a fingerprint only — nobody can read a key back, not even HO.<br>• A key works only for its ticked endpoints and states; switch it off or delete it and it stops at once.<br>• Passwords, staff logins, the EMI gateway secret and other tools’ private fields can never be published here.</div>';
+  }
+  if (DT) publicDocs(); else start();
+})();
+</script>
+</body>
+</html>
