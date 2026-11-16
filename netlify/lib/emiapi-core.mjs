@@ -89,7 +89,7 @@ export async function emiApiAction(b, ctx) {
     const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted", "doc"].includes(ef[0]) ? ef[0] : "compact";
     let sig = str(b.sig, 20) || "ok";
     if (sig === "ok") sig = ["ok", "nobody", "imeionly", "secs", "upper", "query"].includes(ef[1]) ? ef[1] : "ok";
-    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : bodyMode === "doc" ? docOrder(o, ep) : vivoOrder(o)); } catch (x) { } }
+    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); const eo = (cfg.order || {})[ep]; raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : bodyMode === "doc" ? docOrder(o, ep) : eo && eo.length && o && typeof o === "object" && !Array.isArray(o) ? eo.filter((k) => k in o).concat(Object.keys(vivoOrder(o)).filter((k) => !eo.includes(k))).reduce((a, k) => { a[k] = o[k]; return a; }, {}) : vivoOrder(o)); } catch (x) { } }
     let ts = t, secret = K.secret, inv = E.invoker, signed = raw, upper = false;
     if (sig === "nobody") signed = "";
     if (sig === "secs") ts = Math.floor(t / 1000);
@@ -130,6 +130,14 @@ export async function emiApiAction(b, ctx) {
     const e = ENVS.includes(b.env) ? b.env : "uat";
     if (!FMTS.includes(b.fmt)) return json(400, { ok: false, error: "Unknown format" });
     cfg.envs[e].fmt = b.fmt; await store.set("eapicfg", cfg);
+    return json(200, { ok: true, cfg, keys: keyInfo() });
+  }
+  if (b.action === "eapi-order") {   // the field order the gateway accepted for one API (found with "Find the field order")
+    if (!EAPI_ENDPOINTS[b.ep]) return json(400, { ok: false, error: "Choose an API" });
+    cfg.order = cfg.order || {};
+    const o = (Array.isArray(b.order) ? b.order : []).map((k) => str(k, 40)).filter((k) => /^\w+$/.test(k)).slice(0, 20);
+    if (o.length) cfg.order[b.ep] = o; else delete cfg.order[b.ep];
+    await store.set("eapicfg", cfg);
     return json(200, { ok: true, cfg, keys: keyInfo() });
   }
   if (b.action === "eapi-sigcalc") {   // check the signature maths against an example from vivo IT, using the saved secret

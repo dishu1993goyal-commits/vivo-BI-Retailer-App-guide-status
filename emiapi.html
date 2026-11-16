@@ -676,8 +676,18 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
           '<div style="margin-top:8px;line-height:1.5"><b>No format was accepted</b> — so the signature method is fine and the <b>secret or invoker name</b> for ' + envName(ENV) + " doesn’t match what the gateway has. UAT and Production usually have <b>different secrets</b>.<br>• Re-paste the " + envName(ENV) + " secret in ⚙️ Set-up (copy it straight from the e-mail, no spaces).<br>• Ask vivo IT to confirm the " + envName(ENV) + " invoker name and secret, and whether this tool’s server must be allowed on their side.</div>");
       if ($("useF")) $("useF").onclick = function () { api({ action: "eapi-fmt", env: ENV, fmt: okF.f }).then(function (x) { if (!x.ok) return toast(x.error); CFG = x.cfg; toast("Saved — all requests on " + envName(ENV) + " now use this format"); FORM.sig = "ok"; $("send").click(); }); };
     };
+    // second pass: the gateway signs the body in its own field order, so try every order of this body's fields (small bodies only)
+    var orders = [], oi = 0, okO = null;
+    try { var O = JSON.parse(raw), K = Object.keys(O); if (K.length >= 2 && K.length <= 4 && !Array.isArray(O)) { var perm = function (a) { return a.length < 2 ? [a] : a.reduce(function (r, x, j) { return r.concat(perm(a.slice(0, j).concat(a.slice(j + 1))).map(function (p) { return [x].concat(p); })); }, []); }; orders = perm(K).slice(1); var core = K.filter(function (k) { return k !== "companyName" && k !== "password"; }); if (core.length && core.length < K.length) orders = orders.concat(perm(core)); } } catch (e) { }
+    var tryOrders = function () {
+      if (okO || oi >= orders.length) { b.disabled = false; var el = document.createElement("div"); el.style.marginTop = "8px"; el.innerHTML = okO ? "<b>✅ The gateway accepts this field order:</b><br>" + esc(okO.join(" → ")) + '<br><button class="btn pri sm" id="useO" style="margin-top:6px">Use this order for this API</button>' : "<b>No field order was accepted either</b> (" + orders.length + " tried). So the gateway expects <b>different field names</b> for this API than the ones in the body. Ask the developer for one working sample request body."; $("probeOut").appendChild(el); if ($("useO")) $("useO").onclick = function () { api({ action: "eapi-order", ep: ep, order: okO }).then(function (x) { if (!x.ok) return toast(x.error); CFG = x.cfg; toast("Saved — this API is now sent in that order"); }); }; return; }
+      var st = $("ordSt"); if (!st) { st = document.createElement("div"); st.id = "ordSt"; st.className = "muted"; st.style.cssText = "font-size:12px;margin-top:6px"; $("probeOut").appendChild(st); }
+      st.textContent = "Trying field orders: " + (oi + 1) + " of " + orders.length + "…";
+      var ks = orders[oi], body = "{" + ks.map(function (k) { return JSON.stringify(k) + ":" + JSON.stringify(O[k]); }).join(",") + "}";
+      api({ action: "eapi-call", env: ENV, ep: ep, raw: body, sig: "ok", fmt: "asis|ok", label: "Field order · " + ks.join(", ") }).then(function (x) { if (x.ok && !x.call.signFail && !x.call.err) okO = ks; oi++; if (okO || oi >= orders.length) { var s2 = $("ordSt"); if (s2) s2.remove(); } tryOrders(); });
+    };
     (function next() {
-      if (i >= FMTS.length) { b.disabled = false; return show(true); }
+      if (i >= FMTS.length) { var okAny = out.filter(function (x) { return !x.c.signFail && !x.c.err; })[0]; show(true); if (!okAny && orders.length) return tryOrders(); b.disabled = false; return; }
       show(false);
       var f = FMTS[i][0];
       api({ action: "eapi-call", env: ENV, ep: ep, raw: raw, sig: "ok", fmt: f, label: "Signature check · " + fmtName(f) }).then(function (x) {
