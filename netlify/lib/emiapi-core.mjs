@@ -19,7 +19,7 @@ export const EAPI_ENDPOINTS = {
   processTradeInRetail: { biz: "Trade-in", name: "Process Trade-In Retail (GetImeiInfo_Retailer)", desc: "Apply a trade-in — retail channel, cross-store sales check applied.", fields: ["companyName", "password", "imei", "oldPhoneBrand", "oldPhoneModel", "modelName", "dealerCode"], opt: ["oldPhoneBrand", "oldPhoneModel", "dealerCode"], changes: true },
   processServiceProtection: { biz: "Service protection", name: "Process Service Protection (GetIMEIActivation)", desc: "Apply service protection (service plan) on an IMEI. erpCode is no longer accepted.", fields: ["companyName", "password", "imei", "dealerCode", "plan"], opt: ["dealerCode", "plan"], changes: true },
   processBuyback: { biz: "ABB (assured buyback)", name: "Process Buyback (GetImeiSoldStatus)", desc: "Apply buyback (ABB) for an IMEI.", fields: ["companyName", "password", "imei", "modelName"], docFields: ["companyName", "password", "modelName", "imei"], changes: true },
-  studentAuthentication: { biz: "Student authentication", name: "Student Authentication", desc: "Authenticate a student for the student discount. companyName and password are sent like the installment APIs; isRocketIdAuthenticated (true / false) is required.", fields: ["companyName", "password", "imei", "isRocketIdAuthenticated"], bool: ["isRocketIdAuthenticated"], changes: true },
+  studentAuthentication: { biz: "Student authentication", name: "Student Authentication", desc: "Authenticate a student for the student discount. body order (from vivo's developer): imei, isRocketIdAuthenticated, companyName, password; isRocketIdAuthenticated (true / false) is required.", fields: ["imei", "isRocketIdAuthenticated", "companyName", "password"], order: ["imei", "isRocketIdAuthenticated", "companyName", "password"], bool: ["isRocketIdAuthenticated"], changes: true },
   enterpriseDiscount: { biz: "Enterprise discount", name: "Enterprise Discount", desc: "Apply the enterprise (corporate) discount on an IMEI. After success the query APIs return 6 in specialBusinessList.", fields: ["imei"], changes: true },
 };
 const DEF_ENV = {
@@ -89,7 +89,7 @@ export async function emiApiAction(b, ctx) {
     const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted", "doc"].includes(ef[0]) ? ef[0] : "compact";
     let sig = str(b.sig, 20) || "ok";
     if (sig === "ok") sig = ["ok", "nobody", "imeionly", "secs", "upper", "query"].includes(ef[1]) ? ef[1] : "ok";
-    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); const eo = (cfg.order || {})[ep]; raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : bodyMode === "doc" ? docOrder(o, ep) : eo && eo.length && o && typeof o === "object" && !Array.isArray(o) ? eo.filter((k) => k in o).concat(Object.keys(vivoOrder(o)).filter((k) => !eo.includes(k))).reduce((a, k) => { a[k] = o[k]; return a; }, {}) : vivoOrder(o)); } catch (x) { } }
+    if (bodyMode !== "asis") { try { const o = JSON.parse(raw); const eo = (cfg.order || {})[ep] || EAPI_ENDPOINTS[ep].order; raw = JSON.stringify(bodyMode === "sorted" ? sortKeys(o) : bodyMode === "doc" ? docOrder(o, ep) : eo && eo.length && o && typeof o === "object" && !Array.isArray(o) ? eo.filter((k) => k in o).concat(Object.keys(vivoOrder(o)).filter((k) => !eo.includes(k))).reduce((a, k) => { a[k] = o[k]; return a; }, {}) : vivoOrder(o)); } catch (x) { } }
     let ts = t, secret = K.secret, inv = E.invoker, signed = raw, upper = false;
     if (sig === "nobody") signed = "";
     if (sig === "secs") ts = Math.floor(t / 1000);
@@ -171,7 +171,7 @@ async function docLink(store) { let l = await store.get("eapidoclink"); if (!l) 
 const docPub = (d) => ({ id: d.id, biz: d.biz, title: d.title, version: d.version, env: d.env, notes: d.notes, name: d.name, mime: d.mime, size: d.size, chunks: d.chunks, published: !!d.published, at: d.at, upd: d.upd, by: d.by });
 // the business-wise documents made by vivo BI (v1.0) are bundled with the function and added once, published
 const SEED = [["Installment", "Installment (EMI)"], ["Trade-in", "Trade-in"], ["Service-protection", "Service protection"], ["ABB-Buyback", "ABB (assured buyback)"], ["Student-authentication", "Student authentication"], ["Enterprise-discount", "Enterprise discount"]];
-const SEED_VER = "v1.1", SEED_FLAG = "eapidocseed3";   // a new SEED_VER replaces the earlier ready-made files (files HO uploaded are never touched)
+const SEED_VER = "v1.2", SEED_FLAG = "eapidocseed4";   // a new SEED_VER replaces the earlier ready-made files (files HO uploaded are never touched)
 async function seedDocs(store, t, env) {
   if (await store.get(SEED_FLAG)) return 0;
   const fs = await import("node:fs"), path = await import("node:path");
@@ -186,7 +186,7 @@ async function seedDocs(store, t, env) {
     const b64s = buf.toString("base64"), parts = []; for (let i = 0; i < b64s.length; i += 1400000) parts.push(b64s.slice(i, i + 1400000));
     const id = "D" + (t + n).toString(36).toUpperCase() + randomBytes(2).toString("hex");
     for (let i = 0; i < parts.length; i++) await store.set(`eapidocb:${id}:${i}`, { d: parts[i] });
-    await store.set("eapidoc:" + id, { id, at: t + n, upd: t + n, by: "vivo BI team", done: true, seed: name, name, mime, size: buf.length, chunks: parts.length, biz, title: biz.replace(/ \(.*\)/, (m) => m) + " API Documentation (" + kind + ")", version: SEED_VER + " · 15 Nov 2026", env: "both", notes: "UAT and Production endpoints, gwSignature authentication, request fields in vivo's order, success rule (code 200 + processStatus true), sample requests / responses, error scenarios, UAT vs Production differences and a UAT testing checklist.", published: true });
+    await store.set("eapidoc:" + id, { id, at: t + n, upd: t + n, by: "vivo BI team", done: true, seed: name, name, mime, size: buf.length, chunks: parts.length, biz, title: biz.replace(/ \(.*\)/, (m) => m) + " API Documentation (" + kind + ")", version: SEED_VER + " · 17 Nov 2026", env: "both", notes: "UAT and Production endpoints, gwSignature authentication, request fields in vivo's order, success rule (code 200 + processStatus true), sample requests / responses, error scenarios, UAT vs Production differences and a UAT testing checklist.", published: true });
     n++;
   }
   await store.set(SEED_FLAG, { at: t, n });
