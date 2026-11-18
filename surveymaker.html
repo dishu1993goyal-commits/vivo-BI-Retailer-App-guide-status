@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Survey & poll creator</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}.help.ok{background:#E6F4EA}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12.5px inherit;cursor:pointer;color:var(--ink)}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sec{background:#fff;border-radius:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.07);overflow:hidden}.sec>.hd{background:linear-gradient(135deg,#2B33A6,#4D5BF9);color:#fff;padding:10px 12px;cursor:pointer}.sec>.hd b{font-size:14px}.sec>.hd small{display:block;opacity:.85;font-size:11.5px;margin-top:2px}
+.q{border-top:1px solid #EEF0F6;padding:10px 12px;cursor:pointer;position:relative}.q:first-of-type{border-top:0}.q .tt{font-weight:650;font-size:13.5px;padding-right:70px}.q .ops{position:absolute;right:8px;top:8px;display:flex;gap:4px}.q .ops button{border:0;background:#EEF0FF;border-radius:7px;width:26px;height:24px;cursor:pointer;color:#2B33A6}
+.q .ch{font-size:12px;color:var(--mut);margin-top:4px;line-height:1.5}.q .br{font-size:11.5px;color:#8A5300;margin-top:3px}
+.req{color:#B42318;font-weight:800}
+.link{font:700 15px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;background:#F7F8FC;border-radius:10px;padding:10px;margin-top:6px}
+.qr{display:flex;justify-content:center;margin-top:10px}
+.tb{width:100%;border-collapse:collapse;font-size:12px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.bars div{display:flex;align-items:center;gap:6px;font-size:12px;margin-top:4px}.bars span{flex:0 0 38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bars i{display:block;height:10px;border-radius:6px;background:#4D5BF9}
+.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+.step{display:flex;gap:10px;margin-top:12px}.step>i{flex:0 0 26px;height:26px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 13px/26px inherit;text-align:center;font-style:normal}.step>div{flex:1;font-size:13px;line-height:1.55}
+.pv{background:#F0EBF8;border-radius:16px;padding:10px}.pv .c{background:#fff;border-radius:10px;padding:12px;margin-top:8px}.pv .c.top{border-top:8px solid #4D5BF9}.pv label{display:block;font-size:13px;margin-top:6px}
+.big{font-size:40px;text-align:center}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=2"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📝</span></div>
+  <h1>Survey & poll creator</h1><p>Describe it → AI builds the Google Form → share the link</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"><div class="loading"><div class="spin"></div>Loading…</div></div></div>
+<script src="/vendor/qrcode/qrcode.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), TAB = "new", CFG = {}, ROWS = [], CUR = null, DIRTY = false, NEWKEY = "";
+  var TYPES = [["single", "One choice (radio)"], ["multi", "Many choices (checkboxes)"], ["dropdown", "Dropdown"], ["yesno", "Yes / No"], ["short", "Short answer"], ["paragraph", "Long answer"], ["number", "Number"], ["phone", "Mobile number"], ["email", "E-mail"], ["scale", "Rating scale"], ["grid", "Grid (one per row)"], ["checkgrid", "Grid (many per row)"], ["date", "Date"], ["time", "Time"], ["info", "Note (no answer)"]];
+  var TN = {}; TYPES.forEach(function (t) { TN[t[0]] = t[1]; });
+  var CHOICE = { single: 1, yesno: 1, multi: 1, dropdown: 1 }, BRANCH = { single: 1, yesno: 1, dropdown: 1 };
+  var TPL = [["😊", "Retailer satisfaction", "Retailers", "Survey for vivo retailers on how satisfied they are with vivo: stock availability, scheme payouts and their timeliness, support from the vivo sales team (FSE / TL), display and POSM, and the Retailer App. Ask the state, firm name and store size. If they are not satisfied with payouts, ask what the main issue is. End with what vivo should improve first."],
+    ["🎓", "Training feedback", "Promoters", "Feedback from in-store promoters after a product training session on the new vivo model. Rate the trainer, content and duration; check 3 key feature questions to see what they remember (camera, battery, charging); ask whether they feel confident to demo; if not, ask what extra help they need."],
+    ["🛍️", "Customer purchase", "Customers", "Short survey for customers who just bought a vivo phone in store: which model, why they chose vivo, which other brands they considered, whether they used EMI / finance (if yes which partner and how easy it was), how they rate the promoter's help, and would they recommend vivo (0-10)."],
+    ["⚡", "Quick poll", "Sales team", "Quick poll for the sales team: which day and time suits them best for the monthly review call next week. Options Monday to Saturday, morning or afternoon."],
+    ["📅", "Event RSVP", "Retailers", "RSVP form for the vivo dealer meet: name, firm, mobile, state and city, will they attend (yes / no / maybe), if yes how many people will come (max 3) and any food preference. If no, ask the reason."],
+    ["📣", "Scheme awareness", "Retailers", "Check whether retailers know the current sell-out scheme: have they heard of it, from whom, do they know the slabs and the payout date, and are they participating. If not participating, ask why."],
+    ["💸", "Competitor price check", "Promoters", "Weekly competitor check by promoters: store name, state, which competitor brands are displayed, the best-selling competitor model this week, its price and any offer (cashback / EMI) on it, and footfall compared with last week."]];
+  var copy = function (t, msg) { var ok = function () { toast(msg || "Copied"); }; try { navigator.clipboard.writeText(t).then(ok, function () { fall(t); ok(); }); } catch (e) { fall(t); ok(); } };
+  function fall(t) { var a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) { } a.remove(); }
+  var lines = function (v) { return String(v || "").split("\n").map(function (x) { return x.trim(); }).filter(Boolean); };
+  var nq = function () { return "q" + Date.now().toString(36) + Math.floor(Math.random() * 99); };
+  function qrSvg(text, px) { try { var q = qrcode(0, "M"); q.addData(text); q.make(); var n = q.getModuleCount(), c = px / (n + 4), s = '<svg xmlns="http://www.w3.org/2000/svg" width="' + px + '" height="' + px + '" viewBox="0 0 ' + px + " " + px + '"><rect width="100%" height="100%" fill="#fff"/>'; for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) s += '<rect x="' + ((k + 2) * c).toFixed(2) + '" y="' + ((r + 2) * c).toFixed(2) + '" width="' + (c + 0.3).toFixed(2) + '" height="' + (c + 0.3).toFixed(2) + '"/>'; return s + "</svg>"; } catch (e) { return ""; } }
+
+  function load(after) { api({ action: "sf-get" }).then(function (r) { if (!r.ok) { $("tabs").innerHTML = ""; VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>' + esc(r.error || "Not available") + "</b></div>"; return; } CFG = r.cfg; ROWS = r.rows; if (!CFG.google && !CFG.sm && !ROWS.length && TAB === "new" && !CUR) TAB = "setup"; draw(); if (after) after(); }); }
+  function draw() {
+    var T = [["new", CUR ? "✏️ Survey" : "✨ New"], ["list", "📋 My surveys " + (ROWS.length || "")], ["setup", "⚙️ Set-up" + (CFG.google || CFG.sm ? "" : " ⚠")]];
+    $("tabs").innerHTML = T.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    window.scrollTo(0, 0);
+    if (TAB === "setup") return setup(); if (TAB === "list") return list(); if (CUR) return editor(); start();
+  }
+
+  // ================= new =================
+  var ST = { aud: "Retailers", len: "std", lang: "en", anon: false, brief: "" };
+  function start() {
+    var opt = function (id, L, v) { return '<div class="chips" id="' + id + '">' + L.map(function (x) { return '<button data-v="' + x[0] + '" class="' + (x[0] === v ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>"; };
+    VIEW.innerHTML = (CFG.google || CFG.sm ? "" : '<div class="help w"><b>Not connected yet.</b> You can design surveys now; to create the real Google Form, finish ⚙️ Set-up once (about 5 minutes).</div>') +
+      '<div class="card"><b>Describe the survey or poll</b><div class="muted" style="font-size:12.5px;margin-top:2px">Who it is for, what you want to learn, any must-have questions, options or conditions (“if No, ask why”).</div><textarea class="tx" id="br" rows="6" style="margin-top:8px" placeholder="e.g. Survey for retailers in Bihar and UP about the new festive scheme: do they know about it, are the slabs clear, did they get last month\'s payout on time. If payout was late, ask how many days late and what the reason was…">' + esc(ST.brief) + '</textarea><div class="muted" style="font-size:12px;margin-top:6px">Or start from an example:</div><div class="chips" id="tp">' + TPL.map(function (x, i) { return '<button data-i="' + i + '">' + x[0] + " " + x[1] + "</button>"; }).join("") + "</div>" +
+      '<label class="lb">Who will answer</label>' + opt("au", [["Retailers", "Retailers"], ["Promoters", "Promoters"], ["Sales team", "Sales team"], ["Distributors", "Distributors"], ["Customers", "Customers"], ["Employees", "Employees"]], ST.aud) +
+      '<label class="lb">Length</label>' + opt("ln", [["short", "⚡ Quick poll"], ["std", "Standard"], ["long", "Detailed"]], ST.len) +
+      '<label class="lb">Language</label>' + opt("lg", [["en", "English"], ["hi", "हिंदी"], ["both", "English + हिंदी"]], ST.lang) +
+      '<label class="tg" style="margin-top:12px;font-size:13px"><input type="checkbox" id="an"' + (ST.anon ? " checked" : "") + '><i></i><span>Anonymous (don\'t ask name / phone / e-mail)</span></label>' +
+      '<div class="bar2"><button class="btn pri" id="go" style="flex:2">✨ Draft my survey</button><button class="btn ghost" id="bl" style="flex:1">Start blank</button></div><div class="muted" style="font-size:12px;margin-top:6px" id="st"></div></div>' +
+      '<div class="help">You review every question before anything is published. Nothing goes to Google until you tap <b>Create Google Form</b>.</div>';
+    var pick = function (id, key) { [].forEach.call($(id).querySelectorAll("[data-v]"), function (b) { b.onclick = function () { ST[key] = b.dataset.v; [].forEach.call($(id).querySelectorAll("[data-v]"), function (y) { y.classList.toggle("on", y === b); }); }; }); };
+    pick("au", "aud"); pick("ln", "len"); pick("lg", "lang");
+    $("br").oninput = function () { ST.brief = $("br").value; }; $("an").onchange = function () { ST.anon = $("an").checked; };
+    [].forEach.call($("tp").querySelectorAll("[data-i]"), function (b) { b.onclick = function () { var x = TPL[+b.dataset.i]; $("br").value = ST.brief = x[3]; ST.aud = x[2]; ST.len = x[1] === "Quick poll" ? "short" : "std"; start(); }; });
+    $("bl").onclick = function () { CUR = { id: "", survey: { title: "New survey", description: "", confirmation: "", settings: { progressBar: true }, sections: [{ id: "s1", title: "Section 1", description: "", next: "", questions: [] }] }, form: null }; DIRTY = true; draw(); };
+    $("go").onclick = function () {
+      var p = $("br").value.trim(); if (p.length < 15) return toast("Describe the survey in a few lines");
+      $("go").disabled = true; $("st").textContent = "Designing the questions… (20–40 seconds)";
+      api({ action: "sf-ai", mode: "draft", prompt: p, audience: ST.aud, len: ST.len, lang: ST.lang, anon: ST.anon }).then(function (r) {
+        $("go").disabled = false; $("st").textContent = ""; if (!r.ok) return toast(r.error);
+        CUR = { id: "", survey: r.survey, brief: p, form: null }; DIRTY = true; save(function () { draw(); toast("Draft ready — review it"); });
+      });
+    };
+  }
+
+  // ================= editor =================
+  var secName = function (id) { if (id === "SUBMIT") return "Submit the form"; var s = CUR.survey.sections.filter(function (x) { return x.id === id; })[0]; return s ? s.title : id; };
+  function save(cb) { api({ action: "sf-save", id: CUR.id, survey: CUR.survey, brief: CUR.brief || "" }).then(function (r) { if (!r.ok) return toast(r.error); CUR.id = r.id; CUR.survey = r.survey; DIRTY = false; api({ action: "sf-get" }).then(function (x) { if (x.ok) ROWS = x.rows; }); if (cb) cb(); }); }
+  function editor() {
+    var s = CUR.survey, nQ = 0; s.sections.forEach(function (x) { nQ += x.questions.filter(function (q) { return q.type !== "info"; }).length; });
+    var st = s.settings || {};
+    VIEW.innerHTML = (CUR.form ? formCard(CUR.form) : "") +
+      '<div class="card" style="border-top:6px solid #4D5BF9;cursor:pointer" id="hdr"><b style="font-size:16px">' + esc(s.title) + '</b>' + (s.description ? '<div style="font-size:12.5px;margin-top:4px;white-space:pre-wrap">' + esc(s.description) + "</div>" : "") + '<div class="chips" style="margin-top:8px">' + [st.collectEmail ? "📧 collects e-mail" : "", st.limitOne ? "1️⃣ one response each" : "", st.shuffle ? "🔀 shuffled" : "", s.sections.length + " section(s) · " + nQ + " question(s)"].filter(Boolean).map(function (x) { return '<span class="pill m">' + x + "</span>"; }).join(" ") + '</div><div class="muted" style="font-size:11.5px;margin-top:6px">Tap to edit title, description and settings</div></div>' +
+      s.sections.map(function (sec, si) {
+        return '<div class="sec"><div class="hd" data-sec="' + si + '"><b>' + (si + 1) + ". " + esc(sec.title) + '</b><small>' + (sec.description ? esc(sec.description.slice(0, 120)) + " · " : "") + (si === s.sections.length - 1 ? "then submit" : "then → " + esc(sec.next ? secName(sec.next) : s.sections[si + 1].title)) + " · tap to edit</small></div>" +
+          sec.questions.map(function (q, qi) {
+            var br = q.goTo ? Object.keys(q.goTo).map(function (o) { return "“" + o + "” → " + secName(q.goTo[o]); }).join(" · ") : "";
+            return '<div class="q" data-q="' + si + ":" + qi + '"><div class="tt">' + esc(q.title) + (q.required ? ' <span class="req">*</span>' : "") + '</div><div class="ops"><button data-up="' + si + ":" + qi + '">↑</button><button data-dn="' + si + ":" + qi + '">↓</button></div><div class="ch"><span class="pill">' + TN[q.type] + "</span> " + (q.options ? esc(q.options.join(" · ")) + (q.other ? " · Other…" : "") : q.type === "scale" ? q.scale.min + "–" + q.scale.max + (q.scale.minLabel ? " (" + esc(q.scale.minLabel) + " → " + esc(q.scale.maxLabel) + ")" : "") : q.rows ? esc(q.rows.length + " rows × " + q.cols.join(" / ")) : "") + "</div>" + (br ? '<div class="br">↪ ' + esc(br) + "</div>" : "") + "</div>";
+          }).join("") + '<div style="padding:8px 12px 12px"><button class="btn ghost sm" data-add="' + si + '" style="width:100%">＋ Add question</button></div></div>';
+      }).join("") +
+      '<div class="bar2"><button class="btn ghost" id="asec" style="flex:1">＋ Add section</button><button class="btn ghost" id="pv" style="flex:1">👁 Preview</button></div>' +
+      '<div class="card" style="margin-top:12px"><b>✨ Change it with AI</b><div class="bar2" style="margin-top:6px"><input class="tx" id="ch" style="flex:1" placeholder="e.g. add a question on display quality, make it shorter, add Hindi"><button class="btn sec" id="chg">Apply</button></div></div>' +
+      '<div class="card" style="margin-top:12px"><b>Publish</b>' + (CUR.form ? '<div class="help w">This survey already has a live form. Changes here do <b>not</b> change that form — edit it in ' + (CUR.form.platform === "sm" ? "SurveyMonkey" : "Google Forms") + ' (“Edit form” above), or create a new form from this version.</div>' : "") +
+      (CFG.google ? '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="sh"><i></i><span>Also make a Google Sheet that fills with responses</span></label><div class="bar2"><button class="btn pri" id="mk" style="flex:1">🟣 ' + (CUR.form ? "Create a new Google Form" : "Create Google Form") + "</button></div>" : '<div class="help w">Connect Google Forms in ⚙️ Set-up to publish.</div>') +
+      (CFG.sm ? '<div class="bar2"><button class="btn ghost" id="mks" style="flex:1">🐒 Create in SurveyMonkey</button></div>' : "") + '<div class="muted" style="font-size:12px;margin-top:6px" id="mst"></div></div>' +
+      '<div class="bar2"><button class="btn ghost sm" id="xl">⬇ Questions to Excel</button><button class="btn ghost sm" id="ds" style="color:#B42318">🗑 Delete</button><span style="flex:1"></span><button class="btn ghost sm" id="cl">Close</button></div>';
+    if (CUR.form) wireForm(CUR.form);
+    $("hdr").onclick = editHeader;
+    [].forEach.call(VIEW.querySelectorAll("[data-sec]"), function (b) { b.onclick = function () { editSection(+b.dataset.sec); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function (e) { if (e.target.closest(".ops")) return; var p = b.dataset.q.split(":"); editQ(+p[0], +p[1]); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-add]"), function (b) { b.onclick = function () { var si = +b.dataset.add; s.sections[si].questions.push({ id: nq(), type: "single", title: "", options: ["Option 1", "Option 2"], required: true }); editQ(si, s.sections[si].questions.length - 1, true); }; });
+    var mv = function (attr, d) { [].forEach.call(VIEW.querySelectorAll("[data-" + attr + "]"), function (b) { b.onclick = function () { var p = b.dataset[attr].split(":"), Q = s.sections[+p[0]].questions, i = +p[1], j = i + d; if (j < 0 || j >= Q.length) return; Q.splice(j, 0, Q.splice(i, 1)[0]); save(editor); }; }); };
+    mv("up", -1); mv("dn", 1);
+    $("asec").onclick = function () { s.sections.push({ id: "s" + Date.now().toString(36), title: "Section " + (s.sections.length + 1), description: "", next: "", questions: [] }); save(function () { editSection(s.sections.length - 1); editor(); }); };
+    $("pv").onclick = preview;
+    $("chg").onclick = function () { var c = $("ch").value.trim(); if (c.length < 3) return toast("Say what to change"); $("chg").disabled = true; $("mst").textContent = ""; toast("Applying… (20–40 seconds)"); api({ action: "sf-ai", mode: "refine", survey: s, prompt: c, lang: /hindi|हिंदी/i.test(c) ? "both" : "" }).then(function (r) { $("chg").disabled = false; if (!r.ok) return toast(r.error); CUR.survey = r.survey; save(function () { editor(); toast("Updated"); }); }); };
+    if ($("mk")) $("mk").onclick = function () { create("google"); };
+    if ($("mks")) $("mks").onclick = function () { create("sm"); };
+    $("xl").onclick = function () { var R = [["Section", "Question", "Type", "Required", "Options", "Conditional logic"]]; s.sections.forEach(function (sec) { sec.questions.forEach(function (q) { R.push([sec.title, q.title, TN[q.type], q.required ? "Yes" : "", (q.options || q.rows || []).join(" | "), q.goTo ? Object.keys(q.goTo).map(function (o) { return o + " → " + secName(q.goTo[o]); }).join(" | ") : ""]); }); }); download(xlsx([{ name: "Questions", rows: R }]), s.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + "_questions.xlsx"); };
+    $("ds").onclick = function () { sheet("Delete this survey?", CUR.form ? "The Google Form itself is not deleted — only this design." : "", [["🗑", "Delete", function () { if (!CUR.id) { CUR = null; draw(); return; } api({ action: "sf-del", id: CUR.id }).then(function () { CUR = null; TAB = "list"; load(); }); }, "danger"]]); };
+    $("cl").onclick = function () { CUR = null; TAB = "list"; load(); };
+  }
+  function editHeader() {
+    var s = CUR.survey, st = s.settings || (s.settings = {}), tg = function (id, lab, on) { return '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="' + id + '"' + (on ? " checked" : "") + "><i></i><span>" + lab + "</span></label>"; };
+    sheet("Survey details", "", [["✓", "Save", function () { s.title = $("ht").value || s.title; s.description = $("hd").value; s.confirmation = $("hc").value; st.collectEmail = $("ce").checked; st.limitOne = $("lo").checked; st.editAfter = $("ea").checked; st.shuffle = $("sq").checked; st.progressBar = $("pb").checked; save(editor); }, "pri"]],
+      '<label class="lb">Title</label><input class="tx" id="ht" value="' + esc(s.title) + '"><label class="lb">Description (shown at the top)</label><textarea class="tx" id="hd" rows="3">' + esc(s.description || "") + '</textarea><label class="lb">Thank-you message</label><input class="tx" id="hc" value="' + esc(s.confirmation || "") + '">' +
+      tg("ce", "Collect e-mail (respondents sign in with Google)", st.collectEmail) + tg("lo", "Only one response per person (needs Google sign-in)", st.limitOne) + tg("ea", "Allow editing after submit", st.editAfter) + tg("sq", "Shuffle question order", st.shuffle) + tg("pb", "Show progress bar", st.progressBar !== false) +
+      '<div class="muted" style="font-size:11.5px;margin-top:8px">Retailers and customers usually have no Google login — keep e-mail and one-response-per-person off for them.</div>');
+  }
+  function editSection(si) {
+    var s = CUR.survey, sec = s.sections[si], last = si === s.sections.length - 1;
+    sheet("Section " + (si + 1), "", [["✓", "Save", function () { sec.title = $("stt").value || sec.title; sec.description = $("std").value; if ($("stn")) sec.next = $("stn").value; save(editor); }, "pri"], ["↑", "Move up", function () { if (si > 0) { s.sections.splice(si - 1, 0, s.sections.splice(si, 1)[0]); save(editor); } }]].concat(s.sections.length > 1 ? [["🗑", "Delete section", function () { s.sections.splice(si, 1); save(editor); }, "danger"]] : []),
+      '<label class="lb">Section title</label><input class="tx" id="stt" value="' + esc(sec.title) + '"><label class="lb">Description</label><textarea class="tx" id="std" rows="2">' + esc(sec.description || "") + "</textarea>" +
+      (last ? '<div class="muted" style="font-size:12px;margin-top:8px">Last section — the form is submitted after it.</div>' : '<label class="lb">After this section, go to</label><select class="tx" id="stn"><option value="">Next section (' + esc(s.sections[si + 1].title) + ")</option>" + s.sections.map(function (x, i) { return i > si + 1 ? '<option value="' + x.id + '"' + (sec.next === x.id ? " selected" : "") + ">" + esc(x.title) + "</option>" : ""; }).join("") + '<option value="SUBMIT"' + (sec.next === "SUBMIT" ? " selected" : "") + ">Submit the form</option></select>"));
+  }
+  function editQ(si, qi, isNew) {
+    var s = CUR.survey, q = s.sections[si].questions[qi];
+    var targets = '<option value="">Next (continue)</option>' + s.sections.map(function (x, i) { return i > si ? '<option value="' + x.id + '">Go to: ' + esc(x.title) + "</option>" : ""; }).join("") + '<option value="SUBMIT">Submit the form</option>';
+    var body = function () {
+      var t = $("qt") ? $("qt").value : q.type, o = "";
+      if (CHOICE[t]) o += '<label class="lb">Options (one per line)</label><textarea class="tx" id="qo" rows="5">' + esc((t === "yesno" && !(q.options || []).length ? ["Yes", "No"] : q.options || []).join("\n")) + "</textarea>" + (t === "single" || t === "multi" ? '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="qx"' + (q.other ? " checked" : "") + '><i></i><span>Add “Other: ____”</span></label>' : "") + (t === "multi" ? '<label class="lb">Pick at most (optional)</label><input class="tx" id="qm" inputmode="numeric" value="' + ((q.validation || {}).max || "") + '">' : "");
+      if (BRANCH[t]) o += '<label class="lb">Conditional logic — where each answer goes</label><div id="qg"></div><div class="muted" style="font-size:11.5px;margin-top:4px">Works across sections: answers can jump to a later section or submit the form.</div>';
+      if (t === "scale") { var sc = q.scale || { min: 1, max: 5 }; o += '<div class="g2"><div><label class="lb">From</label><select class="tx" id="s0"><option value="1">1</option><option value="0"' + (sc.min === 0 ? " selected" : "") + '>0</option></select></div><div><label class="lb">To</label><select class="tx" id="s1">' + [2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) { return "<option" + (n === sc.max ? " selected" : "") + ">" + n + "</option>"; }).join("") + '</select></div><div><label class="lb">Low label</label><input class="tx" id="sl" value="' + esc(sc.minLabel || "") + '"></div><div><label class="lb">High label</label><input class="tx" id="sh2" value="' + esc(sc.maxLabel || "") + '"></div></div>'; }
+      if (t === "grid" || t === "checkgrid") o += '<label class="lb">Rows (one per line)</label><textarea class="tx" id="gr" rows="4">' + esc((q.rows || []).join("\n")) + '</textarea><label class="lb">Columns (one per line)</label><textarea class="tx" id="gc" rows="3">' + esc((q.cols || []).join("\n")) + "</textarea>";
+      if (t === "number") o += '<div class="g2"><div><label class="lb">Minimum</label><input class="tx" id="n0" inputmode="numeric" value="' + ((q.validation || {}).min != null ? q.validation.min : "") + '"></div><div><label class="lb">Maximum</label><input class="tx" id="n1" inputmode="numeric" value="' + ((q.validation || {}).max != null ? q.validation.max : "") + '"></div></div>';
+      $("qx2").innerHTML = o;
+      if ($("qg")) { var draw2 = function () { var opts = lines($("qo").value); $("qg").innerHTML = opts.map(function (op, i) { return '<div style="display:flex;gap:6px;align-items:center;margin-top:4px"><span style="flex:0 0 38%;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(op) + '</span><select class="tx" data-g="' + i + '" style="flex:1;padding:6px">' + targets + "</select></div>"; }).join(""); [].forEach.call($("qg").querySelectorAll("[data-g]"), function (sel) { sel.value = (q.goTo || {})[opts[+sel.dataset.g]] || ""; }); }; draw2(); $("qo").oninput = draw2; }
+    };
+    sheet(isNew ? "New question" : "Question", s.sections[si].title, [["✓", "Save", function () {
+      var t = $("qt").value; q.type = t; q.title = $("qtt").value.trim(); if (!q.title) { toast("Type the question"); return false; }
+      q.help = $("qh").value.trim(); q.required = t !== "info" && $("qr").checked;
+      delete q.options; delete q.goTo; delete q.other; delete q.scale; delete q.rows; delete q.cols; delete q.validation;
+      if (CHOICE[t]) { q.options = lines($("qo").value); if (q.options.length < (t === "yesno" ? 2 : 1)) { toast("Add the options"); return false; } if ($("qx")) q.other = $("qx").checked; if ($("qm") && +$("qm").value > 0) q.validation = { max: +$("qm").value }; }
+      if ($("qg")) { var g = {}; [].forEach.call($("qg").querySelectorAll("[data-g]"), function (sel) { if (sel.value) g[q.options[+sel.dataset.g]] = sel.value; }); if (Object.keys(g).length) q.goTo = g; }
+      if (t === "scale") q.scale = { min: +$("s0").value, max: +$("s1").value, minLabel: $("sl").value, maxLabel: $("sh2").value };
+      if (t === "grid" || t === "checkgrid") { q.rows = lines($("gr").value); q.cols = lines($("gc").value); }
+      if (t === "number") { var v = {}; if ($("n0").value.trim() !== "") v.min = +$("n0").value; if ($("n1").value.trim() !== "") v.max = +$("n1").value; if (Object.keys(v).length) q.validation = v; }
+      save(editor);
+    }, "pri"], ["⧉", "Duplicate", function () { var c = JSON.parse(JSON.stringify(q)); c.id = nq(); delete c.goTo; s.sections[si].questions.splice(qi + 1, 0, c); save(editor); }]].concat(s.sections.length > 1 ? [["↔", "Move to section…", function () { sheet("Move to", "", s.sections.map(function (x, i) { return ["", (i + 1) + ". " + x.title, function () { if (i === si) return; s.sections[i].questions.push(s.sections[si].questions.splice(qi, 1)[0]); save(editor); }]; })); }]] : []).concat([["🗑", "Delete", function () { s.sections[si].questions.splice(qi, 1); save(editor); }, "danger"]]),
+      '<label class="lb">Question</label><textarea class="tx" id="qtt" rows="2">' + esc(q.title) + '</textarea><label class="lb">Type</label><select class="tx" id="qt">' + TYPES.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === q.type ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + '</select><div id="qx2"></div><label class="lb">Hint under the question (optional)</label><input class="tx" id="qh" value="' + esc(q.help || "") + '"><label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="qr"' + (q.required ? " checked" : "") + "><i></i><span>Required</span></label>");
+    $("qt").onchange = body; body();
+  }
+  function preview() {
+    var s = CUR.survey;
+    sheet("Preview", "How respondents will see it (all sections shown)", [["", "Close", function () { }]], '<div class="pv"><div class="c top"><b style="font-size:17px">' + esc(s.title) + '</b><div style="font-size:12.5px;margin-top:6px;white-space:pre-wrap">' + esc(s.description || "") + "</div></div>" + s.sections.map(function (sec, si) {
+      return (si || s.sections.length > 1 ? '<div class="c" style="background:#4D5BF9;color:#fff"><b>' + esc(sec.title) + "</b>" + (sec.description ? '<div style="font-size:12px">' + esc(sec.description) + "</div>" : "") + "</div>" : "") + sec.questions.map(function (q) {
+        var inp = q.type === "single" || q.type === "yesno" ? q.options.map(function (o) { return "<label>○ " + esc(o) + "</label>"; }).join("") + (q.other ? "<label>○ Other: ____</label>" : "") : q.type === "multi" ? q.options.map(function (o) { return "<label>☐ " + esc(o) + "</label>"; }).join("") + (q.other ? "<label>☐ Other: ____</label>" : "") : q.type === "dropdown" ? '<label>▾ Choose (' + q.options.length + " options)</label>" : q.type === "scale" ? "<label>" + esc(q.scale.minLabel || "") + " " + Array.apply(null, Array(q.scale.max - q.scale.min + 1)).map(function (_, i) { return "○" + (q.scale.min + i); }).join(" ") + " " + esc(q.scale.maxLabel || "") + "</label>" : q.type === "grid" || q.type === "checkgrid" ? "<label>" + esc(q.rows.join(", ")) + " × " + esc(q.cols.join(" / ")) + "</label>" : q.type === "info" ? "" : '<label style="border-bottom:1px solid #ccc;color:#999">' + (q.type === "paragraph" ? "Long answer" : q.type === "date" ? "dd-mm-yyyy" : q.type === "time" ? "--:--" : q.type === "phone" ? "10-digit mobile" : "Your answer") + "</label>";
+        return '<div class="c"><div style="font-size:14px">' + esc(q.title) + (q.required ? ' <span class="req">*</span>' : "") + "</div>" + (q.help ? '<div class="muted" style="font-size:12px">' + esc(q.help) + "</div>" : "") + inp + "</div>";
+      }).join("");
+    }).join("") + "</div>");
+  }
+  function create(platform) {
+    var go = function () {
+      var b = platform === "sm" ? $("mks") : $("mk"); if (b) b.disabled = true; $("mst").textContent = "Creating the form… (10–40 seconds)";
+      var run = function () { api({ action: "sf-create", id: CUR.id, platform: platform, sheet: $("sh") && $("sh").checked }).then(function (r) { if (b) b.disabled = false; $("mst").textContent = ""; if (!r.ok) return sheet("Couldn't create the form", "", [["", "OK", function () { }]], '<div class="help w">' + esc(r.error) + "</div>"); CUR.form = r.form; load(function () { TAB = "new"; draw(); toast("Form is live — share the link"); }); }); };
+      if (DIRTY) save(run); else run();
+    };
+    if (CUR.form) sheet("Create another form?", "This survey already has a live form", [["✓", "Yes, create a new one", go, "pri"]], '<div class="help">The old link keeps working and keeps its responses. The new form gets a new link.</div>'); else go();
+  }
+  function formCard(f) {
+    var link = f.shortUrl || f.url;
+    return '<div class="card" style="border:2px solid #1E9E61"><div class="row" style="gap:6px"><b style="flex:1">✅ Live ' + (f.platform === "sm" ? "SurveyMonkey survey" : "Google Form") + '</b><span class="pill ' + (f.closed ? "r" : "g") + '">' + (f.closed ? "Closed" : "Accepting responses") + '</span></div><div class="link" id="lk">' + esc(link || "(no link returned)") + '</div><div class="bar2"><button class="btn pri sm" id="lc">📋 Copy link</button><button class="btn sec sm" id="lw">🟢 WhatsApp</button><button class="btn ghost sm" id="lq">▦ QR</button></div><div class="bar2">' + (f.editUrl ? '<a class="btn ghost sm" href="' + esc(f.editUrl) + '" target="_blank" rel="noopener">✏️ Edit form</a>' : "") + (f.sheetUrl ? '<a class="btn ghost sm" href="' + esc(f.sheetUrl) + '" target="_blank" rel="noopener">📗 Response sheet</a>' : "") + (f.platform !== "sm" ? '<button class="btn ghost sm" id="lr">📊 Responses</button><button class="btn ghost sm" id="lx">' + (f.closed ? "▶ Reopen" : "⏸ Close") + "</button>" : "") + "</div>" + (f.warn && f.warn.length ? '<div class="help w"><b>Please check</b><br>• ' + f.warn.map(esc).join("<br>• ") + "</div>" : "") + '<div id="qrb"></div><div id="res"></div></div>';
+  }
+  function wireForm(f) {
+    var link = f.shortUrl || f.url, title = CUR.survey.title;
+    $("lc").onclick = function () { copy(link, "Link copied"); };
+    $("lw").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent(title + "\n" + "Please fill this: " + link), "_blank"); };
+    $("lq").onclick = function () { if ($("qrb").innerHTML) { $("qrb").innerHTML = ""; return; } var svg = qrSvg(link, 220); $("qrb").innerHTML = '<div class="qr">' + svg + '</div><div class="bar2" style="justify-content:center"><button class="btn ghost sm" id="qd">⬇ Save QR</button></div>'; $("qd").onclick = function () { var c = document.createElement("canvas"), im = new Image(); c.width = c.height = 660; im.onload = function () { var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, 660, 660); g.drawImage(im, 0, 0, 660, 660); c.toBlob(function (b) { download(b, "survey_QR.png"); }); }; im.src = "data:image/svg+xml;base64," + btoa(svg); }; };
+    if ($("lr")) $("lr").onclick = function () { results(); };
+    if ($("lx")) $("lx").onclick = function () { api({ action: "sf-accepting", id: CUR.id, on: !!f.closed }).then(function (r) { if (!r.ok) return toast(r.error); f.closed = r.closed; toast(r.closed ? "Closed — new responses are blocked" : "Reopened"); editor(); api({ action: "sf-get" }).then(function (x) { if (x.ok) ROWS = x.rows; }); }); };
+  }
+  function results() {
+    $("res").innerHTML = '<div class="loading"><div class="spin"></div>Reading responses…</div>';
+    api({ action: "sf-results", id: CUR.id }).then(function (r) {
+      if (!r.ok) { $("res").innerHTML = ""; return toast(r.error); }
+      CUR.form.count = r.count; var H = r.head, R = r.rows;
+      var sum = "";
+      if (R.length) { CUR.survey.sections.forEach(function (sec) { sec.questions.forEach(function (q) { if (!(CHOICE[q.type] || q.type === "scale")) return; var ci = H.indexOf(q.title); if (ci < 0) return; var C = {}; R.forEach(function (row) { String(row[ci] || "").split(", ").forEach(function (v) { if (v) C[v] = (C[v] || 0) + 1; }); }); var ks = Object.keys(C).sort(function (a, b) { return C[b] - C[a]; }).slice(0, 8), mx = Math.max.apply(null, ks.map(function (k) { return C[k]; }).concat([1])); if (!ks.length) return; sum += '<div style="margin-top:10px"><b style="font-size:12.5px">' + esc(q.title) + '</b><div class="bars">' + ks.map(function (k) { return "<div><span>" + esc(k) + '</span><i style="width:' + Math.max(3, Math.round(C[k] / mx * 45)) + '%"></i>' + C[k] + "</div>"; }).join("") + "</div></div>"; }); }); }
+      $("res").innerHTML = '<div class="help ok"><b>' + r.count + " response(s)</b>" + (r.closed ? " · form is closed" : "") + "</div>" + sum + (R.length ? '<div style="overflow:auto;margin-top:10px;max-height:320px"><table class="tb"><tr>' + H.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr>" + R.slice(-30).reverse().map(function (row) { return "<tr>" + row.map(function (c) { return "<td>" + esc(c) + "</td>"; }).join("") + "</tr>"; }).join("") + '</table></div><div class="bar2"><button class="btn ghost sm" id="rx">⬇ All responses (Excel)</button></div>' : "");
+      if ($("rx")) $("rx").onclick = function () { download(xlsx([{ name: "Responses", rows: [H].concat(R) }]), CUR.survey.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + "_responses.xlsx"); };
+    });
+  }
+
+  // ================= list =================
+  function list() {
+    VIEW.innerHTML = ROWS.length ? ROWS.map(function (x) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-o="' + x.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + esc(x.title) + '</b><span class="pill ' + (!x.form ? "m" : x.form.closed ? "r" : "g") + '">' + (!x.form ? "Draft" : x.form.closed ? "Closed" : "Live") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + x.q + " questions · " + esc(x.by) + " · " + new Date(x.upd).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + (x.form ? " · " + (x.form.platform === "sm" ? "SurveyMonkey" : "Google Form") + (x.form.count ? " · " + x.form.count + " responses" : "") : "") + "</div>" + (x.form && (x.form.shortUrl || x.form.url) ? '<div style="font-size:12px;margin-top:4px;word-break:break-all;color:#3346C9">' + esc(x.form.shortUrl || x.form.url) + "</div>" : "") + "</div>"; }).join("") : '<div class="card empty"><div class="big">📝</div><b>No surveys yet</b><div class="muted" style="margin-top:4px">Create one in ✨ New.</div></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-o]"), function (c) { c.onclick = function () { api({ action: "sf-one", id: c.dataset.o }).then(function (r) { if (!r.ok) return toast(r.error); CUR = { id: r.s.id, survey: r.s.survey, brief: r.s.brief, form: r.s.form }; DIRTY = false; TAB = "new"; draw(); }); }; });
+  }
+
+  // ================= set-up =================
+  function setup() {
+    VIEW.innerHTML = '<div class="card"><div class="row" style="gap:6px"><b style="flex:1">🟣 Google Forms</b><span class="pill ' + (CFG.google ? "g" : "o") + '">' + (CFG.google ? "Connected" + (CFG.account ? " · " + esc(CFG.account) : "") : "Not connected") + '</span></div><div class="muted" style="font-size:12.5px;margin-top:4px">A small script in <b>your</b> Google account creates the forms. Forms and responses stay in that account. One-time, about 5 minutes, on a computer is easiest.</div>' +
+      '<div class="step"><i>1</i><div><b>Get your script.</b> It contains a private key that only this tool knows.' + (CFG.hasKey && !NEWKEY ? ' A key exists already — make a new one only if you are setting up again.' : "") + '<div class="bar2"><button class="btn ' + (CFG.hasKey && !NEWKEY ? "ghost" : "pri") + ' sm" id="nk">🔑 ' + (CFG.hasKey ? "Make a new key + script" : "Make key + script") + "</button>" + (NEWKEY ? '<button class="btn pri sm" id="cs">📋 Copy script</button>' : "") + "</div>" + (NEWKEY ? '<div class="code" id="scr">Loading…</div>' : "") + "</div></div>" +
+      '<div class="step"><i>2</i><div>Open <a href="https://script.google.com/home/projects/create" target="_blank" rel="noopener"><b>script.google.com → New project</b></a> (signed in with the Google account that should own the forms). Delete what is there, paste the script, press 💾 Save.</div></div>' +
+      '<div class="step"><i>3</i><div><b>Deploy → New deployment</b> → ⚙️ type <b>Web app</b> → Execute as: <b>Me</b> · Who has access: <b>Anyone</b> → Deploy. Google asks for permission: <b>Authorize access</b> → choose your account → if you see “Google hasn\'t verified this app”, tap <b>Advanced → Go to project (unsafe)</b> — it is your own script — → Allow.</div></div>' +
+      '<div class="step"><i>4</i><div>Copy the <b>Web app URL</b> (ends with <code>/exec</code>) and paste it here:<input class="tx" id="gu" style="margin-top:6px" placeholder="https://script.google.com/macros/s/…/exec" value=""><div class="bar2"><button class="btn pri" id="gs" style="flex:1">🔌 Connect & test</button>' + (CFG.google ? '<button class="btn ghost" id="gt">Test again</button>' : "") + '</div><div id="gres"></div>' + (CFG.gasUrl ? '<div class="muted" style="font-size:11.5px;margin-top:4px">Saved: ' + esc(CFG.gasUrl) + "</div>" : "") + "</div></div>" +
+      '<div class="help">If you change the script later, use <b>Deploy → Manage deployments → ✏️ → Version: New version</b> so the URL stays the same.<br>Using a vivo Google Workspace account? Your admin may allow only colleagues to answer forms. For retailers and customers, use an account whose forms open for anyone with the link.</div></div>' +
+      '<div class="card" style="margin-top:12px"><div class="row" style="gap:6px"><b style="flex:1">🐒 SurveyMonkey (optional)</b><span class="pill ' + (CFG.sm ? "g" : "m") + '">' + (CFG.sm ? "Token saved" : "Off") + '</span></div><div class="muted" style="font-size:12.5px;margin-top:4px">Needs a <b>paid SurveyMonkey plan with API access</b>. At developer.surveymonkey.com → My Apps → create a <b>Private</b> app with scopes Create/Modify Surveys and Create/Modify Collectors, then copy its access token. Conditional jumps are not set through SurveyMonkey\'s API — add them there if needed.</div><input class="tx" id="smt" type="password" style="margin-top:8px" placeholder="' + (CFG.sm ? "•••••• (saved — paste to replace)" : "Paste access token") + '"><div class="bar2"><button class="btn sec" id="sms" style="flex:1">💾 Save token</button>' + (CFG.sm ? '<button class="btn ghost" id="smx">Remove</button>' : "") + "</div></div>";
+    $("nk").onclick = function () { var go = function () { api({ action: "sf-setup", newKey: true }).then(function (r) { if (!r.ok) return toast(r.error); NEWKEY = r.key; CFG = r.cfg; setup(); }); }; if (CFG.hasKey) sheet("Make a new key?", "", [["🔑", "Yes, new key", go, "pri"]], '<div class="help w">The script you installed earlier stops working until you paste the new script into it and deploy a new version.</div>'); else go(); };
+    if (NEWKEY) fetch("/formsbridge.gs?v=" + Date.now()).then(function (r) { return r.text(); }).then(function (t) { var s = t.replace("@@KEY@@", NEWKEY); $("scr").textContent = s; $("cs").onclick = function () { copy(s, "Script copied — paste it in Apps Script"); }; }).catch(function () { $("scr").textContent = "Couldn't load the script — check your connection."; });
+    var res = function (r) { $("gres").innerHTML = r && r.test ? (r.test.ok ? '<div class="help ok">✅ Connected to <b>' + esc(r.test.account || "your Google account") + "</b>. You can create forms now.</div>" : '<div class="help w">❌ ' + esc(r.test.error || "The connector did not answer") + "</div>") : ""; };
+    $("gs").onclick = function () { var u = $("gu").value.trim(); if (!u) return toast("Paste the Web app URL"); if (!CFG.hasKey) return toast("Do step 1 first"); $("gs").disabled = true; api({ action: "sf-setup", gasUrl: u, test: true }).then(function (r) { $("gs").disabled = false; if (!r.ok) return toast(r.error); CFG = r.cfg; res(r); if (r.test && r.test.ok) NEWKEY = ""; }); };
+    if ($("gt")) $("gt").onclick = function () { api({ action: "sf-setup", test: true }).then(function (r) { if (!r.ok) return toast(r.error); CFG = r.cfg; res(r); }); };
+    $("sms").onclick = function () { var v = $("smt").value.trim(); if (!v) return toast("Paste the token"); api({ action: "sf-setup", smToken: v }).then(function (r) { if (!r.ok) return toast(r.error); CFG = r.cfg; toast("Saved"); setup(); }); };
+    if ($("smx")) $("smx").onclick = function () { api({ action: "sf-setup", smToken: "" }).then(function (r) { if (r.ok) { CFG = r.cfg; setup(); } }); };
+  }
+
+  if (!AUTH || !AUTH.token) { try { localStorage.setItem("biw-return", JSON.stringify(location.pathname)); } catch (e) { } $("tabs").innerHTML = ""; VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; }
+  else load();
+})();
+</script>
+</body>
+</html>
