@@ -1,0 +1,98 @@
+// One-tool links (HO). A link opens exactly ONE tool page for whoever has it; the server refuses every other
+// tool, report and dashboard call for sessions made from a link.
+//   tlk:<id>          { id, hash (sha256 of the secret part), page, name, label, view: "state"|"ho", state, write, ask, pin (scrypt), max, exp, off,
+//                       by, at, opens, devices:[{ n, m, at, last }], bad:{ h:<hour>, n } }
+//   lnkuser:<lnk_id>  the link's own login record { username, app, state, fullName, linkOnly: id, sessions[] } — kept apart from real users
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { LINK_CATALOG } from "./link-catalog.mjs";
+const J = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+const sha = (s) => createHash("sha256").update(String(s)).digest("hex");
+const COMMON = ["me", "ping", "logout", "acc-mine", "tl-use", "cust-get", "theme-get"];
+// action names that change something — blocked unless the link allows changes
+const WRITE = /-(add|set|save|edit|del|delete|remove|hide|refresh|keys|upload|import|bulk|create|update|upd|verify|reset|config|cfg|send|approve|reject|publish|close|accept|submit|respond|claim|pay|push|release|move|assign|freeze|setup)(-|$)/;
+export const isWrite = (a) => WRITE.test(a) || /^(support-upload|cust-save|cust-delete|cust-release|cxx-save|tl-push)$/.test(a);
+
+export function linkAllows(L, action) {
+  if (COMMON.includes(action)) return true;
+  const c = LINK_CATALOG[L.page]; if (!c || !c.acts.includes(action)) return false;
+  return L.write || !isWrite(action);
+}
+// called for every logged-in request made with a link session
+export async function linkGate(store, t, rec, action, app) {
+  const L = await store.get("tlk:" + rec.linkOnly);
+  if (!L || L.off || (L.exp && t > L.exp) || app !== rec.app) return J(401, { ok: false, loggedOut: true, linkEnded: true, error: "This link has expired or was switched off. Ask the person who sent it for a new one." });
+  if (!linkAllows(L, action)) return J(403, { ok: false, linkBlocked: true, error: "This link only opens " + (LINK_CATALOG[L.page] || {}).name + (isWrite(action) && (LINK_CATALOG[L.page] || {}).acts.includes(action) ? " to view — changes are not allowed." : ".") });
+  return null;
+}
+
+const hashPin = (p, salt = randomBytes(8).toString("hex")) => salt + ":" + scryptSync(String(p), salt, 32).toString("hex");
+const pinOk = (p, h) => { try { const [s, x] = String(h).split(":"); const a = scryptSync(String(p), s, 32), b = Buffer.from(x, "hex"); return a.length === b.length && timingSafeEqual(a, b); } catch (e) { return false; } };
+const pubLink = (L, origin) => ({ id: L.id, page: L.page, tool: (LINK_CATALOG[L.page] || {}).name || L.page, icon: (LINK_CATALOG[L.page] || {}).icon || "🔗", label: L.label, view: L.view, state: L.state, write: !!L.write, ask: !!L.ask, pin: !!L.pin, max: L.max, exp: L.exp || 0, off: !!L.off, by: L.by, at: L.at, opens: L.opens || 0, devices: (L.devices || []).length, url: L.url || "" });
+
+export async function tlkAction(b, ctx) {
+  const { store, t, app, rec, pool } = ctx;
+  if (app !== "admin") return J(403, { ok: false, error: "Only HO can make tool links" });
+  if (rec.linkOnly) return J(403, { ok: false, error: "Not allowed" });
+  const by = rec.fullName || rec.username || "";
+  if (b.action === "tlk-cat") return J(200, { ok: true, tools: Object.keys(LINK_CATALOG).map((p) => ({ page: p, id: LINK_CATALOG[p].id, icon: LINK_CATALOG[p].icon, name: LINK_CATALOG[p].name, ho: LINK_CATALOG[p].ho, writes: LINK_CATALOG[p].acts.filter(isWrite).length })).sort((x, y) => x.name.localeCompare(y.name)) });
+  if (b.action === "tlk-list") {
+    const L = (await pool(await store.list("tlk:"), 30, (k) => store.get(k))).filter(Boolean).sort((x, y) => y.at - x.at).slice(0, 300);
+    return J(200, { ok: true, rows: L.map((x) => pubLink(x)) });
+  }
+  if (b.action === "tlk-create") {
+    const c = LINK_CATALOG[str(b.page, 60)]; if (!c) return J(400, { ok: false, error: "Choose a tool" });
+    const view = c.ho || b.view === "ho" ? "ho" : "state", state = view === "state" ? str(b.state, 40) : "";
+    if (view === "state" && !state) return J(400, { ok: false, error: "Choose the state whose data the link shows" });
+    const days = Math.max(0, Math.min(365, Math.round(+b.days || 0))), pin = str(b.pin, 12);
+    if (pin && !/^\d{4,8}$/.test(pin)) return J(400, { ok: false, error: "PIN must be 4–8 digits" });
+    const id = t.toString(36) + randomBytes(3).toString("hex"), secret = randomBytes(18).toString("base64url");
+    const origin = /^https:\/\/[\w.-]+$/.test(String(b.origin || "")) ? b.origin : "";
+    const L = { id, hash: sha(secret), page: str(b.page, 60), label: str(b.label, 80) || "Shared link", view, state, write: !!b.write, ask: b.ask !== false, pin: pin ? hashPin(pin) : "", max: Math.max(1, Math.min(500, Math.round(+b.max || 25))), exp: days ? t + days * 864e5 : 0, off: false, by, byKey: rec.username, at: t, opens: 0, devices: [] };
+    L.url = origin ? origin + "/open.html#" + id + "." + secret : "";
+    await store.set("tlk:" + id, L);
+    return J(200, { ok: true, link: pubLink(L), url: "/open.html#" + id + "." + secret });
+  }
+  const L = await store.get("tlk:" + str(b.id, 30)); if (!L) return J(404, { ok: false, error: "Link not found" });
+  if (b.action === "tlk-set") {
+    if (b.off !== undefined) L.off = !!b.off;
+    if (b.write !== undefined) L.write = !!b.write;
+    if (b.days !== undefined) { const d = Math.max(0, Math.min(365, Math.round(+b.days || 0))); L.exp = d ? t + d * 864e5 : 0; }
+    if (b.max !== undefined) L.max = Math.max(1, Math.min(500, Math.round(+b.max || 25)));
+    await store.set("tlk:" + L.id, L);
+    if (L.off) await store.delete("lnkuser:lnk_" + L.id);   // signs out every device at once
+    return J(200, { ok: true, link: pubLink(L) });
+  }
+  if (b.action === "tlk-devices") return J(200, { ok: true, devices: (L.devices || []).slice().reverse() });
+  if (b.action === "tlk-del") { await store.delete("tlk:" + L.id); await store.delete("lnkuser:lnk_" + L.id); return J(200, { ok: true }); }
+  return J(400, { ok: false, error: "Unknown action" });
+}
+
+// ---- no login: the link page asks what the link opens, then signs the device in ----
+export async function tlkPublic(b, ctx) {
+  const { store, t } = ctx;
+  const m = /^([a-z0-9]{6,20})\.([\w-]{20,40})$/.exec(String(b.k || "").trim()); if (!m) return J(400, { ok: false, error: "This link is not complete — copy the whole link again." });
+  const L = await store.get("tlk:" + m[1]);
+  if (!L || L.hash !== sha(m[2])) return J(404, { ok: false, error: "This link is not valid." });
+  if (L.off) return J(403, { ok: false, error: "This link was switched off by the sender." });
+  if (L.exp && t > L.exp) return J(403, { ok: false, error: "This link has expired. Ask the sender for a new one." });
+  const c = LINK_CATALOG[L.page] || {};
+  if (b.action === "tlk-p-info") return J(200, { ok: true, tool: c.name, icon: c.icon, label: L.label, ask: !!L.ask, pin: !!L.pin, view: L.view, state: L.state, write: !!L.write });
+  if (b.action === "tlk-p-join") {
+    const hr = Math.floor(t / 36e5); if (!L.bad || L.bad.h !== hr) L.bad = { h: hr, n: 0 };
+    if (L.bad.n >= 10) return J(429, { ok: false, error: "Too many wrong PINs. Try again in an hour." });
+    if (L.pin && !pinOk(str(b.pin, 12), L.pin)) { L.bad.n++; await store.set("tlk:" + L.id, L); return J(403, { ok: false, field: "pin", error: "Wrong PIN" }); }
+    const n = str(b.name, 60), mob = str(b.mobile, 15).replace(/\D/g, "").slice(-10);
+    if (L.ask && (n.length < 2 || !/^[6-9]\d{9}$/.test(mob))) return J(400, { ok: false, error: "Enter your name and 10-digit mobile number" });
+    if ((L.devices || []).length >= L.max) return J(403, { ok: false, error: "This link has been opened on the most devices allowed. Ask the sender." });
+    const uname = "lnk_" + L.id, k = "lnkuser:" + uname;
+    const u = (await store.get(k)) || { username: uname, app: L.view === "ho" ? "admin" : "state", state: L.state, fullName: L.label, linkOnly: L.id, vchatId: "LINK", createdAt: t, sessions: [] };
+    u.app = L.view === "ho" ? "admin" : "state"; u.state = L.state;
+    const token = randomBytes(32).toString("hex"); u.sessions = [{ h: sha(token), at: t }].concat(u.sessions || []).slice(0, 500);
+    await store.set(k, u);
+    L.devices = (L.devices || []).concat([{ n: n || "—", m: mob, at: t }]).slice(-500); L.opens = (L.opens || 0) + 1;
+    await store.set("tlk:" + L.id, L);
+    return J(200, { ok: true, app: u.app, username: uname, token, page: L.page, tool: c.name, label: L.label });
+  }
+  return J(400, { ok: false, error: "Unknown action" });
+}

@@ -1,6 +1,22 @@
 // Access control: hides tools, admin settings, dashboard tabs, filters and reports the master admin has switched off
 // for this user, and blocks a tool page opened directly. Rules come from the server (acc-mine) and refresh when
 // the page or app comes back to the front, so changes reach the apps and the web without an update.
+// One-tool links: a browser signed in from a shared link may only stay on that one tool page.
+(function () {
+  try {
+    var w = JSON.parse(localStorage.getItem("biw-auth") || "null"); if (!w || !w.link || !w.link.page) return;
+    var here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+    if (here !== "open.html" && here !== String(w.link.page).toLowerCase()) { location.replace("/" + w.link.page); return; }
+    window.BI_LINK = w.link;
+    document.addEventListener("click", function (e) {   // links to other pages / the dashboard stay closed
+      var a = e.target && e.target.closest && e.target.closest("a[href]"); if (!a) return;
+      var h = a.getAttribute("href") || "", u; try { u = new URL(h, location.href); } catch (x) { return; }
+      if (u.origin === location.origin && /\.html$|\/$/.test(u.pathname) && u.pathname.split("/").pop().toLowerCase() !== here) { e.preventDefault(); e.stopPropagation(); alert("This shared link opens only " + (w.link.tool || "this tool") + "."); }
+    }, true);
+    var add = function () { if (document.getElementById("bi-link-pill") || !document.body) return; var d = document.createElement("div"); d.id = "bi-link-pill"; d.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:10px;z-index:99999;background:rgba(18,22,58,.88);color:#fff;font:600 11.5px Arial,sans-serif;border-radius:99px;padding:6px 12px;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"; d.textContent = "🔗 Shared view · " + (w.link.tool || "") + (w.link.label ? " · " + w.link.label : ""); document.body.appendChild(d); };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", add); else add();
+  } catch (e) { }
+})();
 (function () {
   "use strict";
   if (window.BIACCESS) return;

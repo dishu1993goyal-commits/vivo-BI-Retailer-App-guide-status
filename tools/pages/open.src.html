@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>vivo BI · shared tool</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.big{font-size:44px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔗</span></div>
+  <h1 id="h1">Shared tool</h1><p id="hp">vivo Business Innovation</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Opening…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), K = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  var pub = function (body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state" }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No connection — check your internet and try again." }; }); };
+  var cur = null; try { cur = JSON.parse(localStorage.getItem("biw-auth") || "null"); } catch (e) { }
+  var id = K.split(".")[0];
+  if (!K) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔗</div><b>This link is not complete</b><div class="muted" style="margin-top:6px">Open the full link from the message you received.</div></div>'; return; }
+  if (cur && cur.link && cur.link.id === id && cur.token) { location.replace("/" + cur.link.page); return; }
+  pub({ action: "tlk-p-info", k: K }).then(function (r) {
+    if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">⛔</div><b>' + esc(r.error || "This link can't be opened") + "</b></div>"; return; }
+    $("h1").textContent = r.icon + " " + r.tool; $("hp").textContent = "Shared by vivo BI" + (r.label ? " · " + r.label : "");
+    var other = cur && cur.token && !cur.link;
+    VIEW.innerHTML = '<div class="card"><b>You have been given access to ' + esc(r.tool) + "</b>" +
+      '<div class="muted" style="font-size:12.5px;margin-top:4px">' + (r.view === "ho" ? "All-India view" : "Data for " + esc(r.state)) + " · " + (r.write ? "you can add and edit" : "view only") + ". Only this tool opens with this link.</div>" +
+      (r.ask ? '<label class="lb">Your name</label><input class="tx" id="nm" autocomplete="name"><label class="lb">Mobile number</label><input class="tx" id="mb" inputmode="numeric" maxlength="10" autocomplete="tel">' : "") +
+      (r.pin ? '<label class="lb">PIN (from the sender)</label><input class="tx" id="pn" inputmode="numeric" maxlength="8" type="password">' : "") +
+      (other ? '<div class="help w">This browser is logged in to the BI dashboard as <b>' + esc(cur.username) + "</b>. Opening this link here will sign that login out on this browser.</div>" : "") +
+      '<div class="bar2" style="margin-top:12px"><button class="btn pri" id="go" style="width:100%">Open ' + esc(r.tool) + "</button></div></div>";
+    $("go").onclick = function () {
+      var b = { action: "tlk-p-join", k: K }; if (r.ask) { b.name = $("nm").value.trim(); b.mobile = $("mb").value.trim(); if (b.name.length < 2 || !/^[6-9]\d{9}$/.test(b.mobile)) return toast("Enter your name and 10-digit mobile"); } if (r.pin) b.pin = $("pn").value.trim();
+      $("go").disabled = true;
+      pub(b).then(function (x) {
+        $("go").disabled = false; if (!x.ok) return toast(x.error || "Couldn't open");
+        try { localStorage.setItem("biw-auth", JSON.stringify({ app: x.app, username: x.username, token: x.token, link: { id: id, page: x.page, tool: x.tool, label: x.label } })); localStorage.removeItem("biw-role"); } catch (e) { return toast("Please allow this site to store data (turn off private mode)"); }
+        location.replace("/" + x.page);
+      });
+    };
+  });
+})();
+</script>
+</body>
+</html>
