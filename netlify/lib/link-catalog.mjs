@@ -1114,10 +1114,14 @@ export const LINK_CATALOG = {
 "sf-create",
 "sf-del",
 "sf-get",
+"sf-job",
+"sf-langs",
 "sf-one",
 "sf-results",
 "sf-save",
-"sf-setup"
+"sf-setup",
+"sf-tr",
+"sf-translate"
 ]
 },
 "pcbuilder.html": {

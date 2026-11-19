@@ -43,11 +43,113 @@ export function cleanSurvey(s) {
       return o;
     }).filter(Boolean);
   });
+  const rg = s.regional && typeof s.regional === "object" ? s.regional : {}, map = {};
+  if (rg.map && typeof rg.map === "object") Object.keys(rg.map).slice(0, 60).forEach((k) => { const v = str(rg.map[k], 8); if (LANGS[v]) map[str(k, 60)] = v; });
   return {
+    regional: { on: !!rg.on, stateQ: str(rg.stateQ, 20), map },
     title: str(s.title, 140) || "Survey", description: txt(s.description, 2000), confirmation: txt(s.confirmation, 500) || "Thank you — your response has been recorded.",
     settings: { collectEmail: !!st.collectEmail, limitOne: !!st.limitOne, editAfter: !!st.editAfter, progressBar: st.progressBar !== false, shuffle: !!st.shuffle, requireLogin: !!st.requireLogin },
     sections: secs
   };
+}
+
+// ---------- regional languages ----------
+export const LANGS = { en: "English", hi: "Hindi (हिंदी)", bn: "Bengali (বাংলা)", ta: "Tamil (தமிழ்)", te: "Telugu (తెలుగు)", kn: "Kannada (ಕನ್ನಡ)", ml: "Malayalam (മലയാളം)", mr: "Marathi (मराठी)", gu: "Gujarati (ગુજરાતી)", pa: "Punjabi (ਪੰਜਾਬੀ)", or: "Odia (ଓଡ଼ିଆ)", as: "Assamese (অসমীয়া)", ur: "Urdu (اردو)", kok: "Konkani (कोंकणी)", ne: "Nepali (नेपाली)" };
+const SL = [[/andhra|telangana/i, "te"], [/arunachal|meghalaya|mizoram|nagaland|manipur|north ?east|\bne\b|ladakh|bhutan|lakshadweep/i, "en"], [/assam/i, "as"], [/bihar|chhattisgarh|delhi|haryana|himachal|jharkhand|madhya|rajasthan|uttar|chandigarh|andaman|\bup\b|\bmp\b|dadra|daman/i, "hi"], [/goa/i, "kok"], [/gujarat/i, "gu"], [/jammu|kashmir|j ?& ?k/i, "ur"], [/karnataka/i, "kn"], [/kerala/i, "ml"], [/maharashtra|mumbai/i, "mr"], [/odisha|orissa/i, "or"], [/punjab/i, "pa"], [/tamil|puducherry|pondicherry|chennai/i, "ta"], [/bengal|tripura|kolkata/i, "bn"], [/sikkim/i, "ne"]];
+export const defaultLang = (state) => { for (const [re, l] of SL) if (re.test(state)) return l; return "en"; };
+export const ALL_STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu & Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman & Nicobar", "Chandigarh", "Dadra Nagar Haveli & Daman Diu", "Lakshadweep", "Puducherry"];
+const stateQOf = (s) => { const r = s.regional || {}; const q = (s.sections[0] || { questions: [] }).questions.filter((x) => x.id === r.stateQ && (x.type === "dropdown" || x.type === "single"))[0]; return q || null; };
+export function langsNeeded(s) { const q = stateQOf(s); if (!q) return []; const m = (s.regional || {}).map || {}; return [...new Set(q.options.map((o) => m[o] || defaultLang(o)))].filter((l) => l !== "en"); }
+// the text that a translation is made from — if it changes, the translations are out of date
+export function baseText(s) { return JSON.stringify([s.sections.map((x) => [x.title, x.description, x.questions.filter((q) => !(s.regional && q.id === s.regional.stateQ)).map((q) => [q.id, q.type, q.title, q.help, q.options, q.rows, q.cols, q.scale && [q.scale.minLabel, q.scale.maxLabel]])]), s.confirmation]); }
+const tHash = (s) => { let h = 0; const t = baseText(s); for (let i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) | 0; return String(h); };
+function cleanTr(base, j) {   // keep the structure of the base design, only take translated text; anything missing stays in the base language
+  const out = { sections: {}, q: {} }; if (!j || typeof j !== "object") return out;
+  (Array.isArray(j.sections) ? j.sections : []).forEach((x) => { if (x && x.id) out.sections[str(x.id, 30)] = { title: str(x.title, 200), description: txt(x.description, 800) }; (Array.isArray(x && x.questions) ? x.questions : []).forEach((q) => { if (q && q.id) out.q[str(q.id, 30)] = q; }); });
+  const Q = {}; base.sections.forEach((sec) => sec.questions.forEach((q) => { const t = out.q[q.id]; if (!t) return; const o = { title: str(t.title, 400), help: txt(t.help, 600) }; const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x) => str(x, 200)); if (q.options && same(t.options, q.options)) o.options = t.options.map((x) => str(x, 200)); if (q.rows && same(t.rows, q.rows)) o.rows = t.rows.map((x) => str(x, 150)); if (q.cols && same(t.cols, q.cols)) o.cols = t.cols.map((x) => str(x, 80)); if (q.scale && t.scale) o.scale = { minLabel: str(t.scale.minLabel, 60), maxLabel: str(t.scale.maxLabel, 60) }; Q[q.id] = o; }));
+  return { sections: out.sections, q: Q, confirmation: txt(j.confirmation, 600) };
+}
+// one opening section with the State question, then one copy of the survey per language; answers jump to their state's copy
+export function expandRegional(s, tr) {
+  const sq = stateQOf(s); if (!sq) throw new Error("Choose the State question first (it must be in the first section).");
+  const m = s.regional.map || {}, langOf = (o) => m[o] || defaultLang(o), langs = [...new Set(sq.options.map(langOf))];
+  const head = { id: "s0rg", title: s.sections[0].title, description: s.sections[0].description, next: "", questions: [Object.assign({}, sq, { required: true, help: (sq.help ? sq.help + " · " : "") + "The form continues in your state's language.", goTo: {} })] };
+  const sections = [head], map = [{ base: sq.id, lang: "" }], firstOf = {};
+  const body = s.sections.map((sec, i) => Object.assign({}, sec, { questions: i === 0 ? sec.questions.filter((q) => q.id !== sq.id) : sec.questions })).filter((sec) => sec.questions.length || sec.description);
+  if (!body.length) throw new Error("Add some questions after the State question.");
+  const ids = body.map((x) => x.id);
+  langs.forEach((L) => {
+    const T = L === "en" ? null : tr[L], suf = "__" + L, tgt = (v) => (v === "SUBMIT" ? "SUBMIT" : ids.includes(v) ? v + suf : "");
+    body.forEach((sec, i) => {
+      const ts = T && T.sections[sec.id] || {}, last = i === body.length - 1;
+      const qs = sec.questions.map((q) => {
+        const tq = T && T.q[q.id] || {}, n = JSON.parse(JSON.stringify(q)); n.id = q.id + suf;
+        if (tq.title) n.title = tq.title; if (tq.help) n.help = tq.help; if (tq.options) n.options = tq.options; if (tq.rows) n.rows = tq.rows; if (tq.cols) n.cols = tq.cols; if (tq.scale && n.scale) { n.scale.minLabel = tq.scale.minLabel || n.scale.minLabel; n.scale.maxLabel = tq.scale.maxLabel || n.scale.maxLabel; }
+        if (q.goTo) { n.goTo = {}; Object.keys(q.goTo).forEach((o) => { const k = q.options.indexOf(o), t = tgt(q.goTo[o]); if (k >= 0 && t) n.goTo[n.options[k]] = t; }); }
+        if (q.type !== "info") map.push({ base: q.id, lang: L, opts: n.options || null, bopts: q.options || null });
+        return n;
+      });
+      sections.push({ id: sec.id + suf, title: ts.title || sec.title, description: ts.description || sec.description, next: sec.next ? tgt(sec.next) : last ? "SUBMIT" : "", questions: qs });
+      if (i === 0) firstOf[L] = sec.id + suf;
+    });
+    if (body[body.length - 1] && !sections[sections.length - 1].next) sections[sections.length - 1].next = "SUBMIT";
+  });
+  // the last block's final section submits by itself; every block's last section was set to SUBMIT above
+  sq.options.forEach((o) => { head.questions[0].goTo[o] = firstOf[langOf(o)]; });
+  if (sq.other) head.questions[0].other = false;
+  return { survey: Object.assign({}, s, { sections, regional: undefined }), map, langs };
+}
+// responses: one column per real question, answers in the base language
+export function mergeRows(map, base, head, rows) {
+  const order = [], seen = {}; base.sections.forEach((sec) => sec.questions.forEach((q) => { if (q.type !== "info" && !seen[q.id]) { seen[q.id] = 1; order.push(q); } }));
+  const H = [head[0], head[1], "Language"].concat(order.map((q) => q.title));
+  const R = rows.map((r) => {
+    const v = {}, lang = { L: "" };
+    map.forEach((m, i) => { const x = r[2 + i]; if (x === "" || x == null || v[m.base] != null) return; let y = x;
+      if (m.opts && m.bopts) { const one = (a) => { const k = m.opts.indexOf(a); return k >= 0 ? m.bopts[k] : a; }; y = m.opts.indexOf(x) >= 0 ? one(x) : String(x).split(", ").map(one).join(", "); }
+      v[m.base] = y; if (m.lang) lang.L = m.lang; });
+    return [r[0], r[1], LANGS[lang.L] ? LANGS[lang.L].split(" (")[0] : ""].concat(order.map((q) => v[q.id] == null ? "" : v[q.id]));
+  });
+  return { head: H, rows: R };
+}
+async function translateOne(base, L, env, aiFetch, askAI) {
+  const slim = { sections: base.sections.map((x) => ({ id: x.id, title: x.title, description: x.description, questions: x.questions.filter((q) => !(base.regional && q.id === base.regional.stateQ)).map((q) => { const o = { id: q.id, title: q.title }; if (q.help) o.help = q.help; if (q.options) o.options = q.options; if (q.rows) o.rows = q.rows; if (q.cols) o.cols = q.cols; if (q.scale && (q.scale.minLabel || q.scale.maxLabel)) o.scale = { minLabel: q.scale.minLabel, maxLabel: q.scale.maxLabel }; return o; }) })), confirmation: base.confirmation };
+  const sys = "You translate survey forms for vivo India (smartphones) into " + LANGS[L] + " for retailers, promoters and customers. Use simple, everyday " + LANGS[L].split(" (")[0] + " in its native script — the way people in that state speak, not formal or literary. Keep brand, model and product names (vivo, V60, Y300, EMI, ABB, V-Shield), numbers and units unchanged. Translate every title, description, help text, option, row, column and scale label. Return EXACTLY the same JSON structure with the same ids and the same number of options / rows / columns in the same order. Reply with JSON only.";
+  const r = await askAI(env, "Translate this survey now.", JSON.stringify(slim).slice(0, 15000), [], aiFetch, { system: sys, label: "SURVEY (JSON)", json: true, maxTokens: 8000 });
+  if (!r.ok) throw new Error(r.error || "AI didn't answer");
+  const j = parse(r.text); if (!j || !Array.isArray(j.sections)) throw new Error("The translation came back unreadable");
+  return cleanTr(base, j);
+}
+// background work (translate many languages / build a big form) — runs in sfjob-background, or inline when that is not available
+export async function runSfJob(store, env, id, f, askAI) {
+  const job = await store.get("sf:job:" + id); if (!job || job.state !== "queued") return;
+  job.state = "run"; job.at2 = Date.now(); await store.set("sf:job:" + id, job);
+  const x = await store.get("sf:s:" + job.sid);
+  try {
+    if (!x) throw new Error("Survey not found");
+    if (job.kind === "translate") {
+      x.tr = x.tr || {}; const base = cleanSurvey(x.survey), h = tHash(base);
+      for (let i = 0; i < job.langs.length; i++) {
+        const L = job.langs[i]; job.msg = "Translating to " + LANGS[L].split(" (")[0] + " (" + (i + 1) + " of " + job.langs.length + ")…"; await store.set("sf:job:" + id, job);
+        let tr = null, err = "";
+        for (let a = 0; a < 2 && !tr; a++) { try { tr = await translateOne(base, L, env, f, askAI); } catch (e) { err = String(e.message || e); } }
+        if (tr) { const cur = (await store.get("sf:s:" + job.sid)) || x; cur.tr = cur.tr || {}; cur.tr[L] = Object.assign(tr, { h, at: Date.now() }); await store.set("sf:s:" + job.sid, cur); job.done = (job.done || []).concat([L]); }
+        else job.fail = (job.fail || []).concat([L + ": " + err.slice(0, 120)]);
+      }
+      job.state = "done"; job.msg = job.fail && job.fail.length ? "Some languages failed — try again" : "All languages ready";
+    } else if (job.kind === "create") {
+      const cfg = (await store.get("sf:cfg")) || {}, s = cleanSurvey(x.survey); let send = s, map = null;
+      if (s.regional.on) { const need = langsNeeded(s), h = tHash(s), miss = need.filter((L) => !(x.tr && x.tr[L] && x.tr[L].h === h)); if (miss.length) throw new Error("Translate first — missing or out of date: " + miss.map((L) => LANGS[L].split(" (")[0]).join(", ")); const e = expandRegional(s, x.tr || {}); send = e.survey; map = e.map; }
+      job.msg = "Creating the Google Form" + (map ? " in " + (new Set(map.map((m) => m.lang).filter(Boolean))).size + " languages" : "") + "…"; await store.set("sf:job:" + id, job);
+      const r = await gas(cfg, { action: "create", survey: send, opts: { sheet: !!job.sheet } }, f);
+      if (!r.ok) throw new Error(r.error || "Couldn't create the form");
+      const cur = (await store.get("sf:s:" + job.sid)) || x;
+      cur.form = { platform: "google", id: str(r.id, 120), url: str(r.url, 400), shortUrl: str(r.shortUrl, 200), editUrl: str(r.editUrl, 400), sheetUrl: str(r.sheetUrl, 400), at: Date.now(), by: job.by, warn: (r.warn || []).slice(0, 20).map((w) => str(w, 300)).concat(map ? ["The Google Sheet (if any) has one column per language for each question — use 📊 Responses here for one merged column per question, in English."] : []), map, base: map ? s : null };
+      cur.upd = Date.now(); await store.set("sf:s:" + job.sid, cur);
+      job.state = "done"; job.msg = "Form is live"; job.form = cur.form;
+    }
+  } catch (e) { job.state = "err"; job.msg = String(e.message || e).slice(0, 300); }
+  job.end = Date.now(); await store.set("sf:job:" + id, job);
 }
 
 const SCHEMA = `JSON shape (exactly):
@@ -119,11 +221,31 @@ export async function sfAction(b, ctx) {
       .map((x) => ({ id: x.id, title: x.title, by: x.by, at: x.at, upd: x.upd, form: x.form ? { platform: x.form.platform, url: x.form.url, shortUrl: x.form.shortUrl, at: x.form.at, closed: !!x.form.closed, count: x.form.count || 0 } : null, q: (x.survey.sections || []).reduce((a, s) => a + s.questions.length, 0) }));
     return J(200, { ok: true, cfg: pub(), rows: L });
   }
-  if (b.action === "sf-one") { const x = await store.get("sf:s:" + str(b.id, 20)); return x ? J(200, { ok: true, s: x }) : J(404, { ok: false, error: "Not found" }); }
+  if (b.action === "sf-one") { const x = await store.get("sf:s:" + str(b.id, 20)); if (!x) return J(404, { ok: false, error: "Not found" }); const sv = cleanSurvey(x.survey), h = tHash(sv), trs = {}; Object.keys(x.tr || {}).forEach((L) => { trs[L] = { fresh: x.tr[L].h === h, at: x.tr[L].at }; }); return J(200, { ok: true, s: Object.assign({}, x, { form: x.form ? Object.assign({}, x.form, { map: undefined, base: undefined, regional: !!x.form.map }) : null }), trs, need: sv.regional.on ? langsNeeded(sv) : [] }); }
+  if (b.action === "sf-langs") return J(200, { ok: true, langs: LANGS, states: ALL_STATES, defaults: Object.fromEntries(ALL_STATES.map((st) => [st, defaultLang(st)])) });
+  if (b.action === "sf-tr") { const x = await store.get("sf:s:" + str(b.id, 20)); const L = str(b.lang, 8); if (!x || !x.tr || !x.tr[L]) return J(404, { ok: false, error: "Not translated yet" }); try { const s1 = cleanSurvey(x.survey); const e = expandRegional(Object.assign({}, s1, { regional: Object.assign({}, s1.regional, { map: Object.fromEntries(((stateQOf(s1) || { options: [] }).options).map((o) => [o, L])) }) }), x.tr); return J(200, { ok: true, survey: Object.assign({}, e.survey, { sections: e.survey.sections.slice(1) }) }); } catch (er) { return J(400, { ok: false, error: String(er.message || er) }); } }
+  if (b.action === "sf-job") { const j = await store.get("sf:job:" + str(b.job, 30)); if (!j) return J(404, { ok: false, error: "Job not found" }); if (j.state === "queued" && Date.now() - j.at > 20000) { await runSfJob(store, env, j.id, f, askAI); return J(200, { ok: true, job: await store.get("sf:job:" + j.id) }); } return J(200, { ok: true, job: { state: j.state, msg: j.msg, done: j.done || [], fail: j.fail || [], form: j.form ? Object.assign({}, j.form, { map: undefined, base: undefined }) : null } }); }
+  if (b.action === "sf-translate" || (b.action === "sf-create" && b.platform !== "sm")) {
+    const x = await store.get("sf:s:" + str(b.id, 20)); if (!x) return J(404, { ok: false, error: "Save the survey first" });
+    const sv = cleanSurvey(x.survey);
+    if (b.action === "sf-translate") { if (!askAI) return J(400, { ok: false, error: "AI is not set up yet." }); if (!sv.regional.on || !stateQOf(sv)) return J(400, { ok: false, error: "Switch on regional languages and choose the State question first" }); }
+    else { if (!sv.sections.some((sec) => sec.questions.some((q) => q.type !== "info"))) return J(400, { ok: false, error: "Add at least one question" }); if (!cfg.gasUrl || !cfg.gasKey) return J(400, { ok: false, error: "Google Forms is not connected yet — HO: open Set-up." }); }
+    let langs = [];
+    if (b.action === "sf-translate") { const h = tHash(sv); langs = langsNeeded(sv).filter((L) => b.all || !(x.tr && x.tr[L] && x.tr[L].h === h)); if (!langs.length) return J(200, { ok: true, nothing: true }); }
+    const jid = t.toString(36) + randomBytes(3).toString("hex");
+    await store.set("sf:job:" + jid, { id: jid, kind: b.action === "sf-translate" ? "translate" : "create", sid: x.id, langs, sheet: !!b.sheet, by, state: "queued", at: t, msg: "Starting…" });
+    const site = env.SITE_URL || env.URL;
+    if (site && ctx.jobFetch) { try { await ctx.jobFetch(site + "/.netlify/functions/sfjob-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: jid }) }); } catch (e) { await runSfJob(store, env, jid, f, askAI); } }
+    else await runSfJob(store, env, jid, f, askAI);
+    return J(200, { ok: true, job: jid });
+  }
   if (b.action === "sf-save") {
     const id = str(b.id, 20) || nid(t), old = await store.get("sf:s:" + id), sv = cleanSurvey(b.survey);
     const x = { id, title: sv.title, survey: sv, brief: old ? old.brief : txt(b.brief, 3000), by: old ? old.by : by, at: old ? old.at : t, upd: t, form: old ? old.form : null };
-    await store.set("sf:s:" + id, x); return J(200, { ok: true, id, survey: sv });
+    x.tr = old ? old.tr : undefined;
+    await store.set("sf:s:" + id, x);
+    const h = tHash(sv), trs = {}; Object.keys(x.tr || {}).forEach((L) => { trs[L] = { fresh: x.tr[L].h === h, at: x.tr[L].at }; });
+    return J(200, { ok: true, id, survey: sv, trs, need: sv.regional.on ? langsNeeded(sv) : [] });
   }
   if (b.action === "sf-del") { await store.delete("sf:s:" + str(b.id, 20)); return J(200, { ok: true }); }
 
@@ -149,6 +271,7 @@ export async function sfAction(b, ctx) {
     if (b.platform === "sm") { if (!cfg.smToken) return J(400, { ok: false, error: "SurveyMonkey is not connected — HO: open Set-up." }); try { r = await smCreate(cfg.smToken, s, f); } catch (e) { r = { ok: false, error: "SurveyMonkey: " + String(e.message || e).slice(0, 240) }; } }
     else r = await gas(cfg, { action: "create", survey: s, opts: { sheet: !!b.sheet } }, f);
     if (!r.ok) return J(502, { ok: false, error: r.error || "Couldn't create the form" });
+    if (s.regional.on && b.platform === "sm") r.warn = (r.warn || []).concat(["SurveyMonkey: regional languages are not applied — the survey is in the base language only."]);
     x.form = { platform: b.platform === "sm" ? "sm" : "google", id: str(r.id, 120), url: str(r.url, 400), shortUrl: str(r.shortUrl, 200), editUrl: str(r.editUrl, 400), sheetUrl: str(r.sheetUrl, 400), at: t, by, warn: (r.warn || []).slice(0, 20).map((w) => str(w, 300)) };
     x.upd = t; await store.set("sf:s:" + x.id, x);
     return J(200, { ok: true, form: x.form });
@@ -160,7 +283,10 @@ export async function sfAction(b, ctx) {
     if (!r.ok) return J(502, { ok: false, error: r.error || "Couldn't reach the form" });
     if (b.action === "sf-results") { x.form.count = +r.count || 0; x.form.closed = r.accepting === false; } else x.form.closed = !r.on;
     await store.set("sf:s:" + x.id, x);
-    return J(200, b.action === "sf-results" ? { ok: true, count: r.count, closed: x.form.closed, head: (r.head || []).slice(0, 200), rows: (r.rows || []).slice(0, 3000) } : { ok: true, closed: x.form.closed });
+    if (b.action !== "sf-results") return J(200, { ok: true, closed: x.form.closed });
+    let head = (r.head || []).slice(0, 2000), rows = (r.rows || []).slice(0, 3000);
+    if (x.form.map && x.form.base) { const m = mergeRows(x.form.map, x.form.base, head, rows); head = m.head; rows = m.rows; }
+    return J(200, { ok: true, count: r.count, closed: x.form.closed, head, rows, merged: !!x.form.map });
   }
 
   if (b.action === "sf-ai") {

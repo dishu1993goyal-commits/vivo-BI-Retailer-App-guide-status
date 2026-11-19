@@ -1066,7 +1066,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^st-/.test(b.action)) return stAction(b, surveyCtx());
     if (/^pp-/.test(b.action)) return ppAction(b, surveyCtx());
     if (/^sq-/.test(b.action)) return sqAction(b, surveyCtx());
-    if (/^sf-/.test(b.action)) return sfAction(b, surveyCtx());
+    if (/^sf-/.test(b.action)) return sfAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^tlk-/.test(b.action)) return tlkAction(b, surveyCtx());
     if (/^so-/.test(b.action)) return salesAction(b, surveyCtx());
     if (/^roi-/.test(b.action)) return roiAction(b, surveyCtx());

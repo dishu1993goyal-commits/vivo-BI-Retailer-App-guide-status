@@ -400,7 +400,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
     return ov;
   }
-  var VIEW = $("view"), TAB = "new", CFG = {}, ROWS = [], CUR = null, DIRTY = false, NEWKEY = "";
+  var VIEW = $("view"), TAB = "new", CFG = {}, ROWS = [], CUR = null, DIRTY = false, NEWKEY = "", LG = null;
   var TYPES = [["single", "One choice (radio)"], ["multi", "Many choices (checkboxes)"], ["dropdown", "Dropdown"], ["yesno", "Yes / No"], ["short", "Short answer"], ["paragraph", "Long answer"], ["number", "Number"], ["phone", "Mobile number"], ["email", "E-mail"], ["scale", "Rating scale"], ["grid", "Grid (one per row)"], ["checkgrid", "Grid (many per row)"], ["date", "Date"], ["time", "Time"], ["info", "Note (no answer)"]];
   var TN = {}; TYPES.forEach(function (t) { TN[t[0]] = t[1]; });
   var CHOICE = { single: 1, yesno: 1, multi: 1, dropdown: 1 }, BRANCH = { single: 1, yesno: 1, dropdown: 1 };
@@ -455,7 +455,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 
   // ================= editor =================
   var secName = function (id) { if (id === "SUBMIT") return "Submit the form"; var s = CUR.survey.sections.filter(function (x) { return x.id === id; })[0]; return s ? s.title : id; };
-  function save(cb) { api({ action: "sf-save", id: CUR.id, survey: CUR.survey, brief: CUR.brief || "" }).then(function (r) { if (!r.ok) return toast(r.error); CUR.id = r.id; CUR.survey = r.survey; DIRTY = false; api({ action: "sf-get" }).then(function (x) { if (x.ok) ROWS = x.rows; }); if (cb) cb(); }); }
+  function save(cb) { api({ action: "sf-save", id: CUR.id, survey: CUR.survey, brief: CUR.brief || "" }).then(function (r) { if (!r.ok) return toast(r.error); CUR.id = r.id; CUR.survey = r.survey; CUR.trs = r.trs || {}; CUR.need = r.need || []; DIRTY = false; api({ action: "sf-get" }).then(function (x) { if (x.ok) ROWS = x.rows; }); if (cb) cb(); }); }
   function editor() {
     var s = CUR.survey, nQ = 0; s.sections.forEach(function (x) { nQ += x.questions.filter(function (q) { return q.type !== "info"; }).length; });
     var st = s.settings || {};
@@ -470,11 +470,13 @@ td.n,th.n{text-align:right;white-space:nowrap}
       }).join("") +
       '<div class="bar2"><button class="btn ghost" id="asec" style="flex:1">＋ Add section</button><button class="btn ghost" id="pv" style="flex:1">👁 Preview</button></div>' +
       '<div class="card" style="margin-top:12px"><b>✨ Change it with AI</b><div class="bar2" style="margin-top:6px"><input class="tx" id="ch" style="flex:1" placeholder="e.g. add a question on display quality, make it shorter, add Hindi"><button class="btn sec" id="chg">Apply</button></div></div>' +
+      regionalCard() +
       '<div class="card" style="margin-top:12px"><b>Publish</b>' + (CUR.form ? '<div class="help w">This survey already has a live form. Changes here do <b>not</b> change that form — edit it in ' + (CUR.form.platform === "sm" ? "SurveyMonkey" : "Google Forms") + ' (“Edit form” above), or create a new form from this version.</div>' : "") +
       (CFG.google ? '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="sh"><i></i><span>Also make a Google Sheet that fills with responses</span></label><div class="bar2"><button class="btn pri" id="mk" style="flex:1">🟣 ' + (CUR.form ? "Create a new Google Form" : "Create Google Form") + "</button></div>" : '<div class="help w">Connect Google Forms in ⚙️ Set-up to publish.</div>') +
       (CFG.sm ? '<div class="bar2"><button class="btn ghost" id="mks" style="flex:1">🐒 Create in SurveyMonkey</button></div>' : "") + '<div class="muted" style="font-size:12px;margin-top:6px" id="mst"></div></div>' +
       '<div class="bar2"><button class="btn ghost sm" id="xl">⬇ Questions to Excel</button><button class="btn ghost sm" id="ds" style="color:#B42318">🗑 Delete</button><span style="flex:1"></span><button class="btn ghost sm" id="cl">Close</button></div>';
     if (CUR.form) wireForm(CUR.form);
+    wireRegional();
     $("hdr").onclick = editHeader;
     [].forEach.call(VIEW.querySelectorAll("[data-sec]"), function (b) { b.onclick = function () { editSection(+b.dataset.sec); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-q]"), function (b) { b.onclick = function (e) { if (e.target.closest(".ops")) return; var p = b.dataset.q.split(":"); editQ(+p[0], +p[1]); }; });
@@ -482,7 +484,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     var mv = function (attr, d) { [].forEach.call(VIEW.querySelectorAll("[data-" + attr + "]"), function (b) { b.onclick = function () { var p = b.dataset[attr].split(":"), Q = s.sections[+p[0]].questions, i = +p[1], j = i + d; if (j < 0 || j >= Q.length) return; Q.splice(j, 0, Q.splice(i, 1)[0]); save(editor); }; }); };
     mv("up", -1); mv("dn", 1);
     $("asec").onclick = function () { s.sections.push({ id: "s" + Date.now().toString(36), title: "Section " + (s.sections.length + 1), description: "", next: "", questions: [] }); save(function () { editSection(s.sections.length - 1); editor(); }); };
-    $("pv").onclick = preview;
+    $("pv").onclick = function () { preview(); };
     $("chg").onclick = function () { var c = $("ch").value.trim(); if (c.length < 3) return toast("Say what to change"); $("chg").disabled = true; $("mst").textContent = ""; toast("Applying… (20–40 seconds)"); api({ action: "sf-ai", mode: "refine", survey: s, prompt: c, lang: /hindi|हिंदी/i.test(c) ? "both" : "" }).then(function (r) { $("chg").disabled = false; if (!r.ok) return toast(r.error); CUR.survey = r.survey; save(function () { editor(); toast("Updated"); }); }); };
     if ($("mk")) $("mk").onclick = function () { create("google"); };
     if ($("mks")) $("mks").onclick = function () { create("sm"); };
@@ -490,6 +492,36 @@ td.n,th.n{text-align:right;white-space:nowrap}
     $("ds").onclick = function () { sheet("Delete this survey?", CUR.form ? "The Google Form itself is not deleted — only this design." : "", [["🗑", "Delete", function () { if (!CUR.id) { CUR = null; draw(); return; } api({ action: "sf-del", id: CUR.id }).then(function () { CUR = null; TAB = "list"; load(); }); }, "danger"]]); };
     $("cl").onclick = function () { CUR = null; TAB = "list"; load(); };
   }
+  // ---------- regional languages by state ----------
+  var lname = function (L) { return LG && LG.langs[L] ? LG.langs[L] : L; };
+  function stateQs() { return (CUR.survey.sections[0] || { questions: [] }).questions.filter(function (q) { return q.type === "dropdown" || q.type === "single"; }); }
+  function regionalCard() {
+    var s = CUR.survey, rg = s.regional || (s.regional = { on: false, stateQ: "", map: {} });
+    var h = '<div class="card" style="margin-top:12px"><div class="row" style="gap:6px"><b style="flex:1">🌐 Questions in each state\'s language</b><label class="tg" style="font-size:13px"><input type="checkbox" id="rgon"' + (rg.on ? " checked" : "") + "><i></i><span></span></label></div>";
+    if (!rg.on) return h + '<div class="muted" style="font-size:12.5px;margin-top:4px">The form opens with a State question; after it, every question and option appears in that state\'s language (Hindi, Tamil, Bengali …). States without a regional language get English.</div></div>';
+    var qs = stateQs(), sq = qs.filter(function (q) { return q.id === rg.stateQ; })[0];
+    h += '<label class="lb">Which question asks the state?</label>' + (qs.length ? '<select class="tx" id="rgq"><option value="">Choose…</option>' + qs.map(function (q) { return '<option value="' + q.id + '"' + (q.id === rg.stateQ ? " selected" : "") + ">" + esc(q.title) + "</option>"; }).join("") + "</select>" : "") + '<div class="bar2" style="margin-top:6px"><button class="btn ghost sm" id="rgadd">＋ Add a State question (all states)</button></div><div class="muted" style="font-size:11.5px">It must be in the first section; it is shown first, in the base language.</div>';
+    if (!sq) return h + "</div>";
+    if (!LG) { api({ action: "sf-langs" }).then(function (r) { if (r.ok) { LG = r; editor(); } }); return h + '<div class="muted" style="margin-top:8px">Loading languages…</div></div>'; }
+    var langOf = function (o) { return rg.map[o] || (LG.defaults[o] || guess(o)); };
+    var groups = {}; sq.options.forEach(function (o) { var L = langOf(o); (groups[L] = groups[L] || []).push(o); });
+    var need = CUR.need || [], trs = CUR.trs || {}, ready = need.filter(function (L) { return trs[L] && trs[L].fresh; });
+    h += '<label class="lb">Language for each state (tap to change)</label><div style="max-height:260px;overflow:auto;border:1px solid #EEF0F6;border-radius:10px">' + sq.options.map(function (o, i) { return '<div style="display:flex;gap:6px;align-items:center;padding:5px 8px;border-top:' + (i ? "1px solid #EEF0F6" : "0") + '"><span style="flex:1;font-size:12.5px">' + esc(o) + '</span><select class="tx" data-st="' + i + '" style="width:auto;padding:5px 8px;font-size:12.5px">' + Object.keys(LG.langs).map(function (L) { return '<option value="' + L + '"' + (L === langOf(o) ? " selected" : "") + ">" + esc(LG.langs[L]) + "</option>"; }).join("") + "</select></div>"; }).join("") + "</div>" +
+      '<div class="chips" style="margin-top:8px">' + Object.keys(groups).map(function (L) { var ok = L === "en" || (trs[L] && trs[L].fresh); return '<span class="pill ' + (ok ? "g" : "o") + '" data-pv="' + L + '" style="cursor:' + (L !== "en" && ok ? "pointer" : "default") + '">' + (ok ? "✓ " : "⚠ ") + esc(lname(L).split(" (")[0]) + " · " + groups[L].length + "</span>"; }).join(" ") + "</div>" +
+      (need.length ? '<div class="bar2"><button class="btn ' + (ready.length === need.length ? "ghost" : "pri") + '" id="rgtr" style="flex:1">🌐 ' + (ready.length === need.length ? "Translate again" : "Translate (" + (need.length - ready.length) + " language" + (need.length - ready.length > 1 ? "s" : "") + ")") + '</button></div><div class="muted" style="font-size:12px;margin-top:4px" id="rgst">' + (ready.length === need.length ? "All languages ready — tap a green language to preview it." : "Translate before creating the form. If you change questions later, translate again.") + "</div>" : '<div class="muted" style="font-size:12px;margin-top:6px">All chosen states use English — nothing to translate.</div>') + "</div>";
+    return h;
+  }
+  function guess(o) { return /tamil|puducherry/i.test(o) ? "ta" : /andhra|telangana/i.test(o) ? "te" : /karnataka/i.test(o) ? "kn" : /kerala/i.test(o) ? "ml" : /maharashtra/i.test(o) ? "mr" : /gujarat/i.test(o) ? "gu" : /punjab/i.test(o) ? "pa" : /odisha/i.test(o) ? "or" : /assam/i.test(o) ? "as" : /bengal|tripura/i.test(o) ? "bn" : /bihar|uttar|madhya|rajasthan|haryana|delhi|jharkhand|chhattisgarh|himachal/i.test(o) ? "hi" : "en"; }
+  function wireRegional() {
+    var s = CUR.survey, rg = s.regional; if (!$("rgon")) return;
+    $("rgon").onchange = function () { rg.on = $("rgon").checked; if (rg.on && !rg.stateQ) { var q = stateQs().filter(function (x) { return /state|राज्य/i.test(x.title); })[0]; if (q) rg.stateQ = q.id; } save(editor); };
+    if ($("rgq")) $("rgq").onchange = function () { rg.stateQ = $("rgq").value; save(editor); };
+    if ($("rgadd")) $("rgadd").onclick = function () { var go = function () { var q = { id: "state", type: "dropdown", title: "Your state", required: true, options: (LG ? LG.states : ["Bihar", "Uttar Pradesh"]).slice() }; if (s.sections[0].questions.some(function (x) { return x.id === "state"; })) q.id = "state" + Date.now().toString(36); s.sections[0].questions.unshift(q); rg.stateQ = q.id; save(editor); }; if (!LG) api({ action: "sf-langs" }).then(function (r) { if (r.ok) LG = r; go(); }); else go(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-st]"), function (sel) { sel.onchange = function () { var sq = stateQs().filter(function (q) { return q.id === rg.stateQ; })[0]; rg.map[sq.options[+sel.dataset.st]] = sel.value; save(editor); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-pv]"), function (b) { b.onclick = function () { var L = b.dataset.pv; if (L === "en") return; api({ action: "sf-tr", id: CUR.id, lang: L }).then(function (r) { if (!r.ok) return toast(r.error); var keep = CUR.survey; CUR.survey = r.survey; preview(lname(L)); CUR.survey = keep; }); }; });
+    if ($("rgtr")) $("rgtr").onclick = function () { var b = $("rgtr"); b.disabled = true; var all = /again/.test(b.textContent); api({ action: "sf-translate", id: CUR.id, all: all }).then(function (r) { if (!r.ok) { b.disabled = false; return toast(r.error); } if (r.nothing) { b.disabled = false; return toast("Already translated"); } poll(r.job, function (j) { $("rgst") && ($("rgst").textContent = j.msg || "Working…"); }, function (j) { api({ action: "sf-one", id: CUR.id }).then(function (x) { if (x.ok) { CUR.trs = x.trs; CUR.need = x.need; } editor(); toast(j.fail && j.fail.length ? "Some languages failed — tap Translate again" : "Translations ready"); }); }); }); };
+  }
+  function poll(job, tick, done) { var n = 0; (function next() { api({ action: "sf-job", job: job }).then(function (r) { n++; if (!r.ok) return toast(r.error); tick(r.job); if (r.job.state === "done" || r.job.state === "err") return done(r.job); if (n > 400) return toast("Still working — check again in a minute"); setTimeout(next, 2500); }); })(); }
   function editHeader() {
     var s = CUR.survey, st = s.settings || (s.settings = {}), tg = function (id, lab, on) { return '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="' + id + '"' + (on ? " checked" : "") + "><i></i><span>" + lab + "</span></label>"; };
     sheet("Survey details", "", [["✓", "Save", function () { s.title = $("ht").value || s.title; s.description = $("hd").value; s.confirmation = $("hc").value; st.collectEmail = $("ce").checked; st.limitOne = $("lo").checked; st.editAfter = $("ea").checked; st.shuffle = $("sq").checked; st.progressBar = $("pb").checked; save(editor); }, "pri"]],
@@ -530,9 +562,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<label class="lb">Question</label><textarea class="tx" id="qtt" rows="2">' + esc(q.title) + '</textarea><label class="lb">Type</label><select class="tx" id="qt">' + TYPES.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === q.type ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + '</select><div id="qx2"></div><label class="lb">Hint under the question (optional)</label><input class="tx" id="qh" value="' + esc(q.help || "") + '"><label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="qr"' + (q.required ? " checked" : "") + "><i></i><span>Required</span></label>");
     $("qt").onchange = body; body();
   }
-  function preview() {
+  function preview(lang) {
     var s = CUR.survey;
-    sheet("Preview", "How respondents will see it (all sections shown)", [["", "Close", function () { }]], '<div class="pv"><div class="c top"><b style="font-size:17px">' + esc(s.title) + '</b><div style="font-size:12.5px;margin-top:6px;white-space:pre-wrap">' + esc(s.description || "") + "</div></div>" + s.sections.map(function (sec, si) {
+    sheet("Preview" + (typeof lang === "string" ? " · " + lang : ""), "How respondents will see it (all sections shown)", [["", "Close", function () { }]], '<div class="pv"><div class="c top"><b style="font-size:17px">' + esc(s.title) + '</b><div style="font-size:12.5px;margin-top:6px;white-space:pre-wrap">' + esc(s.description || "") + "</div></div>" + s.sections.map(function (sec, si) {
       return (si || s.sections.length > 1 ? '<div class="c" style="background:#4D5BF9;color:#fff"><b>' + esc(sec.title) + "</b>" + (sec.description ? '<div style="font-size:12px">' + esc(sec.description) + "</div>" : "") + "</div>" : "") + sec.questions.map(function (q) {
         var inp = q.type === "single" || q.type === "yesno" ? q.options.map(function (o) { return "<label>○ " + esc(o) + "</label>"; }).join("") + (q.other ? "<label>○ Other: ____</label>" : "") : q.type === "multi" ? q.options.map(function (o) { return "<label>☐ " + esc(o) + "</label>"; }).join("") + (q.other ? "<label>☐ Other: ____</label>" : "") : q.type === "dropdown" ? '<label>▾ Choose (' + q.options.length + " options)</label>" : q.type === "scale" ? "<label>" + esc(q.scale.minLabel || "") + " " + Array.apply(null, Array(q.scale.max - q.scale.min + 1)).map(function (_, i) { return "○" + (q.scale.min + i); }).join(" ") + " " + esc(q.scale.maxLabel || "") + "</label>" : q.type === "grid" || q.type === "checkgrid" ? "<label>" + esc(q.rows.join(", ")) + " × " + esc(q.cols.join(" / ")) + "</label>" : q.type === "info" ? "" : '<label style="border-bottom:1px solid #ccc;color:#999">' + (q.type === "paragraph" ? "Long answer" : q.type === "date" ? "dd-mm-yyyy" : q.type === "time" ? "--:--" : q.type === "phone" ? "10-digit mobile" : "Your answer") + "</label>";
         return '<div class="c"><div style="font-size:14px">' + esc(q.title) + (q.required ? ' <span class="req">*</span>' : "") + "</div>" + (q.help ? '<div class="muted" style="font-size:12px">' + esc(q.help) + "</div>" : "") + inp + "</div>";
@@ -542,7 +574,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
   function create(platform) {
     var go = function () {
       var b = platform === "sm" ? $("mks") : $("mk"); if (b) b.disabled = true; $("mst").textContent = "Creating the form… (10–40 seconds)";
-      var run = function () { api({ action: "sf-create", id: CUR.id, platform: platform, sheet: $("sh") && $("sh").checked }).then(function (r) { if (b) b.disabled = false; $("mst").textContent = ""; if (!r.ok) return sheet("Couldn't create the form", "", [["", "OK", function () { }]], '<div class="help w">' + esc(r.error) + "</div>"); CUR.form = r.form; load(function () { TAB = "new"; draw(); toast("Form is live — share the link"); }); }); };
+      var fail = function (m) { if (b) b.disabled = false; $("mst").textContent = ""; sheet("Couldn't create the form", "", [["", "OK", function () { }]], '<div class="help w">' + esc(m) + "</div>"); };
+      var live = function (form) { if (b) b.disabled = false; $("mst").textContent = ""; CUR.form = form; load(function () { TAB = "new"; draw(); toast("Form is live — share the link"); }); };
+      var run = function () { api({ action: "sf-create", id: CUR.id, platform: platform, sheet: $("sh") && $("sh").checked }).then(function (r) { if (!r.ok) return fail(r.error); if (r.form) return live(r.form); poll(r.job, function (j) { if ($("mst")) $("mst").textContent = j.msg || "Working…"; }, function (j) { if (j.state === "err") return fail(j.msg); api({ action: "sf-one", id: CUR.id }).then(function (x) { live(x.ok && x.s.form ? x.s.form : j.form); }); }); }); };
       if (DIRTY) save(run); else run();
     };
     if (CUR.form) sheet("Create another form?", "This survey already has a live form", [["✓", "Yes, create a new one", go, "pri"]], '<div class="help">The old link keeps working and keeps its responses. The new form gets a new link.</div>'); else go();
@@ -566,7 +600,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       CUR.form.count = r.count; var H = r.head, R = r.rows;
       var sum = "";
       if (R.length) { CUR.survey.sections.forEach(function (sec) { sec.questions.forEach(function (q) { if (!(CHOICE[q.type] || q.type === "scale")) return; var ci = H.indexOf(q.title); if (ci < 0) return; var C = {}; R.forEach(function (row) { String(row[ci] || "").split(", ").forEach(function (v) { if (v) C[v] = (C[v] || 0) + 1; }); }); var ks = Object.keys(C).sort(function (a, b) { return C[b] - C[a]; }).slice(0, 8), mx = Math.max.apply(null, ks.map(function (k) { return C[k]; }).concat([1])); if (!ks.length) return; sum += '<div style="margin-top:10px"><b style="font-size:12.5px">' + esc(q.title) + '</b><div class="bars">' + ks.map(function (k) { return "<div><span>" + esc(k) + '</span><i style="width:' + Math.max(3, Math.round(C[k] / mx * 45)) + '%"></i>' + C[k] + "</div>"; }).join("") + "</div></div>"; }); }); }
-      $("res").innerHTML = '<div class="help ok"><b>' + r.count + " response(s)</b>" + (r.closed ? " · form is closed" : "") + "</div>" + sum + (R.length ? '<div style="overflow:auto;margin-top:10px;max-height:320px"><table class="tb"><tr>' + H.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr>" + R.slice(-30).reverse().map(function (row) { return "<tr>" + row.map(function (c) { return "<td>" + esc(c) + "</td>"; }).join("") + "</tr>"; }).join("") + '</table></div><div class="bar2"><button class="btn ghost sm" id="rx">⬇ All responses (Excel)</button></div>' : "");
+      $("res").innerHTML = '<div class="help ok"><b>' + r.count + " response(s)</b>" + (r.closed ? " · form is closed" : "") + (r.merged ? " · all languages merged, answers in English" : "") + "</div>" + sum + (R.length ? '<div style="overflow:auto;margin-top:10px;max-height:320px"><table class="tb"><tr>' + H.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr>" + R.slice(-30).reverse().map(function (row) { return "<tr>" + row.map(function (c) { return "<td>" + esc(c) + "</td>"; }).join("") + "</tr>"; }).join("") + '</table></div><div class="bar2"><button class="btn ghost sm" id="rx">⬇ All responses (Excel)</button></div>' : "");
       if ($("rx")) $("rx").onclick = function () { download(xlsx([{ name: "Responses", rows: [H].concat(R) }]), CUR.survey.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + "_responses.xlsx"); };
     });
   }
@@ -574,7 +608,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   // ================= list =================
   function list() {
     VIEW.innerHTML = ROWS.length ? ROWS.map(function (x) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-o="' + x.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + esc(x.title) + '</b><span class="pill ' + (!x.form ? "m" : x.form.closed ? "r" : "g") + '">' + (!x.form ? "Draft" : x.form.closed ? "Closed" : "Live") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + x.q + " questions · " + esc(x.by) + " · " + new Date(x.upd).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + (x.form ? " · " + (x.form.platform === "sm" ? "SurveyMonkey" : "Google Form") + (x.form.count ? " · " + x.form.count + " responses" : "") : "") + "</div>" + (x.form && (x.form.shortUrl || x.form.url) ? '<div style="font-size:12px;margin-top:4px;word-break:break-all;color:#3346C9">' + esc(x.form.shortUrl || x.form.url) + "</div>" : "") + "</div>"; }).join("") : '<div class="card empty"><div class="big">📝</div><b>No surveys yet</b><div class="muted" style="margin-top:4px">Create one in ✨ New.</div></div>';
-    [].forEach.call(VIEW.querySelectorAll("[data-o]"), function (c) { c.onclick = function () { api({ action: "sf-one", id: c.dataset.o }).then(function (r) { if (!r.ok) return toast(r.error); CUR = { id: r.s.id, survey: r.s.survey, brief: r.s.brief, form: r.s.form }; DIRTY = false; TAB = "new"; draw(); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-o]"), function (c) { c.onclick = function () { api({ action: "sf-one", id: c.dataset.o }).then(function (r) { if (!r.ok) return toast(r.error); CUR = { id: r.s.id, survey: r.s.survey, brief: r.s.brief, form: r.s.form, trs: r.trs || {}, need: r.need || [] }; DIRTY = false; TAB = "new"; draw(); }); }; });
   }
 
   // ================= set-up =================
