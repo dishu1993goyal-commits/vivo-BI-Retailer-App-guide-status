@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Process Center AI builder</title>
+<style>
+/*@@CSS@@*/
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.step{display:flex;gap:10px;margin-top:12px}.step>i{flex:0 0 26px;height:26px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 13px/26px inherit;text-align:center;font-style:normal}.step>div{flex:1;font-size:13px;line-height:1.55}
+.bm{display:inline-block;background:#4D5BF9;color:#fff;border-radius:10px;padding:9px 14px;font-weight:700;text-decoration:none;cursor:grab;margin-top:6px}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧩</span></div>
+  <h1>Process Center AI builder</h1><p>Step 1 of 2 · capture one sample process</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view");
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; return; }
+  if (AUTH.app && AUTH.app !== "admin") { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>Only HO can use this tool</b></div>'; return; }
+  fetch("/pc_capture.js?v=" + Date.now()).then(function (r) { return r.text(); }).then(function (code) {
+    var min = code.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map(function (l) { return l.trim(); }).filter(Boolean).join("\n");
+    var guard = "if(!/vform|vwork|vivo/i.test(location.hostname)){alert('Open the Process Center designer first, then click this bookmark.');}else{" + min + "}";
+    var href = "javascript:" + encodeURIComponent("(function(){" + guard + "})()");
+    VIEW.innerHTML = '<div class="card"><b>What this tool will do</b><div style="font-size:13px;line-height:1.6;margin-top:4px">You describe a form and its approval flow → AI builds the fields, rules, approval nodes, conditions and field permissions → it is loaded into Process Center as a <b>draft</b> → you check it and Release / Publish yourself.<br>To build that, I first need one real sample of how Process Center stores a design. This page helps you capture it — nothing is changed in Process Center.</div></div>' +
+      '<div class="card" style="margin-top:12px"><b>Capture a sample (computer, Chrome or Edge)</b>' +
+      '<div class="step"><i>1</i><div>Show the bookmarks bar (Ctrl+Shift+B), then <b>drag</b> this button onto it:<br><a class="bm" id="bm" href="#">📥 vivo BI capture</a></div></div>' +
+      '<div class="step"><i>2</i><div>In vWork → Office → <b>Process Center</b>, open a <b>test</b> process in the designer (Edit). Best: one with several field types, at least two approval levels and one condition branch.</div></div>' +
+      '<div class="step"><i>3</i><div>Click the <b>📥 vivo BI capture</b> bookmark. A small dark box appears at the bottom right.</div></div>' +
+      '<div class="step"><i>4</i><div>Open the tabs <b>Basic info → Form design → Process design</b>, and in Process design tap one approval node so its settings panel opens. Then tap <b>🔍 Read design</b> in the box.</div></div>' +
+      '<div class="step"><i>5</i><div>Optional but very helpful — only on a <b>test</b> process: press the designer\'s own <b>Save</b> (not Release). The box notes how the designer saves.</div></div>' +
+      '<div class="step"><i>6</i><div>Tap <b>⬇ Download</b> in the box and send me the <code>process_capture_….json</code> file.</div></div>' +
+      '<div class="help">🔒 The helper only reads what is already open on your screen. It removes passwords, tokens and cookies, sends nothing anywhere, and the file is saved on your computer. It may contain names / vWork IDs that appear in the process — fine to share with me, but don\'t post it publicly.</div>' +
+      '<div class="help w">Phone only? In Chrome on Android: add any bookmark, edit it, paste the code from <b>Copy bookmark code</b> as its URL and name it <b>bicapture</b>. On the designer page, type <b>bicapture</b> in the address bar and tap the bookmark suggestion.<div style="margin-top:6px"><button class="btn ghost sm" id="cp">📋 Copy bookmark code</button></div></div></div>';
+    $("bm").href = href; $("bm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar (don't click it here)"); };
+    $("cp").onclick = function () { var ok = function () { toast("Copied"); }; try { navigator.clipboard.writeText(href).then(ok, ok); } catch (e) { ok(); } };
+  });
+})();
+</script>
+</body>
+</html>
