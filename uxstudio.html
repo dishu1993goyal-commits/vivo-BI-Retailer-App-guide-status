@@ -203,7 +203,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .dev>.sc{transform-origin:0 0;position:absolute;left:0;top:0}
 .tbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:6px 0;display:flex;gap:6px;overflow-x:auto}.tbar button{flex:0 0 auto}
 .prop{position:sticky;bottom:0;z-index:15}
-.play{position:fixed;inset:0;background:rgba(10,12,30,.92);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}.play .dev{border-radius:30px}.play .pb{display:flex;gap:8px}
+.uxov{position:fixed;inset:0;background:rgba(10,12,30,.92);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}.uxov .dev{border-radius:30px}.uxov .pb{display:flex;gap:8px}
 .iss{border-left:4px solid #F5A623;padding:6px 10px;margin-top:8px;background:#fff;border-radius:8px;font-size:12.5px;cursor:pointer}.iss.high{border-color:#D93B3B}.iss.low{border-color:#9AA0BD}
 .code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px}
 .step{display:flex;gap:10px;margin-top:10px}.step>i{flex:0 0 24px;height:24px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 12px/24px inherit;text-align:center;font-style:normal}.step>div{flex:1;font-size:13px;line-height:1.5}
@@ -219,7 +219,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎛️</span></div>
   <h1 id="h1">UI/UX studio</h1><p id="hp">Describe an app or website → screens, prototype, user test, Figma</p></div>
 <div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
-<script src="/ux-render.js?v=2"></script>
+<script src="/ux-render.js?v=4"></script>
 <script src="/vendor/qrcode/qrcode.js"></script>
 <script>
 (function () {
@@ -495,7 +495,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 
   // ================= prototype =================
   function play(start) {
-    var hist = [], cur = start || D.screens[0].id, ov = document.createElement("div"); ov.className = "play"; document.body.appendChild(ov);
+    var hist = [], cur = start || D.screens[0].id, ov = document.createElement("div"); ov.className = "uxov"; document.body.appendChild(ov);
     var draw = function () { var w = Math.min(window.innerWidth - 20, D.platform === "web" ? 1200 : 390), h = UXR.H[D.platform] * w / UXR.W[D.platform], mh = window.innerHeight - 90; if (h > mh) w = w * mh / h; ov.innerHTML = frame(D.screens.filter(function (s) { return s.id === cur; })[0] || D.screens[0], Math.round(w), "play") + '<div class="pb"><button class="btn ghost sm" id="pbk" style="background:#fff">← Back</button><button class="btn ghost sm" id="prs" style="background:#fff">↺ Restart</button><button class="btn pri sm" id="pcl">✕ Close</button></div>'; $("pbk").onclick = function () { if (hist.length) { cur = hist.pop(); draw(); } }; $("prs").onclick = function () { hist = []; cur = D.screens[0].id; draw(); }; $("pcl").onclick = function () { ov.remove(); }; };
     ov.onclick = function (e) { if (e.target.closest("[data-back]") && hist.length) { cur = hist.pop(); return draw(); } var l = e.target.closest("[data-l]"); if (l && ov.contains(l)) { hist.push(cur); cur = l.getAttribute("data-l"); draw(); } };
     draw();
@@ -556,8 +556,15 @@ td.n,th.n{text-align:right;white-space:nowrap}
   function exportPanel() {
     if (DIRTY) save(true);
     var code = "BIUX1:" + btoa(unescape(encodeURIComponent(JSON.stringify(D))));
-    sheet("⬇ Export", "", [["🟣", "Copy design for Figma", function () { copy(code, "Copied — paste it in the Figma plugin"); return false; }, "pri"], ["🌐", "Clickable prototype (HTML)", function () { download(new Blob([UXR.exportHtml(D)], { type: "text/html" }), D.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + "_prototype.html"); return false; }], ["🖼", "This screen as PNG", function () { png(); return false; }], ["🧾", "Design as JSON (for developers)", function () { download(new Blob([JSON.stringify(D, null, 1)], { type: "application/json" }), "design.json"); return false; }]],
-      '<b>Open it in Figma</b><div class="step"><i>1</i><div>One time, in the <b>Figma desktop app</b>: download <a href="/figma-plugin/vivo-bi-figma-plugin.zip" download><b>the vivo BI plugin</b></a>, unzip it, then in Figma: <b>Menu → Plugins → Development → Import plugin from manifest…</b> → choose <code>manifest.json</code>.</div></div><div class="step"><i>2</i><div>Tap <b>Copy design for Figma</b> above.</div></div><div class="step"><i>3</i><div>In any Figma file: <b>Plugins → Development → vivo BI → UI import</b>, paste, press <b>Build</b>. Every screen becomes a frame with auto-layout, real text, colours and the prototype links.</div></div><div class="help">Or share the design link from 🧪 Test — the plugin can also load it by that link.</div><div class="help">The HTML file is a working click-through prototype — open it on any phone or send it to developers as the reference build.</div>');
+    setTimeout(function () { var a = $("svgdl"); if (a) a.onclick = function (e) { e.preventDefault(); svgOut(false); }; }, 50);
+    sheet("⬇ Export", "", [["🟣", "Copy design for Figma", function () { copy(code, "Copied — paste it in the Figma plugin"); return false; }, "pri"], ["🌐", "Clickable prototype (HTML)", function () { download(new Blob([UXR.exportHtml(D)], { type: "text/html" }), D.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + "_prototype.html"); return false; }], ["🟪", "Copy screens as SVG (Figma in browser)", function () { svgOut(true); return false; }], ["🖼", "This screen as PNG", function () { png(); return false; }], ["🧾", "Design as JSON (for developers)", function () { download(new Blob([JSON.stringify(D, null, 1)], { type: "application/json" }), "design.json"); return false; }]],
+      '<b>Open it in Figma</b><div class="step"><i>1</i><div>One time, in the <b>Figma desktop app</b>: download <a href="/figma-plugin/vivo-bi-figma-plugin.zip" download><b>the vivo BI plugin</b></a>, unzip it, then in Figma: <b>Menu → Plugins → Development → Import plugin from manifest…</b> → choose <code>manifest.json</code>.</div></div><div class="step"><i>2</i><div>Tap <b>Copy design for Figma</b> above.</div></div><div class="step"><i>3</i><div>In any Figma file: <b>Plugins → Development → vivo BI → UI import</b>, paste, press <b>Build</b>. Every screen becomes a frame with auto-layout, real text, colours and the prototype links.</div></div><div class="help">Or share the design link from 🧪 Test — the plugin can also load it by that link.</div><div class="help w"><b>No Figma desktop app?</b> (phone, or a work laptop where installing is blocked) Use <b>Copy screens as SVG</b>: open Figma in the browser on a computer, open a file, click the canvas and press <b>Ctrl+V</b>. All screens arrive side by side as editable shapes and text — no auto-layout or prototype links that way. <a href="#" id="svgdl">Download the .svg instead</a> (drag it into Figma).</div><div class="help">The HTML file is a working click-through prototype — open it on any phone or send it to developers as the reference build.</div>');
+  }
+  function svgOut(copyIt) {
+    var box = document.createElement("div"); box.style.cssText = "position:fixed;left:-99999px;top:0;display:flex;gap:20px;align-items:flex-start"; box.innerHTML = D.screens.map(function (s) { return UXR.screen(D, s, "play"); }).join(""); document.body.appendChild(box);
+    [].forEach.call(box.children, function (sc) { sc.style.height = "auto"; sc.style.minHeight = UXR.H[D.platform] + "px"; }); [].forEach.call(box.querySelectorAll(".ux-body"), function (b) { b.style.overflow = "visible"; b.style.flex = "1 0 auto"; });
+    var svg = UXR.toSvg([].slice.call(box.children)); box.remove();
+    if (copyIt) copy(svg, "Copied " + D.screens.length + " screens — paste in Figma (Ctrl+V)"); else download(new Blob([svg], { type: "image/svg+xml" }), D.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + ".svg");
   }
   function png() {
     lib("/vendor/html-to-image.js", function () { return window.htmlToImage; }).then(function () {
