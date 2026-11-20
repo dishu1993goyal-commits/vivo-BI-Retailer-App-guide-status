@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Prototype</title>
+<style>
+/*@@CSS@@*/
+html,body{background:#E9EBF5}
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.dev{position:relative;overflow:hidden;border-radius:26px;box-shadow:0 10px 30px rgba(20,24,51,.25);background:#fff;margin:0 auto}.dev.web{border-radius:8px}.dev>.sc{transform-origin:0 0;position:absolute;left:0;top:0}
+.task{position:sticky;top:0;z-index:5;background:#12163A;color:#fff;border-radius:0 0 14px 14px;padding:10px 12px;font-size:13.5px;display:flex;gap:8px;align-items:center}.task b{flex:1}
+.task button{border:0;border-radius:9px;padding:7px 10px;font:700 12px inherit;cursor:pointer}
+.stars{display:flex;gap:6px;justify-content:center;font-size:32px;margin-top:6px}.stars span{cursor:pointer;filter:grayscale(1);opacity:.5}.stars span.on{filter:none;opacity:1}
+.big{font-size:44px;text-align:center}
+@media(max-width:600px){.full .dev{border-radius:0;box-shadow:none}}
+</style>
+</head>
+<body>
+<div id="app"><div class="loading" style="margin-top:40px"><div class="spin"></div>Loading prototype…</div></div>
+<script src="/ux-render.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var APP = $("app"), K = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim(), D = null, TASKS = [], name = "", ti = -1, cur = "", hist = [], res = [], t0 = 0, taps = 0, path = [];
+  var st = document.createElement("style"); st.textContent = UXR.css(".ux-screen"); document.head.appendChild(st);
+  var pub = function (b) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", k: K }, b)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No connection" }; }); };
+  if (!K) { APP.innerHTML = '<div class="wrap"><div class="card empty"><div class="big">🔗</div><b>This link is not complete</b></div></div>'; return; }
+  pub({ action: "ux-p-get" }).then(function (r) {
+    if (!r.ok) { APP.innerHTML = '<div class="wrap"><div class="card empty"><div class="big">⛔</div><b>' + esc(r.error) + "</b></div></div>"; return; }
+    D = r.doc; TASKS = r.tasks || []; document.title = D.title; cur = D.screens[0].id;
+    if (!TASKS.length) return draw();
+    APP.innerHTML = '<div class="wrap"><div class="card"><b style="font-size:17px">' + esc(D.title) + '</b><div style="font-size:13px;line-height:1.6;margin-top:6px">You will try <b>' + TASKS.length + " short task" + (TASKS.length > 1 ? "s" : "") + "</b> on an app design. It is a picture-only prototype: tap buttons and items like a real app. There are no wrong answers — we are testing the design, not you.</div>" + '<label class="lb">Your name (optional)</label><input class="tx" id="nm"><div class="bar2" style="margin-top:12px"><button class="btn pri" id="st" style="width:100%">Start</button></div></div></div>';
+    $("st").onclick = function () { name = $("nm").value.trim(); next(); };
+  });
+  function next() { if (ti >= 0) res.push({ id: TASKS[ti].id, ok: !!res.__ok, gaveUp: !!res.__gu, ms: Date.now() - t0, taps: taps, path: path.slice() }); res.__ok = res.__gu = false; ti++; if (ti >= TASKS.length) return finish(); cur = D.screens[0].id; hist = []; taps = 0; path = [cur]; t0 = Date.now(); draw(); }
+  function draw() {
+    var w = Math.min(window.innerWidth, D.platform === "web" ? 1200 : 430), k = w / UXR.W[D.platform], h = UXR.H[D.platform] * k, tk = TASKS[ti];
+    var avail = window.innerHeight - (tk ? 64 : 0); if (h > avail && window.innerWidth > 600) { k = k * avail / h; w = UXR.W[D.platform] * k; h = avail; }
+    var s = D.screens.filter(function (x) { return x.id === cur; })[0] || D.screens[0];
+    APP.className = "full"; APP.innerHTML = (tk ? '<div class="task"><span>' + (ti + 1) + "/" + TASKS.length + "</span><b>" + esc(tk.text) + '</b>' + (tk.goal ? "" : '<button id="dn" style="background:#1E9E61;color:#fff">Done</button>') + '<button id="gu" style="background:#fff;color:#12163A">Skip</button></div>' : "") + '<div class="dev ' + D.platform + '" style="width:' + Math.round(w) + "px;height:" + Math.round(h) + 'px"><div class="sc" style="transform:scale(' + k + ')">' + UXR.screen(D, s, "play") + "</div></div>";
+    if ($("dn")) $("dn").onclick = function () { res.__ok = true; next(); }; if ($("gu")) $("gu").onclick = function () { res.__gu = true; next(); };
+  }
+  APP.addEventListener("click", function (e) {
+    if (!D || !e.target.closest(".dev")) return; taps++;
+    if (e.target.closest("[data-back]") && hist.length) { cur = hist.pop(); path.push(cur); return draw(); }
+    var l = e.target.closest("[data-l]"); if (!l) return; hist.push(cur); cur = l.getAttribute("data-l"); path.push(cur);
+    if (TASKS[ti] && TASKS[ti].goal === cur) { res.__ok = true; draw(); var tk = document.querySelector(".task"); if (tk) { tk.style.background = "#1E9E61"; tk.querySelector("b").textContent = "✓ Task complete!"; } setTimeout(next, 1100); return; }
+    draw();
+  });
+  function finish() {
+    var ease = 0; APP.className = "";
+    APP.innerHTML = '<div class="wrap"><div class="card"><b style="font-size:17px">Thank you! One last thing</b><div style="font-size:13px;margin-top:6px">How easy was it to use?</div><div class="stars" id="sr">' + [1, 2, 3, 4, 5].map(function (n) { return '<span data-n="' + n + '">⭐</span>'; }).join("") + '</div><label class="lb">Anything confusing or missing? (optional)</label><textarea class="tx" id="nt" rows="3"></textarea><div class="bar2" style="margin-top:12px"><button class="btn pri" id="sd" style="width:100%">Send</button></div></div></div>';
+    [].forEach.call($("sr").querySelectorAll("[data-n]"), function (b) { b.onclick = function () { ease = +b.dataset.n; [].forEach.call($("sr").querySelectorAll("[data-n]"), function (y) { y.classList.toggle("on", +y.dataset.n <= ease); }); }; });
+    $("sd").onclick = function () { $("sd").disabled = true; pub({ action: "ux-p-result", name: name, ease: ease, note: $("nt").value, tasks: res, device: (window.innerWidth + "x" + window.innerHeight) }).then(function (r) { APP.innerHTML = '<div class="wrap"><div class="card empty"><div class="big">' + (r.ok ? "🙏" : "⚠") + "</div><b>" + (r.ok ? "Thanks — your answers were sent." : esc(r.error)) + "</b></div></div>"; }); };
+  }
+  window.addEventListener("resize", function () { if (D && (ti < 0 ? !TASKS.length : ti < TASKS.length)) draw(); });
+})();
+</script>
+</body>
+</html>

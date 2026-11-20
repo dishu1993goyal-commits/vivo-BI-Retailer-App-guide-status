@@ -45,6 +45,7 @@ import { ppAction } from "./pp-core.mjs";
 import { sqAction } from "./sq-core.mjs";
 import { sfAction } from "./sf-core.mjs";
 import { tlkAction, tlkPublic, linkGate } from "./tlk-core.mjs";
+import { uxAction, uxPublic } from "./ux-core.mjs";
 import { bmAction } from "./bm-core.mjs";
 import { salAction, salPublic } from "./sal-core.mjs";
 import { salesAction } from "./sales-core.mjs";
@@ -534,7 +535,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   if (/^hr-p-/.test(b.action)) return hrPublic(b, { store, t, pool, env, mailFetch });   // referral link (no login) + candidate status link
   if (/^pc-p-/.test(b.action)) return pcPublic(b, { store, t, pool, env, mailFetch });   // photo contest link (no login)
   if (/^ms-p-/.test(b.action)) return msPublic(b, { store, t, pool, env });   // market survey link (no login)
-  if (/^tlk-p-/.test(b.action)) return tlkPublic(b, { store, t });   // one-tool link: sign a device in to that tool only
+  if (/^tlk-p-/.test(b.action)) return tlkPublic(b, { store, t });
+  if (/^ux-p-/.test(b.action)) return uxPublic(b, { store, t });   // shared UI prototype: play + user-test results   // one-tool link: sign a device in to that tool only
   if (/^iub-p-/.test(b.action)) return iubPublic(b, { store, t, pool, env, mailFetch });   // finance partner's secure link (no login)   // retailer's read-only link (no login)
   const uKeyOf = (k) => `user:${app}:${k}`;
   const pKeyOf = (p) => `phone:${app}:${p}`;
@@ -914,7 +916,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-report-ai", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv)-/;
+  const NEW_PREFIX = /^(eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username), lnk = /^lnk_/i.test(String(b.username || "")), recKey = key ? (lnk ? "lnkuser:" + key : uKeyOf(key)) : "";
     const rec = key ? await store.get(recKey) : null;
@@ -1068,6 +1070,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^sq-/.test(b.action)) return sqAction(b, surveyCtx());
     if (/^sf-/.test(b.action)) return sfAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^tlk-/.test(b.action)) return tlkAction(b, surveyCtx());
+    if (/^ux-/.test(b.action)) return uxAction(b, surveyCtx());
     if (/^so-/.test(b.action)) return salesAction(b, surveyCtx());
     if (/^roi-/.test(b.action)) return roiAction(b, surveyCtx());
     if (/^(lh|ls|lt|mp|cv)-/.test(b.action)) return bixAction(b, surveyCtx());

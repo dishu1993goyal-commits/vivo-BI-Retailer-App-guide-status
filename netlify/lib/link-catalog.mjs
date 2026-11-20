@@ -1131,6 +1131,20 @@ export const LINK_CATALOG = {
 "ho": true,
 "acts": []
 },
+"uxstudio.html": {
+"id": "uxstudio",
+"icon": "🎛️",
+"name": "UI/UX studio (app & web design)",
+"ho": false,
+"acts": [
+"ux-ai",
+"ux-get",
+"ux-list",
+"ux-results",
+"ux-save",
+"ux-share"
+]
+},
 "hygcheck.html": {
 "id": "hygcheck",
 "icon": "🔎",

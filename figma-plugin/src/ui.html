@@ -1,0 +1,23 @@
+<div style="font:12px Inter,Arial,sans-serif;padding:12px">
+  <b style="font-size:13px">vivo BI · UI import</b>
+  <p style="margin:6px 0;color:#555">Paste the design copied from the BI app (<i>Export → Copy design for Figma</i>) or a shared prototype link.</p>
+  <textarea id="t" style="width:100%;height:150px;font:11px monospace;box-sizing:border-box" placeholder="BIUX1:…  or  https://…/uxplay.html#…"></textarea>
+  <button id="b" style="margin-top:8px;width:100%;padding:9px;border:0;border-radius:8px;background:#4D5BF9;color:#fff;font-weight:700;cursor:pointer">Build</button>
+  <div id="s" style="margin-top:8px;color:#333"></div>
+</div>
+<script>
+var SITE = "https://vivo-business-innovation-dashboard-22.netlify.app";
+var s = document.getElementById("s");
+document.getElementById("b").onclick = async function () {
+  var v = document.getElementById("t").value.trim(), d = null; s.textContent = "Reading…";
+  try {
+    if (/^BIUX1:/.test(v)) d = JSON.parse(decodeURIComponent(escape(atob(v.slice(6).replace(/\s+/g, "")))));
+    else if (/uxplay\.html#/.test(v)) { var r = await fetch(SITE + "/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify({ app: "state", action: "ux-p-get", k: v.split("#")[1] }) }); var j = await r.json(); if (!j.ok) throw new Error(j.error || "Couldn't load"); d = j.doc; }
+    else if (/^\{/.test(v)) d = JSON.parse(v);
+    else throw new Error("Paste the design code (starts with BIUX1:) or a prototype link");
+  } catch (e) { s.textContent = "⚠ " + e.message; return; }
+  s.textContent = "Building " + d.screens.length + " screens…";
+  parent.postMessage({ pluginMessage: { type: "build", doc: d } }, "*");
+};
+onmessage = function (e) { var m = e.data.pluginMessage; if (m && m.type === "status") s.textContent = m.text; };
+</script>

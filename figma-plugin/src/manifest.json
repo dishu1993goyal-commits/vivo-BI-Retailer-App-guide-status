@@ -1,0 +1,10 @@
+{
+  "name": "vivo BI · UI import",
+  "id": "vivo-bi-ui-import",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { "allowedDomains": ["https://vivo-business-innovation-dashboard-22.netlify.app"], "reasoning": "Loads a design you shared from the vivo BI UI/UX studio." }
+}

@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>UI/UX studio</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}.help.ok{background:#E6F4EA}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12.5px inherit;cursor:pointer;color:var(--ink)}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.strip{display:flex;gap:10px;overflow-x:auto;padding:8px 2px 10px}.th{flex:0 0 auto;cursor:pointer;text-align:center;font-size:11px;color:var(--mut)}.th .fr{border-radius:10px;overflow:hidden;box-shadow:0 0 0 2px transparent,0 2px 8px rgba(20,24,51,.12);background:#fff;position:relative}.th.on .fr{box-shadow:0 0 0 3px #4D5BF9,0 2px 8px rgba(20,24,51,.12)}.th.on{color:#2B33A6;font-weight:700}.th .add{display:flex;align-items:center;justify-content:center;font-size:26px;color:#9AA0BD;background:#F1F2F8}
+.stage{background:#E3E6F2;border-radius:16px;padding:12px;display:flex;justify-content:center;margin-top:6px}
+.dev{position:relative;overflow:hidden;border-radius:26px;box-shadow:0 10px 30px rgba(20,24,51,.25);background:#fff}.dev.web{border-radius:8px}
+.dev>.sc{transform-origin:0 0;position:absolute;left:0;top:0}
+.tbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:6px 0;display:flex;gap:6px;overflow-x:auto}.tbar button{flex:0 0 auto}
+.prop{position:sticky;bottom:0;z-index:15}
+.play{position:fixed;inset:0;background:rgba(10,12,30,.92);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}.play .dev{border-radius:30px}.play .pb{display:flex;gap:8px}
+.iss{border-left:4px solid #F5A623;padding:6px 10px;margin-top:8px;background:#fff;border-radius:8px;font-size:12.5px;cursor:pointer}.iss.high{border-color:#D93B3B}.iss.low{border-color:#9AA0BD}
+.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+.step{display:flex;gap:10px;margin-top:10px}.step>i{flex:0 0 24px;height:24px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 12px/24px inherit;text-align:center;font-style:normal}.step>div{flex:1;font-size:13px;line-height:1.5}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px}
+.big{font-size:40px;text-align:center}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=3"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎛️</span></div>
+  <h1 id="h1">UI/UX studio</h1><p id="hp">Describe an app or website → screens, prototype, user test, Figma</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/ux-render.js?v=2"></script>
+<script src="/vendor/qrcode/qrcode.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), D = null, ID = "", CUR = "", SEL = "", DIRTY = false, ST = { platform: "mobile", style: "hifi", n: 6 }, timer = null;
+  var st = document.createElement("style"); st.textContent = UXR.css(".ux-screen"); document.head.appendChild(st);
+  var EX = [["📱", "Retailer app", "mobile", "Retailer app for vivo dealers: home with today's sales, scheme progress and payout earned; scheme list and scheme detail with slabs; IMEI check by scanning; payout ledger; profile. Bottom tabs: Home, Schemes, Scan, Payouts, Me."], ["🧑‍💼", "Promoter app", "mobile", "App for in-store promoters: check-in with selfie and location, daily sales entry by model, today's target vs achieved, training videos and quiz, leave request, incentive earned this month."], ["🖥️", "BI dashboard website", "web", "Website dashboard for the vivo BI team: top KPI cards, state ranking table, sell-out trend chart, filters by state and month, retailer list with search, and a retailer detail page."], ["🛍️", "Customer EMI finder", "mobile", "Customer-facing app to find the best EMI and exchange offer for a vivo phone: choose model and variant, see price, EMI plans by bank / finance partner, exchange value estimate, and book a store visit."], ["📍", "Store locator site", "web", "Website to find vivo exclusive stores and service centres: search by city / PIN, map with list, store detail with timings, call and directions, and offers at that store."], ["🎟️", "Event registration", "mobile", "Registration app for a vivo dealer meet: event details, agenda, register with name / firm / mobile, QR entry pass, and feedback form after the event."]];
+  var copy = function (t, m) { var ok = function () { toast(m || "Copied"); }; try { navigator.clipboard.writeText(t).then(ok, function () { fall(t); ok(); }); } catch (e) { fall(t); ok(); } };
+  function fall(t) { var a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) { } a.remove(); }
+  function lib(src, test) { return test() ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
+  var scr = function (id) { return D.screens.filter(function (s) { return s.id === (id || CUR); })[0]; };
+  function frame(s, w, mode) { var W = UXR.W[D.platform], H = UXR.H[D.platform], k = w / W; return '<div class="dev ' + D.platform + '" style="width:' + w + "px;height:" + Math.round(H * k) + 'px"><div class="sc" style="transform:scale(' + k + ')">' + UXR.screen(D, s, mode) + "</div></div>"; }
+  function save(now) { DIRTY = true; clearTimeout(timer); var go = function () { api({ action: "ux-save", id: ID, doc: D }).then(function (r) { if (!r.ok) return toast(r.error); ID = r.id; DIRTY = false; var e = $("svst"); if (e) e.textContent = "Saved"; }); }; if (now) go(); else timer = setTimeout(go, 900); var e = $("svst"); if (e) e.textContent = "Saving…"; }
+
+  // ================= home =================
+  function home() {
+    $("h1").textContent = "UI/UX studio"; $("hp").textContent = "Describe an app or website → screens, prototype, user test, Figma";
+    VIEW.innerHTML = '<div class="card"><b>What should we design?</b><textarea class="tx" id="pr" rows="5" style="margin-top:6px" placeholder="e.g. A mobile app for retailers to track scheme progress, check IMEI status and see payouts…"></textarea><div class="chips" id="ex">' + EX.map(function (x, i) { return '<button data-i="' + i + '">' + x[0] + " " + x[1] + "</button>"; }).join("") + '</div>' +
+      '<label class="lb">Platform</label><div class="chips" id="pf">' + [["mobile", "📱 Mobile app"], ["web", "🖥️ Website"], ["tablet", "📟 Tablet"]].map(function (x) { return '<button data-v="' + x[0] + '" class="' + (ST.platform === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>" +
+      '<label class="lb">Fidelity</label><div class="chips" id="sy">' + [["hifi", "🎨 High-fidelity"], ["wireframe", "✏️ Wireframe"]].map(function (x) { return '<button data-v="' + x[0] + '" class="' + (ST.style === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + "</div>" +
+      '<div class="g2"><div><label class="lb">Screens</label><select class="tx" id="nn">' + [3, 4, 5, 6, 8, 10, 12].map(function (n) { return "<option" + (n === ST.n ? " selected" : "") + ">" + n + "</option>"; }).join("") + '</select></div><div><label class="lb">Brand / colours (optional)</label><input class="tx" id="br" placeholder="e.g. vivo blue, clean, rounded"></div></div>' +
+      '<div class="bar2"><button class="btn pri" id="go" style="flex:2">✨ Design it</button><button class="btn ghost" id="bl" style="flex:1">Blank</button></div><div class="muted" id="gst" style="font-size:12px;margin-top:6px"></div></div><div id="lst"></div>';
+    var pk = function (id, key) { [].forEach.call($(id).querySelectorAll("[data-v]"), function (b) { b.onclick = function () { ST[key] = b.dataset.v; [].forEach.call($(id).querySelectorAll("[data-v]"), function (y) { y.classList.toggle("on", y === b); }); }; }); };
+    pk("pf", "platform"); pk("sy", "style");
+    [].forEach.call($("ex").querySelectorAll("[data-i]"), function (b) { b.onclick = function () { var x = EX[+b.dataset.i]; $("pr").value = x[3]; ST.platform = x[2]; [].forEach.call($("pf").querySelectorAll("[data-v]"), function (y) { y.classList.toggle("on", y.dataset.v === x[2]); }); }; });
+    $("bl").onclick = function () { D = { title: "Untitled design", platform: ST.platform, style: ST.style, theme: {}, screens: [{ id: "home", name: "Home", children: [{ t: "nav", title: "Home" }, { t: "text", text: "Tap ＋ Add to start", size: 18, weight: 700 }] }] }; ID = ""; api({ action: "ux-save", doc: D }).then(function (r) { if (!r.ok) return toast(r.error); ID = r.id; D = r.doc; CUR = D.screens[0].id; SEL = ""; editor(); }); };
+    $("go").onclick = function () { var p = $("pr").value.trim(); if (p.length < 12) return toast("Describe the app or website"); $("go").disabled = true; $("gst").textContent = "Designing the screens… (30–60 seconds)"; api({ action: "ux-ai", mode: "make", prompt: p, platform: ST.platform, style: ST.style, n: +$("nn").value, brand: $("br").value }).then(function (r) { $("go").disabled = false; $("gst").textContent = ""; if (!r.ok) return toast(r.error); D = r.doc; ID = ""; api({ action: "ux-save", doc: D, prompt: p }).then(function (x) { if (x.ok) { ID = x.id; D = x.doc; } CUR = D.screens[0].id; SEL = ""; editor(); toast(D.screens.length + " screens ready"); }); }); };
+    api({ action: "ux-list" }).then(function (r) { if (!r.ok || !r.rows.length) return; $("lst").innerHTML = '<div class="sh" style="margin-top:14px"><span><b>My designs</b></span></div>' + r.rows.map(function (x) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-o="' + x.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + esc(x.title) + '</b><span class="pill m">' + ({ mobile: "📱", web: "🖥️", tablet: "📟" })[x.platform] + " " + x.screens + " screens</span>" + (x.shared ? '<span class="pill g">shared</span>' : "") + '</div><div class="muted" style="font-size:12px">' + (x.style === "wireframe" ? "Wireframe" : "High-fidelity") + " · " + new Date(x.upd).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) + "</div></div>"; }).join(""); [].forEach.call($("lst").querySelectorAll("[data-o]"), function (c) { c.onclick = function () { api({ action: "ux-get", id: c.dataset.o }).then(function (g) { if (!g.ok) return toast(g.error); ID = g.d.id; D = g.d.doc; CUR = D.screens[0].id; SEL = ""; editor(); }); }; }); });
+  }
+
+  // ================= editor =================
+  function editor() {
+    $("h1").textContent = D.title; $("hp").textContent = D.screens.length + " screens · " + (D.style === "wireframe" ? "wireframe" : "high-fidelity") + " · " + D.platform;
+    var cw = Math.min(VIEW.clientWidth - 24, D.platform === "web" ? 1000 : 380);
+    VIEW.innerHTML = '<div class="tbar"><button class="btn ghost sm" id="bk">← Designs</button><button class="btn pri sm" id="pl">▶ Prototype</button><button class="btn ghost sm" id="ts">🧪 Test</button><button class="btn ghost sm" id="rv">🔍 UX review</button><button class="btn ghost sm" id="xp">⬇ Export / Figma</button><button class="btn ghost sm" id="tm">🎨 Theme</button><span class="muted" id="svst" style="font-size:11.5px;align-self:center;white-space:nowrap">Saved</span></div>' +
+      '<div class="strip" id="strip"></div><div class="stage" id="stg"></div><div id="pp"></div>' +
+      '<div class="card" style="margin-top:10px"><b>✨ Change with AI</b><div class="chips" id="sc2"><button data-v="s" class="on">This screen</button><button data-v="a">Whole design</button></div><div class="bar2" style="margin-top:6px"><input class="tx" id="ai" style="flex:1" placeholder="e.g. add a search bar and filter chips, make the cards bigger"><button class="btn sec" id="aig">Apply</button></div><div class="muted" id="aist" style="font-size:12px;margin-top:4px"></div></div>';
+    $("bk").onclick = function () { if (DIRTY) save(true); D = null; home(); };
+    $("pl").onclick = function () { play(); }; $("ts").onclick = testPanel; $("rv").onclick = review; $("xp").onclick = exportPanel; $("tm").onclick = theme;
+    var scope = "s"; [].forEach.call($("sc2").querySelectorAll("[data-v]"), function (b) { b.onclick = function () { scope = b.dataset.v; [].forEach.call($("sc2").querySelectorAll("[data-v]"), function (y) { y.classList.toggle("on", y === b); }); }; });
+    $("aig").onclick = function () { var p = $("ai").value.trim(); if (p.length < 3) return toast("Say what to change"); $("aig").disabled = true; $("aist").textContent = "Working… (15–45 seconds)"; api({ action: "ux-ai", mode: "edit", doc: D, prompt: p, screen: scope === "s" ? CUR : "" }).then(function (r) { $("aig").disabled = false; $("aist").textContent = ""; if (!r.ok) return toast(r.error); D = r.doc; if (!scr()) CUR = D.screens[0].id; SEL = ""; save(true); editor(); toast("Updated"); }); };
+    strip(); canvas(cw); props();
+  }
+  function strip() {
+    var tw = D.platform === "web" ? 150 : 70;
+    $("strip").innerHTML = D.screens.map(function (s) { return '<div class="th' + (s.id === CUR ? " on" : "") + '" data-s="' + esc(s.id) + '"><div class="fr">' + frame(s, tw, "") + "</div>" + esc(s.name) + "</div>"; }).join("") + '<div class="th" id="addS"><div class="fr add" style="width:' + tw + "px;height:" + Math.round(UXR.H[D.platform] * tw / UXR.W[D.platform]) + 'px">＋</div>Add screen</div>';
+    [].forEach.call($("strip").querySelectorAll("[data-s]"), function (b) { b.onclick = function () { if (CUR === b.dataset.s) return screenMenu(); CUR = b.dataset.s; SEL = ""; editor(); }; });
+    $("addS").onclick = addScreen;
+  }
+  function canvas(cw) {
+    var s = scr(); $("stg").innerHTML = frame(s, cw, "edit");
+    if (SEL) { var el = $("stg").querySelector('[data-p="' + SEL + '"]'); if (el) el.classList.add("ux-sel"); }
+    $("stg").onclick = function (e) { var n = e.target.closest("[data-p]"); if (!n || !$("stg").contains(n)) { SEL = ""; } else SEL = n.dataset.p; [].forEach.call($("stg").querySelectorAll(".ux-sel"), function (x) { x.classList.remove("ux-sel"); }); if (SEL) $("stg").querySelector('[data-p="' + SEL + '"]').classList.add("ux-sel"); props(); };
+  }
+  var FIELDS = { text: [["text", "Text", "area"], ["size", "Size", "num"], ["weight", "Weight", "sel:300,400,500,600,700,800"], ["color", "Colour", "col"], ["align", "Align", "sel:left,center,right"]], button: [["text", "Label"], ["variant", "Style", "sel:primary,secondary,ghost,danger"], ["icon", "Icon (emoji)"], ["full", "Full width", "bool"]], input: [["label", "Label"], ["placeholder", "Placeholder"], ["kind", "Kind", "sel:text,password,search,select,date,number,textarea"]], image: [["label", "What the image shows"], ["h", "Height", "num"], ["radius", "Corner", "num"]], icon: [["name", "Emoji"], ["size", "Size", "num"]], nav: [["title", "Title"], ["back", "Back arrow", "bool"]], avatar: [["name", "Name"], ["size", "Size", "num"]], badge: [["text", "Text"], ["color", "Colour", "col"]], toggle: [["label", "Label"], ["on", "On", "bool"]], check: [["label", "Label"], ["on", "Ticked", "bool"]], stat: [["label", "Label"], ["value", "Value"], ["delta", "Change"]], progress: [["label", "Label"], ["value", "Percent", "num"]], spacer: [["h", "Height", "num"]], chart: [["label", "Title"], ["kind", "Type", "sel:bar,line,pie"], ["h", "Height", "num"]], col: [["gap", "Gap", "num"], ["pad", "Padding", "num"], ["bg", "Background", "col"], ["radius", "Corner", "num"], ["align", "Align", "sel:start,center,end,stretch"], ["justify", "Justify", "sel:start,center,end,between"]], grid: [["cols", "Columns", "num"], ["gap", "Gap", "num"]] };
+  FIELDS.row = FIELDS.col; FIELDS.card = FIELDS.col;
+  var TN = { col: "Column", row: "Row", card: "Card", grid: "Grid", text: "Text", button: "Button", input: "Input", image: "Image", icon: "Icon", list: "List", nav: "Top bar", tabbar: "Tab bar", chips: "Chips", toggle: "Toggle", check: "Checkbox", divider: "Divider", spacer: "Spacer", stat: "Stat", progress: "Progress", avatar: "Avatar", badge: "Badge", table: "Table", chart: "Chart" };
+  function props() {
+    var pp = $("pp"); if (!SEL) { pp.innerHTML = '<div class="help">Tap anything on the screen to edit it. Tap the selected screen in the strip for rename / duplicate / delete.</div><div class="bar2"><button class="btn ghost sm" id="adE">＋ Add element</button></div>'; $("adE").onclick = function () { addEl(); }; return; }
+    var g = UXR.get(D, SEL, CUR); if (!g) { SEL = ""; return props(); } var n = g.node, F = FIELDS[n.t] || [];
+    var inp = function (f) { var v = n[f[0]], k = f[2] || "txt"; if (k === "area") return '<label class="lb">' + f[1] + '</label><textarea class="tx" data-f="' + f[0] + '" rows="2">' + esc(v || "") + "</textarea>"; if (k === "bool") return '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" data-f="' + f[0] + '"' + (v ? " checked" : "") + "><i></i><span>" + f[1] + "</span></label>"; if (k.indexOf("sel:") === 0) return '<div><label class="lb">' + f[1] + '</label><select class="tx" data-f="' + f[0] + '">' + k.slice(4).split(",").map(function (o) { return "<option" + (String(v) === o ? " selected" : "") + ">" + o + "</option>"; }).join("") + "</select></div>"; if (k === "col") return '<div><label class="lb">' + f[1] + '</label><input type="color" data-f="' + f[0] + '" value="' + (v || "#4D5BF9") + '" style="width:100%;height:38px;border:0;background:none"></div>'; return '<div><label class="lb">' + f[1] + '</label><input class="tx" data-f="' + f[0] + '"' + (k === "num" ? ' inputmode="numeric"' : "") + ' value="' + esc(v == null ? "" : v) + '"></div>'; };
+    var hasItems = n.t === "list" || n.t === "tabbar" || n.t === "chips" || n.t === "table" || n.t === "chart";
+    pp.innerHTML = '<div class="card prop" style="margin-top:10px"><div class="row" style="gap:6px"><b style="flex:1">' + (TN[n.t] || n.t) + '</b><button class="btn ghost sm" id="eUp">↑</button><button class="btn ghost sm" id="eDn">↓</button><button class="btn ghost sm" id="eDp">⧉</button><button class="btn ghost sm" id="eDl" style="color:#B42318">🗑</button><button class="btn ghost sm" id="eX">✕</button></div>' +
+      '<div class="g2">' + F.filter(function (f) { return f[2] !== "area" && f[2] !== "bool"; }).map(inp).join("") + "</div>" + F.filter(function (f) { return f[2] === "area" || f[2] === "bool"; }).map(inp).join("") +
+      (hasItems ? '<label class="lb">' + (n.t === "table" ? "Rows (cells separated by | ; first line = headers)" : n.t === "chart" ? "Values (comma separated)" : n.t === "chips" ? "Chips (one per line)" : "Items — one per line: icon | title | sub | right | link-screen") + '</label><textarea class="tx" id="eIt" rows="4">' + esc(n.t === "list" ? n.items.map(function (x) { return [x.icon, x.title, x.sub, x.right, x.link].map(function (v) { return v || ""; }).join(" | "); }).join("\n") : n.t === "tabbar" ? n.items.map(function (x) { return [x.icon, x.label, "", "", x.link].map(function (v) { return v || ""; }).join(" | "); }).join("\n") : n.t === "chips" ? n.items.join("\n") : n.t === "chart" ? n.values.join(", ") : [n.cols.join(" | ")].concat(n.rows.map(function (r) { return r.join(" | "); })).join("\n")) + "</textarea>" : "") +
+      '<label class="lb">Tap goes to (prototype)</label><select class="tx" id="eLk"><option value="">— nothing —</option>' + D.screens.map(function (s) { return '<option value="' + esc(s.id) + '"' + (n.link === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select>" +
+      '<div class="bar2"><button class="btn ghost sm" id="adE">＋ Add element ' + (n.children ? "inside" : "after") + '</button><button class="btn ghost sm" id="ePar">⤴ Select parent</button></div></div>';
+    [].forEach.call(pp.querySelectorAll("[data-f]"), function (e) { e.oninput = e.onchange = function () { var f = e.dataset.f, v = e.type === "checkbox" ? e.checked : e.value; if (/^(size|weight|h|radius|gap|pad|value|cols)$/.test(f)) v = +v || 0; n[f] = v; rerender(); }; });
+    if ($("eIt")) $("eIt").oninput = function () { var L = $("eIt").value.split("\n").map(function (x) { return x.trim(); }).filter(Boolean), sp = function (l) { return l.split("|").map(function (x) { return x.trim(); }); }; if (n.t === "list") n.items = L.map(function (l) { var a = sp(l); return { icon: a[0], title: a[1] || a[0], sub: a[2], right: a[3], link: a[4] || undefined }; }); else if (n.t === "tabbar") n.items = L.map(function (l) { var a = sp(l); return { icon: a[0], label: a[1], link: a[4] || undefined }; }); else if (n.t === "chips") n.items = L; else if (n.t === "chart") n.values = $("eIt").value.split(/[,\s]+/).map(Number).filter(function (x) { return !isNaN(x); }); else if (n.t === "table") { n.cols = sp(L[0] || ""); n.rows = L.slice(1).map(sp); } rerender(); };
+    $("eLk").onchange = function () { if ($("eLk").value) n.link = $("eLk").value; else delete n.link; rerender(); };
+    var arr = g.parent.children;
+    $("eUp").onclick = function () { if (g.index > 0) { arr.splice(g.index - 1, 0, arr.splice(g.index, 1)[0]); SEL = SEL.replace(/\d+$/, g.index - 1); rerender(true); } };
+    $("eDn").onclick = function () { if (g.index < arr.length - 1) { arr.splice(g.index + 1, 0, arr.splice(g.index, 1)[0]); SEL = SEL.replace(/\d+$/, g.index + 1); rerender(true); } };
+    $("eDp").onclick = function () { arr.splice(g.index + 1, 0, JSON.parse(JSON.stringify(n))); SEL = SEL.replace(/\d+$/, g.index + 1); rerender(true); };
+    $("eDl").onclick = function () { arr.splice(g.index, 1); SEL = ""; rerender(true); };
+    $("eX").onclick = function () { SEL = ""; editor(); };
+    $("ePar").onclick = function () { if (SEL.indexOf(".") > 0) { SEL = SEL.replace(/\.\d+$/, ""); editor(); } else toast("This is at the top of the screen"); };
+    $("adE").onclick = function () { addEl(n.children ? { into: n, path: SEL } : { after: g, path: SEL }); };
+  }
+  function rerender(full) { save(); var cw = Math.min(VIEW.clientWidth - 24, D.platform === "web" ? 1000 : 380); canvas(cw); if (full) props(); strip(); }
+  function addEl(where) {
+    var T = [["text", "Text", { t: "text", text: "New text", size: 14, weight: 400 }], ["button", "Button", { t: "button", text: "Button", variant: "primary" }], ["input", "Input", { t: "input", label: "Label", placeholder: "Type here" }], ["card", "Card", { t: "card", pad: 14, gap: 8, children: [{ t: "text", text: "Card title", size: 15, weight: 700 }, { t: "text", text: "Details", size: 13, muted: true }] }], ["row", "Row", { t: "row", gap: 8, children: [{ t: "text", text: "Left" }, { t: "text", text: "Right" }] }], ["list", "List", { t: "list", items: [{ icon: "📦", title: "Item one", sub: "Details", right: "›" }, { icon: "📦", title: "Item two", sub: "Details" }] }], ["image", "Image", { t: "image", h: 160, label: "Photo" }], ["stat", "Stat", { t: "stat", label: "Sales", value: "₹4.2 L", delta: "+8%" }], ["chips", "Chips", { t: "chips", items: ["All", "Open", "Done"] }], ["chart", "Chart", { t: "chart", kind: "bar", values: [4, 7, 5, 9, 6], label: "Trend" }], ["table", "Table", { t: "table", cols: ["Name", "Value"], rows: [["A", "10"], ["B", "20"]] }], ["toggle", "Toggle", { t: "toggle", label: "Notifications", on: true }], ["progress", "Progress", { t: "progress", value: 60, label: "Target" }], ["nav", "Top bar", { t: "nav", title: "Title", back: true }], ["tabbar", "Tab bar", { t: "tabbar", items: [{ icon: "🏠", label: "Home" }, { icon: "🔍", label: "Search" }, { icon: "👤", label: "Me" }] }], ["divider", "Divider", { t: "divider" }], ["spacer", "Spacer", { t: "spacer", h: 16 }]];
+    sheet("Add element", "", T.map(function (x) { return ["", x[1], function () { var n = JSON.parse(JSON.stringify(x[2])); var s = scr(); if (where && where.into) { where.into.children.push(n); SEL = where.path + "." + (where.into.children.length - 1); } else if (where && where.after) { where.after.parent.children.splice(where.after.index + 1, 0, n); SEL = where.path.replace(/\d+$/, where.after.index + 1); } else { var i = s.children.length - (s.children.length && s.children[s.children.length - 1].t === "tabbar" ? 1 : 0); s.children.splice(i, 0, n); SEL = String(i); } rerender(true); }]; }));
+  }
+  function addScreen() {
+    sheet("Add screen", "", [["✨", "Design it with AI", function () { sheet("New screen with AI", "", [["✨", "Create", function () { var p = $("ns").value.trim(); if (p.length < 5) { toast("Describe the screen"); return false; } var id = "s" + Date.now().toString(36); D.screens.push({ id: id, name: $("nn2").value.trim() || "New screen", children: [{ t: "nav", title: $("nn2").value.trim() || "New screen", back: true }] }); toast("Designing… (15–40 seconds)"); api({ action: "ux-ai", mode: "edit", doc: D, screen: id, prompt: "Design this new screen: " + p + ". Match the style of the other screens; link back where sensible." }).then(function (r) { if (!r.ok) return toast(r.error); D = r.doc; CUR = id; SEL = ""; save(true); editor(); }); }, "pri"]], '<label class="lb">Screen name</label><input class="tx" id="nn2" placeholder="e.g. Scheme detail"><label class="lb">What is on it</label><textarea class="tx" id="ns" rows="3" placeholder="e.g. Scheme name, dates, slab table, my progress bar, Join button"></textarea>'); }, "pri"], ["＋", "Blank screen", function () { var id = "s" + Date.now().toString(36); D.screens.push({ id: id, name: "Screen " + (D.screens.length + 1), children: [{ t: "nav", title: "Screen " + (D.screens.length + 1), back: true }] }); CUR = id; SEL = ""; save(); editor(); }], ["⧉", "Duplicate this screen", function () { var s = JSON.parse(JSON.stringify(scr())); s.id = "s" + Date.now().toString(36); s.name += " copy"; D.screens.splice(D.screens.indexOf(scr()) + 1, 0, s); CUR = s.id; SEL = ""; save(); editor(); }]]);
+  }
+  function screenMenu() {
+    var s = scr(), i = D.screens.indexOf(s);
+    sheet(s.name, "Screen", [["✓", "Save name", function () { s.name = $("sn").value.trim() || s.name; save(); editor(); }, "pri"], ["←", "Move left", function () { if (i > 0) { D.screens.splice(i - 1, 0, D.screens.splice(i, 1)[0]); save(); editor(); } }], ["→", "Move right", function () { if (i < D.screens.length - 1) { D.screens.splice(i + 1, 0, D.screens.splice(i, 1)[0]); save(); editor(); } }]].concat(D.screens.length > 1 ? [["🗑", "Delete screen", function () { D.screens.splice(i, 1); CUR = D.screens[Math.max(0, i - 1)].id; SEL = ""; save(); editor(); }, "danger"]] : []), '<label class="lb">Screen name</label><input class="tx" id="sn" value="' + esc(s.name) + '"><div class="muted" style="font-size:12px;margin-top:6px">The first screen is where the prototype starts.</div>');
+  }
+  function theme() {
+    var t = D.theme;
+    sheet("Theme", "Applies to every screen", [["✓", "Apply", function () { D.title = $("tt").value.trim() || D.title; t.primary = $("tp").value; t.bg = $("tb").value; t.surface = $("tsf").value; t.text = $("ttx").value; t.radius = +$("trd").value || 0; t.font = $("tf").value; D.style = $("tsy").value; D.platform = $("tpf").value; save(true); editor(); }, "pri"]],
+      '<label class="lb">Design name</label><input class="tx" id="tt" value="' + esc(D.title) + '"><div class="g2"><div><label class="lb">Main colour</label><input type="color" id="tp" value="' + t.primary + '" style="width:100%;height:38px;border:0"></div><div><label class="lb">Background</label><input type="color" id="tb" value="' + t.bg + '" style="width:100%;height:38px;border:0"></div><div><label class="lb">Cards</label><input type="color" id="tsf" value="' + t.surface + '" style="width:100%;height:38px;border:0"></div><div><label class="lb">Text</label><input type="color" id="ttx" value="' + t.text + '" style="width:100%;height:38px;border:0"></div><div><label class="lb">Corner radius</label><input class="tx" id="trd" inputmode="numeric" value="' + t.radius + '"></div><div><label class="lb">Font</label><select class="tx" id="tf">' + ["Inter", "Roboto", "Poppins", "Noto Sans"].map(function (f) { return "<option" + (f === t.font ? " selected" : "") + ">" + f + "</option>"; }).join("") + '</select></div><div><label class="lb">Fidelity</label><select class="tx" id="tsy"><option value="hifi">High-fidelity</option><option value="wireframe"' + (D.style === "wireframe" ? " selected" : "") + '>Wireframe</option></select></div><div><label class="lb">Platform</label><select class="tx" id="tpf">' + ["mobile", "tablet", "web"].map(function (p) { return "<option" + (p === D.platform ? " selected" : "") + ">" + p + "</option>"; }).join("") + "</select></div></div>");
+  }
+
+  // ================= prototype =================
+  function play(start) {
+    var hist = [], cur = start || D.screens[0].id, ov = document.createElement("div"); ov.className = "play"; document.body.appendChild(ov);
+    var draw = function () { var w = Math.min(window.innerWidth - 20, D.platform === "web" ? 1200 : 390), h = UXR.H[D.platform] * w / UXR.W[D.platform], mh = window.innerHeight - 90; if (h > mh) w = w * mh / h; ov.innerHTML = frame(D.screens.filter(function (s) { return s.id === cur; })[0] || D.screens[0], Math.round(w), "play") + '<div class="pb"><button class="btn ghost sm" id="pbk" style="background:#fff">← Back</button><button class="btn ghost sm" id="prs" style="background:#fff">↺ Restart</button><button class="btn pri sm" id="pcl">✕ Close</button></div>'; $("pbk").onclick = function () { if (hist.length) { cur = hist.pop(); draw(); } }; $("prs").onclick = function () { hist = []; cur = D.screens[0].id; draw(); }; $("pcl").onclick = function () { ov.remove(); }; };
+    ov.onclick = function (e) { if (e.target.closest("[data-back]") && hist.length) { cur = hist.pop(); return draw(); } var l = e.target.closest("[data-l]"); if (l && ov.contains(l)) { hist.push(cur); cur = l.getAttribute("data-l"); draw(); } };
+    draw();
+  }
+
+  // ================= test =================
+  function testPanel() {
+    if (DIRTY) save(true);
+    api({ action: "ux-share", id: ID }).then(function (r) {
+      if (!r.ok) return toast(r.error); var sh = r.share, url = location.origin + "/uxplay.html#" + sh.token, tasks = sh.tasks.slice();
+      var body = function () {
+        return '<div class="help">Testers open the link on their phone, try each task on your prototype, and rate it. You see who completed which task, how long it took and where they got stuck.</div>' +
+          '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="shon"' + (sh.on ? " checked" : "") + "><i></i><span>Link is on (anyone with the link can view the prototype)</span></label>" +
+          (sh.on ? '<div class="code" style="background:#F7F8FC;color:#141833">' + esc(url) + '</div><div class="bar2"><button class="btn pri sm" id="tcp">📋 Copy</button><button class="btn sec sm" id="twa">🟢 WhatsApp</button><button class="btn ghost sm" id="tqr">▦ QR</button></div><div id="tqrb"></div>' : "") +
+          '<label class="lb">Tasks for testers</label><div id="tk">' + tasks.map(function (k, i) { return '<div class="card" style="margin-top:6px;padding:8px"><input class="tx" data-tt="' + i + '" value="' + esc(k.text) + '"><div class="row" style="gap:6px;margin-top:6px"><span class="muted" style="font-size:12px">Done when they reach</span><select class="tx" data-tg="' + i + '" style="flex:1;padding:6px">' + '<option value="">(they say done)</option>' + D.screens.map(function (s) { return '<option value="' + esc(s.id) + '"' + (k.goal === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + '</select><button class="btn ghost sm" data-tx="' + i + '">🗑</button></div></div>'; }).join("") + '</div><div class="bar2"><button class="btn ghost sm" id="tad">＋ Task</button><button class="btn ghost sm" id="tai">✨ Suggest tasks</button><button class="btn sec sm" id="tsv">💾 Save tasks</button></div><div id="tres"></div>';
+      };
+      sheet("🧪 User test", "", [["📊", "Results", function () { results(); return false; }, "pri"]], body());
+      var wire = function () {
+        var box = document.querySelector(".sheet .sbody") || document.querySelector(".sheet");
+        $("shon").onchange = function () { api({ action: "ux-share", id: ID, on: $("shon").checked }).then(function (x) { if (x.ok) { sh = x.share; reb(); } }); };
+        if ($("tcp")) { $("tcp").onclick = function () { copy(url, "Link copied"); }; $("twa").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent("Please try this app prototype (2–5 minutes): " + url), "_blank"); }; $("tqr").onclick = function () { var q = qrcode(0, "M"); q.addData(url); q.make(); $("tqrb").innerHTML = '<div style="display:flex;justify-content:center;margin-top:8px">' + q.createSvgTag(4, 8) + "</div>"; }; }
+        [].forEach.call(document.querySelectorAll("[data-tt]"), function (e) { e.oninput = function () { tasks[+e.dataset.tt].text = e.value; }; });
+        [].forEach.call(document.querySelectorAll("[data-tg]"), function (e) { e.onchange = function () { tasks[+e.dataset.tg].goal = e.value; }; });
+        [].forEach.call(document.querySelectorAll("[data-tx]"), function (e) { e.onclick = function () { tasks.splice(+e.dataset.tx, 1); reb(); }; });
+        $("tad").onclick = function () { tasks.push({ text: "", goal: "" }); reb(); };
+        $("tai").onclick = function () { $("tai").disabled = true; api({ action: "ux-ai", mode: "tests", doc: D }).then(function (x) { $("tai").disabled = false; if (!x.ok) return toast(x.error); tasks = x.tasks; reb(); }); };
+        $("tsv").onclick = function () { api({ action: "ux-share", id: ID, tasks: tasks.filter(function (k) { return k.text.trim(); }) }).then(function (x) { if (!x.ok) return toast(x.error); sh = x.share; tasks = sh.tasks.slice(); toast("Tasks saved"); reb(); }); };
+      };
+      var reb = function () { var b = document.querySelector("#tk") && document.querySelector("#tk").parentNode; if (b) { b.innerHTML = body(); wire(); } };
+      wire();
+    });
+  }
+  function results() {
+    api({ action: "ux-results", id: ID }).then(function (r) {
+      if (!r.ok) return toast(r.error); var R = r.rows, T = r.tasks, nm = function (id) { var s = D.screens.filter(function (x) { return x.id === id; })[0]; return s ? s.name : id; };
+      if (!R.length) return sheet("Results", "", [], '<div class="muted">No one has finished the test yet.</div>');
+      var rowT = T.map(function (k) { var A = R.map(function (x) { return (x.tasks || []).filter(function (y) { return y.id === k.id; })[0]; }).filter(Boolean), ok = A.filter(function (a) { return a.ok; }), avg = function (f, L) { return L.length ? Math.round(L.reduce(function (s, a) { return s + a[f]; }, 0) / L.length) : 0; }; return { k: k, n: A.length, ok: ok.length, ms: avg("ms", ok), taps: avg("taps", ok) }; });
+      var ease = R.filter(function (x) { return x.ease; }), avgE = ease.length ? (ease.reduce(function (s, x) { return s + x.ease; }, 0) / ease.length).toFixed(1) : "–";
+      var data = "Tasks:\n" + rowT.map(function (t) { return "- " + t.k.text + " (goal " + nm(t.k.goal) + "): " + t.ok + "/" + t.n + " completed, avg " + Math.round(t.ms / 1000) + "s, " + t.taps + " taps"; }).join("\n") + "\nPaths:\n" + R.slice(0, 40).map(function (x) { return (x.tasks || []).map(function (y) { return y.id + (y.ok ? " ok " : y.gaveUp ? " gave up " : " ") + y.path.map(nm).join(">"); }).join(" | "); }).join("\n") + "\nEase ratings: " + ease.map(function (x) { return x.ease; }).join(",") + "\nComments:\n" + R.filter(function (x) { return x.note; }).map(function (x) { return "- " + x.note; }).join("\n");
+      sheet("📊 Test results", R.length + " tester(s) · ease " + avgE + "/5", [["✨", "AI summary", function () { api({ action: "ux-ai", mode: "insight", data: data }).then(function (x) { if (!x.ok) return toast(x.error); $("rai").innerHTML = '<div class="help" style="white-space:pre-wrap">' + esc(x.text) + "</div>"; }); return false; }, "pri"], ["⬇", "Excel", function () { download(xlsx([{ name: "Results", rows: [["When", "Tester", "Ease", "Comment"].concat(T.map(function (k) { return k.text; }))].concat(R.map(function (x) { return [new Date(x.at).toLocaleString("en-IN"), x.name, x.ease, x.note].concat(T.map(function (k) { var a = (x.tasks || []).filter(function (y) { return y.id === k.id; })[0]; return a ? (a.ok ? "✓ " : a.gaveUp ? "gave up " : "✗ ") + Math.round(a.ms / 1000) + "s · " + a.path.map(nm).join(" > ") : ""; })); })) }]), "ux_test_results.xlsx"); return false; }]],
+        '<table class="tb"><tr><th>Task</th><th>Done</th><th>Avg time</th><th>Taps</th></tr>' + rowT.map(function (t) { var pc = t.n ? Math.round(t.ok * 100 / t.n) : 0; return "<tr><td>" + esc(t.k.text) + '</td><td><span class="pill ' + (pc >= 80 ? "g" : pc >= 50 ? "o" : "r") + '">' + t.ok + "/" + t.n + "</span></td><td>" + Math.round(t.ms / 1000) + "s</td><td>" + t.taps + "</td></tr>"; }).join("") + "</table>" +
+        (R.some(function (x) { return x.note; }) ? '<label class="lb">Comments</label>' + R.filter(function (x) { return x.note; }).slice(0, 20).map(function (x) { return '<div style="font-size:12.5px;margin-top:4px"><b>' + esc(x.name || "Tester") + "</b> (" + x.ease + "/5): " + esc(x.note) + "</div>"; }).join("") : "") + '<div id="rai"></div>');
+    });
+  }
+
+  // ================= review =================
+  function review() {
+    toast("Reviewing the design… (20–40 seconds)");
+    api({ action: "ux-ai", mode: "review", doc: D }).then(function (r) {
+      if (!r.ok) return toast(r.error); var v = r.review;
+      sheet("🔍 UX review · " + v.score + "/100", v.summary, [["✨", "Fix the high-priority issues", function () { var hi = v.issues.filter(function (x) { return x.severity === "high"; }).concat(v.issues.filter(function (x) { return x.severity === "medium"; })).slice(0, 6); if (!hi.length) { toast("Nothing high-priority"); return false; } toast("Applying fixes… (30–60 seconds)"); api({ action: "ux-ai", mode: "edit", doc: D, prompt: "Fix these UX issues: " + hi.map(function (x) { return "[" + x.screen + "] " + x.issue + " → " + x.fix; }).join("; ") }).then(function (x) { if (!x.ok) return toast(x.error); D = x.doc; if (!scr()) CUR = D.screens[0].id; SEL = ""; save(true); editor(); toast("Fixes applied — review again to check"); }); }, "pri"]],
+        (v.strengths.length ? '<div class="help ok"><b>Good</b><br>• ' + v.strengths.map(esc).join("<br>• ") + "</div>" : "") + v.issues.map(function (x, i) { return '<div class="iss ' + x.severity + '" data-is="' + i + '"><span class="pill ' + (x.severity === "high" ? "r" : x.severity === "medium" ? "o" : "m") + '">' + x.severity + "</span> <b>" + esc((D.screens.filter(function (s) { return s.id === x.screen; })[0] || {}).name || x.screen) + "</b><div>" + esc(x.issue) + '</div><div class="muted">Fix: ' + esc(x.fix) + "</div></div>"; }).join(""));
+      [].forEach.call(document.querySelectorAll("[data-is]"), function (e) { e.onclick = function () { var x = v.issues[+e.dataset.is]; if (D.screens.some(function (s) { return s.id === x.screen; })) { CUR = x.screen; SEL = ""; var c = document.querySelector(".sheet .act:last-child"); editor(); } }; });
+    });
+  }
+
+  // ================= export =================
+  function exportPanel() {
+    if (DIRTY) save(true);
+    var code = "BIUX1:" + btoa(unescape(encodeURIComponent(JSON.stringify(D))));
+    sheet("⬇ Export", "", [["🟣", "Copy design for Figma", function () { copy(code, "Copied — paste it in the Figma plugin"); return false; }, "pri"], ["🌐", "Clickable prototype (HTML)", function () { download(new Blob([UXR.exportHtml(D)], { type: "text/html" }), D.title.replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + "_prototype.html"); return false; }], ["🖼", "This screen as PNG", function () { png(); return false; }], ["🧾", "Design as JSON (for developers)", function () { download(new Blob([JSON.stringify(D, null, 1)], { type: "application/json" }), "design.json"); return false; }]],
+      '<b>Open it in Figma</b><div class="step"><i>1</i><div>One time, in the <b>Figma desktop app</b>: download <a href="/figma-plugin/vivo-bi-figma-plugin.zip" download><b>the vivo BI plugin</b></a>, unzip it, then in Figma: <b>Menu → Plugins → Development → Import plugin from manifest…</b> → choose <code>manifest.json</code>.</div></div><div class="step"><i>2</i><div>Tap <b>Copy design for Figma</b> above.</div></div><div class="step"><i>3</i><div>In any Figma file: <b>Plugins → Development → vivo BI → UI import</b>, paste, press <b>Build</b>. Every screen becomes a frame with auto-layout, real text, colours and the prototype links.</div></div><div class="help">Or share the design link from 🧪 Test — the plugin can also load it by that link.</div><div class="help">The HTML file is a working click-through prototype — open it on any phone or send it to developers as the reference build.</div>');
+  }
+  function png() {
+    lib("/vendor/html-to-image.js", function () { return window.htmlToImage; }).then(function () {
+      var box = document.createElement("div"); box.style.cssText = "position:fixed;left:-99999px;top:0"; box.innerHTML = UXR.screen(D, scr(), "play"); document.body.appendChild(box);
+      window.htmlToImage.toBlob(box.firstChild, { pixelRatio: 2 }).then(function (b) { box.remove(); download(b, (scr().name || "screen").replace(/[^\w \-]+/g, "").trim().replace(/\s+/g, "_") + ".png"); }).catch(function () { box.remove(); toast("Couldn't make the picture"); });
+    });
+  }
+
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div style="margin-top:12px"><a class="btn pri" href="/">Log in</a></div></div>'; }
+  else home();
+  window.addEventListener("resize", function () { if (D && $("stg")) { clearTimeout(window.__ur); window.__ur = setTimeout(function () { canvas(Math.min(VIEW.clientWidth - 24, D.platform === "web" ? 1000 : 380)); }, 200); } });
+})();
+</script>
+</body>
+</html>
