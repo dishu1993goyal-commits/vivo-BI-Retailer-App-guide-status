@@ -1,8 +1,9 @@
 {
-  "versionCode": 41,
-  "versionName": "7.5",
+  "versionCode": 42,
+  "versionName": "7.6",
   "notes": [
-    "Product permissions (vivo portal): fixed “Search button not found” — the app now finds the portal's Search button next to the TypeName box"
+    "New: Portal task recorder (Admin app) — record a task once on a vivo portal, then the app repeats it for every Excel row. You log in and type every password and captcha yourself; the app stops and waits for you at those steps.",
+    "Product permissions keep working as in 7.5."
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
