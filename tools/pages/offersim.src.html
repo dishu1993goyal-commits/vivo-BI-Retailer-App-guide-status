@@ -29,8 +29,20 @@
   /*@@CORE@@*/
   var VIEW = $("view"), CAT = [], M = null, OPTS = [], IN = { price: 0, oldVal: 0, down: 0, model: "", variant: "" };
   var nf = function (n) { return "₹" + Math.round(n).toLocaleString("en-IN"); };
-  var amt = function (s) { s = String(s || ""); var m = s.match(/₹\s?([\d,]+)/) || s.match(/rs\.?\s?([\d,]+)/i) || s.match(/([\d,]{3,})\s?(off|cashback|discount|bonus|extra)/i); return m ? +m[1].replace(/,/g, "") : 0; };
-  var pct = function (s, price) { var m = String(s || "").match(/(\d+(?:\.\d+)?)\s?%/); if (!m) return 0; var v = price * +m[1] / 100, cap = String(s).match(/up to\s?₹\s?([\d,]+)/i); return cap ? Math.min(v, +cap[1].replace(/,/g, "")) : v; };
+  // the benefit amount in an offer text — not the minimum purchase / transaction amount, and never more than 40% of the price
+  var amt = function (s, price) {
+    s = String(s || ""); var best = 0, re = /(?:₹|rs\.?|inr)\s?([\d,]+(?:\.\d+)?)\s*(k\b)?|([\d,]{3,})\s?(?=\s?(?:off|cashback|discount|bonus|extra))/gi, m;
+    while ((m = re.exec(s))) {
+      var v = +String(m[1] || m[3]).replace(/,/g, "") * (m[2] ? 1000 : 1), before = s.slice(Math.max(0, m.index - 40), m.index).toLowerCase(), after = s.slice(m.index, m.index + 40).toLowerCase();
+      if (!v) continue;
+      if (/(above|over|min(imum)?|transaction|txn|purchase|spend|order value|worth|mop|price|cart|on a? ?(phone|device)s? of|loan amount|emi of)\W*$/.test(before.trim().slice(-30))) continue;   // a condition, not the benefit
+      var good = /(cashback|discount|off|bonus|instant|save|saving|benefit|up ?to|extra|flat|reward)/.test(before + after);
+      if (price && v > price * 0.4) continue;
+      if (good && v > best) best = v; else if (!best && v < (price || 1e9) * 0.25) best = v;
+    }
+    return best;
+  };
+  var pct = function (s, price) { var m = String(s || "").match(/(\d+(?:\.\d+)?)\s?%/); if (!m || +m[1] > 40) return 0; var v = price * +m[1] / 100, cap = String(s).match(/up to\s?(?:₹|rs\.?)\s?([\d,]+)/i); return cap ? Math.min(v, +cap[1].replace(/,/g, "")) : v; };
   function load() {
     api({ action: "aff-catalog" }).then(function (r) { CAT = r.ok ? r.models || [] : []; var pre = null; try { pre = JSON.parse(sessionStorage.getItem("offersim-model") || "null"); } catch (e) { } draw(); if (pre && pre.slug) pick(pre.slug); });
   }
@@ -59,13 +71,13 @@
   }
   function build() {
     var md = (M && M.model) || {}, P = IN.price, out = [{ name: "Full payment", kind: "cash", disc: 0, n: 0, adv: 0, noCost: false, rate: 0, fee: 0, exch: 0, useEx: false }];
-    var exB = (md.exchange || []).reduce(function (a, x) { return Math.max(a, amt(x.benefit)); }, 0), up = (md.upgrade || []).reduce(function (a, x) { return Math.max(a, amt(x.benefit)); }, 0);
-    (md.cashback || []).forEach(function (c) { var d = amt(c.benefit) || pct(c.benefit, P); if (d) out.push({ name: (c.partner || "Cashback") + " cashback", kind: "cash", disc: d, n: 0, adv: 0, noCost: false, rate: 0, fee: 0, exch: 0, useEx: false, note: c.benefit }); });
+    var exB = (md.exchange || []).reduce(function (a, x) { return Math.max(a, amt(x.benefit, P)); }, 0), up = (md.upgrade || []).reduce(function (a, x) { return Math.max(a, amt(x.benefit, P)); }, 0);
+    (md.cashback || []).forEach(function (c) { var d = amt(c.benefit, P) || pct(c.benefit, P); if (d) out.push({ name: (c.partner || "Cashback") + " cashback", kind: "cash", disc: d, n: 0, adv: 0, noCost: false, rate: 0, fee: 0, exch: 0, useEx: false, note: c.benefit }); });
     (md.emi || []).forEach(function (e) {
       var sc = String(e.scheme || "").match(/(\d+)\s*\/\s*(\d+)/), tens = (e.tenures || []).map(Number).filter(Boolean), n = sc ? +sc[1] : tens.length ? Math.max.apply(null, tens) : 6, adv = sc ? +sc[2] : 0;
-      out.push({ name: (e.partner || "EMI") + (e.type ? " · " + e.type : ""), kind: "emi", disc: amt(e.benefit) || pct(e.benefit, P), n: n, adv: adv, noCost: !!e.noCost, rate: e.noCost ? 0 : 16, fee: 0, exch: 0, useEx: false, note: [e.scheme, e.benefit, e.validTill && "till " + e.validTill].filter(Boolean).join(" · ") });
+      out.push({ name: (e.partner || "EMI") + (e.type ? " · " + e.type : ""), kind: "emi", disc: amt(e.benefit, P) || pct(e.benefit, P), n: n, adv: adv, noCost: !!e.noCost, rate: e.noCost ? 0 : 16, fee: 0, exch: 0, useEx: false, note: [e.scheme, e.benefit, e.validTill && "till " + e.validTill].filter(Boolean).join(" · ") });
     });
-    (M && M.reports || []).filter(function (x) { return x.kind === "emi" || x.kind === "cashback"; }).slice(0, 6).forEach(function (x) { var d = amt(x.details) || amt(x.scheme); out.push({ name: (x.partner || "Field offer") + " (" + (x.state || "field") + ")", kind: x.kind === "emi" ? "emi" : "cash", disc: d, n: x.kind === "emi" ? 6 : 0, adv: 0, noCost: true, rate: 0, fee: 0, exch: 0, useEx: false, note: [x.scheme, x.details].filter(Boolean).join(" · ").slice(0, 120) }); });
+    (M && M.reports || []).filter(function (x) { return x.kind === "emi" || x.kind === "cashback"; }).slice(0, 6).forEach(function (x) { var d = amt(x.details, P) || amt(x.scheme, P); out.push({ name: (x.partner || "Field offer") + " (" + (x.state || "field") + ")", kind: x.kind === "emi" ? "emi" : "cash", disc: d, n: x.kind === "emi" ? 6 : 0, adv: 0, noCost: true, rate: 0, fee: 0, exch: 0, useEx: false, note: [x.scheme, x.details].filter(Boolean).join(" · ").slice(0, 120) }); });
     if (exB || up) out.forEach(function (o) { o.exch = Math.max(exB, up); });
     OPTS = out; opts(); calc();
   }
@@ -79,7 +91,7 @@
     [].forEach.call($("ops").querySelectorAll("[data-x]"), function (a) { a.onclick = function () { OPTS.splice(+a.dataset.x, 1); opts(); calc(); }; });
   }
   function one(o) {
-    var P = IN.price, ex = o.useEx ? IN.oldVal + (o.exch || 0) : 0, pay = Math.max(0, P - (o.disc || 0) - ex);
+    var P = IN.price, ex = o.useEx ? IN.oldVal + (o.exch || 0) : 0, pay = Math.max(0, P - Math.min(o.disc || 0, P * 0.6) - ex);
     if (o.kind !== "emi" || !o.n) return { now: pay, emi: 0, months: 0, cash: pay, eff: pay + (o.useEx ? IN.oldVal : 0), interest: 0 };
     var down = Math.min(IN.down, pay), L = pay - down, n = Math.max(1, Math.round(o.n)), a = Math.min(n, Math.round(o.adv || 0)), emi;
     if (o.noCost || !o.rate) emi = L / n; else { var r = o.rate / 1200, f = Math.pow(1 + r, n); emi = L * r * f / (f - 1); }

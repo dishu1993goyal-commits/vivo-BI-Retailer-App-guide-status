@@ -78,6 +78,30 @@ export async function emiApiAction(b, ctx) {
 
   // ---- IMEI test data: many test IMEIs per environment with their details, picked from a list instead of typed
   //   eapiimei:<env>  { rows: [{ id, imei, model, dealer, scheme, amount, oldBrand, oldModel, plan, partner, label, note, last:{ ep, t, ok, msg, at } }] }
+  // ---- partner mails: who gets the test pack (To per company, one common Cc list) and what goes in it
+  //   eapimail { from, cc:[], to:{ "<company lower>": [emails] }, subject, note }
+  if (b.action === "eapi-mailcfg") {
+    const M = (await store.get("eapimail")) || { from: "", cc: [], to: {}, subject: "", note: "" };
+    if (b.save) {
+      const em = (v) => String(v || "").trim().toLowerCase().slice(0, 120), ok = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      const x = b.cfg || {}, list = (a, n) => [...new Set((Array.isArray(a) ? a : String(a || "").split(/[,;\s]+/)).map(em).filter(ok))].slice(0, n);
+      if (x.from !== undefined) M.from = ok(em(x.from)) ? em(x.from) : "";
+      if (x.cc !== undefined) M.cc = list(x.cc, 15);
+      if (x.to) Object.keys(x.to).slice(0, 300).forEach((c) => { const k = String(c).trim().toLowerCase().slice(0, 120); if (!k) return; const v = list(x.to[c], 6); if (v.length) M.to[k] = v; else delete M.to[k]; });
+      if (x.subject !== undefined) M.subject = str(x.subject, 200);
+      if (x.note !== undefined) M.note = String(x.note || "").slice(0, 3000);
+      M.upd = t; M.by = by; await store.set("eapimail", M);
+    }
+    return json(200, { ok: true, cfg: M });
+  }
+  if (b.action === "eapi-mailpack") {   // everything a partner mail needs; secrets are only sent to HO's own screen to put in the draft
+    const e = ENVS.includes(b.env) ? b.env : "prod", E = cfg.envs[e] || {}, K = keys[e] || {}, PW = (await store.get("eapipw:" + e)) || {};
+    const pwOf = (c) => { const k = Object.keys(PW).find((x) => x.toLowerCase() === String(c).toLowerCase()); return k ? PW[k] : String(E.company || "").toLowerCase() === String(c).toLowerCase() ? K.password || "" : ""; };
+    const comps = (Array.isArray(b.companies) ? b.companies : []).slice(0, 50).map((c) => str(c, 120)).filter(Boolean);
+    const docs = (await Promise.all((await store.list("eapidoc:")).map((k) => store.get(k)))).filter((d) => d && d.done && d.biz === "Installment (EMI)").sort((x, y) => String(y.version || "").localeCompare(String(x.version || ""), undefined, { numeric: true }) || (y.upd || y.at) - (x.upd || x.at));
+    const doc = docs.find((d) => d.env === (e === "prod" ? "Production" : "UAT")) || docs.find((d) => !d.env || /both|all/i.test(d.env)) || docs[0] || null;
+    return json(200, { ok: true, env: e, url: E.url || "", invoker: E.invoker || "", secret: K.secret || "", companies: comps.map((c) => ({ company: c, password: pwOf(c) })), doc: doc ? { id: doc.id, name: doc.name, title: doc.title, version: doc.version, mime: doc.mime, size: doc.size } : null, mail: (await store.get("eapimail")) || { from: "", cc: [], to: {} } });
+  }
   if (/^eapi-imei-/.test(b.action)) {
     const e = ENVS.includes(b.env) ? b.env : "uat", key = "eapiimei:" + e, D = (await store.get(key)) || { rows: [] };
     const IF = { imei: 20, imei2: 20, model: 80, dealer: 60, scheme: 80, amount: 20, oldBrand: 60, oldModel: 80, plan: 80, partner: 80, label: 120, note: 300 };

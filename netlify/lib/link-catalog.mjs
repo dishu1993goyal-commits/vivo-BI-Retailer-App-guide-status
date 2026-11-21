@@ -1518,6 +1518,8 @@ export const LINK_CATALOG = {
 "eapi-imei-save",
 "eapi-log",
 "eapi-log-clear",
+"eapi-mailcfg",
+"eapi-mailpack",
 "eapi-order",
 "eapi-p-doc",
 "eapi-p-docs",
