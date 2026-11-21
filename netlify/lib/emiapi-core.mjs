@@ -80,9 +80,17 @@ export async function emiApiAction(b, ctx) {
   //   eapiimei:<env>  { rows: [{ id, imei, model, dealer, scheme, amount, oldBrand, oldModel, plan, partner, label, note, last:{ ep, t, ok, msg, at } }] }
   if (/^eapi-imei-/.test(b.action)) {
     const e = ENVS.includes(b.env) ? b.env : "uat", key = "eapiimei:" + e, D = (await store.get(key)) || { rows: [] };
-    const IF = { imei: 20, model: 80, dealer: 60, scheme: 80, amount: 20, oldBrand: 60, oldModel: 80, plan: 80, partner: 80, label: 120, note: 300 };
-    const clean = (x) => { const o = {}; Object.keys(IF).forEach((k) => { o[k] = str(x && x[k], IF[k]); }); o.imei = o.imei.replace(/[\s'"]/g, ""); return o; };
-    if (b.action === "eapi-imei-list") return json(200, { ok: true, rows: D.rows });
+    const IF = { imei: 20, imei2: 20, model: 80, dealer: 60, scheme: 80, amount: 20, oldBrand: 60, oldModel: 80, plan: 80, partner: 80, label: 120, note: 300 };
+    const clean = (x) => { const o = {}; Object.keys(IF).forEach((k) => { o[k] = str(x && x[k], IF[k]); }); o.imei = o.imei.replace(/[\s'"]/g, ""); o.imei2 = o.imei2.replace(/[\s'"]/g, ""); return o; };
+    // partner logins: company name → password, per environment. Write-only: passwords are never sent back to a screen.
+    const pwKey = "eapipw:" + e, PW = (await store.get(pwKey)) || {};
+    const pwInfo = () => Object.keys(PW).sort().map((c) => ({ company: c, len: PW[c].length }));
+    if (b.action === "eapi-imei-list") return json(200, { ok: true, rows: D.rows, logins: pwInfo() });
+    if (b.action === "eapi-imei-pw") {   // { creds: [{ company, password }] } add / change; { del: company } remove
+      if (b.del) delete PW[cleanKey(b.del)];
+      for (const x of (Array.isArray(b.creds) ? b.creds : []).slice(0, 500)) { const c = cleanKey(x && x.company).slice(0, 120), pw = cleanKey(x && x.password).slice(0, 200); if (c && pw) PW[c] = pw; }
+      await store.set(pwKey, PW); return json(200, { ok: true, logins: pwInfo() });
+    }
     if (b.action === "eapi-imei-save") {   // add / update by IMEI (replace: true = the list becomes exactly these rows)
       const inRows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 5000).map(clean).filter((x) => x.imei);
       if (!inRows.length) return json(400, { ok: false, error: "No IMEIs to save" });
@@ -106,7 +114,10 @@ export async function emiApiAction(b, ctx) {
     if (!E.invoker || !K.secret) return json(400, { ok: false, error: "Add the invoker name and secret for " + (e === "prod" ? "Production" : "UAT") + " in Set-up first." });
     // {{companyName}} / {{password}} are filled from Set-up, so the password never has to be typed on the test screen
     let raw = String(b.raw == null ? "" : b.raw).slice(0, 20000);
-    raw = raw.replace(/\{\{\s*companyName\s*\}\}/g, jsonEsc(E.company || "")).replace(/\{\{\s*password\s*\}\}/g, jsonEsc(K.password || ""));
+    // b.cred = a partner's company name from the IMEI list: use that partner's saved password instead of Set-up's
+    let coName = E.company || "", pwd = K.password || "";
+    if (b.cred) { const P = (await store.get("eapipw:" + e)) || {}, c = cleanKey(b.cred).slice(0, 120); if (!P[c]) return json(400, { ok: false, error: "No password saved for “" + c + "” on " + (e === "prod" ? "Production" : "UAT") + ". Add it in 📱 IMEI data → Partner logins." }); coName = c; pwd = P[c]; }
+    raw = raw.replace(/\{\{\s*companyName\s*\}\}/g, jsonEsc(coName)).replace(/\{\{\s*password\s*\}\}/g, jsonEsc(pwd));
     // body layout + how the signature is built. "ok" = this environment's saved format (found with "Find the right signature").
     const ef = String(b.fmt || E.fmt || "compact|ok").split("|"), bodyMode = ["asis", "compact", "sorted", "doc"].includes(ef[0]) ? ef[0] : "compact";
     let sig = str(b.sig, 20) || "ok";
@@ -137,7 +148,7 @@ export async function emiApiAction(b, ctx) {
     } catch (x) { err = x && x.name === "AbortError" ? "No reply from the vivo gateway within 9 seconds" : "Could not reach the vivo gateway: " + String((x && (x.cause && x.cause.code || x.message)) || x).slice(0, 160); }
     const ms = Date.now() - t0;
     let res = null; try { res = JSON.parse(text); } catch (x) { }
-    const mask = (s) => K.password ? String(s).split(jsonEsc(K.password)).join("••••••") : String(s);
+    const mask = (s) => pwd ? String(s).split(jsonEsc(pwd)).join("••••••") : String(s);
     const d = (res && res.data) || {};
     const log = { id: t.toString(36) + randomBytes(2).toString("hex"), at: t, by, env: e, ep, label: str(b.label, 120), sig, url, status, ms, err,
       req: mask(raw), sigShown: b64(inv) + "@#" + ts + "@#" + hash.slice(0, 12) + "…", fmt: bodyMode + "|" + sig, sigFull: headers.gwSignature || "", ts, inv, bodyBytes: Buffer.byteLength(raw, "utf8"), signedBytes: Buffer.byteLength(signed, "utf8"),

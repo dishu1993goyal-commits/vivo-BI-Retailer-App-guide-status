@@ -1011,6 +1011,7 @@ export const LINK_CATALOG = {
 "eapi-imei-del",
 "eapi-imei-list",
 "eapi-imei-mark",
+"eapi-imei-pw",
 "eapi-imei-save",
 "eapi-log",
 "eapi-log-clear",
