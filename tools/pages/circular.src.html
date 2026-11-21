@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Circular studio</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12px inherit;cursor:pointer;color:var(--ink);text-align:left}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:14px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:6px;font-size:13px}
+.prog{height:8px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:#4D5BF9;width:0;transition:width .3s}
+.li{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #EEF0F6;cursor:pointer}.li:first-child{border-top:0}.li .t{flex:1;min-width:0}.li b{display:block;font-size:14px}
+.lcard{background:linear-gradient(135deg,#2B33A6,#4D5BF9);color:#fff;border-radius:16px;padding:18px;min-height:150px;margin-top:8px;font-size:14.5px;line-height:1.6;white-space:pre-wrap}.lcard h4{margin:0 0 8px;font-size:17px}
+.flip{perspective:900px;margin-top:8px;cursor:pointer}.flip .in{position:relative;min-height:150px;transition:transform .45s;transform-style:preserve-3d}.flip.on .in{transform:rotateY(180deg)}
+.flip .f,.flip .b{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;padding:18px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:15px;font-weight:700}
+.flip .f{background:#FFF4E5;color:#5A3A00}.flip .b{background:#E6F4EA;color:#0F4D2C;transform:rotateY(180deg)}
+.q{margin-top:12px;padding-top:10px;border-top:1px solid #EEF0F6}.q b{display:block;font-size:14px;margin-bottom:6px}.q label{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid #E3E6F3;border-radius:10px;margin-top:5px;font-size:13.5px;cursor:pointer}
+.q label.ok{background:#E6F4EA;border-color:#9BD3AE}.q label.bad{background:#FDECEC;border-color:#F3B1AA}.q .why{font-size:12.5px;color:var(--mut);margin-top:5px}
+.ch{border-left:4px solid #4D5BF9;background:#F7F8FC;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:13px}.ch.added{border-color:#13693F}.ch.removed{border-color:#B42318}.ch .bf{color:#B42318;text-decoration:line-through}.ch .af{color:#13693F;font-weight:700}
+.score{font-size:42px;font-weight:900;text-align:center;color:#2B33A6}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📜</span></div>
+  <h1>Circular studio</h1><p>Turn a circular into a lesson + quiz in every state's language — or see what changed</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script src="/docread.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), HO = AUTH && AUTH.app === "admin", META = null, LIST = [], TAB = /compare/.test(location.hash) ? "cmp" : "list", ED = null, CMP = { old: "", neu: "", oldn: "", neun: "" }, DIFF = null;
+  var TABS = HO ? [["list", "📚 Lessons"], ["new", "＋ New lesson"], ["cmp", "🔍 What changed?"]] : [["list", "📚 My lessons"], ["cmp", "🔍 What changed?"]];
+  var LNAME = function (l) { return META && META.langs[l] || l; };
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    if (TAB === "list") drawList(); else if (TAB === "new") drawNew(); else drawCmp();
+  }
+  // files → text (scanned pages are read by AI)
+  function readFiles(files, pm) {
+    var out = [], i = 0;
+    return new Promise(function (res) {
+      (function next() {
+        if (i >= files.length) return res(out.join("\n\n").trim());
+        var f = files[i++]; pm("Opening " + f.name + "…");
+        DOCREAD.read(f, { maxPages: 25 }).then(function (d) {
+          var k = 0;
+          (function pg() {
+            if (k >= d.pages.length) return next();
+            var p = d.pages[k++];
+            if (!p.img) { out.push(p.text); return pg(); }
+            pm("Reading scanned page " + p.n + " of " + f.name + "…");
+            api({ action: "cs-ocr", img: p.img }).then(function (r) { if (r.ok) out.push(r.text); else toast(r.error); pg(); });
+          })();
+        }, function (e) { toast(f.name + ": " + e.message); next(); });
+      })();
+    });
+  }
+  function drawList() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "cs-list" }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>' + esc(r.error) + "</b></div>"; return; }
+      LIST = r.rows;
+      VIEW.innerHTML = '<div class="card">' + (LIST.length ? LIST.map(function (x) {
+        var tag = HO ? (x.pub ? '<span class="pill g">Published</span>' : '<span class="pill m">Draft</span>') + ' <span class="pill">' + (x.done || 0) + " done</span>" : x.mine ? '<span class="pill g">✓ ' + x.mine.score + "/" + x.mine.total + "</span>" : '<span class="pill o">New</span>';
+        return '<div class="li" data-i="' + x.id + '"><span style="font-size:26px">📜</span><span class="t"><b>' + esc(x.title) + '</b><span class="muted" style="font-size:12px">' + x.n + " questions · " + x.langs.map(LNAME).join(", ") + (HO ? " · " + (x.states[0] === "all" ? "all states" : x.states.length + " state(s)") : "") + " · " + dOnly(x.upd) + "</span></span>" + tag + "</div>";
+      }).join("") : '<div class="empty"><div class="big">📜</div><b>' + (HO ? "No lessons yet" : "No lessons for you yet") + '</b><div class="muted">' + (HO ? "Tap “＋ New lesson” and add a circular." : "When HO publishes a circular lesson for your state, it shows here.") + "</div></div>") + "</div>";
+      [].forEach.call(VIEW.querySelectorAll(".li"), function (el) { el.onclick = function () { openL(el.dataset.i); }; });
+    });
+  }
+  function openL(id) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Opening…</div>';
+    api({ action: "cs-get", id: id }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      var L = r.l, langs = Object.keys(L.langs), pref = function () { try { return localStorage.getItem("cs-lang") || ""; } catch (e) { return ""; } };
+      var lang = langs.indexOf(pref()) >= 0 ? pref() : META && langs.indexOf(META.mine) >= 0 ? META.mine : "en", ci = 0, fi = 0, ans = [];
+      function show() {
+        var X = L.langs[lang];
+        VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button><span style="flex:1"></span>' + (HO ? '<button class="btn ghost sm" id="st">📊 Who finished</button><button class="btn ghost sm" id="ed">✏️ Edit</button><button class="btn ghost sm" id="pb">' + (L.pub ? "Unpublish" : "Publish") + '</button><button class="btn ghost sm" id="dl">🗑</button>' : "") + "</div>" +
+          (langs.length > 1 ? '<div class="chips" id="lg">' + langs.map(function (l) { return '<button data-l="' + l + '" class="' + (l === lang ? "on" : "") + '">' + esc(LNAME(l)) + "</button>"; }).join("") + "</div>" : "") +
+          '<h2 style="margin:12px 0 4px">' + esc(X.title) + '</h2><div style="font-size:14px;line-height:1.6">' + esc(X.summary) + "</div>" +
+          (X.keypoints.length ? '<div class="help"><b>Remember</b><br>' + X.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div>" : "") + "</div>" +
+          (X.cards.length ? '<div class="card"><b>📖 Lesson · ' + (ci + 1) + " of " + X.cards.length + '</b><div class="lcard"><h4>' + esc(X.cards[ci].title) + "</h4>" + esc(X.cards[ci].body) + '</div><div class="bar2"><button class="btn ghost sm" id="cp"' + (ci ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="cn"' + (ci < X.cards.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") +
+          (X.flash.length ? '<div class="card"><b>🃏 Flash cards · ' + (fi + 1) + " of " + X.flash.length + '</b><div class="muted" style="font-size:12px">Tap the card to see the answer</div><div class="flip" id="fl"><div class="in"><div class="f">' + esc(X.flash[fi].q) + '</div><div class="b">' + esc(X.flash[fi].a) + '</div></div></div><div class="bar2"><button class="btn ghost sm" id="fp"' + (fi ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="fn"' + (fi < X.flash.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") +
+          '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + (r.mine ? '<div class="help">Your best: <b>' + r.mine.score + "/" + r.mine.total + "</b> · tries: " + r.mine.tries + "</div>" : "") +
+          X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (o, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"' + (ans[i] === j ? " checked" : "") + "> " + esc(o) + "</label>"; }).join("") + "</div>"; }).join("") +
+          '<div class="bar2"><button class="btn pri" id="sb">Submit answers</button></div></div>';
+        $("bk").onclick = drawList;
+        if ($("lg")) [].forEach.call($("lg").children, function (b) { b.onclick = function () { lang = b.dataset.l; try { localStorage.setItem("cs-lang", lang); } catch (e) { } show(); }; });
+        if ($("cn")) { $("cn").onclick = function () { ci++; show(); }; $("cp").onclick = function () { ci--; show(); }; }
+        if ($("fl")) { $("fl").onclick = function () { $("fl").classList.toggle("on"); }; $("fn").onclick = function () { fi++; show(); }; $("fp").onclick = function () { fi--; show(); }; }
+        [].forEach.call(VIEW.querySelectorAll(".q input"), function (inp) { inp.onchange = function () { ans[+inp.name.slice(1)] = +inp.value; }; });
+        $("sb").onclick = function () {
+          if (X.quiz.some(function (q, i) { return ans[i] == null; })) return toast("Answer every question first");
+          var right = 0; [].forEach.call(VIEW.querySelectorAll(".q"), function (el, i) { var q = X.quiz[i]; if (ans[i] === q.answer) right++; [].forEach.call(el.querySelectorAll("label"), function (lb, j) { lb.className = j === q.answer ? "ok" : j === ans[i] ? "bad" : ""; }); if (q.why) el.insertAdjacentHTML("beforeend", '<div class="why">💡 ' + esc(q.why) + "</div>"); });
+          $("sb").disabled = true;
+          api({ action: "cs-done", id: L.id, lang: lang, answers: ans }).then(function (d) {
+            $("qz").insertAdjacentHTML("afterbegin", '<div class="score">' + right + "/" + X.quiz.length + '</div><div style="text-align:center;font-weight:700">' + (right === X.quiz.length ? "🎉 Perfect!" : right >= X.quiz.length * 0.6 ? "👍 Well done" : "Read the lesson again and retry") + (d.test ? '<div class="muted" style="font-size:12px">HO test — not counted</div>' : "") + '</div><div class="bar2" style="justify-content:center"><button class="btn ghost sm" id="rt">Try again</button></div>');
+            $("rt").onclick = function () { ans = []; show(); };
+            $("qz").scrollIntoView({ behavior: "smooth" });
+          });
+        };
+        if (HO) {
+          $("st").onclick = function () { stats(L); };
+          $("ed").onclick = function () { ED = { step: "edit", id: L.id, en: JSON.parse(JSON.stringify(L.langs.en)), langs: langs.filter(function (l) { return l !== "en"; }), states: L.states, pub: L.pub, src: L.src || "" }; TAB = "new"; draw(); };
+          $("pb").onclick = function () { api({ action: "cs-save", id: L.id, langs: L.langs, states: L.states, pub: !L.pub }).then(function (s) { if (!s.ok) return toast(s.error); L.pub = !L.pub; toast(L.pub ? "Published" : "Unpublished"); show(); }); };
+          $("dl").onclick = function () { if (confirm("Delete this lesson and its results?")) api({ action: "cs-del", id: L.id }).then(function () { toast("Deleted"); drawList(); }); };
+        }
+      }
+      show();
+    });
+  }
+  function stats(L) {
+    api({ action: "cs-stats", id: L.id }).then(function (r) {
+      if (!r.ok) return toast(r.error);
+      var byS = {}; r.rows.forEach(function (d) { (byS[d.state] = byS[d.state] || []).push(d); });
+      sheet("Who finished · " + L.title, r.rows.length + " people", [["⬇", "Download Excel", function () { download(xlsx([{ name: "Completion", rows: [["Name", "State", "Best score", "Out of", "Tries", "Language", "Last"]].concat(r.rows.map(function (d) { return [d.name, d.state, d.score, d.total, d.tries, LNAME(d.lang), dt(d.at)]; })) }]), "lesson_completion.xlsx"); return false; }, "pri"]],
+        '<table class="tb" style="margin-top:8px"><tr><th>State</th><th>Done</th><th>Avg score</th></tr>' + Object.keys(byS).sort().map(function (s) { var a = byS[s]; return "<tr><td>" + esc(s) + "</td><td>" + a.length + "</td><td>" + Math.round(a.reduce(function (x, d) { return x + d.score / d.total; }, 0) / a.length * 100) + "%</td></tr>"; }).join("") + "</table>" +
+        '<div style="max-height:260px;overflow:auto;margin-top:8px"><table class="tb"><tr><th>Name</th><th>State</th><th>Score</th></tr>' + r.rows.map(function (d) { return "<tr><td>" + esc(d.name) + "</td><td>" + esc(d.state) + "</td><td>" + d.score + "/" + d.total + "</td></tr>"; }).join("") + "</table></div>");
+    });
+  }
+  function drawNew() {
+    if (!ED) ED = { step: "src" };
+    if (ED.step === "src") {
+      VIEW.innerHTML = '<div class="card"><b>1. Add the circular</b><div class="drop" id="dp">📎 PDF, photos or Word file</div><input type="file" id="fi" multiple accept=".pdf,image/*,.docx,.txt" style="display:none"><label class="lb">…or paste its text</label><textarea class="tx" id="tx" rows="6" placeholder="Paste the circular here">' + esc(ED.src || "") + '</textarea>' +
+        '<label class="lb">Who is it for?</label><input class="tx" id="au" value="' + esc(ED.aud || "retailers, promoters and the sales team") + '"><label class="lb">Quiz questions</label><div class="chips" id="nq">' + [4, 6, 8, 10].map(function (n) { return '<button data-n="' + n + '" class="' + ((ED.nq || 6) === n ? "on" : "") + '">' + n + "</button>"; }).join("") + '</div><div class="bar2"><button class="btn pri" id="mk">✨ Make the lesson</button></div><div id="pm" class="muted" style="font-size:12.5px;margin-top:6px"></div></div>';
+      [].forEach.call($("nq").children, function (b) { b.onclick = function () { ED.nq = +b.dataset.n; ED.src = $("tx").value; ED.aud = $("au").value; drawNew(); }; });
+      $("dp").onclick = function () { $("fi").click(); };
+      $("fi").onchange = function () { var pm = function (m) { $("pm").textContent = m; }; readFiles([].slice.call($("fi").files), pm).then(function (t) { $("tx").value = ($("tx").value + "\n\n" + t).trim(); pm(t ? "Text added — check it, then make the lesson." : "No text found"); }); };
+      $("mk").onclick = function () {
+        ED.src = $("tx").value.trim(); ED.aud = $("au").value; if (ED.src.length < 80) return toast("Add the circular first");
+        $("mk").disabled = true; $("pm").textContent = "AI is writing the lesson… (about 20–40 seconds)";
+        api({ action: "cs-lesson", text: ED.src, audience: ED.aud, nq: ED.nq || 6 }).then(function (r) { $("mk").disabled = false; if (!r.ok) { $("pm").textContent = r.error; return; } ED.en = r.lesson; ED.step = "edit"; ED.states = ED.states || ["all"]; ED.langs = ED.langs || []; drawNew(); });
+      };
+      return;
+    }
+    var X = ED.en;
+    VIEW.innerHTML = '<div class="card"><b>2. Check the lesson</b><div class="help w">Check every number against the circular before publishing.</div>' +
+      '<label class="lb">Title</label><input class="tx" id="e_t" value="' + esc(X.title) + '"><label class="lb">Summary</label><textarea class="tx" id="e_s" rows="3">' + esc(X.summary) + '</textarea>' +
+      '<label class="lb">Key points (one per line)</label><textarea class="tx" id="e_k" rows="5">' + esc(X.keypoints.join("\n")) + "</textarea>" +
+      '<label class="lb">Lesson cards</label>' + X.cards.map(function (c, i) { return '<input class="tx" data-ct="' + i + '" value="' + esc(c.title) + '" style="margin-top:6px;font-weight:700"><textarea class="tx" data-cb="' + i + '" rows="3">' + esc(c.body) + "</textarea>"; }).join("") +
+      '<label class="lb">Flash cards (question || answer, one per line)</label><textarea class="tx" id="e_f" rows="6">' + esc(X.flash.map(function (f) { return f.q + " || " + f.a; }).join("\n")) + "</textarea>" +
+      '<label class="lb">Quiz — tick the right answer</label>' + X.quiz.map(function (q, i) { return '<div class="q"><input class="tx" data-qq="' + i + '" value="' + esc(q.q) + '">' + q.options.map(function (o, j) { return '<label><input type="radio" name="a' + i + '" value="' + j + '"' + (q.answer === j ? " checked" : "") + '><input class="tx" data-qo="' + i + "_" + j + '" value="' + esc(o) + '" style="flex:1;padding:4px 6px"></label>'; }).join("") + '<a href="#" data-qd="' + i + '" style="font-size:12px">Remove question</a></div>'; }).join("") + "</div>" +
+      '<div class="card"><b>3. Who sees it</b><div class="chips" id="sts"><button data-s="all" class="' + (ED.states[0] === "all" ? "on" : "") + '">All states</button>' + (META ? META.states : []).map(function (s) { return '<button data-s="' + esc(s) + '" class="' + (ED.states.indexOf(s) >= 0 ? "on" : "") + '">' + esc(s) + "</button>"; }).join("") + "</div>" +
+      '<b style="display:block;margin-top:12px">4. Languages</b><div class="muted" style="font-size:12px">English is always included. Each person sees their state\'s language first and can switch.</div><div class="chips" id="lgs">' + Object.keys(META ? META.langs : {}).filter(function (l) { return l !== "en"; }).map(function (l) { return '<button data-l="' + l + '" class="' + (ED.langs.indexOf(l) >= 0 ? "on" : "") + '">' + esc(LNAME(l)) + "</button>"; }).join("") + '</div><a href="#" id="sug" style="font-size:12.5px">Pick the languages of the chosen states</a>' +
+      '<div class="bar2"><button class="btn pri" id="pub">🚀 Translate &amp; publish</button><button class="btn ghost" id="drf">Save as draft (English)</button><button class="btn ghost" id="bk">← Start again</button></div><div id="pg"></div></div>';
+    function grab() {
+      X.title = $("e_t").value.trim(); X.summary = $("e_s").value.trim(); X.keypoints = $("e_k").value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
+      X.cards.forEach(function (c, i) { c.title = VIEW.querySelector('[data-ct="' + i + '"]').value; c.body = VIEW.querySelector('[data-cb="' + i + '"]').value; });
+      X.flash = $("e_f").value.split("\n").map(function (l) { var p = l.split("||"); return { q: (p[0] || "").trim(), a: (p[1] || "").trim() }; }).filter(function (f) { return f.q && f.a; });
+      X.quiz.forEach(function (q, i) { q.q = VIEW.querySelector('[data-qq="' + i + '"]').value; q.options = q.options.map(function (o, j) { return VIEW.querySelector('[data-qo="' + i + "_" + j + '"]').value; }); var c = VIEW.querySelector('input[name="a' + i + '"]:checked'); q.answer = c ? +c.value : q.answer; });
+    }
+    [].forEach.call(VIEW.querySelectorAll("[data-qd]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); X.quiz.splice(+a.dataset.qd, 1); drawNew(); }; });
+    [].forEach.call($("sts").children, function (b) { b.onclick = function () { grab(); var s = b.dataset.s; if (s === "all") ED.states = ["all"]; else { var on = ED.states.indexOf(s) >= 0; ED.states = ED.states.filter(function (x) { return x !== "all" && x !== s; }).concat(on ? [] : [s]); if (!ED.states.length) ED.states = ["all"]; } drawNew(); }; });
+    [].forEach.call($("lgs").children, function (b) { b.onclick = function () { grab(); var l = b.dataset.l; ED.langs = ED.langs.indexOf(l) >= 0 ? ED.langs.filter(function (x) { return x !== l; }) : ED.langs.concat([l]); drawNew(); }; });
+    $("sug").onclick = function (e) { e.preventDefault(); if (!META) return; grab(); var S = ED.states[0] === "all" ? META.states : ED.states, s = {}; S.forEach(function (x) { var l = META.defaults[x]; if (l && l !== "en" && META.langs[l]) s[l] = 1; }); ED.langs = Object.keys(s); drawNew(); };
+    $("bk").onclick = function () { if (confirm("Throw away this lesson and start again?")) { ED = { step: "src", src: ED.src }; drawNew(); } };
+    $("drf").onclick = function () { grab(); save(false); };
+    $("pub").onclick = function () { grab(); save(true); };
+    function save(pub) {
+      if (X.quiz.length < 2) return toast("Keep at least 2 quiz questions");
+      var out = { en: X }, todo = []; if (pub) ED.langs.forEach(function (l) { todo.push([l, "a"], [l, "b"]); });
+      $("pub").disabled = $("drf").disabled = true; $("pg").innerHTML = '<div class="prog"><i id="pbar"></i></div><div id="pt" class="muted" style="font-size:12.5px">Saving…</div>';
+      var i = 0, fails = [];
+      (function next() {
+        if (i >= todo.length) return done();
+        var j = todo[i++]; $("pt").textContent = "Translating into " + LNAME(j[0]) + " (" + (j[1] === "a" ? "lesson" : "quiz") + ")…"; $("pbar").style.width = Math.round((i - 1) / todo.length * 100) + "%";
+        api({ action: "cs-tr", lang: j[0], part: j[1], lesson: X }).then(function (r) { if (!r.ok) { if (fails.indexOf(LNAME(j[0])) < 0) fails.push(LNAME(j[0])); return next(); } out[j[0]] = Object.assign(out[j[0]] || {}, r.lesson); next(); });
+      })();
+      function done() {
+        Object.keys(out).forEach(function (l) { if (l !== "en" && !(out[l].cards && out[l].quiz)) delete out[l]; });
+        api({ action: "cs-save", id: ED.id, langs: out, states: ED.states, pub: pub, src: ED.src }).then(function (r) {
+          $("pub").disabled = $("drf").disabled = false;
+          if (!r.ok) { $("pt").textContent = r.error; return; }
+          toast(pub ? "Published" : "Saved"); if (fails.length) alert("These languages could not be translated — open the lesson, tap Edit and publish again: " + fails.join(", "));
+          ED = null; TAB = "list"; draw(); setTimeout(function () { openL(r.id); }, 300);
+        });
+      }
+    }
+  }
+  function drawCmp() {
+    var box = function (k, t) { return '<div class="card"><b>' + t + '</b><div class="drop" data-d="' + k + '">📎 ' + (CMP[k + "n"] ? esc(CMP[k + "n"]) + " · tap to change" : "PDF, photo or Word file") + '</div><textarea class="tx" data-t="' + k + '" rows="4" placeholder="…or paste the text" style="margin-top:6px">' + esc(CMP[k]) + "</textarea></div>"; };
+    VIEW.innerHTML = box("old", "Old circular") + box("neu", "New circular") + '<input type="file" id="fi" multiple accept=".pdf,image/*,.docx,.txt" style="display:none"><div class="card"><div class="bar2" style="margin-top:0"><button class="btn pri" id="go">🔍 Show what changed</button></div><div id="pm" class="muted" style="font-size:12.5px;margin-top:6px"></div></div><div id="res"></div>';
+    var which = null, pm = function (m) { $("pm").textContent = m; };
+    [].forEach.call(VIEW.querySelectorAll("[data-d]"), function (d) { d.onclick = function () { which = d.dataset.d; $("fi").value = ""; $("fi").click(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (t) { t.oninput = function () { CMP[t.dataset.t] = t.value; }; });
+    $("fi").onchange = function () { var fs = [].slice.call($("fi").files), k = which; readFiles(fs, pm).then(function (t) { CMP[k] = t; CMP[k + "n"] = fs.map(function (f) { return f.name; }).join(", "); drawCmp(); pm(t ? "Text read." : "No text found"); }); };
+    $("go").onclick = function () {
+      if (CMP.old.length < 40 || CMP.neu.length < 40) return toast("Add both circulars");
+      $("go").disabled = true; pm("AI is comparing… (about 20–40 seconds)");
+      api({ action: "cs-diff", old: CMP.old, new: CMP.neu }).then(function (r) { $("go").disabled = false; if (!r.ok) return pm(r.error); pm(""); DIFF = r.diff; showDiff(); });
+    };
+    if (DIFF) showDiff();
+  }
+  function showDiff() {
+    var D = DIFF, imp = D.changes.filter(function (c) { return c.important; }).length;
+    $("res").innerHTML = '<div class="card"><b>Summary</b><div style="font-size:14px;line-height:1.6;margin-top:4px">' + esc(D.summary) + '</div><div class="bar2"><span class="pill">' + D.changes.length + ' changes</span><span class="pill r">' + imp + ' important</span><span style="flex:1"></span><button class="btn ghost sm" id="x">⬇ Excel</button>' + (HO ? '<button class="btn ghost sm" id="ml">📚 Lesson from new circular</button>' : "") + "</div>" +
+      D.changes.map(function (c) { return '<div class="ch ' + c.type + '"><b>' + esc(c.area) + "</b> " + (c.important ? '<span class="pill r">Important</span> ' : "") + '<span class="pill m">' + c.type + '</span><div style="margin-top:4px">' + (c.before ? '<span class="bf">' + esc(c.before) + "</span><br>" : "") + (c.after ? '<span class="af">' + esc(c.after) + "</span>" : "") + "</div>" + (c.impact ? '<div class="muted" style="font-size:12px;margin-top:3px">👥 ' + esc(c.impact) + "</div>" : "") + "</div>"; }).join("") +
+      (D.same.length ? '<div class="help"><b>Not changed</b><br>' + D.same.map(function (s) { return "• " + esc(s); }).join("<br>") + "</div>" : "") +
+      (D.check.length ? '<div class="help w"><b>Please confirm</b><br>' + D.check.map(function (s) { return "• " + esc(s); }).join("<br>") + "</div>" : "") + '<div class="muted" style="font-size:12px;margin-top:8px">AI comparison — check important changes in the circular itself.</div></div>';
+    $("x").onclick = function () { download(xlsx([{ name: "Changes", rows: [["Area", "Type", "Important", "Before", "After", "Impact"]].concat(D.changes.map(function (c) { return [c.area, c.type, c.important ? "Yes" : "", c.before, c.after, c.impact]; })) }, { name: "Summary", rows: [["Summary"], [D.summary], [""], ["Not changed"]].concat(D.same.map(function (s) { return [s]; })).concat([[""], ["To confirm"]]).concat(D.check.map(function (s) { return [s]; })) }]), "circular_changes.xlsx"); };
+    if ($("ml")) $("ml").onclick = function () { ED = { step: "src", src: CMP.neu }; TAB = "new"; draw(); };
+  }
+  api({ action: "cs-meta" }).then(function (r) { if (r.ok) META = r; draw(); });
+})();
+</script>
+</body>
+</html>

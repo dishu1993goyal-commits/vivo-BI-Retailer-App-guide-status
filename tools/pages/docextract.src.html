@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PDF / photo → Excel</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12px inherit;cursor:pointer;color:var(--ink);text-align:left}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tb{width:100%;border-collapse:collapse;font-size:12px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:5px 6px;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:5px 6px;vertical-align:top}
+.scroll{overflow:auto;max-height:420px;margin-top:8px;border:1px solid #EEF0F6;border-radius:10px}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:8px}.drop b{display:block;font-size:14px}
+.prog{height:8px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:#4D5BF9;width:0;transition:width .3s}
+.fl{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:6px 0;border-top:1px solid #EEF0F6}
+.big{font-size:40px;text-align:center}
+td[contenteditable]:focus{outline:2px solid #4D5BF9;background:#fff}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📄</span></div>
+  <h1>PDF / photo → Excel</h1><p>Invoices, claim lists, statements, IMEI sheets — AI reads them into a clean Excel</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script src="/docread.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "new", TPLS = [], PICK = "auto", FILES = [], OUT = null;
+  var BUILT = [
+    { id: "auto", name: "✨ Find all tables", cols: [] },
+    { id: "b-inv", name: "🧾 Invoice items", hint: "Repeat the invoice no and date on every row", cols: [{ name: "Invoice no" }, { name: "Invoice date" }, { name: "Seller" }, { name: "Buyer" }, { name: "Item / model" }, { name: "HSN" }, { name: "Qty" }, { name: "Rate" }, { name: "Taxable value" }, { name: "GST %" }, { name: "Total" }] },
+    { id: "b-imei", name: "📱 IMEI list", cols: [{ name: "IMEI", hint: "15 digits" }, { name: "Model" }, { name: "Colour" }, { name: "Dealer / retailer" }, { name: "Date" }] },
+    { id: "b-claim", name: "💰 Scheme claim / payout list", cols: [{ name: "Partner code" }, { name: "Partner name" }, { name: "State" }, { name: "Model" }, { name: "Qty" }, { name: "Amount" }, { name: "Remarks" }] },
+    { id: "b-bank", name: "🏦 Bank statement", cols: [{ name: "Date" }, { name: "Narration" }, { name: "Ref / cheque no" }, { name: "Debit" }, { name: "Credit" }, { name: "Balance" }] }
+  ];
+  var TABS = [["new", "📄 Extract"], ["tpl", "🧩 Templates"], ["how", "❓ How it works"]];
+  var all = function () { return BUILT.concat(TPLS); };
+  var cur = function () { return all().filter(function (t) { return t.id === PICK; })[0] || BUILT[0]; };
+  function loadT() { return api({ action: "dx-tpls" }).then(function (r) { TPLS = r.ok ? r.rows : []; if (!r.ok && r.error) toast(r.error); }); }
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    if (TAB === "new") drawNew(); else if (TAB === "tpl") drawTpl(); else drawHow();
+  }
+  function drawNew() {
+    var t = cur();
+    VIEW.innerHTML = '<div class="card"><b>1. What is in the document?</b><div class="chips" id="tp">' + all().map(function (x) { return '<button data-i="' + esc(x.id) + '" class="' + (x.id === PICK ? "on" : "") + '">' + esc(x.name) + "</button>"; }).join("") + "</div>" +
+      (t.cols.length ? '<div class="help">Columns: ' + t.cols.map(function (c) { return "<b>" + esc(c.name) + "</b>"; }).join(" · ") + "</div>" : '<div class="help">AI finds every table on each page and keeps them as separate sheets. Pick or make a template when you want one fixed set of columns.</div>') +
+      '<label class="lb">Note for AI (optional)</label><input class="tx" id="hint" placeholder="e.g. ignore the summary page; amounts are in lakh" value="' + esc(t.hint || "") + '">' +
+      '<b style="display:block;margin-top:14px">2. Add the files</b><div class="drop" id="drop"><b>📎 Tap to add PDFs or photos</b><span class="muted" style="font-size:12px">Many files at once is fine · scanned pages and phone photos work too</span></div><input type="file" id="fi" multiple accept=".pdf,image/*,.docx,.txt,.csv" style="display:none">' +
+      '<div id="fl"></div><div class="bar2"><button class="btn pri" id="go"' + (FILES.length ? "" : " disabled") + '>✨ Read into Excel</button><span class="muted" style="font-size:12px">Up to 30 pages a file</span></div><div id="st"></div></div><div id="out"></div>';
+    [].forEach.call($("tp").children, function (b) { b.onclick = function () { PICK = b.dataset.i; drawNew(); }; });
+    $("drop").onclick = function () { $("fi").click(); };
+    $("fi").onchange = function () { FILES = FILES.concat([].slice.call($("fi").files)).slice(0, 40); drawNew(); };
+    $("fl").innerHTML = FILES.map(function (f, i) { return '<div class="fl"><span>' + esc(f.name) + ' <span class="muted">' + Math.round(f.size / 1024) + ' KB</span></span><a href="#" data-i="' + i + '">✕</a></div>'; }).join("");
+    [].forEach.call($("fl").querySelectorAll("a"), function (a) { a.onclick = function (e) { e.preventDefault(); FILES.splice(+a.dataset.i, 1); drawNew(); }; });
+    $("go").onclick = run;
+    if (OUT) drawOut();
+  }
+  function run() {
+    var t = cur(), hint = $("hint").value, st = $("st"), go = $("go"), stop = false; OUT = { tpl: t, sheets: {}, notes: [], fails: [], pages: 0 };
+    go.disabled = true; st.innerHTML = '<div class="prog"><i id="pb"></i></div><div class="bar2"><span id="pm" class="muted" style="font-size:12.5px">Opening files…</span><button class="btn ghost sm" id="stp">Stop</button></div>';
+    $("out").innerHTML = "";
+    $("stp").onclick = function () { stop = true; $("pm").textContent = "Stopping after this page…"; };
+    var jobs = [], fi = 0;
+    (function nextFile() {
+      if (fi >= FILES.length) return pages();
+      var f = FILES[fi++]; $("pm").textContent = "Opening " + f.name + "…";
+      DOCREAD.read(f, { maxPages: 30 }).then(function (d) { d.pages.forEach(function (p) { jobs.push({ file: f.name, p: p }); }); if (d.total > 30) OUT.notes.push(f.name + ": only the first 30 of " + d.total + " pages were read"); nextFile(); }, function (e) { OUT.fails.push(f.name + ": " + e.message); nextFile(); });
+    })();
+    function pages() {
+      var i = 0;
+      (function next() {
+        if (i >= jobs.length || stop) return finish();
+        var j = jobs[i++]; $("pm").textContent = "Reading " + j.file + " · page " + j.p.n + " (" + i + " of " + jobs.length + ")" + (j.p.img ? " · scanned page" : ""); $("pb").style.width = Math.round((i - 1) / jobs.length * 100) + "%";
+        var body = { action: "dx-page", cols: t.cols, hint: hint }; if (j.p.img) body.img = j.p.img; else body.text = j.p.text;
+        api(body).then(function (r) {
+          OUT.pages++;
+          if (!r.ok) { OUT.fails.push(j.file + " p" + j.p.n + ": " + r.error); return next(); }
+          r.tables.forEach(function (tb) { add(t.cols.length ? "Data" : (tb.title || "Table"), tb, j); });
+          if (r.notes) OUT.notes.push(j.file + " p" + j.p.n + ": " + r.notes);
+          next();
+        });
+      })();
+    }
+    function finish() { $("pb").style.width = "100%"; go.disabled = false; st.innerHTML = '<div class="help">' + (stop ? "Stopped. " : "Done. ") + OUT.pages + " page(s) read" + (OUT.fails.length ? ' · <b style="color:#B42318">' + OUT.fails.length + " problem(s)</b>" : "") + "</div>"; drawOut(); }
+  }
+  function add(name, tb, j) {
+    // same columns → same sheet; file name and page go in front so every row can be traced back
+    var key = tb.columns.join("|").toLowerCase(), s = null;
+    Object.keys(OUT.sheets).forEach(function (k) { if (OUT.sheets[k].key === key) s = OUT.sheets[k]; });
+    if (!s) { var nm = name.replace(/[\\\/?*\[\]:]/g, " ").slice(0, 28) || "Table", n = nm, c = 2; while (OUT.sheets[n]) n = nm.slice(0, 25) + " " + c++; s = OUT.sheets[n] = { key: key, name: n, head: ["File", "Page"].concat(tb.columns), rows: [] }; }
+    tb.rows.forEach(function (r) { s.rows.push([j.file, j.p.n].concat(r)); });
+  }
+  function drawOut() {
+    var S = Object.keys(OUT.sheets).map(function (k) { return OUT.sheets[k]; }), tot = S.reduce(function (a, s) { return a + s.rows.length; }, 0);
+    $("out").innerHTML = '<div class="card"><b>Result · ' + tot + " row(s) in " + S.length + " sheet(s)</b>" +
+      (OUT.fails.length ? '<div class="help w">' + OUT.fails.map(esc).join("<br>") + "</div>" : "") + (OUT.notes.length ? '<div class="help">🗒 ' + OUT.notes.slice(0, 12).map(esc).join("<br>") + "</div>" : "") +
+      (tot ? '<div class="bar2"><button class="btn pri" id="dl">⬇ Download Excel</button><button class="btn ghost" id="cp">Copy first sheet</button></div><div class="help">Check the numbers before you use them — AI can misread blurred scans. Tap a cell to fix it; the Excel uses your fixes.</div>' : "") +
+      S.map(function (s, si) { return '<b style="display:block;margin-top:12px">' + esc(s.name) + ' <span class="pill m">' + s.rows.length + ' rows</span></b><div class="scroll"><table class="tb"><tr>' + s.head.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr>" + s.rows.slice(0, 300).map(function (r, ri) { return "<tr>" + r.map(function (v, ci) { return ci < 2 ? '<td class="muted">' + esc(v) + "</td>" : '<td contenteditable data-s="' + si + '" data-r="' + ri + '" data-c="' + ci + '">' + esc(v) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" + (s.rows.length > 300 ? '<div class="muted" style="font-size:12px">Showing 300 — the Excel has all ' + s.rows.length + "</div>" : ""); }).join("") + "</div>";
+    [].forEach.call($("out").querySelectorAll("td[contenteditable]"), function (td) { td.onblur = function () { var v = td.textContent.trim(), n = v !== "" && /^-?\d+(\.\d+)?$/.test(v) ? +v : v; S[+td.dataset.s].rows[+td.dataset.r][+td.dataset.c] = n; }; });
+    if (!tot) return;
+    $("dl").onclick = function () { download(xlsx(S.map(function (s) { return { name: s.name, rows: [s.head].concat(s.rows) }; })), (OUT.tpl.id === "auto" ? "extracted" : OUT.tpl.name.replace(/[^\w ]+/g, "").trim().replace(/\s+/g, "_")) + "_" + new Date().toISOString().slice(0, 10) + ".xlsx"); };
+    $("cp").onclick = function () { var s = S[0], t = [s.head].concat(s.rows).map(function (r) { return r.join("\t"); }).join("\n"); try { navigator.clipboard.writeText(t).then(function () { toast("Copied — paste into Excel"); }); } catch (e) { toast("Copy not allowed here"); } };
+  }
+  function drawTpl() {
+    VIEW.innerHTML = '<div class="card"><b>Templates</b><div class="muted" style="font-size:12.5px">A template is a fixed list of columns for one kind of document, shared with everyone who uses this tool. Every file then lands in the same Excel layout.</div><div class="bar2"><button class="btn pri sm" id="nw">＋ New template</button></div>' +
+      (TPLS.length ? TPLS.map(function (t) { return '<div class="fl"><span><b>' + esc(t.name) + '</b><br><span class="muted">' + t.cols.map(function (c) { return esc(c.name); }).join(" · ") + " · by " + esc(t.by || "") + '</span></span><span><a href="#" data-e="' + t.id + '">Edit</a> · <a href="#" data-d="' + t.id + '">Delete</a></span></div>'; }).join("") : '<div class="muted" style="margin-top:10px">No templates yet. The built-in ones are on the Extract tab.</div>') + "</div>";
+    $("nw").onclick = function () { edit(null); };
+    [].forEach.call(VIEW.querySelectorAll("a[data-e]"), function (a) { a.onclick = function (e) { e.preventDefault(); edit(TPLS.filter(function (t) { return t.id === a.dataset.e; })[0]); }; });
+    [].forEach.call(VIEW.querySelectorAll("a[data-d]"), function (a) { a.onclick = function (e) { e.preventDefault(); if (!confirm("Delete this template?")) return; api({ action: "dx-tpl-del", id: a.dataset.d }).then(function (r) { if (!r.ok) return toast(r.error); loadT().then(draw); }); }; });
+  }
+  function edit(t) {
+    sheet(t ? "Edit template" : "New template", "One column per line. After a | you can tell AI what to look for.", [["💾", "Save", function (ov) {
+      var cols = ov.querySelector("#tc").value.split("\n").map(function (l) { var p = l.split("|"); return { name: p[0].trim(), hint: (p[1] || "").trim() }; }).filter(function (c) { return c.name; });
+      var name = ov.querySelector("#tn").value.trim(); if (!name || !cols.length) { toast("Add a name and at least one column"); return false; }
+      api({ action: "dx-tpl-save", id: t && t.id, name: name, hint: ov.querySelector("#th").value, cols: cols }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); PICK = r.id; loadT().then(draw); });
+    }, "pri"]], '<label class="lb">Name</label><input class="tx" id="tn" placeholder="e.g. Dealer claim form" value="' + esc(t ? t.name : "") + '"><label class="lb">Columns</label><textarea class="tx" id="tc" rows="7" placeholder="Dealer code\nDealer name\nIMEI | 15 digits\nAmount | in rupees">' + esc(t ? t.cols.map(function (c) { return c.name + (c.hint ? " | " + c.hint : ""); }).join("\n") : "") + '</textarea><label class="lb">Note for AI (optional)</label><input class="tx" id="th" value="' + esc(t ? t.hint || "" : "") + '">');
+  }
+  function drawHow() {
+    VIEW.innerHTML = '<div class="card"><b>How it works</b><div class="help">1. Pick what the document is — or “Find all tables”.<br>2. Add PDFs or photos (many at once).<br>3. Pages with text are read directly; scanned pages and photos are read by AI vision.<br>4. Check the preview, fix any cell, download the Excel. Every row keeps its file name and page so you can trace it.</div><div class="help w">AI can misread blurred or handwritten pages. Always check totals before using the Excel for payouts. Files are not stored — only the pages being read are sent to AI.</div></div>';
+  }
+  loadT().then(draw);
+})();
+</script>
+</body>
+</html>

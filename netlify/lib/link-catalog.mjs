@@ -572,6 +572,40 @@ export const LINK_CATALOG = {
 "lh-submit"
 ]
 },
+"circular.html": {
+"id": "circular",
+"icon": "📜",
+"name": "Circular lessons & quiz",
+"ho": false,
+"acts": [
+"cs-del",
+"cs-diff",
+"cs-done",
+"cs-get",
+"cs-lesson",
+"cs-list",
+"cs-meta",
+"cs-ocr",
+"cs-save",
+"cs-stats",
+"cs-tr"
+]
+},
+"roleplay.html": {
+"id": "roleplay",
+"icon": "🎭",
+"name": "AI role-play trainer",
+"ho": false,
+"acts": [
+"rpl-board",
+"rpl-cust",
+"rpl-cust-del",
+"rpl-cust-save",
+"rpl-mine",
+"rpl-say",
+"rpl-score"
+]
+},
 "guide.html": {
 "id": "guide",
 "icon": "📘",
@@ -1143,6 +1177,49 @@ export const LINK_CATALOG = {
 "ux-results",
 "ux-save",
 "ux-share"
+]
+},
+"docextract.html": {
+"id": "docextract",
+"icon": "📄",
+"name": "PDF / photo → Excel",
+"ho": false,
+"acts": [
+"dx-page",
+"dx-tpl-del",
+"dx-tpl-save",
+"dx-tpls"
+]
+},
+"videoguide.html": {
+"id": "videoguide",
+"icon": "🎬",
+"name": "Process video → guide",
+"ho": false,
+"acts": [
+"vg-del",
+"vg-get",
+"vg-img",
+"vg-intro",
+"vg-list",
+"vg-p-get",
+"vg-save",
+"vg-share",
+"vg-steps"
+]
+},
+"portalbot.html": {
+"id": "portalbot",
+"icon": "🤖",
+"name": "Portal task recorder",
+"ho": true,
+"acts": [
+"bot-del",
+"bot-get",
+"bot-list",
+"bot-log",
+"bot-runs",
+"bot-save"
 ]
 },
 "hygcheck.html": {

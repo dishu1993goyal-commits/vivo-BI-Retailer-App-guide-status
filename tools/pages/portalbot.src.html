@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Portal task recorder</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}.help.r{background:#FDECEC}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.stp{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid #EEF0F6;font-size:13px}.stp .n{flex:0 0 24px;height:24px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 12px/24px inherit;text-align:center}.stp .c{flex:1;min-width:0}.stp.rk .n{background:#B42318}.stp.ps .n{background:#8A5300}
+.li{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #EEF0F6;cursor:pointer}.li:first-child{border-top:0}.li .t{flex:1;min-width:0}.li b{display:block}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.code{font:11.5px/1.45 ui-monospace,Menlo,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:8px 10px;word-break:break-all;max-height:90px;overflow:auto;margin-top:6px}
+.bm{display:inline-block;background:#2B33A6;color:#fff;border-radius:10px;padding:8px 12px;font-weight:800;text-decoration:none;margin-top:6px}
+.step{display:flex;gap:10px;margin-top:10px}.step i{flex:0 0 24px;height:24px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 12px/24px inherit;text-align:center;font-style:normal}.step div{flex:1;font-size:13px;line-height:1.55}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🤖</span></div>
+  <h1>Portal task recorder</h1><p>Do a task once on a vivo portal — the app repeats it for every Excel row</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), BB = window.BIBot && window.BIBot.version ? window.BIBot : null, TAB = "list", REC = null, ROWS = null, HEAD = [], RUN = null, CODE = null, RISK = /delete|remove|删除|release|publish|发布|approve|reject|submit|提交|pay\b|transfer/i;
+  var TABS = [["list", "🤖 Recordings"], ["new", "● New recording"], ["runs", "📋 Runs"]];
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b></div>'; return; }
+  if (AUTH.app !== "admin") { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>Only HO can use this tool</b></div>'; return; }
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; REC = null; ROWS = null; draw(); }; });
+    if (TAB === "list") return REC ? (REC.id ? drawRec() : drawEdit()) : drawList();
+    if (TAB === "new") return REC ? drawEdit() : drawNew();
+    drawRuns();
+  }
+  var rid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); };
+  var b64 = function (o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); };
+  var unb64 = function (s) { try { return JSON.parse(decodeURIComponent(escape(atob(String(s).trim())))); } catch (e) { return null; } };
+  var what = function (s) { var d = s.sel || {}, n = d.text || d.label || d.ph || d.aria || d.name || d.tag || ""; return s.a === "click" ? "Tap “" + n + "”" : s.a === "type" ? "Type in “" + n + "”" : s.a === "select" ? "Choose in “" + n + "”" : s.a === "check" ? (s.on ? "Tick" : "Untick") + " “" + n + "”" : s.a === "wait" ? "Wait " + Math.round(s.ms / 1000) + " s" : "👉 Your turn: " + (s.say || ""); };
+  var risky = function (s) { return s.a === "click" && RISK.test((s.sel || {}).text || ""); };
+  function copy(t, msg) { try { navigator.clipboard.writeText(t).then(function () { toast(msg || "Copied"); }, function () { prompt("Copy this:", t); }); } catch (e) { prompt("Copy this:", t); } }
+  // ---------------- list ----------------
+  function drawList() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "bot-list" }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      VIEW.innerHTML = (BB ? "" : '<div class="help w">You are not in the Admin app. On a computer the recorder works through a bookmark (shown when you record or run). On the phone, open this tool from the <b>Admin app</b>.</div>') +
+        '<div class="card">' + (r.rows.length ? r.rows.map(function (x) { return '<div class="li" data-i="' + x.id + '"><span style="font-size:26px">🤖</span><span class="t"><b>' + esc(x.name) + '</b><span class="muted" style="font-size:12px">' + x.n + " steps · " + (x.cols.length ? "Excel columns: " + x.cols.map(esc).join(", ") : "no Excel columns yet") + " · run " + x.runs + " time(s)</span></span></div>"; }).join("") : '<div class="empty"><div class="big">🤖</div><b>No recordings yet</b><div class="muted">Tap “● New recording”, do the task once on the portal, and the app learns the clicks.</div></div>') + "</div>" +
+        '<div class="card"><b>How it works</b><div class="help">1. <b>Record</b>: open the portal from here, log in yourself, do the task once for one item.<br>2. <b>Mark the Excel columns</b>: say which typed boxes change per row (e.g. IMEI, Partner code).<br>3. <b>Run</b>: pick the Excel — the app repeats the clicks for every row and makes a result sheet.<br>Passwords and captchas are never saved or typed by the app — it stops and you type them.</div></div>';
+      [].forEach.call(VIEW.querySelectorAll(".li"), function (el) { el.onclick = function () { api({ action: "bot-get", id: el.dataset.i }).then(function (g) { if (!g.ok) return toast(g.error); REC = g.r; ROWS = null; drawRec(); }); }; });
+    });
+  }
+  // ---------------- recording ----------------
+  function drawNew() {
+    VIEW.innerHTML = '<div class="card"><b>New recording</b><label class="lb">Name</label><input class="tx" id="nm" placeholder="e.g. Set partner limit in IMEI query system"><label class="lb">Portal address to start from</label><input class="tx" id="ur" value="https://in-transfer.vivo.xyz/login.htm"><div class="help">Start on the page where the task begins. Log in yourself; recording starts after you are in. Do the task once, slowly, then tap <b>Finish</b> on the dark bar at the bottom of the portal.</div><div class="bar2"><button class="btn pri" id="go">● Start recording</button></div><div id="dk"></div></div>' +
+      '<div class="card"><b>Already have a recording code?</b><div class="muted" style="font-size:12px">From the computer bookmark’s “Copy recording”.</div><textarea class="tx" id="pc" rows="3" placeholder="Paste the recording code"></textarea><div class="bar2"><button class="btn ghost sm" id="imp">Import</button></div></div>';
+    $("go").onclick = function () {
+      var url = $("ur").value.trim(), nm = $("nm").value.trim() || "Recording";
+      if (!/^https:\/\/[^\/]*vivo\.(xyz|com|com\.cn|in)(\/|$)/i.test(url)) return toast("Use a vivo portal address (https://….vivo.xyz/…)");
+      var job = { id: rid(), mode: "rec", start: url };
+      CODE = { name: nm, url: url };
+      if (BB) { var r = BB.run(JSON.stringify(job), url); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start"); return; }
+      desk(job, "rec");
+    };
+    $("imp").onclick = function () { var x = unb64($("pc").value); if (!x || x.mode !== "rec" || !x.steps) return toast("That is not a recording code"); REC = { name: (CODE && CODE.name) || "Recording", url: x.url || (CODE && CODE.url) || "", steps: x.steps }; drawEdit(); };
+  }
+  // computer: bookmark with the runner inside; the job goes over by copy & paste
+  function desk(job, kind) {
+    fetch("/vivo_bot.js?v=" + Date.now()).then(function (r) { return r.text(); }).then(function (code) {
+      var boot = "if(!/vivo\\.(xyz|com|in)/i.test(location.hostname)){alert('Open the vivo portal first, then click this bookmark.');}else{" + code.replace(/\/\*[\s\S]*?\*\//g, "") +
+        ";if(!window.__biBotLoop){var S=null;try{S=JSON.parse(sessionStorage.getItem('__bibot')||'null')}catch(e){}var J=null;if(!S||S.done){var c=prompt('Paste the job code from the BI tool');if(!c)return;try{J=JSON.parse(decodeURIComponent(escape(atob(c.trim()))))}catch(e){alert('That code is not valid');return}}window.__biBotLoop=setInterval(function(){var r=JSON.parse(window.__biBotRun(J));J=null;if(r.s==='done'||r.s==='stopped'||r.s==='err'){clearInterval(window.__biBotLoop);window.__biBotLoop=0;var out=btoa(unescape(encodeURIComponent(JSON.stringify(r))));window.__biBotPanelOnly('✅ '+r.msg+' — copy the result and paste it in the BI tool',[['Copy result',function(){navigator.clipboard.writeText(out).then(function(){alert('Copied')},function(){prompt('Copy this',out)})},'#13693F']]);}},1500);}}";
+      var href = "javascript:" + encodeURIComponent("(function(){" + boot + "})()");
+      $("dk").innerHTML = '<div class="help w"><b>On a computer (Chrome / Edge)</b></div><div class="step"><i>1</i><div>Drag this button to the bookmarks bar (Ctrl+Shift+B shows the bar): <a class="bm" id="bm" href="#">🤖 vivo BI robot</a></div></div><div class="step"><i>2</i><div>Copy the job code: <button class="btn ghost sm" id="cj">Copy job code</button></div></div><div class="step"><i>3</i><div>Open <b>' + esc(job.start || REC && REC.url || "") + '</b>, log in, click the bookmark and paste the code. If the portal opens a new page, click the bookmark again — it carries on.</div></div><div class="step"><i>4</i><div>At the end tap <b>Copy result</b> on the portal and paste it here:<textarea class="tx" id="rp" rows="2" placeholder="Paste the result code"></textarea><button class="btn pri sm" id="rb" style="margin-top:6px">Use result</button></div></div>';
+      $("bm").setAttribute("href", href); $("bm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar"); };
+      $("cj").onclick = function () { copy(b64(job), "Job code copied"); };
+      $("rb").onclick = function () { var x = unb64($("rp").value); if (!x) return toast("That code is not valid"); got(x); };
+    });
+  }
+  // result from the app or the bookmark
+  function got(r) {
+    if (r.mode === "rec") { if (!r.steps || !r.steps.length) return toast("Nothing was recorded"); REC = { name: (CODE && CODE.name) || "Recording", url: r.url || (CODE && CODE.url) || "", steps: r.steps }; TAB = "new"; draw(); return; }
+    if (r.mode === "play" && RUN) { RUN.status = r; api({ action: "bot-log", run: RUN.id, rec: REC && REC.id, name: REC && REC.name, status: { s: r.s, msg: r.msg, rows: r.rows, res: r.res } }); showRes(); }
+  }
+  function pending() { if (!BB) return; var L = []; try { L = JSON.parse(BB.pending() || "[]"); } catch (e) { } L.forEach(function (p) { BB.ack(p.id); var st = null; try { st = JSON.parse(p.status || "null"); } catch (e) { } if (st && (st.mode === "rec" || (RUN && RUN.id === p.id))) got(st); else if (p.state === "err" || p.state === "stopped") toast(p.state === "err" ? "The portal run stopped with a problem" : "The portal run was stopped"); }); }
+  window.__biBotDone = pending;
+  // ---------------- edit steps ----------------
+  function drawEdit() {
+    var S = REC.steps;
+    VIEW.innerHTML = '<div class="card"><b>Check the recording</b><label class="lb">Name</label><input class="tx" id="nm" value="' + esc(REC.name) + '"><label class="lb">Start page</label><input class="tx" id="ur" value="' + esc(REC.url) + '">' +
+      '<div class="help">For each <b>Type</b> step, choose: keep the same text every time, or take it from an <b>Excel column</b> (write the column name).</div>' +
+      S.map(function (s, i) { return '<div class="stp' + (risky(s) ? " rk" : s.a === "pause" ? " ps" : "") + '"><div class="n">' + (i + 1) + '</div><div class="c"><b>' + esc(what(s)) + "</b>" + (risky(s) ? ' <span class="pill r">check: changes data</span>' : "") +
+        (s.a === "type" || s.a === "select" ? '<div class="bar2" style="margin-top:4px"><input class="tx" data-col="' + i + '" placeholder="Excel column (leave empty = fixed)" value="' + esc(s.col || "") + '" style="flex:1"><input class="tx" data-v="' + i + '" placeholder="Fixed value" value="' + esc(s.v || "") + '" style="flex:1"></div>' : "") +
+        (s.a === "check" ? '<div class="bar2" style="margin-top:4px"><input class="tx" data-col="' + i + '" placeholder="Excel column with Yes/No (optional)" value="' + esc(s.col || "") + '"></div>' : "") +
+        '<div style="font-size:12px;margin-top:3px"><a href="#" data-del="' + i + '">Remove</a> · <a href="#" data-w="' + i + '">Add 2 s wait after</a> · <a href="#" data-p="' + i + '">Add your-turn step after</a></div></div></div>'; }).join("") +
+      '<div class="bar2"><button class="btn pri" id="sv">💾 Save recording</button><button class="btn ghost" id="cx">Cancel</button></div></div>';
+    function grab() { REC.name = $("nm").value.trim() || "Recording"; REC.url = $("ur").value.trim(); [].forEach.call(VIEW.querySelectorAll("[data-col]"), function (x) { S[+x.dataset.col].col = x.value.trim(); }); [].forEach.call(VIEW.querySelectorAll("[data-v]"), function (x) { S[+x.dataset.v].v = x.value; }); }
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); S.splice(+a.dataset.del, 1); drawEdit(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-w]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); S.splice(+a.dataset.w + 1, 0, { a: "wait", ms: 2000, sel: {} }); drawEdit(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-p]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); var say = prompt("What should the person do here?"); if (say) { S.splice(+a.dataset.p + 1, 0, { a: "pause", say: say, sel: {} }); drawEdit(); } }; });
+    $("cx").onclick = function () { if (confirm("Throw away the changes?")) { REC = null; draw(); } };
+    $("sv").onclick = function () { grab(); api({ action: "bot-save", id: REC.id, name: REC.name, url: REC.url, steps: S }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); api({ action: "bot-get", id: r.id }).then(function (g) { REC = g.r; TAB = "list"; draw(); }); }); };
+  }
+  // ---------------- run ----------------
+  function drawRec() {
+    var S = REC.steps, cols = S.map(function (s) { return s.col; }).filter(Boolean).filter(function (c, i, a) { return a.indexOf(c) === i; }), rk = S.filter(risky);
+    var miss = ROWS ? cols.filter(function (c) { return HEAD.indexOf(c) < 0; }) : [];
+    VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button><span style="flex:1"></span><button class="btn ghost sm" id="ed">✏️ Edit steps</button><button class="btn ghost sm" id="tp">⬇ Excel template</button><button class="btn ghost sm" id="dl">🗑</button></div><h2 style="margin:10px 0 2px">' + esc(REC.name) + '</h2><div class="muted" style="font-size:12px">' + esc(REC.url) + " · " + S.length + " steps</div>" +
+      S.map(function (s, i) { return '<div class="stp' + (risky(s) ? " rk" : s.a === "pause" ? " ps" : "") + '"><div class="n">' + (i + 1) + '</div><div class="c">' + esc(what(s)) + (s.col ? ' <span class="pill">from column “' + esc(s.col) + '”</span>' : s.v ? ' <span class="pill m">' + esc(s.v) + "</span>" : "") + "</div></div>"; }).join("") + "</div>" +
+      '<div class="card"><b>Run it</b>' + (cols.length ? '<div class="muted" style="font-size:12.5px">Excel with columns: ' + cols.map(function (c) { return "<b>" + esc(c) + "</b>"; }).join(", ") + ' — one row per item.</div><input type="file" id="xf" accept=".xlsx,.xls,.csv" style="margin-top:8px">' : '<div class="muted" style="font-size:12.5px">No Excel columns — it will run once. (Edit steps to take typed values from Excel.)</div><label class="lb">How many times?</label><input class="tx" id="times" type="number" min="1" max="200" value="1">') +
+      (ROWS ? '<div class="help">' + ROWS.length + " rows found" + (miss.length ? ' · <b style="color:#B42318">missing columns: ' + miss.map(esc).join(", ") + "</b>" : " ✓") + "</div>" : "") +
+      '<label style="display:flex;gap:8px;font-size:13px;margin-top:10px"><input type="checkbox" id="fs" checked> Start each row from the start page</label><label style="display:flex;gap:8px;font-size:13px;margin-top:6px"><input type="checkbox" id="one"> Test with the first row only</label>' +
+      (rk.length ? '<div class="help r"><b>⚠ These steps change data on the portal:</b><br>' + rk.map(function (s) { return "• " + esc(what(s)); }).join("<br>") + '<label style="display:flex;gap:8px;margin-top:6px"><input type="checkbox" id="ok"> I checked the Excel — go ahead</label></div>' : "") +
+      '<div class="bar2"><button class="btn pri" id="run">▶ Run on the portal</button></div><div id="dk"></div><div id="res"></div></div>';
+    $("bk").onclick = function () { REC = null; ROWS = null; drawList(); };
+    $("ed").onclick = function () { REC = JSON.parse(JSON.stringify(REC)); drawEdit(); };
+    $("tp").onclick = function () { download(xlsx([{ name: "Rows", rows: [cols.length ? cols : ["(no columns)"]] }]), REC.name.replace(/[^\w ]+/g, "").replace(/\s+/g, "_") + "_template.xlsx"); };
+    $("dl").onclick = function () { if (confirm("Delete this recording?")) api({ action: "bot-del", id: REC.id }).then(function () { REC = null; drawList(); }); };
+    if ($("xf")) $("xf").onchange = function () {
+      var f = $("xf").files[0]; if (!f) return;
+      lib().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+        var wb = XLSX.read(buf, { type: "array", raw: false }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false });
+        HEAD = (A[0] || []).map(function (h) { return String(h).trim(); });
+        ROWS = A.slice(1).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }).map(function (r) { var o = {}; HEAD.forEach(function (h, i) { o[h] = String(r[i] == null ? "" : r[i]).trim(); }); return o; });
+        drawRec();
+      }, function () { toast("Couldn't read that file"); });
+    };
+    $("run").onclick = function () {
+      var rows = cols.length ? ROWS : Array.apply(null, Array(Math.max(1, Math.min(200, +($("times") || {}).value || 1)))).map(function () { return {}; });
+      if (!rows || !rows.length) return toast("Choose the Excel first");
+      if (miss.length) return toast("The Excel is missing columns: " + miss.join(", "));
+      if (rk.length && !$("ok").checked) return toast("Tick the confirmation first");
+      if ($("one").checked) rows = rows.slice(0, 1);
+      if (rows.length > 2000) return toast("Up to 2000 rows a run");
+      RUN = { id: rid(), rows: rows };
+      var job = { id: RUN.id, mode: "play", steps: S, rows: rows, fromStart: $("fs").checked, start: REC.url };
+      if (BB) { var r = BB.run(JSON.stringify(job), REC.url); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start"); return; }
+      desk(job, "play");
+    };
+    if (RUN && RUN.status) showRes();
+  }
+  function lib() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  function showRes() {
+    if (!$("res")) return; var st = RUN.status, R = st.res || [], ok = R.filter(function (x) { return x.ok; }).length;
+    $("res").innerHTML = '<div class="help ' + (ok === R.length ? "" : "w") + '"><b>' + esc(st.msg || "") + "</b></div>" + (R.length ? '<div style="max-height:300px;overflow:auto;margin-top:6px"><table class="tb"><tr><th>Row</th><th>Result</th><th>Portal said</th></tr>' + R.map(function (x) { return "<tr><td>" + x.row + "</td><td>" + (x.ok ? '<span class="pill g">OK</span>' : '<span class="pill r">Problem</span>') + "</td><td>" + esc(x.msg) + "</td></tr>"; }).join("") + '</table></div><div class="bar2"><button class="btn ghost sm" id="rx">⬇ Result Excel</button></div><div class="muted" style="font-size:12px">“OK” means every step ran and the portal showed no error. Check a few items on the portal to be sure.</div>' : "");
+    if ($("rx")) $("rx").onclick = function () { var keys = Object.keys(RUN.rows[0] || {}); download(xlsx([{ name: "Result", rows: [["Row"].concat(keys).concat(["Result", "Portal said"])].concat(RUN.rows.map(function (r, i) { var x = R.filter(function (y) { return y.row === i + 1; })[0]; return [i + 1].concat(keys.map(function (k) { return r[k]; })).concat([x ? (x.ok ? "OK" : "Problem") : "Not run", x ? x.msg : ""]); })) }]), "portal_run_result.xlsx"); };
+  }
+  function drawRuns() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "bot-runs" }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      VIEW.innerHTML = '<div class="card">' + (r.rows.length ? '<table class="tb"><tr><th>When</th><th>Recording</th><th>Result</th></tr>' + r.rows.map(function (x) { var ok = x.res.filter(function (y) { return y.ok; }).length; return "<tr><td>" + dt(x.at) + "</td><td>" + esc(x.name) + "</td><td>" + (x.state === "done" ? '<span class="pill g">Done</span>' : '<span class="pill o">' + esc(x.state) + "</span>") + " " + ok + "/" + x.res.length + " rows OK</td></tr>"; }).join("") + "</table>" : '<div class="empty muted">No runs yet</div>') + "</div>";
+    });
+  }
+  draw(); pending();
+})();
+</script>
+</body>
+</html>

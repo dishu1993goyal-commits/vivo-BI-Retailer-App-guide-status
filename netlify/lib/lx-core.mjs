@@ -1,0 +1,249 @@
+// Five AI work tools on one module:
+//   dx-  PDF / photo → Excel extractor        dx:t:<id>                    saved column templates (shared)
+//   cs-  Circular studio (lesson + quiz, what changed)
+//        cs:l:<id> lesson { id, title, langs:{en:{…},hi:{…}}, states:[]|["all"], pub, by, at }   cs:d:<id>:<userKey> { score, total, lang, at, name, state }
+//   vg-  Process video → step-by-step guide   vg:g:<id> { id, title, lang, n, intro, by, owner, at, shared, token }   vg:i:<id>:<n> { img, title, text }   vg:tok:<token> → id
+//   rpl- AI role-play trainer                 rpl:c:<id> custom scenario (HO)   rpl:s:<userKey>:<id> scored session
+//   bot- Portal task recorder (storage)       bot:r:<userKey>:<id> recording   bot:x:<userKey>:<runId> run result
+import { randomBytes } from "node:crypto";
+import { readImages } from "./schemecalc-core.mjs";
+import { aiKeys } from "./aff-core.mjs";
+import { ALL_STATES, defaultLang, LANGS } from "./sf-core.mjs";
+const J = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+const txt = (v, n) => String(v == null ? "" : v).replace(/\r/g, "").trim().slice(0, n);
+const parse = (s) => { try { return JSON.parse(String(s).replace(/^[^{[]*/, "").replace(/[^}\]]*$/, "")); } catch (e) { return null; } };
+const nid = (t) => t.toString(36) + randomBytes(3).toString("hex");
+const isImg = (s) => /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]{100,}$/.test(String(s || "")) && String(s).length < 2600000;
+const list = (a, n) => (Array.isArray(a) ? a : []).slice(0, n);
+const LN = { en: "simple Indian English", hi: "simple Hindi (Devanagari)", bn: "Bengali", ta: "Tamil", te: "Telugu", kn: "Kannada", ml: "Malayalam", mr: "Marathi", gu: "Gujarati", pa: "Punjabi", or: "Odia", as: "Assamese" };
+
+async function ai(ctx, system, data, opt) {
+  const r = await ctx.askAI(ctx.env || {}, "Follow the instructions and answer now.", data, [], ctx.aiFetch, Object.assign({ system, label: "INPUT", json: true, maxTokens: 4000 }, opt || {}));
+  if (!r.ok) return { ok: false, error: r.error || "AI didn't answer — try again." };
+  if (opt && opt.json === false) return { ok: true, text: String(r.text || "") };
+  const j = parse(r.text); return j ? { ok: true, j } : { ok: false, error: "The AI answer wasn't readable — try again." };
+}
+async function see(ctx, imgs, prompt, opt) {
+  const keys = await aiKeys(ctx.store, ctx.env || {});
+  const r = await readImages(keys, ctx.env || {}, imgs, ctx.aiFetch, prompt, Object.assign({ timeout: 40000, maxModels: 3, prefer: "gemini" }, opt || {}));
+  return r.ok ? { ok: true, text: r.text } : { ok: false, error: "Couldn't read the picture: " + String(r.error || "").slice(0, 160) };
+}
+
+// ---------------- dx: PDF / photo → Excel ----------------
+const cleanTable = (t) => {
+  const cols = list(t && t.columns, 40).map((c) => str(c, 60)).filter(Boolean); if (!cols.length) return null;
+  const rows = list(t.rows, 800).map((r) => (Array.isArray(r) ? r : cols.map((c) => r && r[c])).slice(0, cols.length).map((v) => (v == null ? "" : typeof v === "number" ? v : str(v, 300))));
+  return { title: str(t.title, 80), columns: cols, rows: rows.filter((r) => r.some((v) => v !== "")) };
+};
+async function dx(b, ctx) {
+  const { store, t, app } = ctx;
+  if (b.action === "dx-tpls") { const L = (await ctx.pool(await store.list("dx:t:"), 20, (k) => store.get(k))).filter(Boolean).sort((x, y) => x.name.localeCompare(y.name)); return J(200, { ok: true, rows: L }); }
+  if (b.action === "dx-tpl-save") { const cols = list(b.cols, 40).map((c) => ({ name: str(c.name, 60), hint: str(c.hint, 120) })).filter((c) => c.name); if (!str(b.name, 60) || !cols.length) return J(400, { ok: false, error: "Give the template a name and at least one column" }); const id = str(b.id, 20) || nid(t); await store.set("dx:t:" + id, { id, name: str(b.name, 60), hint: txt(b.hint, 600), cols, by: ctx.by, at: t }); return J(200, { ok: true, id }); }
+  if (b.action === "dx-tpl-del") { const x = await store.get("dx:t:" + str(b.id, 20)); if (x && x.by !== ctx.by && app !== "admin") return J(403, { ok: false, error: "Only its maker or HO can delete it" }); await store.delete("dx:t:" + str(b.id, 20)); return J(200, { ok: true }); }
+  if (b.action !== "dx-page") return J(400, { ok: false, error: "Unknown action" });
+  const cols = list(b.cols, 40).map((c) => (typeof c === "string" ? { name: str(c, 60) } : { name: str(c.name, 60), hint: str(c.hint, 120) })).filter((c) => c.name), hint = txt(b.hint, 600);
+  const want = cols.length ? "Return ONE table with exactly these columns in this order: " + cols.map((c) => '"' + c.name + '"' + (c.hint ? " (" + c.hint + ")" : "")).join(", ") + ". Leave a cell empty if the page does not show it." : 'Find every table or list of records on the page and return each as a table with clear column names. Also turn key-value details (invoice no, date, totals, party name) into a one-row table called "Details".';
+  const sys = "You extract data from business documents (Indian context: ₹ amounts, dates as written, GSTIN, IMEI, model names, dealer codes) into spreadsheet tables. " + want + (hint ? " User note: " + hint : "") + ' Copy values exactly; numbers without currency symbols or thousands separators (e.g. 12500.50); dates as YYYY-MM-DD when unambiguous. Do not invent rows. Reply with JSON only: {"tables":[{"title":"…","columns":["…"],"rows":[["…"]]}],"notes":"anything unclear, short"}';
+  let res;
+  if (isImg(b.img)) {
+    const r = await see(ctx, [b.img], sys + "\n\nThe image is one page of the document.", { accept: (x) => /"tables"/.test(x) });
+    if (r.ok) { const j = parse(r.text); if (j) res = { ok: true, j }; }
+    if (!res) { const r2 = await see(ctx, [b.img], "Write out ALL text on this page exactly, keeping each table row on its own line with cells separated by ' | '. Text only."); if (!r2.ok) return J(502, { ok: false, error: r2.error }); res = await ai(ctx, sys, r2.text.slice(0, 14000), { maxTokens: 6000 }); }
+  } else {
+    const tx = txt(b.text, 16000); if (tx.length < 5) return J(400, { ok: false, error: "This page has no readable text" });
+    res = await ai(ctx, sys, tx, { maxTokens: 6000 });
+  }
+  if (!res.ok) return J(502, { ok: false, error: res.error });
+  const tables = list(res.j.tables, 12).map(cleanTable).filter(Boolean);
+  return J(200, { ok: true, tables, notes: str(res.j.notes, 300) });
+}
+
+// ---------------- cs: circular studio ----------------
+const cleanLesson = (j) => ({
+  title: str(j.title, 120) || "Lesson", summary: txt(j.summary, 900), keypoints: list(j.keypoints, 10).map((x) => str(x, 240)).filter(Boolean),
+  cards: list(j.cards, 10).map((c) => ({ title: str(c && c.title, 100), body: txt(c && c.body, 900) })).filter((c) => c.title || c.body),
+  flash: list(j.flash, 14).map((c) => ({ q: str(c && c.q, 200), a: str(c && c.a, 300) })).filter((c) => c.q && c.a),
+  quiz: list(j.quiz, 12).map((q) => { const o = list(q && q.options, 5).map((x) => str(x, 160)).filter(Boolean); const a = Math.round(+(q && q.answer)); return { q: str(q && q.q, 300), options: o, answer: a >= 0 && a < o.length ? a : 0, why: str(q && q.why, 300) }; }).filter((q) => q.q && q.options.length >= 2)
+});
+const LESSON = '{"title":"…","summary":"3-4 sentences: what this circular is about and who it affects","keypoints":["the 5-8 facts people must remember: dates, slabs, amounts, eligibility, how to claim"],"cards":[{"title":"…","body":"a short teaching card, 2-5 sentences or bullet lines"}],"flash":[{"q":"…","a":"…"}],"quiz":[{"q":"…","options":["…","…","…","…"],"answer":0,"why":"one line"}]}';
+const canSee = (x, ho, rec) => ho || (x.pub && (x.states.includes("all") || x.states.includes(rec.state)));
+async function cs(b, ctx) {
+  const { store, t, app, rec, uk } = ctx, ho = app === "admin";
+  if (b.action === "cs-meta") return J(200, { ok: true, langs: Object.fromEntries(Object.keys(LN).map((k) => [k, LANGS[k] || k])), states: ALL_STATES, defaults: Object.fromEntries(ALL_STATES.map((x) => [x, defaultLang(x)])), mine: defaultLang(String(rec.state || "")) });
+  if (b.action === "cs-ocr") { if (!isImg(b.img)) return J(400, { ok: false, error: "No picture" }); const r = await see(ctx, [b.img], "This is a page of a business circular / policy. Write out ALL its text exactly, top to bottom; keep tables as rows with cells separated by ' | '. Text only.", { accept: (x) => x.trim().length > 30 }); return r.ok ? J(200, { ok: true, text: r.text.slice(0, 20000) }) : J(502, { ok: false, error: r.error }); }
+  if (b.action === "cs-lesson") {
+    const tx = txt(b.text, 15000); if (tx.length < 80) return J(400, { ok: false, error: "The circular text is too short — add more pages" });
+    const sys = "You turn a vivo India business circular (scheme, policy, launch, process) into a short lesson for " + (str(b.audience, 60) || "retailers, promoters and the sales team") + ". Use ONLY facts from the circular — every number, date, slab and condition must match it exactly; never invent. Write in simple Indian English. 4-7 cards, 6-10 flash cards, " + Math.max(3, Math.min(10, +b.nq || 6)) + " quiz questions (4 options, one correct, plausible wrong options, test real understanding like 'how much will a retailer get for 40 units'). Reply with JSON only: " + LESSON;
+    const r = await ai(ctx, sys, tx, { maxTokens: 6000, label: "CIRCULAR" }); if (!r.ok) return J(502, { ok: false, error: r.error });
+    return J(200, { ok: true, lesson: cleanLesson(r.j) });
+  }
+  if (b.action === "cs-tr") {
+    // one language, in two halves (part a: summary + cards, part b: flash cards + quiz) so each AI call stays short
+    const L = str(b.lang, 4); if (!LN[L] || L === "en") return J(400, { ok: false, error: "Choose a language" });
+    const base = cleanLesson(b.lesson || {}), part = b.part === "b" ? "b" : "a";
+    const sub = part === "a" ? { title: base.title, summary: base.summary, keypoints: base.keypoints, cards: base.cards } : { flash: base.flash, quiz: base.quiz.map((q) => ({ q: q.q, options: q.options, why: q.why })) };
+    const r = await ai(ctx, "Translate this JSON into " + LN[L] + " in the native script, using everyday words people in that state use. Keep numbers, ₹ amounts, dates, model and scheme names unchanged. Keep exactly the same JSON keys and structure, the same number of items and options, in the same order. Reply with JSON only.", JSON.stringify(sub), { maxTokens: 6000, label: "JSON" });
+    if (!r.ok) return J(502, { ok: false, error: r.error });
+    if (part === "a") { const tr = cleanLesson(Object.assign({ flash: [], quiz: [] }, r.j)); return J(200, { ok: true, part, lesson: { title: tr.title || base.title, summary: tr.summary, keypoints: tr.keypoints, cards: tr.cards } }); }
+    const fl = list(r.j.flash, 14).map((c) => ({ q: str(c && c.q, 200), a: str(c && c.a, 300) })).filter((c) => c.q && c.a);
+    const quiz = base.quiz.map((q, i) => { const x = list(r.j.quiz, 12)[i] || {}, o = list(x.options, 5).map((v) => str(v, 160)); return { q: str(x.q, 300) || q.q, options: o.length === q.options.length ? o : q.options, answer: q.answer, why: str(x.why, 300) || q.why }; });
+    return J(200, { ok: true, part, lesson: { flash: fl.length === base.flash.length ? fl : base.flash, quiz } });
+  }
+  if (b.action === "cs-diff") {
+    const o = txt(b.old, 14000), n = txt(b.new, 14000); if (o.length < 40 || n.length < 40) return J(400, { ok: false, error: "Add both the old and the new circular" });
+    const sys = 'You compare two versions of a vivo India business circular (OLD then NEW). List EVERY real change in meaning — slabs, amounts, percentages, dates / validity, eligible models, eligible partners or regions, conditions, claim process, deadlines, exclusions — and anything added or removed. Ignore pure wording or formatting changes. Quote exact values. Reply with JSON only: {"summary":"2-3 sentences: the most important changes","changes":[{"area":"e.g. Slab 2 payout","type":"changed|added|removed","before":"old value / text or empty","after":"new value / text or empty","impact":"who is affected and how, one line","important":true}],"same":["key things that did NOT change, max 5"],"check":["anything ambiguous to confirm with the circular owner"]}';
+    const r = await ai(ctx, sys, "=== OLD CIRCULAR ===\n" + o + "\n\n=== NEW CIRCULAR ===\n" + n, { maxTokens: 5000, label: "CIRCULARS" }); if (!r.ok) return J(502, { ok: false, error: r.error });
+    const j = r.j; return J(200, { ok: true, diff: { summary: txt(j.summary, 800), changes: list(j.changes, 60).map((c) => ({ area: str(c.area, 120), type: ["changed", "added", "removed"].includes(c.type) ? c.type : "changed", before: txt(c.before, 500), after: txt(c.after, 500), impact: str(c.impact, 300), important: !!c.important })), same: list(j.same, 8).map((x) => str(x, 200)), check: list(j.check, 8).map((x) => str(x, 240)) } });
+  }
+  if (b.action === "cs-save") {
+    if (!ho) return J(403, { ok: false, error: "Only HO can save lessons" });
+    const id = str(b.id, 20) || nid(t), old = await store.get("cs:l:" + id), langs = {};
+    Object.keys(b.langs || {}).slice(0, 13).forEach((L) => { if (LN[L]) langs[L] = cleanLesson(b.langs[L]); }); if (!langs.en) return J(400, { ok: false, error: "The English lesson is missing" });
+    const states = list(b.states, 40).map((s) => str(s, 40)).filter(Boolean);
+    const x = { id, title: langs.en.title, langs, states: states.length ? states : ["all"], pub: !!b.pub, by: old ? old.by : ctx.by, at: old ? old.at : t, upd: t, src: txt(b.src, 20000) || (old && old.src) || "" };
+    if (JSON.stringify(x).length > 4500000) return J(413, { ok: false, error: "Lesson too big" });
+    await store.set("cs:l:" + id, x); return J(200, { ok: true, id });
+  }
+  if (b.action === "cs-list") {
+    const L = (await ctx.pool(await store.list("cs:l:"), 20, (k) => store.get(k))).filter(Boolean).filter((x) => canSee(x, ho, rec)).sort((x, y) => y.upd - x.upd).slice(0, 150);
+    const mine = ho ? {} : Object.fromEntries((await ctx.pool(L.map((x) => "cs:d:" + x.id + ":" + uk), 20, (k) => store.get(k))).map((d, i) => [L[i].id, d]).filter((p) => p[1]));
+    const counts = {}; if (ho) for (const x of L) counts[x.id] = (await store.list("cs:d:" + x.id + ":")).length;
+    return J(200, { ok: true, rows: L.map((x) => ({ id: x.id, title: x.title, langs: Object.keys(x.langs), states: x.states, pub: x.pub, by: x.by, upd: x.upd, n: x.langs.en.quiz.length, done: counts[x.id], mine: mine[x.id] ? { score: mine[x.id].score, total: mine[x.id].total } : null })) });
+  }
+  const x = await store.get("cs:l:" + str(b.id, 20)); if (!x) return J(404, { ok: false, error: "Lesson not found" });
+  if (!canSee(x, ho, rec)) return J(403, { ok: false, error: "This lesson is not for your state" });
+  if (b.action === "cs-get") { const d = ho ? null : await store.get("cs:d:" + x.id + ":" + uk); return J(200, { ok: true, l: Object.assign({}, x, { src: ho ? x.src : undefined }), mine: d }); }
+  if (b.action === "cs-done") {
+    if (ho) return J(200, { ok: true, test: true });
+    const L = LN[b.lang] && x.langs[b.lang] ? b.lang : "en", Q = x.langs[L].quiz, ans = list(b.answers, Q.length), score = Q.reduce((a, q, i) => a + (+ans[i] === q.answer ? 1 : 0), 0);
+    const k = "cs:d:" + x.id + ":" + uk, old = await store.get(k);
+    const d = { score: Math.max(score, old ? old.score : 0), last: score, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1, name: rec.fullName || rec.username, state: rec.state || "HO", first: old ? old.first : t };
+    await store.set(k, d); return J(200, { ok: true, score, total: Q.length, best: d.score });
+  }
+  if (b.action === "cs-stats") { if (!ho) return J(403, { ok: false, error: "HO only" }); const R = (await ctx.pool(await store.list("cs:d:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).sort((p, q) => q.at - p.at); return J(200, { ok: true, rows: R.map((d) => ({ name: d.name, state: d.state, score: d.score, total: d.total, tries: d.tries, lang: d.lang, at: d.at })) }); }
+  if (b.action === "cs-del") { if (!ho) return J(403, { ok: false, error: "HO only" }); for (const k of await store.list("cs:d:" + x.id + ":")) await store.delete(k); await store.delete("cs:l:" + x.id); return J(200, { ok: true }); }
+  return J(400, { ok: false, error: "Unknown action" });
+}
+
+// ---------------- vg: process video → guide ----------------
+async function vg(b, ctx) {
+  const { store, t, app, uk } = ctx, ho = app === "admin";
+  if (b.action === "vg-steps") {
+    const frames = list(b.frames, 6).filter(isImg); if (!frames.length) return J(400, { ok: false, error: "No frames" });
+    const L = LN[b.lang] ? b.lang : "en", from = Math.max(0, Math.round(+b.from || 0));
+    const p = "These " + frames.length + " screenshots (in order, numbered " + from + " to " + (from + frames.length - 1) + ") are taken from a screen recording of someone doing a task" + (b.what ? ": " + str(b.what, 200) : "") + ". " + (b.prev ? 'The step before these was: "' + str(b.prev, 200) + '". ' : "") + "For EACH screenshot write the instruction a new user needs at that point — what to tap / type / choose and where it is on the screen (e.g. 'Tap Set Product Permission at the top'), naming buttons and fields exactly as shown. Never copy passwords, OTPs or personal numbers seen on screen. If a screenshot shows nothing new compared with the previous one, mark it skip. Write in " + LN[L] + '. Reply with JSON only: {"steps":[{"frame":' + from + ',"title":"short action, max 8 words","text":"1-3 sentences","skip":false}]}';
+    const r = await see(ctx, frames, p, { accept: (x) => /"steps"/.test(x), timeout: 55000 });
+    if (!r.ok) return J(502, { ok: false, error: r.error });
+    const j = parse(r.text); if (!j) return J(502, { ok: false, error: "The AI answer wasn't readable — try again." });
+    return J(200, { ok: true, steps: list(j.steps, 12).map((s, i) => { const f = Math.round(+s.frame); return { frame: f >= from && f < from + frames.length ? f : from + i, title: str(s.title, 90), text: txt(s.text, 600), skip: !!s.skip }; }) });
+  }
+  if (b.action === "vg-intro") { const r = await ai(ctx, "Write a title and a 2-sentence introduction for a step-by-step guide made from these steps (who it is for, what it achieves) in " + (LN[b.lang] || LN.en) + '. Reply with JSON only: {"title":"…","intro":"…"}', txt(b.steps, 6000), { maxTokens: 600 }); return r.ok ? J(200, { ok: true, title: str(r.j.title, 100), intro: txt(r.j.intro, 500) }) : J(502, { ok: false, error: r.error }); }
+  if (b.action === "vg-save") {
+    // texts first; the pictures follow one by one with vg-img (one request can't carry 40 screenshots)
+    const steps = list(b.steps, 80).filter((s) => s && (s.title || s.text)); if (!steps.length) return J(400, { ok: false, error: "No steps" });
+    const id = str(b.id, 20) || nid(t), old = await store.get("vg:g:" + id); if (old && old.owner !== uk && !ho) return J(403, { ok: false, error: "Only its maker can change it" });
+    for (let i = 0; i < steps.length; i++) await store.set("vg:i:" + id + ":" + i, { img: isImg(steps[i].img) ? steps[i].img : "", title: str(steps[i].title, 90), text: txt(steps[i].text, 800) });
+    for (let i = steps.length; old && i < old.n; i++) await store.delete("vg:i:" + id + ":" + i);
+    const g = { id, title: str(b.title, 100) || "Guide", intro: txt(b.intro, 600), lang: LN[b.lang] ? b.lang : "en", n: steps.length, by: old ? old.by : ctx.by, owner: old ? old.owner : uk, at: old ? old.at : t, upd: t, shared: old ? old.shared : true, token: old ? old.token : "" };
+    await store.set("vg:g:" + id, g); return J(200, { ok: true, id });
+  }
+  if (b.action === "vg-list") { const L = (await ctx.pool(await store.list("vg:g:"), 20, (k) => store.get(k))).filter(Boolean).filter((g) => g.owner === uk || g.shared).sort((x, y) => y.upd - x.upd).slice(0, 200); return J(200, { ok: true, rows: L.map((g) => ({ id: g.id, title: g.title, n: g.n, by: g.by, upd: g.upd, mine: g.owner === uk, lang: g.lang, pub: !!g.token })) }); }
+  const g = await store.get("vg:g:" + str(b.id, 20)); if (!g) return J(404, { ok: false, error: "Guide not found" });
+  if (b.action === "vg-get") { if (g.owner !== uk && !g.shared && !ho) return J(403, { ok: false, error: "Not shared" }); const steps = await ctx.pool(Array.from({ length: g.n }, (_, i) => "vg:i:" + g.id + ":" + i), 10, (k) => store.get(k)); return J(200, { ok: true, g: Object.assign({}, g, { steps: steps.filter(Boolean) }), mine: g.owner === uk }); }
+  if (g.owner !== uk && !ho) return J(403, { ok: false, error: "Only its maker can change it" });
+  if (b.action === "vg-img") {
+    const i = Math.round(+b.i); if (!(i >= 0 && i < g.n) || !isImg(b.img)) return J(400, { ok: false, error: "Bad picture" });
+    const k = "vg:i:" + g.id + ":" + i, s = (await store.get(k)) || { title: "", text: "" }; s.img = b.img; await store.set(k, s); return J(200, { ok: true });
+  }
+  if (b.action === "vg-del") { for (let i = 0; i < g.n; i++) await store.delete("vg:i:" + g.id + ":" + i); if (g.token) await store.delete("vg:tok:" + g.token); await store.delete("vg:g:" + g.id); return J(200, { ok: true }); }
+  if (b.action === "vg-share") { if (b.team !== undefined) g.shared = !!b.team; if (b.pub !== undefined) { if (b.pub && !g.token) { g.token = randomBytes(12).toString("base64url"); await store.set("vg:tok:" + g.token, { id: g.id }); } if (!b.pub && g.token) { await store.delete("vg:tok:" + g.token); g.token = ""; } } await store.set("vg:g:" + g.id, g); return J(200, { ok: true, shared: g.shared, token: g.token }); }
+  return J(400, { ok: false, error: "Unknown action" });
+}
+export async function vgPublic(b, { store }) {
+  const k = str(b.k, 40), tk = k ? await store.get("vg:tok:" + k) : null; if (!tk) return J(404, { ok: false, error: "This guide link is not valid or was switched off." });
+  const g = await store.get("vg:g:" + tk.id); if (!g || g.token !== k) return J(404, { ok: false, error: "This guide link is not valid or was switched off." });
+  const steps = []; for (let i = 0; i < g.n; i++) { const s = await store.get("vg:i:" + g.id + ":" + i); if (s) steps.push(s); }
+  return J(200, { ok: true, g: { title: g.title, intro: g.intro, lang: g.lang, by: g.by, upd: g.upd, steps } });
+}
+
+// ---------------- rpl: AI role-play trainer ----------------
+const cleanSc = (s) => ({ id: str(s && s.id, 24), title: str(s && s.title, 80), who: str(s && s.who, 60), you: str(s && s.you, 120), persona: txt(s && s.persona, 1200), goal: txt(s && s.goal, 400), opener: str(s && s.opener, 300), level: ["easy", "medium", "hard"].includes(s && s.level) ? s.level : "medium" });
+async function rpl(b, ctx) {
+  const { store, t, app, uk, rec } = ctx, ho = app === "admin";
+  if (b.action === "rpl-cust") { const L = (await ctx.pool(await store.list("rpl:c:"), 20, (k) => store.get(k))).filter(Boolean); return J(200, { ok: true, rows: L }); }
+  if (b.action === "rpl-cust-save") { if (!ho) return J(403, { ok: false, error: "Only HO can add situations" }); const s = cleanSc(b.sc); if (!s.title || !s.persona) return J(400, { ok: false, error: "Add a title and who the AI plays" }); s.id = s.id || "c" + nid(t); await store.set("rpl:c:" + s.id, Object.assign(s, { by: ctx.by, at: t })); return J(200, { ok: true, id: s.id }); }
+  if (b.action === "rpl-cust-del") { if (!ho) return J(403, { ok: false, error: "HO only" }); await store.delete("rpl:c:" + str(b.id, 24)); return J(200, { ok: true }); }
+  const sc = cleanSc(b.sc), L = LN[b.lang] ? b.lang : "en", hist = list(b.history, 40).map((m) => ({ r: m.r === "me" ? "me" : "ai", t: txt(m.t, 800) })).filter((m) => m.t);
+  const convo = hist.map((m) => (m.r === "me" ? "TRAINEE" : "YOU") + ": " + m.t).join("\n");
+  if (b.action === "rpl-say") {
+    if (!sc.persona) return J(400, { ok: false, error: "Choose a situation" });
+    const level = { easy: "Be fairly easy to convince if the trainee is polite and clear.", medium: "Push back realistically; agree only when your concerns are answered well.", hard: "Be tough and sceptical; raise several objections; only agree to an excellent pitch." }[sc.level];
+    const sys = "ROLE-PLAY for sales training at vivo India. You play: " + sc.persona + " The trainee is " + (sc.you || "a vivo salesperson") + ". Stay in character as a real person in an Indian phone store / dealer shop; never mention you are an AI or give coaching. Reply in " + LN[L] + (L === "en" ? " (Hinglish is fine if that is how the trainee writes)" : "") + ", 1-3 short spoken sentences. " + level + " Use realistic details (prices in ₹, competitor brands, EMI, exchange). If the conversation has clearly ended (you agree to buy / sign up, or you walk away), end your reply with [END].";
+    const r = await ai(ctx, sys, convo || "(The trainee has not spoken yet. Start the conversation with: " + (sc.opener || "a natural opening line") + ")", { json: false, maxTokens: 300, label: "CONVERSATION SO FAR" });
+    if (!r.ok) return J(502, { ok: false, error: r.error });
+    let say = String(r.text).replace(/^(YOU|AI|Customer|Retailer)\s*:\s*/i, "").trim(); const end = /\[END\]/i.test(say); say = say.replace(/\[END\]/gi, "").trim().slice(0, 600);
+    return J(200, { ok: true, say, end });
+  }
+  if (b.action === "rpl-score") {
+    if (hist.filter((m) => m.r === "me").length < 2) return J(400, { ok: false, error: "Talk a bit more before scoring (at least 2 replies)" });
+    const sys = "You are a vivo India sales trainer. Score the TRAINEE in this role-play. Situation: " + sc.title + ". Goal for the trainee: " + (sc.goal || "handle the conversation and close") + ". Judge only the trainee's lines. Reply in " + LN[L] + ' with JSON only: {"score":0-100,"result":"closed|progress|lost","parts":{"opening":0-20,"needs":0-20,"product":0-20,"objections":0-20,"closing":0-20},"good":["specific things done well, quote them"],"improve":["specific, actionable"],"better":[{"said":"a trainee line","try":"a better way to say it"}],"summary":"2 sentences"}';
+    const r = await ai(ctx, sys, convo, { maxTokens: 1500, label: "TRANSCRIPT" }); if (!r.ok) return J(502, { ok: false, error: r.error });
+    const j = r.j, pt = j.parts || {}, P = {}; ["opening", "needs", "product", "objections", "closing"].forEach((k) => { P[k] = Math.max(0, Math.min(20, Math.round(+pt[k] || 0))); });
+    const out = { score: Math.max(0, Math.min(100, Math.round(+j.score || Object.values(P).reduce((a, x) => a + x, 0)))), result: ["closed", "progress", "lost"].includes(j.result) ? j.result : "progress", parts: P, good: list(j.good, 6).map((x) => str(x, 240)), improve: list(j.improve, 6).map((x) => str(x, 240)), better: list(j.better, 4).map((x) => ({ said: str(x && x.said, 200), try: str(x && x.try, 240) })), summary: str(j.summary, 400) };
+    const id = nid(t); await store.set("rpl:s:" + uk + ":" + id, { id, sc: sc.id, title: sc.title, score: out.score, result: out.result, at: t, name: rec.fullName || rec.username, state: rec.state || "HO", turns: hist.length, lang: L });
+    return J(200, { ok: true, r: out });
+  }
+  if (b.action === "rpl-mine") { const R = (await ctx.pool(await store.list("rpl:s:" + uk + ":"), 20, (k) => store.get(k))).filter(Boolean).sort((x, y) => y.at - x.at).slice(0, 100); return J(200, { ok: true, rows: R }); }
+  if (b.action === "rpl-board") { const R = (await ctx.pool(await store.list("rpl:s:"), 30, (k) => store.get(k))).filter(Boolean).filter((x) => ho || x.state === rec.state); const best = {}; R.forEach((x) => { const k = x.name + "|" + x.state + "|" + x.sc; if (!best[k] || x.score > best[k].score) best[k] = x; }); return J(200, { ok: true, rows: Object.values(best).sort((x, y) => y.score - x.score).slice(0, 300), total: R.length }); }
+  return J(400, { ok: false, error: "Unknown action" });
+}
+
+// ---------------- bot: portal task recorder (storage only; the clicking happens on the user's own device) ----------------
+export const botHostOk = (u) => { try { const x = new URL(u), h = x.hostname.toLowerCase(); return x.protocol === "https:" && /(^|\.)vivo\.(xyz|com|com\.cn|in)$/.test(h); } catch (e) { return false; } };
+const cleanStep = (s) => {
+  const a = ["click", "type", "select", "pause", "wait", "check", "page"].includes(s && s.a) ? s.a : "click", sel = s && s.sel && typeof s.sel === "object" ? s.sel : {};
+  const S = {}; ["tag", "id", "name", "ph", "aria", "text", "label", "type", "role", "css", "near"].forEach((k) => { if (sel[k] != null && sel[k] !== "") S[k] = str(sel[k], k === "css" ? 400 : 120); }); if (sel.idx != null) S.idx = Math.max(0, Math.min(500, Math.round(+sel.idx || 0)));
+  const o = { a, sel: S };
+  if (a === "type" || a === "select") { o.v = txt(s.v, 400); if (s.col) o.col = str(s.col, 60); if (s.secret) { o.secret = true; o.v = ""; } }
+  if (a === "check") o.on = !!s.on;
+  if (a === "wait") o.ms = Math.max(200, Math.min(60000, Math.round(+s.ms || 1000)));
+  if (s && s.say) o.say = str(s.say, 160);
+  if (s && s.page) o.page = str(s.page, 300);
+  return o;
+};
+async function bot(b, ctx) {
+  const { store, t, uk } = ctx;
+  if (b.action === "bot-list") { const R = (await ctx.pool(await store.list("bot:r:" + uk + ":"), 20, (k) => store.get(k))).filter(Boolean).sort((x, y) => y.upd - x.upd); return J(200, { ok: true, rows: R.map((x) => ({ id: x.id, name: x.name, url: x.url, n: x.steps.length, cols: [...new Set(x.steps.map((s) => s.col).filter(Boolean))], upd: x.upd, runs: x.runs || 0 })) }); }
+  if (b.action === "bot-get") { const x = await store.get("bot:r:" + uk + ":" + str(b.id, 20)); return x ? J(200, { ok: true, r: x }) : J(404, { ok: false, error: "Not found" }); }
+  if (b.action === "bot-save") {
+    const url = str(b.url, 400); if (!botHostOk(url)) return J(400, { ok: false, error: "Only vivo portal addresses (https://….vivo.xyz) can be used" });
+    const steps = list(b.steps, 300).map(cleanStep); if (!steps.length) return J(400, { ok: false, error: "No steps were recorded" });
+    const id = str(b.id, 20) || nid(t), old = await store.get("bot:r:" + uk + ":" + id);
+    const x = { id, name: str(b.name, 80) || "Recording", url, steps, at: old ? old.at : t, upd: t, runs: old ? old.runs || 0 : 0, note: txt(b.note, 600) };
+    await store.set("bot:r:" + uk + ":" + id, x); return J(200, { ok: true, id });
+  }
+  if (b.action === "bot-del") { await store.delete("bot:r:" + uk + ":" + str(b.id, 20)); return J(200, { ok: true }); }
+  if (b.action === "bot-log") {
+    const id = str(b.run, 30); if (!/^[A-Za-z0-9_-]{4,30}$/.test(id)) return J(400, { ok: false, error: "Bad run id" });
+    const s = b.status || {}, x = { id, rec: str(b.rec, 20), name: str(b.name, 80), at: t, state: ["done", "stopped", "err"].includes(s.s) ? s.s : "stopped", msg: str(s.msg, 300), rows: Math.round(+s.rows || 0), res: list(s.res, 3000).map((r) => ({ row: Math.round(+r.row || 0), ok: !!r.ok, msg: str(r.msg, 200) })) };
+    const k = "bot:x:" + uk + ":" + id, had = await store.get(k);
+    await store.set(k, x);
+    if (x.rec && !had) { const r = await store.get("bot:r:" + uk + ":" + x.rec); if (r) { r.runs = (r.runs || 0) + 1; await store.set("bot:r:" + uk + ":" + r.id, r); } }
+    return J(200, { ok: true });
+  }
+  if (b.action === "bot-runs") { const R = (await ctx.pool(await store.list("bot:x:" + uk + ":"), 20, (k) => store.get(k))).filter(Boolean).sort((x, y) => y.at - x.at).slice(0, 60); return J(200, { ok: true, rows: R }); }
+  return J(400, { ok: false, error: "Unknown action" });
+}
+
+export async function lxAction(b, ctx) {
+  const c = Object.assign({}, ctx, { by: ctx.rec.fullName || ctx.rec.username || "", uk: ctx.app + ":" + ctx.key });
+  const a = b.action, needAI = /^(dx-page|cs-(ocr|lesson|tr|diff)|vg-(steps|intro)|rpl-(say|score))$/.test(a);
+  if (needAI && !ctx.askAI) return J(400, { ok: false, error: "AI is not set up yet." });
+  if (/^dx-/.test(a)) return dx(b, c);
+  if (/^cs-/.test(a)) return cs(b, c);
+  if (/^vg-/.test(a)) return vg(b, c);
+  if (/^rpl-/.test(a)) return rpl(b, c);
+  if (/^bot-/.test(a)) return ctx.app === "admin" ? bot(b, c) : J(403, { ok: false, error: "Only HO can use the portal task recorder" });
+  return J(400, { ok: false, error: "Unknown action" });
+}

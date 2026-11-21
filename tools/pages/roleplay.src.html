@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI role-play trainer</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12px inherit;cursor:pointer;color:var(--ink)}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.sc{display:flex;gap:10px;align-items:flex-start;padding:11px 0;border-top:1px solid #EEF0F6;cursor:pointer}.sc:first-child{border-top:0}.sc .e{font-size:28px}.sc .t{flex:1}.sc b{display:block;font-size:14px}
+.chat{display:flex;flex-direction:column;gap:8px;min-height:240px;max-height:56vh;overflow:auto;padding:4px 2px;margin-top:8px}
+.m{max-width:82%;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap}.m.ai{background:#F1F2F8;align-self:flex-start;border-bottom-left-radius:4px}.m.me{background:#2B33A6;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}.m.sys{align-self:center;background:#FFF4E5;font-size:12.5px}
+.say{display:flex;gap:6px;margin-top:8px}.say textarea{flex:1;resize:none}
+.mic{width:46px;border-radius:12px;border:0;background:#EEF0FF;font-size:20px;cursor:pointer}.mic.on{background:#E53935;color:#fff;animation:pu 1s infinite}@keyframes pu{50%{opacity:.6}}
+.score{font-size:46px;font-weight:900;text-align:center;color:#2B33A6}
+.pb{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-top:6px}.pb span{flex:0 0 110px}.pb i{flex:1;height:9px;background:#EEF0F6;border-radius:99px;overflow:hidden;position:relative}.pb i b{position:absolute;top:0;bottom:0;left:0;background:#4D5BF9;border-radius:99px}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎭</span></div>
+  <h1>AI role-play trainer</h1><p>Practise with an AI customer or retailer — get a score and tips</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), HO = AUTH && AUTH.app === "admin", TAB = "pick", CUST = [], SC = null, H = [], LANG = "en", BUSY = false, ENDED = false, VOICE = false, LEVEL = "medium";
+  var BUILT = [
+    { id: "b1", e: "🛍️", title: "Walk-in customer comparing brands", who: "Customer", you: "a vivo promoter in a mobile store", persona: "Rahul, 27, office worker with a ₹20,000–25,000 budget. He likes a Samsung and a Redmi model he saw online and thinks vivo is overpriced for the specs. Cares about camera, battery and resale value.", goal: "Find his needs, show where the vivo model wins, handle the price objection, close the sale or a demo.", opener: "Bhaiya, ye vivo wala itna mehenga kyun hai? Online Redmi isse sasta mil raha hai." },
+    { id: "b2", e: "💳", title: "Customer worried about EMI", who: "Customer", you: "a vivo promoter", persona: "Sunita, 35, school teacher, wants a phone for her son's online classes. Has no credit card, worried about hidden EMI charges and down payment.", goal: "Explain zero-cost / card-less EMI options clearly, build trust, close.", opener: "EMI pe lena hai, par mere paas credit card nahi hai. Kuch hidden charge toh nahi lagega?" },
+    { id: "b3", e: "😠", title: "Angry customer after a display problem", who: "Customer", you: "a vivo promoter", persona: "Vikram, 40, bought a vivo phone 2 months ago; the display has a green line. He is angry, threatens to post on social media and wants a new phone today.", goal: "Calm him down, show empathy, explain the service-centre process and warranty clearly, keep him as a vivo customer.", opener: "Do mahine mein screen kharab ho gayi! Mujhe abhi naya phone chahiye, warna main review daal dunga." },
+    { id: "b4", e: "🏪", title: "Retailer refuses new model stock", who: "Retailer", you: "a vivo FSE (field sales executive)", persona: "Gupta ji, owner of a multi-brand phone shop. Has old vivo stock lying unsold for 45 days and says the new model will also not move. Pushes other brands because of better margins.", goal: "Understand his stock problem, offer liquidation support / scheme, convince him to take the new model.", opener: "Pehle ka stock hi nahi nikla, naya model leke kya karunga? Doosre brand zyada margin de rahe hain." },
+    { id: "b5", e: "💰", title: "Retailer angry about late scheme payout", who: "Retailer", you: "a vivo FSE", persona: "Imran bhai, high-volume retailer. Last month's scheme payout has not come; he says vivo promises and doesn't pay, and threatens to remove the vivo display.", goal: "Acknowledge, explain the payout timeline and claim status honestly, give a clear next step, keep the display and sell-in.", opener: "Pichle mahine ka scheme ka paisa abhi tak nahi aaya. Ab main vivo ka display hata raha hoon." },
+    { id: "b6", e: "📵", title: "Retailer pre-activating phones", who: "Retailer", you: "a vivo FSE", persona: "Suresh, retailer who activates phones before selling to hit targets and sells them as 'new' at a discount. Doesn't see the harm.", goal: "Explain market hygiene rules and why pre-activation hurts him (warranty, penalties, scheme eligibility) without insulting him; get his commitment to stop.", opener: "Target poora karna hai toh activate karna padta hai na. Customer ko kya farak padta hai?" },
+    { id: "b7", e: "🤝", title: "Customer bargaining hard", who: "Customer", you: "a vivo promoter", persona: "Neha, 24, college student. Ready to buy but wants ₹2,000 off, free earbuds and a free cover; says the shop next door will give it.", goal: "Hold the price professionally, add value (offers, exchange, EMI, accessories bundle), close without a heavy discount.", opener: "Agar 2000 kam karo aur earbuds free do toh abhi le lungi, warna bagal wali dukaan mein de rahe hain." }
+  ];
+  var LANGS = [["en", "English / Hinglish"], ["hi", "हिंदी"], ["bn", "বাংলা"], ["ta", "தமிழ்"], ["te", "తెలుగు"], ["kn", "ಕನ್ನಡ"], ["mr", "मराठी"], ["gu", "ગુજરાતી"], ["pa", "ਪੰਜਾਬੀ"], ["or", "ଓଡ଼ିଆ"], ["ml", "മലയാളം"]];
+  var BCP = { en: "en-IN", hi: "hi-IN", bn: "bn-IN", ta: "ta-IN", te: "te-IN", kn: "kn-IN", mr: "mr-IN", gu: "gu-IN", pa: "pa-IN", or: "or-IN", ml: "ml-IN" };
+  var TABS = [["pick", "🎭 Practise"], ["mine", "📈 My scores"], ["board", "🏆 Leaderboard"]].concat(HO ? [["cust", "🧩 Situations"]] : []);
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { if (SC && !ENDED && H.length > 2 && !confirm("Leave this role-play?")) return; SC = null; TAB = b.dataset.t; draw(); }; });
+    if (TAB === "pick") return SC ? drawChat() : drawPick();
+    if (TAB === "mine") return drawMine(); if (TAB === "board") return drawBoard(); drawCust();
+  }
+  var all = function () { return BUILT.concat(CUST.map(function (c) { return Object.assign({ e: "🧩" }, c); })); };
+  function drawPick() {
+    VIEW.innerHTML = '<div class="card"><b>Language</b><div class="chips" id="lg">' + LANGS.map(function (l) { return '<button data-l="' + l[0] + '" class="' + (LANG === l[0] ? "on" : "") + '">' + l[1] + "</button>"; }).join("") + '</div><b style="display:block;margin-top:10px">Difficulty</b><div class="chips" id="lv">' + [["easy", "🙂 Easy"], ["medium", "😐 Medium"], ["hard", "😤 Hard"]].map(function (l) { return '<button data-v="' + l[0] + '" class="' + (LEVEL === l[0] ? "on" : "") + '">' + l[1] + "</button>"; }).join("") + "</div></div>" +
+      '<div class="card"><b>Choose a situation</b>' + all().map(function (s) { return '<div class="sc" data-i="' + esc(s.id) + '"><span class="e">' + s.e + '</span><span class="t"><b>' + esc(s.title) + '</b><span class="muted" style="font-size:12.5px">You are ' + esc(s.you || "a vivo salesperson") + " · AI plays the " + esc(String(s.who || "customer").toLowerCase()) + "</span></span></div>"; }).join("") + "</div>";
+    [].forEach.call($("lg").children, function (b) { b.onclick = function () { LANG = b.dataset.l; drawPick(); }; });
+    [].forEach.call($("lv").children, function (b) { b.onclick = function () { LEVEL = b.dataset.v; drawPick(); }; });
+    [].forEach.call(VIEW.querySelectorAll(".sc"), function (d) { d.onclick = function () { SC = Object.assign({}, all().filter(function (s) { return s.id === d.dataset.i; })[0], { level: LEVEL }); H = []; ENDED = false; drawChat(); say(); }; });
+  }
+  function drawChat() {
+    VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><b style="flex:1">' + SC.e + " " + esc(SC.title) + '</b><span class="pill m">' + SC.level + '</span></div><div class="help"><b>Your goal:</b> ' + esc(SC.goal || "") + '</div><div class="chat" id="ch"></div>' +
+      '<div class="say"><textarea class="tx" id="in" rows="2" placeholder="Type what you would say…"></textarea>' + (SR ? '<button class="mic" id="mic" title="Speak">🎤</button>' : "") + '<button class="btn pri" id="snd">Send</button></div>' +
+      '<div class="bar2"><label style="font-size:12.5px"><input type="checkbox" id="vo"' + (VOICE ? " checked" : "") + '> 🔊 Read replies aloud</label><span style="flex:1"></span><button class="btn sec sm" id="end">🏁 End &amp; score</button><button class="btn ghost sm" id="rs">↺ Restart</button><button class="btn ghost sm" id="bk">← Situations</button></div></div><div id="res"></div>';
+    paint();
+    $("snd").onclick = send;
+    $("in").onkeydown = function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
+    $("vo").onchange = function () { VOICE = $("vo").checked; };
+    $("end").onclick = score;
+    $("rs").onclick = function () { H = []; ENDED = false; drawChat(); say(); };
+    $("bk").onclick = function () { if (H.length > 2 && !ENDED && !confirm("Leave this role-play?")) return; SC = null; drawPick(); };
+    if ($("mic")) $("mic").onclick = listen;
+  }
+  function paint() {
+    var c = $("ch"); if (!c) return;
+    c.innerHTML = H.map(function (m) { return '<div class="m ' + m.r + '">' + esc(m.t) + "</div>"; }).join("") + (BUSY ? '<div class="m ai muted">…</div>' : "") + (ENDED ? '<div class="m sys">The conversation has ended — tap “End &amp; score”.</div>' : "");
+    c.scrollTop = c.scrollHeight;
+  }
+  function send() { var v = $("in").value.trim(); if (!v || BUSY || ENDED) return; H.push({ r: "me", t: v }); $("in").value = ""; say(); }
+  function say() {
+    BUSY = true; paint();
+    api({ action: "rpl-say", sc: SC, lang: LANG, history: H }).then(function (r) {
+      BUSY = false;
+      if (!r.ok) { toast(r.error); if (H.length && H[H.length - 1].r === "me" && $("in")) $("in").value = H.pop().t; return paint(); }
+      H.push({ r: "ai", t: r.say }); if (r.end) ENDED = true; paint();
+      if (VOICE && window.speechSynthesis) { try { var u = new SpeechSynthesisUtterance(r.say); u.lang = BCP[LANG] || "en-IN"; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { } }
+    });
+  }
+  var REC = null;
+  function listen() {
+    if (REC) { REC.stop(); return; }
+    try { REC = new SR(); } catch (e) { return toast("Voice input isn't available here"); }
+    REC.lang = BCP[LANG] || "en-IN"; REC.interimResults = true; REC.continuous = false;
+    var base = $("in").value; $("mic").classList.add("on");
+    REC.onresult = function (e) { var t = ""; for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; $("in").value = (base ? base + " " : "") + t; };
+    REC.onerror = function (e) { if (e.error === "not-allowed") toast("Allow the microphone to speak"); };
+    REC.onend = function () { REC = null; if ($("mic")) $("mic").classList.remove("on"); };
+    REC.start();
+  }
+  function score() {
+    if (H.filter(function (m) { return m.r === "me"; }).length < 2) return toast("Reply at least twice before scoring");
+    $("end").disabled = true; $("res").innerHTML = '<div class="card"><div class="loading"><div class="spin"></div>The trainer is scoring you…</div></div>';
+    api({ action: "rpl-score", sc: SC, lang: LANG, history: H }).then(function (x) {
+      $("end").disabled = false;
+      if (!x.ok) { $("res").innerHTML = ""; return toast(x.error); }
+      var R = x.r, P = [["opening", "Opening"], ["needs", "Finding needs"], ["product", "Product / offer"], ["objections", "Objections"], ["closing", "Closing"]];
+      $("res").innerHTML = '<div class="card"><div class="score">' + R.score + '<span style="font-size:20px">/100</span></div><div style="text-align:center"><span class="pill ' + (R.result === "closed" ? "g" : R.result === "lost" ? "r" : "o") + '">' + ({ closed: "✅ Closed", progress: "⏳ In progress", lost: "❌ Lost" })[R.result] + '</span></div><div class="help">' + esc(R.summary) + "</div>" +
+        P.map(function (p) { return '<div class="pb"><span>' + p[1] + '</span><i><b style="width:' + R.parts[p[0]] * 5 + '%"></b></i><span style="flex:0 0 36px;text-align:right">' + R.parts[p[0]] + "/20</span></div>"; }).join("") +
+        (R.good.length ? '<b style="display:block;margin-top:12px">👍 Done well</b>' + R.good.map(function (s) { return '<div style="font-size:13.5px;margin-top:4px">• ' + esc(s) + "</div>"; }).join("") : "") +
+        (R.improve.length ? '<b style="display:block;margin-top:12px">🎯 Improve</b>' + R.improve.map(function (s) { return '<div style="font-size:13.5px;margin-top:4px">• ' + esc(s) + "</div>"; }).join("") : "") +
+        (R.better.length ? '<b style="display:block;margin-top:12px">💬 Better ways to say it</b>' + R.better.map(function (b) { return '<div class="help"><span class="muted">You said:</span> ' + esc(b.said) + "<br><b>Try:</b> " + esc(b.try) + "</div>"; }).join("") : "") +
+        '<div class="bar2"><button class="btn pri" id="ag">↺ Try again</button><button class="btn ghost" id="ot">Another situation</button></div></div>';
+      $("ag").onclick = function () { H = []; ENDED = false; drawChat(); say(); };
+      $("ot").onclick = function () { SC = null; drawPick(); };
+      $("res").scrollIntoView({ behavior: "smooth" });
+    });
+  }
+  function drawMine() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "rpl-mine" }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      var R = r.rows, avg = R.length ? Math.round(R.reduce(function (a, x) { return a + x.score; }, 0) / R.length) : 0;
+      VIEW.innerHTML = '<div class="card">' + (R.length ? '<div class="bar2" style="margin-top:0"><span class="pill">' + R.length + ' sessions</span><span class="pill g">Average ' + avg + '</span><span class="pill o">Best ' + Math.max.apply(null, R.map(function (x) { return x.score; })) + '</span></div><table class="tb" style="margin-top:8px"><tr><th>Situation</th><th>Score</th><th>Result</th><th>When</th></tr>' + R.map(function (x) { return "<tr><td>" + esc(x.title) + "</td><td><b>" + x.score + "</b></td><td>" + x.result + "</td><td>" + dOnly(x.at) + "</td></tr>"; }).join("") + "</table>" : '<div class="empty"><div class="big">📈</div><b>No scores yet</b><div class="muted">Finish a role-play and tap “End &amp; score”.</div></div>') + "</div>";
+    });
+  }
+  function drawBoard() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "rpl-board" }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      var P = {}; r.rows.forEach(function (x) { var k = x.name + "|" + x.state, p = P[k] = P[k] || { name: x.name, state: x.state, sum: 0, n: 0, best: 0 }; p.sum += x.score; p.n++; p.best = Math.max(p.best, x.score); });
+      var L = Object.keys(P).map(function (k) { var p = P[k]; p.avg = Math.round(p.sum / p.n); return p; }).sort(function (a, b) { return b.avg - a.avg || b.n - a.n; });
+      VIEW.innerHTML = '<div class="card"><b>🏆 ' + (HO ? "All states" : "Your state") + '</b><div class="muted" style="font-size:12px">Average of each person\'s best score per situation · ' + r.total + " sessions</div>" + (L.length ? '<table class="tb" style="margin-top:8px"><tr><th>#</th><th>Name</th>' + (HO ? "<th>State</th>" : "") + "<th>Avg</th><th>Situations</th></tr>" + L.slice(0, 100).map(function (p, i) { return "<tr><td>" + (i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1) + "</td><td>" + esc(p.name) + "</td>" + (HO ? "<td>" + esc(p.state) + "</td>" : "") + "<td><b>" + p.avg + "</b></td><td>" + p.n + "</td></tr>"; }).join("") + "</table>" + (HO ? '<div class="bar2"><button class="btn ghost sm" id="xl">⬇ Excel</button></div>' : "") : '<div class="empty muted" style="margin-top:10px">No scores yet</div>') + "</div>";
+      if ($("xl")) $("xl").onclick = function () { download(xlsx([{ name: "Leaderboard", rows: [["Name", "State", "Average", "Best", "Situations"]].concat(L.map(function (p) { return [p.name, p.state, p.avg, p.best, p.n]; })) }, { name: "Best per situation", rows: [["Name", "State", "Situation", "Score", "Result", "When"]].concat(r.rows.map(function (x) { return [x.name, x.state, x.title, x.score, x.result, dt(x.at)]; })) }]), "roleplay_scores.xlsx"); };
+    });
+  }
+  function drawCust() {
+    VIEW.innerHTML = '<div class="card"><b>Your own situations</b><div class="muted" style="font-size:12.5px">Add situations from real field problems — they show to everyone under “Choose a situation”.</div><div class="bar2"><button class="btn pri sm" id="nw">＋ New situation</button></div>' + CUST.map(function (c) { return '<div class="sc"><span class="e">🧩</span><span class="t"><b>' + esc(c.title) + '</b><span class="muted" style="font-size:12px">' + esc(String(c.persona).slice(0, 140)) + '</span></span><span style="font-size:12.5px;white-space:nowrap"><a href="#" data-e="' + c.id + '">Edit</a> · <a href="#" data-d="' + c.id + '">Delete</a></span></div>'; }).join("") + "</div>";
+    $("nw").onclick = function () { edit({}); };
+    [].forEach.call(VIEW.querySelectorAll("[data-e]"), function (a) { a.onclick = function (e) { e.preventDefault(); edit(CUST.filter(function (c) { return c.id === a.dataset.e; })[0]); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-d]"), function (a) { a.onclick = function (e) { e.preventDefault(); if (confirm("Delete?")) api({ action: "rpl-cust-del", id: a.dataset.d }).then(function () { load().then(draw); }); }; });
+  }
+  function edit(c) {
+    var f = function (id, lb, v, ta, ph) { return '<label class="lb">' + lb + "</label>" + (ta ? '<textarea class="tx" id="' + id + '" rows="3" placeholder="' + esc(ph || "") + '">' + esc(v || "") + "</textarea>" : '<input class="tx" id="' + id + '" value="' + esc(v || "") + '" placeholder="' + esc(ph || "") + '">'); };
+    sheet(c.id ? "Edit situation" : "New situation", "", [["💾", "Save", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
+      var sc = { id: c.id, title: g("s1"), who: g("s2") || "Customer", you: g("s3"), persona: g("s4"), goal: g("s5"), opener: g("s6") };
+      if (!sc.title || !sc.persona) { toast("Add a title and who the AI plays"); return false; }
+      api({ action: "rpl-cust-save", sc: sc }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); load().then(draw); });
+    }, "pri"]], f("s1", "Title", c.title, 0, "e.g. Distributor asks for credit extension") + f("s2", "AI plays the…", c.who, 0, "Customer / Retailer / Distributor") + f("s3", "The trainee is…", c.you, 0, "a vivo FSE") + f("s4", "Who the AI is (name, situation, mood, what they want)", c.persona, 1) + f("s5", "Goal for the trainee", c.goal, 1) + f("s6", "First line the AI says (optional)", c.opener));
+  }
+  function load() { return api({ action: "rpl-cust" }).then(function (r) { CUST = r.ok ? r.rows : []; }); }
+  load().then(draw);
+})();
+</script>
+</body>
+</html>

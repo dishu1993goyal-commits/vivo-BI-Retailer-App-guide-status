@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Process video → guide</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:600 12px inherit;cursor:pointer;color:var(--ink)}.chips button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:8px}
+.prog{height:8px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:#4D5BF9;width:0;transition:width .3s}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px}.grid .fr{position:relative;border-radius:8px;overflow:hidden;border:2px solid #DADDF0;cursor:pointer}.grid .fr img{width:100%;display:block}.grid .fr.off{opacity:.3}.grid .fr span{position:absolute;left:4px;top:4px;background:#2B33A6;color:#fff;font:800 11px/1 inherit;border-radius:99px;padding:3px 6px}
+.st{display:flex;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #EEF0F6}.st .n{flex:0 0 30px;height:30px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 14px/30px inherit;text-align:center}.st .c{flex:1;min-width:0}.st img{width:100%;border-radius:10px;border:1px solid #E3E6F3;margin-top:6px}.st.skip{opacity:.45}
+.li{display:flex;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #EEF0F6;cursor:pointer}.li:first-child{border-top:0}.li .t{flex:1;min-width:0}.li b{display:block}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎬</span></div>
+  <h1>Process video → guide</h1><p id="sub">Record your screen once — get a step-by-step guide with pictures</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "new", G = null, FR = [], LANG = "en", WHAT = "", PUBK = (location.hash.match(/k=([\w-]+)/) || [])[1];
+  var LANGS = [["en", "English"], ["hi", "हिंदी Hindi"], ["bn", "বাংলা"], ["ta", "தமிழ்"], ["te", "తెలుగు"], ["kn", "ಕನ್ನಡ"], ["mr", "मराठी"], ["gu", "ગુજરાતી"], ["pa", "ਪੰਜਾਬੀ"], ["or", "ଓଡ଼ିଆ"], ["ml", "മലയാളം"], ["as", "অসমীয়া"]];
+  var TABS = [["new", "🎬 New guide"], ["mine", "📚 Guides"]];
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { if (G && G.dirty && !confirm("Leave without saving the guide?")) return; G = null; TAB = b.dataset.t; draw(); }; });
+    if (TAB === "mine") return drawList();
+    if (G) return drawGuide(true);
+    drawNew();
+  }
+  // 1. video → key screens (done on the device; the video is never uploaded)
+  function drawNew() {
+    VIEW.innerHTML = '<div class="card"><b>1. Add a screen recording</b><div class="help">Record the process once with the phone or computer screen recorder. Go slowly and stay a second on each screen. Don\'t show passwords or customer details.</div><div class="drop" id="dp"><b>🎞 Tap to choose the video</b><div class="muted" style="font-size:12px">MP4 / WebM · up to 10 minutes · the video stays on your device</div></div><input type="file" id="fi" accept="video/*" style="display:none">' +
+      '<label class="lb">What does the video show? (helps AI)</label><input class="tx" id="wh" value="' + esc(WHAT) + '" placeholder="e.g. How to raise an IMEI unblock request in vWork">' +
+      '<label class="lb">Guide language</label><div class="chips" id="lg">' + LANGS.map(function (l) { return '<button data-l="' + l[0] + '" class="' + (LANG === l[0] ? "on" : "") + '">' + l[1] + "</button>"; }).join("") + '</div><div id="pg"></div></div><div id="frs"></div>';
+    [].forEach.call($("lg").children, function (b) { b.onclick = function () { LANG = b.dataset.l; WHAT = $("wh").value; drawNew(); }; });
+    $("dp").onclick = function () { $("fi").click(); };
+    $("fi").onchange = function () { WHAT = $("wh").value; var f = $("fi").files[0]; if (f) frames(f); };
+    if (FR.length) drawFrames();
+  }
+  function frames(file) {
+    var v = document.createElement("video"), url = URL.createObjectURL(file), small = document.createElement("canvas"), sg = small.getContext("2d", { willReadFrequently: true }), last = null, out = [], t = 0, step = 0.5;
+    v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url; small.width = 48; small.height = 64;
+    $("pg").innerHTML = '<div class="prog"><i id="pb"></i></div><div id="pm" class="muted" style="font-size:12.5px">Opening the video…</div>';
+    v.onerror = function () { $("pm").textContent = "This video can't be opened here. Try an MP4 file."; };
+    v.onloadedmetadata = function () {
+      var D = v.duration; if (!isFinite(D) || !D) { $("pm").textContent = "Couldn't read the video length."; return; }
+      if (D > 600) D = 600;
+      step = D > 240 ? 1 : 0.5;
+      var W = v.videoWidth, H = v.videoHeight, k = Math.min(1, 1280 / Math.max(W, H)), big = document.createElement("canvas"); big.width = Math.round(W * k); big.height = Math.round(H * k);
+      small.height = Math.max(16, Math.round(48 * H / W));
+      var stable = 0, cand = null;
+      var grab = function () { big.getContext("2d").drawImage(v, 0, 0, big.width, big.height); out.push({ t: cand.t, img: big.toDataURL("image/jpeg", 0.72), on: true }); cand = null; };
+      function seek() { if (t > D || out.length >= 60) return fin(); v.currentTime = Math.min(t, D - 0.05); }
+      v.onseeked = function () {
+        sg.drawImage(v, 0, 0, small.width, small.height);
+        var px = sg.getImageData(0, 0, small.width, small.height).data, diff = 0;
+        if (last) { for (var i = 0; i < px.length; i += 4) diff += Math.abs(px[i] - last[i]) + Math.abs(px[i + 1] - last[i + 1]) + Math.abs(px[i + 2] - last[i + 2]); diff = diff / (px.length / 4) / 3; }
+        // keep a screen once it has changed and then stayed still for a moment (skips taps and scrolling in between)
+        if (!last || diff > 7) { cand = { t: t }; stable = 0; last = px; }
+        else if (cand && ++stable >= (step < 1 ? 2 : 1)) grab();
+        $("pb").style.width = Math.round(t / D * 100) + "%"; $("pm").textContent = "Finding the key screens… " + out.length + " found";
+        t += step; seek();
+      };
+      function fin() { if (cand) grab(); URL.revokeObjectURL(url); FR = out; $("pg").innerHTML = out.length ? "" : '<div class="help w">No screens found in this video.</div>'; drawFrames(); }
+      seek();
+    };
+  }
+  function drawFrames() {
+    var on = FR.filter(function (f) { return f.on; }).length;
+    $("frs").innerHTML = '<div class="card"><b>2. Key screens · ' + on + " of " + FR.length + ' kept</b><div class="muted" style="font-size:12px">Tap a screen to leave it out (blank, repeated or private screens). Up to 40 are used.</div><div class="grid">' + FR.map(function (f, i) { return '<div class="fr' + (f.on ? "" : " off") + '" data-i="' + i + '"><img src="' + f.img + '"><span>' + Math.floor(f.t / 60) + ":" + ("0" + Math.floor(f.t % 60)).slice(-2) + "</span></div>"; }).join("") + '</div><div class="bar2"><button class="btn pri" id="mk"' + (on ? "" : " disabled") + '>✨ Write the steps</button></div><div id="pg2"></div></div>';
+    [].forEach.call($("frs").querySelectorAll(".fr"), function (d) { d.onclick = function () { FR[+d.dataset.i].on = !FR[+d.dataset.i].on; drawFrames(); }; });
+    $("mk").onclick = write;
+  }
+  function write() {
+    var use = FR.filter(function (f) { return f.on; }).slice(0, 40), steps = [], i = 0, prev = "";
+    $("mk").disabled = true; $("pg2").innerHTML = '<div class="prog"><i id="pb2"></i></div><div id="pm2" class="muted" style="font-size:12.5px"></div>';
+    (function next() {
+      if (i >= use.length) return intro();
+      var batch = use.slice(i, i + 4), from = i; i += 4;
+      $("pm2").textContent = "AI is reading screens " + (from + 1) + "–" + Math.min(i, use.length) + " of " + use.length + "…"; $("pb2").style.width = Math.round(from / use.length * 100) + "%";
+      api({ action: "vg-steps", frames: batch.map(function (f) { return f.img; }), from: from, lang: LANG, what: WHAT, prev: prev }).then(function (r) {
+        if (!r.ok) { batch.forEach(function (f) { steps.push({ img: f.img, title: "Step", text: "", skip: false }); }); toast(r.error); return next(); }
+        batch.forEach(function (f, k) { var s = r.steps.filter(function (x) { return x.frame === from + k; })[0] || {}; steps.push({ img: f.img, title: s.title || "", text: s.text || "", skip: !!s.skip }); if (s.title && !s.skip) prev = s.title; });
+        next();
+      });
+    })();
+    function intro() {
+      $("pm2").textContent = "Writing the title…";
+      var lines = steps.filter(function (s) { return !s.skip; }).map(function (s, k) { return (k + 1) + ". " + s.title + " — " + s.text; }).join("\n");
+      api({ action: "vg-intro", steps: lines, lang: LANG }).then(function (r) { G = { title: r.ok ? r.title : WHAT || "Step-by-step guide", intro: r.ok ? r.intro : "", lang: LANG, steps: steps, mine: true, dirty: true }; FR = []; drawGuide(true); });
+    }
+  }
+  // 3. edit / view
+  function drawGuide(edit) {
+    var S = G.steps, n = 0, ed = edit && G.mine && !PUBK;
+    VIEW.innerHTML = '<div class="card">' + (ed ? '<label class="lb">Title</label><input class="tx" id="gt" value="' + esc(G.title) + '"><label class="lb">Introduction</label><textarea class="tx" id="gi" rows="2">' + esc(G.intro) + "</textarea>" : '<h2 style="margin:0 0 6px">' + esc(G.title) + '</h2><div style="font-size:14px;line-height:1.6">' + esc(G.intro) + "</div>" + (G.by ? '<div class="muted" style="font-size:12px;margin-top:4px">by ' + esc(G.by) + " · " + dOnly(G.upd) + "</div>" : "")) +
+      '<div class="bar2">' + (ed ? '<button class="btn pri" id="sv">💾 Save</button>' : "") + (!PUBK && G.id && G.mine ? '<button class="btn ghost sm" id="sh">🔗 Share</button>' : "") + '<button class="btn ghost sm" id="pdf">⬇ PDF</button><button class="btn ghost sm" id="ppt">⬇ PowerPoint</button>' + (!PUBK && G.id && G.mine ? (ed ? "" : '<button class="btn ghost sm" id="ed">✏️ Edit</button>') + '<button class="btn ghost sm" id="del">🗑</button>' : "") + (PUBK ? "" : '<button class="btn ghost sm" id="bk">← Back</button>') + '</div><div id="pg3"></div>' +
+      S.map(function (s, i) {
+        if (s.skip && !ed) return "";
+        var no = s.skip ? "–" : ++n;
+        return '<div class="st' + (s.skip ? " skip" : "") + '"><div class="n">' + no + '</div><div class="c">' + (ed ? '<input class="tx" data-t="' + i + '" value="' + esc(s.title) + '" style="font-weight:700"><textarea class="tx" data-x="' + i + '" rows="2" style="margin-top:4px">' + esc(s.text) + '</textarea><div style="margin-top:4px;font-size:12px"><a href="#" data-sk="' + i + '">' + (s.skip ? "Include this step" : "Leave this step out") + "</a>" + (i ? ' · <a href="#" data-up="' + i + '">Move up</a>' : "") + "</div>" : "<b>" + esc(s.title) + '</b><div style="font-size:13.5px;line-height:1.55;margin-top:2px">' + esc(s.text) + "</div>") + (s.img ? '<img src="' + s.img + '" loading="lazy">' : "") + "</div></div>";
+      }).join("") + "</div>";
+    function grab() { if (!$("gt")) return; G.title = $("gt").value; G.intro = $("gi").value; S.forEach(function (s, i) { var a = VIEW.querySelector('[data-t="' + i + '"]'); if (a) { s.title = a.value; s.text = VIEW.querySelector('[data-x="' + i + '"]').value; } }); }
+    [].forEach.call(VIEW.querySelectorAll("[data-sk]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); S[+a.dataset.sk].skip = !S[+a.dataset.sk].skip; G.dirty = true; drawGuide(true); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-up]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); var i = +a.dataset.up, x = S[i]; S[i] = S[i - 1]; S[i - 1] = x; G.dirty = true; drawGuide(true); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-t],[data-x],#gt,#gi"), function (el) { el.oninput = function () { G.dirty = true; }; });
+    if ($("bk")) $("bk").onclick = function () { grab(); if (G.dirty && G.mine && !confirm("Leave without saving?")) return; G = null; TAB = "mine"; draw(); };
+    if ($("ed")) $("ed").onclick = function () { drawGuide(true); };
+    if ($("sv")) $("sv").onclick = function () { grab(); save(); };
+    $("pdf").onclick = function () { grab(); pdf(); };
+    $("ppt").onclick = function () { grab(); ppt(); };
+    if ($("sh")) $("sh").onclick = share;
+    if ($("del")) $("del").onclick = function () { if (confirm("Delete this guide?")) api({ action: "vg-del", id: G.id }).then(function () { G = null; TAB = "mine"; draw(); }); };
+  }
+  function save() {
+    var S = G.steps.filter(function (s) { return !s.skip; }); if (!S.length) return toast("No steps left");
+    S.forEach(function (s) { if (!s.title && !s.text) s.title = "Step"; });
+    $("sv").disabled = true; $("pg3").innerHTML = '<div class="prog"><i id="pb3"></i></div><div id="pm3" class="muted" style="font-size:12.5px">Saving…</div>';
+    api({ action: "vg-save", id: G.id, title: G.title, intro: G.intro, lang: G.lang, steps: S.map(function (s) { return { title: s.title, text: s.text }; }) }).then(function (r) {
+      if (!r.ok) { $("sv").disabled = false; $("pm3").textContent = r.error; return; }
+      G.id = r.id; var i = 0, bad = 0;
+      (function up() {
+        if (i >= S.length) { G.steps = S; G.dirty = false; toast(bad ? bad + " picture(s) didn't upload — save again" : "Saved"); return drawGuide(false); }
+        var k = i++; $("pb3").style.width = Math.round(k / S.length * 100) + "%"; $("pm3").textContent = "Uploading pictures " + (k + 1) + " of " + S.length + "…";
+        if (!S[k].img) return up();
+        api({ action: "vg-img", id: G.id, i: k, img: S[k].img }).then(function (x) { if (!x.ok) bad++; up(); });
+      })();
+    });
+  }
+  function share() {
+    api({ action: "vg-get", id: G.id }).then(function (r) {
+      var g = r.ok ? r.g : {}, link = function (tk) { return location.origin + "/videoguide.html#k=" + tk; };
+      var go = function (tk) { var u = link(tk); try { navigator.clipboard.writeText(u); } catch (e) { } prompt("Public link (anyone with it can view, no login):", u); };
+      sheet("Share this guide", "", [["🔗", g.token ? "Copy public link" : "Make a public link", function () {
+        if (g.token) go(g.token); else api({ action: "vg-share", id: G.id, pub: true }).then(function (s) { if (s.ok) go(s.token); else toast(s.error); });
+      }, "pri"], ["👥", g.shared ? "Hide from team list" : "Show in team list", function () { api({ action: "vg-share", id: G.id, team: !g.shared }).then(function (s) { toast(s.ok ? (s.shared ? "Shown to the team" : "Only you see it now") : s.error); }); }]].concat(g.token ? [["⛔", "Switch off public link", function () { api({ action: "vg-share", id: G.id, pub: false }).then(function () { toast("Public link switched off"); }); }]] : []),
+        '<div class="help">Team list: everyone with this tool sees the guide.<br>Public link: anyone with the link can view it without logging in — don\'t use it for confidential processes.</div>');
+    });
+  }
+  // exports — each page is drawn as a picture so Hindi and other scripts come out right
+  function wrap(g, text, x, y, w, lh, max) { var words = String(text || "").split(/\s+/), line = "", n = 0; for (var i = 0; i < words.length; i++) { var t = line ? line + " " + words[i] : words[i]; if (g.measureText(t).width > w && line) { g.fillText(line, x, y); y += lh; line = words[i]; if (++n >= max) return y; } else line = t; } if (line) { g.fillText(line, x, y); y += lh; } return y; }
+  function loadImg(src) { return new Promise(function (r) { if (!src) return r(null); var im = new Image(); im.onload = function () { r(im); }; im.onerror = function () { r(null); }; im.src = src; }); }
+  function pages() {
+    var S = G.steps.filter(function (s) { return !s.skip; }), out = [], i = 0, F = "system-ui,-apple-system,'Noto Sans','Noto Sans Devanagari',sans-serif";
+    return new Promise(function (res) {
+      (function next() {
+        if (i > S.length) return res(out);
+        var c = document.createElement("canvas"); c.width = 1240; c.height = 1754; var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#2B33A6"; g.fillRect(0, 0, c.width, 14);
+        if (i === 0) { g.fillStyle = "#111"; g.font = "800 64px " + F; var y = wrap(g, G.title, 90, 260, 1060, 80, 4); g.fillStyle = "#444"; g.font = "36px " + F; wrap(g, G.intro, 90, y + 40, 1060, 52, 8); g.fillStyle = "#888"; g.font = "28px " + F; g.fillText(S.length + " steps · vivo Business Innovation", 90, 1650); out.push(c.toDataURL("image/jpeg", 0.85)); i++; return next(); }
+        var s = S[i - 1];
+        loadImg(s.img).then(function (im) {
+          g.fillStyle = "#4D5BF9"; g.beginPath(); g.arc(130, 140, 46, 0, 7); g.fill(); g.fillStyle = "#fff"; g.font = "800 44px " + F; g.textAlign = "center"; g.fillText(String(i), 130, 156); g.textAlign = "left";
+          g.fillStyle = "#111"; g.font = "800 46px " + F; var y = wrap(g, s.title, 200, 156, 950, 58, 2); g.fillStyle = "#333"; g.font = "34px " + F; y = wrap(g, s.text, 90, Math.max(y, 230) + 20, 1060, 48, 6) + 20;
+          if (im) { var mw = 1060, mh = 1680 - y, k = Math.min(mw / im.width, mh / im.height), w = im.width * k, h = im.height * k; g.drawImage(im, 90 + (mw - w) / 2, y, w, h); g.strokeStyle = "#DDE"; g.lineWidth = 2; g.strokeRect(90 + (mw - w) / 2, y, w, h); }
+          g.fillStyle = "#999"; g.font = "26px " + F; g.fillText(String(G.title).slice(0, 60) + " · step " + i + " of " + S.length, 90, 1716);
+          out.push(c.toDataURL("image/jpeg", 0.85)); i++; next();
+        });
+      })();
+    });
+  }
+  function lib(src, test) { return test() ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  var fname = function (x) { return String(G.title || "guide").replace(/[^\wऀ-෿ ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 60) + x; };
+  function pdf() { toast("Making the PDF…"); Promise.all([lib("/vendor/jspdf/jspdf.umd.min.js", function () { return window.jspdf; }), pages()]).then(function (r) { var P = r[1], d = new window.jspdf.jsPDF({ unit: "pt", format: "a4" }); P.forEach(function (p, i) { if (i) d.addPage(); d.addImage(p, "JPEG", 0, 0, 595.28, 841.89); }); download(d.output("blob"), fname(".pdf")); }, function () { toast("Couldn't make the PDF"); }); }
+  function ppt() {
+    toast("Making the PowerPoint…");
+    lib("/vendor/pptx/pptxgen.bundle.js", function () { return window.PptxGenJS; }).then(function () {
+      var p = new window.PptxGenJS(); p.layout = "LAYOUT_WIDE"; var S = G.steps.filter(function (s) { return !s.skip; });
+      var t = p.addSlide(); t.background = { color: "2B33A6" }; t.addText(G.title, { x: 0.7, y: 2.3, w: 12, h: 1.4, fontSize: 36, bold: true, color: "FFFFFF" }); t.addText(G.intro || "", { x: 0.7, y: 3.8, w: 12, h: 1.4, fontSize: 18, color: "DDE2FF" });
+      S.forEach(function (s, i) { var sl = p.addSlide(); sl.addText(String(i + 1), { x: 0.4, y: 0.35, w: 0.7, h: 0.7, shape: p.ShapeType.ellipse, fill: { color: "4D5BF9" }, color: "FFFFFF", bold: true, fontSize: 20, align: "center" }); sl.addText(s.title, { x: 1.3, y: 0.3, w: 11.5, h: 0.8, fontSize: 24, bold: true, color: "111111" }); sl.addText(s.text || "", { x: 0.5, y: 1.2, w: 4.6, h: 5.6, fontSize: 16, color: "333333", valign: "top" }); if (s.img) sl.addImage({ data: s.img, x: 5.4, y: 1.2, w: 7.5, h: 5.8, sizing: { type: "contain", w: 7.5, h: 5.8 } }); });
+      return p.write({ outputType: "blob" }).then(function (b) { download(b, fname(".pptx")); });
+    }).catch(function () { toast("Couldn't make the PowerPoint"); });
+  }
+  function drawList() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "vg-list" }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      VIEW.innerHTML = '<div class="card">' + (r.rows.length ? r.rows.map(function (g) { return '<div class="li" data-i="' + g.id + '"><span style="font-size:26px">🎬</span><span class="t"><b>' + esc(g.title) + '</b><span class="muted" style="font-size:12px">' + g.n + " steps · " + esc(g.by) + " · " + dOnly(g.upd) + "</span></span>" + (g.mine ? '<span class="pill">Mine</span>' : "") + (g.pub ? ' <span class="pill g">Public link</span>' : "") + "</div>"; }).join("") : '<div class="empty"><div class="big">🎬</div><b>No guides yet</b><div class="muted">Make one from a screen recording on the New guide tab.</div></div>') + "</div>";
+      [].forEach.call(VIEW.querySelectorAll(".li"), function (el) { el.onclick = function () { openG(el.dataset.i); }; });
+    });
+  }
+  function openG(id) { VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Opening…</div>'; api({ action: "vg-get", id: id }).then(function (r) { if (!r.ok) { toast(r.error); return drawList(); } G = Object.assign(r.g, { mine: r.mine }); drawGuide(false); }); }
+  if (PUBK) {
+    $("tabs").style.display = "none"; $("sub").textContent = "Step-by-step guide";
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Opening…</div>';
+    fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify({ app: "state", action: "vg-p-get", k: PUBK }) }).then(function (r) { return r.json(); }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔗</div><b>' + esc(r.error) + "</b></div>"; return; }
+      G = Object.assign(r.g, { mine: false }); drawGuide(false);
+    }, function () { VIEW.innerHTML = '<div class="card empty"><b>No internet connection</b></div>'; });
+  } else draw();
+})();
+</script>
+</body>
+</html>
