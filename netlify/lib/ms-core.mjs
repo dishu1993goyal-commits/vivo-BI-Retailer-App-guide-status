@@ -7,6 +7,8 @@
 //   msr:<sid>:<rid>     response      msp:<pid> { sid, rid, data, thumb, w, h }
 import { randomBytes } from "node:crypto";
 import { STATES } from "./cmp-core.mjs";
+import { gas } from "./sf-core.mjs";
+import { createHash } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 const txt = (v, n) => String(v == null ? "" : v).replace(/\r/g, "").trim().slice(0, n);
@@ -62,6 +64,47 @@ export async function msAction(b, ctx) {
   }
   const s = await get(b.sid); if (!s) return json(404, { ok: false, error: "Survey not found" });
   if (b.action === "ms-results") return json(200, { ok: true, s, rows: (await respOf(store, pool, s.id)).sort((x, y) => y.at - x.at).map((r) => { delete r.up; return r; }) });
+  if (b.action === "ms-gform") {   // the same survey as a Google Form (no photos / GPS there); answers come back with ms-gres
+    const cfg = (await store.get("sf:cfg")) || {}; if (!cfg.gasUrl || !cfg.gasKey) return json(400, { ok: false, error: "Google Forms is not connected yet — connect it once in 📝 Survey & poll creator → Set-up." });
+    const f = ctx.aiFetch || fetch, link = site + "/msurvey.html#s=" + s.token, cols = [], me = [];
+    const add = (arr, key, q) => { arr.push(q); if (q.type !== "info") cols.push(key); };
+    add(me, "name", { id: "n", type: "short", title: "Your name", required: true }); add(me, "state", { id: "st", type: "dropdown", title: "State", options: s.states.length ? s.states : STATES, required: true });
+    if (s.ask.phone) add(me, "phone", { id: "ph", type: "phone", title: "Mobile number", required: true });
+    if (s.ask.empId) add(me, "empId", { id: "em", type: "short", title: "Employee ID" });
+    if (s.ask.store) add(me, "store", { id: "sto", type: "short", title: "Store / retailer name", required: true });
+    if (s.ask.city) add(me, "city", { id: "ci", type: "short", title: "City" });
+    const qs = [], TY = { text: "short", long: "paragraph", choice: "single", multi: "multi", yesno: "yesno", number: "number", price: "number", rating: "scale" };
+    s.questions.forEach((q) => {
+      if (q.type === "photo") return add(qs, null, { type: "info", title: "📷 " + q.q, help: "Photos can't be added in a Google Form. To send photos, fill the survey link instead: " + link });
+      const g = { id: q.id, type: TY[q.type] || "short", title: q.q + (q.type === "price" ? " (₹)" : ""), required: q.req, help: q.group || "" };
+      if (q.type === "choice" || q.type === "multi") g.options = q.options; if (q.type === "yesno") g.options = ["Yes", "No"]; if (q.type === "rating") g.scale = { min: 1, max: 5, minLabel: "Poor", maxLabel: "Excellent" };
+      if (q.type === "number" || q.type === "price") g.validation = { min: 0 };
+      add(qs, q.id, g);
+    });
+    const survey = { title: s.title, description: (s.desc ? s.desc + "\n\n" : "") + "Fill this once for every store you visit.", confirmation: "Thank you — your response is recorded.", settings: { progressBar: true },
+      sections: [{ id: "s1", title: "About you and the store", questions: me }, { id: "s2", title: "Survey", questions: qs }] };
+    const r = await gas(cfg, { action: "create", survey, opts: {} }, f); if (!r.ok) return json(502, { ok: false, error: r.error || "Google didn't make the form" });
+    const old = s.gform; s.gform = { id: r.id, url: r.url, shortUrl: r.shortUrl, editUrl: r.editUrl, at: t, cols, pulled: 0, n: 0 };
+    if (old && old.id) { s.gold = (s.gold || []).concat([{ id: old.id }]).slice(-4); }
+    await store.set("ms:" + s.id, s); return json(200, { ok: true, gform: s.gform, warn: r.warnings || [] });
+  }
+  if (b.action === "ms-gres") {   // pull Google Form answers into the results (one response per row, marked "Google Form")
+    const cfg = (await store.get("sf:cfg")) || {}, G = s.gform; if (!G) return json(400, { ok: false, error: "No Google Form for this survey yet" });
+    const r = await gas(cfg, { action: "results", id: G.id, max: 3000 }, ctx.aiFetch || fetch); if (!r.ok) return json(502, { ok: false, error: r.error || "Couldn't read the Google Form" });
+    let n = 0; const byQ = Object.fromEntries(s.questions.map((q) => [q.id, q]));
+    for (const row of r.rows || []) {
+      const h = createHash("sha256").update(G.id + "|" + row.join("|")).digest("hex").slice(0, 10), rid = "G" + h.toUpperCase(), k = `msr:${s.id}:${rid}`;
+      if (await store.get(k)) continue;
+      const d = { name: "", phone: "", empId: "", store: "", city: "", state: "" }, answers = {};
+      G.cols.forEach((c, i) => { const v = row[i + 2] == null ? "" : String(row[i + 2]); if (c in d) d[c] = v; else if (byQ[c]) { const q = byQ[c]; answers[c] = q.type === "multi" ? v.split(", ").filter(Boolean) : ["number", "price", "rating"].includes(q.type) && v !== "" && !isNaN(+v) ? +v : v; } });
+      s.questions.forEach((q) => { if (q.type === "photo") answers[q.id] = []; });
+      const at = Date.parse(String(row[0]).replace(" ", "T") + ":00+05:30") || t;
+      await store.set(k, { id: rid, at, name: str(d.name, 80), phone: phoneOf(d.phone), empId: str(d.empId, 30), store: str(d.store, 100), city: str(d.city, 60), state: STATES.find((x) => low(x) === low(d.state)) || str(d.state, 40), gps: null, answers, photos: [], need: 0, done: true, src: "Google Form" });
+      n++;
+    }
+    G.pulled = t; G.n = (r.rows || []).length; await store.set("ms:" + s.id, s);
+    return json(200, { ok: true, added: n, total: G.n });
+  }
   if (b.action === "ms-thumbs") {
     const out = {}; for (const id of (Array.isArray(b.ids) ? b.ids : []).slice(0, 40)) { const p = await store.get("msp:" + str(id, 30)); if (p && p.sid === s.id) out[id] = { d: p.thumb, w: p.w, h: p.h }; }
     return json(200, { ok: true, thumbs: out });

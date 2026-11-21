@@ -627,6 +627,8 @@ export const LINK_CATALOG = {
 "ms-ai",
 "ms-delete",
 "ms-get",
+"ms-gform",
+"ms-gres",
 "ms-img",
 "ms-list",
 "ms-p-info",
