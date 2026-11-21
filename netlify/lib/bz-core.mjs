@@ -5,6 +5,7 @@
 //   cr-  Data-to-creative presets       cr:p:<id> { id, name, tpl, theme, fields, by, at }
 // The pairing, offer maths and creatives run on the device; the server keeps settings, results and shared data.
 import { randomBytes } from "node:crypto";
+import { EAPI_ENDPOINTS } from "./emiapi-core.mjs";
 const J = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 const txt = (v, n) => String(v == null ? "" : v).replace(/\r/g, "").trim().slice(0, n);
@@ -12,6 +13,7 @@ const list = (a, n) => (Array.isArray(a) ? a : []).slice(0, n);
 const nid = (t) => t.toString(36) + randomBytes(3).toString("hex");
 const num = (v) => { const x = +v; return isFinite(x) ? x : 0; };
 const parse = (s) => { try { return JSON.parse(String(s).replace(/^[^{[]*/, "").replace(/[^}\]]*$/, "")); } catch (e) { return null; } };
+const STAGE_NAMES = { lead: "Lead", docs: "Docs & agreement", uat_creds: "UAT logins shared", uat_test: "UAT testing", uat_signoff: "UAT signed off", prod_creds: "Production logins", prod_live: "Live", paused: "Paused" };
 const STAGES = ["lead", "docs", "uat_creds", "uat_test", "uat_signoff", "prod_creds", "prod_live", "paused"];
 const API_LIST = ["queryInstallment", "processInstallment", "releaseInstallment", "queryTradeIn", "processTradeIn", "processTradeInRetail", "processServiceProtection", "processBuyback", "studentAuthentication", "enterpriseDiscount"];
 
@@ -39,6 +41,44 @@ export async function bzAction(b, ctx) {
   }
 
   // ---------------- Partner Integration Hub ----------------
+// Partners are filled automatically from the EMI API tester: company logins (UAT / Production), the Set-up company,
+// test IMEIs and test history. A deleted partner is remembered (ph:gone:<company>) so the sync doesn't bring it back.
+const ckey = (s) => String(s || "").trim().toLowerCase();
+async function testerFacts(store, pool) {
+  const C = {}, get = (name) => { const k = ckey(name); if (!k) return null; return (C[k] = C[k] || { name: String(name).trim(), login: { uat: false, prod: false }, setup: [], imeis: { uat: 0, prod: 0 }, eps: new Set(), ok: { uat: new Set(), prod: new Set() } }); };
+  const cfg = (await store.get("eapicfg")) || { envs: {} }, keys = (await store.get("eapikeys")) || {};
+  for (const e of ["uat", "prod"]) {
+    const P = (await store.get("eapipw:" + e)) || {}; Object.keys(P).forEach((c) => { const x = get(c); if (x) x.login[e] = true; });
+    const co = cfg.envs && cfg.envs[e] && cfg.envs[e].company; if (co) { const x = get(co); x.setup.push(e); if (keys[e] && keys[e].password) x.login[e] = true; }
+    const D = (await store.get("eapiimei:" + e)) || { rows: [] }; D.rows.forEach((r) => { const x = r.partner ? get(r.partner) : co ? get(co) : null; if (x) x.imeis[e]++; });
+  }
+  const logs = (await pool((await store.list("eapilog:")).slice(-3000), 40, (k) => store.get(k))).filter(Boolean);
+  logs.forEach((l) => { let c = ""; try { c = JSON.parse(l.req).companyName || ""; } catch (e) { const m = /"companyName"\s*:\s*"([^"]*)"/.exec(l.req || ""); c = m ? m[1] : ""; } if (!c || /^\{\{/.test(c)) return; const x = get(c); if (!x) return; x.eps.add(l.ep); if (l.processStatus === true && (l.code == null || String(l.code) === "200")) x.ok[l.env === "prod" ? "prod" : "uat"].add(l.ep); });
+  return { C, cfg };
+}
+const inferStage = (f) => (f.login.prod ? "prod_creds" : f.ok.uat.size ? "uat_test" : f.login.uat ? "uat_creds" : "lead");
+async function syncHub(store, t, pool, by) {
+  const { C } = await testerFacts(store, pool), P = (await pool(await store.list("ph:p:"), 20, (k) => store.get(k))).filter(Boolean);
+  const gone = new Set((await store.list("ph:gone:")).map((k) => k.slice(8)));
+  let added = 0, updated = 0;
+  for (const k of Object.keys(C)) {
+    const f = C[k]; if (gone.has(k)) continue;
+    let p = P.find((x) => ckey(x.company) === k) || P.find((x) => ckey(x.name) === k), ch = false;
+    const st = inferStage(f), apis = [...f.eps].filter((x) => API_LIST.includes(x));
+    if (!p) {
+      p = { id: nid(t + added), name: f.name, company: f.name, type: "", spoc: "", phone: "", email: "", tech: "", apis, stage: st, dates: Object.fromEntries(STAGES.map((s) => [s, s === st ? t : 0])), checks: { uat_cred: f.login.uat, prod_cred: f.login.prod }, notes: [{ t, by: "Sync", x: "Added from the EMI API tester" }], target: 0, by: "EMI API tester", at: t, upd: t, auto: true };
+      await store.set("ph:p:" + p.id, p); P.push(p); added++; continue;
+    }
+    if (!p.company) { p.company = f.name; ch = true; }
+    apis.forEach((a) => { if (!p.apis.includes(a)) { p.apis.push(a); ch = true; } });
+    if (f.login.uat && !p.checks.uat_cred) { p.checks.uat_cred = true; ch = true; }
+    if (f.login.prod && !p.checks.prod_cred) { p.checks.prod_cred = true; ch = true; }
+    if (p.stage !== "paused" && STAGES.indexOf(st) > STAGES.indexOf(p.stage)) { p.stage = st; p.dates[st] = p.dates[st] || t; ch = true; }
+    if (ch) { p.upd = t; await store.set("ph:p:" + p.id, p); updated++; }
+  }
+  await store.set("ph:sync", { at: t, by, added, updated, seen: Object.keys(C).length });
+  return { added, updated, seen: Object.keys(C).length, at: t };
+}
   if (/^ph-/.test(a)) {
     if (!ho) return hoOnly();
     const clean = (p, old) => ({
@@ -50,14 +90,18 @@ export async function bzAction(b, ctx) {
       target: num(p.target) || 0, by: old ? old.by : by, at: old ? old.at : t, upd: t
     });
     if (a === "ph-list") {
+      const sy = (await store.get("ph:sync")) || { at: 0 }; let sync = sy;
+      if (b.sync || t - sy.at > 10 * 6e4) sync = await syncHub(store, t, pool, by);
       const P = (await pool(await store.list("ph:p:"), 20, (k) => store.get(k))).filter(Boolean).sort((x, y) => x.name.localeCompare(y.name));
       const since = t - 30 * 864e5, keys = await store.list("ph:st:"), S = {};
       const recent = keys.filter((k) => Date.parse(k.slice(-10)) >= since - 864e5);
       (await pool(recent, 30, (k) => store.get(k).then((v) => [k, v]))).forEach(([k, v]) => { if (!v) return; const pid = k.split(":")[2], s = S[pid] = S[pid] || { calls: 0, err: 0, last: "" }; s.calls += v.calls; s.err += v.err; if (k.slice(-10) > s.last) s.last = k.slice(-10); });
-      return J(200, { ok: true, rows: P.map((p) => Object.assign({}, p, { s30: S[p.id] || null })), stages: STAGES, apis: API_LIST });
+      return J(200, { ok: true, rows: P.map((p) => Object.assign({}, p, { s30: S[p.id] || null })), stages: STAGES, apis: API_LIST, sync });
     }
-    if (a === "ph-save") { const old = b.id ? await store.get("ph:p:" + str(b.id, 20)) : null; const p = clean(b.p || {}, old); if (!p.name) return J(400, { ok: false, error: "Type the partner name" }); if (old && old.stage !== p.stage && !p.dates[p.stage]) p.dates[p.stage] = t; if (!old) p.dates[p.stage] = p.dates[p.stage] || t; await store.set("ph:p:" + p.id, p); return J(200, { ok: true, p }); }
-    if (a === "ph-del") { const id = str(b.id, 20); for (const k of await store.list("ph:st:" + id + ":")) await store.delete(k); await store.delete("ph:p:" + id); return J(200, { ok: true }); }
+    if (a === "ph-save") { const old = b.id ? await store.get("ph:p:" + str(b.id, 20)) : null; const p = clean(b.p || {}, old); if (!p.name) return J(400, { ok: false, error: "Type the partner name" });
+      if (!p.company) p.company = p.name;
+      const dupe = (await pool(await store.list("ph:p:"), 20, (k) => store.get(k))).find((x) => x && x.id !== p.id && ckey(x.company || x.name) === ckey(p.company)); if (dupe) return J(400, { ok: false, error: "“" + dupe.name + "” already uses the company name “" + p.company + "” — open it instead" }); await store.delete("ph:gone:" + ckey(p.company || p.name)); if (old && old.stage !== p.stage && !p.dates[p.stage]) p.dates[p.stage] = t; if (!old) p.dates[p.stage] = p.dates[p.stage] || t; await store.set("ph:p:" + p.id, p); return J(200, { ok: true, p }); }
+    if (a === "ph-del") { const id = str(b.id, 20), old = await store.get("ph:p:" + id); if (old) await store.set("ph:gone:" + ckey(old.company || old.name), { at: t, by }); for (const k of await store.list("ph:st:" + id + ":")) await store.delete(k); await store.delete("ph:p:" + id); return J(200, { ok: true }); }
     if (a === "ph-get") {
       const p = await store.get("ph:p:" + str(b.id, 20)); if (!p) return J(404, { ok: false, error: "Not found" });
       const days = (await pool(await store.list("ph:st:" + p.id + ":"), 30, (k) => store.get(k).then((v) => v && Object.assign({ d: k.slice(-10) }, v)))).filter(Boolean).sort((x, y) => (x.d < y.d ? -1 : 1)).slice(-120);
@@ -66,8 +110,42 @@ export async function bzAction(b, ctx) {
       const logs = (await pool((await store.list("eapilog:")).slice(-3000), 40, (k) => store.get(k))).filter(Boolean);
       logs.forEach((l) => { let c = ""; try { c = String(JSON.parse(l.req).companyName || "").toLowerCase(); } catch (e) { const m = /"companyName"\s*:\s*"([^"]*)"/.exec(l.req || ""); c = m ? m[1].toLowerCase() : ""; } if (c !== co) return; const ok = l.processStatus === true && (l.code == null || String(l.code) === "200"); const k = l.env + "|" + l.ep, x = T[k] = T[k] || { env: l.env, ep: l.ep, n: 0, ok: 0, last: 0, lastMsg: "", codes: {} }; x.n++; if (ok) x.ok++; if (!ok && l.errorCode) x.codes[l.errorCode] = (x.codes[l.errorCode] || 0) + 1; if (l.at > x.last) { x.last = l.at; x.lastMsg = (ok ? "✓ " : "✗ ") + (l.message || l.errorMessage || l.err || "").slice(0, 120); } });
       const imeis = {}; for (const e of ["uat", "prod"]) { const D = (await store.get("eapiimei:" + e)) || { rows: [] }; imeis[e] = D.rows.filter((r) => String(r.partner || "").toLowerCase() === co).length; }
-      const logins = {}; for (const e of ["uat", "prod"]) { const P = (await store.get("eapipw:" + e)) || {}; logins[e] = Object.keys(P).some((c) => c.toLowerCase() === co); }
-      return J(200, { ok: true, p, days, tests: Object.values(T).sort((x, y) => (x.env + x.ep < y.env + y.ep ? -1 : 1)), imeis, logins });
+      const cfg = (await store.get("eapicfg")) || { envs: {} }, keys = (await store.get("eapikeys")) || {}, setup = {}, imeiRows = {};
+      const logins = {}; for (const e of ["uat", "prod"]) { const P = (await store.get("eapipw:" + e)) || {}; logins[e] = Object.keys(P).some((c) => c.toLowerCase() === co) || (ckey(((cfg.envs || {})[e] || {}).company) === co && !!(keys[e] && keys[e].password)); }
+      for (const e of ["uat", "prod"]) {
+        const E = (cfg.envs || {})[e] || {}; setup[e] = { url: E.url || "", invoker: E.invoker || "", isSetup: ckey(E.company) === co, setupCompany: E.company || "" };
+        const D = (await store.get("eapiimei:" + e)) || { rows: [] }; imeiRows[e] = D.rows.filter((r) => ckey(r.partner) === co || (!r.partner && setup[e].isSetup)).slice(0, 60).map((r) => ({ imei: r.imei, imei2: r.imei2 || "", model: r.model, dealer: r.dealer, label: r.label, last: r.last || null }));
+        imeis[e] = Math.max(imeis[e], imeiRows[e].length);
+      }
+      const apiInfo = p.apis.map((ep) => { const x = EAPI_ENDPOINTS[ep] || {}; return { ep, name: x.name || ep, biz: x.biz || "", desc: x.desc || "", fields: x.fields || [], urls: { uat: setup.uat.url ? setup.uat.url + "/retail-emi/business/" + ep : "", prod: setup.prod.url ? setup.prod.url + "/retail-emi/business/" + ep : "" } }; });
+      const bizes = new Set(apiInfo.map((x) => x.biz));
+      const docs = (await pool(await store.list("eapidoc:"), 20, (k) => store.get(k))).filter((d) => d && d.done && (bizes.has(d.biz) || /^All/.test(d.biz || "") || !bizes.size)).sort((x, y) => (y.upd || y.at) - (x.upd || x.at)).map((d) => ({ id: d.id, biz: d.biz, title: d.title, version: d.version, env: d.env, name: d.name, size: d.size, published: !!d.published, upd: d.upd || d.at }));
+      const dl = await store.get("eapidoclink"), docLink = dl && dl.on ? "/emiapi.html?d=" + dl.token : "";
+      return J(200, { ok: true, p, days, tests: Object.values(T).sort((x, y) => (x.env + x.ep < y.env + y.ep ? -1 : 1)), imeis, logins, setup, imeiRows, apiInfo, docs, docLink });
+    }
+    if (a === "ph-pw") {   // set / remove a partner's API password — the same login store the EMI API tester uses
+      const e = b.env === "prod" ? "prod" : "uat", c = str(b.company, 120); if (!c) return J(400, { ok: false, error: "No company name" });
+      const P = (await store.get("eapipw:" + e)) || {}, k = Object.keys(P).find((x) => ckey(x) === ckey(c)) || c;
+      if (b.del) delete P[k]; else { const pw = String(b.password || "").trim().slice(0, 200); if (!pw) return J(400, { ok: false, error: "Type the password" }); P[k] = pw; }
+      await store.set("eapipw:" + e, P); return J(200, { ok: true });
+    }
+    if (a === "ph-import") {   // [{ name, company, type, spoc, phone, email, tech, apis, stage, uatPw, prodPw }] → add / update; passwords go to the tester's login store
+      const P = (await pool(await store.list("ph:p:"), 20, (k) => store.get(k))).filter(Boolean), pw = { uat: (await store.get("eapipw:uat")) || {}, prod: (await store.get("eapipw:prod")) || {} };
+      let added = 0, updated = 0, pws = 0;
+      for (const r of list(b.rows, 500)) {
+        const name = str(r.name, 80), co = str(r.company, 120) || name; if (!name && !co) continue;
+        let old = P.find((x) => ckey(x.company) === ckey(co)) || P.find((x) => ckey(x.name) === ckey(name || co));
+        const base = old ? Object.assign({}, old) : { apis: [], checks: {}, notes: [], dates: {}, stage: "lead" };
+        ["type", "spoc", "phone", "email", "tech"].forEach((f) => { if (str(r[f], 160)) base[f] = r[f]; });
+        base.name = name || base.name || co; base.company = co;
+        const ap = String(r.apis || "").split(/[,;\s]+/).filter((x) => API_LIST.includes(x)); if (ap.length) base.apis = ap;
+        const sg = Object.keys(STAGE_NAMES).find((k) => ckey(STAGE_NAMES[k]) === ckey(r.stage) || k === ckey(r.stage)); if (sg) base.stage = sg;
+        const p = clean(base, old); if (old && old.stage !== p.stage && !p.dates[p.stage]) p.dates[p.stage] = t; if (!old) p.dates[p.stage] = p.dates[p.stage] || t;
+        await store.set("ph:p:" + p.id, p); await store.delete("ph:gone:" + ckey(p.company)); if (old) { updated++; Object.assign(old, p); } else { added++; P.push(p); }
+        for (const e of ["uat", "prod"]) { const v = String(r[e + "Pw"] || "").trim(); if (v) { const k = Object.keys(pw[e]).find((x) => ckey(x) === ckey(co)) || co; pw[e][k] = v.slice(0, 200); pws++; if (e === "uat") p.checks.uat_cred = true; else p.checks.prod_cred = true; await store.set("ph:p:" + p.id, p); } }
+      }
+      if (pws) { await store.set("eapipw:uat", pw.uat); await store.set("eapipw:prod", pw.prod); }
+      return J(200, { ok: true, added, updated, pws });
     }
     if (a === "ph-stats") {   // { rows: [[partnerId, yyyy-mm-dd, api, calls, errors]] } from an imported gateway log (aggregated on the device)
       const add = {}; list(b.rows, 20000).forEach((r) => { const id = str(r[0], 20), d = str(r[1], 10); if (!id || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return; const k = id + ":" + d, x = add[k] = add[k] || { calls: 0, ok: 0, err: 0, apis: {} }; const c = Math.round(num(r[3])), e = Math.round(num(r[4])); x.calls += c; x.err += e; x.ok += c - e; const ep = str(r[2], 40) || "—", y = x.apis[ep] = x.apis[ep] || { calls: 0, err: 0 }; y.calls += c; y.err += e; });

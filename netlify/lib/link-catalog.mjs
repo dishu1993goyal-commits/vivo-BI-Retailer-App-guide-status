@@ -1564,9 +1564,12 @@ export const LINK_CATALOG = {
 "name": "Partner Integration Hub",
 "ho": true,
 "acts": [
+"eapi-doc-file",
 "ph-del",
 "ph-get",
+"ph-import",
 "ph-list",
+"ph-pw",
 "ph-save",
 "ph-stats"
 ],
