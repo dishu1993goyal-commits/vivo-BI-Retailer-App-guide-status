@@ -1613,6 +1613,14 @@ export const LINK_CATALOG = {
 "📚 Saved runs"
 ],
 [
+"plan",
+"💡 Scheme idea & plan"
+],
+[
+"brd",
+"📄 BRD / CR"
+],
+[
 "rule",
 "🛠 Rule for vivo IT"
 ],

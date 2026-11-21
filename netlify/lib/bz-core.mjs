@@ -25,8 +25,8 @@ export async function bzAction(b, ctx) {
   if (/^bp-/.test(a)) {
     if (!ho) return hoOnly();
     if (a === "bp-cfg") {
-      const old = (await store.get("bp:cfg")) || { win: 30, before: false, samePartner: true, okOnly: true, iotWords: ["watch", "buds", "tws", "pad", "tab", "band", "earphone", "earbuds", "airpod", "speaker", "charger"] };
-      if (b.save) { const c = b.cfg || {}; Object.assign(old, { win: Math.max(1, Math.min(1440, Math.round(num(c.win) || 30))), before: !!c.before, samePartner: c.samePartner !== false, okOnly: c.okOnly !== false, iotWords: list(c.iotWords, 60).map((x) => str(x, 40).toLowerCase()).filter(Boolean) }); await store.set("bp:cfg", old); }
+      const old = (await store.get("bp:cfg")) || { win: 30, before: false, samePartner: true, okOnly: true, schemeMatch: true, iotWords: ["watch", "buds", "tws", "pad", "tab", "band", "earphone", "earbuds", "airpod", "speaker", "charger"] };
+      if (b.save) { const c = b.cfg || {}; Object.assign(old, { win: Math.max(1, Math.min(1440, Math.round(num(c.win) || 30))), before: !!c.before, samePartner: c.samePartner !== false, okOnly: c.okOnly !== false, schemeMatch: c.schemeMatch !== false, iotWords: list(c.iotWords, 60).map((x) => str(x, 40).toLowerCase()).filter(Boolean) }); await store.set("bp:cfg", old); }
       return J(200, { ok: true, cfg: old });
     }
     if (a === "bp-save") {
