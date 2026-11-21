@@ -64,6 +64,28 @@
   }
   function tap(el) { try { el.scrollIntoView({ block: "center" }); } catch (e) { } ["pointerdown", "mousedown", "pointerup", "mouseup"].forEach(function (e) { el.dispatchEvent(new MouseEvent(e, { bubbles: true, cancelable: true, view: W })); }); el.click(); }
   function portalMsg() { var m = [].filter.call(D.querySelectorAll(".el-message,.el-notification,.ant-message-notice,.el-form-item__error,.van-toast,.layui-layer-content"), vis).map(function (x) { return clean(x.innerText, 140); }).filter(Boolean); return m.slice(-2).join(" · "); }
+  // ---------- scan: list what is on this page so AI can build the steps (nothing is clicked or typed) ----------
+  function scanPage() {
+    var F = [], seen = {}, add = function (k, el, extra) { if (F.length >= 140 || !vis(el) || inPanel(el)) return; var d = desc(el), key = k + JSON.stringify(d); if (seen[key]) return; seen[key] = 1; F.push(Object.assign({ k: k, sel: d }, extra || {})); };
+    [].forEach.call(D.querySelectorAll("input,textarea,select"), function (el) {
+      var t = (el.type || "").toLowerCase(), hint = [el.name, el.id, el.getAttribute("placeholder"), labelOf(el)].join(" ");
+      if (/hidden|submit|button|file|image|reset/.test(t)) return;
+      if (t === "password" || SECRET.test(hint) || CAPTCHA.test(hint)) return add("secret", el);
+      if (/checkbox|radio/.test(t)) return add("check", el, { label: labelOf(el) || clean((el.closest("label") || el.parentElement || {}).innerText, 60) });
+      if (el.tagName === "SELECT") return add("select", el, { opts: [].slice.call(el.options, 0, 40).map(function (o) { return clean(o.text, 50); }) });
+      if (el.readOnly && el.closest(".el-select,.ant-select,.el-cascader,.van-field")) return add("dropdown", el);
+      if (el.readOnly && el.closest(".el-date-editor")) return add("date", el);
+      add(el.tagName === "TEXTAREA" ? "textarea" : "input", el);
+    });
+    [].forEach.call(D.querySelectorAll("button,.el-button,[role=button],a,.el-tabs__item,[role=tab],.el-menu-item,.el-submenu__title,.el-dropdown-link"), function (el) { var tx = clean(el.innerText || el.textContent, 40); if (!tx || tx.length < 2) return; add(/^(a)$/i.test(el.tagName) && !el.closest(".el-menu,.el-tabs") ? "link" : el.closest(".el-menu,.el-tabs,[role=tab]") ? "menu" : "button", el, { risky: RISKY.test(tx) || undefined }); });
+    var heads = [].filter.call(D.querySelectorAll("h1,h2,h3,.el-breadcrumb,.page-title,.el-card__header,.el-dialog__title"), vis).map(function (x) { return clean(x.innerText, 80); }).filter(Boolean).slice(0, 8);
+    return { url: location.href, title: clean(D.title, 80), heads: heads, fields: F };
+  }
+  function pickOption(val) {   // Element-UI / Ant dropdown: click the visible option with this text
+    var L = [].filter.call(D.querySelectorAll(".el-select-dropdown__item,.ant-select-item-option,li[role=option],.el-cascader-node,.van-picker-column__item,.el-dropdown-menu__item"), vis);
+    var o = L.filter(function (x) { return clean(x.innerText) === clean(val); })[0] || L.filter(function (x) { return clean(x.innerText).toLowerCase() === clean(val).toLowerCase(); })[0] || L.filter(function (x) { return clean(x.innerText).toLowerCase().indexOf(clean(val).toLowerCase()) === 0; })[0];
+    if (o) tap(o); return !!o;
+  }
   // ---------- small panel on the page ----------
   var P = null;
   function panel(text, btns) {
@@ -100,13 +122,20 @@
   // ---------- one tick ----------
   W.__biBotRun = function (job) {
     var S = load();
-    if (job && job.id && (!S || S.id !== job.id)) { S = { id: job.id, mode: job.mode, steps: job.mode === "rec" ? [] : job.steps || [], rows: job.rows || [{}], fromStart: job.fromStart !== false, start: job.start || location.href, row: 0, step: 0, tries: 0, res: [], at: 0, you: false, done: false }; save(S); }
+    if (job && job.id && (!S || S.id !== job.id)) { S = { id: job.id, mode: job.mode, scan: job.scan ? 1 : 0, steps: job.mode === "rec" ? [] : job.steps || [], rows: job.rows || [{}], fromStart: job.fromStart !== false, start: job.start || location.href, row: 0, step: 0, tries: 0, res: [], at: 0, you: false, done: false }; save(S); }
     if (!S) return JSON.stringify({ s: "wait", msg: "No job" });
     if (job && job.stop) { S.stop = true; save(S); }
     if (S.done) return JSON.stringify(S.final);
     var fin = function (s, msg, extra) { S.done = true; S.final = Object.assign({ s: s, msg: msg, mode: S.mode }, extra || {}); save(S); if (P) P.remove(); P = null; return JSON.stringify(S.final); };
     if (loginPage()) { panel("🔑 Log in to the portal yourself (user ID, password, captcha). The run continues after you log in.", []); return JSON.stringify({ s: "login" }); }
     // ---- recording
+    if (S.mode === "rec" && S.scan) {
+      if (S.stop) return fin(S.found ? "done" : "stopped", S.found ? "Scanned " + S.found.fields.length + " items on the page" : "Scan cancelled", { steps: [], scan: S.found || null, url: S.found ? S.found.url : S.start });
+      panel("🔍 Open the page where you do the task (the form or list), then tap “Scan this page”. Nothing is clicked or typed.", [
+        ["🔍 Scan this page", function () { var x = load(); x.found = scanPage(); x.stop = true; save(x); }, "#13693F"],
+        ["Cancel", function () { var x = load(); x.stop = true; save(x); }, "#555"]]);
+      return JSON.stringify({ s: "you", msg: "Open the page where you do the task, then tap 🔍 Scan this page on the dark bar at the bottom." });
+    }
     if (S.mode === "rec") {
       hook();
       if (S.stop) return fin("done", "Recorded " + S.steps.length + " steps", { steps: S.steps, url: S.start });
@@ -143,6 +172,7 @@
       if (st.a === "click") tap(el);
       else if (st.a === "type") setVal(el, val);
       else if (st.a === "select") { var o = [].filter.call(el.options || [], function (x) { return clean(x.text) === clean(val) || x.value === val; })[0]; if (!o) return failRow("option “" + val + "” not in the list"); setVal(el, o.value); }
+      else if (st.a === "pick") { if (!S.picking) { tap(el); S.picking = 1; S.at = Date.now(); save(S); return JSON.stringify({ s: "run", pct: pct, msg: head + " · opening the list" }); } S.picking = 0; if (!pickOption(val)) { save(S); return failRow("“" + val + "” is not in the list"); } }
       else if (st.a === "check") { var cb = el.type === "checkbox" || el.type === "radio" ? el : el.querySelector("input[type=checkbox],input[type=radio]") || el; var want = st.col ? /^(1|y|yes|true|✓|x)$/i.test(val) : st.on; if (!!cb.checked !== want) tap(cb.tagName === "INPUT" && !vis(cb) ? el : cb); }
     } catch (e) { return failRow("step failed: " + clean(e.message, 80)); }
     S.at = Date.now(); save(S);

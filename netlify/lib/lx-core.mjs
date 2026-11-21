@@ -361,10 +361,10 @@ async function rpl(b, ctx) {
 // ---------------- bot: portal task recorder (storage only; the clicking happens on the user's own device) ----------------
 export const botHostOk = (u) => { try { const x = new URL(u), h = x.hostname.toLowerCase(); return x.protocol === "https:" && /(^|\.)vivo\.(xyz|com|com\.cn|in)$/.test(h); } catch (e) { return false; } };
 const cleanStep = (s) => {
-  const a = ["click", "type", "select", "pause", "wait", "check", "page"].includes(s && s.a) ? s.a : "click", sel = s && s.sel && typeof s.sel === "object" ? s.sel : {};
+  const a = ["click", "type", "select", "pick", "pause", "wait", "check", "page"].includes(s && s.a) ? s.a : "click", sel = s && s.sel && typeof s.sel === "object" ? s.sel : {};
   const S = {}; ["tag", "id", "name", "ph", "aria", "text", "label", "type", "role", "css", "near"].forEach((k) => { if (sel[k] != null && sel[k] !== "") S[k] = str(sel[k], k === "css" ? 400 : 120); }); if (sel.idx != null) S.idx = Math.max(0, Math.min(500, Math.round(+sel.idx || 0)));
   const o = { a, sel: S };
-  if (a === "type" || a === "select") { o.v = txt(s.v, 400); if (s.col) o.col = str(s.col, 60); if (s.secret) { o.secret = true; o.v = ""; } }
+  if (a === "type" || a === "select" || a === "pick") { o.v = txt(s.v, 400); if (s.col) o.col = str(s.col, 60); if (s.secret) { o.secret = true; o.v = ""; } }
   if (a === "check") o.on = !!s.on;
   if (a === "wait") o.ms = Math.max(200, Math.min(60000, Math.round(+s.ms || 1000)));
   if (s && s.say) o.say = str(s.say, 160);
@@ -381,6 +381,31 @@ async function bot(b, ctx) {
     const id = str(b.id, 20) || nid(t), old = await store.get("bot:r:" + uk + ":" + id);
     const x = { id, name: str(b.name, 80) || "Recording", url, steps, at: old ? old.at : t, upd: t, runs: old ? old.runs || 0 : 0, note: txt(b.note, 600) };
     await store.set("bot:r:" + uk + ":" + id, x); return J(200, { ok: true, id });
+  }
+  if (b.action === "bot-ai") {   // plain-language task + scanned page fields → steps the robot can run (AI never sees passwords; it marks them as your-turn)
+    const F = list(b.fields, 140).map((f, i) => ({ i, k: str(f.k, 10), label: str((f.sel || {}).label || f.label, 60), text: str((f.sel || {}).text, 40), ph: str((f.sel || {}).ph, 40), name: str((f.sel || {}).name, 40), opts: list(f.opts, 25).map((o) => str(o, 40)), risky: !!f.risky }));
+    if (!F.length) return J(400, { ok: false, error: "Scan the portal page first" });
+    const task = txt(b.task, 1500); if (task.length < 8) return J(400, { ok: false, error: "Describe the task in a sentence or two" });
+    const cols = list(b.cols, 30).map((c) => str(c, 40)).filter(Boolean);
+    const system = "You turn a plain-language task on a web portal into robot steps. You get the task, the Excel column names (if any) and a numbered list of the fields and buttons found on the page (k = input | textarea | select | dropdown | date | check | button | menu | link | secret). " +
+      "Reply JSON only: {\"steps\":[{\"a\":\"type|pick|select|check|click|wait|pause\",\"f\":<field number or null>,\"col\":\"Excel column or empty\",\"v\":\"fixed value or empty\",\"say\":\"for pause: what the person does\",\"why\":\"one short line\"}],\"cols\":[\"Excel columns this task needs\"],\"notes\":[\"short tips or doubts\"]}. " +
+      "Rules: use only field numbers from the list. input/textarea → a=type; select → a=select; dropdown → a=pick (the robot opens the list and taps the option with that text); check → a=check with v=yes/no or a column; button/menu/link → a=click. " +
+      "Values that change per row come from an Excel column (col): reuse the given column names when they fit, else invent short clear names (e.g. IMEI, Partner code). Fixed values go in v. " +
+      "After a click that loads data or opens a dialog, add {a:wait, v:\"2\"} (seconds). NEVER type passwords, OTPs or captchas: for secret fields add a pause with say. " +
+      "For buttons that save / submit / delete / approve / release / publish keep them (the person confirms before running) but mention it in notes. Keep the steps in the order a person would do them for ONE row. Maximum 40 steps.";
+    const data = "TASK: " + task + "\nEXCEL COLUMNS: " + (cols.join(", ") || "(none yet)") + "\nPAGE: " + str(b.title, 80) + " · " + list(b.heads, 8).map((h) => str(h, 60)).join(" | ") + "\nFIELDS:\n" + F.map((f) => f.i + ". [" + f.k + "] " + [f.label && "label=" + f.label, f.text && "text=" + f.text, f.ph && "placeholder=" + f.ph, f.name && "name=" + f.name, f.opts.length && "options=" + f.opts.join("/"), f.risky && "CHANGES DATA"].filter(Boolean).join(" · ")).join("\n");
+    const r = await ai(ctx, system, data, { maxTokens: 3000 }); if (!r.ok) return J(502, r);
+    const steps = list(r.j.steps, 40).map((x) => ({ a: ["type", "pick", "select", "check", "click", "wait", "pause"].includes(x.a) ? x.a : "click", f: x.f != null && x.f !== "" && Number.isInteger(+x.f) && +x.f >= 0 && +x.f < F.length ? +x.f : null, col: str(x.col, 40), v: str(x.v, 200), say: str(x.say, 160), why: str(x.why, 140) })).filter((x) => x.a === "wait" || x.a === "pause" || x.f != null).filter((x) => !(x.f != null && F[x.f].k === "secret" && x.a !== "pause"));
+    if (!steps.length) return J(502, { ok: false, error: "The AI couldn't match the task to this page — add more detail (which boxes to fill, which button to press)." });
+    return J(200, { ok: true, steps, cols: list(r.j.cols, 20).map((c) => str(c, 40)).filter(Boolean), notes: list(r.j.notes, 6).map((n) => str(n, 200)) });
+  }
+  if (b.action === "bot-vba") {   // Excel-side helper: a VBA macro that prepares / checks the rows before a run
+    const task = txt(b.task, 1500), cols = list(b.cols, 30).map((c) => str(c, 40)).filter(Boolean);
+    if (task.length < 8) return J(400, { ok: false, error: "Describe what the macro should do" });
+    const system = "Write one Excel VBA macro (Sub PrepareRows) for a person who prepares an Excel sheet that a web robot will use row by row. Sheet 1, row 1 = headers. Reply JSON only: {\"code\":\"full VBA code\",\"steps\":[\"how to add and run it, 3-5 short lines\"]}. " +
+      "The macro must: trim spaces, remove duplicate rows by the first column, keep long numbers as text (IMEI, mobile, codes — no 1.23E+14), flag problems in a new column 'Check' (empty required cells, IMEI not 15 digits, mobile not 10 digits), colour bad rows light red, and show a MsgBox with counts. Then do anything extra the task asks. Comment the code in simple English. Do not use external references.";
+    const r = await ai(ctx, system, "TASK: " + task + "\nCOLUMNS: " + (cols.join(", ") || "(unknown)"), { maxTokens: 3500 }); if (!r.ok) return J(502, r);
+    return J(200, { ok: true, code: txt(r.j.code, 20000), steps: list(r.j.steps, 6).map((x) => str(x, 200)) });
   }
   if (b.action === "bot-del") { await store.delete("bot:r:" + uk + ":" + str(b.id, 20)); return J(200, { ok: true }); }
   if (b.action === "bot-log") {

@@ -18,23 +18,39 @@
 .bm{display:inline-block;background:#2B33A6;color:#fff;border-radius:10px;padding:8px 12px;font-weight:800;text-decoration:none;margin-top:6px}
 .step{display:flex;gap:10px;margin-top:10px}.step i{flex:0 0 24px;height:24px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 12px/24px inherit;text-align:center;font-style:normal}.step div{flex:1;font-size:13px;line-height:1.55}
 .big{font-size:40px;text-align:center}
+.how{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}.how div{background:#F7F8FC;border-radius:12px;padding:10px;font-size:12.5px;line-height:1.5}.how b{display:block;font-size:14px;margin-bottom:2px}
+.tpl{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #E3E6F3;border-radius:12px;margin-top:8px;cursor:pointer;background:#fff}.tpl:hover{border-color:#4D5BF9}.tpl span{font-size:24px}.tpl b{display:block;font-size:13.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.45;display:block}
+.wz{display:flex;gap:6px;margin-bottom:8px}.wz span{flex:1;text-align:center;font-size:11.5px;font-weight:800;padding:6px 4px;border-radius:99px;background:#EEF0F6;color:var(--mut)}.wz span.on{background:#4D5BF9;color:#fff}.wz span.dn{background:#E6F4EA;color:#13693F}
+.opt{border:2px solid #E3E6F3;border-radius:14px;padding:12px;margin-top:10px;cursor:pointer}.opt.on{border-color:#4D5BF9;background:#F5F6FF}.opt b{font-size:14px}
+.why{font-size:11.5px;color:var(--mut);margin-top:2px}
+.vba{font:11.5px/1.45 ui-monospace,Menlo,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;white-space:pre;overflow:auto;max-height:340px;margin-top:8px}
 </style>
 </head>
 <body>
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🤖</span></div>
-  <h1>Portal task recorder</h1><p>Do a task once on a vivo portal — the app repeats it for every Excel row</p></div>
+  <h1>Portal task robot</h1><p>Tell it the task, show it the page once — it repeats the work for every row of your Excel</p></div>
 <div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
 <script>
 (function () {
   "use strict";
   /*@@CORE@@*/
-  var VIEW = $("view"), BB = window.BIBot && window.BIBot.version ? window.BIBot : null, TAB = "list", REC = null, ROWS = null, HEAD = [], RUN = null, CODE = null, RISK = /delete|remove|删除|release|publish|发布|approve|reject|submit|提交|pay\b|transfer/i;
-  var TABS = [["list", "🤖 Recordings"], ["new", "● New recording"], ["runs", "📋 Runs"]];
+  var VIEW = $("view"), BB = window.BIBot && window.BIBot.version ? window.BIBot : null, TAB = (function () { try { return localStorage.getItem("pb-seen") ? "list" : "home"; } catch (e) { return "home"; } })(), WZ = null, SCAN = null, REC = null, ROWS = null, HEAD = [], RUN = null, CODE = null, RISK = /delete|remove|删除|release|publish|发布|approve|reject|submit|提交|pay\b|transfer/i;
+  var TABS = [["home", "🏠 Start here"], ["list", "🤖 My tasks"], ["new", "✨ New task"], ["runs", "📋 Runs"]];
+  var PORTALS = [["IMEI Query System", "https://in-transfer.vivo.xyz/login.htm"], ["vWork", "https://in-vwork.vivo.xyz/"], ["Other vivo portal", ""]];
+  var TEMPLATES = [
+    ["🔐", "Set product permission for partners", "IMEI Query System — new model launch: open the partner role, tick the model, save. One row per partner role.", "Open Product permission. Search the role from the Excel column Role. Open it, search the model from column Model, tick it and press Save.", ["Role", "Model"], 0],
+    ["🔍", "Look up IMEIs and note the status", "Search each IMEI and read the result (the robot shows the portal's message per row).", "Open IMEI query. Type the IMEI from the Excel column IMEI in the search box and press Search. Wait for the result.", ["IMEI"], 0],
+    ["🔓", "Unblock / release a list of IMEIs", "Release IMEIs one by one; the run stops for you on any confirmation.", "Open the IMEI release page. Type the IMEI from column IMEI, press Search, then press Release and confirm.", ["IMEI", "Reason"], 0],
+    ["🏪", "Update dealer / store details", "Edit a field for many dealers in vWork (e.g. contact number).", "Open dealer master. Search the dealer code from column Dealer code, press Edit, change the mobile number to column Mobile and press Save.", ["Dealer code", "Mobile"], 1],
+    ["📥", "Download a report for many dealers", "Pick the dealer and dates, press Export — repeat for each row.", "Open the sales report. Choose the dealer from column Dealer code, set the start date from column From and end date from column To, then press Export.", ["Dealer code", "From", "To"], 1],
+    ["📝", "Fill a form for each row", "Any form: the robot types each Excel column into the matching box and saves.", "Press New. Fill every box from the Excel column with the same name. Press Save.", [], 2]];
+  function seen() { try { localStorage.setItem("pb-seen", "1"); } catch (e) { } }
   if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b></div>'; return; }
   if (AUTH.app !== "admin") { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>Only HO can use this tool</b></div>'; return; }
   function draw() {
     $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
-    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; REC = null; ROWS = null; draw(); }; });
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; REC = null; ROWS = null; if (TAB === "new") WZ = null; draw(); }; });
+    if (TAB === "home") return drawHome();
     if (TAB === "list") return REC ? (REC.id ? drawRec() : drawEdit()) : drawList();
     if (TAB === "new") return REC ? drawEdit() : drawNew();
     drawRuns();
@@ -42,7 +58,7 @@
   var rid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); };
   var b64 = function (o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); };
   var unb64 = function (s) { try { return JSON.parse(decodeURIComponent(escape(atob(String(s).trim())))); } catch (e) { return null; } };
-  var what = function (s) { var d = s.sel || {}, n = d.text || d.label || d.ph || d.aria || d.name || d.tag || ""; return s.a === "click" ? "Tap “" + n + "”" : s.a === "type" ? "Type in “" + n + "”" : s.a === "select" ? "Choose in “" + n + "”" : s.a === "check" ? (s.on ? "Tick" : "Untick") + " “" + n + "”" : s.a === "wait" ? "Wait " + Math.round(s.ms / 1000) + " s" : "👉 Your turn: " + (s.say || ""); };
+  var what = function (s) { var d = s.sel || {}, n = d.text || d.label || d.ph || d.aria || d.name || d.tag || ""; return s.a === "pick" ? "Choose from the list “" + n + "”" : s.a === "click" ? "Tap “" + n + "”" : s.a === "type" ? "Type in “" + n + "”" : s.a === "select" ? "Choose in “" + n + "”" : s.a === "check" ? (s.on ? "Tick" : "Untick") + " “" + n + "”" : s.a === "wait" ? "Wait " + Math.round(s.ms / 1000) + " s" : "👉 Your turn: " + (s.say || ""); };
   var risky = function (s) { return s.a === "click" && RISK.test((s.sel || {}).text || ""); };
   function copy(t, msg) { try { navigator.clipboard.writeText(t).then(function () { toast(msg || "Copied"); }, function () { prompt("Copy this:", t); }); } catch (e) { prompt("Copy this:", t); } }
   // ---------------- list ----------------
@@ -51,24 +67,77 @@
     api({ action: "bot-list" }).then(function (r) {
       if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
       VIEW.innerHTML = (BB ? "" : '<div class="help w">You are not in the Admin app. On a computer the recorder works through a bookmark (shown when you record or run). On the phone, open this tool from the <b>Admin app</b>.</div>') +
-        '<div class="card">' + (r.rows.length ? r.rows.map(function (x) { return '<div class="li" data-i="' + x.id + '"><span style="font-size:26px">🤖</span><span class="t"><b>' + esc(x.name) + '</b><span class="muted" style="font-size:12px">' + x.n + " steps · " + (x.cols.length ? "Excel columns: " + x.cols.map(esc).join(", ") : "no Excel columns yet") + " · run " + x.runs + " time(s)</span></span></div>"; }).join("") : '<div class="empty"><div class="big">🤖</div><b>No recordings yet</b><div class="muted">Tap “● New recording”, do the task once on the portal, and the app learns the clicks.</div></div>') + "</div>" +
-        '<div class="card"><b>How it works</b><div class="help">1. <b>Record</b>: open the portal from here, log in yourself, do the task once for one item.<br>2. <b>Mark the Excel columns</b>: say which typed boxes change per row (e.g. IMEI, Partner code).<br>3. <b>Run</b>: pick the Excel — the app repeats the clicks for every row and makes a result sheet.<br>Passwords and captchas are never saved or typed by the app — it stops and you type them.</div></div>';
+        '<div class="card">' + (r.rows.length ? r.rows.map(function (x) { return '<div class="li" data-i="' + x.id + '"><span style="font-size:26px">🤖</span><span class="t"><b>' + esc(x.name) + '</b><span class="muted" style="font-size:12px">' + x.n + " steps · " + (x.cols.length ? "Excel columns: " + x.cols.map(esc).join(", ") : "no Excel columns yet") + " · run " + x.runs + " time(s)</span></span></div>"; }).join("") : '<div class="empty"><div class="big">🤖</div><b>No recordings yet</b><div class="muted">Tap “✨ New task” — pick a ready-made task or describe yours, show the robot the portal page, and it learns the clicks.</div></div>') + "</div>" +
+        '<div class="card"><b>New here?</b><div class="help">See 🏠 <b>Start here</b> for how it works, ready-made tasks and the benefits.</div><div class="bar2"><button class="btn pri sm" id="nw">✨ New task</button><button class="btn ghost sm" id="hm">🏠 Start here</button></div></div>';
+      $("nw").onclick = function () { WZ = null; TAB = "new"; draw(); }; $("hm").onclick = function () { TAB = "home"; draw(); };
       [].forEach.call(VIEW.querySelectorAll(".li"), function (el) { el.onclick = function () { api({ action: "bot-get", id: el.dataset.i }).then(function (g) { if (!g.ok) return toast(g.error); REC = g.r; ROWS = null; drawRec(); }); }; });
     });
   }
   // ---------------- recording ----------------
+  // ---------------- start here ----------------
+  function drawHome() {
+    seen();
+    VIEW.innerHTML = '<div class="card"><b style="font-size:16px">What this robot does</b><div class="muted" style="font-size:13px;line-height:1.55;margin-top:4px">Any repeated job on a vivo portal — 50 partner permissions, 200 IMEI look-ups, 30 dealer updates — done row by row from your Excel while you watch. You log in yourself; it never types passwords or captchas.</div>' +
+      '<div class="how"><div><b>① Say the task</b>Pick a ready-made task or write it in one or two lines.</div><div><b>② Show the page</b>Open the portal page once and tap 🔍 Scan — AI picks the boxes and buttons. Or record yourself doing it once.</div><div><b>③ Check the Excel</b>The tool checks IMEIs, mobiles, blanks and duplicates and makes a clean file (or an Excel macro).</div><div><b>④ Test 1 row, then run</b>Watch it work, stop any time. Get a result sheet: OK / problem per row.</div></div>' +
+      '<div class="help"><b>Benefits:</b> hours of clicking → minutes · same steps every time (fewer mistakes) · a result file you can share · anyone in HO can re-run a saved task.</div><div class="bar2"><button class="btn pri" id="h1">✨ Make a new task</button><button class="btn ghost" id="h2">🤖 My tasks</button></div></div>' +
+      '<div class="card"><b>Ready-made tasks</b><div class="muted" style="font-size:12px">Tap one — the wording and Excel columns are filled in; you only show it the page.</div>' + TEMPLATES.map(function (t, i) { return '<div class="tpl" data-tp="' + i + '"><span>' + t[0] + '</span><div><b>' + esc(t[1]) + "</b><small>" + esc(t[2]) + "</small></div></div>"; }).join("") + "</div>" +
+      '<div class="card"><b>Where it works</b><div class="help">📱 <b>Admin app</b> — opens the portal inside the app (best).<br>💻 <b>Computer</b> — Chrome / Edge with a one-time bookmark (shown when you start).<br>Only vivo portal addresses are allowed. Steps that save, submit, release or delete are marked and need your tick before a run.</div></div>';
+    $("h1").onclick = function () { WZ = null; TAB = "new"; draw(); }; $("h2").onclick = function () { TAB = "list"; draw(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-tp]"), function (d) { d.onclick = function () { var t = TEMPLATES[+d.dataset.tp]; WZ = { step: 1, name: t[1], task: t[3], cols: t[4].slice(), url: PORTALS[t[5]][1] }; TAB = "new"; draw(); }; });
+  }
+  // ---------------- new task wizard ----------------
   function drawNew() {
-    VIEW.innerHTML = '<div class="card"><b>New recording</b><label class="lb">Name</label><input class="tx" id="nm" placeholder="e.g. Set partner limit in IMEI query system"><label class="lb">Portal address to start from</label><input class="tx" id="ur" value="https://in-transfer.vivo.xyz/login.htm"><div class="help">Start on the page where the task begins. Log in yourself; recording starts after you are in. Do the task once, slowly, then tap <b>Finish</b> on the dark bar at the bottom of the portal.</div><div class="bar2"><button class="btn pri" id="go">● Start recording</button></div><div id="dk"></div></div>' +
-      '<div class="card"><b>Already have a recording code?</b><div class="muted" style="font-size:12px">From the computer bookmark’s “Copy recording”.</div><textarea class="tx" id="pc" rows="3" placeholder="Paste the recording code"></textarea><div class="bar2"><button class="btn ghost sm" id="imp">Import</button></div></div>';
-    $("go").onclick = function () {
-      var url = $("ur").value.trim(), nm = $("nm").value.trim() || "Recording";
-      if (!/^https:\/\/[^\/]*vivo\.(xyz|com|com\.cn|in)(\/|$)/i.test(url)) return toast("Use a vivo portal address (https://….vivo.xyz/…)");
-      var job = { id: rid(), mode: "rec", start: url };
-      CODE = { name: nm, url: url };
-      if (BB) { var r = BB.run(JSON.stringify(job), url); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start"); return; }
-      desk(job, "rec");
-    };
-    $("imp").onclick = function () { var x = unb64($("pc").value); if (!x || x.mode !== "rec" || !x.steps) return toast("That is not a recording code"); REC = { name: (CODE && CODE.name) || "Recording", url: x.url || (CODE && CODE.url) || "", steps: x.steps }; drawEdit(); };
+    WZ = WZ || { step: 1, name: "", task: "", cols: [], url: PORTALS[0][1] };
+    var wz = '<div class="wz">' + ["1 · Task", "2 · Show the page", "3 · Check steps"].map(function (x, i) { return '<span class="' + (WZ.step === i + 1 ? "on" : WZ.step > i + 1 ? "dn" : "") + '">' + x + "</span>"; }).join("") + "</div>";
+    if (WZ.step === 1) {
+      VIEW.innerHTML = '<div class="card">' + wz + '<b>What should the robot do?</b><div class="chips" id="tpc" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">' + TEMPLATES.map(function (t, i) { return '<button class="btn ghost sm" data-tp="' + i + '">' + t[0] + " " + esc(t[1]) + "</button>"; }).join("") + "</div>" +
+        '<label class="lb">Task name</label><input class="tx" id="nm" value="' + esc(WZ.name) + '" placeholder="e.g. Set V50 permission for partner roles">' +
+        '<label class="lb">Portal</label><select class="tx" id="pt">' + PORTALS.map(function (p, i) { return '<option value="' + i + '"' + (p[1] && WZ.url === p[1] ? " selected" : "") + ">" + esc(p[0]) + "</option>"; }).join("") + '</select><input class="tx" id="ur" style="margin-top:6px" value="' + esc(WZ.url) + '" placeholder="https://….vivo.xyz/…">' +
+        '<label class="lb">Describe the task for ONE row, in plain words</label><textarea class="tx" id="tk" rows="4" placeholder="e.g. Open Product permission. Search the role from column Role, tick the model from column Model and press Save.">' + esc(WZ.task) + "</textarea>" +
+        '<label class="lb">Excel columns (what changes per row) <small class="muted">comma-separated, or read them from your Excel</small></label><input class="tx" id="cl" value="' + esc(WZ.cols.join(", ")) + '" placeholder="IMEI, Partner code"><div class="bar2"><button class="btn ghost sm" id="rx">📎 Read columns from my Excel</button><input type="file" id="rxf" accept=".xlsx,.xls,.csv" style="display:none"></div>' +
+        '<div class="bar2"><button class="btn pri" id="nx" style="flex:1">Next → show the page</button></div></div>' +
+        '<div class="card"><b>Already have a recording code?</b><div class="muted" style="font-size:12px">From the computer bookmark’s “Copy recording”.</div><textarea class="tx" id="pc" rows="2" placeholder="Paste the recording code"></textarea><div class="bar2"><button class="btn ghost sm" id="imp">Import</button></div></div>';
+      var grab = function () { WZ.name = $("nm").value.trim(); WZ.url = $("ur").value.trim(); WZ.task = $("tk").value.trim(); WZ.cols = $("cl").value.split(",").map(function (x) { return x.trim(); }).filter(Boolean); };
+      [].forEach.call(VIEW.querySelectorAll("[data-tp]"), function (b) { b.onclick = function () { var t = TEMPLATES[+b.dataset.tp]; WZ.name = t[1]; WZ.task = t[3]; WZ.cols = t[4].slice(); if (PORTALS[t[5]][1]) WZ.url = PORTALS[t[5]][1]; drawNew(); }; });
+      $("pt").onchange = function () { var p = PORTALS[+$("pt").value]; if (p[1]) $("ur").value = p[1]; else { $("ur").value = ""; $("ur").focus(); } };
+      $("rx").onclick = function () { $("rxf").value = ""; $("rxf").click(); };
+      $("rxf").onchange = function () { var f = $("rxf").files[0]; if (!f) return; lib().then(function () { return f.arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array" }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" }); $("cl").value = (A[0] || []).map(function (h) { return String(h).trim(); }).filter(Boolean).join(", "); toast("Columns read"); }, function () { toast("Couldn't read that file"); }); };
+      $("nx").onclick = function () { grab(); if (!/^https:\/\/[^\/]*vivo\.(xyz|com|com\.cn|in)(\/|$)/i.test(WZ.url)) return toast("Use a vivo portal address (https://….vivo.xyz/…)"); if (!WZ.name) WZ.name = WZ.task.slice(0, 50) || "Portal task"; WZ.step = 2; drawNew(); };
+      $("imp").onclick = function () { var x = unb64($("pc").value); if (!x || x.mode !== "rec" || !x.steps) return toast("That is not a recording code"); grab(); REC = { name: WZ.name || "Recording", url: x.url || WZ.url, steps: x.steps, note: WZ.task }; drawEdit(); };
+      return;
+    }
+    if (WZ.step === 2) {
+      WZ.how = WZ.how || "scan";
+      VIEW.innerHTML = '<div class="card">' + wz + '<b>Show the robot the portal page</b><div class="muted" style="font-size:12.5px">' + esc(WZ.name) + "</div>" +
+        '<div class="opt' + (WZ.how === "scan" ? " on" : "") + '" data-h="scan"><b>🔍 Scan the page — AI builds the steps</b> <span class="pill g">fastest</span><div class="muted" style="font-size:12.5px;margin-top:4px">The portal opens. Log in, go to the page where the work is done, tap <b>Scan this page</b>. Nothing is clicked or typed. AI reads the boxes and buttons and writes the steps from your task description.</div></div>' +
+        '<div class="opt' + (WZ.how === "rec" ? " on" : "") + '" data-h="rec"><b>● Record me doing it once</b><div class="muted" style="font-size:12.5px;margin-top:4px">Best for long or unusual tasks. Do the task once for one item; every tap and typed value is saved. You then mark which values come from Excel.</div></div>' +
+        '<div class="bar2"><button class="btn ghost" id="bk">← Back</button><button class="btn pri" id="go" style="flex:1">' + (WZ.how === "scan" ? "🔍 Open the portal to scan" : "● Open the portal and record") + '</button></div><div id="dk"></div><div id="aim"></div></div>';
+      [].forEach.call(VIEW.querySelectorAll("[data-h]"), function (o) { o.onclick = function () { WZ.how = o.dataset.h; drawNew(); }; });
+      $("bk").onclick = function () { WZ.step = 1; drawNew(); };
+      $("go").onclick = function () {
+        var job = { id: rid(), mode: "rec", start: WZ.url }; if (WZ.how === "scan") job.scan = true;
+        CODE = { name: WZ.name, url: WZ.url };
+        if (BB) { var r = BB.run(JSON.stringify(job), WZ.url); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start"); return; }
+        desk(job, "rec");
+      };
+      return;
+    }
+  }
+  function aiSteps(scan) {   // scanned page → AI steps → editable recording
+    SCAN = scan; TAB = "new"; WZ = WZ || { step: 2, name: (CODE && CODE.name) || "Portal task", task: "", cols: [], url: scan.url }; WZ.step = 2; draw();
+    var box = $("aim") || VIEW; box.innerHTML = '<div class="loading"><div class="spin"></div>Found ' + scan.fields.length + " boxes and buttons. AI is writing the steps…</div>";
+    if (!WZ.task) { var t = prompt("Describe the task for one row (which boxes to fill from which Excel column, which button to press):", ""); if (!t) { box.innerHTML = ""; return; } WZ.task = t; }
+    api({ action: "bot-ai", task: WZ.task, cols: WZ.cols, fields: scan.fields, title: scan.title, heads: scan.heads }).then(function (r) {
+      if (!r.ok) { box.innerHTML = '<div class="help r">' + esc(r.error) + '</div><div class="bar2"><button class="btn pri sm" id="again">Try again</button></div>'; $("again").onclick = function () { aiSteps(scan); }; return; }
+      var F = scan.fields, steps = r.steps.map(function (x) {
+        if (x.a === "wait") return { a: "wait", ms: Math.max(1, Math.min(30, +x.v || 2)) * 1000, sel: {}, why: x.why };
+        var f = x.f != null ? F[x.f] : null, sel = f ? f.sel : {};
+        if (x.a === "pause") return { a: "pause", say: x.say || "Check and continue", sel: sel, why: x.why };
+        var o = { a: x.a, sel: sel, why: x.why }; if (x.col) o.col = x.col; else if (x.v) o.v = x.v; if (x.a === "check") o.on = !/^(no|false|0|untick)$/i.test(x.v || "yes");
+        return o;
+      });
+      REC = { name: WZ.name, url: WZ.url, steps: steps, note: WZ.task, ai: r.notes || [] }; WZ.step = 3; TAB = "new"; draw();
+    });
   }
   // computer: bookmark with the runner inside; the job goes over by copy & paste
   function desk(job, kind) {
@@ -84,7 +153,9 @@
   }
   // result from the app or the bookmark
   function got(r) {
-    if (r.mode === "rec") { if (!r.steps || !r.steps.length) return toast("Nothing was recorded"); REC = { name: (CODE && CODE.name) || "Recording", url: r.url || (CODE && CODE.url) || "", steps: r.steps }; TAB = "new"; draw(); return; }
+    if (r.mode === "rec" && r.scan) { if (!r.scan.fields || !r.scan.fields.length) return toast("Nothing found on that page — open the page with the form, then scan"); return aiSteps(r.scan); }
+    if (r.mode === "rec" && !r.steps.length && r.s === "stopped") return toast("Scan cancelled");
+    if (r.mode === "rec") { if (!r.steps || !r.steps.length) return toast("Nothing was recorded"); REC = { name: (CODE && CODE.name) || "Recording", url: r.url || (CODE && CODE.url) || "", steps: r.steps, note: WZ ? WZ.task : "" }; if (WZ) WZ.step = 3; TAB = "new"; draw(); return; }
     if (r.mode === "play" && RUN) { RUN.status = r; api({ action: "bot-log", run: RUN.id, rec: REC && REC.id, name: REC && REC.name, status: { s: r.s, msg: r.msg, rows: r.rows, res: r.res } }); showRes(); }
   }
   function pending() { if (!BB) return; var L = []; try { L = JSON.parse(BB.pending() || "[]"); } catch (e) { } L.forEach(function (p) { BB.ack(p.id); var st = null; try { st = JSON.parse(p.status || "null"); } catch (e) { } if (st && (st.mode === "rec" || (RUN && RUN.id === p.id))) got(st); else if (p.state === "err" || p.state === "stopped") toast(p.state === "err" ? "The portal run stopped with a problem" : "The portal run was stopped"); }); }
@@ -92,10 +163,11 @@
   // ---------------- edit steps ----------------
   function drawEdit() {
     var S = REC.steps;
-    VIEW.innerHTML = '<div class="card"><b>Check the recording</b><label class="lb">Name</label><input class="tx" id="nm" value="' + esc(REC.name) + '"><label class="lb">Start page</label><input class="tx" id="ur" value="' + esc(REC.url) + '">' +
-      '<div class="help">For each <b>Type</b> step, choose: keep the same text every time, or take it from an <b>Excel column</b> (write the column name).</div>' +
+    var wzh = WZ && TAB === "new" ? '<div class="wz"><span class="dn">1 · Task</span><span class="dn">2 · Show the page</span><span class="on">3 · Check steps</span></div>' : "";
+    VIEW.innerHTML = '<div class="card">' + wzh + '<b>Check the steps</b>' + (REC.ai && REC.ai.length ? '<div class="help w"><b>AI notes:</b><br>' + REC.ai.map(function (n) { return "• " + esc(n); }).join("<br>") + "</div>" : "") + (REC.note ? '<div class="muted" style="font-size:12px;margin-top:6px">Task: ' + esc(REC.note) + "</div>" : "") + '<label class="lb">Name</label><input class="tx" id="nm" value="' + esc(REC.name) + '"><label class="lb">Start page</label><input class="tx" id="ur" value="' + esc(REC.url) + '">' +
+      '<div class="help">For each <b>Type / Choose</b> step: take the value from an <b>Excel column</b> (write the column name) or keep a fixed value. Remove anything wrong; add waits where the page is slow.</div>' +
       S.map(function (s, i) { return '<div class="stp' + (risky(s) ? " rk" : s.a === "pause" ? " ps" : "") + '"><div class="n">' + (i + 1) + '</div><div class="c"><b>' + esc(what(s)) + "</b>" + (risky(s) ? ' <span class="pill r">check: changes data</span>' : "") +
-        (s.a === "type" || s.a === "select" ? '<div class="bar2" style="margin-top:4px"><input class="tx" data-col="' + i + '" placeholder="Excel column (leave empty = fixed)" value="' + esc(s.col || "") + '" style="flex:1"><input class="tx" data-v="' + i + '" placeholder="Fixed value" value="' + esc(s.v || "") + '" style="flex:1"></div>' : "") +
+        (s.why ? '<div class="why">💡 ' + esc(s.why) + "</div>" : "") + (s.a === "type" || s.a === "select" || s.a === "pick" ? '<div class="bar2" style="margin-top:4px"><input class="tx" data-col="' + i + '" placeholder="Excel column (leave empty = fixed)" value="' + esc(s.col || "") + '" style="flex:1"><input class="tx" data-v="' + i + '" placeholder="Fixed value" value="' + esc(s.v || "") + '" style="flex:1"></div>' : "") +
         (s.a === "check" ? '<div class="bar2" style="margin-top:4px"><input class="tx" data-col="' + i + '" placeholder="Excel column with Yes/No (optional)" value="' + esc(s.col || "") + '"></div>' : "") +
         '<div style="font-size:12px;margin-top:3px"><a href="#" data-del="' + i + '">Remove</a> · <a href="#" data-w="' + i + '">Add 2 s wait after</a> · <a href="#" data-p="' + i + '">Add your-turn step after</a></div></div></div>'; }).join("") +
       '<div class="bar2"><button class="btn pri" id="sv">💾 Save recording</button><button class="btn ghost" id="cx">Cancel</button></div></div>';
@@ -104,7 +176,7 @@
     [].forEach.call(VIEW.querySelectorAll("[data-w]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); S.splice(+a.dataset.w + 1, 0, { a: "wait", ms: 2000, sel: {} }); drawEdit(); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-p]"), function (a) { a.onclick = function (e) { e.preventDefault(); grab(); var say = prompt("What should the person do here?"); if (say) { S.splice(+a.dataset.p + 1, 0, { a: "pause", say: say, sel: {} }); drawEdit(); } }; });
     $("cx").onclick = function () { if (confirm("Throw away the changes?")) { REC = null; draw(); } };
-    $("sv").onclick = function () { grab(); api({ action: "bot-save", id: REC.id, name: REC.name, url: REC.url, steps: S }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); api({ action: "bot-get", id: r.id }).then(function (g) { REC = g.r; TAB = "list"; draw(); }); }); };
+    $("sv").onclick = function () { grab(); api({ action: "bot-save", id: REC.id, name: REC.name, url: REC.url, steps: S, note: REC.note || "" }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved"); api({ action: "bot-get", id: r.id }).then(function (g) { REC = g.r; WZ = null; TAB = "list"; draw(); }); }); };
   }
   // ---------------- run ----------------
   function drawRec() {
@@ -113,10 +185,11 @@
     VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button><span style="flex:1"></span><button class="btn ghost sm" id="ed">✏️ Edit steps</button><button class="btn ghost sm" id="tp">⬇ Excel template</button><button class="btn ghost sm" id="dl">🗑</button></div><h2 style="margin:10px 0 2px">' + esc(REC.name) + '</h2><div class="muted" style="font-size:12px">' + esc(REC.url) + " · " + S.length + " steps</div>" +
       S.map(function (s, i) { return '<div class="stp' + (risky(s) ? " rk" : s.a === "pause" ? " ps" : "") + '"><div class="n">' + (i + 1) + '</div><div class="c">' + esc(what(s)) + (s.col ? ' <span class="pill">from column “' + esc(s.col) + '”</span>' : s.v ? ' <span class="pill m">' + esc(s.v) + "</span>" : "") + "</div></div>"; }).join("") + "</div>" +
       '<div class="card"><b>Run it</b>' + (cols.length ? '<div class="muted" style="font-size:12.5px">Excel with columns: ' + cols.map(function (c) { return "<b>" + esc(c) + "</b>"; }).join(", ") + ' — one row per item.</div><input type="file" id="xf" accept=".xlsx,.xls,.csv" style="margin-top:8px">' : '<div class="muted" style="font-size:12.5px">No Excel columns — it will run once. (Edit steps to take typed values from Excel.)</div><label class="lb">How many times?</label><input class="tx" id="times" type="number" min="1" max="200" value="1">') +
-      (ROWS ? '<div class="help">' + ROWS.length + " rows found" + (miss.length ? ' · <b style="color:#B42318">missing columns: ' + miss.map(esc).join(", ") + "</b>" : " ✓") + "</div>" : "") +
-      '<label style="display:flex;gap:8px;font-size:13px;margin-top:10px"><input type="checkbox" id="fs" checked> Start each row from the start page</label><label style="display:flex;gap:8px;font-size:13px;margin-top:6px"><input type="checkbox" id="one"> Test with the first row only</label>' +
+      (ROWS ? '<div class="help">' + ROWS.length + " rows found" + (miss.length ? ' · <b style="color:#B42318">missing columns: ' + miss.map(esc).join(", ") + "</b>" : " ✓") + "</div>" + checkHtml(cols) : "") +
+      (cols.length ? '<div class="bar2"><button class="btn ghost sm" id="vb">📗 Excel macro (VBA) to prepare the rows</button></div>' : "") +
+      '<label style="display:flex;gap:8px;font-size:13px;margin-top:10px"><input type="checkbox" id="fs" checked> Start each row from the start page</label><label style="display:flex;gap:8px;font-size:13px;margin-top:6px"><input type="checkbox" id="good"' + (ROWS && CHK && CHK.bad.length ? " checked" : "") + '> Skip rows with problems in the Excel check</label>' +
       (rk.length ? '<div class="help r"><b>⚠ These steps change data on the portal:</b><br>' + rk.map(function (s) { return "• " + esc(what(s)); }).join("<br>") + '<label style="display:flex;gap:8px;margin-top:6px"><input type="checkbox" id="ok"> I checked the Excel — go ahead</label></div>' : "") +
-      '<div class="bar2"><button class="btn pri" id="run">▶ Run on the portal</button></div><div id="dk"></div><div id="res"></div></div>';
+      '<div class="bar2"><button class="btn sec" id="one">🧪 Test 1 row</button><button class="btn pri" id="run" style="flex:1">▶ Run all rows</button></div><div class="muted" style="font-size:11.5px;margin-top:4px">Always test one row first and check it on the portal.</div><div id="dk"></div><div id="res"></div></div>';
     $("bk").onclick = function () { REC = null; ROWS = null; drawList(); };
     $("ed").onclick = function () { REC = JSON.parse(JSON.stringify(REC)); drawEdit(); };
     $("tp").onclick = function () { download(xlsx([{ name: "Rows", rows: [cols.length ? cols : ["(no columns)"]] }]), REC.name.replace(/[^\w ]+/g, "").replace(/\s+/g, "_") + "_template.xlsx"); };
@@ -126,23 +199,61 @@
       lib().then(function () { return f.arrayBuffer(); }).then(function (buf) {
         var wb = XLSX.read(buf, { type: "array", raw: false }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false });
         HEAD = (A[0] || []).map(function (h) { return String(h).trim(); });
-        ROWS = A.slice(1).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }).map(function (r) { var o = {}; HEAD.forEach(function (h, i) { o[h] = String(r[i] == null ? "" : r[i]).trim(); }); return o; });
+        ROWS = A.slice(1).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }).map(function (r) { var o = {}; HEAD.forEach(function (h, i) { o[h] = String(r[i] == null ? "" : r[i]).trim().replace(/\.0$/, ""); }); return o; });
+        CHK = check(ROWS, cols);
         drawRec();
       }, function () { toast("Couldn't read that file"); });
     };
-    $("run").onclick = function () {
+    if ($("vb")) $("vb").onclick = function () { vba(cols); };
+    if ($("cx2")) $("cx2").onclick = function () { download(xlsx([{ name: "Rows", rows: [HEAD.concat(["Check"])].concat(ROWS.map(function (r, i) { return HEAD.map(function (h) { return r[h]; }).concat([(CHK.byRow[i] || []).join("; ")]); })) }]), REC.name.replace(/[^\w ]+/g, "").replace(/\s+/g, "_") + "_checked.xlsx"); };
+    var go = function (oneRow) {
       var rows = cols.length ? ROWS : Array.apply(null, Array(Math.max(1, Math.min(200, +($("times") || {}).value || 1)))).map(function () { return {}; });
       if (!rows || !rows.length) return toast("Choose the Excel first");
       if (miss.length) return toast("The Excel is missing columns: " + miss.join(", "));
       if (rk.length && !$("ok").checked) return toast("Tick the confirmation first");
-      if ($("one").checked) rows = rows.slice(0, 1);
+      if (cols.length && $("good") && $("good").checked && CHK) rows = rows.filter(function (r, i) { return !CHK.byRow[i]; });
+      if (oneRow) rows = rows.slice(0, 1);
+      if (!rows.length) return toast("No rows left to run");
       if (rows.length > 2000) return toast("Up to 2000 rows a run");
       RUN = { id: rid(), rows: rows };
       var job = { id: RUN.id, mode: "play", steps: S, rows: rows, fromStart: $("fs").checked, start: REC.url };
       if (BB) { var r = BB.run(JSON.stringify(job), REC.url); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start"); return; }
       desk(job, "play");
     };
+    $("one").onclick = function () { go(true); }; $("run").onclick = function () { go(false); };
     if (RUN && RUN.status) showRes();
+  }
+  // ---------------- Excel check: catches the mistakes that make a portal run fail ----------------
+  var CHK = null;
+  function luhn(x) { var s = 0; for (var i = 0; i < 15; i++) { var d = +x[14 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; } return s % 10 === 0; }
+  function check(R, cols) {
+    var byRow = {}, bad = [], seenK = {}, add = function (i, m) { (byRow[i] = byRow[i] || []).push(m); };
+    R.forEach(function (r, i) {
+      cols.forEach(function (c) {
+        var v = r[c] == null ? "" : String(r[c]), lc = c.toLowerCase();
+        if (!v) return add(i, c + " is empty");
+        if (/e\+\d+$/i.test(v)) return add(i, c + " shows as " + v + " (Excel turned it into a number — format the column as Text)");
+        if (/imei/.test(lc)) { if (!/^\d{15}$/.test(v)) add(i, c + " must be 15 digits"); else if (!luhn(v)) add(i, c + " fails the IMEI check digit"); }
+        else if (/mobile|phone|contact/.test(lc) && !/^[6-9]\d{9}$/.test(v.replace(/\D/g, "").slice(-10))) add(i, c + " is not a 10-digit mobile");
+      });
+      var k = cols.length ? cols.map(function (c) { return r[c]; }).join("|") : ""; if (k && seenK[k] != null) add(i, "same as row " + (seenK[k] + 2)); else if (k) seenK[k] = i;
+    });
+    Object.keys(byRow).forEach(function (i) { bad.push(+i); });
+    return { byRow: byRow, bad: bad };
+  }
+  function checkHtml(cols) {
+    if (!CHK) return ""; var n = CHK.bad.length;
+    return '<div class="help ' + (n ? "w" : "") + '"><b>🧹 Excel check: ' + (n ? n + " of " + ROWS.length + " rows have problems" : "all " + ROWS.length + " rows look fine ✓") + "</b>" + (n ? "<br>" + CHK.bad.slice(0, 6).map(function (i) { return "Row " + (i + 2) + ": " + esc(CHK.byRow[i].join("; ")); }).join("<br>") + (n > 6 ? "<br>…and " + (n - 6) + " more" : "") + '<div class="bar2"><button class="btn ghost sm" id="cx2">⬇ Excel with a Check column</button></div>' : "") + "</div>";
+  }
+  function vba(cols) {
+    var task = prompt("Anything extra the macro should do? (optional — e.g. 'add 91 before mobile numbers', 'split Partner into Code and Name')", "") ;
+    if (task === null) return;
+    toast("Writing the macro…");
+    api({ action: "bot-vba", task: "Prepare rows for: " + (REC.note || REC.name) + (task ? ". Also: " + task : ""), cols: cols }).then(function (r) {
+      if (!r.ok) return toast(r.error);
+      var ov = sheet("📗 Excel macro (VBA)", "Cleans and checks the sheet before a run", [["📋", "Copy code", function () { copy(r.code, "Macro copied"); return false; }, "pri"], ["⬇", "Download .bas", function () { download(new Blob(["Attribute VB_Name = \"PrepareRows\"\r\n" + r.code.replace(/\r?\n/g, "\r\n")], { type: "text/plain" }), "PrepareRows.bas"); return false; }]],
+        '<ol style="font-size:12.5px;line-height:1.6;margin:8px 0 0 18px;padding:0">' + (r.steps.length ? r.steps : ["Open the Excel → Alt + F11 → Insert → Module.", "Paste the code, close the editor.", "Alt + F8 → PrepareRows → Run.", "Save as .xlsx (the macro is only needed once)."]).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + '</ol><div class="vba">' + esc(r.code) + '</div><div class="muted" style="font-size:11.5px;margin-top:6px">AI-written — read it once before running. Also see 🧮 Excel macro builder for bigger macros.</div>');
+    });
   }
   function lib() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
   function showRes() {

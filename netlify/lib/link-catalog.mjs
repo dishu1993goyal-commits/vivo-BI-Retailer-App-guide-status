@@ -1926,24 +1926,30 @@ export const LINK_CATALOG = {
 "portalbot.html": {
 "id": "portalbot",
 "icon": "🤖",
-"name": "Portal task recorder",
+"name": "Portal task robot",
 "ho": true,
 "acts": [
+"bot-ai",
 "bot-del",
 "bot-get",
 "bot-list",
 "bot-log",
 "bot-runs",
-"bot-save"
+"bot-save",
+"bot-vba"
 ],
 "tabs": [
 [
+"home",
+"🏠 Start here"
+],
+[
 "list",
-"🤖 Recordings"
+"🤖 My tasks"
 ],
 [
 "new",
-"● New recording"
+"✨ New task"
 ],
 [
 "runs",
