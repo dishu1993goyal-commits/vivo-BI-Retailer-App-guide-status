@@ -828,6 +828,7 @@ export const LINK_CATALOG = {
 "cs-done",
 "cs-get",
 "cs-gform",
+"cs-glink",
 "cs-gres",
 "cs-job",
 "cs-lesson",
@@ -843,7 +844,8 @@ export const LINK_CATALOG = {
 "cs-start",
 "cs-stats",
 "cs-tr",
-"tlk-cat"
+"tlk-cat",
+"tlk-short"
 ],
 "tabs": [
 [

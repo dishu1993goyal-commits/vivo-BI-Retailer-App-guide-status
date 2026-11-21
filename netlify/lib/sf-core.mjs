@@ -250,6 +250,7 @@ export async function sfAction(b, ctx) {
   if (b.action === "sf-del") { await store.delete("sf:s:" + str(b.id, 20)); return J(200, { ok: true }); }
 
   if (b.action === "sf-setup") {   // HO connects Google Forms / SurveyMonkey
+    if (b.script) { if (!cfg.gasKey) return J(400, { ok: false, error: "Make the key first" }); return J(200, { ok: true, key: cfg.gasKey }); }   // HO re-copies the latest script with the same key (update without reconnecting)
     if (b.newKey) { cfg.gasKey = "bi_" + randomBytes(18).toString("base64url"); cfg.account = ""; await store.set("sf:cfg", cfg); return J(200, { ok: true, key: cfg.gasKey, cfg: pub() }); }
     if (b.gasUrl !== undefined) {
       const u = str(b.gasUrl, 300);

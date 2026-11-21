@@ -145,15 +145,27 @@ async function cs(b, ctx) {
     if (!ho) return J(403, { ok: false, error: "HO only" });
     const C = await scCfg(store), P = (d) => points(C, d.score, d.total, d.secs);   // points use today's scoring settings
     const R = (await ctx.pool(await store.list("cs:d:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "App", name: d.name, state: d.state, phone: "", score: d.score, total: d.total, secs: d.secs ?? null, points: P(d), tries: d.tries, lang: d.lang, at: d.at }));
-    const W = (await ctx.pool(await store.list("cs:x:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "Web link", name: d.name, state: d.state, phone: d.phone || "", score: d.score, total: d.total, secs: d.secs ?? null, points: P(d), tries: d.tries, lang: d.lang, at: d.at }));
+    const W = (await ctx.pool(await store.list("cs:x:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: d.via === "google" ? "Google quiz page" : "Web link", name: d.name, state: d.state, phone: d.phone || "", score: d.score, total: d.total, secs: d.secs ?? null, points: P(d), tries: d.tries, lang: d.lang, at: d.at }));
     const F = []; Object.values(x.gforms || {}).concat(x.gold || []).forEach((g) => (g.rows || []).forEach((d) => F.push({ src: "Google Form", name: d.name, state: d.state, phone: d.phone, score: d.score, total: d.total, secs: null, points: P({ score: d.score, total: d.total, secs: null }), tries: 1, lang: d.lang, at: Date.parse(String(d.at).replace(" ", "T") + ":00+05:30") || 0 })));
-    return J(200, { ok: true, scoring: C, rows: R.concat(W, F).sort((p, q) => q.points - p.points || q.at - p.at), forms: Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, { url: g.shortUrl || g.url, edit: g.editUrl, pulled: g.pulled || 0, n: (g.rows || []).length, quiz: !!g.quiz }])), token: x.token || "" });
+    return J(200, { ok: true, scoring: C, rows: R.concat(W, F).sort((p, q) => q.points - p.points || q.at - p.at), forms: Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, { url: g.shortUrl || g.url, edit: g.editUrl, pulled: g.pulled || 0, n: (g.rows || []).length, quiz: !!g.quiz }])), token: x.token || "", glink: x.glink && x.token ? await (async () => { const c = (await store.get("sf:cfg")) || {}; return c.gasUrl ? c.gasUrl + "?k=" + x.token : ""; })() : "" });
   }
   if (b.action === "cs-share") {   // public web link: anyone with it reads the case study and takes the quiz after typing name + state
     if (!ho) return J(403, { ok: false, error: "HO only" });
     if (b.on && !x.token) { x.token = randomBytes(10).toString("base64url"); await store.set("cs:tok:" + x.token, { id: x.id }); }
-    if (!b.on && x.token) { await store.delete("cs:tok:" + x.token); x.token = ""; }
+    if (!b.on && x.token) { await store.delete("cs:tok:" + x.token); x.token = ""; x.glink = false; }
     await store.set("cs:l:" + x.id, x); return J(200, { ok: true, token: x.token || "" });
+  }
+  if (b.action === "cs-glink") {   // timed quiz page on the Google connector's address (script.google.com) — the BI site address is never shown
+    if (!ho) return J(403, { ok: false, error: "HO only" });
+    const cfg = (await store.get("sf:cfg")) || {}; if (!cfg.gasUrl || !cfg.gasKey) return J(400, { ok: false, error: "Google is not connected yet — connect it once in 📝 Survey & poll creator → Set-up." });
+    const f = ctx.aiFetch || fetch, ping = await gas(cfg, { action: "ping" }, f);
+    if (!ping.ok) return J(502, { ok: false, error: ping.error });
+    if (!(+ping.version >= 5)) return J(200, { ok: false, update: true, error: "Update the Google connector once (version 5 is needed for the timed quiz page)." });
+    const site = String(b.site || "").replace(/\/+$/, ""); if (!/^https:\/\/[\w.-]+$/.test(site)) return J(400, { ok: false, error: "Bad site address" });
+    const sr = await gas(cfg, { action: "site", site }, f); if (!sr.ok) return J(502, { ok: false, error: sr.error || "Couldn't set up the connector" });
+    if (!x.token) { x.token = randomBytes(10).toString("base64url"); await store.set("cs:tok:" + x.token, { id: x.id }); }
+    x.glink = true; await store.set("cs:l:" + x.id, x);
+    return J(200, { ok: true, url: cfg.gasUrl + "?k=" + x.token, token: x.token });
   }
   if (b.action === "cs-gform") {   // build a Google Form (name, state, mobile + the quiz) in one language — runs as a background job
     if (!ho) return J(403, { ok: false, error: "HO only" });
@@ -279,7 +291,7 @@ export async function csPublic(b, { store, t }) {
     const score = Q.reduce((a, q, i) => a + (ans[i] != null && +ans[i] === q.answer ? 1 : 0), 0), secs = await tookSecs(store, b.st, x.id, "pub", t);
     const pid = createHash("sha256").update(name.toLowerCase() + "|" + state + "|" + phone).digest("hex").slice(0, 16), key = "cs:x:" + x.id + ":" + pid, old = await store.get(key);
     const C = await scCfg(store), cur = { score, secs, points: points(C, score, Q.length, secs) }, keep = better(cur, old) ? cur : { score: old.score, secs: old.secs, points: old.points ?? points(C, old.score, old.total, old.secs) };
-    await store.set(key, { name, state, phone, score: keep.score, secs: keep.secs, points: keep.points, last: score, lastSecs: secs, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1 });
+    await store.set(key, { name, state, phone, via: b.via === "google" ? "google" : "web", score: keep.score, secs: keep.secs, points: keep.points, last: score, lastSecs: secs, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1 });
     return J(200, { ok: true, score, total: Q.length, secs, answers: Q.map((q) => q.answer), why: Q.map((q) => q.why), keypoints: X.keypoints });
   }
   return J(400, { ok: false, error: "Unknown action" });
