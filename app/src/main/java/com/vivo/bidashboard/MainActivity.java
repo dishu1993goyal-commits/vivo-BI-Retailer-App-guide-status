@@ -3311,6 +3311,41 @@ public class MainActivity extends FragmentActivity {
     }
     // Portal task recorder: the BI page (portalbot.html) records clicks once on a vivo portal, then replays them for each Excel row.
     // The person logs in and types every password / captcha; the script only taps and types what was recorded.
+    // Partner mails from the EMI API tester: opens Outlook (or the chosen mail app) with To, Cc, subject, text and the attachments.
+    private class MailBridge {
+        @JavascriptInterface public String compose(String json) {
+            try {
+                JSONObject j = new JSONObject(json);
+                java.io.File dir = new java.io.File(getCacheDir(), "share/mail/" + System.currentTimeMillis());
+                if (!dir.mkdirs() && !dir.isDirectory()) return "bad";
+                java.util.ArrayList<Uri> uris = new java.util.ArrayList<>();
+                org.json.JSONArray fs = j.optJSONArray("files");
+                for (int i = 0; fs != null && i < fs.length() && i < 6; i++) {
+                    JSONObject f = fs.getJSONObject(i);
+                    String name = f.optString("name", "file" + i).replaceAll("[\\\\/:*?\"<>|]", "_");
+                    byte[] data = android.util.Base64.decode(f.optString("b64"), android.util.Base64.DEFAULT);
+                    if (data.length > 25 * 1024 * 1024) continue;
+                    java.io.File out = new java.io.File(dir, name);
+                    try (java.io.FileOutputStream o = new java.io.FileOutputStream(out)) { o.write(data); }
+                    uris.add(androidx.core.content.FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", out));
+                }
+                Intent in = new Intent(uris.size() > 1 ? Intent.ACTION_SEND_MULTIPLE : Intent.ACTION_SEND);
+                in.setType(uris.isEmpty() ? "message/rfc822" : "*/*");
+                in.putExtra(Intent.EXTRA_EMAIL, toArr(j.optJSONArray("to")));
+                in.putExtra(Intent.EXTRA_CC, toArr(j.optJSONArray("cc")));
+                in.putExtra(Intent.EXTRA_SUBJECT, j.optString("subject"));
+                in.putExtra(Intent.EXTRA_TEXT, j.optString("body"));
+                if (uris.size() > 1) in.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris); else if (uris.size() == 1) in.putExtra(Intent.EXTRA_STREAM, uris.get(0));
+                in.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                String pkg = "com.microsoft.office.outlook"; boolean has = false;
+                try { getPackageManager().getPackageInfo(pkg, 0); has = true; } catch (Exception ignored) { }
+                if (has) { in.setPackage(pkg); ui.post(() -> { try { startActivity(in); } catch (Exception e) { in.setPackage(null); startActivity(Intent.createChooser(in, "Send with")); } }); return "ok"; }
+                ui.post(() -> startActivity(Intent.createChooser(in, "Send with")));
+                return "no-outlook";
+            } catch (Throwable e) { return "bad"; }
+        }
+        private String[] toArr(org.json.JSONArray a) { if (a == null) return new String[0]; String[] o = new String[a.length()]; for (int i = 0; i < a.length(); i++) o[i] = a.optString(i); return o; }
+    }
     private class BotBridge {
         private final WebView w;
         BotBridge(WebView w) { this.w = w; }
@@ -3619,6 +3654,7 @@ public class MainActivity extends FragmentActivity {
             surveyWeb.addJavascriptInterface(new UnblockBridge(surveyWeb), "BIUnblock");
             surveyWeb.addJavascriptInterface(new PermBridge(surveyWeb), "BIPerm");
             surveyWeb.addJavascriptInterface(new BotBridge(surveyWeb), "BIBot");
+            surveyWeb.addJavascriptInterface(new MailBridge(), "BIMail");
             surveyWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
