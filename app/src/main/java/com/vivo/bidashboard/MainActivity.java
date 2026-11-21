@@ -3286,13 +3286,67 @@ public class MainActivity extends FragmentActivity {
     // the app then presses the same buttons a person would. The steps live in assets/vivo_perm.js.
     private boolean inPerm = false, pDone, pStop;
     private JSONObject pJob;
-    private String pJs, pLast = "";
+    private String pJs, bJs, pLast = "", pKind = "perm";   // pKind: perm = product permissions, bot = portal task recorder
     private int pTick;
     private boolean permPageOk(WebView w) {
         try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && Uri.parse(u).getPath().startsWith("/prodperm"); }
         catch (Throwable t) { return false; }
     }
-    private SharedPreferences permPrefs() { return getSharedPreferences("perm_runs", MODE_PRIVATE); }
+    private SharedPreferences permPrefs() { return getSharedPreferences("bot".equals(pKind) ? "bot_runs" : "perm_runs", MODE_PRIVATE); }
+    private boolean botPageOk(WebView w) {
+        try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && Uri.parse(u).getPath().startsWith("/portalbot"); }
+        catch (Throwable t) { return false; }
+    }
+    private static boolean botHostOk(String u) {
+        try { Uri x = Uri.parse(u); String h = String.valueOf(x.getHost()).toLowerCase(); return "https".equals(x.getScheme()) && h.matches("([a-z0-9-]+\\.)*vivo\\.(xyz|com|com\\.cn|in)"); } catch (Throwable t) { return false; }
+    }
+    private String botScript() {
+        if (bJs != null) return bJs;
+        try (java.io.InputStream in = getAssets().open("vivo_bot.js")) {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            bJs = bo.toString("UTF-8");
+        } catch (Throwable e) { bJs = ""; }
+        return bJs;
+    }
+    // Portal task recorder: the BI page (portalbot.html) records clicks once on a vivo portal, then replays them for each Excel row.
+    // The person logs in and types every password / captcha; the script only taps and types what was recorded.
+    private class BotBridge {
+        private final WebView w;
+        BotBridge(WebView w) { this.w = w; }
+        @JavascriptInterface public String version() { return "1"; }
+        /** job = {id, mode: rec|play, steps[], rows[], fromStart, start}. Returns ok / blocked / busy / bad. */
+        @JavascriptInterface public String run(String job, String url) {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> botPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "blocked";
+                if (inPerm || inUnblock) return "busy";
+                if (job == null || job.length() > 3_000_000) return "bad";
+                JSONObject j = new JSONObject(job);
+                String m = j.optString("mode");
+                if (!j.optString("id").matches("[A-Za-z0-9_-]{4,30}") || !("rec".equals(m) || "play".equals(m))) return "bad";
+                if ("play".equals(m) && (j.optJSONArray("steps") == null || j.optJSONArray("rows") == null)) return "bad";
+                String u = url == null ? "" : url.trim();
+                if (!botHostOk(u)) return "bad";
+                if (!j.has("start")) j.put("start", u);
+                j.put("url", u);
+                ui.post(() -> { pKind = "bot"; showPerm(w, j); });
+                return "ok";
+            } catch (Throwable e) { return "bad"; }
+        }
+        @JavascriptInterface public String pending() {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> botPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS)) return "[]";
+                org.json.JSONArray a = new org.json.JSONArray();
+                for (Object v : getSharedPreferences("bot_runs", MODE_PRIVATE).getAll().values()) try { a.put(new JSONObject(String.valueOf(v))); } catch (Throwable ignored) { }
+                return a.toString();
+            } catch (Throwable e) { return "[]"; }
+        }
+        @JavascriptInterface public void ack(String id) { if (id != null) getSharedPreferences("bot_runs", MODE_PRIVATE).edit().remove(id).apply(); }
+    }
     private String permScript() {
         if (pJs != null) return pJs;
         try (java.io.InputStream in = getAssets().open("vivo_perm.js")) {
@@ -3319,7 +3373,7 @@ public class MainActivity extends FragmentActivity {
                 String u = url == null || url.trim().isEmpty() ? UNBLOCK_DEF_URL : url.trim();
                 if (!"https".equals(Uri.parse(u).getScheme())) return "bad";
                 j.put("url", u);
-                ui.post(() -> showPerm(w, j));
+                ui.post(() -> { pKind = "perm"; showPerm(w, j); });
                 return "ok";
             } catch (Throwable e) { return "bad"; }
         }
@@ -3340,7 +3394,7 @@ public class MainActivity extends FragmentActivity {
         inPerm = true; pDone = false; pStop = false; pTick = 0; pLast = "";
         pJob = job; unblockFrom = from;
         uHost = String.valueOf(Uri.parse(job.optString("url")).getHost()).toLowerCase();
-        uCred = portalLoad(uCredId()); uTypedU = ""; uTypedP = ""; uOnLogin = false; uAsked = false;
+        uCred = "bot".equals(pKind) ? null : portalLoad(uCredId()); uTypedU = ""; uTypedP = ""; uOnLogin = false; uAsked = "bot".equals(pKind);
         ViewGroup content = findViewById(android.R.id.content);
         unblockPrev = content.getChildCount() > 0 ? content.getChildAt(0) : null;
         if (unblockPrev != null) content.removeView(unblockPrev);
@@ -3373,7 +3427,7 @@ public class MainActivity extends FragmentActivity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.WHITE);
-        page.addView(profileHeaderBar((job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
+        page.addView(profileHeaderBar("bot".equals(pKind) ? ("rec".equals(job.optString("mode")) ? "● vivo portal · recording" : "🤖 vivo portal · running your recording") : (job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
         uBanner = new TextView(this);
         uBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
         uBanner.setTextColor(Color.parseColor("#111111"));
@@ -3382,6 +3436,7 @@ public class MainActivity extends FragmentActivity {
         uBanner.setOnClickListener(v -> {
             if (uOnLogin && uCred != null) unblockForget();
             else if (pDone && inPerm) permClose();
+            else if ("bot".equals(pKind) && "rec".equals(pJob.optString("mode")) && !uOnLogin && !pStop) { pStop = true; unblockBanner("Finishing the recording…", "#E8F0FE"); }
         });
         unblockBanner("Opening the vivo portal…", "#E8F0FE");
         page.addView(vivoWeb, new LinearLayout.LayoutParams(-1, 0, 1f));
@@ -3398,8 +3453,10 @@ public class MainActivity extends FragmentActivity {
             JSONObject c = new JSONObject(pJob.toString());
             c.remove("url");
             if (pStop) c.put("stop", true);
-            if (uCred != null && uSameHost()) c.put("fill", new JSONObject().put("u", uCred.optString("u")).put("p", uCred.optString("p")));
-            String js = "(function(){try{if(!window.__biPermRun){" + permScript() + "}return window.__biPermRun(" + c + ");}catch(e){return JSON.stringify({s:'wait',msg:String(e&&e.message||e)});}})()";
+            boolean bot = "bot".equals(pKind);
+            if (!bot && uCred != null && uSameHost()) c.put("fill", new JSONObject().put("u", uCred.optString("u")).put("p", uCred.optString("p")));
+            String fn = bot ? "__biBotRun" : "__biPermRun";
+            String js = "(function(){try{if(!window." + fn + "){" + (bot ? botScript() : permScript()) + "}return window." + fn + "(" + c + ");}catch(e){return JSON.stringify({s:'wait',msg:String(e&&e.message||e)});}})()";
             vivoWeb.evaluateJavascript(js, v -> {
                 try {
                     if (v == null || "null".equals(v) || pDone || !inPerm) return;
@@ -3409,14 +3466,17 @@ public class MainActivity extends FragmentActivity {
                     if ("login".equals(s)) {
                         uOnLogin = true;
                         if (!r.optString("u").isEmpty() && !r.optString("p").isEmpty()) { uTypedU = r.optString("u"); uTypedP = r.optString("p"); }
-                        if (uCred != null) unblockBanner("🔑 User ID and password filled in — just type the captcha and tap Log In. The app takes over after that.  (Tap here to forget the saved login.)", "#FFF4E5");
+                        if ("bot".equals(pKind)) unblockBanner("🔑 Log in to the vivo portal yourself: user ID, password and captcha, then tap Log In. " + ("rec".equals(pJob.optString("mode")) ? "Recording starts after you are in." : "The run starts after you are in."), "#FFF4E5");
+                        else if (uCred != null) unblockBanner("🔑 User ID and password filled in — just type the captcha and tap Log In. The app takes over after that.  (Tap here to forget the saved login.)", "#FFF4E5");
                         else unblockBanner("🔑 Log in to the vivo portal: type the user ID, password and the captcha, then tap Log In. The app can remember the user ID and password for next time.", "#FFF4E5");
                         return;
                     }
-                    if (uOnLogin) { uOnLogin = false; unblockKeepCookies(); unblockAskSave(); }
+                    if (uOnLogin) { uOnLogin = false; unblockKeepCookies(); if (!"bot".equals(pKind)) unblockAskSave(); }
                     if ("wait".equals(s)) return;
                     pLast = raw;
-                    if ("run".equals(s)) unblockBanner((pStop ? "Stopping after this product…  " : "⏳ " + r.optInt("pct") + "%  ·  ") + msg + (pStop ? "" : "\nKeep the app open. Don't touch the portal while it works."), "#E8F0FE");
+                    if ("rec".equals(s)) { unblockBanner("● Recording · " + r.optInt("n") + " steps. Do the task once, slowly.\nWhen finished, tap Finish on the portal's dark bar (or tap here).", "#FDECEC"); return; }
+                    if ("you".equals(s)) { unblockBanner("👉 " + msg, "#FFF4E5"); return; }
+                    if ("run".equals(s)) unblockBanner((pStop ? ("bot".equals(pKind) ? "Stopping after this row…  " : "Stopping after this product…  ") : "⏳ " + r.optInt("pct") + "%  ·  ") + msg + (pStop ? "" : "\nKeep the app open. Don't touch the portal while it works."), "#E8F0FE");
                     else if ("done".equals(s)) permFinish("done", "✅ " + msg + "  Tap here to see the result.", "#E6F4EA");
                     else if ("stopped".equals(s)) permFinish("stopped", "Stopped. Tap here to see what was done.", "#FFF4E5");
                     else if ("err".equals(s) || "busy".equals(s)) permFinish("err", "⚠ " + msg + "\nTap here to go back to the result.", "#FDECEC");
@@ -3433,13 +3493,14 @@ public class MainActivity extends FragmentActivity {
             permPrefs().edit().putString(id, new JSONObject().put("id", id).put("state", state).put("status", pLast).put("at", System.currentTimeMillis()).toString()).apply();
         } catch (Throwable ignored) { }
         unblockBanner(banner, color);
-        if ("done".equals(state)) ui.postDelayed(() -> { if (inPerm && pDone) permClose(); }, 2500);
+        if ("done".equals(state) || ("bot".equals(pKind) && "stopped".equals(state))) ui.postDelayed(() -> { if (inPerm && pDone) permClose(); }, "bot".equals(pKind) && "rec".equals(pJob.optString("mode")) ? 1200 : 2500);
     }
     private void permAskClose() {
         if (pDone || uOnLogin || pLast.isEmpty()) { if (!pDone) permFinish("stopped", "Closed", "#FFF4E5"); permClose(); return; }
         if (pStop) { new AlertDialog.Builder(this).setMessage("Close now without waiting for the current product to finish?").setPositiveButton("Close now", (d, w) -> { permFinish("stopped", "Closed", "#FFF4E5"); permClose(); }).setNegativeButton("Wait", null).show(); return; }
-        new AlertDialog.Builder(this).setMessage("Stop setting product permissions? What is already ticked stays ticked; the rest is left as it is.")
-                .setPositiveButton("Stop", (d, w) -> { pStop = true; unblockBanner("Stopping after this product…", "#FFF4E5"); })
+        boolean botRec = "bot".equals(pKind) && "rec".equals(pJob.optString("mode"));
+        new AlertDialog.Builder(this).setMessage("bot".equals(pKind) ? (botRec ? "Finish the recording now? The steps recorded so far are kept." : "Stop the run after the current row? Rows already done stay done.") : "Stop setting product permissions? What is already ticked stays ticked; the rest is left as it is.")
+                .setPositiveButton(botRec ? "Finish" : "Stop", (d, w) -> { pStop = true; unblockBanner(botRec ? "Finishing the recording…" : "bot".equals(pKind) ? "Stopping after this row…" : "Stopping after this product…", "#FFF4E5"); })
                 .setNegativeButton("Carry on", null).show();
     }
     private void permClose() {
@@ -3453,7 +3514,8 @@ public class MainActivity extends FragmentActivity {
         if (unblockPrev != null) { if (unblockPrev.getParent() != null) ((ViewGroup) unblockPrev.getParent()).removeView(unblockPrev); setContentView(unblockPrev); }
         unblockPrev = null;
         final WebView w = unblockFrom; unblockFrom = null;
-        if (w != null) ui.postDelayed(() -> { try { if (permPageOk(w)) w.evaluateJavascript("window.__biPermDone&&window.__biPermDone()", null); } catch (Throwable ignored) { } }, 300);
+        final boolean wasBot = "bot".equals(pKind);
+        if (w != null) ui.postDelayed(() -> { try { if (wasBot ? botPageOk(w) : permPageOk(w)) w.evaluateJavascript(wasBot ? "window.__biBotDone&&window.__biBotDone()" : "window.__biPermDone&&window.__biPermDone()", null); } catch (Throwable ignored) { } }, 300);
     }
 
     private void doNative(String name) {
@@ -3556,6 +3618,7 @@ public class MainActivity extends FragmentActivity {
             surveyWeb.addJavascriptInterface(new SmsBridge(surveyWeb), "BISms");
             surveyWeb.addJavascriptInterface(new UnblockBridge(surveyWeb), "BIUnblock");
             surveyWeb.addJavascriptInterface(new PermBridge(surveyWeb), "BIPerm");
+            surveyWeb.addJavascriptInterface(new BotBridge(surveyWeb), "BIBot");
             surveyWeb.setWebViewClient(new WebViewClient() {
                 @Override
                 public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
