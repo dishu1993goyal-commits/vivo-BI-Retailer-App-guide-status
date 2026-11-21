@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Partner Integration Hub</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pc{background:#fff;border-radius:14px;padding:12px;margin-top:8px;cursor:pointer;box-shadow:0 1px 4px rgba(20,24,51,.06)}.pc b{font-size:15px}
+.steps{display:flex;gap:3px;margin-top:8px}.steps i{flex:1;height:7px;border-radius:99px;background:#E6E8F2}.steps i.on{background:#4D5BF9}.steps i.live{background:#13A05B}
+.tl{border-left:3px solid #DADDF0;margin:10px 0 0 6px;padding-left:12px}.tl div{position:relative;padding:4px 0;font-size:12.5px}.tl div:before{content:"";position:absolute;left:-18px;top:9px;width:9px;height:9px;border-radius:50%;background:#C9CEF2}.tl div.on:before{background:#4D5BF9}
+.ck{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #EEF0F6;font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chips label{display:flex;gap:5px;align-items:center;border:1px solid #DADDF0;border-radius:99px;padding:5px 10px;font-size:12px;cursor:pointer}
+.tb{width:100%;border-collapse:collapse;font-size:12px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px}.kpi{background:#F7F8FC;border-radius:12px;padding:10px}.kpi b{display:block;font-size:20px}.kpi span{font-size:11.5px;color:var(--mut)}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:16px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:8px}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🤝</span></div>
+  <h1>Partner Integration Hub</h1><p>Every EMI / affordability partner: go-live stage, tests, logins and live traffic in one place</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script src="/bichart.js"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "list", ROWS = [], META = null, FIL = "all", CUR = null;
+  var TABS = [["list", "🤝 Partners"], ["imp", "📥 Import live traffic"]];
+  var SN = { lead: "Lead", docs: "Docs & agreement", uat_creds: "UAT logins shared", uat_test: "UAT testing", uat_signoff: "UAT signed off", prod_creds: "Production logins", prod_live: "Live", paused: "Paused" };
+  var CHECK = [["nda", "Agreement / NDA signed"], ["docs", "API documents sent"], ["uat_cred", "UAT logins (company name + password) shared"], ["ip", "Partner IPs whitelisted"], ["uat_pass", "All UAT test cases passed"], ["uat_mail", "UAT sign-off mail received"], ["prod_cred", "Production logins shared"], ["prod_first", "First live transaction done"], ["recon", "Daily report / settlement set up"]];
+  var TYPES = ["Bank", "NBFC", "POS / payments", "Fintech / BNPL", "Trade-in / buy-back", "Insurance / protection", "Other"];
+  if (!AUTH || AUTH.app !== "admin") { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>Only HO can use this tool</b></div>'; return; }
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; CUR = null; draw(); }; });
+    if (TAB === "imp") return tImp(); if (CUR) return detail(CUR); tList();
+  }
+  function load() { return api({ action: "ph-list" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>"; return false; } ROWS = r.rows; META = r; return true; }); }
+  var stIdx = function (s) { return META.stages.indexOf(s); };
+  function bar(p) { var k = stIdx(p.stage), live = p.stage === "prod_live"; return '<div class="steps">' + META.stages.slice(0, 7).map(function (s, i) { return "<i class=\"" + (i <= k && p.stage !== "paused" ? (live ? "live" : "on") : "") + '"></i>'; }).join("") + "</div>"; }
+  function tList() {
+    var cnt = {}; ROWS.forEach(function (p) { cnt[p.stage] = (cnt[p.stage] || 0) + 1; });
+    var L = ROWS.filter(function (p) { return FIL === "all" || p.stage === FIL; });
+    VIEW.innerHTML = '<div class="card"><div class="kpis"><div class="kpi"><b>' + ROWS.length + '</b><span>partners</span></div><div class="kpi" style="background:#E6F4EA"><b>' + (cnt.prod_live || 0) + '</b><span>live</span></div><div class="kpi"><b>' + ((cnt.uat_creds || 0) + (cnt.uat_test || 0) + (cnt.uat_signoff || 0)) + '</b><span>in UAT</span></div><div class="kpi"><b>' + ((cnt.lead || 0) + (cnt.docs || 0)) + '</b><span>not started</span></div></div>' +
+      '<div class="chips" id="fl">' + [["all", "All"]].concat(META.stages.map(function (s) { return [s, SN[s]]; })).map(function (x) { return '<label style="' + (FIL === x[0] ? "background:#2B33A6;color:#fff;border-color:#2B33A6" : "") + '" data-f="' + x[0] + '">' + esc(x[1]) + (x[0] !== "all" && cnt[x[0]] ? " " + cnt[x[0]] : "") + "</label>"; }).join("") + '</div><div class="bar2"><button class="btn pri sm" id="add">＋ Add partner</button><button class="btn ghost sm" id="xl">⬇ Status Excel</button></div></div>' +
+      (L.length ? L.map(function (p) { var s = p.s30, er = s && s.calls ? Math.round(s.err / s.calls * 1000) / 10 : null; return '<div class="pc" data-i="' + p.id + '"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">' + esc(p.name) + '</b><span class="pill ' + (p.stage === "prod_live" ? "g" : p.stage === "paused" ? "r" : "") + '">' + esc(SN[p.stage]) + "</span></div>" + bar(p) + '<div class="muted" style="font-size:12px;margin-top:6px">' + esc(p.type || "") + " · " + p.apis.length + " API(s)" + (p.company ? " · login “" + esc(p.company) + "”" : "") + (s ? " · 30 days: " + s.calls.toLocaleString("en-IN") + " calls, " + er + "% errors" : "") + "</div></div>"; }).join("") : '<div class="card empty" style="margin-top:8px"><div class="big">🤝</div><b>No partners yet</b><div class="muted">Add each bank / NBFC / POS partner once. Tests from the EMI API tester and live traffic you import show up automatically.</div></div>');
+    [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (c) { c.onclick = function () { FIL = c.dataset.f; tList(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-i]"), function (c) { c.onclick = function () { CUR = c.dataset.i; detail(CUR); }; });
+    $("add").onclick = function () { edit(null); };
+    $("xl").onclick = function () { download(xlsx([{ name: "Partners", rows: [["Partner", "Type", "Company name (API login)", "Stage", "APIs", "SPOC", "Phone", "E-mail", "Calls 30d", "Errors 30d", "UAT logins shared", "Went live"]].concat(ROWS.map(function (p) { return [p.name, p.type, p.company, SN[p.stage], p.apis.join(", "), p.spoc, p.phone, p.email, p.s30 ? p.s30.calls : "", p.s30 ? p.s30.err : "", p.dates.uat_creds ? new Date(p.dates.uat_creds).toLocaleDateString("en-IN") : "", p.dates.prod_live ? new Date(p.dates.prod_live).toLocaleDateString("en-IN") : ""]; })) }]), "partner_status_" + new Date().toISOString().slice(0, 10) + ".xlsx"); };
+  }
+  function edit(p) {
+    var v = function (k) { return esc(p ? p[k] || "" : ""); };
+    sheet(p ? "Edit " + p.name : "Add a partner", "", [["💾", "Save", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id).value.trim(); };
+      var x = Object.assign({}, p || { apis: [], checks: {}, notes: [], dates: {}, stage: "lead" }, { name: g("e1"), company: g("e2"), type: g("e3"), spoc: g("e4"), phone: g("e5"), email: g("e6"), tech: g("e7"), target: +g("e8") || 0 });
+      if (!x.name) { toast("Type the partner name"); return false; }
+      save(x).then(function (q) { if (q) { CUR = q.id; draw(); } });
+    }, "pri"]].concat(p ? [["🗑", "Delete partner", function () { if (!confirm("Delete " + p.name + " and its imported traffic?")) return false; api({ action: "ph-del", id: p.id }).then(function () { CUR = null; load().then(draw); }); }, "danger"]] : []),
+      '<label class="lb">Partner name</label><input class="tx" id="e1" value="' + v("name") + '" placeholder="e.g. Bajaj Finserv"><label class="lb">Company name used in the API (login)</label><input class="tx" id="e2" value="' + v("company") + '" placeholder="exactly as in the EMI API tester / gateway"><label class="lb">Type</label><select class="tx" id="e3">' + TYPES.map(function (t) { return "<option" + (p && p.type === t ? " selected" : "") + ">" + t + "</option>"; }).join("") + '</select><div class="g2"><div><label class="lb">Business SPOC</label><input class="tx" id="e4" value="' + v("spoc") + '"></div><div><label class="lb">Phone</label><input class="tx" id="e5" value="' + v("phone") + '" inputmode="tel"></div></div><label class="lb">E-mail</label><input class="tx" id="e6" value="' + v("email") + '"><label class="lb">Tech contact (name · phone / mail)</label><input class="tx" id="e7" value="' + v("tech") + '"><label class="lb">Expected calls per month (optional)</label><input class="tx" id="e8" value="' + (p && p.target ? p.target : "") + '" inputmode="numeric">');
+  }
+  function save(p) { return api({ action: "ph-save", id: p.id, p: p }).then(function (r) { if (!r.ok) { toast(r.error); return null; } var i = ROWS.findIndex(function (x) { return x.id === r.p.id; }); if (i >= 0) ROWS[i] = Object.assign(ROWS[i], r.p); else ROWS.push(r.p); return r.p; }); }
+  function detail(id) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "ph-get", id: id }).then(function (r) {
+      if (!r.ok) { toast(r.error); CUR = null; return draw(); }
+      var p = r.p, D = r.days, tot = D.reduce(function (a, d) { a.c += d.calls; a.e += d.err; return a; }, { c: 0, e: 0 }), last30 = D.slice(-30), c30 = last30.reduce(function (a, d) { return a + d.calls; }, 0), e30 = last30.reduce(function (a, d) { return a + d.err; }, 0);
+      var uatT = r.tests.filter(function (x) { return x.env === "uat"; }), passEps = uatT.filter(function (x) { return x.ok > 0; }).map(function (x) { return x.ep; });
+      VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Partners</button><button class="btn ghost sm" id="ed" style="margin-left:auto">✏️ Edit</button><button class="btn ghost sm" id="rep">📄 Test report</button><a class="btn ghost sm" href="/emiapi.html">🧪 EMI API tester</a></div>' +
+        '<h2 style="margin:10px 0 2px">' + esc(p.name) + '</h2><div class="muted" style="font-size:12.5px">' + esc([p.type, p.company && "login “" + p.company + "”", p.spoc, p.phone, p.email].filter(Boolean).join(" · ")) + (p.tech ? "<br>Tech: " + esc(p.tech) : "") + "</div>" + bar(p) +
+        '<label class="lb">Stage</label><select class="tx" id="stg">' + META.stages.map(function (s) { return '<option value="' + s + '"' + (p.stage === s ? " selected" : "") + ">" + SN[s] + "</option>"; }).join("") + "</select>" +
+        '<div class="tl">' + META.stages.filter(function (s) { return p.dates[s]; }).map(function (s) { return '<div class="on"><b>' + SN[s] + "</b> · " + new Date(p.dates[s]).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) + "</div>"; }).join("") + "</div></div>" +
+        '<div class="card"><b>✅ Go-live checklist</b> <span class="muted" style="font-size:12px">' + CHECK.filter(function (c) { return p.checks[c[0]]; }).length + "/" + CHECK.length + "</span>" + CHECK.map(function (c) { return '<label class="ck"><input type="checkbox" data-ck="' + c[0] + '"' + (p.checks[c[0]] ? " checked" : "") + "> " + esc(c[1]) + (c[0] === "uat_cred" ? ' <span class="pill ' + (r.logins.uat ? "g" : "m") + '">UAT password ' + (r.logins.uat ? "saved in tester" : "not in tester") + "</span>" : c[0] === "prod_cred" ? ' <span class="pill ' + (r.logins.prod ? "g" : "m") + '">Prod password ' + (r.logins.prod ? "saved" : "not saved") + "</span>" : "") + "</label>"; }).join("") + "</div>" +
+        '<div class="card"><b>🔌 APIs for this partner</b><div class="chips">' + META.apis.map(function (a) { return '<label><input type="checkbox" data-ap="' + a + '"' + (p.apis.indexOf(a) >= 0 ? " checked" : "") + "> " + a + (passEps.indexOf(a) >= 0 ? " ✓" : "") + "</label>"; }).join("") + '</div><div class="muted" style="font-size:11.5px;margin-top:4px">✓ = at least one successful UAT test in the EMI API tester</div></div>' +
+        '<div class="card"><b>🧪 Tests from the EMI API tester</b> <span class="muted" style="font-size:12px">requests sent with company name “' + esc(p.company || p.name) + '” · test IMEIs saved: UAT ' + r.imeis.uat + ", Production " + r.imeis.prod + "</span>" + (r.tests.length ? '<div style="overflow:auto;margin-top:6px"><table class="tb"><tr><th>Env</th><th>API</th><th>Tests</th><th>Passed</th><th>Errors seen</th><th>Last</th></tr>' + r.tests.map(function (x) { return "<tr><td>" + (x.env === "prod" ? "Prod" : "UAT") + "</td><td>" + esc(x.ep) + "</td><td>" + x.n + '</td><td><span class="pill ' + (x.ok ? "g" : "r") + '">' + x.ok + "</span></td><td>" + esc(Object.keys(x.codes).map(function (k) { return k + "×" + x.codes[k]; }).join(", ")) + "</td><td><small>" + esc(x.lastMsg) + "<br>" + dt(x.last) + "</small></td></tr>"; }).join("") + "</table></div>" : '<div class="muted" style="font-size:12.5px;margin-top:6px">No tests yet with this company name. In the EMI API tester, add the partner login and IMEIs with this company name.</div>') + "</div>" +
+        '<div class="card"><b>📈 Live traffic</b>' + (D.length ? '<div class="kpis"><div class="kpi"><b>' + c30.toLocaleString("en-IN") + '</b><span>calls, last 30 days</span></div><div class="kpi"><b>' + (c30 ? Math.round(e30 / c30 * 1000) / 10 : 0) + '%</b><span>error rate</span></div><div class="kpi"><b>' + D[D.length - 1].d + '</b><span>last day imported</span></div>' + (p.target ? '<div class="kpi"><b>' + Math.round(c30 / p.target * 100) + '%</b><span>of expected monthly calls</span></div>' : "") + '</div><div id="ch" style="margin-top:8px"></div>' : '<div class="muted" style="font-size:12.5px;margin-top:6px">No traffic yet — import the gateway log in 📥 Import live traffic.</div>') + "</div>" +
+        '<div class="card"><b>🗒 Notes</b><div class="bar2"><input class="tx" id="nt" placeholder="e.g. Partner asked for new error code list" style="flex:1"><button class="btn sec sm" id="na">Add</button></div>' + p.notes.slice().reverse().map(function (n) { return '<div style="border-top:1px solid #EEF0F6;padding:6px 0;font-size:13px">' + esc(n.x) + '<br><small class="muted">' + esc(n.by) + " · " + dt(n.t) + "</small></div>"; }).join("") + "</div>";
+      if (D.length && window.BICH) $("ch").innerHTML = BICH.lines({ labels: D.map(function (d) { return d.d.slice(5); }), series: [{ name: "Calls", values: D.map(function (d) { return d.calls; }) }, { name: "Errors", values: D.map(function (d) { return d.err; }), color: "#E5484D" }], height: 200 });
+      $("bk").onclick = function () { CUR = null; load().then(draw); };
+      $("ed").onclick = function () { edit(p); };
+      $("stg").onchange = function () { p.stage = $("stg").value; save(p).then(function () { detail(id); }); };
+      [].forEach.call(VIEW.querySelectorAll("[data-ck]"), function (c) { c.onchange = function () { p.checks[c.dataset.ck] = c.checked; save(p); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-ap]"), function (c) { c.onchange = function () { p.apis = META.apis.filter(function (a) { var x = VIEW.querySelector('[data-ap="' + a + '"]'); return x && x.checked; }); save(p); }; });
+      $("na").onclick = function () { var x = $("nt").value.trim(); if (!x) return; p.notes.push({ t: Date.now(), by: AUTH.username || "", x: x }); save(p).then(function () { detail(id); }); };
+      $("rep").onclick = function () { report(p, r); };
+    });
+  }
+  function report(p, r) {
+    var rows = [["vivo EMI Business API — partner test report"], ["Partner", p.name], ["Company name (login)", p.company || p.name], ["Stage", SN[p.stage]], ["APIs", p.apis.join(", ")], ["Date", new Date().toLocaleString("en-IN")], [""], ["Environment", "API", "Tests", "Passed", "Errors seen", "Last result", "Last tested"]].concat(r.tests.map(function (x) { return [x.env === "prod" ? "Production" : "UAT", x.ep, x.n, x.ok, Object.keys(x.codes).map(function (k) { return k + " × " + x.codes[k]; }).join(", "), x.lastMsg, dt(x.last)]; }));
+    rows.push([""], ["Go-live checklist"]); CHECK.forEach(function (c) { rows.push([c[1], p.checks[c[0]] ? "Done" : "Pending"]); });
+    download(xlsx([{ name: "Test report", rows: rows }]), "API_test_report_" + p.name.replace(/[^\w]+/g, "_") + ".xlsx");
+  }
+  // ---------- import live traffic (gateway log) ----------
+  var RAW = null, M = {};
+  function lib() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  function tImp() {
+    VIEW.innerHTML = '<div class="card"><b>📥 Import live traffic</b><div class="muted" style="font-size:12.5px">The same gateway log you use in the 🔗 Bundle Pair Engine: one row per call with <b>request time, partner / company</b> and (optional) <b>API</b> and <b>result</b>. It is summed per partner, day and API — the log itself is not stored.</div><div class="drop" id="dp">📎 Choose the log file</div><input type="file" id="fi" accept=".xlsx,.xls,.csv" style="display:none"><div id="mp"></div></div>';
+    $("dp").onclick = function () { $("fi").click(); };
+    $("fi").onchange = function () { var f = $("fi").files[0]; if (!f) return; $("dp").textContent = "Reading " + f.name + "…"; lib().then(function () { return f.arrayBuffer(); }).then(function (b) { var wb = XLSX.read(b, { type: "array" }); RAW = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }); $("dp").textContent = "📎 " + f.name + " · " + (RAW.length - 1) + " rows"; mapCols(); }); };
+  }
+  function mapCols() {
+    var H = RAW[0].map(function (h) { return String(h); }), g = function (re) { return H.findIndex(function (h) { return re.test(h.toLowerCase().replace(/[\s_]+/g, "")); }); };
+    M = { time: g(/time|date/), partner: g(/partner|company|bank|invoker|client/), api: g(/api|endpoint|interface|method|service/), result: g(/result|status|success|process|code/) };
+    var sel = function (k, lb) { return '<div><label class="lb">' + lb + '</label><select class="tx" data-m="' + k + '"><option value="-1">—</option>' + H.map(function (h, i) { return '<option value="' + i + '"' + (M[k] === i ? " selected" : "") + ">" + esc(h.slice(0, 40)) + "</option>"; }).join("") + "</select></div>"; };
+    $("mp").innerHTML = '<div class="g2">' + sel("time", "Request time *") + sel("partner", "Partner / company *") + sel("api", "API") + sel("result", "Result") + '</div><div class="bar2"><button class="btn sec" id="nx">Next: match partners</button></div><div id="mt"></div>';
+    [].forEach.call($("mp").querySelectorAll("[data-m]"), function (s) { s.onchange = function () { M[s.dataset.m] = +s.value; }; });
+    $("nx").onclick = matchP;
+  }
+  function day(v) { if (typeof v === "number") { var d = new Date(Math.round((v - 25569) * 864e5)); return d.toISOString().slice(0, 10); } var s = String(v).trim(), m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/); if (m) return m[1] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[3]).slice(-2); m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/); if (m) return m[3] + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2); return ""; }
+  function okRes(v) { var s = String(v == null ? "" : v).trim().toLowerCase(); return !s || /^(true|success|succeed|ok|y|yes|1|200|pass|approved)$/.test(s); }
+  function matchP() {
+    if (M.time < 0 || M.partner < 0) return toast("Choose the time and partner columns");
+    var names = {}; RAW.slice(1).forEach(function (r) { var n = String(r[M.partner] || "").trim(); if (n) names[n] = (names[n] || 0) + 1; });
+    var N = Object.keys(names).sort(function (a, b) { return names[b] - names[a]; }).slice(0, 200), auto = function (n) { var l = n.toLowerCase(); var p = ROWS.filter(function (x) { return (x.company || "").toLowerCase() === l || x.name.toLowerCase() === l; })[0] || ROWS.filter(function (x) { return l.indexOf(x.name.toLowerCase()) >= 0 || x.name.toLowerCase().indexOf(l) >= 0; })[0]; return p ? p.id : ""; };
+    $("mt").innerHTML = '<b style="display:block;margin-top:12px">Which partner is each name?</b><table class="tb" style="margin-top:6px"><tr><th>Name in the log</th><th>Calls</th><th>Partner in the hub</th></tr>' + N.map(function (n, i) { var a = auto(n); return "<tr><td>" + esc(n) + "</td><td>" + names[n] + '</td><td><select class="tx" data-n="' + i + '"><option value="">— skip —</option>' + ROWS.map(function (p) { return '<option value="' + p.id + '"' + (a === p.id ? " selected" : "") + ">" + esc(p.name) + "</option>"; }).join("") + "</select></td></tr>"; }).join("") + '</table><div class="bar2"><button class="btn pri" id="im">📥 Import</button></div>';
+    $("im").onclick = function () {
+      var pick = {}; [].forEach.call($("mt").querySelectorAll("[data-n]"), function (s) { if (s.value) pick[N[+s.dataset.n]] = s.value; });
+      var agg = {}; RAW.slice(1).forEach(function (r) { var pid = pick[String(r[M.partner] || "").trim()], d = day(r[M.time]); if (!pid || !d) return; var ep = M.api >= 0 ? String(r[M.api] || "").trim() : "", k = pid + "|" + d + "|" + ep, x = agg[k] = agg[k] || [pid, d, ep, 0, 0]; x[3]++; if (M.result >= 0 && !okRes(r[M.result])) x[4]++; });
+      var rows = Object.keys(agg).map(function (k) { return agg[k]; }); if (!rows.length) return toast("Nothing to import — match at least one partner");
+      $("im").disabled = true; api({ action: "ph-stats", rows: rows }).then(function (r) { $("im").disabled = false; if (!r.ok) return toast(r.error); toast(r.days + " partner-days imported"); TAB = "list"; load().then(draw); });
+    };
+  }
+  load().then(function (ok) { if (ok) draw(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Affordability Penetration Board</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:8px}.kpi{background:#F7F8FC;border-radius:12px;padding:10px}.kpi b{display:block;font-size:22px}.kpi span{font-size:11.5px;color:var(--mut)}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px;cursor:pointer;white-space:nowrap}.tb td{border-top:1px solid #EEF0F6;padding:6px}.tb td.n{text-align:right}.tb tr.click{cursor:pointer}.tb tr.click:hover td{background:#F7F8FC}
+.scroll{overflow:auto;max-height:420px;margin-top:8px}
+.hb{display:flex;align-items:center;gap:6px}.hb i{display:block;height:8px;border-radius:99px;background:#4D5BF9}
+.flt{display:flex;gap:8px;flex-wrap:wrap}.flt select{flex:1;min-width:130px}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:16px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:8px}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📊</span></div>
+  <h1>Affordability Penetration</h1><p>How much of sell-out goes on EMI — by state, partner, model and store</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/bichart.js"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), HO = AUTH && AUTH.app === "admin", D = null, F = { m: "", st: "", p: "" }, AI = null;
+  var nf = function (n) { return Math.round(n).toLocaleString("en-IN"); }, pc = function (a, b) { return b ? a / b * 100 : 0; }, p1 = function (x) { return (Math.round(x * 10) / 10).toFixed(1) + "%"; };
+  function load() { api({ action: "ap-get" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>"; return; } D = r.data; if (D) { F.m = D.months[D.months.length - 1]; if (D.mine) F.st = D.mine; } draw(); }); }
+  function prevM(m) { var i = D.months.indexOf(m); return i > 0 ? D.months[i - 1] : ""; }
+  function draw() {
+    if (!D) { VIEW.innerHTML = '<div class="card empty"><div class="big">📊</div><b>No data yet</b><div class="muted">' + (HO ? "Upload the monthly sell-out and EMI file below." : "HO has not uploaded the data yet.") + "</div></div>" + (HO ? upCard() : ""); if (HO) wireUp(); return; }
+    var ms = D.ms.filter(function (r) { return !F.st || r[1] === F.st; }), mp = D.mp.filter(function (r) { return (!F.st || r[1] === F.st); });
+    var agg = function (rows, m, keyI) { var o = {}; rows.forEach(function (r) { if (r[0] !== m) return; var k = keyI == null ? "all" : r[keyI], x = o[k] = o[k] || [0, 0]; x[0] += r[3]; x[1] += r[4]; }); return o; };
+    var m = F.m, pm = prevM(m), cur = agg(ms, m).all || [0, 0], prv = pm ? agg(ms, pm).all || [0, 0] : null;
+    var penNow = pc(cur[1], cur[0]), penPrev = prv ? pc(prv[1], prv[0]) : null;
+    var trend = D.months.map(function (x) { var a = agg(ms, x).all || [0, 0]; return { m: x, pen: pc(a[1], a[0]), s: a[0], e: a[1] }; });
+    var byS = agg(D.ms, m, 1), byS0 = pm ? agg(D.ms, pm, 1) : {}, byM = agg(ms, m, 2), byM0 = pm ? agg(ms, pm, 2) : {};
+    var parts = {}, parts0 = {}; mp.forEach(function (r) { if (r[0] === m) parts[r[2]] = (parts[r[2]] || 0) + r[3]; if (r[0] === pm) parts0[r[2]] = (parts0[r[2]] || 0) + r[3]; });
+    var pTot = Object.values(parts).reduce(function (a, b) { return a + b; }, 0), p0Tot = Object.values(parts0).reduce(function (a, b) { return a + b; }, 0);
+    var stores = D.st.filter(function (r) { return !F.st || r[0] === F.st; }), gaps = stores.filter(function (r) { return r[3] >= 5 && pc(r[4], r[3]) < 5; }).sort(function (a, b) { return b[3] - a[3]; }).slice(0, 40);
+    var states = HO ? Object.keys(byS).sort(function (a, b) { return pc(byS[b][1], byS[b][0]) - pc(byS[a][1], byS[a][0]); }) : [];
+    var models = Object.keys(byM).sort(function (a, b) { return byM[b][0] - byM[a][0]; }).slice(0, 25);
+    var delta = function (a, b) { if (b == null) return ""; var d = a - b; if (Math.abs(d) < 0.05) return '<span class="pill m">no change</span>'; return '<span class="pill ' + (d >= 0 ? "g" : "r") + '">' + (d >= 0 ? "▲ " : "▼ ") + Math.abs(Math.round(d * 10) / 10) + " pts</span>"; };
+    VIEW.innerHTML = '<div class="card"><div class="flt"><select class="tx" id="fm">' + D.months.slice().reverse().map(function (x) { return '<option value="' + x + '"' + (x === m ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select>" + (HO ? '<select class="tx" id="fs"><option value="">All India</option>' + Object.keys(agg(D.ms, m, 1)).sort().map(function (s) { return '<option' + (s === F.st ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" : '<span class="pill" style="align-self:center">' + esc(F.st) + "</span>") + "</div>" +
+      '<div class="kpis"><div class="kpi"><b>' + p1(penNow) + '</b><span>EMI penetration ' + delta(penNow, penPrev) + '</span></div><div class="kpi"><b>' + nf(cur[1]) + '</b><span>EMI units</span></div><div class="kpi"><b>' + nf(cur[0]) + '</b><span>total sell-out</span></div><div class="kpi"><b>' + Object.keys(parts).length + '</b><span>partners active</span></div><div class="kpi" style="background:#FFF4E5"><b>' + gaps.length + '</b><span>stores with almost no EMI</span></div></div>' +
+      '<div id="tr" style="margin-top:10px"></div><div class="bar2"><button class="btn pri sm" id="ai">✨ AI insights</button><button class="btn ghost sm" id="xl">⬇ Excel</button></div><div id="aiO"></div></div>' +
+      (HO ? '<div class="card"><b>🗺 By state</b> <span class="muted" style="font-size:12px">tap a state to filter</span><div class="scroll"><table class="tb"><tr><th>State</th><th>Sell-out</th><th>EMI</th><th>Penetration</th><th>vs last month</th></tr>' + states.map(function (s) { var x = byS[s], p = pc(x[1], x[0]), q = byS0[s] ? pc(byS0[s][1], byS0[s][0]) : null; return '<tr class="click" data-s="' + esc(s) + '"><td>' + esc(s) + '</td><td class="n">' + nf(x[0]) + '</td><td class="n">' + nf(x[1]) + '</td><td><div class="hb"><i style="width:' + Math.min(100, p) + 'px"></i>' + p1(p) + "</div></td><td>" + delta(p, q) + "</td></tr>"; }).join("") + "</table></div></div>" : "") +
+      '<div class="card"><b>🏦 Partner share of EMI</b>' + (Object.keys(parts).length ? '<div class="scroll"><table class="tb"><tr><th>Partner</th><th>EMI units</th><th>Share</th><th>Share vs last month</th></tr>' + Object.keys(parts).sort(function (a, b) { return parts[b] - parts[a]; }).map(function (k) { var sh = pc(parts[k], pTot), sh0 = p0Tot ? pc(parts0[k] || 0, p0Tot) : null; return "<tr><td>" + esc(k) + '</td><td class="n">' + nf(parts[k]) + '</td><td><div class="hb"><i style="width:' + Math.min(100, sh) + 'px;background:#13A05B"></i>' + p1(sh) + "</div></td><td>" + delta(sh, sh0) + "</td></tr>"; }).join("") + "</table></div>" : '<div class="muted" style="font-size:12.5px">No partner split in the data.</div>') + "</div>" +
+      '<div class="card"><b>📱 By model</b> <span class="muted" style="font-size:12px">top 25 by sell-out · low penetration in red</span><div class="scroll"><table class="tb"><tr><th>Model</th><th>Sell-out</th><th>EMI</th><th>Penetration</th><th>vs last month</th></tr>' + models.map(function (k) { var x = byM[k], p = pc(x[1], x[0]), q = byM0[k] ? pc(byM0[k][1], byM0[k][0]) : null; return "<tr><td>" + esc(k) + '</td><td class="n">' + nf(x[0]) + '</td><td class="n">' + nf(x[1]) + '</td><td style="color:' + (p < penNow * 0.6 ? "#B42318" : "inherit") + '">' + p1(p) + "</td><td>" + delta(p, q) + "</td></tr>"; }).join("") + "</table></div></div>" +
+      '<div class="card"><b>🏪 Stores selling but almost no EMI</b> <span class="muted" style="font-size:12px">' + esc(D.storeMonth || m) + ' · 5+ units sold, under 5% on EMI</span>' + (gaps.length ? '<div class="scroll"><table class="tb"><tr><th>Store</th><th>State</th><th>Sell-out</th><th>EMI</th></tr>' + gaps.map(function (r) { return "<tr><td>" + esc(r[2] || r[1]) + '<br><small class="muted">' + esc(r[1]) + "</small></td><td>" + esc(r[0]) + '</td><td class="n">' + nf(r[3]) + '</td><td class="n">' + nf(r[4]) + "</td></tr>"; }).join("") + "</table></div>" : '<div class="muted" style="font-size:12.5px">None — or no store-level data.</div>') + "</div>" +
+      (HO ? upCard() : "") + '<div class="muted" style="font-size:11.5px;text-align:center;margin:10px 0">Data from ' + esc(D.file || "upload") + " · " + dt(D.at) + "</div>";
+    if (window.BICH) $("tr").innerHTML = BICH.lines({ labels: trend.map(function (t) { return t.m; }), series: [{ name: "EMI penetration %", values: trend.map(function (t) { return Math.round(t.pen * 10) / 10; }) }], height: 180, fmt: function (v) { return v + "%"; } });
+    $("fm").onchange = function () { F.m = $("fm").value; AI = null; draw(); };
+    if ($("fs")) $("fs").onchange = function () { F.st = $("fs").value; AI = null; draw(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-s]"), function (tr) { tr.onclick = function () { F.st = tr.dataset.s; AI = null; draw(); window.scrollTo(0, 0); }; });
+    $("xl").onclick = function () { download(xlsx([{ name: "Trend", rows: [["Month", "Sell-out", "EMI", "Penetration %"]].concat(trend.map(function (t) { return [t.m, t.s, t.e, Math.round(t.pen * 10) / 10]; })) }, { name: "States " + m, rows: [["State", "Sell-out", "EMI", "Penetration %"]].concat(Object.keys(byS).map(function (s) { return [s, byS[s][0], byS[s][1], Math.round(pc(byS[s][1], byS[s][0]) * 10) / 10]; })) }, { name: "Partners " + m, rows: [["Partner", "EMI units", "Share %"]].concat(Object.keys(parts).map(function (k) { return [k, parts[k], Math.round(pc(parts[k], pTot) * 10) / 10]; })) }, { name: "Models " + m, rows: [["Model", "Sell-out", "EMI", "Penetration %"]].concat(Object.keys(byM).map(function (k) { return [k, byM[k][0], byM[k][1], Math.round(pc(byM[k][1], byM[k][0]) * 10) / 10]; })) }, { name: "Store gaps", rows: [["State", "Store code", "Store", "Sell-out", "EMI"]].concat(gaps) }]), "affordability_penetration_" + m + (F.st ? "_" + F.st.replace(/\s+/g, "_") : "") + ".xlsx"); };
+    $("ai").onclick = function () {
+      $("ai").disabled = true; $("aiO").innerHTML = '<div class="loading"><div class="spin"></div>Reading the numbers…</div>';
+      var sum = "Scope: " + (F.st || "All India") + ", month " + m + (pm ? " vs " + pm : "") + "\nPenetration " + p1(penNow) + (penPrev != null ? " (last month " + p1(penPrev) + ")" : "") + ", EMI units " + nf(cur[1]) + " of " + nf(cur[0]) + "\nTrend: " + trend.slice(-6).map(function (t) { return t.m + " " + p1(t.pen); }).join(", ") +
+        (HO && !F.st ? "\nStates (pen now / last month): " + states.map(function (s) { return s + " " + p1(pc(byS[s][1], byS[s][0])) + (byS0[s] ? "/" + p1(pc(byS0[s][1], byS0[s][0])) : ""); }).join("; ") : "") +
+        "\nPartners (share now / last month): " + Object.keys(parts).sort(function (a, b) { return parts[b] - parts[a]; }).slice(0, 12).map(function (k) { return k + " " + p1(pc(parts[k], pTot)) + (p0Tot ? "/" + p1(pc(parts0[k] || 0, p0Tot)) : ""); }).join("; ") +
+        "\nModels (sell-out, pen): " + models.slice(0, 15).map(function (k) { return k + " " + nf(byM[k][0]) + " " + p1(pc(byM[k][1], byM[k][0])); }).join("; ") + "\nStores with sales but under 5% EMI: " + gaps.length + (gaps.length ? " e.g. " + gaps.slice(0, 5).map(function (r) { return (r[2] || r[1]) + " (" + r[0] + ", " + r[3] + " units)"; }).join(", ") : "");
+      api({ action: "ap-ai", summary: sum }).then(function (r) { $("ai").disabled = false; if (!r.ok) { $("aiO").innerHTML = ""; return toast(r.error); } AI = r.ai; $("aiO").innerHTML = '<div class="help"><b>' + esc(AI.headline) + "</b><br>" + AI.insights.map(function (x) { return "• " + esc(x); }).join("<br>") + '</div><div class="help" style="background:#E6F4EA"><b>Actions</b><br>' + AI.actions.map(function (x) { return "→ " + esc(x); }).join("<br>") + "</div>"; });
+    };
+    if (HO) wireUp();
+  }
+  // ---------- HO upload ----------
+  function upCard() { return '<div class="card"><b>📥 Update the data (HO)</b><div class="muted" style="font-size:12.5px">One Excel with two sheets: <b>Sales</b> (Month, State, Store code, Store name, Model, Qty) and <b>EMI</b> (Month, State, Store code, Model, Partner, Qty). Month as YYYY-MM or a date. Store columns are optional.</div><div class="drop" id="dp">📎 Choose the Excel</div><input type="file" id="fi" accept=".xlsx,.xls" style="display:none"><div class="bar2"><button class="btn ghost sm" id="tp">⬇ Template</button></div></div>'; }
+  function lib() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  function wireUp() {
+    $("tp").onclick = function () { download(xlsx([{ name: "Sales", rows: [["Month", "State", "Store code", "Store name", "Model", "Qty"], ["2026-10", "Bihar", "BHR0012", "Mobile World Patna", "vivo V50", 42], ["2026-10", "Bihar", "BHR0012", "Mobile World Patna", "vivo Y39", 65]] }, { name: "EMI", rows: [["Month", "State", "Store code", "Model", "Partner", "Qty"], ["2026-10", "Bihar", "BHR0012", "vivo V50", "Bajaj Finserv", 18], ["2026-10", "Bihar", "BHR0012", "vivo Y39", "HDB Financial", 9]] }]), "affordability_penetration_template.xlsx"); };
+    $("dp").onclick = function () { $("fi").click(); };
+    $("fi").onchange = function () {
+      var f = $("fi").files[0]; if (!f) return; $("dp").textContent = "Reading " + f.name + "…";
+      lib().then(function () { return f.arrayBuffer(); }).then(function (b) {
+        var wb = XLSX.read(b, { type: "array" }), sh = function (re) { var n = wb.SheetNames.filter(function (x) { return re.test(x.toLowerCase()); })[0]; return n ? XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: "", raw: true }) : null; };
+        var S = sh(/sale|sell/) || sh(/./), E = sh(/emi|finance|afford/);
+        if (!S || !E) return toast("Need two sheets: Sales and EMI");
+        var col = function (H, re) { return H.findIndex(function (h) { return re.test(String(h).toLowerCase().replace(/[\s_]+/g, "")); }); };
+        var mon = function (v) { if (typeof v === "number") { var d = new Date(Math.round((v - 25569) * 864e5)); return d.toISOString().slice(0, 7); } var s = String(v).trim(), m = s.match(/^(\d{4})[\-\/.](\d{1,2})/); if (m) return m[1] + "-" + ("0" + m[2]).slice(-2); m = s.match(/(\d{1,2})[\-\/.](\d{4})$/); if (m) return m[2] + "-" + ("0" + m[1]).slice(-2); var d2 = Date.parse("1 " + s); return isNaN(d2) ? "" : new Date(d2 + 864e5).toISOString().slice(0, 7); };
+        var hs = S[0], he = E[0], cS = { m: col(hs, /month|date|period/), s: col(hs, /state/), sc: col(hs, /storecode|dealercode|code/), sn: col(hs, /storename|dealername|name/), md: col(hs, /model|product/), q: col(hs, /qty|quantity|units|sell|sales/) }, cE = { m: col(he, /month|date|period/), s: col(he, /state/), sc: col(he, /storecode|dealercode|code/), md: col(he, /model|product/), p: col(he, /partner|bank|financier|company/), q: col(he, /qty|quantity|units|emi/) };
+        if ([cS.m, cS.s, cS.md, cS.q, cE.m, cE.s, cE.md, cE.q].some(function (x) { return x < 0; })) return toast("Columns not found — use the template headings");
+        var ms = {}, mp = {}, st = {}, names = {};
+        S.slice(1).forEach(function (r) { var m = mon(r[cS.m]), s = String(r[cS.s]).trim(), md = String(r[cS.md]).trim(), q = +r[cS.q] || 0; if (!m || !s) return; var k = m + "|" + s + "|" + md; (ms[k] = ms[k] || [m, s, md, 0, 0])[3] += q; if (cS.sc >= 0 && r[cS.sc]) { var sk = m + "|" + s + "|" + String(r[cS.sc]).trim(); (st[sk] = st[sk] || [0, 0])[0] += q; if (cS.sn >= 0) names[String(r[cS.sc]).trim()] = String(r[cS.sn]).trim(); } });
+        E.slice(1).forEach(function (r) { var m = mon(r[cE.m]), s = String(r[cE.s]).trim(), md = String(r[cE.md]).trim(), q = +r[cE.q] || 0; if (!m || !s) return; var k = m + "|" + s + "|" + md; (ms[k] = ms[k] || [m, s, md, 0, 0])[4] += q; var p = cE.p >= 0 ? String(r[cE.p]).trim() || "Unknown" : "All partners", pk = m + "|" + s + "|" + p; (mp[pk] = mp[pk] || [m, s, p, 0])[3] += q; if (cE.sc >= 0 && r[cE.sc]) { var sk = m + "|" + s + "|" + String(r[cE.sc]).trim(); (st[sk] = st[sk] || [0, 0])[1] += q; } });
+        var months = Object.keys(ms).map(function (k) { return k.slice(0, 7); }).sort(), last = months[months.length - 1];
+        var stRows = Object.keys(st).filter(function (k) { return k.slice(0, 7) === last; }).map(function (k) { var p = k.split("|"); return [p[1], p[2], names[p[2]] || "", st[k][0], st[k][1]]; }).sort(function (a, b) { return b[3] - a[3]; }).slice(0, 8000);
+        $("dp").textContent = "Saving…";
+        api({ action: "ap-save", ms: Object.values(ms), mp: Object.values(mp), st: stRows, storeMonth: last, file: f.name }).then(function (r) { if (!r.ok) { $("dp").textContent = "📎 Choose the Excel"; return toast(r.error); } toast(r.months + " month(s) loaded"); load(); });
+      }, function () { toast("Couldn't read that file"); });
+    };
+  }
+  load();
+})();
+</script>
+</body>
+</html>

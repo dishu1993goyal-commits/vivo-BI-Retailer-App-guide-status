@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bundle Pair Engine</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.tabs2{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}.tabs2 button{flex:0 0 auto;border:0;background:#fff;border-radius:99px;padding:8px 14px;font:700 13px inherit;cursor:pointer;color:var(--ink2);box-shadow:0 1px 4px rgba(20,24,51,.08)}.tabs2 button.on{background:#2B33A6;color:#fff}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:16px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:8px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:8px}.kpi{background:#F7F8FC;border-radius:12px;padding:10px}.kpi b{display:block;font-size:22px}.kpi span{font-size:11.5px;color:var(--mut)}
+.tb{width:100%;border-collapse:collapse;font-size:12px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px;white-space:nowrap;position:sticky;top:0}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.scroll{overflow:auto;max-height:430px;margin-top:8px;border:1px solid #EEF0F6;border-radius:10px}
+.g3{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;white-space:pre-wrap;overflow:auto;max-height:420px}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.seg button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:6px 11px;font:700 12px inherit;cursor:pointer}.seg button.on{background:#2B33A6;color:#fff;border-color:#2B33A6}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🔗</span></div>
+  <h1>Bundle Pair Engine</h1><p>Find which phone IMEI and IoT serial were sold together — from dealer code + request time only</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), TAB = "run", CFG = null, RAW = null, MAP = {}, RES = null, SHOW = "pairs", FILE = "";
+  var TABS = [["run", "▶ Pair a log"], ["runs", "📚 Saved runs"], ["rule", "🛠 Rule for vivo IT"], ["set", "⚙️ Settings"]];
+  var COLS = [["time", "Request time", /req.*time|request.*time|call.*time|create.*time|^time$|timestamp|date.?time|^date$/], ["dealer", "Dealer code", /dealer|store.?code|shop.?code|retailer.?code/], ["id", "IMEI / serial", /imei|serial|^sn$|device.?id/], ["model", "Model", /model|product|sku/], ["partner", "Partner / company", /partner|company|bank|invoker|client/], ["api", "API name", /api|endpoint|interface|method|service/], ["result", "Result / status", /result|status|success|process|code|resp/]];
+  if (!AUTH || AUTH.app !== "admin") { VIEW.innerHTML = '<div class="card empty"><div class="big">🔒</div><b>Only HO can use this tool</b></div>'; return; }
+  function draw() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("");
+    [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    ({ run: tRun, runs: tRuns, rule: tRule, set: tSet })[TAB]();
+  }
+  function lib() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  // ---------- 1. load the gateway log ----------
+  function tRun() {
+    VIEW.innerHTML = '<div class="card"><b>1. Add the API call log</b><div class="muted" style="font-size:12.5px">Export from vivo IT / the gateway: one row per processInstallment call with <b>request time, dealer code, IMEI or serial</b> (model, partner, API and result help but are optional). Excel or CSV, up to ~200,000 rows.</div><div class="drop" id="dp">📎 Choose the log file</div><input type="file" id="fi" accept=".xlsx,.xls,.csv,.txt" style="display:none"><div class="bar2"><button class="btn ghost sm" id="smp">⬇ Sample log to try</button><button class="btn ghost sm" id="tpl">⬇ Excel template</button></div><div id="mp"></div></div><div id="out"></div>';
+    $("dp").onclick = function () { $("fi").value = ""; $("fi").click(); };
+    $("fi").onchange = function () { var f = $("fi").files[0]; if (!f) return; FILE = f.name; $("dp").textContent = "Reading " + f.name + "…"; lib().then(function () { return f.arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array", cellDates: false }); RAW = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }); $("dp").textContent = "📎 " + f.name + " · " + (RAW.length - 1) + " rows · tap to change"; guess(); mapping(); }, function () { toast("Couldn't read that file"); }); };
+    $("smp").onclick = function () { RAW = sample(); FILE = "sample"; guess(); mapping(); $("dp").textContent = "📎 Sample log · " + (RAW.length - 1) + " rows"; };
+    $("tpl").onclick = function () { download(xlsx([{ name: "Log", rows: [["Request time", "Dealer code", "IMEI / serial", "Model", "Partner", "API", "Result"], ["2026-11-20 11:02:10", "BHR0012", "861234567890123", "vivo V50", "Bajaj Finserv", "processInstallment", "success"], ["2026-11-20 11:09:45", "BHR0012", "WTC3K9X22AB", "vivo Watch 3", "Bajaj Finserv", "processInstallment", "success"]] }]), "bundle_log_template.xlsx"); };
+    if (RAW) { $("dp").textContent = "📎 " + FILE + " · " + (RAW.length - 1) + " rows · tap to change"; mapping(); }
+    if (RES) show();
+  }
+  function guess() { var H = RAW[0].map(function (h) { return String(h).toLowerCase().replace(/[\s_]+/g, ""); }); MAP = {}; COLS.forEach(function (c) { var i = H.findIndex(function (h, k) { return c[2].test(h) && Object.keys(MAP).every(function (x) { return MAP[x] !== k; }); }); if (i >= 0) MAP[c[0]] = i; }); }
+  function mapping() {
+    var H = RAW[0];
+    $("mp").innerHTML = '<b style="display:block;margin-top:12px">2. Check the columns</b><div class="g3">' + COLS.map(function (c) { return '<div><label class="lb">' + c[1] + (c[0] === "time" || c[0] === "dealer" || c[0] === "id" ? " *" : "") + '</label><select class="tx" data-c="' + c[0] + '"><option value="">—</option>' + H.map(function (h, i) { return '<option value="' + i + '"' + (MAP[c[0]] === i ? " selected" : "") + ">" + esc(String(h).slice(0, 40)) + "</option>"; }).join("") + "</select></div>"; }).join("") + '</div><div class="help">Pairing window <b>' + CFG.win + " min</b> · IoT may come before the phone: <b>" + (CFG.before ? "yes" : "no") + "</b> · same partner only: <b>" + (CFG.samePartner ? "yes" : "no") + "</b> · successful calls only: <b>" + (CFG.okOnly ? "yes" : "no") + '</b> — change in ⚙️ Settings.</div><div class="bar2"><button class="btn pri" id="go">🔗 Find the bundles</button></div>';
+    [].forEach.call($("mp").querySelectorAll("[data-c]"), function (s) { s.onchange = function () { if (s.value === "") delete MAP[s.dataset.c]; else MAP[s.dataset.c] = +s.value; }; });
+    $("go").onclick = function () { if (MAP.time == null || MAP.dealer == null || MAP.id == null) return toast("Choose the time, dealer code and IMEI / serial columns"); $("go").disabled = true; setTimeout(function () { RES = pair(); $("go").disabled = false; SHOW = "pairs"; show(); }, 30); };
+  }
+  // ---------- 2. the pairing ----------
+  function toTime(v) {
+    if (typeof v === "number") return Math.round((v - 25569) * 864e5);   // Excel date number (kept as wall-clock time)
+    var s = String(v).trim(); if (!s) return NaN;
+    var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})[ T]?(\d{1,2})?:?(\d{2})?:?(\d{2})?/); if (m) return Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})[ T]?(\d{1,2})?:?(\d{2})?:?(\d{2})?/); if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0), +(m[6] || 0));
+    if (/^\d{13}$/.test(s)) return +s + 5.5 * 36e5; if (/^\d{10}$/.test(s)) return (+s) * 1000 + 5.5 * 36e5;
+    var d = Date.parse(s); return isNaN(d) ? NaN : d;
+  }
+  var fmt = function (ms) { if (!isFinite(ms)) return ""; var d = new Date(ms); return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2) + " " + ("0" + d.getUTCHours()).slice(-2) + ":" + ("0" + d.getUTCMinutes()).slice(-2) + ":" + ("0" + d.getUTCSeconds()).slice(-2); };
+  function luhn(s) { var sum = 0; for (var i = 0; i < 15; i++) { var d = +s[14 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } sum += d; } return sum % 10 === 0; }
+  function okRes(v) { var s = String(v == null ? "" : v).trim().toLowerCase(); if (!s) return true; return /^(true|success|succeed|ok|y|yes|1|200|pass|approved)$/.test(s); }
+  function pair() {
+    var rows = RAW.slice(1), W = CFG.win * 6e4, words = CFG.iotWords, bad = 0, skipped = 0, calls = [];
+    rows.forEach(function (r, i) {
+      var t = toTime(r[MAP.time]), dealer = String(r[MAP.dealer] || "").trim().toUpperCase(), id = String(r[MAP.id] == null ? "" : r[MAP.id]).trim().replace(/\.0$/, "");
+      if (typeof r[MAP.id] === "number") id = String(Math.round(r[MAP.id]));
+      if (!isFinite(t) || !dealer || !id) { bad++; return; }
+      var res = MAP.result != null ? r[MAP.result] : ""; if (CFG.okOnly && !okRes(res)) { skipped++; return; }
+      var model = MAP.model != null ? String(r[MAP.model] || "").trim() : "", ml = model.toLowerCase();
+      var isIot = words.some(function (w) { return w && ml.indexOf(w) >= 0; }) || !/^\d{15}$/.test(id);
+      calls.push({ i: i + 2, t: t, dealer: dealer, id: id, model: model, partner: MAP.partner != null ? String(r[MAP.partner] || "").trim() : "", api: MAP.api != null ? String(r[MAP.api] || "").trim() : "", iot: isIot, luhn: /^\d{15}$/.test(id) ? luhn(id) : null, used: false });
+    });
+    calls.sort(function (a, b) { return a.t - b.t; });
+    var byD = {}; calls.forEach(function (c) { (byD[c.dealer] = byD[c.dealer] || []).push(c); });
+    var pairs = [], unp = [], amb = [], seen = {}, dup = 0;
+    Object.keys(byD).forEach(function (d) {
+      var L = byD[d], P = L.filter(function (c) { return !c.iot; });
+      L.filter(function (c) { return c.iot; }).forEach(function (io) {
+        if (seen[io.id]) { dup++; io.dup = true; } seen[io.id] = 1;
+        var cands = P.filter(function (p) { return !p.used && (CFG.before ? Math.abs(io.t - p.t) <= W : io.t - p.t >= 0 && io.t - p.t <= W) && (!CFG.samePartner || !io.partner || !p.partner || io.partner.toLowerCase() === p.partner.toLowerCase()); });
+        if (!cands.length) { unp.push(io); return; }
+        cands.sort(function (a, b) { return Math.abs(io.t - a.t) - Math.abs(io.t - b.t) || (b.t <= io.t) - (a.t <= io.t); });
+        var best = cands[0], gap = Math.abs(io.t - best.t) / 6e4, conf = cands.length === 1 ? "High" : Math.abs(io.t - cands[1].t) / 6e4 - gap >= 3 ? "Medium" : "Low";
+        best.used = true; pairs.push({ ph: best, io: io, gap: gap, conf: conf, n: cands.length });
+        if (conf === "Low") amb.push({ io: io, cands: cands.slice(0, 4) });
+      });
+    });
+    var phones = calls.filter(function (c) { return !c.iot; }).length, iots = calls.length - phones, byP = {};
+    pairs.forEach(function (x) { var k = x.ph.partner || "—"; (byP[k] = byP[k] || { p: 0, u: 0 }).p++; }); unp.forEach(function (x) { var k = x.partner || "—"; (byP[k] = byP[k] || { p: 0, u: 0 }).u++; });
+    return { calls: calls.length, bad: bad, skipped: skipped, phones: phones, iots: iots, pairs: pairs, unp: unp, amb: amb, dup: dup, byP: byP, dealers: Object.keys(byD).length, badLuhn: calls.filter(function (c) { return c.luhn === false; }).length };
+  }
+  // ---------- 3. results ----------
+  var HEADP = ["Dealer code", "Phone IMEI", "Phone model", "Phone time", "IoT serial", "IoT model", "IoT time", "Gap (min)", "Partner", "Confidence", "Phones in window"];
+  var rowP = function (x) { return [x.ph.dealer, x.ph.id, x.ph.model, fmt(x.ph.t), x.io.id, x.io.model, fmt(x.io.t), Math.round(x.gap * 10) / 10, x.ph.partner || x.io.partner, x.conf, x.n]; };
+  var HEADU = ["Dealer code", "IoT serial", "IoT model", "Time", "Partner", "Why"];
+  var rowU = function (x) { return [x.dealer, x.id, x.model, fmt(x.t), x.partner, x.dup ? "Same serial processed again" : "No phone at this dealer within " + CFG.win + " min"]; };
+  var HEADA = ["Dealer code", "IoT serial", "IoT time", "Possible phones (IMEI · time)"];
+  var rowA = function (x) { return [x.io.dealer, x.io.id, fmt(x.io.t), x.cands.map(function (c) { return c.id + " · " + fmt(c.t).slice(11); }).join("  |  ")]; };
+  function show() {
+    var R = RES, hi = R.pairs.filter(function (x) { return x.conf === "High"; }).length;
+    var tbl = function (head, rows) { return '<div class="scroll"><table class="tb"><tr>' + head.map(function (h) { return "<th>" + esc(h) + "</th>"; }).join("") + "</tr>" + rows.slice(0, 500).map(function (r) { return "<tr>" + r.map(function (v, i) { return "<td>" + (head[i] === "Confidence" ? '<span class="pill ' + (v === "High" ? "g" : v === "Medium" ? "o" : "r") + '">' + v + "</span>" : esc(v)) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" + (rows.length > 500 ? '<div class="muted" style="font-size:12px">Showing 500 of ' + rows.length + " — the Excel has all</div>" : ""); };
+    var parts = Object.keys(R.byP).sort(function (a, b) { return R.byP[b].p - R.byP[a].p; });
+    $("out").innerHTML = '<div class="card" style="margin-top:12px"><b>Result</b><div class="kpis"><div class="kpi"><b>' + R.calls + '</b><span>calls used</span></div><div class="kpi"><b>' + R.phones + '</b><span>phone calls</span></div><div class="kpi"><b>' + R.iots + '</b><span>IoT calls</span></div><div class="kpi" style="background:#E6F4EA"><b>' + R.pairs.length + '</b><span>bundles found (' + hi + ' sure)</span></div><div class="kpi" style="background:#FDECEC"><b>' + R.unp.length + '</b><span>IoT without a phone</span></div><div class="kpi" style="background:#FFF4E5"><b>' + R.amb.length + "</b><span>need a check</span></div></div>" +
+      (R.bad || R.skipped || R.dup || R.badLuhn ? '<div class="help w">' + [R.bad ? R.bad + " rows had no time / dealer / IMEI and were left out" : "", R.skipped ? R.skipped + " failed calls left out" : "", R.dup ? R.dup + " IoT serials were processed more than once" : "", R.badLuhn ? R.badLuhn + " 15-digit numbers fail the IMEI check digit" : ""].filter(Boolean).join(" · ") + "</div>" : "") +
+      '<div class="seg" id="sv"><button data-s="pairs" class="' + (SHOW === "pairs" ? "on" : "") + '">🔗 Bundles</button><button data-s="unp" class="' + (SHOW === "unp" ? "on" : "") + '">⚠ IoT without phone</button><button data-s="amb" class="' + (SHOW === "amb" ? "on" : "") + '">❓ Need a check</button><button data-s="part" class="' + (SHOW === "part" ? "on" : "") + '">🏦 By partner</button></div>' +
+      (SHOW === "pairs" ? tbl(HEADP, R.pairs.map(rowP)) : SHOW === "unp" ? tbl(HEADU, R.unp.map(rowU)) : SHOW === "amb" ? tbl(HEADA, R.amb.map(rowA)) : tbl(["Partner", "Bundles", "IoT without phone", "Bundle share"], parts.map(function (k) { var x = R.byP[k]; return [k, x.p, x.u, Math.round(x.p / Math.max(1, x.p + x.u) * 100) + "%"]; }))) +
+      '<div class="help"><b>How to read it</b><br>✅ <b>High</b> — only one unpaired phone at that dealer in the window. 🟠 <b>Medium</b> — several phones, the nearest is clearly closest. 🔴 <b>Low</b> — several phones within 3 minutes of each other; listed in “Need a check”. <b>IoT without phone</b> — an IoT was financed at a dealer with no phone call in the window (possible bundle misuse, or the phone was billed elsewhere).</div>' +
+      '<div class="bar2"><button class="btn pri" id="xl">⬇ Excel (all sheets)</button><button class="btn ghost" id="sv2">💾 Save run</button></div></div>';
+    [].forEach.call($("sv").children, function (b) { b.onclick = function () { SHOW = b.dataset.s; show(); }; });
+    $("xl").onclick = function () { download(xlsx([{ name: "Bundles", rows: [HEADP].concat(R.pairs.map(rowP)) }, { name: "IoT without phone", rows: [HEADU].concat(R.unp.map(rowU)) }, { name: "Need a check", rows: [HEADA].concat(R.amb.map(rowA)) }, { name: "By partner", rows: [["Partner", "Bundles", "IoT without phone"]].concat(parts.map(function (k) { return [k, R.byP[k].p, R.byP[k].u]; })) }, { name: "Summary", rows: [["Item", "Value"], ["File", FILE], ["Calls used", R.calls], ["Phone calls", R.phones], ["IoT calls", R.iots], ["Bundles", R.pairs.length], ["Sure (High)", hi], ["IoT without phone", R.unp.length], ["Need a check", R.amb.length], ["Window (min)", CFG.win], ["Made", new Date().toLocaleString("en-IN")]] }]), "bundle_pairs_" + new Date().toISOString().slice(0, 10) + ".xlsx"); };
+    $("sv2").onclick = function () { var nm = prompt("Name this run", FILE.replace(/\.\w+$/, "") + " · " + new Date().toLocaleDateString("en-IN")); if (!nm) return; api({ action: "bp-save", name: nm, cfg: CFG, stats: { calls: R.calls, phones: R.phones, iots: R.iots, bundles: R.pairs.length, sure: hi, unpaired: R.unp.length, check: R.amb.length }, pairs: R.pairs.map(rowP), unp: R.unp.map(rowU), amb: R.amb.map(rowA) }).then(function (r) { toast(r.ok ? "Saved" : r.error); }); };
+  }
+  function sample() {
+    var R = [["Request time", "Dealer code", "IMEI / serial", "Model", "Partner", "API", "Result"]], base = Date.UTC(2026, 10, 20, 10, 0, 0), add = function (min, d, id, m, p, res) { R.push([fmt(base + min * 6e4), d, id, m, p || "Bajaj Finserv", "processInstallment", res || "success"]); };
+    add(0, "BHR0012", "861234567890123", "vivo V50"); add(6, "BHR0012", "WTC3K9X22AB", "vivo Watch 3");                    // clean bundle
+    add(12, "BHR0012", "861234567890131", "vivo Y39"); add(14, "BHR0012", "861234567890149", "vivo Y39"); add(16, "BHR0012", "TWS4H77Q01", "vivo TWS 4");   // two phones close together → check
+    add(30, "UP00451", "PAD2Z9918K", "vivo Pad 3");                                                                                 // IoT alone
+    add(40, "UP00451", "861234567890156", "vivo T4", "HDB Financial"); add(48, "UP00451", "WTC3K9X55CD", "vivo Watch 3", "HDB Financial");
+    add(60, "DL00077", "861234567890164", "vivo X200"); add(200, "DL00077", "TWS4H77Q02", "vivo TWS 4");                            // too far apart
+    add(70, "DL00077", "861234567890172", "vivo Y29", "", "failed");
+    return R;
+  }
+  // ---------- saved runs ----------
+  function tRuns() {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>';
+    api({ action: "bp-list" }).then(function (r) {
+      if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
+      VIEW.innerHTML = '<div class="card">' + (r.rows.length ? '<table class="tb"><tr><th>Run</th><th>Bundles</th><th>IoT alone</th><th>Check</th><th></th></tr>' + r.rows.map(function (x) { return "<tr><td><b>" + esc(x.name) + '</b><br><small class="muted">' + dt(x.at) + " · " + esc(x.by) + "</small></td><td>" + (x.stats.bundles || 0) + "</td><td>" + (x.stats.unpaired || 0) + "</td><td>" + (x.stats.check || 0) + '</td><td style="white-space:nowrap"><a style="cursor:pointer" data-x="' + x.id + '">⬇ Excel</a> · <a style="cursor:pointer;color:#B42318" data-d="' + x.id + '">Delete</a></td></tr>'; }).join("") + "</table>" : '<div class="empty muted">No saved runs yet</div>') + "</div>";
+      [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (a) { a.onclick = function () { api({ action: "bp-get", id: a.dataset.x }).then(function (g) { if (!g.ok) return toast(g.error); var x = g.run; download(xlsx([{ name: "Bundles", rows: [HEADP].concat(x.pairs) }, { name: "IoT without phone", rows: [HEADU].concat(x.unp) }, { name: "Need a check", rows: [HEADA].concat(x.amb) }]), x.name.replace(/[^\w]+/g, "_") + ".xlsx"); }); }; });
+      [].forEach.call(VIEW.querySelectorAll("[data-d]"), function (a) { a.onclick = function () { if (confirm("Delete this run?")) api({ action: "bp-del", id: a.dataset.d }).then(tRuns); }; });
+    });
+  }
+  // ---------- rule for vivo IT (real-time pairing inside processInstallment, request unchanged) ----------
+  function spec() {
+    var w = CFG.win;
+    return "BUNDLE PAIRING INSIDE processInstallment — design note for vivo IT\n(request parameters stay exactly the same for all partners)\n\n" +
+      "GOAL\nWhen a customer buys a phone + an IoT product (watch / TWS / pad) on one bundle offer, the partner calls processInstallment twice — once with the phone IMEI and once with the IoT serial, both in the 'imei' field. vivo must know, on its own data only, which phone and which IoT belong together, and should refuse an IoT bundle call when no phone was sold with it.\n\n" +
+      "DATA WE ALREADY HAVE ON EVERY CALL\n  dealer code, request time (server time), partner (invoker), the imei field, the model resolved from IMEI / serial, result.\n\n" +
+      "1. NEW TABLES\n" +
+      "  bundle_open (id, dealer_code, partner, imei, model, req_time, status OPEN|PAIRED|EXPIRED|RELEASED, pair_id)\n" +
+      "  bundle_pair (pair_id, dealer_code, partner, phone_imei, phone_model, phone_time, iot_serial, iot_model, iot_time, gap_seconds, rule_version, status ACTIVE|BROKEN, created_at)\n" +
+      "  index bundle_open (dealer_code, status, req_time)\n\n" +
+      "2. ON EVERY SUCCESSFUL processInstallment\n" +
+      "  a) Classify: phone = 15-digit IMEI with a valid check digit and a phone model; IoT = serial of an IoT model in the product master.\n" +
+      "  b) Phone → insert into bundle_open with status OPEN.\n" +
+      "  c) IoT that is on a bundle offer →\n" +
+      "       BEGIN; SELECT … FROM bundle_open WHERE dealer_code = :dealer AND partner = :partner AND status = 'OPEN'\n" +
+      "         AND req_time BETWEEN :now - " + w + " minutes AND :now ORDER BY req_time DESC LIMIT 1 FOR UPDATE;\n" +
+      "       found → set status = 'PAIRED', insert bundle_pair, COMMIT, return success (data.bundlePairId may be added to the RESPONSE only — optional).\n" +
+      "       not found → ROLLBACK, return processStatus=false, errorCode = BUNDLE_PHONE_NOT_FOUND,\n" +
+      "         message = \"Process the phone first, then the IoT within " + w + " minutes at the same store.\"\n" +
+      "  d) IoT not on a bundle offer → normal flow, no pairing.\n\n" +
+      "3. RELEASE (releaseInstallment / UpdateImeiInfo)\n" +
+      "  Releasing a paired phone or IoT → bundle_pair.status = BROKEN; release of an OPEN phone → RELEASED. Broken bundles go to the review report.\n\n" +
+      "4. HOUSEKEEPING\n  Every 15 minutes: OPEN phones older than " + w + " minutes → EXPIRED (no effect on the phone sale).\n\n" +
+      "5. REPORT (daily)\n" +
+      "  select p.created_at::date as day, p.partner, p.dealer_code, p.phone_imei, p.phone_model, p.iot_serial, p.iot_model, p.gap_seconds/60.0 as gap_min, p.status\n  from bundle_pair p where p.created_at >= current_date - interval 30 day order by p.created_at;\n" +
+      "  + IoT calls refused with BUNDLE_PHONE_NOT_FOUND by partner and dealer (possible misuse).\n\n" +
+      "6. TEST CASES (UAT, with the EMI API tester)\n" +
+      "  T1 phone then IoT, same dealer, 5 min apart → pair created, both success.\n" +
+      "  T2 IoT alone → BUNDLE_PHONE_NOT_FOUND.\n" +
+      "  T3 phone, wait " + (w + 5) + " min, IoT → BUNDLE_PHONE_NOT_FOUND (expired).\n" +
+      "  T4 two phones then one IoT → paired with the latest phone; second IoT pairs with the other phone.\n" +
+      "  T5 phone at dealer A, IoT at dealer B → refused.\n" +
+      "  T6 phone partner X, IoT partner Y → refused.\n" +
+      "  T7 same IoT serial twice → second call refused (already processed).\n" +
+      "  T8 release the phone after pairing → pair BROKEN, shows in report.\n\n" +
+      "Until this is live, HO pairs the daily gateway log with the Bundle Pair Engine in the BI app (same rule, offline).\n";
+  }
+  function tRule() {
+    VIEW.innerHTML = '<div class="card"><b>🛠 Real-time pairing rule for vivo IT</b><div class="muted" style="font-size:12.5px;margin-top:4px">Same request for every partner — the gateway pairs by <b>dealer code + request time</b> (+ partner) and refuses an IoT bundle call when no phone was sold first. Share this note with IT; until they build it, use ▶ Pair a log every day.</div><div class="code" style="margin-top:10px">' + esc(spec()) + '</div><div class="bar2"><button class="btn pri" id="cp">📋 Copy</button><button class="btn ghost" id="dl">⬇ Download (.txt)</button></div></div>';
+    $("cp").onclick = function () { try { navigator.clipboard.writeText(spec()).then(function () { toast("Copied"); }); } catch (e) { prompt("Copy:", spec()); } };
+    $("dl").onclick = function () { download(new Blob([spec()], { type: "text/plain" }), "bundle_pairing_rule_for_IT.txt"); };
+  }
+  function tSet() {
+    VIEW.innerHTML = '<div class="card"><b>⚙️ Pairing settings</b><label class="lb">Pairing window (minutes between phone and IoT)</label><input class="tx" id="w" type="number" min="1" max="1440" value="' + CFG.win + '">' +
+      '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="bf"' + (CFG.before ? " checked" : "") + '><i></i><span>IoT may be processed before the phone</span></label>' +
+      '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="sp"' + (CFG.samePartner ? " checked" : "") + '><i></i><span>Pair only calls from the same partner</span></label>' +
+      '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="ok"' + (CFG.okOnly ? " checked" : "") + '><i></i><span>Use successful calls only</span></label>' +
+      '<label class="lb">An item is IoT when its model contains (comma-separated) — anything that is not a 15-digit IMEI is also IoT</label><textarea class="tx" id="iw" rows="3">' + esc(CFG.iotWords.join(", ")) + '</textarea><div class="bar2"><button class="btn pri" id="sv">💾 Save</button></div></div>';
+    $("sv").onclick = function () { api({ action: "bp-cfg", save: true, cfg: { win: +$("w").value, before: $("bf").checked, samePartner: $("sp").checked, okOnly: $("ok").checked, iotWords: $("iw").value.split(",").map(function (x) { return x.trim(); }) } }).then(function (r) { if (!r.ok) return toast(r.error); CFG = r.cfg; toast("Saved"); }); };
+  }
+  api({ action: "bp-cfg" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>"; return; } CFG = r.cfg; draw(); });
+})();
+</script>
+</body>
+</html>

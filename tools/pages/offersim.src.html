@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offer Simulator</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.m{background:#F1F2F6;color:#555}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.op{border:1px solid #E3E6F3;border-radius:14px;padding:10px 12px;margin-top:8px;background:#fff}.op.best{border:2px solid #13A05B;background:#F3FBF6}
+.op .h{display:flex;gap:8px;align-items:center}.op .h b{flex:1;font-size:14px}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.nums div{background:#F7F8FC;border-radius:10px;padding:7px}.nums b{display:block;font-size:15px}.nums span{font-size:10.5px;color:var(--mut)}
+.ed{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}.ed label{font-size:10.5px;color:var(--mut)}.ed input,.ed select{width:100%;padding:6px;border:1px solid #DADDF0;border-radius:8px;font:13px inherit}
+.big{font-size:40px;text-align:center}
+@media(max-width:520px){.nums{grid-template-columns:1fr 1fr}.ed{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🧮</span></div>
+  <h1>Offer Simulator</h1><p>Which EMI / cashback / exchange option gives the customer the lowest real price?</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), CAT = [], M = null, OPTS = [], IN = { price: 0, oldVal: 0, down: 0, model: "", variant: "" };
+  var nf = function (n) { return "₹" + Math.round(n).toLocaleString("en-IN"); };
+  var amt = function (s) { s = String(s || ""); var m = s.match(/₹\s?([\d,]+)/) || s.match(/rs\.?\s?([\d,]+)/i) || s.match(/([\d,]{3,})\s?(off|cashback|discount|bonus|extra)/i); return m ? +m[1].replace(/,/g, "") : 0; };
+  var pct = function (s, price) { var m = String(s || "").match(/(\d+(?:\.\d+)?)\s?%/); if (!m) return 0; var v = price * +m[1] / 100, cap = String(s).match(/up to\s?₹\s?([\d,]+)/i); return cap ? Math.min(v, +cap[1].replace(/,/g, "")) : v; };
+  function load() {
+    api({ action: "aff-catalog" }).then(function (r) { CAT = r.ok ? r.models || [] : []; var pre = null; try { pre = JSON.parse(sessionStorage.getItem("offersim-model") || "null"); } catch (e) { } draw(); if (pre && pre.slug) pick(pre.slug); });
+  }
+  function draw() {
+    VIEW.innerHTML = '<div class="card"><b>1. Phone</b><input class="tx" id="mq" list="ml" placeholder="Type a model, e.g. V50, Y39, T4" value="' + esc(IN.model) + '" style="margin-top:6px"><datalist id="ml">' + CAT.map(function (m) { return '<option value="' + esc(m.name) + '">'; }).join("") + '</datalist><div id="vr"></div>' +
+      '<div class="g3"><div><label class="lb">Selling price (MOP) ₹</label><input class="tx" id="pr" inputmode="numeric" value="' + (IN.price || "") + '"></div><div><label class="lb">Old phone value ₹ (exchange)</label><input class="tx" id="ov" inputmode="numeric" value="' + (IN.oldVal || "") + '" placeholder="0 = no exchange"></div><div><label class="lb">Down payment ₹ (EMI)</label><input class="tx" id="dp" inputmode="numeric" value="' + (IN.down || "") + '" placeholder="0"></div></div><div id="st" class="muted" style="font-size:12px;margin-top:6px"></div></div>' +
+      '<div class="card"><b>2. Offers</b> <span class="muted" style="font-size:12px">filled from the Affordability hub — change any number</span><div id="ops"></div><div class="bar2"><button class="btn ghost sm" id="add">＋ Add an offer</button></div></div><div id="res"></div>';
+    $("mq").onchange = function () { var v = $("mq").value.trim().toLowerCase(), m = CAT.filter(function (x) { return x.name.toLowerCase() === v; })[0] || CAT.filter(function (x) { return x.name.toLowerCase().indexOf(v) >= 0; })[0]; IN.model = $("mq").value; if (m) pick(m.slug); };
+    ["pr", "ov", "dp"].forEach(function (id) { $(id).oninput = function () { IN.price = +$("pr").value || 0; IN.oldVal = +$("ov").value || 0; IN.down = +$("dp").value || 0; calc(); }; });
+    $("add").onclick = function () { OPTS.push({ name: "My offer", kind: "emi", disc: 0, n: 6, adv: 0, noCost: true, rate: 16, fee: 0, exch: 0, useEx: false }); opts(); calc(); };
+    if (!OPTS.length) OPTS = [{ name: "Full payment", kind: "cash", disc: 0, n: 0, adv: 0, noCost: false, rate: 0, fee: 0, exch: 0, useEx: false }];
+    opts(); calc();
+  }
+  function pick(slug) {
+    $("st").textContent = "Loading offers…";
+    api({ action: "aff-model", slug: slug }).then(function (r) {
+      if (!r.ok) { $("st").textContent = r.error; return; }
+      M = r; var md = r.model || {}, ho = r.ho || {}, V = (ho.variants && ho.variants.length ? ho.variants : md.variants || []).filter(function (v) { return v.price || v.mrp; });
+      IN.model = r.base.name; $("mq").value = IN.model;
+      $("vr").innerHTML = V.length ? '<label class="lb">Variant</label><select class="tx" id="vv">' + V.map(function (v, i) { return '<option value="' + i + '">' + esc([v.ram, v.storage].filter(Boolean).join(" + ") || "Variant " + (i + 1)) + " — " + nf(v.price || v.mrp) + "</option>"; }).join("") + "</select>" : "";
+      var setP = function (i) { var v = V[i]; IN.price = v ? v.price || v.mrp : IN.price; $("pr").value = IN.price || ""; };
+      if (V.length) { setP(0); $("vv").onchange = function () { setP(+$("vv").value); build(); }; }
+      build();
+      $("st").textContent = (r.refreshing ? "Offers are being refreshed in the background — open again in a minute for the latest. " : "") + (md.updatedAt ? "Offers checked " + new Date(md.updatedAt).toLocaleDateString("en-IN") + "." : md.emi ? "" : "No researched offers for this model yet — add them below.");
+    });
+  }
+  function build() {
+    var md = (M && M.model) || {}, P = IN.price, out = [{ name: "Full payment", kind: "cash", disc: 0, n: 0, adv: 0, noCost: false, rate: 0, fee: 0, exch: 0, useEx: false }];
+    var exB = (md.exchange || []).reduce(function (a, x) { return Math.max(a, amt(x.benefit)); }, 0), up = (md.upgrade || []).reduce(function (a, x) { return Math.max(a, amt(x.benefit)); }, 0);
+    (md.cashback || []).forEach(function (c) { var d = amt(c.benefit) || pct(c.benefit, P); if (d) out.push({ name: (c.partner || "Cashback") + " cashback", kind: "cash", disc: d, n: 0, adv: 0, noCost: false, rate: 0, fee: 0, exch: 0, useEx: false, note: c.benefit }); });
+    (md.emi || []).forEach(function (e) {
+      var sc = String(e.scheme || "").match(/(\d+)\s*\/\s*(\d+)/), tens = (e.tenures || []).map(Number).filter(Boolean), n = sc ? +sc[1] : tens.length ? Math.max.apply(null, tens) : 6, adv = sc ? +sc[2] : 0;
+      out.push({ name: (e.partner || "EMI") + (e.type ? " · " + e.type : ""), kind: "emi", disc: amt(e.benefit) || pct(e.benefit, P), n: n, adv: adv, noCost: !!e.noCost, rate: e.noCost ? 0 : 16, fee: 0, exch: 0, useEx: false, note: [e.scheme, e.benefit, e.validTill && "till " + e.validTill].filter(Boolean).join(" · ") });
+    });
+    (M && M.reports || []).filter(function (x) { return x.kind === "emi" || x.kind === "cashback"; }).slice(0, 6).forEach(function (x) { var d = amt(x.details) || amt(x.scheme); out.push({ name: (x.partner || "Field offer") + " (" + (x.state || "field") + ")", kind: x.kind === "emi" ? "emi" : "cash", disc: d, n: x.kind === "emi" ? 6 : 0, adv: 0, noCost: true, rate: 0, fee: 0, exch: 0, useEx: false, note: [x.scheme, x.details].filter(Boolean).join(" · ").slice(0, 120) }); });
+    if (exB || up) out.forEach(function (o) { o.exch = Math.max(exB, up); });
+    OPTS = out; opts(); calc();
+  }
+  function opts() {
+    $("ops").innerHTML = OPTS.map(function (o, i) {
+      return '<div class="op"><div class="h"><input class="tx" data-k="name" data-i="' + i + '" value="' + esc(o.name) + '" style="flex:1;font-weight:700;padding:6px"><a style="cursor:pointer;color:#B42318;font-size:12px" data-x="' + i + '">remove</a></div>' + (o.note ? '<div class="muted" style="font-size:11.5px;margin-top:3px">' + esc(o.note) + "</div>" : "") +
+        '<div class="ed"><div><label>Type</label><select data-k="kind" data-i="' + i + '"><option value="cash"' + (o.kind === "cash" ? " selected" : "") + '>Pay full</option><option value="emi"' + (o.kind === "emi" ? " selected" : "") + '>EMI</option></select></div><div><label>Instant discount / cashback ₹</label><input data-k="disc" data-i="' + i + '" inputmode="numeric" value="' + Math.round(o.disc || 0) + '"></div><div><label>Exchange / upgrade bonus ₹</label><input data-k="exch" data-i="' + i + '" inputmode="numeric" value="' + Math.round(o.exch || 0) + '"></div><div><label>Use exchange?</label><select data-k="useEx" data-i="' + i + '"><option value="0">No</option><option value="1"' + (o.useEx ? " selected" : "") + ">Yes</option></select></div>" +
+        (o.kind === "emi" ? '<div><label>Months</label><input data-k="n" data-i="' + i + '" inputmode="numeric" value="' + o.n + '"></div><div><label>Advance EMIs</label><input data-k="adv" data-i="' + i + '" inputmode="numeric" value="' + o.adv + '"></div><div><label>No-cost EMI?</label><select data-k="noCost" data-i="' + i + '"><option value="1">Yes</option><option value="0"' + (o.noCost ? "" : " selected") + '>No</option></select></div><div><label>Interest % a year</label><input data-k="rate" data-i="' + i + '" inputmode="decimal" value="' + o.rate + '"' + (o.noCost ? " disabled" : "") + '></div><div><label>Processing fee ₹</label><input data-k="fee" data-i="' + i + '" inputmode="numeric" value="' + o.fee + '"></div>' : "") + "</div></div>";
+    }).join("");
+    [].forEach.call($("ops").querySelectorAll("[data-k]"), function (el) { el.oninput = el.onchange = function () { var o = OPTS[+el.dataset.i], k = el.dataset.k; o[k] = k === "name" ? el.value : k === "kind" ? el.value : k === "useEx" || k === "noCost" ? el.value === "1" : +el.value || 0; if (k === "kind" || k === "noCost") { opts(); } calc(); }; });
+    [].forEach.call($("ops").querySelectorAll("[data-x]"), function (a) { a.onclick = function () { OPTS.splice(+a.dataset.x, 1); opts(); calc(); }; });
+  }
+  function one(o) {
+    var P = IN.price, ex = o.useEx ? IN.oldVal + (o.exch || 0) : 0, pay = Math.max(0, P - (o.disc || 0) - ex);
+    if (o.kind !== "emi" || !o.n) return { now: pay, emi: 0, months: 0, cash: pay, eff: pay + (o.useEx ? IN.oldVal : 0), interest: 0 };
+    var down = Math.min(IN.down, pay), L = pay - down, n = Math.max(1, Math.round(o.n)), a = Math.min(n, Math.round(o.adv || 0)), emi;
+    if (o.noCost || !o.rate) emi = L / n; else { var r = o.rate / 1200, f = Math.pow(1 + r, n); emi = L * r * f / (f - 1); }
+    var cash = down + emi * n + (o.fee || 0);
+    return { now: down + emi * a + (o.fee || 0), emi: emi, months: n - a, cash: cash, eff: cash + (o.useEx ? IN.oldVal : 0), interest: emi * n - L };
+  }
+  function calc() {
+    if (!$("res")) return;
+    if (!IN.price) { $("res").innerHTML = '<div class="help">Pick a model or type the selling price to compare.</div>'; return; }
+    var R = OPTS.map(function (o, i) { return { o: o, i: i, x: one(o) }; }).sort(function (a, b) { return a.x.eff - b.x.eff; }), best = R[0], lowE = R.filter(function (r) { return r.x.emi; }).sort(function (a, b) { return a.x.emi - b.x.emi; })[0];
+    $("res").innerHTML = '<div class="card"><b>3. Best for the customer</b><div class="muted" style="font-size:12px">Effective price = all cash paid + old phone given (if exchanged). Lower is better.</div>' + R.map(function (r, k) {
+      var x = r.x, o = r.o, save = IN.price - x.eff;
+      return '<div class="op' + (k === 0 ? " best" : "") + '"><div class="h"><b>' + (k + 1) + ". " + esc(o.name) + "</b>" + (k === 0 ? '<span class="pill g">🏆 Lowest price</span>' : "") + (lowE && lowE === r ? '<span class="pill o">Lowest EMI</span>' : "") + '</div><div class="nums"><div><b>' + nf(x.eff) + '</b><span>effective price</span></div><div><b style="color:' + (save >= 0 ? "#13693F" : "#B42318") + '">' + (save >= 0 ? "" : "−") + nf(Math.abs(save)) + '</b><span>' + (save >= 0 ? "saved vs MOP" : "extra vs MOP") + "</span></div>" + (x.emi ? '<div><b>' + nf(x.emi) + " × " + o.n + '</b><span>EMI' + (o.adv ? " (" + o.adv + " paid upfront)" : "") + '</span></div><div><b>' + nf(x.now) + '</b><span>pay today</span></div>' : '<div><b>' + nf(x.now) + '</b><span>pay today</span></div><div><b>—</b><span>no EMI</span></div>') + "</div>" + (x.interest > 1 ? '<div class="muted" style="font-size:11.5px;margin-top:4px">Interest ' + nf(x.interest) + (o.fee ? " + fee " + nf(o.fee) : "") + "</div>" : "") + "</div>";
+    }).join("") + '<div class="bar2"><button class="btn pri" id="cr">🎨 Make a creative</button><button class="btn ghost" id="xl">⬇ Excel</button><button class="btn ghost" id="wa">🟢 WhatsApp text</button></div><div class="help w">Offer terms come from public sources and field reports — confirm with the partner before promising a customer. Interest-bearing EMI uses the rate you enter.</div></div>';
+    $("xl").onclick = function () { download(xlsx([{ name: "Offers", rows: [["Rank", "Option", "Discount", "Exchange bonus", "Used exchange", "Months", "Advance EMIs", "No-cost", "Interest % p.a.", "Fee", "EMI", "Pay today", "Total cash", "Effective price", "Saved vs MOP"]].concat(R.map(function (r, k) { var o = r.o, x = r.x; return [k + 1, o.name, Math.round(o.disc), Math.round(o.exch), o.useEx ? "Yes" : "No", o.kind === "emi" ? o.n : "", o.kind === "emi" ? o.adv : "", o.kind === "emi" ? (o.noCost ? "Yes" : "No") : "", o.kind === "emi" && !o.noCost ? o.rate : "", o.fee || "", Math.round(x.emi), Math.round(x.now), Math.round(x.cash), Math.round(x.eff), Math.round(IN.price - x.eff)]; })) }, { name: "Inputs", rows: [["Model", IN.model], ["Price", IN.price], ["Old phone value", IN.oldVal], ["Down payment", IN.down], ["Made", new Date().toLocaleString("en-IN")]] }]), "offer_comparison_" + (IN.model || "phone").replace(/[^\w]+/g, "_") + ".xlsx"); };
+    var line = function () { var o = best.o, x = best.x; return o.kind === "emi" ? nf(x.emi) + "/month × " + o.n + " months" + (o.noCost ? " · No-cost EMI" : "") + " with " + o.name : o.name; };
+    $("wa").onclick = function () { var t = "📱 " + IN.model + " — best deal today\n💰 Effective price " + nf(best.x.eff) + " (MOP " + nf(IN.price) + ")\n✅ " + line() + (best.o.disc ? "\n🎁 Instant benefit " + nf(best.o.disc) : "") + (best.o.useEx ? "\n🔁 Exchange bonus " + nf(best.o.exch) : "") + "\n*T&C apply"; window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank"); };
+    $("cr").onclick = function () { try { localStorage.setItem("cr-prefill", JSON.stringify({ tpl: "offer", rows: [{ model: IN.model, price: nf(IN.price), offer: nf(best.x.eff), line1: line(), line2: best.o.disc ? "Instant benefit " + nf(best.o.disc) : best.o.useEx ? "Exchange bonus " + nf(best.o.exch) : "Best price today", foot: "*T&C apply · Offer as on " + new Date().toLocaleDateString("en-IN") }] })); } catch (e) { } location.href = "/datacreative.html#offer"; };
+  }
+  load();
+})();
+</script>
+</body>
+</html>

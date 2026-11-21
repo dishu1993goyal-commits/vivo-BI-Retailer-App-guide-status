@@ -159,6 +159,29 @@ export const LINK_CATALOG = {
 ]
 ]
 },
+"offersim.html": {
+"id": "offersim",
+"icon": "🧮",
+"name": "Offer Simulator",
+"ho": false,
+"acts": [
+"aff-catalog",
+"aff-model"
+],
+"tabs": []
+},
+"affpen.html": {
+"id": "affpen",
+"icon": "📊",
+"name": "Affordability Penetration",
+"ho": false,
+"acts": [
+"ap-ai",
+"ap-get",
+"ap-save"
+],
+"tabs": []
+},
 "portals.html": {
 "id": "portals",
 "icon": "🔗",
@@ -1535,6 +1558,60 @@ export const LINK_CATALOG = {
 ]
 ]
 },
+"partnerhub.html": {
+"id": "partnerhub",
+"icon": "🤝",
+"name": "Partner Integration Hub",
+"ho": true,
+"acts": [
+"ph-del",
+"ph-get",
+"ph-list",
+"ph-save",
+"ph-stats"
+],
+"tabs": [
+[
+"list",
+"🤝 Partners"
+],
+[
+"imp",
+"📥 Import live traffic"
+]
+]
+},
+"bundlepair.html": {
+"id": "bundlepair",
+"icon": "🔗",
+"name": "Bundle Pair Engine",
+"ho": true,
+"acts": [
+"bp-cfg",
+"bp-del",
+"bp-get",
+"bp-list",
+"bp-save"
+],
+"tabs": [
+[
+"run",
+"▶ Pair a log"
+],
+[
+"runs",
+"📚 Saved runs"
+],
+[
+"rule",
+"🛠 Rule for vivo IT"
+],
+[
+"set",
+"⚙️ Settings"
+]
+]
+},
 "config.html": {
 "id": "config",
 "icon": "⚙️",
@@ -1789,6 +1866,17 @@ export const LINK_CATALOG = {
 "❓ How it works"
 ]
 ]
+},
+"datacreative.html": {
+"id": "datacreative",
+"icon": "🎨",
+"name": "Data-to-creative studio",
+"ho": false,
+"acts": [
+"cr-list",
+"cr-save"
+],
+"tabs": []
 },
 "videoguide.html": {
 "id": "videoguide",

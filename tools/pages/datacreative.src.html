@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Data-to-creative studio</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tp{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:8px}.tp button{border:1px solid #DADDF0;background:#fff;border-radius:12px;padding:10px;font:700 12.5px inherit;cursor:pointer;text-align:left}.tp button.on{border-color:#2B33A6;background:#EEF0FF}.tp small{display:block;font-weight:500;color:var(--mut);font-size:11px}
+.th{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.th button{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #DADDF0;cursor:pointer}.th button.on{box-shadow:0 0 0 3px #2B33A6}
+.fl{display:grid;grid-template-columns:130px 1fr;gap:6px;align-items:center;margin-top:6px;font-size:12.5px}
+.pv{display:flex;justify-content:center;margin-top:10px}.pv canvas{max-width:100%;max-height:560px;border-radius:12px;box-shadow:0 4px 20px rgba(20,24,51,.15)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-top:8px}.grid img{width:100%;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.12);cursor:pointer}
+.tb{width:100%;border-collapse:collapse;font-size:12px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:5px}.tb td{border-top:1px solid #EEF0F6;padding:5px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.chips button{border:1px solid #DADDF0;background:#fff;border-radius:99px;padding:4px 9px;font:600 11.5px inherit;cursor:pointer}
+.big{font-size:40px;text-align:center}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎨</span></div>
+  <h1>Data-to-creative studio</h1><p>Pick a template, add an Excel — get one branded creative per row</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), HO = AUTH && AUTH.app === "admin", PRE = [], LOGO = null, LOGOSRC = "/brand-logo.png", ROW = 0;
+  var THEMES = {
+    vivo: { a: "#415FFF", b: "#1C2A9E", ink: "#fff", acc: "#FFD166", card: "rgba(255,255,255,.12)" },
+    festive: { a: "#C2185B", b: "#4A0E2E", ink: "#fff", acc: "#FFC845", card: "rgba(255,255,255,.12)" },
+    gold: { a: "#1B1F3B", b: "#07091A", ink: "#fff", acc: "#E8B64C", card: "rgba(232,182,76,.12)" },
+    green: { a: "#0E9F6E", b: "#064E3B", ink: "#fff", acc: "#FDE68A", card: "rgba(255,255,255,.12)" },
+    white: { a: "#FFFFFF", b: "#EEF1FF", ink: "#12163A", acc: "#415FFF", card: "rgba(65,95,255,.08)" }
+  };
+  var TPL = {
+    offer: { name: "📱 Offer card", sub: "Model + best price / EMI", one: true, f: [["model", "Model", "{Model}"], ["price", "MOP (struck)", "{MOP}"], ["offer", "Big price", "{Offer price}"], ["line1", "Line 1", "{EMI}"], ["line2", "Line 2", "{Benefit}"], ["foot", "Footer", "*T&C apply"]] },
+    champion: { name: "🏆 Champion card", sub: "Top retailer / promoter / state", one: true, f: [["title", "Title", "Champion of the month"], ["name", "Name", "{Name}"], ["sub", "Second line", "{State}"], ["value", "Big number", "{Units}"], ["unit", "Number label", "units sold"], ["foot", "Footer", "Congratulations from vivo BI"]] },
+    rank: { name: "📋 Leaderboard", sub: "Top 10 from all rows", one: false, f: [["title", "Title", "Top 10 retailers"], ["sub", "Sub-title", "October 2026"], ["name", "Row name", "{Name}"], ["value", "Row value", "{Units}"], ["foot", "Footer", "vivo Business Innovation"]] },
+    scheme: { name: "💰 Scheme poster", sub: "Slabs, validity, how to claim", one: true, f: [["title", "Title", "{Scheme}"], ["sub", "Sub-title", "{Models}"], ["body", "Slabs (one per line)", "{Slabs}"], ["valid", "Validity", "{Valid}"], ["foot", "Footer", "Contact your FSE for details"]] },
+    wish: { name: "🎂 Wish card", sub: "Birthday / anniversary", one: true, f: [["title", "Title", "Happy Birthday"], ["name", "Name", "{Name}"], ["msg", "Message", "Wishing you a great year ahead!"], ["from", "From", "Team vivo {State}"]] },
+    cert: { name: "📜 Certificate", sub: "Achievement / training", one: true, f: [["title", "Title", "Certificate of Achievement"], ["pre", "Line before name", "This is proudly presented to"], ["name", "Name", "{Name}"], ["why", "For", "{Achievement}"], ["date", "Date", "{Date}"], ["sign", "Signed by", "vivo Business Innovation"]] }
+  };
+  var SIZES = { sq: [1080, 1080, "Square 1:1"], story: [1080, 1920, "Story 9:16"], a4: [1240, 1754, "A4 portrait"], wide: [1600, 900, "Wide 16:9"] };
+  var S = { tpl: "offer", theme: "vivo", size: "sq", fields: {}, head: [], rows: [] };
+  function fieldsOf() { var o = {}; TPL[S.tpl].f.forEach(function (f) { o[f[0]] = S.fields[f[0]] != null ? S.fields[f[0]] : f[2]; }); return o; }
+  function fill(t, row) { return String(t || "").replace(/\{([^}]+)\}/g, function (m, k) { var i = S.head.findIndex(function (h) { return String(h).trim().toLowerCase() === k.trim().toLowerCase(); }); return i >= 0 && row ? String(row[i] == null ? "" : row[i]) : (S.rows.length ? "" : m); }); }
+  // ---------- drawing ----------
+  function wrap(g, t, x, y, w, lh, max, align) { var lines = []; String(t || "").split("\n").forEach(function (para) { var ws = para.split(/\s+/), line = ""; ws.forEach(function (wd) { var tt = line ? line + " " + wd : wd; if (g.measureText(tt).width > w && line) { lines.push(line); line = wd; } else line = tt; }); lines.push(line); }); lines = lines.slice(0, max || 20); g.textAlign = align || "left"; lines.forEach(function (l, i) { g.fillText(l, x, y + i * lh); }); return y + lines.length * lh; }
+  function fit(g, t, w, size, weight, fam) { var s = size; do { g.font = weight + " " + s + "px " + fam; s -= 2; } while (g.measureText(t).width > w && s > 18); }
+  var FAM = "'Noto Sans', system-ui, -apple-system, Arial, sans-serif";
+  function render(rowIdx) {
+    var W = SIZES[S.size][0], H = SIZES[S.size][1], T = THEMES[S.theme], c = document.createElement("canvas"); c.width = W; c.height = H; var g = c.getContext("2d"), F = fieldsOf(), row = S.rows[rowIdx] || null, v = function (k) { return fill(F[k], row); }, u = W / 1080;
+    var gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, T.a); gr.addColorStop(1, T.b); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.globalAlpha = .08; g.fillStyle = T.ink; g.beginPath(); g.arc(W * .9, H * .1, 260 * u, 0, 7); g.fill(); g.beginPath(); g.arc(W * .05, H * .95, 200 * u, 0, 7); g.fill(); g.globalAlpha = 1;
+    if (LOGO) { var lw = 220 * u, lh = lw * LOGO.height / LOGO.width; g.fillStyle = "#fff"; var px = 18 * u; roundRect(g, 50 * u - px, 50 * u - px, lw + 2 * px, lh + 2 * px, 18 * u); g.fill(); g.drawImage(LOGO, 50 * u, 50 * u, lw, lh); }
+    g.fillStyle = T.ink; var cx = W / 2, y;
+    if (S.tpl === "offer") {
+      fit(g, v("model"), W - 160 * u, 86 * u, "800", FAM); g.textAlign = "center"; y = H * .3; g.fillText(v("model"), cx, y);
+      g.font = "500 " + 44 * u + "px " + FAM; g.globalAlpha = .75; var mp = v("price"); if (mp) { g.fillText("MOP " + mp, cx, y + 80 * u); var mw = g.measureText("MOP " + mp).width; g.fillRect(cx - mw / 2, y + 66 * u, mw, 4 * u); } g.globalAlpha = 1;
+      g.fillStyle = T.card; roundRect(g, 90 * u, y + 130 * u, W - 180 * u, 300 * u, 36 * u); g.fill();
+      g.fillStyle = T.acc; g.font = "600 " + 40 * u + "px " + FAM; g.fillText("Effective price", cx, y + 205 * u); fit(g, v("offer"), W - 260 * u, 150 * u, "900", FAM); g.fillText(v("offer"), cx, y + 360 * u);
+      g.fillStyle = T.ink; g.font = "700 " + 46 * u + "px " + FAM; y = wrap(g, v("line1"), cx, y + 520 * u, W - 160 * u, 58 * u, 3, "center"); g.font = "500 " + 40 * u + "px " + FAM; wrap(g, v("line2"), cx, y + 10 * u, W - 160 * u, 52 * u, 2, "center");
+    } else if (S.tpl === "champion") {
+      g.textAlign = "center"; g.fillStyle = T.acc; g.font = "700 " + 48 * u + "px " + FAM; var y0 = H * .25; g.fillText(v("title").toUpperCase(), cx, y0);
+      g.fillStyle = T.ink; g.font = "900 " + 200 * u + "px " + FAM; g.fillText("🏆", cx, y0 + 230 * u);
+      fit(g, v("name"), W - 160 * u, 92 * u, "800", FAM); g.fillText(v("name"), cx, y0 + 360 * u); g.font = "500 " + 44 * u + "px " + FAM; g.globalAlpha = .8; g.fillText(v("sub"), cx, y0 + 430 * u); g.globalAlpha = 1;
+      g.fillStyle = T.acc; fit(g, v("value"), W - 300 * u, 130 * u, "900", FAM); g.fillText(v("value"), cx, y0 + 590 * u); g.fillStyle = T.ink; g.font = "600 " + 40 * u + "px " + FAM; g.fillText(v("unit"), cx, y0 + 650 * u);
+    } else if (S.tpl === "rank") {
+      g.textAlign = "left"; g.font = "800 " + 64 * u + "px " + FAM; g.fillText(v("title"), 70 * u, 250 * u); g.font = "500 " + 36 * u + "px " + FAM; g.globalAlpha = .8; g.fillText(v("sub"), 70 * u, 305 * u); g.globalAlpha = 1;
+      var L = S.rows.length ? S.rows.slice(0, 10) : [null, null, null], top = 360 * u, rh = Math.min(118 * u, (H - top - 140 * u) / Math.max(3, L.length));
+      L.forEach(function (r, i) { var yy = top + i * rh; g.fillStyle = i < 3 ? T.acc : T.card; roundRect(g, 60 * u, yy, W - 120 * u, rh - 14 * u, 22 * u); g.fill(); g.fillStyle = i < 3 ? T.b : T.ink; g.font = "900 " + 44 * u + "px " + FAM; g.textAlign = "center"; g.fillText(String(i + 1), 120 * u, yy + rh / 2 + 6 * u); g.textAlign = "left"; g.font = "700 " + 40 * u + "px " + FAM; var nm = r ? fill(F.name, r) : "Name " + (i + 1); g.fillText(nm.length > 30 ? nm.slice(0, 29) + "…" : nm, 180 * u, yy + rh / 2 + 6 * u); g.textAlign = "right"; g.font = "800 " + 42 * u + "px " + FAM; g.fillText(r ? fill(F.value, r) : "0", W - 100 * u, yy + rh / 2 + 6 * u); });
+      g.fillStyle = T.ink;
+    } else if (S.tpl === "scheme") {
+      g.textAlign = "left"; fit(g, v("title"), W - 140 * u, 76 * u, "900", FAM); y = wrap(g, v("title"), 70 * u, 290 * u, W - 140 * u, 84 * u, 2); g.font = "500 " + 40 * u + "px " + FAM; g.globalAlpha = .85; y = wrap(g, v("sub"), 70 * u, y + 10 * u, W - 140 * u, 50 * u, 2); g.globalAlpha = 1;
+      var lines = v("body").split(/\n|;/).map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 8), bh = 96 * u;
+      lines.forEach(function (l, i) { var yy = y + 30 * u + i * (bh + 14 * u); g.fillStyle = T.card; roundRect(g, 70 * u, yy, W - 140 * u, bh, 22 * u); g.fill(); g.fillStyle = T.acc; g.beginPath(); g.arc(120 * u, yy + bh / 2, 16 * u, 0, 7); g.fill(); g.fillStyle = T.ink; g.font = "700 " + 40 * u + "px " + FAM; g.fillText(l.length > 46 ? l.slice(0, 45) + "…" : l, 160 * u, yy + bh / 2 + 14 * u); });
+      g.fillStyle = T.acc; g.font = "700 " + 40 * u + "px " + FAM; g.fillText(v("valid"), 70 * u, H - 170 * u); g.fillStyle = T.ink;
+    } else if (S.tpl === "wish") {
+      g.textAlign = "center"; g.font = "200 " + 180 * u + "px " + FAM; g.fillText("🎉", cx, H * .32); g.fillStyle = T.acc; fit(g, v("title"), W - 140 * u, 96 * u, "900", FAM); g.fillText(v("title"), cx, H * .32 + 160 * u); g.fillStyle = T.ink; fit(g, v("name"), W - 140 * u, 88 * u, "800", FAM); g.fillText(v("name"), cx, H * .32 + 270 * u); g.font = "500 " + 44 * u + "px " + FAM; wrap(g, v("msg"), cx, H * .32 + 360 * u, W - 200 * u, 58 * u, 4, "center"); g.font = "600 " + 38 * u + "px " + FAM; g.globalAlpha = .85; g.fillText(v("from"), cx, H - 160 * u); g.globalAlpha = 1;
+    } else if (S.tpl === "cert") {
+      g.fillStyle = "#FFFDF6"; g.fillRect(40 * u, 40 * u, W - 80 * u, H - 80 * u); g.strokeStyle = T.acc; g.lineWidth = 10 * u; g.strokeRect(70 * u, 70 * u, W - 140 * u, H - 140 * u);
+      if (LOGO) { var lw2 = 260 * u, lh2 = lw2 * LOGO.height / LOGO.width; g.drawImage(LOGO, cx - lw2 / 2, 130 * u, lw2, lh2); }
+      g.textAlign = "center"; g.fillStyle = T.b === "#EEF1FF" ? "#1C2A9E" : T.b; fit(g, v("title"), W - 240 * u, 70 * u, "900", "Georgia, serif"); g.fillText(v("title"), cx, H * .3); g.fillStyle = "#555"; g.font = "italic 400 " + 38 * u + "px Georgia, serif"; g.fillText(v("pre"), cx, H * .3 + 110 * u);
+      g.fillStyle = "#111"; fit(g, v("name"), W - 260 * u, 96 * u, "800", "Georgia, serif"); g.fillText(v("name"), cx, H * .3 + 240 * u); g.fillStyle = "#333"; g.font = "400 " + 40 * u + "px " + FAM; wrap(g, v("why"), cx, H * .3 + 340 * u, W - 300 * u, 54 * u, 4, "center");
+      g.font = "600 " + 34 * u + "px " + FAM; g.textAlign = "left"; g.fillText(v("date"), 150 * u, H - 200 * u); g.textAlign = "right"; g.fillText(v("sign"), W - 150 * u, H - 200 * u); g.fillStyle = "#111";
+    }
+    var foot = v("foot"); if (foot && S.tpl !== "cert") { g.textAlign = "center"; g.fillStyle = T.ink; g.globalAlpha = .7; g.font = "500 " + 30 * u + "px " + FAM; g.fillText(foot, cx, H - 70 * u); g.globalAlpha = 1; }
+    return c;
+  }
+  function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  // ---------- page ----------
+  function draw() {
+    var t = TPL[S.tpl], F = fieldsOf();
+    VIEW.innerHTML = '<div class="card"><b>1. Template</b><div class="tp" id="tp">' + Object.keys(TPL).map(function (k) { return '<button data-k="' + k + '" class="' + (S.tpl === k ? "on" : "") + '">' + TPL[k].name + "<small>" + TPL[k].sub + "</small></button>"; }).join("") + '</div>' +
+      '<div class="bar2" style="align-items:flex-start"><div><label class="lb" style="margin-top:0">Colours</label><div class="th" id="th">' + Object.keys(THEMES).map(function (k) { return '<button data-k="' + k + '" class="' + (S.theme === k ? "on" : "") + '" style="background:linear-gradient(135deg,' + THEMES[k].a + "," + THEMES[k].b + ')" title="' + k + '"></button>'; }).join("") + '</div></div><div style="flex:1;min-width:140px"><label class="lb" style="margin-top:0">Size</label><select class="tx" id="sz">' + Object.keys(SIZES).map(function (k) { return '<option value="' + k + '"' + (S.size === k ? " selected" : "") + ">" + SIZES[k][2] + "</option>"; }).join("") + '</select></div><div><label class="lb" style="margin-top:0">Logo</label><button class="btn ghost sm" id="lg">🖼 Change</button><input type="file" id="lgf" accept="image/*" style="display:none"></div></div>' +
+      (PRE.length ? '<label class="lb">Saved designs</label><div class="chips" id="pre">' + PRE.map(function (p, i) { return '<button data-i="' + i + '">' + esc(p.name) + "</button>"; }).join("") + "</div>" : "") + "</div>" +
+      '<div class="card"><b>2. Data</b> <span class="muted" style="font-size:12px">' + (S.rows.length ? S.rows.length + " rows · columns: " + S.head.map(esc).join(", ") : "Excel / CSV with a heading row — or paste from Excel") + '</span><div class="bar2"><button class="btn ghost sm" id="up">📎 Excel / CSV</button><button class="btn ghost sm" id="ps">📋 Paste</button>' + (S.rows.length ? '<button class="btn ghost sm" id="clr">Clear</button>' : "") + '</div><input type="file" id="fi" accept=".xlsx,.xls,.csv" style="display:none"></div>' +
+      '<div class="card"><b>3. Text</b> <span class="muted" style="font-size:12px">write {Column name} to take a value from the data</span>' + (S.head.length ? '<div class="chips">' + S.head.map(function (h) { return '<button data-h="' + esc(h) + '">{' + esc(h) + "}</button>"; }).join("") + "</div>" : "") + t.f.map(function (f) { return '<div class="fl"><span>' + esc(f[1]) + "</span>" + (f[0] === "body" || f[0] === "msg" || f[0] === "why" ? '<textarea class="tx" rows="3" data-f="' + f[0] + '">' + esc(F[f[0]]) + "</textarea>" : '<input class="tx" data-f="' + f[0] + '" value="' + esc(F[f[0]]) + '">') + "</div>"; }).join("") + "</div>" +
+      '<div class="card"><b>4. Preview</b>' + (S.rows.length && t.one ? ' <span class="muted" style="font-size:12px">row ' + (ROW + 1) + " of " + S.rows.length + '</span><div class="bar2"><button class="btn ghost sm" id="pv0">← Prev</button><button class="btn ghost sm" id="pv1">Next →</button></div>' : "") + '<div class="pv" id="pv"></div><div class="bar2"><button class="btn pri" id="d1">⬇ This PNG</button>' + (S.rows.length > 1 && t.one ? '<button class="btn sec" id="zip">⬇ All ' + S.rows.length + ' as ZIP</button><button class="btn ghost" id="pdf">⬇ All as PDF</button>' : "") + '<button class="btn ghost" id="cv">Canva CSV</button>' + (HO ? '<button class="btn ghost" id="sv">💾 Save design</button>' : "") + '</div><div id="pg"></div>' + (S.rows.length > 1 && t.one ? '<div class="grid" id="gr"></div>' : "") + "</div>" +
+      '<div class="help">🎨 <b>Want to finish it in Canva?</b> “Canva CSV” gives the filled-in text of every row. In Canva: open your design → Apps → <b>Bulk create</b> → upload the CSV → connect each text box to a column → Generate. (Canva Bulk create needs a Canva Pro / Teams account.)</div>';
+    [].forEach.call($("tp").children, function (b) { b.onclick = function () { S.tpl = b.dataset.k; S.fields = {}; ROW = 0; draw(); }; });
+    [].forEach.call($("th").children, function (b) { b.onclick = function () { S.theme = b.dataset.k; draw(); }; });
+    $("sz").onchange = function () { S.size = $("sz").value; prev(); };
+    $("lg").onclick = function () { $("lgf").click(); };
+    $("lgf").onchange = function () { var f = $("lgf").files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { LOGOSRC = rd.result; logo().then(prev); }; rd.readAsDataURL(f); };
+    if ($("pre")) [].forEach.call($("pre").children, function (b) { b.onclick = function () { var p = PRE[+b.dataset.i]; S.tpl = p.tpl; S.theme = p.theme; S.size = p.size || "sq"; S.fields = p.fields || {}; if (p.logo) LOGOSRC = p.logo; logo().then(draw); }; });
+    $("up").onclick = function () { $("fi").click(); };
+    $("fi").onchange = function () { var f = $("fi").files[0]; if (!f) return; lib().then(function () { return f.arrayBuffer(); }).then(function (b) { var wb = XLSX.read(b, { type: "array" }), A = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false }).filter(function (r) { return r.some(function (v) { return String(v).trim(); }); }); setData(A); }); };
+    $("ps").onclick = function () { sheet("Paste from Excel", "Copy the rows with the heading row and paste", [["✓", "Use", function (ov) { var tx = ov.querySelector("#pt").value; setData(tx.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (l) { return l.split("\t"); })); }, "pri"]], '<textarea class="tx" id="pt" rows="8"></textarea>'); };
+    if ($("clr")) $("clr").onclick = function () { S.head = []; S.rows = []; ROW = 0; draw(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-f]"), function (el) { el.oninput = function () { S.fields[el.dataset.f] = el.value; clearTimeout(window.__pvT); window.__pvT = setTimeout(prev, 200); }; el.onfocus = function () { window.__lastF = el; }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-h]"), function (b) { b.onclick = function () { var el = window.__lastF; if (!el) return toast("Tap a text box first"); var p = el.selectionStart || el.value.length; el.value = el.value.slice(0, p) + "{" + b.dataset.h + "}" + el.value.slice(p); el.oninput(); }; });
+    if ($("pv0")) { $("pv0").onclick = function () { ROW = (ROW - 1 + S.rows.length) % S.rows.length; draw(); }; $("pv1").onclick = function () { ROW = (ROW + 1) % S.rows.length; draw(); }; }
+    $("d1").onclick = function () { render(ROW).toBlob(function (b) { download(b, name(ROW) + ".png"); }, "image/png"); };
+    if ($("zip")) $("zip").onclick = zipAll;
+    if ($("pdf")) $("pdf").onclick = pdfAll;
+    $("cv").onclick = function () { var F2 = fieldsOf(), keys = TPL[S.tpl].f.map(function (f) { return f[0]; }), rows = (S.rows.length ? S.rows : [null]).map(function (r) { return keys.map(function (k) { return fill(F2[k], r); }); }); var csv = [TPL[S.tpl].f.map(function (f) { return f[1]; })].concat(rows).map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(","); }).join("\n"); download(new Blob(["﻿" + csv], { type: "text/csv" }), "canva_bulk_" + S.tpl + ".csv"); };
+    if ($("sv")) $("sv").onclick = function () { var nm = prompt("Name this design", TPL[S.tpl].name.replace(/^\S+\s/, "") + " · " + S.theme); if (!nm) return; api({ action: "cr-save", name: nm, tpl: S.tpl, theme: S.theme, size: S.size, fields: fieldsOf(), logo: LOGOSRC.indexOf("data:") === 0 ? LOGOSRC : "" }).then(function (r) { if (!r.ok) return toast(r.error); toast("Saved for everyone"); loadPre().then(draw); }); };
+    prev();
+  }
+  var name = function (i) { var r = S.rows[i], F = fieldsOf(), k = F.name ? "name" : F.model ? "model" : "title"; return (S.tpl + "_" + (i + 1) + "_" + fill(F[k], r)).replace(/[^\wऀ-෿]+/g, "_").slice(0, 60); };
+  function prev() { var c = render(TPL[S.tpl].one ? ROW : 0); $("pv").innerHTML = ""; $("pv").appendChild(c); if ($("gr")) { var g = $("gr"), n = Math.min(S.rows.length, 12); g.innerHTML = ""; for (var i = 0; i < n; i++) { var im = new Image(); im.src = render(i).toDataURL("image/jpeg", .6); im.dataset.i = i; im.onclick = function () { ROW = +this.dataset.i; draw(); window.scrollTo(0, 0); }; g.appendChild(im); } } }
+  function lib(src, test) { src = src || "/vendor/xlsx.full.min.js"; test = test || function () { return window.XLSX; }; return test() ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  function setData(A) { if (!A || A.length < 2) return toast("Need a heading row and at least one row"); S.head = A[0].map(function (h) { return String(h).trim(); }); S.rows = A.slice(1, 2001); ROW = 0; autoMap(); draw(); }
+  function autoMap() { var F = fieldsOf(); Object.keys(F).forEach(function (k) { if (!/\{[^}]+\}/.test(F[k])) return; var m = F[k].match(/\{([^}]+)\}/)[1].toLowerCase(), h = S.head.filter(function (x) { return x.toLowerCase() === m; })[0] || S.head.filter(function (x) { var l = x.toLowerCase(); return l.indexOf(m) >= 0 || m.indexOf(l) >= 0; })[0]; if (h) S.fields[k] = F[k].replace(/\{[^}]+\}/, "{" + h + "}"); }); }
+  function zipAll() {
+    var n = S.rows.length; $("pg").innerHTML = '<div class="muted" style="font-size:12.5px" id="pgt">Making 0 of ' + n + "…</div>";
+    lib("/vendor/jszip.min.js", function () { return window.JSZip; }).then(function () {
+      var z = new JSZip(), i = 0;
+      (function next() { if (i >= n) return z.generateAsync({ type: "blob" }).then(function (b) { download(b, "creatives_" + S.tpl + ".zip"); $("pg").innerHTML = ""; }); var k = i++; render(k).toBlob(function (b) { z.file(name(k) + ".png", b); $("pgt").textContent = "Making " + i + " of " + n + "…"; setTimeout(next, 0); }, "image/png"); })();
+    });
+  }
+  function pdfAll() {
+    var n = Math.min(S.rows.length, 300); $("pg").innerHTML = '<div class="muted" style="font-size:12.5px" id="pgt">Making the PDF…</div>';
+    lib("/vendor/jspdf/jspdf.umd.min.js", function () { return window.jspdf; }).then(function () { var W = SIZES[S.size][0], H = SIZES[S.size][1], d = new window.jspdf.jsPDF({ unit: "px", format: [W, H], orientation: W > H ? "l" : "p" }); for (var i = 0; i < n; i++) { if (i) d.addPage([W, H], W > H ? "l" : "p"); d.addImage(render(i).toDataURL("image/jpeg", .88), "JPEG", 0, 0, W, H); } download(d.output("blob"), "creatives_" + S.tpl + ".pdf"); $("pg").innerHTML = ""; });
+  }
+  function logo() { return new Promise(function (res) { var im = new Image(); im.onload = function () { LOGO = im; res(); }; im.onerror = function () { LOGO = null; res(); }; im.src = LOGOSRC; }); }
+  function loadPre() { return api({ action: "cr-list" }).then(function (r) { PRE = r.ok ? r.rows : []; }); }
+  var pre = null; try { pre = JSON.parse(localStorage.getItem("cr-prefill") || "null"); localStorage.removeItem("cr-prefill"); } catch (e) { }
+  if (pre && TPL[pre.tpl]) { S.tpl = pre.tpl; var keys = Object.keys(pre.rows[0]); S.head = keys; S.rows = pre.rows.map(function (r) { return keys.map(function (k) { return r[k]; }); }); S.fields = {}; TPL[S.tpl].f.forEach(function (f) { if (keys.indexOf(f[0]) >= 0) S.fields[f[0]] = "{" + f[0] + "}"; }); }
+  Promise.all([logo(), loadPre()]).then(draw);
+})();
+</script>
+</body>
+</html>
