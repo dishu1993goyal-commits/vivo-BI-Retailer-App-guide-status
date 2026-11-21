@@ -184,21 +184,133 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     });
   }
   function draw() {
-    var tabs = [["test", "🧪 Send a request"], ["cases", "✅ Test cases"], ["log", "📜 History"], ["ref", "📘 API reference"], ["docs", "📂 Documents"], ["codes", "📚 Error codes"], ["cfg", "⚙️ Set-up"]];
+    var tabs = [["test", "🧪 Send a request"], ["imei", "📱 IMEI data"], ["cases", "✅ Test cases"], ["log", "📜 History"], ["ref", "📘 API reference"], ["docs", "📂 Documents"], ["codes", "📚 Error codes"], ["cfg", "⚙️ Set-up"]];
     VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div>' +
       (TAB !== "cfg" && TAB !== "codes" && TAB !== "ref" && TAB !== "docs" ? '<div class="envs" style="margin-top:10px"><button data-env="uat" class="uat ' + (ENV === "uat" ? "on" : "") + '">🧪 UAT' + (KEYS.uat.secret ? "" : " · not set up") + '</button><button data-env="prod" class="prod ' + (ENV === "prod" ? "on" : "") + '">🔴 Production' + (KEYS.prod.secret ? "" : " · not set up") + "</button></div>" : "") + '<div id="tp"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; try { history.replaceState(null, "", "#" + TAB); } catch (e) { } draw(); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-env]"), function (b) { b.onclick = function () { ENV = b.dataset.env; FORM = {}; try { localStorage.setItem("eapi-env", ENV); } catch (e) { } draw(); }; });
-    ({ test: tTest, cases: tCases, log: tLog, codes: tCodes, ref: tRef, docs: tDocs, cfg: tCfg })[TAB]();
+    ({ test: tTest, imei: tImei, cases: tCases, log: tLog, codes: tCodes, ref: tRef, docs: tDocs, cfg: tCfg })[TAB]();
+  }
+
+  // ======================= 📱 IMEI test data (many IMEIs per environment, picked from a list) =======================
+  var BANK = { uat: null, prod: null }, BSEL = {}, BQ = "", BRES = null;
+  var BCOL = [["imei", "IMEI"], ["model", "Model name"], ["dealer", "Dealer code"], ["scheme", "Scheme"], ["amount", "Finance amount"], ["oldBrand", "Old phone brand"], ["oldModel", "Old phone model"], ["plan", "Service plan"], ["partner", "Partner"], ["label", "Scenario"], ["note", "Notes"]];
+  var BMAP = { imei: "imei", model: "modelName", dealer: "dealerCode", scheme: "scheme", amount: "financeAmount", oldBrand: "oldPhoneBrand", oldModel: "oldPhoneModel", plan: "plan" };
+  function loadBank(e) { return api({ action: "eapi-imei-list", env: e }).then(function (r) { BANK[e] = r.ok ? r.rows : []; }); }
+  function rowVals(row) { var v = baseVals(); Object.keys(BMAP).forEach(function (k) { if (row[k]) v[BMAP[k]] = row[k]; }); return v; }
+  function useRow(row) {
+    FORM.vals = Object.assign(FORM.vals || {}, rowVals(row)); FORM.raw = null; FORM.row = row.id;
+    (EPS[EP].fields || []).forEach(function (f) { if ((EPS[EP].opt || []).includes(f)) FORM.on[f] = !!FORM.vals[f]; });
+  }
+  function imeiPicker() {
+    var L = BANK[ENV] || [], cur = L.filter(function (x) { return x.imei === (FORM.vals || {}).imei; })[0];
+    return '<label class="lb">📱 Pick a test IMEI <small class="muted">fills the IMEI and its details below</small></label><select class="tx" id="imsel"><option value="">' + (L.length ? "— choose from " + L.length + " saved " + envName(ENV) + " IMEIs —" : "No saved IMEIs yet") + "</option>" +
+      L.map(function (x) { return '<option value="' + x.id + '"' + (cur && cur.id === x.id ? " selected" : "") + ">" + esc(x.imei + (x.model ? " · " + x.model : "") + (x.label ? " · " + x.label : "") + (x.partner ? " · " + x.partner : "")) + "</option>"; }).join("") + '<option value="__add">＋ Import / add IMEIs…</option></select>';
+  }
+  function markBank(imei, ep, c) { var v = verdict(c); if (!imei || !(BANK[ENV] || []).some(function (x) { return x.imei === imei; })) return; api({ action: "eapi-imei-mark", env: ENV, imei: imei, ep: ep, ok: !!v.ok, msg: v.t + (c.message ? " — " + c.message : "") }); (BANK[ENV] || []).forEach(function (x) { if (x.imei === imei) x.last = { ep: ep, ok: !!v.ok, msg: v.t + (c.message ? " — " + c.message : ""), at: Date.now() }; }); }
+  function xlsxLib() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var sc = document.createElement("script"); sc.src = "/vendor/xlsx.full.min.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); }); }
+  function colOf(h) {
+    h = String(h || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (/^(env|environment)/.test(h)) return "env"; if (/imei/.test(h)) return "imei"; if (/oldphonebrand|oldbrand/.test(h)) return "oldBrand"; if (/oldphonemodel|oldmodel/.test(h)) return "oldModel";
+    if (/model/.test(h)) return "model"; if (/dealer|store|retailer/.test(h)) return "dealer"; if (/scheme/.test(h)) return "scheme"; if (/amount|finance/.test(h)) return "amount";
+    if (/plan/.test(h)) return "plan"; if (/partner|bank|company/.test(h)) return "partner"; if (/scenario|label|case|purpose/.test(h)) return "label"; if (/note|remark|comment/.test(h)) return "note"; return "";
+  }
+  function cellStr(v) { if (typeof v === "number") return Number.isInteger(v) ? String(v) : String(v); return String(v == null ? "" : v).trim(); }
+  function selRows() { return (BANK[ENV] || []).filter(function (x) { return BSEL[x.id]; }); }
+  function tImei() {
+    if (BANK[ENV] == null) { $("tp").innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>'; loadBank(ENV).then(tImei); return; }
+    var L = BANK[ENV], q = BQ.toLowerCase(), V = L.filter(function (x) { return !q || BCOL.some(function (c) { return String(x[c[0]] || "").toLowerCase().indexOf(q) >= 0; }); }), S = selRows();
+    $("tp").innerHTML = '<div class="card"><b>📱 ' + envName(ENV) + ' test IMEIs · ' + L.length + '</b><div class="muted" style="font-size:12px;margin-top:3px">Keep all your test IMEIs with their model, dealer code and other details here. In 🧪 Send a request, pick one from the list and every field is filled.</div>' +
+      '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn pri sm" id="bimp">⬆ Import Excel</button><button class="btn ghost sm" id="btpl">⬇ Excel template</button><button class="btn ghost sm" id="badd">＋ Add one</button><button class="btn ghost sm" id="bpaste">📋 Paste from Excel</button></div><input type="file" id="bfi" accept=".xlsx,.xls,.csv" style="display:none"></div>' +
+      (L.length ? '<div class="card" style="margin-top:10px"><input class="tx" id="bq" placeholder="🔎 Search IMEI, model, dealer, partner, scenario…" value="' + esc(BQ) + '">' +
+        '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center"><label class="tg" style="font-size:12.5px"><input type="checkbox" id="ball"' + (V.length && V.every(function (x) { return BSEL[x.id]; }) ? " checked" : "") + '><i></i><span>Select all' + (q ? " shown" : "") + '</span></label><span class="sp"></span><span class="pill m">' + S.length + ' selected</span></div>' +
+        '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn pri sm" id="brun"' + (S.length ? "" : " disabled") + '>▶ Test selected</button><button class="btn ghost sm" id="bcp"' + (S.length ? "" : " disabled") + '>📋 Copy</button><button class="btn ghost sm" id="bxl"' + (S.length ? "" : " disabled") + '>⬇ Export Excel</button><button class="btn ghost sm" id="bwa"' + (S.length ? "" : " disabled") + '>💬 WhatsApp</button><button class="btn ghost sm" id="bdel"' + (S.length ? "" : " disabled") + ' style="color:#B42318">🗑 Delete</button></div>' +
+        '<div class="tbw" style="margin-top:8px;max-height:460px;overflow:auto"><table class="tb"><tr><th></th><th>IMEI</th><th>Model</th><th>Dealer</th><th>Scenario / partner</th><th>Last test</th><th></th></tr>' +
+        V.map(function (x) { return '<tr><td><input type="checkbox" data-bs="' + x.id + '"' + (BSEL[x.id] ? " checked" : "") + '></td><td class="fx" style="white-space:nowrap">' + esc(x.imei) + (/^\d{15}$/.test(x.imei) ? "" : ' <span class="pill r" title="An IMEI has 15 digits">check</span>') + "</td><td>" + esc(x.model) + "</td><td>" + esc(x.dealer) + "</td><td>" + esc([x.label, x.partner].filter(Boolean).join(" · ")) + (x.scheme || x.amount ? '<br><small class="muted">' + esc([x.scheme, x.amount && "₹" + x.amount].filter(Boolean).join(" · ")) + "</small>" : "") + "</td><td>" + (x.last ? '<span class="pill ' + (x.last.ok ? "g" : "r") + '">' + (x.last.ok ? "✓" : "✗") + "</span> <small>" + esc((EPS[x.last.ep] ? EPS[x.last.ep].name.split(" (")[0] : x.last.ep) + " · " + when(x.last.at)) + "</small>" : '<small class="muted">—</small>') + '</td><td style="white-space:nowrap"><a style="cursor:pointer" data-bu="' + x.id + '" title="Use in Send a request">▶</a> <a style="cursor:pointer;margin-left:6px" data-be="' + x.id + '" title="Edit">✏️</a></td></tr>'; }).join("") + "</table></div></div>" : '<div class="card empty" style="margin-top:10px"><div class="big">📱</div><b>No ' + envName(ENV) + ' IMEIs yet</b><div class="muted">Download the template, fill one row per IMEI and import it. An “Environment” column (UAT / Production) puts each row in the right list.</div></div>') +
+      '<div id="bres"></div>';
+    var on = function (id, f) { if ($(id)) $(id).onclick = f; };
+    on("bimp", function () { $("bfi").value = ""; $("bfi").click(); });
+    $("bfi").onchange = function () { var f = $("bfi").files[0]; if (!f) return; xlsxLib().then(function () { return f.arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array" }); importRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true })); }, function () { toast("Couldn't read that file"); }); };
+    on("btpl", function () { download(xlsx([{ name: "IMEIs", rows: [["Environment"].concat(BCOL.map(function (c) { return c[1]; })), ["UAT", "861234567890123", "vivo V40", "DLR001", "", "25000", "", "", "", "Benow", "Valid IMEI – should pass", ""], ["UAT", "861234567890124", "vivo Y39", "DLR002", "", "15000", "", "", "", "Benow", "Wrong dealer – should fail", ""], ["Production", "861234567890125", "vivo T4", "DLR003", "", "", "Samsung", "Galaxy A14", "", "Cashify", "Trade-in check", ""]] }, { name: "How to fill", rows: [["Column", "What to put"], ["Environment", "UAT or Production (if left out, rows go to the list you are on)"], ["IMEI", "15 digits. Format the column as Text in Excel so the digits stay exact"], ["Model name", "As vivo's system knows it"], ["Dealer code", "Store / dealer code"], ["Scheme, Finance amount", "For installment APIs"], ["Old phone brand / model", "For trade-in APIs"], ["Service plan", "For service protection"], ["Partner", "Who this IMEI is for (to share it later)"], ["Scenario", "What you test with it, e.g. Valid, Already blocked, Wrong model"], ["Notes", "Anything else"]] }]), "EMI_API_test_IMEIs_template.xlsx"); });
+    on("bpaste", function () { sheet("Paste from Excel", "Copy the rows from Excel (with the heading row) and paste here.", [["⬆", "Import", function (ov) { var t = ov.querySelector("#bpt").value; if (!t.trim()) { toast("Paste the rows first"); return false; } importRows(t.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (l) { return l.split("\t"); })); }, "pri"]], '<textarea class="tx" id="bpt" rows="8" placeholder="IMEI\tModel name\tDealer code&#10;861234567890123\tvivo V40\tDLR001"></textarea>'); });
+    on("badd", function () { editRow(null); });
+    if ($("bq")) $("bq").oninput = function () { BQ = $("bq").value; var p = $("bq").selectionStart; tImei(); $("bq").focus(); try { $("bq").setSelectionRange(p, p); } catch (e) { } };
+    if ($("ball")) $("ball").onchange = function () { V.forEach(function (x) { BSEL[x.id] = $("ball").checked; }); tImei(); };
+    [].forEach.call($("tp").querySelectorAll("[data-bs]"), function (c) { c.onchange = function () { BSEL[c.dataset.bs] = c.checked; tImei(); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-be]"), function (a) { a.onclick = function () { editRow(L.filter(function (x) { return x.id === a.dataset.be; })[0]); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-bu]"), function (a) { a.onclick = function () { var row = L.filter(function (x) { return x.id === a.dataset.bu; })[0]; TAB = "test"; if (!FORM.ep || FORM.ep !== EP) FORM = {}; draw(); useRow(row); tTest(); }; });
+    var shareRows = function () { return [["Environment"].concat(BCOL.map(function (c) { return c[1]; }))].concat(selRows().map(function (x) { return [envName(ENV)].concat(BCOL.map(function (c) { return x[c[0]] || ""; })); })); };
+    var trim = function (R) { var keep = R[0].map(function (h, i) { return R.slice(1).some(function (r) { return r[i] !== ""; }); }); return R.map(function (r) { return r.filter(function (v, i) { return keep[i]; }); }); };   // leave out empty columns
+    var cp = function (t) { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast("Copied " + selRows().length + " IMEI(s) — paste in Excel, mail or chat"); }, function () { prompt("Copy this:", t); }); };
+    on("bcp", function () { cp(trim(shareRows()).map(function (r) { return r.join("\t"); }).join("\n")); });
+    on("bxl", function () { download(xlsx([{ name: "Test IMEIs", rows: trim(shareRows()) }]), "vivo_test_IMEIs_" + envName(ENV) + "_" + new Date().toISOString().slice(0, 10) + ".xlsx"); });
+    on("bwa", function () { var R = trim(shareRows()), H = R[0]; var t = "vivo " + envName(ENV) + " test IMEIs:\n" + R.slice(1).map(function (r, i) { return (i + 1) + ". " + r.map(function (v, j) { return j && v ? H[j] + ": " + v : ""; }).filter(Boolean).join(" | "); }).join("\n"); window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank"); });
+    on("bdel", function () { var S2 = selRows(); sheet("Delete " + S2.length + " IMEI(s)?", "They are removed from the " + envName(ENV) + " list only — nothing changes in vivo's system.", [["🗑", "Delete", function () { api({ action: "eapi-imei-del", env: ENV, ids: S2.map(function (x) { return x.id; }) }).then(function (r) { if (!r.ok) return toast(r.error); BANK[ENV] = r.rows; BSEL = {}; tImei(); }); }, "danger"]]); });
+    on("brun", batchSheet);
+    if (BRES && BRES.env === ENV) showBatch();
+  }
+  function importRows(A) {
+    A = (A || []).filter(function (r) { return r && r.some(function (v) { return cellStr(v); }); });
+    if (A.length < 2) return toast("No rows found — the first row must be the column headings");
+    var map = A[0].map(colOf); if (map.indexOf("imei") < 0) return toast("No IMEI column found in the first row");
+    var by = { uat: [], prod: [] }, bad = 0, sci = 0;
+    A.slice(1).forEach(function (r) { var o = {}; map.forEach(function (k, i) { if (k) o[k] = cellStr(r[i]); }); if (/e\+/i.test(o.imei)) sci++; o.imei = (o.imei || "").replace(/\s|'/g, ""); if (!o.imei) return; if (!/^\d{15}$/.test(o.imei)) bad++; var e = /prod|live/i.test(o.env || "") ? "prod" : /uat|test/i.test(o.env || "") ? "uat" : ENV; delete o.env; by[e].push(o); });
+    if (sci) return toast(sci + " IMEI(s) look like 8.61E+14 — format the IMEI column as Text in Excel and type them again");
+    var envs = ["uat", "prod"].filter(function (e) { return by[e].length; });
+    sheet("Import " + (by.uat.length + by.prod.length) + " IMEI(s)?", envs.map(function (e) { return by[e].length + " to " + envName(e); }).join(" · ") + (bad ? " · " + bad + " are not 15 digits (kept, marked “check”)" : ""), [["➕", "Add to the list (same IMEI = update)", function () { go(false); }, "pri"], ["♻", "Replace the whole list", function () { go(true); }]]);
+    function go(replace) {
+      Promise.all(envs.map(function (e) { return api({ action: "eapi-imei-save", env: e, rows: by[e], replace: replace }).then(function (r) { if (!r.ok) { toast(r.error); return null; } BANK[e] = r.rows; return r; }); })).then(function (R) {
+        var a = 0, u = 0; R.forEach(function (r) { if (r) { a += r.added; u += r.updated; } }); toast(a + " added · " + u + " updated"); if (envs.length === 1 && envs[0] !== ENV) { ENV = envs[0]; draw(); } else tImei();
+      });
+    }
+  }
+  function editRow(x) {
+    sheet(x ? "Edit IMEI" : "Add an IMEI", envName(ENV), [["💾", "Save", function (ov) { var o = {}; BCOL.forEach(function (c) { o[c[0]] = ov.querySelector("#be_" + c[0]).value.trim(); }); if (!o.imei) { toast("Type the IMEI"); return false; } if (x && x.imei !== o.imei) api({ action: "eapi-imei-del", env: ENV, ids: [x.id] }); api({ action: "eapi-imei-save", env: ENV, rows: [o] }).then(function (r) { if (!r.ok) return toast(r.error); BANK[ENV] = r.rows; toast("Saved"); tImei(); }); }, "pri"]],
+      BCOL.map(function (c) { return '<label class="lb">' + c[1] + '</label><input class="tx" id="be_' + c[0] + '" value="' + esc(x ? x[c[0]] || "" : "") + '"' + (c[0] === "imei" ? ' inputmode="numeric"' : "") + ">"; }).join(""));
+  }
+  // ▶ the same API on many IMEIs, one after another
+  function batchSheet() {
+    var S = selRows(), ch = false;
+    sheet("Test " + S.length + " IMEI(s) on " + envName(ENV), "Each IMEI is sent with its own details; company name and password come from Set-up.", [["▶", "Start", function (ov) {
+      var ep = ov.querySelector("#bep").value, okc = ov.querySelector("#bok");
+      if (EPS[ep].changes && !(okc && okc.checked)) { toast("Tick the confirmation — this API changes the IMEIs"); return false; }
+      runBatch(ep, S);
+    }, "pri"]], '<label class="lb">API</label><select class="tx" id="bep">' + bizList().map(function (g) { return '<optgroup label="' + esc(g) + '">' + Object.keys(EPS).filter(function (k) { return EPS[k].biz === g; }).map(function (k) { return '<option value="' + k + '"' + (k === EP ? " selected" : "") + ">" + esc(EPS[k].name) + (EPS[k].changes ? " ⚠️" : "") + "</option>"; }).join("") + "</optgroup>"; }).join("") + '</select><div id="bwarn"></div>');
+    var w = function () { var ep = $("bep").value; $("bwarn").innerHTML = EPS[ep].changes ? '<div class="warn">⚠️ This API <b>changes the status</b> of all ' + S.length + " IMEIs" + (ENV === "prod" ? " <b>on Production</b>" : "") + '.<label style="display:flex;gap:6px;margin-top:6px"><input type="checkbox" id="bok"> I understand — use test IMEIs</label></div>' : ""; };
+    $("bep").onchange = w; w();
+  }
+  function runBatch(ep, S) {
+    BRES = { env: ENV, ep: ep, rows: [], total: S.length, stop: false }; var i = 0;
+    showBatch();
+    (function next() {
+      if (i >= S.length || BRES.stop) { BRES.done = true; showBatch(); return; }
+      var row = S[i++], vals = rowVals(row), omit = (EPS[ep].fields || []).filter(function (f) { return (EPS[ep].opt || []).includes(f) && !vals[f]; });
+      api({ action: "eapi-call", env: ENV, ep: ep, raw: bodyOf(ep, vals, omit), sig: "ok", label: "Batch · " + (row.label || row.imei) }).then(function (r) {
+        var c = r.ok ? r.call : { err: r.error }, v = verdict(c);
+        BRES.rows.push({ row: row, call: c, v: v }); if (r.ok) markBank(row.imei, ep, c);
+        showBatch(); setTimeout(next, 300);
+      });
+    })();
+  }
+  function showBatch() {
+    if (!$("bres") || !BRES) return; var R = BRES.rows, ok = R.filter(function (x) { return x.v.ok; }).length;
+    $("bres").innerHTML = '<div class="card" style="margin-top:10px"><div class="row" style="align-items:center;gap:8px"><b>▶ ' + esc(EPS[BRES.ep].name.split(" (")[0]) + " · " + envName(BRES.env) + '</b><span class="sp"></span>' + (BRES.done ? '<span class="pill g">' + ok + " ✓</span> <span class=\"pill r\">" + (R.length - ok) + " ✗</span>" : '<span class="pill m">' + R.length + " / " + BRES.total + '</span><button class="btn ghost sm" id="bstop">Stop</button>') + "</div>" +
+      '<div class="tbw" style="margin-top:8px;max-height:400px;overflow:auto"><table class="tb"><tr><th>IMEI</th><th>Scenario</th><th>Result</th><th>Message</th></tr>' + R.map(function (x, i) { return '<tr><td class="fx">' + esc(x.row.imei) + "</td><td>" + esc(x.row.label || "") + '</td><td><span class="pill ' + (x.v.ok ? "g" : "r") + '">' + esc(x.v.t) + "</span></td><td>" + esc(x.call.message || x.call.errorMessage || x.call.err || "") + (x.call.resp ? ' <a style="cursor:pointer" data-bv="' + i + '">view</a>' : "") + "</td></tr>"; }).join("") + "</table></div>" +
+      (BRES.done && R.length ? '<div class="row" style="gap:6px;margin-top:8px"><button class="btn ghost sm" id="bxr">⬇ Result Excel</button></div>' : "") + "</div>";
+    if ($("bstop")) $("bstop").onclick = function () { BRES.stop = true; };
+    [].forEach.call($("bres").querySelectorAll("[data-bv]"), function (a) { a.onclick = function () { var x = R[+a.dataset.bv]; LAST = { call: x.call }; EP = x.call.ep; FORM = {}; TAB = "test"; draw(); }; });
+    if ($("bxr")) $("bxr").onclick = function () { download(xlsx([{ name: "Results", rows: [["Environment", "API", "IMEI", "Model", "Dealer code", "Scenario", "Partner", "Result", "code", "errorCode", "message", "processStatus", "traceId", "HTTP", "ms"]].concat(R.map(function (x) { var c = x.call; return [envName(BRES.env), BRES.ep, x.row.imei, x.row.model, x.row.dealer, x.row.label, x.row.partner, x.v.t, c.code == null ? "" : String(c.code), c.errorCode || "", c.message || c.errorMessage || c.err || "", c.processStatus == null ? "" : String(c.processStatus), c.traceId || "", c.status || "", c.ms || ""]; })) }]), "EMI_API_batch_" + BRES.ep + "_" + new Date().toISOString().slice(0, 10) + ".xlsx"); };
   }
 
   // ======================= single request =======================
   function tTest() {
+    if (BANK[ENV] == null) { $("tp").innerHTML = '<div class="loading"><div class="spin"></div>Loading…</div>'; loadBank(ENV).then(tTest); return; }
     var E = CFG.envs[ENV], fields = EPS[EP].fields;
     if (!FORM.ep || FORM.ep !== EP) { var bv = baseVals(); FORM = { ep: EP, vals: bv, on: {}, sig: FORM.sig || "ok", raw: null }; fields.forEach(function (f) { FORM.on[f] = !((EPS[EP].opt || []).includes(f) && !bv[f]); }); }
     $("tp").innerHTML = '<div class="card"><label class="lb" style="margin-top:0">API</label><select class="tx" id="ep">' + bizList().map(function (g) { return '<optgroup label="' + esc(g) + '">' + Object.keys(EPS).filter(function (k) { return EPS[k].biz === g; }).map(function (k) { return '<option value="' + k + '"' + (k === EP ? " selected" : "") + ">" + esc(EPS[k].name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + "</select>" + '<div class="muted" style="font-size:12px;margin-top:5px">' + esc(EPS[EP].desc || "") + "</div>" +
       '<div class="fx" style="font-size:11.5px;color:var(--mut);margin-top:6px;word-break:break-all">POST ' + esc((E.url || "(URL not set)") + "/retail-emi/business/" + EP) + "</div>" +
       (EPS[EP].changes ? '<div class="warn">⚠️ This API <b>changes the IMEI’s status</b> in vivo’s system' + (ENV === "prod" ? " <b>on Production</b>" : "") + ". Use a test IMEI.</div>" : "") +
+      imeiPicker() +
       '<div class="sec"><span>Request parameters</span><small class="muted">untick = leave the field out</small></div>' +
       fields.map(function (f) {
         var v = FORM.vals[f], ph = /^\{\{/.test(v);
@@ -216,11 +328,12 @@ textarea.code{width:100%;min-height:150px;border:0;outline:none;resize:vertical;
     [].forEach.call($("tp").querySelectorAll("[data-v]"), function (i) { i.oninput = i.onchange = function () { FORM.vals[i.dataset.v] = i.value; refresh(); }; });
     [].forEach.call($("tp").querySelectorAll("[data-ov]"), function (a) { a.onclick = function () { FORM.vals[a.dataset.ov] = ""; tTest(); }; });
     $("rawb").onclick = function () { FORM.raw = FORM.raw != null ? null : currentRaw(); tTest(); };
+    if ($("imsel")) $("imsel").onchange = function () { var v = $("imsel").value; if (v === "__add") { TAB = "imei"; draw(); return; } var row = (BANK[ENV] || []).filter(function (x) { return x.id === v; })[0]; if (row) { useRow(row); tTest(); } };
     if ($("raw")) $("raw").oninput = function () { FORM.raw = $("raw").value; };
     $("pm").onclick = postman;
     $("routes").onclick = routeCheck;
     $("send").onclick = function () {
-      var go = function () { send(EP, currentRaw(), FORM.sig, "Manual", $("send")).then(function (r) { if (r) { LAST = r; showOut(r); } }); };
+      var go = function () { send(EP, currentRaw(), FORM.sig, "Manual", $("send")).then(function (r) { if (r) { LAST = r; showOut(r); markBank(FORM.vals.imei, EP, r.call); } }); };
       if (EPS[EP].changes && ENV === "prod") sheet("Send to Production?", EPS[EP].name.split(" (")[0] + " changes this IMEI’s status on vivo’s live system.", [["▶", "Yes, send", go, "danger"], ["", "Cancel", function () { }]]);
       else go();
     };

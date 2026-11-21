@@ -76,6 +76,28 @@ export async function emiApiAction(b, ctx) {
     return json(200, { ok: true, cfg, keys: keyInfo(), endpoints: EAPI_ENDPOINTS });
   }
 
+  // ---- IMEI test data: many test IMEIs per environment with their details, picked from a list instead of typed
+  //   eapiimei:<env>  { rows: [{ id, imei, model, dealer, scheme, amount, oldBrand, oldModel, plan, partner, label, note, last:{ ep, t, ok, msg, at } }] }
+  if (/^eapi-imei-/.test(b.action)) {
+    const e = ENVS.includes(b.env) ? b.env : "uat", key = "eapiimei:" + e, D = (await store.get(key)) || { rows: [] };
+    const IF = { imei: 20, model: 80, dealer: 60, scheme: 80, amount: 20, oldBrand: 60, oldModel: 80, plan: 80, partner: 80, label: 120, note: 300 };
+    const clean = (x) => { const o = {}; Object.keys(IF).forEach((k) => { o[k] = str(x && x[k], IF[k]); }); o.imei = o.imei.replace(/[\s'"]/g, ""); return o; };
+    if (b.action === "eapi-imei-list") return json(200, { ok: true, rows: D.rows });
+    if (b.action === "eapi-imei-save") {   // add / update by IMEI (replace: true = the list becomes exactly these rows)
+      const inRows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 5000).map(clean).filter((x) => x.imei);
+      if (!inRows.length) return json(400, { ok: false, error: "No IMEIs to save" });
+      const old = b.replace ? [] : D.rows, byI = new Map(old.map((x) => [x.imei, x])); let added = 0, updated = 0;
+      for (const x of inRows) { const o = byI.get(x.imei); if (o) { Object.assign(o, x); updated++; } else { byI.set(x.imei, Object.assign({ id: t.toString(36) + randomBytes(3).toString("hex") }, x)); added++; } }
+      D.rows = [...byI.values()].slice(0, 5000); D.upd = t; D.by = by;
+      await store.set(key, D); return json(200, { ok: true, rows: D.rows, added, updated });
+    }
+    if (b.action === "eapi-imei-del") { const ids = new Set((b.ids || []).map(String)); D.rows = D.rows.filter((x) => !ids.has(x.id)); await store.set(key, D); return json(200, { ok: true, rows: D.rows }); }
+    if (b.action === "eapi-imei-mark") {   // remember the last test result next to the IMEI
+      const r = D.rows.find((x) => x.imei === str(b.imei, 20)); if (!r) return json(200, { ok: true });
+      r.last = { ep: str(b.ep, 40), ok: !!b.ok, msg: str(b.msg, 160), at: t }; await store.set(key, D); return json(200, { ok: true });
+    }
+    return json(400, { ok: false, error: "Unknown action" });
+  }
   if (b.action === "eapi-call") {
     const e = ENVS.includes(b.env) ? b.env : "prod", E = cfg.envs[e], K = keys[e] || {};
     const ep = EAPI_ENDPOINTS[b.ep] ? b.ep : null;
