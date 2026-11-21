@@ -12,7 +12,7 @@
     return new Promise(function (res, rej) {
       var u = URL.createObjectURL(file), im = new Image();
       im.onload = function () { var d = fit(im.naturalWidth, im.naturalHeight, max), c = document.createElement("canvas"); c.width = d[0]; c.height = d[1]; var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, d[0], d[1]); g.drawImage(im, 0, 0, d[0], d[1]); URL.revokeObjectURL(u); res(jpeg(c)); };
-      im.onerror = function () { URL.revokeObjectURL(u); rej(new Error("That picture couldn't be opened")); };
+      im.onerror = function () { URL.revokeObjectURL(u); rej(new Error(/heic|heif/i.test(file.name + file.type) ? "HEIC photos can't be read here — take a screenshot or share it as JPG" : "That picture couldn't be opened")); };
       im.src = u;
     });
   }
@@ -38,9 +38,25 @@
     });
   }
   function docx(file) { return lib("/vendor/jszip.min.js", function () { return root.JSZip; }).then(function () { return root.JSZip.loadAsync(file); }).then(function (z) { var f = z.file("word/document.xml"); return f ? f.async("string") : ""; }).then(function (x) { return String(x).replace(/<\/w:p>/g, "\n").replace(/<w:tab\/>/g, "\t").replace(/<\/w:tc>/g, "\t").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/\n{3,}/g, "\n\n").trim(); }); }
+  // phones often hand over files with no type and no extension (e.g. "image:1234") — look at the first bytes instead
+  function sniff(file) {
+    return file.slice(0, 8).arrayBuffer().then(function (b) {
+      var u = new Uint8Array(b), h = Array.prototype.map.call(u, function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
+      if (h.indexOf("25504446") === 0) return "application/pdf";
+      if (h.indexOf("ffd8") === 0) return "image/jpeg"; if (h.indexOf("89504e47") === 0) return "image/png"; if (h.indexOf("52494646") === 0) return "image/webp"; if (h.indexOf("47494638") === 0) return "image/gif";
+      if (h.indexOf("504b0304") === 0) return "docx"; return "";
+    }, function () { return ""; });
+  }
   function read(file, o) {
+    var n0 = (file.name || "").toLowerCase();
+    if (!file.type && !/\.(pdf|jpe?g|png|webp|gif|bmp|heic|docx|txt|csv|md|json)$/.test(n0)) return sniff(file).then(function (k) {
+      if (!k) return Promise.reject(new Error("Use a PDF, a photo, a Word (.docx) or a text file"));
+      var ext = k === "application/pdf" ? ".pdf" : k === "docx" ? ".docx" : "." + k.split("/")[1];
+      var f2; try { f2 = new File([file], (file.name || "file") + ext, { type: k === "docx" ? "" : k }); } catch (e) { f2 = file; f2.__t = k; }
+      return read(f2, o);
+    });
     o = Object.assign({ maxPages: 30, maxSide: 1600 }, o || {});
-    var n = (file.name || "").toLowerCase(), t = file.type || "";
+    var n = (file.name || "").toLowerCase(), t = file.type || file.__t || "";
     if (/\.pdf$/.test(n) || t === "application/pdf") return pdf(file, o).then(function (r) { return { name: file.name, kind: "pdf", pages: r.pages, total: r.total }; });
     if (/^image\//.test(t) || /\.(jpe?g|png|webp|heic|gif|bmp)$/.test(n)) return imgFile(file, o.maxSide).then(function (d) { return { name: file.name, kind: "image", pages: [{ n: 1, text: "", img: d }] }; });
     if (/\.docx$/.test(n)) return docx(file).then(function (x) { return { name: file.name, kind: "docx", pages: [{ n: 1, text: x }] }; });

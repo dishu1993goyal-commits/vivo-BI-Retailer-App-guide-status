@@ -62,7 +62,7 @@ async function dx(b, ctx) {
 
 // ---------------- cs: circular studio ----------------
 const cleanLesson = (j) => ({
-  title: str(j.title, 120) || "Lesson", summary: txt(j.summary, 6000), keypoints: list(j.keypoints, 10).map((x) => str(x, 240)).filter(Boolean),
+  title: str(j.title, 120) || "Lesson", summary: txt(j.summary, 14000), keypoints: list(j.keypoints, 10).map((x) => str(x, 240)).filter(Boolean),
   cards: list(j.cards, 10).map((c) => ({ title: str(c && c.title, 100), body: txt(c && c.body, 900) })).filter((c) => c.title || c.body),
   flash: list(j.flash, 14).map((c) => ({ q: str(c && c.q, 200), a: str(c && c.a, 300) })).filter((c) => c.q && c.a),
   quiz: list(j.quiz, 12).map((q) => { const o = list(q && q.options, 5).map((x) => str(x, 160)).filter(Boolean); const a = Math.round(+(q && q.answer)); return { q: str(q && q.q, 300), options: o, answer: a >= 0 && a < o.length ? a : 0, why: str(q && q.why, 300) }; }).filter((q) => q.q && q.options.length >= 2)
@@ -72,29 +72,13 @@ const canSee = (x, ho, rec) => ho || (x.pub && (x.states.includes("all") || x.st
 async function cs(b, ctx) {
   const { store, t, app, rec, uk } = ctx, ho = app === "admin";
   if (b.action === "cs-meta") return J(200, { ok: true, langs: Object.fromEntries(Object.keys(LN).map((k) => [k, LANGS[k] || k])), states: ALL_STATES, defaults: Object.fromEntries(ALL_STATES.map((x) => [x, defaultLang(x)])), mine: defaultLang(String(rec.state || "")) });
-  if (b.action === "cs-job") { const j = await store.get("cs:job:" + str(b.job, 30)); return j ? J(200, { ok: true, job: j }) : J(404, { ok: false, error: "Job not found" }); }
-  if (b.action === "cs-ocr") { if (!isImg(b.img)) return J(400, { ok: false, error: "No picture" }); const r = await see(ctx, [b.img], "This is a page of a business circular / policy. Write out ALL its text exactly, top to bottom; keep tables as rows with cells separated by ' | '. Text only.", { accept: (x) => x.trim().length > 30 }); return r.ok ? J(200, { ok: true, text: r.text.slice(0, 20000) }) : J(502, { ok: false, error: r.error }); }
-  if (b.action === "cs-lesson") {
-    const tx = txt(b.text, 15000); if (tx.length < 80) return J(400, { ok: false, error: "The circular text is too short — add more pages" });
-    const nq = Math.max(3, Math.min(10, +b.nq || 6));
-    const sys = "You turn a vivo India business circular (scheme, policy, launch, process) into a short lesson for " + (str(b.audience, 60) || "retailers, promoters and the sales team") + ". Use ONLY facts from the circular — every number, date, slab, model and condition must match it exactly; never invent facts. Write in simple Indian English.\n" +
-      "SUMMARY = A CASE STUDY: 3-6 short paragraphs telling a realistic story (e.g. a retailer or promoter in a town, with a name, who learns about this circular and works through it) that carries EVERY important fact of the circular — slabs, amounts, dates, eligible models/partners, conditions, exclusions, how to claim. The reader must read all paragraphs to understand the rules.\n" +
-      "QUIZ: exactly " + nq + " questions, 4 options each, one correct. Every question must be answerable ONLY from the case study, but must NOT be a copy of a sentence in it: ask the reader to APPLY the rules — calculate a payout for a new quantity, decide if a different model/date/partner qualifies, find the mistake in a claim, choose the right next step, combine two facts from different paragraphs. Wrong options must be plausible (common mistakes, the neighbouring slab, a nearby date). The 'why' explains the reasoning in one line.\n" +
-      "Also: 5-8 keypoints (the facts to remember, shown after the quiz), 4-7 short teaching cards and 6-10 flash cards. Reply with JSON only: " + LESSON;
-    const r = await ai(ctx, sys, tx, { maxTokens: 6000, label: "CIRCULAR" }); if (!r.ok) return J(502, { ok: false, error: r.error });
-    return J(200, { ok: true, lesson: cleanLesson(r.j) });
-  }
-  if (b.action === "cs-tr") {
-    // one language, in two halves (part a: summary + cards, part b: flash cards + quiz) so each AI call stays short
-    const L = str(b.lang, 4); if (!LN[L] || L === "en") return J(400, { ok: false, error: "Choose a language" });
-    const base = cleanLesson(b.lesson || {}), part = b.part === "b" ? "b" : "a";
-    const sub = part === "a" ? { title: base.title, summary: base.summary, keypoints: base.keypoints, cards: base.cards } : { flash: base.flash, quiz: base.quiz.map((q) => ({ q: q.q, options: q.options, why: q.why })) };
-    const r = await ai(ctx, "Translate this JSON into " + LN[L] + " in the native script, using everyday words people in that state use. Keep numbers, ₹ amounts, dates, model and scheme names unchanged. Keep exactly the same JSON keys and structure, the same number of items and options, in the same order. Reply with JSON only.", JSON.stringify(sub), { maxTokens: 6000, label: "JSON" });
-    if (!r.ok) return J(502, { ok: false, error: r.error });
-    if (part === "a") { const tr = cleanLesson(Object.assign({ flash: [], quiz: [] }, r.j)); return J(200, { ok: true, part, lesson: { title: tr.title || base.title, summary: tr.summary, keypoints: tr.keypoints, cards: tr.cards } }); }
-    const fl = list(r.j.flash, 14).map((c) => ({ q: str(c && c.q, 200), a: str(c && c.a, 300) })).filter((c) => c.q && c.a);
-    const quiz = base.quiz.map((q, i) => { const x = list(r.j.quiz, 12)[i] || {}, o = list(x.options, 5).map((v) => str(v, 160)); return { q: str(x.q, 300) || q.q, options: o.length === q.options.length ? o : q.options, answer: q.answer, why: str(x.why, 300) || q.why }; });
-    return J(200, { ok: true, part, lesson: { flash: fl.length === base.flash.length ? fl : base.flash, quiz } });
+  if (b.action === "cs-job") { const j = await store.get("cs:job:" + str(b.job, 30)); return j ? J(200, { ok: true, job: Object.assign({}, j, { input: undefined }) }) : J(404, { ok: false, error: "Job not found" }); }
+  if (b.action === "cs-ocr" || b.action === "cs-lesson" || b.action === "cs-tr") {   // long AI work runs as a background job; the page polls cs-job
+    const kind = b.action.slice(3), input = kind === "ocr" ? { imgs: list(b.imgs || (b.img ? [b.img] : []), 4).filter(isImg) } : kind === "lesson" ? { text: txt(b.text, 30000), audience: str(b.audience, 60), nq: +b.nq || 6 } : { lang: str(b.lang, 4), lesson: b.lesson || {} };
+    if (kind === "ocr" && !input.imgs.length) return J(400, { ok: false, error: "No picture" });
+    if (kind === "lesson" && input.text.length < 80) return J(400, { ok: false, error: "The circular text is too short — add more pages" });
+    if (kind === "tr" && (!LN[input.lang] || input.lang === "en")) return J(400, { ok: false, error: "Choose a language" });
+    return startCsJob(ctx, { kind, input });
   }
   if (b.action === "cs-diff") {
     const o = txt(b.old, 14000), n = txt(b.new, 14000); if (o.length < 40 || n.length < 40) return J(400, { ok: false, error: "Add both the old and the new circular" });
@@ -132,7 +116,7 @@ async function cs(b, ctx) {
     const R = (await ctx.pool(await store.list("cs:d:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "App", name: d.name, state: d.state, phone: "", score: d.score, total: d.total, tries: d.tries, lang: d.lang, at: d.at }));
     const W = (await ctx.pool(await store.list("cs:x:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "Web link", name: d.name, state: d.state, phone: d.phone || "", score: d.score, total: d.total, tries: d.tries, lang: d.lang, at: d.at }));
     const F = []; Object.values(x.gforms || {}).forEach((g) => (g.rows || []).forEach((d) => F.push({ src: "Google Form", name: d.name, state: d.state, phone: d.phone, score: d.score, total: d.total, tries: 1, lang: d.lang, at: Date.parse(String(d.at).replace(" ", "T") + ":00+05:30") || 0 })));
-    return J(200, { ok: true, rows: R.concat(W, F).sort((p, q) => q.at - p.at), forms: Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, { url: g.shortUrl || g.url, edit: g.editUrl, pulled: g.pulled || 0, n: (g.rows || []).length }])), token: x.token || "" });
+    return J(200, { ok: true, rows: R.concat(W, F).sort((p, q) => q.at - p.at), forms: Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, { url: g.shortUrl || g.url, edit: g.editUrl, pulled: g.pulled || 0, n: (g.rows || []).length, quiz: !!g.quiz }])), token: x.token || "" });
   }
   if (b.action === "cs-share") {   // public web link: anyone with it reads the case study and takes the quiz after typing name + state
     if (!ho) return J(403, { ok: false, error: "HO only" });
@@ -143,12 +127,7 @@ async function cs(b, ctx) {
   if (b.action === "cs-gform") {   // build a Google Form (name, state, mobile + the quiz) in one language — runs as a background job
     if (!ho) return J(403, { ok: false, error: "HO only" });
     const cfg = (await store.get("sf:cfg")) || {}; if (!cfg.gasUrl || !cfg.gasKey) return J(400, { ok: false, error: "Google Forms is not connected yet — connect it once in 📝 Survey & poll creator → Set-up." });
-    const L = x.langs[b.lang] ? b.lang : "en", jid = t.toString(36) + randomBytes(3).toString("hex");
-    await store.set("cs:job:" + jid, { id: jid, lid: x.id, lang: L, state: "queued", at: t, msg: "Starting…" });
-    const site = ctx.env && (ctx.env.SITE_URL || ctx.env.URL);
-    if (site && ctx.jobFetch) { try { await ctx.jobFetch(site + "/.netlify/functions/csjob-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: jid }) }); } catch (e) { await runCsJob(store, jid, ctx.aiFetch); } }
-    else await runCsJob(store, jid, ctx.aiFetch);
-    return J(200, { ok: true, job: jid });
+    return startCsJob(ctx, { kind: "form", lid: x.id, lang: x.langs[b.lang] ? b.lang : "en" });
   }
   if (b.action === "cs-gres") {   // pull Google Form answers, mark them, keep them with the lesson
     if (!ho) return J(403, { ok: false, error: "HO only" });
@@ -166,31 +145,96 @@ async function cs(b, ctx) {
   return J(400, { ok: false, error: "Unknown action" });
 }
 
-export async function runCsJob(store, jid, f) {
+async function startCsJob(ctx, o) {
+  const t = Date.now(), jid = t.toString(36) + randomBytes(3).toString("hex");
+  await ctx.store.set("cs:job:" + jid, Object.assign({ id: jid, state: "queued", at: t, msg: "Starting…" }, o));
+  const site = ctx.env && (ctx.env.SITE_URL || ctx.env.URL);
+  if (site && ctx.jobFetch) { try { await ctx.jobFetch(site + "/.netlify/functions/csjob-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: jid }) }); return J(200, { ok: true, job: jid }); } catch (e) { } }
+  await runCsJob(ctx.store, jid, ctx.aiFetch, ctx.env, ctx.askAI);   // no background runner (local) → do it now
+  return J(200, { ok: true, job: jid });
+}
+async function makeLesson(c, text, audience, nq) {
+  nq = Math.max(3, Math.min(10, +nq || 6));
+  const sys = "You turn a vivo India business circular (scheme, policy, launch, process) into a lesson for " + (audience || "retailers, promoters and the sales team") + ". Use ONLY facts from the circular — every number, date, slab, model, partner and condition must match it exactly; never invent rules or numbers. Write in simple Indian English.\n" +
+    "SUMMARY = A DETAILED CASE STUDY of 600-1000 words in 6-10 paragraphs separated by a blank line. Tell a realistic story — e.g. a retailer, promoter or FSE in a named Indian town who reads this circular and applies it over a few days to real customers and orders. The story must carry EVERY rule of the circular in full: each slab with its exact range and amount, each eligible and excluded model / partner / region, the validity dates, conditions, deadlines, how and where to claim, and what happens if a rule is broken. Where the circular has a table, walk through every row inside the story. Explain WHY each rule matters. Do not leave any fact needed for the quiz outside the case study.\n" +
+    "QUIZ: exactly " + nq + " questions, 4 options each, one correct, each tied to one or more paragraphs of the case study. Every answer must be fully supported by the case study, but must NOT be a copy of one of its sentences: ask the reader to APPLY the rules — calculate a payout for a new quantity, decide if a different model / date / partner qualifies, spot the mistake in a claim, choose the right next step, combine facts from two paragraphs. Wrong options must be plausible (common mistakes, the neighbouring slab, a nearby date). 'why' explains the reasoning in one or two lines and names the paragraph.\n" +
+    "Also: 6-10 keypoints (the exact rules to remember), 5-8 teaching cards (title + 3-6 lines each, covering every rule) and 8-12 flash cards (question → short answer). Reply with JSON only: " + LESSON;
+  const r = await ai(c, sys, text, { maxTokens: 9000, label: "CIRCULAR" });
+  if (!r.ok) return r;
+  const l = cleanLesson(r.j);
+  if (l.summary.split(/\s+/).length < 250) {   // too thin → ask once more for a longer story
+    const r2 = await ai(c, sys + "\nYour previous case study was far too short. Write the full 600-1000 word case study this time.", text, { maxTokens: 9000, label: "CIRCULAR" });
+    if (r2.ok) { const l2 = cleanLesson(r2.j); if (l2.summary.length > l.summary.length && l2.quiz.length) return { ok: true, lesson: l2 }; }
+  }
+  return { ok: true, lesson: l };
+}
+async function translateLesson(c, L, lesson) {
+  const base = cleanLesson(lesson || {}), out = {};
+  const parts = [{ title: base.title, summary: base.summary }, { keypoints: base.keypoints, cards: base.cards }, { flash: base.flash, quiz: base.quiz.map((q) => ({ q: q.q, options: q.options, why: q.why })) }];
+  for (const sub of parts) {
+    const r = await ai(c, "Translate this JSON into " + LN[L] + " in the native script, using everyday words people in that state use. Keep numbers, ₹ amounts, dates, model and scheme names unchanged. Keep exactly the same JSON keys and structure, the same number of items and options, in the same order, and the same paragraph breaks. Reply with JSON only.", JSON.stringify(sub), { maxTokens: 9000, label: "JSON" });
+    if (!r.ok) return r;
+    Object.assign(out, r.j);
+  }
+  const tr = cleanLesson(Object.assign({ title: base.title }, out));
+  tr.quiz = base.quiz.map((q, i) => { const x = list(out.quiz, 12)[i] || {}, o = list(x.options, 5).map((v) => str(v, 160)); return { q: str(x.q, 300) || q.q, options: o.length === q.options.length ? o : q.options, answer: q.answer, why: str(x.why, 300) || q.why }; });
+  if (tr.flash.length !== base.flash.length) tr.flash = base.flash;
+  if (!tr.summary) tr.summary = base.summary;
+  return { ok: true, lesson: tr };
+}
+export async function runCsJob(store, jid, f, env, askAI) {
   const job = await store.get("cs:job:" + jid); if (!job || job.state !== "queued") return;
   const up = async (o) => { Object.assign(job, o); await store.set("cs:job:" + jid, job); };
-  await up({ state: "run", msg: "Building the Google Form…" });
+  const c = { store, env: env || {}, aiFetch: f || fetch, askAI };
   try {
+    if (job.kind === "ocr") {
+      await up({ state: "run", msg: "Reading the page…" });
+      const r = await see(c, job.input.imgs, "These are pages of a business circular / policy. Write out ALL the text exactly, top to bottom, page by page; keep every table as rows with cells separated by ' | '. Text only.", { accept: (x) => x.trim().length > 30, timeout: 90000 });
+      return up(r.ok ? { state: "done", msg: "Ready", text: r.text.slice(0, 30000), input: null } : { state: "err", msg: r.error, input: null });
+    }
+    if (job.kind === "lesson") {
+      await up({ state: "run", msg: "Writing the case study, lesson and quiz…" });
+      const r = await makeLesson(c, job.input.text, job.input.audience, job.input.nq);
+      return up(r.ok ? { state: "done", msg: "Ready", lesson: r.lesson, input: null } : { state: "err", msg: r.error, input: null });
+    }
+    if (job.kind === "tr") {
+      await up({ state: "run", msg: "Translating into " + (LANGS[job.input.lang] || job.input.lang) + "…" });
+      const r = await translateLesson(c, job.input.lang, job.input.lesson);
+      return up(r.ok ? { state: "done", msg: "Ready", lesson: r.lesson, input: null } : { state: "err", msg: r.error, input: null });
+    }
+    // Google Form: details → read-first pages (case study, remember, lesson, flash cards) → quiz scored by Google
+    await up({ state: "run", msg: "Building the Google Form…" });
     const x = await store.get("cs:l:" + job.lid), cfg = (await store.get("sf:cfg")) || {}; if (!x) return up({ state: "err", msg: "Lesson not found" });
-    const L = job.lang, X = x.langs[L] || x.langs.en;
+    const L = job.lang, X = x.langs[L] || x.langs.en, paras = X.summary.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    const ping = await gas(cfg, { action: "ping" }, f || fetch), quizOk = ping && ping.ok && +ping.version >= 4;
+    const info = (title, help) => ({ id: "i" + Math.random().toString(36).slice(2, 8), type: "info", title, help: String(help || "").slice(0, 4000) });
+    const caseItems = []; let chunk = "", n = 1;
+    paras.forEach((p) => { if ((chunk + "\n\n" + p).length > 3500 && chunk) { caseItems.push(info("📖 Case study — part " + n++, chunk)); chunk = p; } else chunk = chunk ? chunk + "\n\n" + p : p; });
+    if (chunk) caseItems.push(info(caseItems.length ? "📖 Case study — part " + n : "📖 Case study", chunk));
+    const learn = caseItems.concat(
+      X.keypoints.length ? [info("📌 Remember", X.keypoints.map((k) => "• " + k).join("\n"))] : [],
+      X.cards.map((cd, i) => info("📚 Lesson " + (i + 1) + ": " + cd.title, cd.body)),
+      X.flash.length ? [info("🃏 Flash cards", X.flash.map((fl) => "Q: " + fl.q + "\nA: " + fl.a).join("\n\n"))] : []);
     const survey = {
-      title: X.title + " — quiz", description: "Read the case study below carefully, then answer every question. All answers come from the case study.\n\n" + X.summary,
-      confirmation: "Thank you! Your answers are recorded.", settings: { progressBar: true },
-      sections: [{ id: "s1", title: "Your details", questions: [{ id: "n", type: "short", title: "Your name", required: true }, { id: "st", type: "dropdown", title: "State", options: ALL_STATES.concat(["Other"]), required: true }, { id: "ph", type: "phone", title: "Mobile number (optional)" }] },
-        { id: "s2", title: "Case study", description: X.summary.slice(0, 4000), questions: X.quiz.map((q, i) => ({ id: "q" + i, type: "single", title: (i + 1) + ". " + q.q, options: q.options, required: true })) }]
+      title: X.title + " — lesson & quiz", description: "1) Fill in your details.  2) Read the case study, key points, lessons and flash cards carefully.  3) Answer the quiz — every answer comes from what you read." + (quizOk ? " Your score is shown right after you submit." : ""),
+      confirmation: "Thank you! " + (quizOk ? "Tap “View score” to see your result and the right answers." : "Your answers are recorded."), settings: { progressBar: true, isQuiz: quizOk },
+      sections: [
+        { id: "s1", title: "Your details", questions: [{ id: "n", type: "short", title: "Your name", required: true }, { id: "st", type: "dropdown", title: "State", options: ALL_STATES.concat(["Other"]), required: true }, { id: "ph", type: "phone", title: "Mobile number (optional)" }] },
+        { id: "s2", title: "Read carefully", description: "Read everything on this page before you go to the quiz.", questions: learn },
+        { id: "s3", title: "Quiz", description: "Choose one answer for each question. Scroll back to re-read the case study if you need to.", questions: X.quiz.map((q, i) => ({ id: "q" + i, type: "single", title: (i + 1) + ". " + q.q, options: q.options, required: true, correct: quizOk ? q.options[q.answer] : undefined, points: 1, why: q.why })) }]
     };
     const r = await gas(cfg, { action: "create", survey, opts: {} }, f || fetch);
     if (!r || !r.ok) return up({ state: "err", msg: (r && r.error) || "Google didn't answer" });
-    x.gforms = x.gforms || {}; x.gforms[L] = { id: r.id, url: r.url, shortUrl: r.shortUrl, editUrl: r.editUrl, at: Date.now(), rows: [] };
+    x.gforms = x.gforms || {}; x.gforms[L] = { id: r.id, url: r.url, shortUrl: r.shortUrl, editUrl: r.editUrl, at: Date.now(), rows: [], quiz: quizOk };
     await store.set("cs:l:" + x.id, x);
-    await up({ state: "done", msg: "Ready", url: r.shortUrl || r.url, edit: r.editUrl });
-  } catch (e) { await up({ state: "err", msg: String(e.message || e).slice(0, 200) }); }
+    await up({ state: "done", msg: quizOk ? "Ready" : "Ready — update the Google connector to show scores in the form", url: r.shortUrl || r.url, edit: r.editUrl, quiz: quizOk });
+  } catch (e) { await up({ state: "err", msg: String(e.message || e).slice(0, 200), input: null }); }
 }
 export async function csPublic(b, { store, t }) {
   const k = str(b.k, 40), tk = k ? await store.get("cs:tok:" + k) : null, x = tk ? await store.get("cs:l:" + tk.id) : null;
   if (!x || x.token !== k) return J(404, { ok: false, error: "This lesson link is not valid or was switched off." });
   if (b.action === "cs-p-get") {
-    const langs = {}; Object.keys(x.langs).forEach((L) => { const X = x.langs[L]; langs[L] = { title: X.title, summary: X.summary, quiz: X.quiz.map((q) => ({ q: q.q, options: q.options })) }; });
+    const langs = {}; Object.keys(x.langs).forEach((L) => { const X = x.langs[L]; langs[L] = { title: X.title, summary: X.summary, keypoints: X.keypoints, cards: X.cards, flash: X.flash, quiz: X.quiz.map((q) => ({ q: q.q, options: q.options })) }; });
     return J(200, { ok: true, l: { title: x.title, langs }, states: ALL_STATES, langNames: Object.fromEntries(Object.keys(x.langs).map((L) => [L, LANGS[L] || L])) });
   }
   if (b.action === "cs-p-done") {

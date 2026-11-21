@@ -211,6 +211,10 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .case{font-size:14.5px;line-height:1.75;white-space:pre-wrap;background:#FBFBFE;border:1px solid #EEF0F6;border-radius:12px;padding:12px 14px}
 .qrbox{display:flex;justify-content:center;margin-top:8px}
 .link{font:700 12.5px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;background:#F7F8FC;border-radius:10px;padding:9px;margin-top:6px}
+.case p{margin:0 0 12px;position:relative;padding-left:26px}.case .pn{position:absolute;left:0;top:2px;width:19px;height:19px;border-radius:50%;background:#EEF0FF;color:#3346C9;font:800 10.5px/19px inherit;text-align:center}
+.stp3{display:flex;gap:6px;margin:4px 0 2px}.stp3 span{flex:1;text-align:center;font:700 12px inherit;padding:7px 4px;border-radius:99px;background:#fff;color:var(--mut);box-shadow:0 1px 4px rgba(20,24,51,.06)}.stp3 span.on{background:#2B33A6;color:#fff}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:6px}.fgrid .flip{margin-top:0}.fgrid .flip .in{min-height:120px}.fgrid .flip .f,.fgrid .flip .b{font-size:13.5px;padding:12px}
+.lcard+.lcard{margin-top:8px}.sec{font:800 13px inherit;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:16px 4px 4px}
 .score{font-size:42px;font-weight:900;text-align:center;color:#2B33A6}
 .big{font-size:40px;text-align:center}
 </style>
@@ -223,7 +227,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📜</span></div>
   <h1>Circular studio</h1><p>Turn a circular into a lesson + quiz in every state's language — or see what changed</p></div>
 <div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
-<script src="/docread.js?v=1"></script>
+<script src="/docread.js?v=2"></script>
 <script src="/vendor/qrcode/qrcode.js"></script>
 <script>
 (function () {
@@ -412,6 +416,16 @@ td.n,th.n{text-align:right;white-space:nowrap}
     [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
     if (TAB === "list") drawList(); else if (TAB === "new") drawNew(); else drawCmp();
   }
+  // long AI work runs on the server in the background — start it, then check every few seconds
+  function job(body, pm) {
+    return api(body).then(function (r) {
+      if (!r.ok) return r;
+      return new Promise(function (res) {
+        var n = 0;
+        (function poll() { api({ action: "cs-job", job: r.job }).then(function (j) { var J = j.ok ? j.job : { state: "err", msg: j.error }; if (J.state === "done") return res(Object.assign({ ok: true }, J)); if (J.state === "err") return res({ ok: false, error: J.msg || "Failed — try again" }); if (pm && J.msg) pm(J.msg + (n > 4 ? " (" + Math.round(n * 2.5) + "s)" : "")); if (++n > 240) return res({ ok: false, error: "This is taking too long — try again" }); setTimeout(poll, 2500); }); })();
+      });
+    });
+  }
   // files → text (scanned pages are read by AI)
   function readFiles(files, pm) {
     var out = [], i = 0;
@@ -426,7 +440,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
             var p = d.pages[k++];
             if (!p.img) { out.push(p.text); return pg(); }
             pm("Reading scanned page " + p.n + " of " + f.name + "…");
-            api({ action: "cs-ocr", img: p.img }).then(function (r) { if (r.ok) out.push(r.text); else toast(r.error); pg(); });
+            job({ action: "cs-ocr", imgs: [p.img] }, pm).then(function (r) { if (r.ok) out.push(r.text); else toast(f.name + " page " + p.n + ": " + r.error); pg(); });
           })();
         }, function (e) { toast(f.name + ": " + e.message); next(); });
       })();
@@ -444,44 +458,67 @@ td.n,th.n{text-align:right;white-space:nowrap}
       [].forEach.call(VIEW.querySelectorAll(".li"), function (el) { el.onclick = function () { openL(el.dataset.i); }; });
     });
   }
+
+  // ======== 3-step lesson player (app + public link): 1 Read everything → 2 Quiz → 3 Score + review + revise ========
+  function paras(t) { return String(t || "").split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean); }
+  function caseHtml(X) { return '<div class="case">' + paras(X.summary).map(function (p, i) { return '<p><span class="pn">' + (i + 1) + "</span>" + esc(p) + "</p>"; }).join("") + "</div>"; }
+  function learnHtml(X, withCase) {
+    return (withCase ? '<div class="card"><b>📖 Case study</b> <span class="muted" style="font-size:12px">read every paragraph — the quiz is based on it</span>' + caseHtml(X) + "</div>" : "") +
+      (X.keypoints && X.keypoints.length ? '<div class="card"><b>📌 Remember</b><div style="font-size:13.5px;line-height:1.75;margin-top:4px">' + X.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div></div>" : "") +
+      (X.cards && X.cards.length ? '<div class="card"><b>📚 Lesson</b>' + X.cards.map(function (c, i) { return '<div class="lcard"><h4>' + (i + 1) + ". " + esc(c.title) + "</h4>" + esc(c.body) + "</div>"; }).join("") + "</div>" : "") +
+      (X.flash && X.flash.length ? '<div class="card"><b>🃏 Flash cards</b> <span class="muted" style="font-size:12px">tap a card to see the answer</span><div class="fgrid">' + X.flash.map(function (f) { return '<div class="flip"><div class="in"><div class="f">' + esc(f.q) + '</div><div class="b">' + esc(f.a) + "</div></div></div>"; }).join("") + "</div></div>" : "");
+  }
+  function player(box, X, o) {
+    var step = "learn", ans = [], res = null;
+    function steps() { return '<div class="stp3">' + [["learn", "1 · Read"], ["quiz", "2 · Quiz"], ["done", "3 · Result"]].map(function (x) { return '<span class="' + (x[0] === step ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>"; }
+    function wire() { [].forEach.call(box.querySelectorAll(".flip"), function (f) { f.onclick = function () { f.classList.toggle("on"); }; }); }
+    function render() {
+      if (step === "learn") {
+        box.innerHTML = steps() + (o.mine ? '<div class="help">Your best so far: <b>' + o.mine.score + "/" + o.mine.total + "</b></div>" : "") + learnHtml(X, true) + '<div class="card" style="text-align:center"><button class="btn pri" id="go" style="width:100%">✅ I have read it — start the quiz (' + X.quiz.length + " questions)</button></div>";
+        $("go").onclick = function () { step = "quiz"; render(); window.scrollTo(0, 0); };
+      } else if (step === "quiz") {
+        box.innerHTML = steps() + '<details class="card"><summary style="cursor:pointer;font-weight:700">📖 Re-read the case study</summary>' + caseHtml(X) + "</details>" +
+          '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (op, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"' + (ans[i] === j ? " checked" : "") + "> " + esc(op) + "</label>"; }).join("") + "</div>"; }).join("") + '<div class="bar2"><button class="btn pri" id="sb" style="width:100%">Submit answers</button></div></div>';
+        [].forEach.call(box.querySelectorAll(".q input"), function (inp) { inp.onchange = function () { ans[+inp.name.slice(1)] = +inp.value; }; });
+        $("sb").onclick = function () {
+          var miss = X.quiz.map(function (q, i) { return ans[i] == null ? i + 1 : 0; }).filter(Boolean); if (miss.length) return toast("Answer question " + miss.join(", ") + " first");
+          $("sb").disabled = true; $("sb").textContent = "Checking…";
+          o.submit(ans).then(function (d) { if (!d || !d.ok) { $("sb").disabled = false; $("sb").textContent = "Submit answers"; return toast((d && d.error) || "Couldn't submit — try again"); } res = d; step = "done"; render(); window.scrollTo(0, 0); });
+        };
+      } else {
+        var right = res.score, tot = res.total, pctv = Math.round(right / tot * 100);
+        box.innerHTML = steps() + '<div class="card" style="text-align:center"><div class="score">' + right + "/" + tot + '</div><div style="font-size:15px;font-weight:800">' + (right === tot ? "🎉 Perfect — you understood the circular!" : pctv >= 60 ? "👍 Well done — " + pctv + "%" : "📖 " + pctv + "% — read the lesson below and try again") + "</div>" + (res.test ? '<div class="muted" style="font-size:12px">HO test — not counted</div>' : "") + (res.best != null && res.best > right ? '<div class="muted" style="font-size:12px">Your best: ' + res.best + "/" + tot + "</div>" : "") + '<div class="bar2" style="justify-content:center"><button class="btn sec sm" id="rt">↺ Try again</button>' + (o.back ? '<button class="btn ghost sm" id="bk2">← All lessons</button>' : "") + "</div></div>" +
+          '<div class="card"><b>🧾 Your answers</b>' + X.quiz.map(function (q, i) { var a = res.answers[i], ok = ans[i] === a; return '<div class="q"><b>' + (ok ? "✅ " : "❌ ") + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (op, j) { return '<label class="' + (j === a ? "ok" : j === ans[i] ? "bad" : "") + '">' + esc(op) + (j === ans[i] ? "  ← your answer" : "") + "</label>"; }).join("") + (res.why && res.why[i] ? '<div class="why">💡 ' + esc(res.why[i]) + "</div>" : "") + "</div>"; }).join("") + "</div>" +
+          '<div class="sec">Revise what you learnt</div>' + learnHtml(X, false) + '<details class="card"><summary style="cursor:pointer;font-weight:700">📖 Case study</summary>' + caseHtml(X) + "</details>";
+        $("rt").onclick = function () { ans = []; step = "quiz"; render(); window.scrollTo(0, 0); };
+        if ($("bk2")) $("bk2").onclick = o.back;
+      }
+      wire();
+    }
+    render();
+  }
   function openL(id) {
     VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Opening…</div>';
     api({ action: "cs-get", id: id }).then(function (r) {
       if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
       var L = r.l, langs = Object.keys(L.langs), pref = function () { try { return localStorage.getItem("cs-lang") || ""; } catch (e) { return ""; } };
-      var REV = !!r.mine, lang = langs.indexOf(pref()) >= 0 ? pref() : META && langs.indexOf(META.mine) >= 0 ? META.mine : "en", ci = 0, fi = 0, ans = [];
+      var lang = langs.indexOf(pref()) >= 0 ? pref() : META && langs.indexOf(META.mine) >= 0 ? META.mine : "en", ci = 0, fi = 0, ans = [];
       function show() {
         var X = L.langs[lang];
         VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button>' + (HO ? '<button class="btn ghost sm" id="sh" style="margin-left:auto">🔗 Share</button><button class="btn ghost sm" id="st">📊 Who finished</button><button class="btn ghost sm" id="ed">✏️ Edit</button><button class="btn ghost sm" id="pb">' + (L.pub ? "Unpublish" : "Publish") + '</button><button class="btn ghost sm" id="dl">🗑</button>' : "") + "</div>" +
           (langs.length > 1 ? '<div class="chips" id="lg">' + langs.map(function (l) { return '<button data-l="' + l + '" class="' + (l === lang ? "on" : "") + '">' + esc(LNAME(l)) + "</button>"; }).join("") + "</div>" : "") +
-          '<h2 style="margin:12px 0 4px">' + esc(X.title) + '</h2><div class="muted" style="font-size:12px;margin-bottom:6px">📖 Read the whole case study — every quiz answer comes from it.</div><div class="case">' + esc(X.summary) + "</div></div>" +
-          '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + (r.mine ? '<div class="help">Your best: <b>' + r.mine.score + "/" + r.mine.total + "</b> · tries: " + r.mine.tries + "</div>" : "") +
-          X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (o, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"' + (ans[i] === j ? " checked" : "") + "> " + esc(o) + "</label>"; }).join("") + "</div>"; }).join("") +
-          '<div class="bar2"><button class="btn pri" id="sb">Submit answers</button></div></div>' +
-          (HO || REV ? (X.keypoints.length ? '<div class="card"><b>📌 Remember</b><div style="font-size:13.5px;line-height:1.7;margin-top:4px">' + X.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div></div>" : "") +
-          (X.cards.length ? '<div class="card"><b>📖 Lesson · ' + (ci + 1) + " of " + X.cards.length + '</b><div class="lcard"><h4>' + esc(X.cards[ci].title) + "</h4>" + esc(X.cards[ci].body) + '</div><div class="bar2"><button class="btn ghost sm" id="cp"' + (ci ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="cn"' + (ci < X.cards.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") +
-          (X.flash.length ? '<div class="card"><b>🃏 Flash cards · ' + (fi + 1) + " of " + X.flash.length + '</b><div class="muted" style="font-size:12px">Tap the card to see the answer</div><div class="flip" id="fl"><div class="in"><div class="f">' + esc(X.flash[fi].q) + '</div><div class="b">' + esc(X.flash[fi].a) + '</div></div></div><div class="bar2"><button class="btn ghost sm" id="fp"' + (fi ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="fn"' + (fi < X.flash.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") : "");
+          '<h2 style="margin:12px 0 0">' + esc(X.title) + '</h2></div><div id="lv"></div>';
+        player($("lv"), X, { mine: r.mine, back: drawList, submit: function (a) {
+          var right = X.quiz.reduce(function (n, q, i) { return n + (a[i] === q.answer ? 1 : 0); }, 0);
+          return api({ action: "cs-done", id: L.id, lang: lang, answers: a }).then(function (d) { return { ok: true, score: right, total: X.quiz.length, answers: X.quiz.map(function (q) { return q.answer; }), why: X.quiz.map(function (q) { return q.why; }), test: d.test, best: d.best }; });
+        } });
         $("bk").onclick = drawList;
         if ($("lg")) [].forEach.call($("lg").children, function (b) { b.onclick = function () { lang = b.dataset.l; try { localStorage.setItem("cs-lang", lang); } catch (e) { } show(); }; });
-        if ($("cn")) { $("cn").onclick = function () { ci++; show(); }; $("cp").onclick = function () { ci--; show(); }; }
-        if ($("fl")) { $("fl").onclick = function () { $("fl").classList.toggle("on"); }; $("fn").onclick = function () { fi++; show(); }; $("fp").onclick = function () { fi--; show(); }; }
-        [].forEach.call(VIEW.querySelectorAll(".q input"), function (inp) { inp.onchange = function () { ans[+inp.name.slice(1)] = +inp.value; }; });
-        $("sb").onclick = function () {
-          if (X.quiz.some(function (q, i) { return ans[i] == null; })) return toast("Answer every question first");
-          var right = 0; [].forEach.call(VIEW.querySelectorAll(".q"), function (el, i) { var q = X.quiz[i]; if (ans[i] === q.answer) right++; [].forEach.call(el.querySelectorAll("label"), function (lb, j) { lb.className = j === q.answer ? "ok" : j === ans[i] ? "bad" : ""; }); if (q.why) el.insertAdjacentHTML("beforeend", '<div class="why">💡 ' + esc(q.why) + "</div>"); });
-          $("sb").disabled = true;
-          api({ action: "cs-done", id: L.id, lang: lang, answers: ans }).then(function (d) {
-            $("qz").insertAdjacentHTML("afterbegin", '<div class="score">' + right + "/" + X.quiz.length + '</div><div style="text-align:center;font-weight:700">' + (right === X.quiz.length ? "🎉 Perfect!" : right >= X.quiz.length * 0.6 ? "👍 Well done" : "Read the lesson again and retry") + (d.test ? '<div class="muted" style="font-size:12px">HO test — not counted</div>' : "") + '</div><div class="bar2" style="justify-content:center"><button class="btn ghost sm" id="rt">Try again</button></div>');
-            $("rt").onclick = function () { ans = []; show(); };
-            if (!REV) { REV = true; var keep = $("qz").innerHTML; show(); $("qz").innerHTML = keep; $("rt") && ($("rt").onclick = function () { ans = []; show(); }); }
-            $("qz").scrollIntoView({ behavior: "smooth" });
-          });
-        };
         if (HO) {
           $("st").onclick = function () { stats(L); };
           $("sh").onclick = function () { share(L); };
           $("ed").onclick = function () { ED = { step: "edit", id: L.id, en: JSON.parse(JSON.stringify(L.langs.en)), langs: langs.filter(function (l) { return l !== "en"; }), states: L.states, pub: L.pub, src: L.src || "" }; TAB = "new"; draw(); };
-          $("pb").onclick = function () { api({ action: "cs-save", id: L.id, langs: L.langs, states: L.states, pub: !L.pub }).then(function (s) { if (!s.ok) return toast(s.error); L.pub = !L.pub; toast(L.pub ? "Published" : "Unpublished"); show(); }); };
+          $("pb").onclick = function () { api({ action: "cs-save", id: L.id, langs: L.langs, states: L.states, pub: !L.pub }).then(function (s2) { if (!s2.ok) return toast(s2.error); L.pub = !L.pub; toast(L.pub ? "Published" : "Unpublished"); show(); }); };
           $("dl").onclick = function () { if (confirm("Delete this lesson and its results?")) api({ action: "cs-del", id: L.id }).then(function () { toast("Deleted"); drawList(); }); };
         }
       }
@@ -498,8 +535,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
       var ov = sheet("🔗 Share “" + L.title + "”", "For people outside the app — their name, state and score show in 📊 Who finished", [],
         '<b>🌐 Web link</b><div class="muted" style="font-size:12px">Opens without login: they type name + state, read the case study (in any language you made) and take the quiz.</div>' +
         (web ? '<div class="link">' + esc(web) + '</div><div class="qrbox">' + qrImg(web) + '</div><div class="bar2"><button class="btn pri sm" id="wc">📋 Copy</button><button class="btn ghost sm" id="ww">🟢 WhatsApp</button><button class="btn ghost sm" id="woff" style="color:#B42318">Switch off</button></div>' : '<div class="bar2"><button class="btn pri sm" id="won">Make web link</button></div>') +
-        '<b style="display:block;margin-top:16px">📝 Google Form</b><div class="muted" style="font-size:12px">A Google Form with the case study and quiz (name, state, mobile first). Answers are pulled in and marked here.</div>' +
-        langs.map(function (Lg) { var f = st.forms && st.forms[Lg]; return '<div style="border-top:1px solid #EEF0F6;padding:8px 0;margin-top:6px"><b style="font-size:13px">' + esc(LNAME(Lg)) + "</b>" + (f ? '<div class="link">' + esc(f.url) + '</div><div class="bar2"><button class="btn ghost sm" data-fc="' + esc(f.url) + '">📋 Copy</button><button class="btn ghost sm" data-fw="' + esc(f.url) + '">🟢 WhatsApp</button><a class="btn ghost sm" href="' + esc(f.edit || "#") + '" target="_blank">✏️ Edit in Google</a></div><div class="muted" style="font-size:11.5px">' + f.n + " answers pulled" + (f.pulled ? " · " + dt(f.pulled) : "") + "</div>" : '<div class="bar2"><button class="btn ghost sm" data-mk="' + Lg + '">＋ Make Google Form</button></div>') + "</div>"; }).join("") + '<div id="gfm" class="muted" style="font-size:12.5px"></div>');
+        '<b style="display:block;margin-top:16px">📝 Google Form</b><div class="muted" style="font-size:12px">A Google Form: name, state and mobile → the full case study, key points, lessons and flash cards → the quiz, scored by Google right after submit. Answers are also pulled in and marked here.</div>' +
+        langs.map(function (Lg) { var f = st.forms && st.forms[Lg]; return '<div style="border-top:1px solid #EEF0F6;padding:8px 0;margin-top:6px"><b style="font-size:13px">' + esc(LNAME(Lg)) + "</b>" + (f ? '<div class="link">' + esc(f.url) + '</div><div class="bar2"><button class="btn ghost sm" data-fc="' + esc(f.url) + '">📋 Copy</button><button class="btn ghost sm" data-fw="' + esc(f.url) + '">🟢 WhatsApp</button><a class="btn ghost sm" href="' + esc(f.edit || "#") + '" target="_blank">✏️ Edit in Google</a></div><div class="muted" style="font-size:11.5px">' + f.n + " answers pulled" + (f.pulled ? " · " + dt(f.pulled) : "") + "</div>" + (f.quiz ? '<div class="muted" style="font-size:11.5px">✅ Scored quiz — people see their score and the right answers after submitting.</div>' : '<div class="help w" style="font-size:12px">This form does not show the score. Update the Google connector once: 📝 Survey & poll creator → Set-up → copy the new script into Apps Script → Deploy → Manage deployments → ✏️ → New version. Then delete this form in Google and tap “Make Google Form” again.</div>') : '<div class="bar2"><button class="btn ghost sm" data-mk="' + Lg + '">＋ Make Google Form</button></div>') + "</div>"; }).join("") + '<div id="gfm" class="muted" style="font-size:12.5px"></div>');
       var q = function (s) { return ov.querySelector(s); }, all = function (s) { return ov.querySelectorAll(s); };
       var msg = function (u) { return "📜 " + L.title + "\nRead the case study and take the quiz:\n" + u; };
       if (q("#won")) q("#won").onclick = function () { api({ action: "cs-share", id: L.id, on: true }).then(function (r) { if (!r.ok) return toast(r.error); L.token = r.token; closeSheet(ov); share(L); }); };
@@ -541,8 +578,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
       $("fi").onchange = function () { var pm = function (m) { $("pm").textContent = m; }; readFiles([].slice.call($("fi").files), pm).then(function (t) { $("tx").value = ($("tx").value + "\n\n" + t).trim(); pm(t ? "Text added — check it, then make the lesson." : "No text found"); }); };
       $("mk").onclick = function () {
         ED.src = $("tx").value.trim(); ED.aud = $("au").value; if (ED.src.length < 80) return toast("Add the circular first");
-        $("mk").disabled = true; $("pm").textContent = "AI is writing the lesson… (about 20–40 seconds)";
-        api({ action: "cs-lesson", text: ED.src, audience: ED.aud, nq: ED.nq || 6 }).then(function (r) { $("mk").disabled = false; if (!r.ok) { $("pm").textContent = r.error; return; } ED.en = r.lesson; ED.step = "edit"; ED.states = ED.states || ["all"]; ED.langs = ED.langs || []; drawNew(); });
+        $("mk").disabled = true; $("pm").textContent = "AI is writing the case study, lesson and quiz… (about 1–2 minutes)";
+        job({ action: "cs-lesson", text: ED.src, audience: ED.aud, nq: ED.nq || 6 }, function (m) { $("pm").textContent = m; }).then(function (r) { $("mk").disabled = false; if (!r.ok) { $("pm").textContent = r.error; return; } ED.en = r.lesson; ED.step = "edit"; ED.states = ED.states || ["all"]; ED.langs = ED.langs || []; drawNew(); });
       };
       return;
     }
@@ -571,13 +608,13 @@ td.n,th.n{text-align:right;white-space:nowrap}
     $("pub").onclick = function () { grab(); save(true); };
     function save(pub) {
       if (X.quiz.length < 2) return toast("Keep at least 2 quiz questions");
-      var out = { en: X }, todo = []; if (pub) ED.langs.forEach(function (l) { todo.push([l, "a"], [l, "b"]); });
+      var out = { en: X }, todo = []; if (pub) ED.langs.forEach(function (l) { todo.push([l]); });
       $("pub").disabled = $("drf").disabled = true; $("pg").innerHTML = '<div class="prog"><i id="pbar"></i></div><div id="pt" class="muted" style="font-size:12.5px">Saving…</div>';
       var i = 0, fails = [];
       (function next() {
         if (i >= todo.length) return done();
-        var j = todo[i++]; $("pt").textContent = "Translating into " + LNAME(j[0]) + " (" + (j[1] === "a" ? "lesson" : "quiz") + ")…"; $("pbar").style.width = Math.round((i - 1) / todo.length * 100) + "%";
-        api({ action: "cs-tr", lang: j[0], part: j[1], lesson: X }).then(function (r) { if (!r.ok) { if (fails.indexOf(LNAME(j[0])) < 0) fails.push(LNAME(j[0])); return next(); } out[j[0]] = Object.assign(out[j[0]] || {}, r.lesson); next(); });
+        var j = todo[i++]; $("pt").textContent = "Translating into " + LNAME(j[0]) + "…"; $("pbar").style.width = Math.round((i - 1) / todo.length * 100) + "%";
+        job({ action: "cs-tr", lang: j[0], lesson: X }, function (m) { $("pt").textContent = m; }).then(function (r) { if (!r.ok) { if (fails.indexOf(LNAME(j[0])) < 0) fails.push(LNAME(j[0])); return next(); } out[j[0]] = Object.assign(out[j[0]] || {}, r.lesson); next(); });
       })();
       function done() {
         Object.keys(out).forEach(function (l) { if (l !== "en" && !(out[l].cards && out[l].quiz)) delete out[l]; });
@@ -630,21 +667,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
       }
       function read() {
         var X = L.langs[lang];
-        VIEW.innerHTML = '<div class="card"><h2 style="margin:0 0 4px">' + esc(X.title) + '</h2><div class="muted" style="font-size:12px;margin-bottom:6px">📖 Read the whole case study — every answer comes from it. · ' + esc(me.name) + '</div><div class="case">' + esc(X.summary) + "</div></div>" +
-          '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (o, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"> ' + esc(o) + "</label>"; }).join("") + "</div>"; }).join("") + '<div class="bar2"><button class="btn pri" id="sb">Submit answers</button></div></div>';
-        [].forEach.call(VIEW.querySelectorAll(".q input"), function (inp) { inp.onchange = function () { ans[+inp.name.slice(1)] = +inp.value; }; });
-        $("sb").onclick = function () {
-          if (X.quiz.some(function (q, i) { return ans[i] == null; })) return toast("Answer every question first");
-          $("sb").disabled = true;
-          pub({ action: "cs-p-done", k: PUBK, name: me.name, state: me.state, phone: me.phone, lang: lang, answers: ans }).then(function (d) {
-            if (!d.ok) { $("sb").disabled = false; return toast(d.error); }
-            [].forEach.call(VIEW.querySelectorAll(".q"), function (el, i) { [].forEach.call(el.querySelectorAll("label"), function (lb, j) { lb.className = j === d.answers[i] ? "ok" : j === ans[i] ? "bad" : ""; }); if (d.why[i]) el.insertAdjacentHTML("beforeend", '<div class="why">💡 ' + esc(d.why[i]) + "</div>"); });
-            $("qz").insertAdjacentHTML("afterbegin", '<div class="score">' + d.score + "/" + d.total + '</div><div style="text-align:center;font-weight:700">' + (d.score === d.total ? "🎉 Perfect!" : d.score >= d.total * 0.6 ? "👍 Well done" : "Read the case study again and retry") + '</div><div class="bar2" style="justify-content:center"><button class="btn ghost sm" id="rt">Try again</button></div>');
-            if (d.keypoints && d.keypoints.length) $("qz").insertAdjacentHTML("afterend", '<div class="card"><b>📌 Remember</b><div style="font-size:13.5px;line-height:1.7;margin-top:4px">' + d.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div></div>");
-            $("rt").onclick = function () { ans = []; read(); window.scrollTo(0, 0); };
-            $("qz").scrollIntoView({ behavior: "smooth" });
-          });
-        };
+        VIEW.innerHTML = '<div class="card"><h2 style="margin:0 0 2px">' + esc(X.title) + '</h2><div class="muted" style="font-size:12px">' + esc(me.name) + " · " + esc(me.state) + '</div></div><div id="lv"></div>';
+        player($("lv"), X, { submit: function (a) { return pub({ action: "cs-p-done", k: PUBK, name: me.name, state: me.state, phone: me.phone, lang: lang, answers: a }); } });
       }
       who();
     });

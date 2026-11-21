@@ -12,7 +12,7 @@ function doPost(e) {
   try {
     var b = JSON.parse((e && e.postData && e.postData.contents) || "{}");
     if (!b.key || b.key !== BI_KEY) out = { ok: false, error: "Wrong key — copy the script again from the BI tool's Set-up." };
-    else if (b.action === "ping") out = { ok: true, account: Session.getEffectiveUser().getEmail(), version: 3 };
+    else if (b.action === "ping") out = { ok: true, account: Session.getEffectiveUser().getEmail(), version: 4 };
     else if (b.action === "create") out = createForm(b.survey || {}, b.opts || {});
     else if (b.action === "results") out = results(b.id, +b.max || 3000);
     else if (b.action === "accepting") { var f = FormApp.openById(b.id); f.setAcceptingResponses(!!b.on); if (b.msg) f.setCustomClosedFormMessage(String(b.msg)); out = { ok: true, on: f.isAcceptingResponses() }; }
@@ -76,7 +76,13 @@ function optionList(q) { if (q.type === "yesno") return (q.options && q.options.
 function addQuestion(form, q, warn) {
   var it, t = q.type, title = q.title || "Question";
   if (t === "info") { it = form.addSectionHeaderItem().setTitle(title); if (q.help) it.setHelpText(q.help); return null; }
-  if (t === "single" || t === "yesno") { it = form.addMultipleChoiceItem().setTitle(title).setChoiceValues(optionList(q)); if (q.other && t === "single") it.showOtherOption(true); }
+  if ((t === "single" || t === "yesno") && q.correct != null && tryDo(function () { return form.isQuiz(); })) {   // quiz question: right answer, points and feedback → score shown after submit
+    it = form.addMultipleChoiceItem().setTitle(title);
+    var mc = it; it.setChoices(optionList(q).map(function (o) { return mc.createChoice(o, String(o) === String(q.correct)); }));
+    tryDo(function () { it.setPoints(+q.points || 1); return 1; });
+    if (q.why) tryDo(function () { var fb = FormApp.createFeedback().setText(String(q.why).slice(0, 500)).build(); it.setFeedbackForCorrect(fb); it.setFeedbackForIncorrect(fb); return 1; });
+  }
+  else if (t === "single" || t === "yesno") { it = form.addMultipleChoiceItem().setTitle(title).setChoiceValues(optionList(q)); if (q.other && t === "single") it.showOtherOption(true); }
   else if (t === "multi") {
     it = form.addCheckboxItem().setTitle(title).setChoiceValues(optionList(q)); if (q.other) it.showOtherOption(true);
     var v = q.validation || {};
