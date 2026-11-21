@@ -9,7 +9,26 @@ import { randomBytes } from "node:crypto";
 import { readImages } from "./schemecalc-core.mjs";
 import { aiKeys } from "./aff-core.mjs";
 import { ALL_STATES, defaultLang, LANGS, gas } from "./sf-core.mjs";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+
+// ---- quiz timing + score: the server signs the start time, so the time taken can't be faked
+const SC_DEF = { secPerQ: 30, limitPerQ: 60, wAcc: 80, wTime: 20, minAcc: 50 };
+async function scCfg(store) { return Object.assign({}, SC_DEF, (await store.get("cs:scorecfg")) || {}); }
+async function hkey(store) { let k = await store.get("cs:hkey"); if (!k) { k = { k: randomBytes(24).toString("hex") }; await store.set("cs:hkey", k); } return k.k; }
+async function startTok(store, id, who, t) { const k = await hkey(store); return t.toString(36) + "." + createHmac("sha256", k).update(id + "|" + who + "|" + t).digest("base64url").slice(0, 22); }
+async function tookSecs(store, tok, id, who, t) {   // seconds from the quiz opening to submit, or null if no / bad token
+  const [a, sig] = String(tok || "").split("."), st = parseInt(a, 36); if (!st || !sig) return null;
+  const k = await hkey(store); if (createHmac("sha256", k).update(id + "|" + who + "|" + st).digest("base64url").slice(0, 22) !== sig) return null;
+  const s = Math.round((t - st) / 1000); return s >= 0 && s < 86400 ? s : null;
+}
+// points out of 100: accuracy weight + speed weight (speed counts only when accuracy reaches the minimum); no time → accuracy only, scaled to 100
+function points(C, score, total, secs) {
+  const acc = total ? score / total : 0; if (secs == null) return Math.round(acc * 100);
+  const tgt = C.secPerQ * total, lim = C.limitPerQ ? C.limitPerQ * total : 0;
+  let sp = 0; if (acc * 100 >= C.minAcc) sp = secs <= tgt ? 1 : lim && lim > tgt ? Math.max(0, (lim - secs) / (lim - tgt)) : Math.min(1, tgt / secs);
+  const W = (+C.wAcc || 0) + (+C.wTime || 0) || 100; return Math.round((C.wAcc * acc + C.wTime * sp) / W * 100);
+}
+const better = (n, o) => !o || n.points > (o.points ?? -1) || (n.points === o.points && n.score > o.score);
 const J = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 const txt = (v, n) => String(v == null ? "" : v).replace(/\r/g, "").trim().slice(0, n);
@@ -72,6 +91,13 @@ const canSee = (x, ho, rec) => ho || (x.pub && (x.states.includes("all") || x.st
 async function cs(b, ctx) {
   const { store, t, app, rec, uk } = ctx, ho = app === "admin";
   if (b.action === "cs-meta") return J(200, { ok: true, langs: Object.fromEntries(Object.keys(LN).map((k) => [k, LANGS[k] || k])), states: ALL_STATES, defaults: Object.fromEntries(ALL_STATES.map((x) => [x, defaultLang(x)])), mine: defaultLang(String(rec.state || "")) });
+  if (b.action === "cs-scorecfg") {
+    const C = await scCfg(store);
+    if (b.save) { if (!ho) return J(403, { ok: false, error: "HO only" }); const n = (v, lo, hi, d) => { v = Math.round(+v); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
+      const N = { secPerQ: n(b.cfg.secPerQ, 5, 600, 30), limitPerQ: n(b.cfg.limitPerQ, 0, 1200, 60), wAcc: n(b.cfg.wAcc, 0, 100, 80), wTime: n(b.cfg.wTime, 0, 100, 20), minAcc: n(b.cfg.minAcc, 0, 100, 50) };
+      if (N.limitPerQ && N.limitPerQ < N.secPerQ) N.limitPerQ = N.secPerQ; await store.set("cs:scorecfg", N); return J(200, { ok: true, cfg: N }); }
+    return J(200, { ok: true, cfg: C });
+  }
   if (b.action === "cs-job") { const j = await store.get("cs:job:" + str(b.job, 30)); return j ? J(200, { ok: true, job: Object.assign({}, j, { input: undefined }) }) : J(404, { ok: false, error: "Job not found" }); }
   if (b.action === "cs-ocr" || b.action === "cs-lesson" || b.action === "cs-tr") {   // long AI work runs as a background job; the page polls cs-job
     const kind = b.action.slice(3), input = kind === "ocr" ? { imgs: list(b.imgs || (b.img ? [b.img] : []), 4).filter(isImg) } : kind === "lesson" ? { text: txt(b.text, 30000), audience: str(b.audience, 60), nq: +b.nq || 6 } : { lang: str(b.lang, 4), lesson: b.lesson || {} };
@@ -104,19 +130,24 @@ async function cs(b, ctx) {
   const x = await store.get("cs:l:" + str(b.id, 20)); if (!x) return J(404, { ok: false, error: "Lesson not found" });
   if (!canSee(x, ho, rec)) return J(403, { ok: false, error: "This lesson is not for your state" });
   if (b.action === "cs-get") { const d = ho ? null : await store.get("cs:d:" + x.id + ":" + uk); return J(200, { ok: true, l: Object.assign({}, x, { src: ho ? x.src : undefined, gforms: undefined, forms: ho ? Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, g.shortUrl || g.url])) : undefined, token: ho ? x.token || "" : undefined }), mine: d }); }
+  if (b.action === "cs-start") { const C = await scCfg(store); return J(200, { ok: true, st: await startTok(store, x.id, uk, t), secPerQ: C.secPerQ, limitPerQ: C.limitPerQ }); }
   if (b.action === "cs-done") {
-    if (ho) return J(200, { ok: true, test: true });
-    const L = LN[b.lang] && x.langs[b.lang] ? b.lang : "en", Q = x.langs[L].quiz, ans = list(b.answers, Q.length), score = Q.reduce((a, q, i) => a + (+ans[i] === q.answer ? 1 : 0), 0);
-    const k = "cs:d:" + x.id + ":" + uk, old = await store.get(k);
-    const d = { score: Math.max(score, old ? old.score : 0), last: score, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1, name: rec.fullName || rec.username, state: rec.state || "HO", first: old ? old.first : t };
-    await store.set(k, d); return J(200, { ok: true, score, total: Q.length, best: d.score });
+    const L = LN[b.lang] && x.langs[b.lang] ? b.lang : "en", Q = x.langs[L].quiz, ans = list(b.answers, Q.length), score = Q.reduce((a, q, i) => a + (ans[i] != null && +ans[i] === q.answer ? 1 : 0), 0);
+    const secs = await tookSecs(store, b.st, x.id, uk, t);
+    if (ho) return J(200, { ok: true, test: true, score, total: Q.length, secs });
+    const C = await scCfg(store), pts = points(C, score, Q.length, secs);
+    const k = "cs:d:" + x.id + ":" + uk, old = await store.get(k), cur = { score, secs, points: pts };
+    const keep = better(cur, old) ? cur : { score: old.score, secs: old.secs, points: old.points ?? points(C, old.score, old.total, old.secs) };
+    const d = { score: keep.score, secs: keep.secs, points: keep.points, last: score, lastSecs: secs, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1, name: rec.fullName || rec.username, state: rec.state || "HO", first: old ? old.first : t };
+    await store.set(k, d); return J(200, { ok: true, score, total: Q.length, secs, best: d.score });
   }
   if (b.action === "cs-stats") {
     if (!ho) return J(403, { ok: false, error: "HO only" });
-    const R = (await ctx.pool(await store.list("cs:d:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "App", name: d.name, state: d.state, phone: "", score: d.score, total: d.total, tries: d.tries, lang: d.lang, at: d.at }));
-    const W = (await ctx.pool(await store.list("cs:x:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "Web link", name: d.name, state: d.state, phone: d.phone || "", score: d.score, total: d.total, tries: d.tries, lang: d.lang, at: d.at }));
-    const F = []; Object.values(x.gforms || {}).forEach((g) => (g.rows || []).forEach((d) => F.push({ src: "Google Form", name: d.name, state: d.state, phone: d.phone, score: d.score, total: d.total, tries: 1, lang: d.lang, at: Date.parse(String(d.at).replace(" ", "T") + ":00+05:30") || 0 })));
-    return J(200, { ok: true, rows: R.concat(W, F).sort((p, q) => q.at - p.at), forms: Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, { url: g.shortUrl || g.url, edit: g.editUrl, pulled: g.pulled || 0, n: (g.rows || []).length, quiz: !!g.quiz }])), token: x.token || "" });
+    const C = await scCfg(store), P = (d) => points(C, d.score, d.total, d.secs);   // points use today's scoring settings
+    const R = (await ctx.pool(await store.list("cs:d:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "App", name: d.name, state: d.state, phone: "", score: d.score, total: d.total, secs: d.secs ?? null, points: P(d), tries: d.tries, lang: d.lang, at: d.at }));
+    const W = (await ctx.pool(await store.list("cs:x:" + x.id + ":"), 30, (k) => store.get(k))).filter(Boolean).map((d) => ({ src: "Web link", name: d.name, state: d.state, phone: d.phone || "", score: d.score, total: d.total, secs: d.secs ?? null, points: P(d), tries: d.tries, lang: d.lang, at: d.at }));
+    const F = []; Object.values(x.gforms || {}).concat(x.gold || []).forEach((g) => (g.rows || []).forEach((d) => F.push({ src: "Google Form", name: d.name, state: d.state, phone: d.phone, score: d.score, total: d.total, secs: null, points: P({ score: d.score, total: d.total, secs: null }), tries: 1, lang: d.lang, at: Date.parse(String(d.at).replace(" ", "T") + ":00+05:30") || 0 })));
+    return J(200, { ok: true, scoring: C, rows: R.concat(W, F).sort((p, q) => q.points - p.points || q.at - p.at), forms: Object.fromEntries(Object.entries(x.gforms || {}).map(([L, g]) => [L, { url: g.shortUrl || g.url, edit: g.editUrl, pulled: g.pulled || 0, n: (g.rows || []).length, quiz: !!g.quiz }])), token: x.token || "" });
   }
   if (b.action === "cs-share") {   // public web link: anyone with it reads the case study and takes the quiz after typing name + state
     if (!ho) return J(403, { ok: false, error: "HO only" });
@@ -225,7 +256,8 @@ export async function runCsJob(store, jid, f, env, askAI) {
     };
     const r = await gas(cfg, { action: "create", survey, opts: {} }, f || fetch);
     if (!r || !r.ok) return up({ state: "err", msg: (r && r.error) || "Google didn't answer" });
-    x.gforms = x.gforms || {}; x.gforms[L] = { id: r.id, url: r.url, shortUrl: r.shortUrl, editUrl: r.editUrl, at: Date.now(), rows: [], quiz: quizOk };
+    x.gforms = x.gforms || {}; const oldF = x.gforms[L]; x.gforms[L] = { id: r.id, url: r.url, shortUrl: r.shortUrl, editUrl: r.editUrl, at: Date.now(), rows: [], quiz: quizOk };
+    if (oldF && (oldF.rows || []).length) { x.gold = x.gold || []; x.gold.push(Object.assign({}, oldF, { lang: L })); x.gold = x.gold.slice(-6); }   // answers of a rebuilt form stay in Who finished
     await store.set("cs:l:" + x.id, x);
     await up({ state: "done", msg: quizOk ? "Ready" : "Ready — update the Google connector to show scores in the form", url: r.shortUrl || r.url, edit: r.editUrl, quiz: quizOk });
   } catch (e) { await up({ state: "err", msg: String(e.message || e).slice(0, 200), input: null }); }
@@ -237,16 +269,18 @@ export async function csPublic(b, { store, t }) {
     const langs = {}; Object.keys(x.langs).forEach((L) => { const X = x.langs[L]; langs[L] = { title: X.title, summary: X.summary, keypoints: X.keypoints, cards: X.cards, flash: X.flash, quiz: X.quiz.map((q) => ({ q: q.q, options: q.options })) }; });
     return J(200, { ok: true, l: { title: x.title, langs }, states: ALL_STATES, langNames: Object.fromEntries(Object.keys(x.langs).map((L) => [L, LANGS[L] || L])) });
   }
+  if (b.action === "cs-p-start") { const C = await scCfg(store); return J(200, { ok: true, st: await startTok(store, x.id, "pub", t), secPerQ: C.secPerQ, limitPerQ: C.limitPerQ }); }
   if (b.action === "cs-p-done") {
     const name = str(b.name, 80), state = str(b.state, 40), phone = str(b.phone, 15).replace(/\D/g, "");
     if (name.length < 2 || !state) return J(400, { ok: false, error: "Type your name and choose your state" });
     if ((await store.list("cs:x:" + x.id + ":")).length > 20000) return J(429, { ok: false, error: "This quiz is full" });
     const L = x.langs[b.lang] ? b.lang : "en", X = x.langs[L], Q = X.quiz, ans = list(b.answers, Q.length);
-    if (ans.length < Q.length || ans.some((a) => a == null)) return J(400, { ok: false, error: "Answer every question" });
-    const score = Q.reduce((a, q, i) => a + (+ans[i] === q.answer ? 1 : 0), 0);
+    if (!b.timeout && (ans.length < Q.length || ans.some((a) => a == null))) return J(400, { ok: false, error: "Answer every question" });
+    const score = Q.reduce((a, q, i) => a + (ans[i] != null && +ans[i] === q.answer ? 1 : 0), 0), secs = await tookSecs(store, b.st, x.id, "pub", t);
     const pid = createHash("sha256").update(name.toLowerCase() + "|" + state + "|" + phone).digest("hex").slice(0, 16), key = "cs:x:" + x.id + ":" + pid, old = await store.get(key);
-    await store.set(key, { name, state, phone, score: Math.max(score, old ? old.score : 0), last: score, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1 });
-    return J(200, { ok: true, score, total: Q.length, answers: Q.map((q) => q.answer), why: Q.map((q) => q.why), keypoints: X.keypoints });
+    const C = await scCfg(store), cur = { score, secs, points: points(C, score, Q.length, secs) }, keep = better(cur, old) ? cur : { score: old.score, secs: old.secs, points: old.points ?? points(C, old.score, old.total, old.secs) };
+    await store.set(key, { name, state, phone, score: keep.score, secs: keep.secs, points: keep.points, last: score, lastSecs: secs, total: Q.length, lang: L, at: t, tries: (old ? old.tries : 0) + 1 });
+    return J(200, { ok: true, score, total: Q.length, secs, answers: Q.map((q) => q.answer), why: Q.map((q) => q.why), keypoints: X.keypoints });
   }
   return J(400, { ok: false, error: "Unknown action" });
 }

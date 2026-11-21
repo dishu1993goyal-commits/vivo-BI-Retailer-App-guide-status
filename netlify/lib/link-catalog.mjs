@@ -834,8 +834,11 @@ export const LINK_CATALOG = {
 "cs-ocr",
 "cs-p-done",
 "cs-p-get",
+"cs-p-start",
 "cs-save",
+"cs-scorecfg",
 "cs-share",
+"cs-start",
 "cs-stats",
 "cs-tr",
 "tlk-cat"

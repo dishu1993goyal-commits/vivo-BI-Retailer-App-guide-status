@@ -191,6 +191,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .muted{color:var(--mut)}
 .foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
 
+.qtime{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;background:var(--card,#fff);border:1px solid var(--line,#e3e7ef);border-radius:12px;padding:8px 12px;margin:8px 0;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.qtime .sp{flex:1}.qtime.late{border-color:#e5484d;color:#c62828}
 .lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
 .pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#8A5300}.pill.r{background:#FDECEC;color:#B42318}.pill.m{background:#F1F2F6;color:#555}
 .help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}
@@ -469,28 +471,45 @@ td.n,th.n{text-align:right;white-space:nowrap}
       (X.flash && X.flash.length ? '<div class="card"><b>🃏 Flash cards</b> <span class="muted" style="font-size:12px">tap a card to see the answer</span><div class="fgrid">' + X.flash.map(function (f) { return '<div class="flip"><div class="in"><div class="f">' + esc(f.q) + '</div><div class="b">' + esc(f.a) + "</div></div></div>"; }).join("") + "</div></div>" : "");
   }
   function player(box, X, o) {
-    var step = "learn", ans = [], res = null;
+    var step = "learn", ans = [], res = null, ST = null, T0 = 0, tick = null, LIM = 0, sent = false;
+    var mmss = function (sec) { sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ":" + ("0" + sec % 60).slice(-2); };
+    function stopT() { if (tick) clearInterval(tick); tick = null; }
+    function startQuiz() {   // the clock starts when the questions open; the server signs the start time
+      ans = []; sent = false; ST = null; T0 = Date.now(); LIM = 0; step = "quiz"; render(); window.scrollTo(0, 0);
+      (o.start ? o.start() : Promise.resolve(null)).then(function (r) { if (r && r.ok) { ST = r.st; LIM = r.limitPerQ ? r.limitPerQ * X.quiz.length : 0; } });
+      stopT(); tick = setInterval(function () {
+        var el = box.querySelector("#qt"); if (!el || step !== "quiz") return stopT();
+        var e = (Date.now() - T0) / 1000, n = ans.filter(function (v) { return v != null; }).length;
+        el.innerHTML = "⏱ <b>" + mmss(e) + "</b>" + (LIM ? ' <span class="muted">/ ' + mmss(LIM) + "</span>" : "") + ' <span class="sp"></span>✏️ ' + n + "/" + X.quiz.length + " answered";
+        el.classList.toggle("late", !!LIM && LIM - e <= 30);
+        if (LIM && e >= LIM && !sent) { toast("⏰ Time is up — submitting your answers"); send(true); }
+      }, 500);
+    }
+    function send(timeout) {
+      if (sent) return; sent = true; var b = $("sb"); if (b) { b.disabled = true; b.textContent = "Checking…"; }
+      o.submit(ans, ST, !!timeout).then(function (d) { if (!d || !d.ok) { sent = false; if (b) { b.disabled = false; b.textContent = "Submit answers"; } return toast((d && d.error) || "Couldn't submit — try again"); } stopT(); res = d; if (res.secs == null) res.secs = Math.round((Date.now() - T0) / 1000); res.timeout = !!timeout; step = "done"; render(); window.scrollTo(0, 0); });
+    }
     function steps() { return '<div class="stp3">' + [["learn", "1 · Read"], ["quiz", "2 · Quiz"], ["done", "3 · Result"]].map(function (x) { return '<span class="' + (x[0] === step ? "on" : "") + '">' + x[1] + "</span>"; }).join("") + "</div>"; }
     function wire() { [].forEach.call(box.querySelectorAll(".flip"), function (f) { f.onclick = function () { f.classList.toggle("on"); }; }); }
     function render() {
       if (step === "learn") {
         box.innerHTML = steps() + (o.mine ? '<div class="help">Your best so far: <b>' + o.mine.score + "/" + o.mine.total + "</b></div>" : "") + learnHtml(X, true) + '<div class="card" style="text-align:center"><button class="btn pri" id="go" style="width:100%">✅ I have read it — start the quiz (' + X.quiz.length + " questions)</button></div>";
-        $("go").onclick = function () { step = "quiz"; render(); window.scrollTo(0, 0); };
+        $("go").onclick = startQuiz;
       } else if (step === "quiz") {
         box.innerHTML = steps() + '<details class="card"><summary style="cursor:pointer;font-weight:700">📖 Re-read the case study</summary>' + caseHtml(X) + "</details>" +
+          '<div class="qtime" id="qt">⏱ <b>0:00</b></div>' +
           '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (op, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"' + (ans[i] === j ? " checked" : "") + "> " + esc(op) + "</label>"; }).join("") + "</div>"; }).join("") + '<div class="bar2"><button class="btn pri" id="sb" style="width:100%">Submit answers</button></div></div>';
         [].forEach.call(box.querySelectorAll(".q input"), function (inp) { inp.onchange = function () { ans[+inp.name.slice(1)] = +inp.value; }; });
         $("sb").onclick = function () {
           var miss = X.quiz.map(function (q, i) { return ans[i] == null ? i + 1 : 0; }).filter(Boolean); if (miss.length) return toast("Answer question " + miss.join(", ") + " first");
-          $("sb").disabled = true; $("sb").textContent = "Checking…";
-          o.submit(ans).then(function (d) { if (!d || !d.ok) { $("sb").disabled = false; $("sb").textContent = "Submit answers"; return toast((d && d.error) || "Couldn't submit — try again"); } res = d; step = "done"; render(); window.scrollTo(0, 0); });
+          send(false);
         };
       } else {
         var right = res.score, tot = res.total, pctv = Math.round(right / tot * 100);
-        box.innerHTML = steps() + '<div class="card" style="text-align:center"><div class="score">' + right + "/" + tot + '</div><div style="font-size:15px;font-weight:800">' + (right === tot ? "🎉 Perfect — you understood the circular!" : pctv >= 60 ? "👍 Well done — " + pctv + "%" : "📖 " + pctv + "% — read the lesson below and try again") + "</div>" + (res.test ? '<div class="muted" style="font-size:12px">HO test — not counted</div>' : "") + (res.best != null && res.best > right ? '<div class="muted" style="font-size:12px">Your best: ' + res.best + "/" + tot + "</div>" : "") + '<div class="bar2" style="justify-content:center"><button class="btn sec sm" id="rt">↺ Try again</button>' + (o.back ? '<button class="btn ghost sm" id="bk2">← All lessons</button>' : "") + "</div></div>" +
-          '<div class="card"><b>🧾 Your answers</b>' + X.quiz.map(function (q, i) { var a = res.answers[i], ok = ans[i] === a; return '<div class="q"><b>' + (ok ? "✅ " : "❌ ") + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (op, j) { return '<label class="' + (j === a ? "ok" : j === ans[i] ? "bad" : "") + '">' + esc(op) + (j === ans[i] ? "  ← your answer" : "") + "</label>"; }).join("") + (res.why && res.why[i] ? '<div class="why">💡 ' + esc(res.why[i]) + "</div>" : "") + "</div>"; }).join("") + "</div>" +
+        box.innerHTML = steps() + '<div class="card" style="text-align:center"><div class="score" style="font-size:30px">' + right + " of " + tot + ' correct</div><div class="muted" style="font-size:13px;margin:2px 0 6px">⏱ Time taken ' + mmss(res.secs || 0) + (res.timeout ? " · time ran out" : "") + '</div><div style="font-size:15px;font-weight:800">' + (right === tot ? "🎉 Perfect — you understood the circular!" : pctv >= 60 ? "👍 Well done — " + pctv + "%" : "📖 " + pctv + "% — read the lesson below and try again") + "</div>" + (res.test ? '<div class="muted" style="font-size:12px">HO test — not counted</div>' : "") + (res.best != null && res.best > right ? '<div class="muted" style="font-size:12px">Your best: ' + res.best + " of " + tot + "</div>" : "") + '<div class="bar2" style="justify-content:center"><button class="btn sec sm" id="rt">↺ Try again</button>' + (o.back ? '<button class="btn ghost sm" id="bk2">← All lessons</button>' : "") + "</div></div>" +
+          '<div class="card"><b>🧾 Your answers</b>' + X.quiz.map(function (q, i) { var a = res.answers[i], ok = ans[i] === a; if (ans[i] == null) ok = false; return '<div class="q"><b>' + (ok ? "✅ " : "❌ ") + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (op, j) { return '<label class="' + (j === a ? "ok" : j === ans[i] ? "bad" : "") + '">' + esc(op) + (j === ans[i] ? "  ← your answer" : "") + "</label>"; }).join("") + (res.why && res.why[i] ? '<div class="why">💡 ' + esc(res.why[i]) + "</div>" : "") + "</div>"; }).join("") + "</div>" +
           '<div class="sec">Revise what you learnt</div>' + learnHtml(X, false) + '<details class="card"><summary style="cursor:pointer;font-weight:700">📖 Case study</summary>' + caseHtml(X) + "</details>";
-        $("rt").onclick = function () { ans = []; step = "quiz"; render(); window.scrollTo(0, 0); };
+        $("rt").onclick = startQuiz;
         if ($("bk2")) $("bk2").onclick = o.back;
       }
       wire();
@@ -508,9 +527,9 @@ td.n,th.n{text-align:right;white-space:nowrap}
         VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button>' + (HO ? '<button class="btn ghost sm" id="sh" style="margin-left:auto">🔗 Share</button><button class="btn ghost sm" id="st">📊 Who finished</button><button class="btn ghost sm" id="ed">✏️ Edit</button><button class="btn ghost sm" id="pb">' + (L.pub ? "Unpublish" : "Publish") + '</button><button class="btn ghost sm" id="dl">🗑</button>' : "") + "</div>" +
           (langs.length > 1 ? '<div class="chips" id="lg">' + langs.map(function (l) { return '<button data-l="' + l + '" class="' + (l === lang ? "on" : "") + '">' + esc(LNAME(l)) + "</button>"; }).join("") + "</div>" : "") +
           '<h2 style="margin:12px 0 0">' + esc(X.title) + '</h2></div><div id="lv"></div>';
-        player($("lv"), X, { mine: r.mine, back: drawList, submit: function (a) {
+        player($("lv"), X, { mine: r.mine, back: drawList, start: function () { return api({ action: "cs-start", id: L.id }); }, submit: function (a, st, to) {
           var right = X.quiz.reduce(function (n, q, i) { return n + (a[i] === q.answer ? 1 : 0); }, 0);
-          return api({ action: "cs-done", id: L.id, lang: lang, answers: a }).then(function (d) { return { ok: true, score: right, total: X.quiz.length, answers: X.quiz.map(function (q) { return q.answer; }), why: X.quiz.map(function (q) { return q.why; }), test: d.test, best: d.best }; });
+          return api({ action: "cs-done", id: L.id, lang: lang, answers: a, st: st, timeout: to }).then(function (d) { return { ok: true, secs: d.secs, score: right, total: X.quiz.length, answers: X.quiz.map(function (q) { return q.answer; }), why: X.quiz.map(function (q) { return q.why; }), test: d.test, best: d.best }; });
         } });
         $("bk").onclick = drawList;
         if ($("lg")) [].forEach.call($("lg").children, function (b) { b.onclick = function () { lang = b.dataset.l; try { localStorage.setItem("cs-lang", lang); } catch (e) { } show(); }; });
@@ -535,8 +554,8 @@ td.n,th.n{text-align:right;white-space:nowrap}
       var ov = sheet("🔗 Share “" + L.title + "”", "For people outside the app — their name, state and score show in 📊 Who finished", [],
         '<b>🌐 Web link</b><div class="muted" style="font-size:12px">Opens without login: they type name + state, read the case study (in any language you made) and take the quiz.</div>' +
         (web ? '<div class="link">' + esc(web) + '</div><div class="qrbox">' + qrImg(web) + '</div><div class="bar2"><button class="btn pri sm" id="wc">📋 Copy</button><button class="btn ghost sm" id="ww">🟢 WhatsApp</button><button class="btn ghost sm" id="woff" style="color:#B42318">Switch off</button></div>' : '<div class="bar2"><button class="btn pri sm" id="won">Make web link</button></div>') +
-        '<b style="display:block;margin-top:16px">📝 Google Form</b><div class="muted" style="font-size:12px">A Google Form: name, state and mobile → the full case study, key points, lessons and flash cards → the quiz, scored by Google right after submit. Answers are also pulled in and marked here.</div>' +
-        langs.map(function (Lg) { var f = st.forms && st.forms[Lg]; return '<div style="border-top:1px solid #EEF0F6;padding:8px 0;margin-top:6px"><b style="font-size:13px">' + esc(LNAME(Lg)) + "</b>" + (f ? '<div class="link">' + esc(f.url) + '</div><div class="bar2"><button class="btn ghost sm" data-fc="' + esc(f.url) + '">📋 Copy</button><button class="btn ghost sm" data-fw="' + esc(f.url) + '">🟢 WhatsApp</button><a class="btn ghost sm" href="' + esc(f.edit || "#") + '" target="_blank">✏️ Edit in Google</a></div><div class="muted" style="font-size:11.5px">' + f.n + " answers pulled" + (f.pulled ? " · " + dt(f.pulled) : "") + "</div>" + (f.quiz ? '<div class="muted" style="font-size:11.5px">✅ Scored quiz — people see their score and the right answers after submitting.</div>' : '<div class="help w" style="font-size:12px">This form does not show the score. Update the Google connector once: 📝 Survey & poll creator → Set-up → copy the new script into Apps Script → Deploy → Manage deployments → ✏️ → New version. Then delete this form in Google and tap “Make Google Form” again.</div>') : '<div class="bar2"><button class="btn ghost sm" data-mk="' + Lg + '">＋ Make Google Form</button></div>') + "</div>"; }).join("") + '<div id="gfm" class="muted" style="font-size:12.5px"></div>');
+        '<b style="display:block;margin-top:16px">📝 Google Form</b><div class="muted" style="font-size:12px">A Google Form: name, state and mobile → the full case study, key points, lessons and flash cards → the quiz, scored by Google right after submit (“View score” shows e.g. 5/6 correct). Answers are also pulled in and marked here.</div><div class="help w" style="font-size:12px;margin-top:6px">⏱ Google Forms has no timer, so Google Form answers are scored on correct answers only. For a timed quiz share the 🌐 web link above — it shows a live timer and counts the time in the score.</div>' +
+        langs.map(function (Lg) { var f = st.forms && st.forms[Lg]; return '<div style="border-top:1px solid #EEF0F6;padding:8px 0;margin-top:6px"><b style="font-size:13px">' + esc(LNAME(Lg)) + "</b>" + (f ? '<div class="link">' + esc(f.url) + '</div><div class="bar2"><button class="btn ghost sm" data-fc="' + esc(f.url) + '">📋 Copy</button><button class="btn ghost sm" data-fw="' + esc(f.url) + '">🟢 WhatsApp</button><a class="btn ghost sm" href="' + esc(f.edit || "#") + '" target="_blank">✏️ Edit in Google</a></div><div class="muted" style="font-size:11.5px">' + f.n + " answers pulled" + (f.pulled ? " · " + dt(f.pulled) : "") + "</div>" + (f.quiz ? '<div class="muted" style="font-size:11.5px">✅ Scored quiz — people see their score and the right answers after submitting.</div>' : '<div class="help w" style="font-size:12px">This form does not show the score. Update the Google connector once: 📝 Survey & poll creator → Set-up → copy the new script into Apps Script → Deploy → Manage deployments → ✏️ → New version. Then tap 🔁 Rebuild.</div><div class="bar2"><button class="btn pri sm" data-mk="' + Lg + '">🔁 Rebuild as scored quiz</button></div>') : '<div class="bar2"><button class="btn ghost sm" data-mk="' + Lg + '">＋ Make Google Form</button></div>') + "</div>"; }).join("") + '<div id="gfm" class="muted" style="font-size:12.5px"></div>');
       var q = function (s) { return ov.querySelector(s); }, all = function (s) { return ov.querySelectorAll(s); };
       var msg = function (u) { return "📜 " + L.title + "\nRead the case study and take the quiz:\n" + u; };
       if (q("#won")) q("#won").onclick = function () { api({ action: "cs-share", id: L.id, on: true }).then(function (r) { if (!r.ok) return toast(r.error); L.token = r.token; closeSheet(ov); share(L); }); };
@@ -556,16 +575,31 @@ td.n,th.n{text-align:right;white-space:nowrap}
     });
   }
   function closeSheet(ov) { try { var o = ov && (ov.closest ? ov.closest(".ov,.sheet-ov,.sh-ov") : null) || ov; (o.parentNode && o.remove()); } catch (e) { } var x = document.querySelector(".ov"); if (x) x.remove(); }
+  function mmss(sec) { sec = Math.max(0, Math.round(sec || 0)); return Math.floor(sec / 60) + ":" + ("0" + sec % 60).slice(-2); }
+  function scoring(L) {
+    api({ action: "cs-scorecfg" }).then(function (r) {
+      var C = r.cfg, f = function (id, lb, v, hint) { return '<label class="lb">' + lb + ' <small class="muted">' + hint + '</small></label><input class="tx" type="number" inputmode="numeric" id="' + id + '" value="' + v + '">'; };
+      sheet("⚙️ Quiz scoring", "Applies to every lesson — app, web link and Google Form", [["💾", "Save", function (ov) {
+        var g = function (id) { return ov.querySelector("#" + id).value; };
+        api({ action: "cs-scorecfg", save: true, cfg: { secPerQ: g("c1"), limitPerQ: g("c2"), wAcc: g("c3"), wTime: g("c4"), minAcc: g("c5") } }).then(function (x) { if (!x.ok) return toast(x.error); toast("Scoring saved"); if (L) stats(L); });
+      }, "pri"]],
+        f("c1", "Target time per question (seconds)", C.secPerQ, "finish within this = full speed marks") + f("c2", "Time limit per question (seconds)", C.limitPerQ, "0 = no limit · the quiz submits itself when time is up") +
+        f("c3", "Weight for correct answers", C.wAcc, "e.g. 80") + f("c4", "Weight for speed", C.wTime, "e.g. 20") + f("c5", "Speed counts only from (% correct)", C.minAcc, "stops quick guessing") +
+        '<div class="help" style="margin-top:10px">Example with 6 questions: target ' + C.secPerQ * 6 + " s" + (C.limitPerQ ? ", limit " + C.limitPerQ * 6 + " s" : "") + ". The timer starts when the questions open (reading time isn't counted) and is measured on the server.</div>");
+    });
+  }
   function stats(L) {
     api({ action: "cs-stats", id: L.id }).then(function (r) {
       if (!r.ok) return toast(r.error);
       var srcN = {}; r.rows.forEach(function (d) { srcN[d.src] = (srcN[d.src] || 0) + 1; });
       var byS = {}; r.rows.forEach(function (d) { (byS[d.state] = byS[d.state] || []).push(d); });
-      var acts = [["⬇", "Download Excel", function () { download(xlsx([{ name: "Completion", rows: [["Name", "State", "Mobile", "From", "Best score", "Out of", "Tries", "Language", "Last"]].concat(r.rows.map(function (d) { return [d.name, d.state, d.phone || "", d.src, d.score, d.total, d.tries, LNAME(d.lang), dt(d.at)]; })) }]), "lesson_completion.xlsx"); return false; }, "pri"]];
+      var acts = [["⬇", "Download Excel", function () { download(xlsx([{ name: "Completion", rows: [["Rank", "Name", "State", "Mobile", "From", "Correct", "Out of", "Time taken (m:ss)", "Score /100", "Tries", "Language", "Last"]].concat(r.rows.map(function (d, i) { return [i + 1, d.name, d.state, d.phone || "", d.src, d.score, d.total, d.secs == null ? "no timer" : mmss(d.secs), d.points, d.tries, LNAME(d.lang), dt(d.at)]; })) }]), "lesson_completion.xlsx"); return false; }, "pri"]];
+      acts.push(["⚙️", "Scoring", function () { scoring(L); return false; }]);
       if (Object.keys(r.forms || {}).length) acts.push(["🔄", "Pull Google Form answers", function () { toast("Pulling answers from Google…"); api({ action: "cs-gres", id: L.id }).then(function (x) { if (!x.ok) return toast(x.error); toast(x.n + " Google Form answer(s)" + (x.errs.length ? " · couldn't read: " + x.errs.join(", ") : "")); stats(L); }); }]);
       sheet("Who finished · " + L.title, r.rows.length + " people · " + Object.keys(srcN).map(function (k) { return k + " " + srcN[k]; }).join(" · "), acts,
-        '<table class="tb" style="margin-top:8px"><tr><th>State</th><th>Done</th><th>Avg score</th></tr>' + Object.keys(byS).sort().map(function (s) { var a = byS[s]; return "<tr><td>" + esc(s) + "</td><td>" + a.length + "</td><td>" + Math.round(a.reduce(function (x, d) { return x + d.score / d.total; }, 0) / a.length * 100) + "%</td></tr>"; }).join("") + "</table>" +
-        '<div style="max-height:260px;overflow:auto;margin-top:8px"><table class="tb"><tr><th>Name</th><th>State</th><th>From</th><th>Score</th></tr>' + r.rows.map(function (d) { return "<tr><td>" + esc(d.name) + (d.phone ? '<br><small class="muted">' + esc(d.phone) + "</small>" : "") + "</td><td>" + esc(d.state) + '</td><td><span class="pill ' + (d.src === "App" ? "m" : d.src === "Web link" ? "" : "g") + '">' + esc(d.src) + "</span></td><td>" + d.score + "/" + d.total + "</td></tr>"; }).join("") + "</table></div>");
+        '<table class="tb" style="margin-top:8px"><tr><th>State</th><th>Done</th><th>Correct</th><th>Avg score</th></tr>' + Object.keys(byS).sort().map(function (s) { var a = byS[s]; return "<tr><td>" + esc(s) + "</td><td>" + a.length + "</td><td>" + Math.round(a.reduce(function (x, d) { return x + d.score / d.total; }, 0) / a.length * 100) + "%</td><td><b>" + Math.round(a.reduce(function (x, d) { return x + d.points; }, 0) / a.length) + "</b></td></tr>"; }).join("") + "</table>" +
+        '<div class="muted" style="font-size:11.5px;margin-top:6px">Score /100 = ' + r.scoring.wAcc + "% correct answers + " + r.scoring.wTime + "% speed (target " + r.scoring.secPerQ + " s a question" + (r.scoring.limitPerQ ? ", limit " + r.scoring.limitPerQ + " s" : "") + "; speed counts from " + r.scoring.minAcc + '% correct). Google Form has no timer, so it is scored on correct answers only. People see only how many they got right and their time.</div>' +
+        '<div style="max-height:260px;overflow:auto;margin-top:8px"><table class="tb"><tr><th>#</th><th>Name</th><th>State</th><th>From</th><th>Correct · time</th><th>Score</th></tr>' + r.rows.map(function (d, i) { return "<tr><td>" + (i + 1) + "</td><td>" + esc(d.name) + (d.phone ? '<br><small class="muted">' + esc(d.phone) + "</small>" : "") + "</td><td>" + esc(d.state) + '</td><td><span class="pill ' + (d.src === "App" ? "m" : d.src === "Web link" ? "" : "g") + '">' + esc(d.src) + "</span></td><td>" + d.score + "/" + d.total + '<br><small class="muted">' + (d.secs == null ? "no timer" : "⏱ " + mmss(d.secs)) + "</small></td><td><b>" + d.points + "</b></td></tr>"; }).join("") + "</table></div>");
     });
   }
   function drawNew() {
@@ -668,7 +702,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       function read() {
         var X = L.langs[lang];
         VIEW.innerHTML = '<div class="card"><h2 style="margin:0 0 2px">' + esc(X.title) + '</h2><div class="muted" style="font-size:12px">' + esc(me.name) + " · " + esc(me.state) + '</div></div><div id="lv"></div>';
-        player($("lv"), X, { submit: function (a) { return pub({ action: "cs-p-done", k: PUBK, name: me.name, state: me.state, phone: me.phone, lang: lang, answers: a }); } });
+        player($("lv"), X, { start: function () { return pub({ action: "cs-p-start", k: PUBK }); }, submit: function (a, st, to) { return pub({ action: "cs-p-done", k: PUBK, name: me.name, state: me.state, phone: me.phone, lang: lang, answers: a, st: st, timeout: to }); } });
       }
       who();
     });
