@@ -165,7 +165,7 @@ Rules: question types — single = radio (one answer), multi = checkboxes, dropd
 Conditional logic: when later questions apply only to some people, put them in their own section and use goTo on the deciding question; a branch section that should not continue into the next branch must set "next" to the section where the paths meet (or SUBMIT). goTo targets must be ids of sections that come AFTER the question's section.
 Keep it answerable on a phone: short clear wording, options mutually exclusive and complete (add "Other" via "other":true or "Not applicable" where needed), required only where the answer is essential.`;
 
-async function gas(cfg, body, f) {
+export async function gas(cfg, body, f) {
   if (!cfg.gasUrl || !cfg.gasKey) return { ok: false, error: "Google Forms is not connected yet — HO: open Set-up." };
   let r, t;
   try { r = await f(cfg.gasUrl, { method: "POST", headers: { "content-type": "text/plain;charset=utf-8" }, body: JSON.stringify(Object.assign({ key: cfg.gasKey }, body)), redirect: "follow" }); t = await r.text(); }

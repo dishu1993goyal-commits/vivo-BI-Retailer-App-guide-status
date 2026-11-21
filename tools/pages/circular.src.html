@@ -23,6 +23,9 @@
 .q{margin-top:12px;padding-top:10px;border-top:1px solid #EEF0F6}.q b{display:block;font-size:14px;margin-bottom:6px}.q label{display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid #E3E6F3;border-radius:10px;margin-top:5px;font-size:13.5px;cursor:pointer}
 .q label.ok{background:#E6F4EA;border-color:#9BD3AE}.q label.bad{background:#FDECEC;border-color:#F3B1AA}.q .why{font-size:12.5px;color:var(--mut);margin-top:5px}
 .ch{border-left:4px solid #4D5BF9;background:#F7F8FC;border-radius:10px;padding:9px 11px;margin-top:8px;font-size:13px}.ch.added{border-color:#13693F}.ch.removed{border-color:#B42318}.ch .bf{color:#B42318;text-decoration:line-through}.ch .af{color:#13693F;font-weight:700}
+.case{font-size:14.5px;line-height:1.75;white-space:pre-wrap;background:#FBFBFE;border:1px solid #EEF0F6;border-radius:12px;padding:12px 14px}
+.qrbox{display:flex;justify-content:center;margin-top:8px}
+.link{font:700 12.5px ui-monospace,Menlo,Consolas,monospace;word-break:break-all;background:#F7F8FC;border-radius:10px;padding:9px;margin-top:6px}
 .score{font-size:42px;font-weight:900;text-align:center;color:#2B33A6}
 .big{font-size:40px;text-align:center}
 </style>
@@ -32,6 +35,7 @@
   <h1>Circular studio</h1><p>Turn a circular into a lesson + quiz in every state's language — or see what changed</p></div>
 <div class="wrap"><div class="tabs2" id="tabs"></div><div id="view" style="margin-top:10px"></div></div>
 <script src="/docread.js?v=1"></script>
+<script src="/vendor/qrcode/qrcode.js"></script>
 <script>
 (function () {
   "use strict";
@@ -81,18 +85,18 @@
     api({ action: "cs-get", id: id }).then(function (r) {
       if (!r.ok) return (VIEW.innerHTML = '<div class="card empty"><b>' + esc(r.error) + "</b></div>");
       var L = r.l, langs = Object.keys(L.langs), pref = function () { try { return localStorage.getItem("cs-lang") || ""; } catch (e) { return ""; } };
-      var lang = langs.indexOf(pref()) >= 0 ? pref() : META && langs.indexOf(META.mine) >= 0 ? META.mine : "en", ci = 0, fi = 0, ans = [];
+      var REV = !!r.mine, lang = langs.indexOf(pref()) >= 0 ? pref() : META && langs.indexOf(META.mine) >= 0 ? META.mine : "en", ci = 0, fi = 0, ans = [];
       function show() {
         var X = L.langs[lang];
-        VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button><span style="flex:1"></span>' + (HO ? '<button class="btn ghost sm" id="st">📊 Who finished</button><button class="btn ghost sm" id="ed">✏️ Edit</button><button class="btn ghost sm" id="pb">' + (L.pub ? "Unpublish" : "Publish") + '</button><button class="btn ghost sm" id="dl">🗑</button>' : "") + "</div>" +
+        VIEW.innerHTML = '<div class="card"><div class="bar2" style="margin-top:0"><button class="btn ghost sm" id="bk">← Back</button>' + (HO ? '<button class="btn ghost sm" id="sh" style="margin-left:auto">🔗 Share</button><button class="btn ghost sm" id="st">📊 Who finished</button><button class="btn ghost sm" id="ed">✏️ Edit</button><button class="btn ghost sm" id="pb">' + (L.pub ? "Unpublish" : "Publish") + '</button><button class="btn ghost sm" id="dl">🗑</button>' : "") + "</div>" +
           (langs.length > 1 ? '<div class="chips" id="lg">' + langs.map(function (l) { return '<button data-l="' + l + '" class="' + (l === lang ? "on" : "") + '">' + esc(LNAME(l)) + "</button>"; }).join("") + "</div>" : "") +
-          '<h2 style="margin:12px 0 4px">' + esc(X.title) + '</h2><div style="font-size:14px;line-height:1.6">' + esc(X.summary) + "</div>" +
-          (X.keypoints.length ? '<div class="help"><b>Remember</b><br>' + X.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div>" : "") + "</div>" +
-          (X.cards.length ? '<div class="card"><b>📖 Lesson · ' + (ci + 1) + " of " + X.cards.length + '</b><div class="lcard"><h4>' + esc(X.cards[ci].title) + "</h4>" + esc(X.cards[ci].body) + '</div><div class="bar2"><button class="btn ghost sm" id="cp"' + (ci ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="cn"' + (ci < X.cards.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") +
-          (X.flash.length ? '<div class="card"><b>🃏 Flash cards · ' + (fi + 1) + " of " + X.flash.length + '</b><div class="muted" style="font-size:12px">Tap the card to see the answer</div><div class="flip" id="fl"><div class="in"><div class="f">' + esc(X.flash[fi].q) + '</div><div class="b">' + esc(X.flash[fi].a) + '</div></div></div><div class="bar2"><button class="btn ghost sm" id="fp"' + (fi ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="fn"' + (fi < X.flash.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") +
+          '<h2 style="margin:12px 0 4px">' + esc(X.title) + '</h2><div class="muted" style="font-size:12px;margin-bottom:6px">📖 Read the whole case study — every quiz answer comes from it.</div><div class="case">' + esc(X.summary) + "</div></div>" +
           '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + (r.mine ? '<div class="help">Your best: <b>' + r.mine.score + "/" + r.mine.total + "</b> · tries: " + r.mine.tries + "</div>" : "") +
           X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (o, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"' + (ans[i] === j ? " checked" : "") + "> " + esc(o) + "</label>"; }).join("") + "</div>"; }).join("") +
-          '<div class="bar2"><button class="btn pri" id="sb">Submit answers</button></div></div>';
+          '<div class="bar2"><button class="btn pri" id="sb">Submit answers</button></div></div>' +
+          (HO || REV ? (X.keypoints.length ? '<div class="card"><b>📌 Remember</b><div style="font-size:13.5px;line-height:1.7;margin-top:4px">' + X.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div></div>" : "") +
+          (X.cards.length ? '<div class="card"><b>📖 Lesson · ' + (ci + 1) + " of " + X.cards.length + '</b><div class="lcard"><h4>' + esc(X.cards[ci].title) + "</h4>" + esc(X.cards[ci].body) + '</div><div class="bar2"><button class="btn ghost sm" id="cp"' + (ci ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="cn"' + (ci < X.cards.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") +
+          (X.flash.length ? '<div class="card"><b>🃏 Flash cards · ' + (fi + 1) + " of " + X.flash.length + '</b><div class="muted" style="font-size:12px">Tap the card to see the answer</div><div class="flip" id="fl"><div class="in"><div class="f">' + esc(X.flash[fi].q) + '</div><div class="b">' + esc(X.flash[fi].a) + '</div></div></div><div class="bar2"><button class="btn ghost sm" id="fp"' + (fi ? "" : " disabled") + '>← Back</button><button class="btn sec sm" id="fn"' + (fi < X.flash.length - 1 ? "" : " disabled") + ">Next →</button></div></div>" : "") : "");
         $("bk").onclick = drawList;
         if ($("lg")) [].forEach.call($("lg").children, function (b) { b.onclick = function () { lang = b.dataset.l; try { localStorage.setItem("cs-lang", lang); } catch (e) { } show(); }; });
         if ($("cn")) { $("cn").onclick = function () { ci++; show(); }; $("cp").onclick = function () { ci--; show(); }; }
@@ -105,11 +109,13 @@
           api({ action: "cs-done", id: L.id, lang: lang, answers: ans }).then(function (d) {
             $("qz").insertAdjacentHTML("afterbegin", '<div class="score">' + right + "/" + X.quiz.length + '</div><div style="text-align:center;font-weight:700">' + (right === X.quiz.length ? "🎉 Perfect!" : right >= X.quiz.length * 0.6 ? "👍 Well done" : "Read the lesson again and retry") + (d.test ? '<div class="muted" style="font-size:12px">HO test — not counted</div>' : "") + '</div><div class="bar2" style="justify-content:center"><button class="btn ghost sm" id="rt">Try again</button></div>');
             $("rt").onclick = function () { ans = []; show(); };
+            if (!REV) { REV = true; var keep = $("qz").innerHTML; show(); $("qz").innerHTML = keep; $("rt") && ($("rt").onclick = function () { ans = []; show(); }); }
             $("qz").scrollIntoView({ behavior: "smooth" });
           });
         };
         if (HO) {
           $("st").onclick = function () { stats(L); };
+          $("sh").onclick = function () { share(L); };
           $("ed").onclick = function () { ED = { step: "edit", id: L.id, en: JSON.parse(JSON.stringify(L.langs.en)), langs: langs.filter(function (l) { return l !== "en"; }), states: L.states, pub: L.pub, src: L.src || "" }; TAB = "new"; draw(); };
           $("pb").onclick = function () { api({ action: "cs-save", id: L.id, langs: L.langs, states: L.states, pub: !L.pub }).then(function (s) { if (!s.ok) return toast(s.error); L.pub = !L.pub; toast(L.pub ? "Published" : "Unpublished"); show(); }); };
           $("dl").onclick = function () { if (confirm("Delete this lesson and its results?")) api({ action: "cs-del", id: L.id }).then(function () { toast("Deleted"); drawList(); }); };
@@ -118,13 +124,47 @@
       show();
     });
   }
+  var ORIGIN = null;
+  function origin() { return ORIGIN != null ? Promise.resolve(ORIGIN) : api({ action: "tlk-cat" }).then(function (r) { ORIGIN = (r.ok && r.origin) || location.origin; return ORIGIN; }); }
+  function qrImg(text) { try { var q = qrcode(0, "M"); q.addData(text); q.make(); return q.createImgTag(4, 8); } catch (e) { return ""; } }
+  function cp(t, m) { try { navigator.clipboard.writeText(t).then(function () { toast(m || "Copied"); }, function () { prompt("Copy:", t); }); } catch (e) { prompt("Copy:", t); } }
+  function share(L) {
+    Promise.all([origin(), api({ action: "cs-stats", id: L.id })]).then(function (R) {
+      var o = R[0], st = R[1].ok ? R[1] : { forms: {}, token: L.token || "" }, tok = st.token, web = tok ? o + "/circular.html#k=" + tok : "", langs = Object.keys(L.langs);
+      var ov = sheet("🔗 Share “" + L.title + "”", "For people outside the app — their name, state and score show in 📊 Who finished", [],
+        '<b>🌐 Web link</b><div class="muted" style="font-size:12px">Opens without login: they type name + state, read the case study (in any language you made) and take the quiz.</div>' +
+        (web ? '<div class="link">' + esc(web) + '</div><div class="qrbox">' + qrImg(web) + '</div><div class="bar2"><button class="btn pri sm" id="wc">📋 Copy</button><button class="btn ghost sm" id="ww">🟢 WhatsApp</button><button class="btn ghost sm" id="woff" style="color:#B42318">Switch off</button></div>' : '<div class="bar2"><button class="btn pri sm" id="won">Make web link</button></div>') +
+        '<b style="display:block;margin-top:16px">📝 Google Form</b><div class="muted" style="font-size:12px">A Google Form with the case study and quiz (name, state, mobile first). Answers are pulled in and marked here.</div>' +
+        langs.map(function (Lg) { var f = st.forms && st.forms[Lg]; return '<div style="border-top:1px solid #EEF0F6;padding:8px 0;margin-top:6px"><b style="font-size:13px">' + esc(LNAME(Lg)) + "</b>" + (f ? '<div class="link">' + esc(f.url) + '</div><div class="bar2"><button class="btn ghost sm" data-fc="' + esc(f.url) + '">📋 Copy</button><button class="btn ghost sm" data-fw="' + esc(f.url) + '">🟢 WhatsApp</button><a class="btn ghost sm" href="' + esc(f.edit || "#") + '" target="_blank">✏️ Edit in Google</a></div><div class="muted" style="font-size:11.5px">' + f.n + " answers pulled" + (f.pulled ? " · " + dt(f.pulled) : "") + "</div>" : '<div class="bar2"><button class="btn ghost sm" data-mk="' + Lg + '">＋ Make Google Form</button></div>') + "</div>"; }).join("") + '<div id="gfm" class="muted" style="font-size:12.5px"></div>');
+      var q = function (s) { return ov.querySelector(s); }, all = function (s) { return ov.querySelectorAll(s); };
+      var msg = function (u) { return "📜 " + L.title + "\nRead the case study and take the quiz:\n" + u; };
+      if (q("#won")) q("#won").onclick = function () { api({ action: "cs-share", id: L.id, on: true }).then(function (r) { if (!r.ok) return toast(r.error); L.token = r.token; closeSheet(ov); share(L); }); };
+      if (q("#woff")) q("#woff").onclick = function () { if (!confirm("Switch off the web link? People who have it can no longer open the lesson.")) return; api({ action: "cs-share", id: L.id, on: false }).then(function () { L.token = ""; closeSheet(ov); share(L); }); };
+      if (q("#wc")) q("#wc").onclick = function () { cp(web, "Web link copied"); };
+      if (q("#ww")) q("#ww").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent(msg(web)), "_blank"); };
+      [].forEach.call(all("[data-fc]"), function (b) { b.onclick = function () { cp(b.dataset.fc, "Form link copied"); }; });
+      [].forEach.call(all("[data-fw]"), function (b) { b.onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent(msg(b.dataset.fw)), "_blank"); }; });
+      [].forEach.call(all("[data-mk]"), function (b) { b.onclick = function () {
+        b.disabled = true; q("#gfm").textContent = "Building the Google Form… (about 20–40 seconds)";
+        api({ action: "cs-gform", id: L.id, lang: b.dataset.mk }).then(function (r) {
+          if (!r.ok) { b.disabled = false; q("#gfm").textContent = r.error; return; }
+          var n = 0, poll = function () { api({ action: "cs-job", job: r.job }).then(function (j) { var J = j.ok ? j.job : { state: "err", msg: j.error }; if (J.state === "done") { toast("Google Form ready"); closeSheet(ov); share(L); } else if (J.state === "err") { b.disabled = false; q("#gfm").textContent = "❌ " + J.msg; } else if (++n < 60) { q("#gfm").textContent = J.msg + "…"; setTimeout(poll, 2500); } }); };
+          poll();
+        });
+      }; });
+    });
+  }
+  function closeSheet(ov) { try { var o = ov && (ov.closest ? ov.closest(".ov,.sheet-ov,.sh-ov") : null) || ov; (o.parentNode && o.remove()); } catch (e) { } var x = document.querySelector(".ov"); if (x) x.remove(); }
   function stats(L) {
     api({ action: "cs-stats", id: L.id }).then(function (r) {
       if (!r.ok) return toast(r.error);
+      var srcN = {}; r.rows.forEach(function (d) { srcN[d.src] = (srcN[d.src] || 0) + 1; });
       var byS = {}; r.rows.forEach(function (d) { (byS[d.state] = byS[d.state] || []).push(d); });
-      sheet("Who finished · " + L.title, r.rows.length + " people", [["⬇", "Download Excel", function () { download(xlsx([{ name: "Completion", rows: [["Name", "State", "Best score", "Out of", "Tries", "Language", "Last"]].concat(r.rows.map(function (d) { return [d.name, d.state, d.score, d.total, d.tries, LNAME(d.lang), dt(d.at)]; })) }]), "lesson_completion.xlsx"); return false; }, "pri"]],
+      var acts = [["⬇", "Download Excel", function () { download(xlsx([{ name: "Completion", rows: [["Name", "State", "Mobile", "From", "Best score", "Out of", "Tries", "Language", "Last"]].concat(r.rows.map(function (d) { return [d.name, d.state, d.phone || "", d.src, d.score, d.total, d.tries, LNAME(d.lang), dt(d.at)]; })) }]), "lesson_completion.xlsx"); return false; }, "pri"]];
+      if (Object.keys(r.forms || {}).length) acts.push(["🔄", "Pull Google Form answers", function () { toast("Pulling answers from Google…"); api({ action: "cs-gres", id: L.id }).then(function (x) { if (!x.ok) return toast(x.error); toast(x.n + " Google Form answer(s)" + (x.errs.length ? " · couldn't read: " + x.errs.join(", ") : "")); stats(L); }); }]);
+      sheet("Who finished · " + L.title, r.rows.length + " people · " + Object.keys(srcN).map(function (k) { return k + " " + srcN[k]; }).join(" · "), acts,
         '<table class="tb" style="margin-top:8px"><tr><th>State</th><th>Done</th><th>Avg score</th></tr>' + Object.keys(byS).sort().map(function (s) { var a = byS[s]; return "<tr><td>" + esc(s) + "</td><td>" + a.length + "</td><td>" + Math.round(a.reduce(function (x, d) { return x + d.score / d.total; }, 0) / a.length * 100) + "%</td></tr>"; }).join("") + "</table>" +
-        '<div style="max-height:260px;overflow:auto;margin-top:8px"><table class="tb"><tr><th>Name</th><th>State</th><th>Score</th></tr>' + r.rows.map(function (d) { return "<tr><td>" + esc(d.name) + "</td><td>" + esc(d.state) + "</td><td>" + d.score + "/" + d.total + "</td></tr>"; }).join("") + "</table></div>");
+        '<div style="max-height:260px;overflow:auto;margin-top:8px"><table class="tb"><tr><th>Name</th><th>State</th><th>From</th><th>Score</th></tr>' + r.rows.map(function (d) { return "<tr><td>" + esc(d.name) + (d.phone ? '<br><small class="muted">' + esc(d.phone) + "</small>" : "") + "</td><td>" + esc(d.state) + '</td><td><span class="pill ' + (d.src === "App" ? "m" : d.src === "Web link" ? "" : "g") + '">' + esc(d.src) + "</span></td><td>" + d.score + "/" + d.total + "</td></tr>"; }).join("") + "</table></div>");
     });
   }
   function drawNew() {
@@ -209,7 +249,44 @@
     $("x").onclick = function () { download(xlsx([{ name: "Changes", rows: [["Area", "Type", "Important", "Before", "After", "Impact"]].concat(D.changes.map(function (c) { return [c.area, c.type, c.important ? "Yes" : "", c.before, c.after, c.impact]; })) }, { name: "Summary", rows: [["Summary"], [D.summary], [""], ["Not changed"]].concat(D.same.map(function (s) { return [s]; })).concat([[""], ["To confirm"]]).concat(D.check.map(function (s) { return [s]; })) }]), "circular_changes.xlsx"); };
     if ($("ml")) $("ml").onclick = function () { ED = { step: "src", src: CMP.neu }; TAB = "new"; draw(); };
   }
-  api({ action: "cs-meta" }).then(function (r) { if (r.ok) META = r; draw(); });
+  var PUBK = (location.hash.match(/k=([\w-]+)/) || [])[1];
+  function pub(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state" }, body)) }).then(function (r) { return r.json(); }, function () { return { ok: false, error: "No internet connection" }; }); }
+  function publicLesson() {
+    $("tabs").style.display = "none"; VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Opening…</div>';
+    pub({ action: "cs-p-get", k: PUBK }).then(function (r) {
+      if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">🔗</div><b>' + esc(r.error) + "</b></div>"; return; }
+      var L = r.l, langs = Object.keys(L.langs), lang = "en", me = null, ans = [];
+      try { me = JSON.parse(localStorage.getItem("cs-me") || "null"); } catch (e) { }
+      function who() {
+        VIEW.innerHTML = '<div class="card"><h2 style="margin:0 0 4px">' + esc(L.title) + '</h2><div class="muted" style="font-size:13px">Read a short case study and answer the quiz. Your score is shared with the vivo team.</div>' +
+          '<label class="lb">Your name</label><input class="tx" id="pn" value="' + esc(me ? me.name : "") + '"><label class="lb">State</label><select class="tx" id="ps"><option value="">Choose…</option>' + r.states.concat(["Other"]).map(function (x) { return "<option" + (me && me.state === x ? " selected" : "") + ">" + esc(x) + "</option>"; }).join("") + '</select><label class="lb">Mobile (optional)</label><input class="tx" id="pm" inputmode="numeric" maxlength="10" value="' + esc(me ? me.phone || "" : "") + '">' +
+          (langs.length > 1 ? '<label class="lb">Language</label><select class="tx" id="pl">' + langs.map(function (l) { return '<option value="' + l + '">' + esc(r.langNames[l] || l) + "</option>"; }).join("") + "</select>" : "") +
+          '<div class="bar2"><button class="btn pri" id="pgo" style="width:100%">Start</button></div></div>';
+        $("pgo").onclick = function () { var n = $("pn").value.trim(), st = $("ps").value, ph = $("pm").value.trim(); if (n.length < 2 || !st) return toast("Type your name and choose your state"); if (ph && !/^[6-9]\d{9}$/.test(ph)) return toast("Mobile must be 10 digits"); me = { name: n, state: st, phone: ph }; try { localStorage.setItem("cs-me", JSON.stringify(me)); } catch (e) { } if ($("pl")) lang = $("pl").value; read(); };
+      }
+      function read() {
+        var X = L.langs[lang];
+        VIEW.innerHTML = '<div class="card"><h2 style="margin:0 0 4px">' + esc(X.title) + '</h2><div class="muted" style="font-size:12px;margin-bottom:6px">📖 Read the whole case study — every answer comes from it. · ' + esc(me.name) + '</div><div class="case">' + esc(X.summary) + "</div></div>" +
+          '<div class="card" id="qz"><b>✅ Quiz · ' + X.quiz.length + " questions</b>" + X.quiz.map(function (q, i) { return '<div class="q"><b>' + (i + 1) + ". " + esc(q.q) + "</b>" + q.options.map(function (o, j) { return '<label><input type="radio" name="q' + i + '" value="' + j + '"> ' + esc(o) + "</label>"; }).join("") + "</div>"; }).join("") + '<div class="bar2"><button class="btn pri" id="sb">Submit answers</button></div></div>';
+        [].forEach.call(VIEW.querySelectorAll(".q input"), function (inp) { inp.onchange = function () { ans[+inp.name.slice(1)] = +inp.value; }; });
+        $("sb").onclick = function () {
+          if (X.quiz.some(function (q, i) { return ans[i] == null; })) return toast("Answer every question first");
+          $("sb").disabled = true;
+          pub({ action: "cs-p-done", k: PUBK, name: me.name, state: me.state, phone: me.phone, lang: lang, answers: ans }).then(function (d) {
+            if (!d.ok) { $("sb").disabled = false; return toast(d.error); }
+            [].forEach.call(VIEW.querySelectorAll(".q"), function (el, i) { [].forEach.call(el.querySelectorAll("label"), function (lb, j) { lb.className = j === d.answers[i] ? "ok" : j === ans[i] ? "bad" : ""; }); if (d.why[i]) el.insertAdjacentHTML("beforeend", '<div class="why">💡 ' + esc(d.why[i]) + "</div>"); });
+            $("qz").insertAdjacentHTML("afterbegin", '<div class="score">' + d.score + "/" + d.total + '</div><div style="text-align:center;font-weight:700">' + (d.score === d.total ? "🎉 Perfect!" : d.score >= d.total * 0.6 ? "👍 Well done" : "Read the case study again and retry") + '</div><div class="bar2" style="justify-content:center"><button class="btn ghost sm" id="rt">Try again</button></div>');
+            if (d.keypoints && d.keypoints.length) $("qz").insertAdjacentHTML("afterend", '<div class="card"><b>📌 Remember</b><div style="font-size:13.5px;line-height:1.7;margin-top:4px">' + d.keypoints.map(function (k) { return "• " + esc(k); }).join("<br>") + "</div></div>");
+            $("rt").onclick = function () { ans = []; read(); window.scrollTo(0, 0); };
+            $("qz").scrollIntoView({ behavior: "smooth" });
+          });
+        };
+      }
+      who();
+    });
+  }
+  if (PUBK) publicLesson();
+  else api({ action: "cs-meta" }).then(function (r) { if (r.ok) META = r; draw(); });
 })();
 </script>
 </body>

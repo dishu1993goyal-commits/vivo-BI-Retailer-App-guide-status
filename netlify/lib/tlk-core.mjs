@@ -10,45 +10,64 @@ const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().sli
 const sha = (s) => createHash("sha256").update(String(s)).digest("hex");
 const COMMON = ["me", "ping", "logout", "acc-mine", "tl-use", "cust-get", "theme-get"];
 // action names that change something — blocked unless the link allows changes
-const WRITE = /-(add|set|save|edit|del|delete|remove|hide|refresh|keys|upload|import|bulk|create|update|upd|verify|reset|config|cfg|send|approve|reject|publish|close|accept|submit|respond|claim|pay|push|release|move|assign|freeze|setup)(-|$)/;
-export const isWrite = (a) => WRITE.test(a) || /^(support-upload|cust-save|cust-delete|cust-release|cxx-save|tl-push)$/.test(a);
+const WRITE = /-(add|set|save|edit|del|delete|remove|hide|refresh|keys|upload|import|bulk|create|update|upd|verify|reset|config|cfg|send|approve|reject|publish|close|accept|submit|respond|claim|pay|push|release|move|assign|freeze|setup|call|mark|pw|order|fmt|short|origin|share|gform|gres)(-|$)/;
+export const isWrite = (a, b) => {
+  // "…-cfg" / "…-setup" calls only READ the settings unless they carry something to save
+  if (/-(cfg|config|setup)$/.test(a) && b && !["save", "cfg", "keys", "set", "newKey", "del", "url", "gasUrl", "smToken"].some((k) => b[k] !== undefined && b[k] !== false && b[k] !== "")) return false;
+  return WRITE.test(a) || /^(support-upload|cust-save|cust-delete|cust-release|cxx-save|tl-push)$/.test(a);
+};
 
-export function linkAllows(L, action) {
+export const linkPages = (L) => (Array.isArray(L.pages) && L.pages.length ? L.pages : [L.page]).filter((p) => LINK_CATALOG[p]);
+const toolNames = (L) => linkPages(L).map((p) => LINK_CATALOG[p].name).join(", ");
+export function linkAllows(L, action, b) {
   if (COMMON.includes(action)) return true;
-  const c = LINK_CATALOG[L.page]; if (!c || !c.acts.includes(action)) return false;
-  return L.write || !isWrite(action);
+  if (!linkPages(L).some((p) => LINK_CATALOG[p].acts.includes(action))) return false;
+  return L.write || !isWrite(action, b);
 }
 // called for every logged-in request made with a link session
-export async function linkGate(store, t, rec, action, app) {
+export async function linkGate(store, t, rec, action, app, b) {
   const L = await store.get("tlk:" + rec.linkOnly);
   if (!L || L.off || (L.exp && t > L.exp) || app !== rec.app) return J(401, { ok: false, loggedOut: true, linkEnded: true, error: "This link has expired or was switched off. Ask the person who sent it for a new one." });
-  if (!linkAllows(L, action)) return J(403, { ok: false, linkBlocked: true, error: "This link only opens " + (LINK_CATALOG[L.page] || {}).name + (isWrite(action) && (LINK_CATALOG[L.page] || {}).acts.includes(action) ? " to view — changes are not allowed." : ".") });
+  if (!linkAllows(L, action, b)) return J(403, { ok: false, linkBlocked: true, error: "This link only opens " + toolNames(L) + (isWrite(action) && linkPages(L).some((p) => LINK_CATALOG[p].acts.includes(action)) ? (L.demo ? " as a demo — changes are not allowed." : " to view — changes are not allowed.") : ".") });
   return null;
 }
 
 const hashPin = (p, salt = randomBytes(8).toString("hex")) => salt + ":" + scryptSync(String(p), salt, 32).toString("hex");
 const pinOk = (p, h) => { try { const [s, x] = String(h).split(":"); const a = scryptSync(String(p), s, 32), b = Buffer.from(x, "hex"); return a.length === b.length && timingSafeEqual(a, b); } catch (e) { return false; } };
-const pubLink = (L, origin) => ({ id: L.id, page: L.page, tool: (LINK_CATALOG[L.page] || {}).name || L.page, icon: (LINK_CATALOG[L.page] || {}).icon || "🔗", label: L.label, view: L.view, state: L.state, write: !!L.write, ask: !!L.ask, pin: !!L.pin, max: L.max, exp: L.exp || 0, off: !!L.off, by: L.by, at: L.at, opens: L.opens || 0, devices: (L.devices || []).length, url: L.url || "" });
+const pubLink = (L, origin) => ({ id: L.id, page: L.page, pages: linkPages(L), tabs: L.tabs || {}, demo: !!L.demo, short: L.short || "", tool: toolNames(L) || L.page, icon: linkPages(L).length > 1 ? "🧰" : (LINK_CATALOG[L.page] || {}).icon || "🔗", label: L.label, view: L.view, state: L.state, write: !!L.write, ask: !!L.ask, pin: !!L.pin, max: L.max, exp: L.exp || 0, off: !!L.off, by: L.by, at: L.at, opens: L.opens || 0, devices: (L.devices || []).length, url: L.url || "" });
 
 export async function tlkAction(b, ctx) {
   const { store, t, app, rec, pool } = ctx;
   if (app !== "admin") return J(403, { ok: false, error: "Only HO can make tool links" });
   if (rec.linkOnly) return J(403, { ok: false, error: "Not allowed" });
   const by = rec.fullName || rec.username || "";
-  if (b.action === "tlk-cat") return J(200, { ok: true, tools: Object.keys(LINK_CATALOG).map((p) => ({ page: p, id: LINK_CATALOG[p].id, icon: LINK_CATALOG[p].icon, name: LINK_CATALOG[p].name, ho: LINK_CATALOG[p].ho, writes: LINK_CATALOG[p].acts.filter(isWrite).length })).sort((x, y) => x.name.localeCompare(y.name)) });
+  if (b.action === "tlk-cat") return J(200, { ok: true, origin: ((await store.get("cfg:share")) || {}).origin || "", tools: Object.keys(LINK_CATALOG).map((p) => ({ page: p, id: LINK_CATALOG[p].id, icon: LINK_CATALOG[p].icon, name: LINK_CATALOG[p].name, ho: LINK_CATALOG[p].ho, tabs: LINK_CATALOG[p].tabs || [], writes: LINK_CATALOG[p].acts.filter(isWrite).length })).sort((x, y) => x.name.localeCompare(y.name)) });
+  if (b.action === "tlk-origin") {   // the address shared links start with (your own domain once it is connected in Netlify)
+    let o = String(b.origin || "").trim().replace(/\/+$/, "");
+    if (o && !/^https:\/\/[a-z0-9.-]+\.[a-z]{2,}$/i.test(o)) return J(400, { ok: false, error: "Type it like https://bi.yourdomain.in" });
+    await store.set("cfg:share", { origin: o, by, at: t }); return J(200, { ok: true, origin: o });
+  }
+  if (b.action === "tlk-short") {   // optional short link (is.gd) so the message doesn't show the long address
+    const u = String(b.url || ""); if (!/^https:\/\/[\w.-]+\/[\w./#?=&%-]*$/.test(u) || u.length > 600) return J(400, { ok: false, error: "Bad link" });
+    try { const r = await (ctx.aiFetch || fetch)("https://is.gd/create.php?format=simple&url=" + encodeURIComponent(u)); const x = (await r.text()).trim(); if (!/^https:\/\/is\.gd\/\w+$/.test(x)) return J(502, { ok: false, error: "The short-link service refused: " + x.slice(0, 120) }); return J(200, { ok: true, short: x }); }
+    catch (e) { return J(502, { ok: false, error: "Couldn't reach the short-link service" }); }
+  }
   if (b.action === "tlk-list") {
     const L = (await pool(await store.list("tlk:"), 30, (k) => store.get(k))).filter(Boolean).sort((x, y) => y.at - x.at).slice(0, 300);
     return J(200, { ok: true, rows: L.map((x) => pubLink(x)) });
   }
   if (b.action === "tlk-create") {
-    const c = LINK_CATALOG[str(b.page, 60)]; if (!c) return J(400, { ok: false, error: "Choose a tool" });
-    const view = c.ho || b.view === "ho" ? "ho" : "state", state = view === "state" ? str(b.state, 40) : "";
+    const pages = [...new Set((Array.isArray(b.pages) && b.pages.length ? b.pages : [b.page]).map((p) => str(p, 60)).filter((p) => LINK_CATALOG[p]))].slice(0, 20);
+    if (!pages.length) return J(400, { ok: false, error: "Choose a tool" });
+    const c = LINK_CATALOG[pages[0]], anyHo = pages.some((p) => LINK_CATALOG[p].ho);
+    const tabs = {}; Object.keys(b.tabs || {}).forEach((p) => { if (!pages.includes(p)) return; const known = (LINK_CATALOG[p].tabs || []).map((x) => x[0]), sel = (Array.isArray(b.tabs[p]) ? b.tabs[p] : []).map((x) => str(x, 20)).filter((x) => known.includes(x)); if (sel.length && sel.length < known.length) tabs[p] = sel; });
+    const view = anyHo || b.view === "ho" ? "ho" : "state", state = view === "state" ? str(b.state, 40) : "";
     if (view === "state" && !state) return J(400, { ok: false, error: "Choose the state whose data the link shows" });
     const days = Math.max(0, Math.min(365, Math.round(+b.days || 0))), pin = str(b.pin, 12);
     if (pin && !/^\d{4,8}$/.test(pin)) return J(400, { ok: false, error: "PIN must be 4–8 digits" });
     const id = t.toString(36) + randomBytes(3).toString("hex"), secret = randomBytes(18).toString("base64url");
     const origin = /^https:\/\/[\w.-]+$/.test(String(b.origin || "")) ? b.origin : "";
-    const L = { id, hash: sha(secret), page: str(b.page, 60), label: str(b.label, 80) || "Shared link", view, state, write: !!b.write, ask: b.ask !== false, pin: pin ? hashPin(pin) : "", max: Math.max(1, Math.min(500, Math.round(+b.max || 25))), exp: days ? t + days * 864e5 : 0, off: false, by, byKey: rec.username, at: t, opens: 0, devices: [] };
+    const L = { id, hash: sha(secret), page: pages[0], pages, tabs, demo: !!b.demo, label: str(b.label, 80) || "Shared link", view, state, write: !b.demo && !!b.write, ask: b.ask !== false, pin: pin ? hashPin(pin) : "", max: Math.max(1, Math.min(500, Math.round(+b.max || 25))), exp: days ? t + days * 864e5 : 0, off: false, by, byKey: rec.username, at: t, opens: 0, devices: [] };
     L.url = origin ? origin + "/open.html#" + id + "." + secret : "";
     await store.set("tlk:" + id, L);
     return J(200, { ok: true, link: pubLink(L), url: "/open.html#" + id + "." + secret });
@@ -56,7 +75,8 @@ export async function tlkAction(b, ctx) {
   const L = await store.get("tlk:" + str(b.id, 30)); if (!L) return J(404, { ok: false, error: "Link not found" });
   if (b.action === "tlk-set") {
     if (b.off !== undefined) L.off = !!b.off;
-    if (b.write !== undefined) L.write = !!b.write;
+    if (b.short !== undefined) L.short = /^https:\/\/is\.gd\/\w+$/.test(String(b.short)) ? String(b.short) : "";
+    if (b.write !== undefined) L.write = !L.demo && !!b.write;
     if (b.days !== undefined) { const d = Math.max(0, Math.min(365, Math.round(+b.days || 0))); L.exp = d ? t + d * 864e5 : 0; }
     if (b.max !== undefined) L.max = Math.max(1, Math.min(500, Math.round(+b.max || 25)));
     await store.set("tlk:" + L.id, L);
@@ -77,7 +97,8 @@ export async function tlkPublic(b, ctx) {
   if (L.off) return J(403, { ok: false, error: "This link was switched off by the sender." });
   if (L.exp && t > L.exp) return J(403, { ok: false, error: "This link has expired. Ask the sender for a new one." });
   const c = LINK_CATALOG[L.page] || {};
-  if (b.action === "tlk-p-info") return J(200, { ok: true, tool: c.name, icon: c.icon, label: L.label, ask: !!L.ask, pin: !!L.pin, view: L.view, state: L.state, write: !!L.write });
+  const P = linkPages(L), tools = P.map((p) => ({ page: p, name: LINK_CATALOG[p].name, icon: LINK_CATALOG[p].icon, tabs: (L.tabs || {})[p] || [], all: (LINK_CATALOG[p].tabs || []).map((x) => x[0]) }));
+  if (b.action === "tlk-p-info") return J(200, { ok: true, tool: toolNames(L), icon: P.length > 1 ? "🧰" : c.icon, tools, demo: !!L.demo, label: L.label, ask: !!L.ask, pin: !!L.pin, view: L.view, state: L.state, write: !!L.write });
   if (b.action === "tlk-p-join") {
     const hr = Math.floor(t / 36e5); if (!L.bad || L.bad.h !== hr) L.bad = { h: hr, n: 0 };
     if (L.bad.n >= 10) return J(429, { ok: false, error: "Too many wrong PINs. Try again in an hour." });
@@ -92,7 +113,7 @@ export async function tlkPublic(b, ctx) {
     await store.set(k, u);
     L.devices = (L.devices || []).concat([{ n: n || "—", m: mob, at: t }]).slice(-500); L.opens = (L.opens || 0) + 1;
     await store.set("tlk:" + L.id, L);
-    return J(200, { ok: true, app: u.app, username: uname, token, page: L.page, tool: c.name, label: L.label });
+    return J(200, { ok: true, app: u.app, username: uname, token, page: P[0], pages: P, tools, demo: !!L.demo, tool: toolNames(L), label: L.label });
   }
   return J(400, { ok: false, error: "Unknown action" });
 }

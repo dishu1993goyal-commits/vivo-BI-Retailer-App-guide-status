@@ -20,7 +20,8 @@ export const LINK_CATALOG = {
 "visit-start",
 "visit-stats",
 "visit-stores"
-]
+],
+"tabs": []
 },
 "khata.html": {
 "id": "khata",
@@ -40,7 +41,8 @@ export const LINK_CATALOG = {
 "kh-p-read",
 "kh-shop-off",
 "kh-shops"
-]
+],
+"tabs": []
 },
 "brandmat.html": {
 "id": "brandmat",
@@ -77,6 +79,36 @@ export const LINK_CATALOG = {
 "bm-store-get",
 "bm-stores",
 "bm-vendor-save"
+],
+"tabs": [
+[
+"dash",
+"📊 Overview"
+],
+[
+"stores",
+"🏬 Stores"
+],
+[
+"orders",
+"🛒 Orders"
+],
+[
+"stock",
+"📦 Stock"
+],
+[
+"repairs",
+"🔧 Repairs"
+],
+[
+"audits",
+"🕵️ Audits"
+],
+[
+"catalog",
+"📚 Catalogue"
+]
 ]
 },
 "affordability.html": {
@@ -107,6 +139,24 @@ export const LINK_CATALOG = {
 "aff-tpl-get",
 "aff-tpl-set",
 "support-upload"
+],
+"tabs": [
+[
+"find",
+"💳 Find offers"
+],
+[
+"cmp",
+"⚖️ Compare"
+],
+[
+"state",
+"🗺️ State-wise"
+],
+[
+"reports",
+"📋 Reports"
+]
 ]
 },
 "portals.html": {
@@ -122,7 +172,8 @@ export const LINK_CATALOG = {
 "pt-save",
 "pt-sso",
 "tl-use"
-]
+],
+"tabs": []
 },
 "hygiene.html": {
 "id": "hygiene",
@@ -137,6 +188,16 @@ export const LINK_CATALOG = {
 "hyg-scores",
 "hyg-upload",
 "support-upload"
+],
+"tabs": [
+[
+"list",
+"📋 IMEIs"
+],
+[
+"scores",
+"🏅 Hygiene scores"
+]
 ]
 },
 "faces.html": {
@@ -152,6 +213,24 @@ export const LINK_CATALOG = {
 "face-logs",
 "face-photo",
 "tl-use"
+],
+"tabs": [
+[
+"scan",
+"🔍 Recognise"
+],
+[
+"add",
+"➕ Register"
+],
+[
+"people",
+"👥 People"
+],
+[
+"log",
+"🕒 Check-ins"
+]
 ]
 },
 "storelocator.html": {
@@ -168,6 +247,24 @@ export const LINK_CATALOG = {
 "store-live",
 "store-near",
 "store-save"
+],
+"tabs": [
+[
+"near",
+"📍 Near me"
+],
+[
+"live",
+"🔎 Search"
+],
+[
+"browse",
+"🗺️ Directory"
+],
+[
+"manage",
+"⚙️ Manage"
+]
 ]
 },
 "reports.html": {
@@ -182,7 +279,8 @@ export const LINK_CATALOG = {
 "cust-save",
 "me",
 "visit-list"
-]
+],
+"tabs": []
 },
 "engage.html": {
 "id": "leaderboard",
@@ -215,7 +313,8 @@ export const LINK_CATALOG = {
 "wall-list",
 "wall-photo",
 "wall-post"
-]
+],
+"tabs": []
 },
 "matrix.html": {
 "id": "matrix",
@@ -229,7 +328,8 @@ export const LINK_CATALOG = {
 "matrix-import",
 "matrix-remind",
 "matrix-set"
-]
+],
+"tabs": []
 },
 "statemap.html": {
 "id": "statemap",
@@ -239,7 +339,8 @@ export const LINK_CATALOG = {
 "acts": [
 "map-config",
 "ml-config"
-]
+],
+"tabs": []
 },
 "mailer.html": {
 "id": "mailer",
@@ -255,6 +356,20 @@ export const LINK_CATALOG = {
 "ml-seen",
 "ml-send",
 "tl-use"
+],
+"tabs": [
+[
+"compose",
+"✉️ New report"
+],
+[
+"sent",
+"📤 Sent"
+],
+[
+"inbox",
+"📬 Reports from HO"
+]
 ]
 },
 "pmail.html": {
@@ -268,7 +383,8 @@ export const LINK_CATALOG = {
 "pm-match",
 "pm-send",
 "tl-use"
-]
+],
+"tabs": []
 },
 "applab.html": {
 "id": "applab",
@@ -278,7 +394,8 @@ export const LINK_CATALOG = {
 "acts": [
 "ds-ua",
 "tl-use"
-]
+],
+"tabs": []
 },
 "salary.html": {
 "id": "salary",
@@ -302,6 +419,32 @@ export const LINK_CATALOG = {
 "sal-publish",
 "sal-run",
 "sal-run-get"
+],
+"tabs": [
+[
+"run",
+"📅 Monthly payroll"
+],
+[
+"emps",
+"👥 Employees"
+],
+[
+"struct",
+"💵 Salary structures"
+],
+[
+"plans",
+"🎯 Incentive plans"
+],
+[
+"settings",
+"⚙️ Settings"
+],
+[
+"help",
+"📘 Formulas"
+]
 ]
 },
 "deckstudio.html": {
@@ -314,7 +457,8 @@ export const LINK_CATALOG = {
 "ds-ai",
 "me",
 "tl-use"
-]
+],
+"tabs": []
 },
 "reviewdeck.html": {
 "id": "reviewdeck",
@@ -326,7 +470,8 @@ export const LINK_CATALOG = {
 "ins-snapshot",
 "ml-send",
 "tl-use"
-]
+],
+"tabs": []
 },
 "insights.html": {
 "id": "ingoals",
@@ -341,6 +486,36 @@ export const LINK_CATALOG = {
 "ins-rules",
 "ins-snapshot",
 "tl-use"
+],
+"tabs": [
+[
+"goals",
+"🎯 Goals"
+],
+[
+"alerts",
+"🔔 Alerts"
+],
+[
+"badges",
+"🏅 Badges"
+],
+[
+"peers",
+"👥 Peers"
+],
+[
+"impact",
+"📈 Impact"
+],
+[
+"health",
+"🏪 Retailer health"
+],
+[
+"digest",
+"💬 WhatsApp digest"
+]
 ]
 },
 "manpower.html": {
@@ -353,7 +528,8 @@ export const LINK_CATALOG = {
 "mp-months",
 "mp-upload",
 "mp-view"
-]
+],
+"tabs": []
 },
 "business.html": {
 "id": "festive",
@@ -372,7 +548,8 @@ export const LINK_CATALOG = {
 "mkt-list",
 "mkt-upload",
 "tl-use"
-]
+],
+"tabs": []
 },
 "launch.html": {
 "id": "launch",
@@ -385,7 +562,8 @@ export const LINK_CATALOG = {
 "lt-list",
 "lt-save",
 "lt-update"
-]
+],
+"tabs": []
 },
 "lostsale.html": {
 "id": "lostsale",
@@ -399,7 +577,8 @@ export const LINK_CATALOG = {
 "ls-list",
 "ls-meta",
 "ls-summary"
-]
+],
+"tabs": []
 },
 "voice.html": {
 "id": "voice",
@@ -413,7 +592,8 @@ export const LINK_CATALOG = {
 "cv-store-save",
 "cv-stores",
 "cv-summary"
-]
+],
+"tabs": []
 },
 "msurvey.html": {
 "id": "msurvey",
@@ -432,7 +612,8 @@ export const LINK_CATALOG = {
 "ms-results",
 "ms-save",
 "ms-thumbs"
-]
+],
+"tabs": []
 },
 "producthub.html": {
 "id": "producthub",
@@ -445,7 +626,8 @@ export const LINK_CATALOG = {
 "phub-get",
 "phub-list",
 "phub-save"
-]
+],
+"tabs": []
 },
 "recommend.html": {
 "id": "recommend",
@@ -456,7 +638,8 @@ export const LINK_CATALOG = {
 "advis-ask",
 "advis-questions",
 "phub-ai"
-]
+],
+"tabs": []
 },
 "myday.html": {
 "id": "myday",
@@ -474,7 +657,8 @@ export const LINK_CATALOG = {
 "my-set",
 "notify",
 "tl-use"
-]
+],
+"tabs": []
 },
 "calendar.html": {
 "id": "notices",
@@ -489,7 +673,8 @@ export const LINK_CATALOG = {
 "cal-delete",
 "cal-list",
 "cal-save"
-]
+],
+"tabs": []
 },
 "survey.html": {
 "id": "surveys",
@@ -507,7 +692,8 @@ export const LINK_CATALOG = {
 "survey-results",
 "survey-save",
 "survey-status"
-]
+],
+"tabs": []
 },
 "chat.html": {
 "id": "chat",
@@ -521,7 +707,8 @@ export const LINK_CATALOG = {
 "chat-list",
 "chat-send",
 "support-upload"
-]
+],
+"tabs": []
 },
 "rewards.html": {
 "id": "rewards",
@@ -538,6 +725,28 @@ export const LINK_CATALOG = {
 "rw-run",
 "rw-wallet",
 "rw-wallets"
+],
+"tabs": [
+[
+"wallet",
+"👛 Wallet"
+],
+[
+"redeem",
+"🎁 Redeem"
+],
+[
+"earn",
+"⭐ How to earn"
+],
+[
+"history",
+"🧾 History"
+],
+[
+"manage",
+"⚙️ Manage"
+]
 ]
 },
 "newsletter.html": {
@@ -555,7 +764,8 @@ export const LINK_CATALOG = {
 "nl-list",
 "nl-save",
 "tl-use"
-]
+],
+"tabs": []
 },
 "learn.html": {
 "id": "learn",
@@ -570,6 +780,16 @@ export const LINK_CATALOG = {
 "lh-report",
 "lh-save",
 "lh-submit"
+],
+"tabs": [
+[
+"list",
+"📚 Lessons"
+],
+[
+"rep",
+"📈 Progress"
+]
 ]
 },
 "circular.html": {
@@ -582,13 +802,34 @@ export const LINK_CATALOG = {
 "cs-diff",
 "cs-done",
 "cs-get",
+"cs-gform",
+"cs-gres",
+"cs-job",
 "cs-lesson",
 "cs-list",
 "cs-meta",
 "cs-ocr",
+"cs-p-done",
+"cs-p-get",
 "cs-save",
+"cs-share",
 "cs-stats",
-"cs-tr"
+"cs-tr",
+"tlk-cat"
+],
+"tabs": [
+[
+"list",
+"📚 Lessons"
+],
+[
+"new",
+"＋ New lesson"
+],
+[
+"cmp",
+"🔍 What changed?"
+]
 ]
 },
 "roleplay.html": {
@@ -604,6 +845,24 @@ export const LINK_CATALOG = {
 "rpl-mine",
 "rpl-say",
 "rpl-score"
+],
+"tabs": [
+[
+"pick",
+"🎭 Practise"
+],
+[
+"mine",
+"📈 My scores"
+],
+[
+"board",
+"🏆 Leaderboard"
+],
+[
+"cust",
+"🧩 Situations"
+]
 ]
 },
 "guide.html": {
@@ -611,7 +870,8 @@ export const LINK_CATALOG = {
 "icon": "📘",
 "name": "Guide & manual",
 "ho": false,
-"acts": []
+"acts": [],
+"tabs": []
 },
 "appguide.html": {
 "id": "appguide",
@@ -632,6 +892,24 @@ export const LINK_CATALOG = {
 "ag-script",
 "ag-video-delete",
 "ag-video-url"
+],
+"tabs": [
+[
+"ask",
+"🗣️ Ask"
+],
+[
+"manual",
+"📘 Manual"
+],
+[
+"videos",
+"🎬 Videos"
+],
+[
+"presenter",
+"🧑‍💼 Presenter"
+]
 ]
 },
 "help.html": {
@@ -652,7 +930,8 @@ export const LINK_CATALOG = {
 "flow-list",
 "flow-save",
 "help-config"
-]
+],
+"tabs": []
 },
 "knowledge.html": {
 "id": "knowledge",
@@ -667,7 +946,8 @@ export const LINK_CATALOG = {
 "kb-read",
 "kb-save",
 "support-upload"
-]
+],
+"tabs": []
 },
 "schemes.html": {
 "id": "schemes",
@@ -678,7 +958,8 @@ export const LINK_CATALOG = {
 "scheme-delete",
 "scheme-list",
 "scheme-save"
-]
+],
+"tabs": []
 },
 "schemecalc.html": {
 "id": "schemecalc",
@@ -695,7 +976,8 @@ export const LINK_CATALOG = {
 "sc-save",
 "sc-visits",
 "spol-pick"
-]
+],
+"tabs": []
 },
 "schemepolicy.html": {
 "id": "schemepolicy",
@@ -716,6 +998,20 @@ export const LINK_CATALOG = {
 "spol-up",
 "spol-users",
 "spol-users-check"
+],
+"tabs": [
+[
+"dash",
+"📊 Dashboard"
+],
+[
+"all",
+"📜 All letters"
+],
+[
+"pub",
+"📤 Publish"
+]
 ]
 },
 "schemeassist.html": {
@@ -730,7 +1026,8 @@ export const LINK_CATALOG = {
 "scha-parse",
 "scha-save",
 "spol-pick"
-]
+],
+"tabs": []
 },
 "retailerpay.html": {
 "id": "retailerpay",
@@ -765,6 +1062,28 @@ export const LINK_CATALOG = {
 "rp-wa-send",
 "sc-parse",
 "spol-pick"
+],
+"tabs": [
+[
+"ret",
+"👥 Retailers"
+],
+[
+"calc",
+"🧮 Calculate"
+],
+[
+"bat",
+"📦 Batches"
+],
+[
+"vch",
+"🎁 Vouchers"
+],
+[
+"pay",
+"🏦 Payments"
+]
 ]
 },
 "payplanner.html": {
@@ -783,7 +1102,8 @@ export const LINK_CATALOG = {
 "scha-list",
 "scha-parse",
 "spol-pick"
-]
+],
+"tabs": []
 },
 "retailerportal.html": {
 "id": "retailerportal",
@@ -819,6 +1139,36 @@ export const LINK_CATALOG = {
 "rtp-q-list",
 "rtp-q-raise",
 "rtp-q-reply"
+],
+"tabs": [
+[
+"ov",
+"🏠 Overview"
+],
+[
+"biz",
+"📊 Business"
+],
+[
+"rep",
+"📈 Reports"
+],
+[
+"stk",
+"📦 Stock & IMEI"
+],
+[
+"ord",
+"🛒 Order"
+],
+[
+"pay",
+"💰 Payouts"
+],
+[
+"help",
+"💬 Help"
+]
 ]
 },
 "imeiunblock.html": {
@@ -843,6 +1193,36 @@ export const LINK_CATALOG = {
 "iub-run-result",
 "iub-runs",
 "iub-token"
+],
+"tabs": [
+[
+"dash",
+"📊 Dashboard"
+],
+[
+"new",
+"➕ Raise"
+],
+[
+"verify",
+"🔎 HO check"
+],
+[
+"final",
+"🏁 Final check"
+],
+[
+"queue",
+"🔓 vivo unblock"
+],
+[
+"list",
+"📋 All IMEIs"
+],
+[
+"cfg",
+"⚙️ E-mail set-up"
+]
 ]
 },
 "schemeroi.html": {
@@ -862,6 +1242,24 @@ export const LINK_CATALOG = {
 "roi-sim-list",
 "roi-sim-measure",
 "so-summary"
+],
+"tabs": [
+[
+"sim",
+"🔮 Simulate"
+],
+[
+"list",
+"📊 Results"
+],
+[
+"new",
+"➕ Measure"
+],
+[
+"data",
+"📥 Sell-out data"
+]
 ]
 },
 "forecast.html": {
@@ -879,6 +1277,32 @@ export const LINK_CATALOG = {
 "fc-plan-get",
 "fc-plan-list",
 "fc-plan-save"
+],
+"tabs": [
+[
+"fc",
+"🔮 Forecast"
+],
+[
+"al",
+"📦 Allocation"
+],
+[
+"cal",
+"🎉 Festive calendar"
+],
+[
+"mdl",
+"📱 Model life-cycle"
+],
+[
+"data",
+"📥 Data"
+],
+[
+"plans",
+"💾 Plans"
+]
 ]
 },
 "compete.html": {
@@ -899,6 +1323,36 @@ export const LINK_CATALOG = {
 "cmp-intel-delete",
 "cmp-intel-verify",
 "cmp-refresh"
+],
+"tabs": [
+[
+"mkt",
+"🧭 Market"
+],
+[
+"brands",
+"🏷️ Brands"
+],
+[
+"cmp",
+"⚖️ Compare models"
+],
+[
+"trend",
+"📈 Trends & share"
+],
+[
+"intel",
+"🕵️ Field intel"
+],
+[
+"ask",
+"🤖 Ask AI"
+],
+[
+"cs",
+"📥 Counter share"
+]
 ]
 },
 "hire.html": {
@@ -922,6 +1376,28 @@ export const LINK_CATALOG = {
 "hr-p-status",
 "hr-refer",
 "hr-stage"
+],
+"tabs": [
+[
+"refer",
+"➕ Refer"
+],
+[
+"mine",
+"📋 My referrals"
+],
+[
+"cands",
+"🧑‍💼 Candidates"
+],
+[
+"pipe",
+"📊 Pipeline"
+],
+[
+"cfg",
+"⚙️ Set-up"
+]
 ]
 },
 "contest.html": {
@@ -944,7 +1420,8 @@ export const LINK_CATALOG = {
 "pc-p-submit",
 "pc-save",
 "pc-thumbs"
-]
+],
+"tabs": []
 },
 "disputes.html": {
 "id": "disputes",
@@ -958,7 +1435,8 @@ export const LINK_CATALOG = {
 "disp-get",
 "disp-list",
 "support-upload"
-]
+],
+"tabs": []
 },
 "manuals.html": {
 "id": "manuals",
@@ -977,7 +1455,8 @@ export const LINK_CATALOG = {
 "man-shots-save",
 "man-tts",
 "man-voice"
-]
+],
+"tabs": []
 },
 "admin-tools.html": {
 "id": "import",
@@ -991,7 +1470,8 @@ export const LINK_CATALOG = {
 "inv-resend",
 "mod-get",
 "mod-set"
-]
+],
+"tabs": []
 },
 "emiapi.html": {
 "id": "emiapi",
@@ -1019,6 +1499,40 @@ export const LINK_CATALOG = {
 "eapi-p-doc",
 "eapi-p-docs",
 "eapi-sigcalc"
+],
+"tabs": [
+[
+"test",
+"🧪 Send a request"
+],
+[
+"imei",
+"📱 IMEI data"
+],
+[
+"cases",
+"✅ Test cases"
+],
+[
+"log",
+"📜 History"
+],
+[
+"ref",
+"📘 API reference"
+],
+[
+"docs",
+"📂 Documents"
+],
+[
+"codes",
+"📚 Error codes"
+],
+[
+"cfg",
+"⚙️ Set-up"
+]
 ]
 },
 "config.html": {
@@ -1028,7 +1542,8 @@ export const LINK_CATALOG = {
 "ho": false,
 "acts": [
 "ml-config"
-]
+],
+"tabs": []
 },
 "geolocate.html": {
 "id": "geolocate",
@@ -1049,7 +1564,8 @@ export const LINK_CATALOG = {
 "geo-respond",
 "geo-search",
 "geo-status"
-]
+],
+"tabs": []
 },
 "studio.html": {
 "id": "studio",
@@ -1069,7 +1585,8 @@ export const LINK_CATALOG = {
 "mod-import",
 "mod-set",
 "support-upload"
-]
+],
+"tabs": []
 },
 "xlmacro.html": {
 "id": "xlmacro",
@@ -1082,6 +1599,24 @@ export const LINK_CATALOG = {
 "xm-chat",
 "xm-del",
 "xm-list"
+],
+"tabs": [
+[
+"ai",
+"✨ Build with AI"
+],
+[
+"ready",
+"📦 Ready templates"
+],
+[
+"mine",
+"📁 My templates"
+],
+[
+"how",
+"❓ How it works"
+]
 ]
 },
 "apiplatform.html": {
@@ -1098,6 +1633,24 @@ export const LINK_CATALOG = {
 "oa-p-docs",
 "oa-try",
 "oa-usage"
+],
+"tabs": [
+[
+"eps",
+"🧩 Endpoints"
+],
+[
+"cls",
+"🔑 Clients & keys"
+],
+[
+"use",
+"📈 Usage"
+],
+[
+"how",
+"❓ How it works"
+]
 ]
 },
 "bistudio.html": {
@@ -1115,7 +1668,8 @@ export const LINK_CATALOG = {
 "st-get",
 "st-list",
 "st-save"
-]
+],
+"tabs": []
 },
 "prodperm.html": {
 "id": "prodperm",
@@ -1127,7 +1681,8 @@ export const LINK_CATALOG = {
 "pp-get",
 "pp-log",
 "pp-run"
-]
+],
+"tabs": []
 },
 "agilesql.html": {
 "id": "agilesql",
@@ -1140,6 +1695,28 @@ export const LINK_CATALOG = {
 "sq-del",
 "sq-get",
 "sq-save"
+],
+"tabs": [
+[
+"ask",
+"✨ Write SQL"
+],
+[
+"ideas",
+"💡 Ideas & dashboards"
+],
+[
+"tables",
+"📚 Tables"
+],
+[
+"guide",
+"🧭 How to use Agile BI"
+],
+[
+"saved",
+"⭐ Saved"
+]
 ]
 },
 "surveymaker.html": {
@@ -1161,14 +1738,16 @@ export const LINK_CATALOG = {
 "sf-setup",
 "sf-tr",
 "sf-translate"
-]
+],
+"tabs": []
 },
 "pcbuilder.html": {
 "id": "pcbuilder",
 "icon": "🧩",
 "name": "Process Center AI builder (setting up)",
 "ho": true,
-"acts": []
+"acts": [],
+"tabs": []
 },
 "uxstudio.html": {
 "id": "uxstudio",
@@ -1182,7 +1761,8 @@ export const LINK_CATALOG = {
 "ux-results",
 "ux-save",
 "ux-share"
-]
+],
+"tabs": []
 },
 "docextract.html": {
 "id": "docextract",
@@ -1194,6 +1774,20 @@ export const LINK_CATALOG = {
 "dx-tpl-del",
 "dx-tpl-save",
 "dx-tpls"
+],
+"tabs": [
+[
+"new",
+"📄 Extract"
+],
+[
+"tpl",
+"🧩 Templates"
+],
+[
+"how",
+"❓ How it works"
+]
 ]
 },
 "videoguide.html": {
@@ -1211,6 +1805,16 @@ export const LINK_CATALOG = {
 "vg-save",
 "vg-share",
 "vg-steps"
+],
+"tabs": [
+[
+"new",
+"🎬 New guide"
+],
+[
+"mine",
+"📚 Guides"
+]
 ]
 },
 "portalbot.html": {
@@ -1225,6 +1829,20 @@ export const LINK_CATALOG = {
 "bot-log",
 "bot-runs",
 "bot-save"
+],
+"tabs": [
+[
+"list",
+"🤖 Recordings"
+],
+[
+"new",
+"● New recording"
+],
+[
+"runs",
+"📋 Runs"
+]
 ]
 },
 "hygcheck.html": {
@@ -1236,7 +1854,8 @@ export const LINK_CATALOG = {
 "hyg-upload",
 "ml-config",
 "tl-use"
-]
+],
+"tabs": []
 },
 "sheetjoin.html": {
 "id": "sheetjoin",
@@ -1245,7 +1864,8 @@ export const LINK_CATALOG = {
 "ho": false,
 "acts": [
 "tl-use"
-]
+],
+"tabs": []
 },
 "targetsplit.html": {
 "id": "targetsplit",
@@ -1254,7 +1874,8 @@ export const LINK_CATALOG = {
 "ho": false,
 "acts": [
 "tl-use"
-]
+],
+"tabs": []
 },
 "fieldnotes.html": {
 "id": "fnotes",
@@ -1266,7 +1887,8 @@ export const LINK_CATALOG = {
 "tl-ai-summary",
 "tl-team",
 "tl-thumb"
-]
+],
+"tabs": []
 },
 "toolactivity.html": {
 "id": "tact",
@@ -1278,6 +1900,7 @@ export const LINK_CATALOG = {
 "tl-beat-get",
 "tl-beats",
 "tl-kpis-all"
-]
+],
+"tabs": []
 }
 };

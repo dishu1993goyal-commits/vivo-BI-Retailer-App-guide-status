@@ -46,7 +46,7 @@ import { sqAction } from "./sq-core.mjs";
 import { sfAction } from "./sf-core.mjs";
 import { tlkAction, tlkPublic, linkGate } from "./tlk-core.mjs";
 import { uxAction, uxPublic } from "./ux-core.mjs";
-import { lxAction, vgPublic } from "./lx-core.mjs";
+import { lxAction, vgPublic, csPublic } from "./lx-core.mjs";
 import { bmAction } from "./bm-core.mjs";
 import { salAction, salPublic } from "./sal-core.mjs";
 import { salesAction } from "./sales-core.mjs";
@@ -538,7 +538,8 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
   if (/^ms-p-/.test(b.action)) return msPublic(b, { store, t, pool, env });   // market survey link (no login)
   if (/^tlk-p-/.test(b.action)) return tlkPublic(b, { store, t });
   if (/^ux-p-/.test(b.action)) return uxPublic(b, { store, t });
-  if (b.action === "vg-p-get") return vgPublic(b, { store, t });   // shared step-by-step guide link   // shared UI prototype: play + user-test results   // one-tool link: sign a device in to that tool only
+  if (b.action === "vg-p-get") return vgPublic(b, { store, t });
+  if (/^cs-p-/.test(b.action)) return csPublic(b, { store, t });   // shared lesson link (no login)   // shared step-by-step guide link   // shared UI prototype: play + user-test results   // one-tool link: sign a device in to that tool only
   if (/^iub-p-/.test(b.action)) return iubPublic(b, { store, t, pool, env, mailFetch });   // finance partner's secure link (no login)   // retailer's read-only link (no login)
   const uKeyOf = (k) => `user:${app}:${k}`;
   const pKeyOf = (p) => `phone:${app}:${p}`;
@@ -926,7 +927,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     const sess = rec && (rec.sessions || []).find((x) => x.h === th);
     if (rec && rec.disabled) return json(401, { ok: false, error: "Your account has been disabled by a BI admin. Please contact your BI admin.", loggedOut: true, disabled: true });
     if (!sess) return json(401, { ok: false, error: lnk ? "This link was switched off or reset by the sender. Ask them for a new one." : "You have been logged out. Please log in again.", loggedOut: true });
-    if (rec.linkOnly || lnk) { if (!rec.linkOnly) return json(401, { ok: false, loggedOut: true, error: "Not allowed" }); const g = await linkGate(store, t, rec, b.action, app); if (g) return g; if (b.action === "logout") { const th2 = th; rec.sessions = (rec.sessions || []).filter((x) => x.h !== th2); await store.set(recKey, rec); return json(200, { ok: true }); } }
+    if (rec.linkOnly || lnk) { if (!rec.linkOnly) return json(401, { ok: false, loggedOut: true, error: "Not allowed" }); const g = await linkGate(store, t, rec, b.action, app, b); if (g) return g; if (b.action === "logout") { const th2 = th; rec.sessions = (rec.sessions || []).filter((x) => x.h !== th2); await store.set(recKey, rec); return json(200, { ok: true }); } }
     const save = () => store.set(recKey, rec);
     // Older state accounts must link a vChat ID from the allowed list before using anything else.
     if (app === "state" && !rec.vchatId && !["me", "ping", "vchat-link", "logout", "delete-account", "get-photo"].includes(b.action) && await linkRequired(rec)) {
@@ -1073,7 +1074,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^sf-/.test(b.action)) return sfAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^tlk-/.test(b.action)) return tlkAction(b, surveyCtx());
     if (/^ux-/.test(b.action)) return uxAction(b, surveyCtx());
-    if (/^(dx|cs|vg|rpl|bot)-/.test(b.action)) return lxAction(b, surveyCtx());
+    if (/^(dx|cs|vg|rpl|bot)-/.test(b.action)) return lxAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^so-/.test(b.action)) return salesAction(b, surveyCtx());
     if (/^roi-/.test(b.action)) return roiAction(b, surveyCtx());
     if (/^(lh|ls|lt|mp|cv)-/.test(b.action)) return bixAction(b, surveyCtx());

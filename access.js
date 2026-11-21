@@ -5,15 +5,40 @@
 (function () {
   try {
     var w = JSON.parse(localStorage.getItem("biw-auth") || "null"); if (!w || !w.link || !w.link.page) return;
+    var L = w.link, pages = (L.pages && L.pages.length ? L.pages : [L.page]).map(function (p) { return String(p).toLowerCase(); });
     var here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
-    if (here !== "open.html" && here !== String(w.link.page).toLowerCase()) { location.replace("/" + w.link.page); return; }
-    window.BI_LINK = w.link;
+    if (here !== "open.html" && pages.indexOf(here) < 0) { location.replace("/" + pages[0]); return; }
+    window.BI_LINK = L;
+    var tool = (L.tools || []).filter(function (x) { return String(x.page).toLowerCase() === here; })[0] || { name: L.tool, tabs: [], all: [] };
     document.addEventListener("click", function (e) {   // links to other pages / the dashboard stay closed
       var a = e.target && e.target.closest && e.target.closest("a[href]"); if (!a) return;
       var h = a.getAttribute("href") || "", u; try { u = new URL(h, location.href); } catch (x) { return; }
-      if (u.origin === location.origin && /\.html$|\/$/.test(u.pathname) && u.pathname.split("/").pop().toLowerCase() !== here) { e.preventDefault(); e.stopPropagation(); alert("This shared link opens only " + (w.link.tool || "this tool") + "."); }
+      if (u.origin === location.origin && /\.html$|\/$/.test(u.pathname) && pages.indexOf(u.pathname.split("/").pop().toLowerCase()) < 0) { e.preventDefault(); e.stopPropagation(); alert("This shared link opens only " + (L.tool || "this tool") + "."); }
     }, true);
-    var add = function () { if (document.getElementById("bi-link-pill") || !document.body) return; var d = document.createElement("div"); d.id = "bi-link-pill"; d.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:10px;z-index:99999;background:rgba(18,22,58,.88);color:#fff;font:600 11.5px Arial,sans-serif;border-radius:99px;padding:6px 12px;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"; d.textContent = "🔗 Shared view · " + (w.link.tool || "") + (w.link.label ? " · " + w.link.label : ""); document.body.appendChild(d); };
+    // chosen tabs only: the other tab buttons of this tool are hidden; if the open tab is hidden, the first allowed one opens
+    var keep = tool.tabs || [], all = tool.all || [];
+    var tabs = function () {
+      if (!keep.length) return;
+      var shown = [], hidden = [];
+      Array.prototype.forEach.call(document.querySelectorAll("[data-t]"), function (b) { var t = b.getAttribute("data-t"); if (all.indexOf(t) < 0) return; if (keep.indexOf(t) < 0) { if (b.style.display !== "none") b.style.display = "none"; hidden.push(b); } else shown.push(b); });
+      if (hidden.some(function (b) { return b.classList.contains("on") || b.classList.contains("active") || b.getAttribute("aria-selected") === "true"; }) && shown[0]) shown[0].click();
+    };
+    var add = function () {
+      if (!document.body) return; tabs();
+      if (!window.__biLinkObs) { window.__biLinkObs = new MutationObserver(function () { clearTimeout(window.__biLinkT); window.__biLinkT = setTimeout(tabs, 30); }); window.__biLinkObs.observe(document.body, { childList: true, subtree: true }); }
+      if (document.getElementById("bi-link-pill")) return;
+      var d = document.createElement("div"); d.id = "bi-link-pill";
+      d.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:10px;z-index:99999;background:" + (L.demo ? "rgba(180,35,24,.92)" : "rgba(18,22,58,.88)") + ";color:#fff;font:600 11.5px Arial,sans-serif;border-radius:99px;padding:6px 12px;max-width:92vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:" + (pages.length > 1 ? "pointer" : "default");
+      d.textContent = (L.demo ? "🎭 DEMO · view only · " : "🔗 Shared: ") + (tool.name || L.tool || "") + (pages.length > 1 ? "  ·  switch tool ▾" : "");
+      if (pages.length > 1) d.onclick = function () {
+        var m = document.getElementById("bi-link-menu"); if (m) { m.remove(); return; }
+        m = document.createElement("div"); m.id = "bi-link-menu"; m.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:46px;z-index:99999;background:#fff;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);padding:6px;min-width:240px;max-width:92vw;font:600 14px Arial,sans-serif";
+        (L.tools || pages.map(function (p) { return { page: p, name: p }; })).forEach(function (x) { var a = document.createElement("a"); a.href = "/" + x.page; a.textContent = (x.icon || "🔧") + "  " + x.name; a.style.cssText = "display:block;padding:10px 12px;border-radius:10px;color:#12163A;text-decoration:none;" + (String(x.page).toLowerCase() === here ? "background:#EEF0FF" : ""); m.appendChild(a); });
+        document.body.appendChild(m);
+      };
+      document.body.appendChild(d);
+      if (L.demo && !document.getElementById("bi-demo-mark")) { var wm = document.createElement("div"); wm.id = "bi-demo-mark"; wm.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:99998;background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='160'><text x='20' y='100' transform='rotate(-20 130 80)' font-family='Arial' font-size='34' font-weight='700' fill='rgba(180,35,24,0.07)'>DEMO</text></svg>\")"; document.body.appendChild(wm); }
+    };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", add); else add();
   } catch (e) { }
 })();

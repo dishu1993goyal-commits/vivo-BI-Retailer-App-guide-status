@@ -18,6 +18,7 @@
 .step{display:flex;gap:10px;margin-top:10px}.step i{flex:0 0 26px;height:26px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 13px/26px inherit;text-align:center;font-style:normal}.step div{flex:1;font-size:13px;line-height:1.55}
 .zh{background:#EEF0FF;border-radius:6px;padding:0 5px;font-weight:700;white-space:nowrap}
 .big{font-size:40px;text-align:center}
+.idea{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid #EEF0F6}.step{display:flex;gap:10px;margin-top:10px}.step i{flex:0 0 22px;height:22px;border-radius:50%;background:#4D5BF9;color:#fff;font:800 12px/22px inherit;text-align:center;font-style:normal}.step div{flex:1;font-size:13px;line-height:1.55}
 </style>
 </head>
 <body>
@@ -29,7 +30,62 @@
   "use strict";
   /*@@CORE@@*/
   var VIEW = $("view"), D = null, TAB = "ask", OUT = null, HIST = [], PICK = {}, LASTQ = "", IDEAS = null;
-  var TABS = [["ask", "✨ Write SQL"], ["tables", "📚 Tables"], ["guide", "🧭 How to use Agile BI"], ["saved", "⭐ Saved"]];
+  var TABS = [["ask", "✨ Write SQL"], ["ideas", "💡 Ideas & dashboards"], ["tables", "📚 Tables"], ["guide", "🧭 How to use Agile BI"], ["saved", "⭐ Saved"]];
+  // ---- 💡 built-in ideas: each one names the tables it needs, so you can see which are ready ----
+  var TB = { A: "v_tf_vk_d_sale_active_detail", R: "v_tf_vk_d_sale_report_detail", I: "tf_vk_delivery_inbound", O: "tf_vk_delivery_outbound", AG: "v_td_vk_agency", E: "v_td_vk_employee", PR: "v_td_vk_pricing", PD: "v_td_vk_product", PM: "v_td_vk_product_material", RT: "v_td_vk_retailer", ST: "v_td_vk_store", CR: "v_tf_vk_competitors_report", CS: "v_tf_vk_competitors_setting", V: "ta_vk_vbm_query_detail" };
+  var IDEA_LIB = [
+    ["📈 Sell-out", [
+      ["Daily sales trend", "Daily activated quantity for the last 60 days, split by brand (vivo / iQOO)", "A PD", "Line chart"],
+      ["Month-to-date vs last month", "Month-to-date activated quantity by state compared with the same days of last month, with MoM growth %", "A", "Table with % column"],
+      ["Year-on-year by state", "This month's activated quantity by state vs the same month last year, with YoY growth %", "A", "Bar + % label"],
+      ["Top 20 models", "Top 20 models by activated quantity this month with each model's share % of total", "A PD", "Bar chart"],
+      ["New launch curve (NPL)", "Daily activated quantity of each model for its first 45 days after its first sale date", "A PD", "Line chart, one line per model"],
+      ["Series-wise sales", "This month vs last month activated quantity by series (Y, T, V, X, S, iQOO Z, iQOO Neo, iQOO flagship) using the model name prefix", "A PD", "Table / stacked bar"],
+      ["Store ranking", "Month-to-date activated quantity per store with state, rank within state, top 20 and bottom 20 per state", "A ST", "Table"],
+      ["Silent stores", "Stores that sold in the last 90 days but have zero activations in the last 15 days, with their last sale date", "A ST", "Table (action list)"],
+      ["Day-of-week pattern", "Average daily activated quantity by day of week and week of month for the last 3 months", "A", "Heat map"],
+      ["Price-band mix", "This month's activated quantity by price band (below 10k, 10-15k, 15-20k, 20-30k, 30k+) using the product price", "A PR", "Donut / stacked bar"]]],
+    ["🧾 Reported vs activated", [
+      ["Reporting gap", "Reported sell-out vs activated quantity by state and store this month, with gap and gap %", "A R ST", "Table"],
+      ["Promoter productivity", "Reported quantity per promoter (employee) this month with store and state, ranked", "R E", "Table"]]],
+    ["🚚 Dispatch & stock", [
+      ["MTD dispatch", "Month-to-date outbound (dispatch) quantity by agency and model", "O AG PD", "Table / bar"],
+      ["Inbound vs outbound", "This month's inbound vs outbound quantity by agency with net movement", "I O AG", "Table"],
+      ["Channel stock & days", "Estimated channel stock by agency (total inbound minus outbound minus activations) and stock days = stock ÷ average daily activations of last 30 days", "I O A AG", "Table with KPI"],
+      ["Sell-through by model", "Per model: last 30 days dispatched quantity vs activated quantity and sell-through %", "O A PD", "Table / bubble"],
+      ["Slow movers", "Models dispatched in the last 60 days whose activations are below 30% of dispatch", "O A PD", "Table (action list)"]]],
+    ["🏪 Channel & master data", [
+      ["Active stores", "Count of stores by state and retailer type, and how many had a sale this month", "ST RT A", "Table / bar"],
+      ["New stores", "Stores created this month by state and agency", "ST AG", "Table"],
+      ["Agency scorecard", "Each agency with number of stores and month-to-date activations", "AG ST A", "Table"],
+      ["Retailer concentration", "Share of this month's activations coming from the top 10% retailers, by state", "A RT", "KPI + table"],
+      ["Missing mapping", "Activations this month whose store or state is empty or not in the store master", "A ST", "Table (data quality)"]]],
+    ["👥 Team", [
+      ["Team strength", "Employee count by state and role / position", "E", "Bar chart"],
+      ["Sales per promoter store", "Month-to-date activations per store with the number of promoters at that store", "A E ST", "Table"]]],
+    ["🥊 Competition", [
+      ["Competitor share", "Brand-wise share of reported quantity by state from competitor uploads this month", "CR", "Stacked bar"],
+      ["vivo vs competitors weekly", "Weekly vivo activations vs total competitor reported quantity for the last 12 weeks", "CR A", "Line chart"],
+      ["Tracked competitor models", "List of competitor brands and models being tracked with their settings", "CS", "Table"]]],
+    ["🏷️ Price, product & VBM", [
+      ["Price list", "Current price of each model and its material codes (colour / memory)", "PR PM PD", "Table"],
+      ["Price changes", "Models whose price changed in the last 30 days with old and new price", "PR PD", "Table"],
+      ["VBM by status", "VBM queries by status and handler with average age in days", "V", "Table / bar"],
+      ["Pending VBM > 7 days", "VBM documents still open for more than 7 days with creator and handler", "V", "Table (action list)"]]]
+  ];
+  // ---- 📊 dashboard recipe: the sales overview screen (KPI cards, NPL trend, channel and model details) ----
+  var DASH = [
+    ["KPI · Current day sales", "Total activated quantity for the selected date (default yesterday) and growth % vs the same day last year and vs the same day last week", "A", "Indicator card with two comparison lines; add a small line of the last 60 days as background trend"],
+    ["KPI · Current week sales", "Activated quantity of the current week up to the selected date vs the same week last year and vs last week", "A", "Indicator card"],
+    ["KPI · Current month sales", "Month-to-date activated quantity vs same period of the same month last year and vs last month", "A", "Indicator card"],
+    ["NPL sales trend", "Daily activated quantity of the newest 10 models (by first sale date) for the last 60 days", "A PD", "Line chart — date on X, quantity on Y, model as legend"],
+    ["Channel details by state", "By state: current day sales, change % vs same day last week, month-to-date sales, MoM %, YoY %, and year-to-date (annual) sales, with an India total row", "A ST", "Table with total row; sort by current day sales"],
+    ["Model details by series", "By series and model: current day sales, change % vs same day last week, month-to-date sales, MoM %, year-to-date sales; series from the model name (Y, T, S, V, X, iQOO Z, iQOO Neo, iQOO flagship)", "A PD", "Tree table (series → model) with total row"],
+    ["MTD dispatch", "Month-to-date outbound (dispatch) quantity to agencies, and in-transit quantity if a status shows it", "O", "Indicator card / donut"],
+    ["Channel turnover days", "Estimated channel stock (inbound − outbound − activations) and turnover days = stock ÷ average daily activations of the last 30 days", "I O A", "Indicator card"],
+    ["Target achievement %", "Month-to-date activated quantity by state joined to the monthly target you upload as an Excel dataset (columns: month, state, target), achievement %", "A", "Donut / gauge — needs your target Excel uploaded in Agile BI"],
+    ["Product segments bubble", "Per series: monthly dispatch (X), target achievement % (Y) and current month sales (bubble size)", "O A PD", "Bubble chart"]
+  ];
   var copy = function (t, msg) { var ok = function () { toast(msg || "Copied"); }; try { navigator.clipboard.writeText(t).then(ok, function () { fall(t); ok(); }); } catch (e) { fall(t); ok(); } };
   function fall(t) { var a = document.createElement("textarea"); a.value = t; document.body.appendChild(a); a.select(); try { document.execCommand("copy"); } catch (e) { } a.remove(); }
   var KW = /\b(select|from|where|group by|order by|having|limit|left join|right join|inner join|join|on|as|and|or|not|in|is|null|case|when|then|else|end|distinct|count|sum|avg|min|max|with|union all|union|between|like|desc|asc|date_format|date_trunc|ifnull|round)\b/gi;
@@ -39,21 +95,42 @@
   function draw() {
     $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + (t[0] === "tables" ? " " + known().length + "/" + D.tables.length : "") + "</button>"; }).join("");
     [].forEach.call($("tabs").querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
-    ({ ask: ask, tables: tables, guide: guide, saved: saved })[TAB]();
+    ({ ask: ask, ideas: ideas, tables: tables, guide: guide, saved: saved })[TAB]();
   }
+
+  // ---------------- 💡 ideas & dashboards ----------------
+  function ready(codes) { var miss = codes.split(" ").map(function (c) { return TB[c]; }).filter(function (n) { var t = D.tables.filter(function (x) { return x.name === n; })[0]; return !t || !t.cols.length; }); return miss; }
+  function tName(n) { var t = D.tables.filter(function (x) { return x.name === n; })[0]; return t ? t.en : n; }
+  function useIdea(askText, codes) { LASTQ = askText; PICK = {}; codes.split(" ").forEach(function (c) { PICK[TB[c]] = true; }); TAB = "ask"; draw(); $("q").value = askText; HIST = []; run({ mode: "write", q: askText }, $("go")); }
+  function ideas() {
+    var k = known().length, total = D.tables.length;
+    var badge = function (codes) { var m = ready(codes); return m.length ? '<span class="pill o" title="Columns not loaded: ' + esc(m.map(tName).join(", ")) + '">guessed names</span>' : '<span class="pill g">ready</span>'; };
+    VIEW.innerHTML = (k < total ? '<div class="card"><b>⚡ Make every idea exact — load columns once (2 minutes)</b><div class="muted" style="font-size:12.5px;margin-top:4px">' + k + " of " + total + ' tables have their columns loaded. Ideas still work without them (the AI guesses the column names and tells you which), but loading them makes the SQL run first time.</div><div class="step"><i>1</i><div>Copy this query → in Agile BI create a dataset with <b>Custom SQL</b>, paste, ▶ Run.</div></div><div class="code" style="font-size:11px">' + hl(allColsQ()) + '</div><div class="bar2"><button class="btn pri sm" id="cq">📋 Copy column-finder query</button></div><div class="step"><i>2</i><div>Select all result rows (or Export to Excel) → come back → <b>📚 Tables → 📥 Import</b> → paste / choose the file. Done for all 14 tables at once.</div></div><div class="help w">If Agile BI refuses that query, open each table in 📚 Tables → “Copy test query” (select … limit 5), run it and paste the result with its heading row.</div></div>' : '<div class="help" style="background:#E6F4EA">✅ All ' + total + " tables have their columns — every idea writes exact SQL.</div>") +
+      '<div class="card" style="margin-top:12px"><b>📊 Dashboard recipe: Sales overview</b><div class="muted" style="font-size:12.5px;margin-top:4px">The screen you shared (current day / week / month cards, NPL trend, channel details by state, model details by series, dispatch, turnover, target). Tap ✨ on each block to get its dataset SQL, then build it with the steps below.</div>' +
+      DASH.map(function (d, i) { return '<div class="idea"><div style="flex:1"><b>' + (i + 1) + ". " + esc(d[0]) + "</b> " + badge(d[2]) + '<div class="muted" style="font-size:12px;margin-top:2px">' + esc(d[1]) + '</div><div style="font-size:12px;margin-top:2px">📊 ' + esc(d[3]) + '</div></div><button class="btn sec sm" data-d="' + i + '">✨ SQL</button></div>'; }).join("") +
+      '<div class="help" style="margin-top:10px"><b>Build it in Agile BI</b><br>1. Make one <b>dataset</b> per block above (Data set → Create → Starrocks_pro → Custom SQL → paste → ▶ Run → Save). Name them “OV 01 Day KPI”, “OV 05 State details”… so they sort together.<br>2. <b>Dashboard → New</b> → choose a 12-column layout. Row 1: three indicator cards (blocks 1–3) + turnover / target / dispatch cards (7–9). Row 2: the NPL line (4). Row 3: State table (5). Row 4: Series → model table (6). Row 5: bubble (10).<br>3. Add <b>filters</b> at the top: Date, Area (state), Brand, Products (model) — link each filter to every dataset that has that column.<br>4. Format: numbers with thousand separators, % columns with 1 decimal and red/green colouring (negative red), totals row on.<br>5. Publish → share with your team; set a daily refresh after the data load time.<br><span class="muted">Menu names may differ a little in your Agile BI version — the 🧭 guide tab has the screens.</span></div>' +
+      '<div class="help w"><b>Target achievement & FGI</b> — none of the 14 tables holds targets or factory stock. Upload your monthly target sheet (month, state, model/series, target) as an <b>Excel dataset</b> in Agile BI and join it in the dashboard; ask “join with my target dataset” when you write the SQL.</div></div>' +
+      IDEA_LIB.map(function (g, gi) { return '<div class="card" style="margin-top:12px"><b>' + esc(g[0]) + '</b><span class="muted" style="font-size:12px"> · ' + g[1].length + " ideas</span>" + g[1].map(function (x, i) { return '<div class="idea"><div style="flex:1"><b>' + esc(x[0]) + "</b> " + badge(x[2]) + '<div class="muted" style="font-size:12px;margin-top:2px">' + esc(x[1]) + '</div><div style="font-size:11.5px;margin-top:2px">📊 ' + esc(x[3]) + " · " + esc(x[2].split(" ").map(function (c) { return tName(TB[c]); }).join(" + ")) + '</div></div><button class="btn sec sm" data-g="' + gi + "_" + i + '">✨ SQL</button></div>'; }).join("") + "</div>"; }).join("") +
+      '<div class="card" style="margin-top:12px"><b>Want more?</b><div class="bar2"><button class="btn ghost" id="ai">💡 More ideas from AI</button></div><div id="aiI"></div></div>';
+    if ($("cq")) $("cq").onclick = function () { copy(allColsQ(), "Query copied — run it in Agile BI"); };
+    [].forEach.call(VIEW.querySelectorAll("[data-d]"), function (b) { b.onclick = function () { var d = DASH[+b.dataset.d]; useIdea("For a sales overview dashboard block “" + d[0] + "”: " + d[1] + ". Chart: " + d[3] + ".", d[2]); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-g]"), function (b) { b.onclick = function () { var p = b.dataset.g.split("_"), x = IDEA_LIB[+p[0]][1][+p[1]]; useIdea(x[1] + ". Chart: " + x[3] + ".", x[2]); }; });
+    $("ai").onclick = function () { $("ai").disabled = true; api({ action: "sq-ai", mode: "ideas" }).then(function (r) { $("ai").disabled = false; if (!r.ok) return toast(r.error); $("aiI").innerHTML = r.ideas.map(function (x, i) { return '<div class="idea"><div style="flex:1"><b>' + esc(x.title) + '</b><div class="muted" style="font-size:12px">' + esc(x.ask) + '</div></div><button class="btn sec sm" data-ai="' + i + '">✨ SQL</button></div>'; }).join(""); [].forEach.call($("aiI").querySelectorAll("[data-ai]"), function (b) { b.onclick = function () { var x = r.ideas[+b.dataset.ai]; LASTQ = x.ask; PICK = {}; TAB = "ask"; draw(); $("q").value = x.ask; HIST = []; run({ mode: "write", q: x.ask }, $("go")); }; }); }); };
+  }
+  function allColsQ() { return "select table_name, column_name, data_type, column_comment\nfrom information_schema.columns\nwhere table_schema = '" + D.db + "'\n  and table_name in (" + D.tables.map(function (t) { return "'" + t.name + "'"; }).join(", ") + ")\norder by table_name, ordinal_position"; }
 
   // ---------------- write SQL ----------------
   var EX = ["Monthly sell-out quantity by state for the last 6 months", "Top 20 retailers by sales quantity this month", "Model-wise activation count for last 30 days", "Stores with no sale in the last 30 days", "Inbound vs outbound quantity by agency this month", "Competitor brand share by state from competitor reports", "Number of active stores and retailers by state", "Price list of all current products with material codes"];
   function ask() {
     var k = known();
-    VIEW.innerHTML = (k.length ? "" : '<div class="help w"><b>One-time set-up needed.</b> The AI must know the column names of your tables before it can write correct SQL. Open <b>📚 Tables</b> and add them (5–10 minutes, once).</div>') +
+    VIEW.innerHTML = (k.length < D.tables.length ? '<div class="help w"><b>' + k.length + " of " + D.tables.length + ' tables have their column names loaded.</b> You can still ask — for the others the AI uses the most likely column names and tells you which. Load them once in <b>💡 Ideas & dashboards</b> (2 minutes) to make every query exact.</div>' : "") +
       '<div class="card"><b>What do you want to see?</b><textarea class="tx" id="q" rows="3" style="margin-top:6px" placeholder="e.g. Monthly sell-out quantity by state and model for the last 6 months">' + esc(LASTQ) + '</textarea><div class="muted" style="font-size:12px;margin-top:8px">Tables to use (leave all off = AI chooses):</div><div class="chips" id="pk">' + D.tables.map(function (t) { return '<button data-p="' + t.name + '" class="' + (PICK[t.name] ? "on" : "") + '"' + (t.cols.length ? "" : ' style="opacity:.55"') + ">" + esc(t.en) + (t.cols.length ? "" : " ⚠") + "</button>"; }).join("") + '</div><div class="bar2"><button class="btn pri" id="go" style="flex:2">✨ Write the SQL</button><button class="btn ghost" id="idea" style="flex:1">💡 Ideas</button></div><div class="chips" id="ex"></div></div>' +
       '<div id="out"></div><div class="card" style="margin-top:12px"><b>Already have a query?</b><div class="bar2"><button class="btn ghost" id="fix" style="flex:1">🩹 Fix an error</button><button class="btn ghost" id="exp" style="flex:1">📖 Explain a query</button></div></div>';
     var exs = function () { $("ex").innerHTML = (IDEAS || EX.map(function (e) { return { ask: e }; })).map(function (e, i) { return '<button data-e="' + i + '">' + esc(e.title ? e.title + " — " + e.ask : e.ask) + "</button>"; }).join(""); [].forEach.call($("ex").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { $("q").value = (IDEAS || EX.map(function (e) { return { ask: e }; }))[+b.dataset.e].ask; window.scrollTo(0, 0); }; }); };
     exs();
     [].forEach.call($("pk").querySelectorAll("[data-p]"), function (b) { b.onclick = function () { PICK[b.dataset.p] = !PICK[b.dataset.p]; b.classList.toggle("on"); }; });
     $("go").onclick = function () { var q = $("q").value.trim(); if (q.length < 6) return toast("Describe what you want to see"); LASTQ = q; HIST = []; run({ mode: "write", q: q }, $("go")); };
-    $("idea").onclick = function () { if (!k.length) return toast("Add table columns first (📚 Tables)"); $("idea").disabled = true; api({ action: "sq-ai", mode: "ideas" }).then(function (r) { $("idea").disabled = false; if (!r.ok) return toast(r.error); IDEAS = r.ideas; exs(); toast("Ideas from your tables are below"); }); };
+    $("idea").onclick = function () { TAB = "ideas"; draw(); }; if (false) $("idea").onclick = function () { if (!k.length) return toast("Add table columns first (📚 Tables)"); $("idea").disabled = true; api({ action: "sq-ai", mode: "ideas" }).then(function (r) { $("idea").disabled = false; if (!r.ok) return toast(r.error); IDEAS = r.ideas; exs(); toast("Ideas from your tables are below"); }); };
     $("fix").onclick = function () { sheet("🩹 Fix an error", "Paste the query and the error Agile BI showed", [["🩹", "Fix it", function () { var s = $("fs").value.trim(); if (!s) { toast("Paste the SQL"); return false; } run({ mode: "fix", sql: s, err: $("fe").value }); }, "pri"]], '<label class="lb">SQL</label><textarea class="tx" id="fs" rows="5">' + esc(OUT && OUT.sql || "") + '</textarea><label class="lb">Error message, or what is wrong with the result</label><textarea class="tx" id="fe" rows="3" placeholder="Paste the red error text from Agile BI"></textarea>'); };
     $("exp").onclick = function () { sheet("📖 Explain a query", "", [["📖", "Explain", function () { var s = $("es").value.trim(); if (!s) { toast("Paste the SQL"); return false; } api({ action: "sq-ai", mode: "explain", sql: s }).then(function (r) { if (!r.ok) return toast(r.error); sheet("In plain English", "", [["", "OK", function () { }]], '<div class="help">' + esc(r.out.explain) + (r.out.checks.length ? "<br><br><b>Check:</b><br>• " + r.out.checks.map(esc).join("<br>• ") : "") + "</div>"); }); }, "pri"]], '<textarea class="tx" id="es" rows="7" placeholder="select …"></textarea>'); };
     if (OUT) showOut();
@@ -65,7 +142,7 @@
   }
   function showOut() {
     var o = OUT, name = function (n) { var t = D.tables.filter(function (x) { return x.name === n; })[0]; return t ? t.en : n; };
-    var need = o.need && o.need.length ? '<div class="help w"><b>Column names needed first</b><br>To write this correctly I need the columns of: <b>' + o.need.map(name).map(esc).join(", ") + '</b>.<br>Open 📚 Tables and add them — then ask again.' + (o.sql ? "<br>The query below may contain guessed column names — don't rely on it yet." : "") + '</div><div class="bar2"><button class="btn sec" id="toT">📚 Add the columns</button></div>' : "";
+    var need = o.need && o.need.length ? '<div class="help w"><b>⚠ Some column names are guesses</b><br>The columns of <b>' + o.need.map(name).map(esc).join(", ") + '</b> are not loaded yet, so I used the most likely names' + (o.guessed && o.guessed.length ? ': <code>' + o.guessed.map(esc).join(", ") + "</code>" : "") + '.<br>Try the query in Agile BI. If it says <i>Unknown column</i>, paste the error in 🩹 Fix — or load the real columns once in 📚 Tables (2 minutes) and every query is exact.</div><div class="bar2"><button class="btn sec sm" id="toT">📚 Load the columns</button></div>' : "";
     $("out").innerHTML = '<div class="card" style="margin-top:12px"><b>' + esc(o.title || "Your query") + "</b>" + need + (o.sql ? '<div class="code" id="sqlc">' + hl(o.sql) + '</div><div class="bar2"><button class="btn pri" id="cp" style="flex:2">📋 Copy SQL</button><button class="btn ghost" id="sv" style="flex:1">⭐ Save</button></div>' +
       (o.explain ? '<div class="help"><b>What it does</b><br>' + esc(o.explain) + "</div>" : "") + (o.chart ? '<div class="help"><b>Chart to build</b><br>' + esc(o.chart) + "</div>" : "") + (o.checks && o.checks.length ? '<div class="help w"><b>Please check</b><br>• ' + o.checks.map(esc).join("<br>• ") + "</div>" : "") +
       '<div class="help"><b>Next in Agile BI</b><br>Data set → Create → Create dataset → connection <b>Starrocks_pro</b> → <b>Custom SQL</b> → paste → ▶ Run query → Read data → name it → Save. Full steps are in 🧭.</div>' +

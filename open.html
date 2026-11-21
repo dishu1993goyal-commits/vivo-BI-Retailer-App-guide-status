@@ -392,10 +392,11 @@ td.n,th.n{text-align:right;white-space:nowrap}
   if (cur && cur.link && cur.link.id === id && cur.token) { location.replace("/" + cur.link.page); return; }
   pub({ action: "tlk-p-info", k: K }).then(function (r) {
     if (!r.ok) { VIEW.innerHTML = '<div class="card empty"><div class="big">⛔</div><b>' + esc(r.error || "This link can't be opened") + "</b></div>"; return; }
-    $("h1").textContent = r.icon + " " + r.tool; $("hp").textContent = "Shared by vivo BI" + (r.label ? " · " + r.label : "");
+    $("h1").textContent = r.icon + " " + r.tool; $("hp").textContent = (r.demo ? "Demo · " : "") + "Shared by vivo BI" + (r.label ? " · " + r.label : "");
     var other = cur && cur.token && !cur.link;
     VIEW.innerHTML = '<div class="card"><b>You have been given access to ' + esc(r.tool) + "</b>" +
-      '<div class="muted" style="font-size:12.5px;margin-top:4px">' + (r.view === "ho" ? "All-India view" : "Data for " + esc(r.state)) + " · " + (r.write ? "you can add and edit" : "view only") + ". Only this tool opens with this link.</div>" +
+      '<div class="muted" style="font-size:12.5px;margin-top:4px">' + (r.view === "ho" ? "All-India view" : "Data for " + esc(r.state)) + " · " + (r.demo ? "demo, view only" : r.write ? "you can add and edit" : "view only") + ". " + ((r.tools || []).length > 1 ? "Only these tools open with this link:" : "Only this tool opens with this link.") + "</div>" +
+      ((r.tools || []).length > 1 ? '<div style="margin-top:8px">' + r.tools.map(function (x) { return '<div style="padding:6px 0;border-top:1px solid #EEF0F6;font-size:13.5px">' + x.icon + " " + esc(x.name) + "</div>"; }).join("") + "</div>" : "") +
       (r.ask ? '<label class="lb">Your name</label><input class="tx" id="nm" autocomplete="name"><label class="lb">Mobile number</label><input class="tx" id="mb" inputmode="numeric" maxlength="10" autocomplete="tel">' : "") +
       (r.pin ? '<label class="lb">PIN (from the sender)</label><input class="tx" id="pn" inputmode="numeric" maxlength="8" type="password">' : "") +
       (other ? '<div class="help w">This browser is logged in to the BI dashboard as <b>' + esc(cur.username) + "</b>. Opening this link here will sign that login out on this browser.</div>" : "") +
@@ -405,7 +406,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       $("go").disabled = true;
       pub(b).then(function (x) {
         $("go").disabled = false; if (!x.ok) return toast(x.error || "Couldn't open");
-        try { localStorage.setItem("biw-auth", JSON.stringify({ app: x.app, username: x.username, token: x.token, link: { id: id, page: x.page, tool: x.tool, label: x.label } })); localStorage.removeItem("biw-role"); } catch (e) { return toast("Please allow this site to store data (turn off private mode)"); }
+        try { localStorage.setItem("biw-auth", JSON.stringify({ app: x.app, username: x.username, token: x.token, link: { id: id, page: x.page, pages: x.pages || [x.page], tools: x.tools || [], demo: !!x.demo, tool: x.tool, label: x.label } })); localStorage.removeItem("biw-role"); } catch (e) { return toast("Please allow this site to store data (turn off private mode)"); }
         location.replace("/" + x.page);
       });
     };
