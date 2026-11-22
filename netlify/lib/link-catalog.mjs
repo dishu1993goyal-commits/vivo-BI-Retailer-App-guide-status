@@ -500,6 +500,19 @@ export const LINK_CATALOG = {
 ]
 ]
 },
+"execdeck.html": {
+"id": "execdeck",
+"icon": "🏛",
+"name": "Executive deck (AI)",
+"ho": false,
+"acts": [
+"ar-chat",
+"ar-job",
+"ar-job-get",
+"tl-use"
+],
+"tabs": []
+},
 "deckstudio.html": {
 "id": "deckstudio",
 "icon": "🎬",

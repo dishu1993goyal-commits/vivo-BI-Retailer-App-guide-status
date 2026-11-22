@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Executive deck</title>
+<style>
+/*@@CSS@@*/
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+.stp{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 4px}
+.stp button{border:0;background:#EEF0F6;border-radius:99px;padding:8px 13px;font:inherit;font-weight:800;font-size:13px;cursor:pointer;color:#3B4266}
+.stp button.on{background:#12163A;color:#fff}.stp button.done:not(.on){background:#E3F6EC;color:#1C7A4B}
+.pv{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 1px 8px rgba(20,24,51,.06);border:1px solid #EEF0F6}
+.pv h3{margin:0 0 2px;font-size:15.5px}.pv .best{color:var(--mut);font-size:12.5px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}@media(max-width:560px){.g2{grid-template-columns:1fr}}
+.row2{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#F3F4FA;border-radius:12px;padding:7px 10px;font-size:12.5px;margin:6px 6px 0 0}
+.chip b{font-size:12.5px}.chip button{border:0;background:#fff;border-radius:99px;width:22px;height:22px;cursor:pointer}
+.chip img{width:34px;height:24px;object-fit:cover;border-radius:4px}
+.sw{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;cursor:pointer}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:10px}
+.th{background:#fff;border-radius:12px;box-shadow:0 1px 8px rgba(20,24,51,.08);overflow:hidden;border:1px solid #EEF0F6}
+.th .fr{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#fff;cursor:pointer}
+.th .fr .bislide{transform-origin:0 0;position:absolute;left:0;top:0}
+.th .ft{display:flex;align-items:center;gap:4px;padding:6px 8px;font-size:12px}
+.th .ft b{flex:1;color:var(--mut);font-weight:700}
+.th .ft button{border:0;background:#F3F4FA;border-radius:8px;padding:4px 7px;cursor:pointer;font-size:12px}
+.warn{font-size:11.5px;background:#FFF4DB;color:#8A5B00;border-radius:8px;padding:4px 8px;margin:0 8px 8px}
+.big{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:10px;box-shadow:0 2px 14px rgba(20,24,51,.15);margin-top:8px}
+.big .bislide{transform-origin:0 0;position:absolute;left:0;top:0}
+.out{white-space:pre-wrap;background:#F7F8FC;border-radius:12px;padding:10px;font-size:13px;margin-top:8px;max-height:300px;overflow:auto}
+.fx{border-left:3px solid #3F5BFF;background:#F7F8FC;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px}
+.fx .n{font-weight:800;color:#1B2A8C}.fx button{margin-top:6px}
+.score{display:flex;align-items:center;gap:12px;margin-top:8px}.score b{font-size:34px;color:#14205B}
+.prog{height:6px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:#3F5BFF;width:0;transition:width .5s}
+.ed label.lb{margin-top:8px}.ed textarea.tx{font-size:13px}
+.hint{font-size:12px;color:var(--mut);margin-top:3px}
+.lays{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.lays span{font-size:11.5px;background:#EEF1FF;color:#1B2A8C;border-radius:99px;padding:3px 9px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#execdeck">📘 How to</a></div>
+  <h1>🏛 Executive deck</h1><p>Top-management decks in the BI style — AI writes the storyline from your own numbers, you check, it exports to PowerPoint and PDF</p>
+</div>
+<div class="wrap">
+  <div class="stp" id="stp"></div>
+  <div id="view"></div>
+</div>
+<script src="/deck/deck-engine.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), KEY = "execdeck:draft", STEP = "brief";
+  var D = ls(KEY) || {};
+  D.brief = D.brief || { title: "", aud: "Top management review", period: "", goal: "", len: 12, tone: "Confident, crisp, data-led" };
+  D.notes = D.notes || ""; D.DS = D.DS || {}; D.IM = D.IM || {}; D.slides = D.slides || []; D.deck = D.deck || {}; D.conf = !!D.conf;
+  var STEPS = [["brief", "1 · Brief"], ["mat", "2 · Material"], ["story", "3 · Storyline"], ["slides", "4 · Slides"], ["review", "5 · CXO check"], ["export", "6 · Export"]];
+  var LNAME = { cover: "Cover", agenda: "Agenda", section: "Section divider", kpis: "Headline numbers", chart: "Chart + insights", ranking: "Ranking", messages: "Key messages", compare: "Two columns", timeline: "Timeline / quarters", cards: "Project cards", table: "Table", image: "Picture + points", asks: "Decisions needed", closing: "Closing" };
+  function save() { try { ls(KEY, D); } catch (e) { try { var c = clone(D); c.IM = {}; ls(KEY, c); toast("Pictures are too big to keep after closing — the rest is saved"); } catch (e2) { } } }
+  function lib(src, test) { return test() ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load " + src)); }; document.head.appendChild(s); }); }
+  function libX() { return lib("/vendor/xlsx.full.min.js", function () { return !!window.XLSX; }); }
+  function libP() { return lib("/vendor/pptx/pptxgen.bundle.js", function () { return !!window.PptxGenJS; }); }
+  function libI() { return lib("/vendor/html-to-image.js", function () { return !!window.htmlToImage; }).then(function () { return lib("/vendor/jspdf/jspdf.umd.min.js", function () { return !!(window.jspdf && window.jspdf.jsPDF); }); }); }
+  function nextId(pre, o) { var i = 1; while (o[pre + i]) i++; return pre + i; }
+
+  // ---------- steps ----------
+  function steps() {
+    var done = { brief: !!D.brief.title, mat: !!(D.notes || Object.keys(D.DS).length), story: !!D.slides.length, slides: !!D.slides.length, review: !!D.review, export: false };
+    $("stp").innerHTML = STEPS.map(function (s) { return '<button data-s="' + s[0] + '" class="' + (STEP === s[0] ? "on" : "") + (done[s[0]] ? " done" : "") + '">' + s[1] + "</button>"; }).join("");
+    [].forEach.call($("stp").querySelectorAll("button"), function (b) { b.onclick = function () { go(b.dataset.s); }; });
+  }
+  function go(s) { STEP = s; steps(); ({ brief: vBrief, mat: vMat, story: vStory, slides: vSlides, review: vReview, export: vExport })[s](); window.scrollTo(0, 0); }
+
+  // ---------- 1 brief ----------
+  function vBrief() {
+    var b = D.brief;
+    VIEW.innerHTML = '<div class="pv"><h3>What is this deck for?</h3><div class="best">A sharp brief gives a sharp storyline. The AI writes for the audience and the decision you name here.</div>' +
+      '<label class="lb">Deck title</label><input class="tx" id="bt" value="' + esc(b.title) + '" placeholder="e.g. BI Yearly Review 2026 & Plan 2027">' +
+      '<div class="g2"><div><label class="lb">Audience</label><select class="tx" id="ba">' + ["Top management review", "Board / leadership offsite", "Zonal & state heads", "Partner / bank leadership", "Internal team"].map(function (x) { return "<option" + (x === b.aud ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
+      '<div><label class="lb">Period</label><input class="tx" id="bp" value="' + esc(b.period) + '" placeholder="e.g. Jan–Dec 2026"></div></div>' +
+      '<label class="lb">What should management take away or decide?</label><textarea class="tx" id="bg" rows="3" placeholder="e.g. App usage is the next lever; approve Retailer App 3.0 and make usage part of monthly reviews">' + esc(b.goal) + "</textarea>" +
+      '<div class="g2"><div><label class="lb">Number of slides</label><select class="tx" id="bl">' + [6, 8, 10, 12, 14, 16, 20].map(function (n) { return "<option" + (n === +b.len ? " selected" : "") + ">" + n + "</option>"; }).join("") + "</select></div>" +
+      '<div><label class="lb">Tone</label><select class="tx" id="bo">' + ["Confident, crisp, data-led", "Celebratory — year of wins", "Problem-solving — honest about gaps", "Pitch — ask for budget / approval"].map(function (x) { return "<option" + (x === b.tone ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div></div>" +
+      '<div class="bar2"><button class="btn pri" id="bn">Next: add material →</button></div></div>';
+    $("bn").onclick = function () {
+      b.title = $("bt").value.trim(); b.aud = $("ba").value; b.period = $("bp").value.trim(); b.goal = $("bg").value.trim(); b.len = +$("bl").value; b.tone = $("bo").value;
+      if (!b.title) return toast("Give the deck a title"); save(); go("mat");
+    };
+  }
+
+  // ---------- 2 material ----------
+  function colStats(d) {
+    var f = [], st = [];
+    d.cols.forEach(function (c, i) {
+      var v = d.rows.map(function (r) { return BIDECK.num(r[i]); }).filter(function (x) { return x != null; });
+      if (v.length < Math.max(1, d.rows.length * 0.6)) { st.push(c + " (text)"); return; }
+      var s = v.reduce(function (a, b) { return a + b; }, 0), r1 = function (x) { return Math.round(x * 10) / 10; };
+      var o = { sum: r1(s), avg: r1(s / v.length), max: r1(Math.max.apply(null, v)), min: r1(Math.min.apply(null, v)) };
+      f.push(o.sum, o.avg, o.max, o.min);
+      st.push(c + " (number · total " + o.sum + ", average " + o.avg + ", max " + o.max + ", min " + o.min + ")");
+    });
+    d.facts = f; return st;
+  }
+  function addDataset(name, cols, rows) {
+    cols = cols.map(function (c, i) { return String(c == null || c === "" ? "Column " + (i + 1) : c).trim(); });
+    rows = rows.filter(function (r) { return r.some(function (c) { return c !== "" && c != null; }); }).slice(0, 2000).map(function (r) { return cols.map(function (_, i) { var v = r[i]; if (v instanceof Date) return v.toISOString().slice(0, 10); return typeof v === "number" ? Math.round(v * 1000) / 1000 : String(v == null ? "" : v).slice(0, 120); }); });
+    var id = nextId("D", D.DS); D.DS[id] = { name: String(name).slice(0, 60), cols: cols, rows: rows }; colStats(D.DS[id]); save(); return id;
+  }
+  function readSheet(f) {
+    return libX().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+      var wb = XLSX.read(buf, { type: "array", cellDates: true }), n = 0;
+      wb.SheetNames.forEach(function (sn) {
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: "" }); if (rows.length < 2) return;
+        var h = 0; for (var i = 0; i < Math.min(10, rows.length); i++) { if (rows[i].filter(function (c) { return String(c).trim(); }).length >= Math.max(2, rows[0].length * 0.5)) { h = i; break; } }
+        addDataset(f.name.replace(/\.[^.]+$/, "") + (wb.SheetNames.length > 1 ? " · " + sn : ""), rows[h], rows.slice(h + 1)); n++;
+      });
+      return n;
+    });
+  }
+  function shrink(u, cb) { var im = new Image(); im.onload = function () { var k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); cb(c.toDataURL("image/jpeg", 0.85)); }; im.src = u; }
+  function vMat() {
+    var ds = Object.keys(D.DS), im = Object.keys(D.IM);
+    VIEW.innerHTML = '<div class="pv"><h3>📝 Your points</h3><div class="best">Paste the facts, wins, issues and plans — bullet notes are fine. Every number the AI uses must come from here or from your tables.</div>' +
+      '<textarea class="tx" id="mn" rows="9" placeholder="e.g.\n• Retailer app: 55K+ retailers onboarded, usage 12% (Jul) → 19.8% (Nov)\n• IP Guard live in 7 states + HO\n• VBA pilot Chhattisgarh: 90% of policy logic configured\n• 2027: Retailer App 3.0, DPDPA training in 22 more states">' + esc(D.notes) + "</textarea></div>" +
+      '<div class="pv"><h3>📊 Tables</h3><div class="best">Charts and tables are drawn from these — the AI only picks which columns to show, so numbers on charts are always your numbers.</div>' +
+      (ds.length ? ds.map(function (id) { var d = D.DS[id]; return '<span class="chip"><b>' + id + "</b> " + esc(d.name) + ' · ' + d.rows.length + " rows · " + d.cols.length + ' cols <button data-dd="' + id + '">✕</button></span>'; }).join("") : '<div class="hint">No tables yet.</div>') +
+      '<div class="row2"><input type="file" id="mf" multiple accept=".xlsx,.xls,.csv" style="display:none"><button class="btn ghost sm" id="mfb">📎 Add Excel / CSV</button><button class="btn ghost sm" id="mk">📈 Add BI KPI scores</button><button class="btn ghost sm" id="mp">📋 Paste a table</button></div></div>' +
+      '<div class="pv"><h3>🖼 Pictures</h3><div class="best">Event photos, screenshots, product shots — the AI can place them on a slide.</div>' +
+      im.map(function (id) { return '<span class="chip"><img src="' + D.IM[id].url + '"><b>' + id + "</b> " + esc(D.IM[id].name) + ' <button data-di="' + id + '">✕</button></span>'; }).join("") +
+      '<div class="row2"><input type="file" id="mi" multiple accept="image/*" style="display:none"><button class="btn ghost sm" id="mib">🖼 Add pictures</button></div></div>' +
+      '<div class="pv"><label class="sw" style="margin:0"><input type="checkbox" id="mc"' + (D.conf ? " checked" : "") + '> 🔒 <b>Confidential</b> — send only to AI providers HO has marked OK for confidential work</label></div>' +
+      '<div class="bar2"><button class="btn pri" id="mn2">Next: build the storyline →</button></div>';
+    $("mn").oninput = function () { D.notes = this.value; save(); };
+    $("mc").onchange = function () { D.conf = this.checked; save(); };
+    $("mfb").onclick = function () { $("mf").click(); };
+    $("mf").onchange = function () { var fs = [].slice.call(this.files); if (!fs.length) return; toast("Reading…"); fs.reduce(function (p, f) { return p.then(function () { return readSheet(f); }); }, Promise.resolve()).then(function () { vMat(); }).catch(function (e) { toast(e.message); }); };
+    $("mib").onclick = function () { $("mi").click(); };
+    $("mi").onchange = function () { [].slice.call(this.files).forEach(function (f) { var r = new FileReader(); r.onload = function () { shrink(r.result, function (u) { var id = nextId("I", D.IM); D.IM[id] = { name: f.name.replace(/\.[^.]+$/, "").slice(0, 40), url: u }; save(); vMat(); }); }; r.readAsDataURL(f); }); };
+    [].forEach.call(VIEW.querySelectorAll("[data-dd]"), function (b) { b.onclick = function () { delete D.DS[b.dataset.dd]; save(); vMat(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-di]"), function (b) { b.onclick = function () { delete D.IM[b.dataset.di]; save(); vMat(); }; });
+    $("mp").onclick = function () {
+      sheet("Paste a table", "Copy cells from Excel and paste — first row = headings", [["✅", "Add table", function (ov) { var t = ov.querySelector("textarea").value.trim(); if (!t) return false; var rows = t.split(/\r?\n/).map(function (l) { return l.split("\t").map(function (c) { var n = BIDECK.num(c); return n != null && /\d/.test(c) ? n : c.trim(); }); }); if (rows.length < 2) { toast("Need a heading row and at least one row"); return false; } addDataset(ov.querySelector("input").value || "Pasted table", rows[0], rows.slice(1)); vMat(); }, "pri"]],
+        '<label class="lb">Name</label><input class="tx" placeholder="e.g. State scores"><textarea class="tx" rows="8" style="margin-top:8px;font-family:monospace;font-size:12px"></textarea>');
+    };
+    $("mk").onclick = kpiPick;
+    $("mn2").onclick = function () { if (!D.notes.trim() && !Object.keys(D.DS).length) return toast("Add your points or a table first"); go("story"); };
+  }
+  function kpiPick() {
+    toast("Loading dashboard data…");
+    KPIDATA.load().then(function (K) {
+      var ms = K.months(); if (!ms.length) return toast("No dashboard data yet");
+      var opt = ms.map(function (m) { return '<option value="' + m + '">' + K.KE.monthLabel(m) + "</option>"; }).join("");
+      sheet("Add BI KPI scores", "State-wise score and every KPI for the period, as the dashboard shows it", [["📊", "Add", function (ov) {
+        var f = ov.querySelector("#kf").value, t = ov.querySelector("#kt").value; if (f > t) { var x = f; f = t; t = x; }
+        var last = new Date(Date.UTC(+t.slice(0, 4), +t.slice(5, 7), 0)).toISOString().slice(0, 10);
+        try {
+          var sp = K.KE.scorePeriod(K.RAW, K.SETUP, f + "-01", last, "Total"), rows = sp.kpi_state || [];
+          if (!rows.length) { toast("No scores for that period"); return false; }
+          var cols = Object.keys(rows[0]).filter(function (k) { return rows.some(function (r) { var v = r[k]; return v != null && typeof v !== "object"; }) && !/^(code|_)/.test(k); });
+          var lab = f === t ? K.KE.monthLabel(f) : K.KE.monthLabel(f) + " – " + K.KE.monthLabel(t);
+          addDataset("BI KPI scores · " + lab, cols, rows.map(function (r) { return cols.map(function (k) { return r[k]; }); }));
+          if (!D.brief.period) D.brief.period = lab; save(); vMat();
+        } catch (e) { toast("Couldn't read scores: " + e.message); return false; }
+      }, "pri"]], '<div class="g2"><div><label class="lb">From</label><select class="tx" id="kf">' + opt + '</select></div><div><label class="lb">To</label><select class="tx" id="kt">' + opt + "</select></div></div>");
+      var ov = document.querySelector(".ov:last-child"); if (ov) { ov.querySelector("#kf").value = ms[Math.max(0, ms.length - 3)]; ov.querySelector("#kt").value = ms[ms.length - 1]; }
+    }).catch(function (e) { toast(e.message); });
+  }
+
+  // ---------- AI ----------
+  function job(req, onTick) {
+    req.sensitive = !!D.conf;
+    return api({ action: "ar-job", req: req }).then(function (r) {
+      if (!r.ok) throw new Error(r.error || "AI is not available");
+      var t0 = Date.now();
+      return new Promise(function (res, rej) {
+        (function poll() {
+          api({ action: "ar-job-get", job: r.job }).then(function (g) {
+            if (!g.ok) return rej(new Error(g.error));
+            if (g.st === "done") { if (!g.res || !g.res.ok) return rej(new Error((g.res && g.res.error) || "AI couldn't finish")); return res(g.res); }
+            if (Date.now() - t0 > 360000) return rej(new Error("The AI is taking too long — try again"));
+            if (onTick) onTick(Date.now() - t0); setTimeout(poll, 2500);
+          });
+        })();
+      });
+    });
+  }
+  function parseJ(t) { var s = String(t || "").replace(/```(json)?/g, ""), a = s.indexOf("{"), b = s.lastIndexOf("}"); if (a < 0 || b < a) throw new Error("The AI didn't return a deck — try again"); return JSON.parse(s.slice(a, b + 1)); }
+  function material() {
+    var o = ["BRIEF", "Title: " + D.brief.title, "Audience: " + D.brief.aud, "Period: " + (D.brief.period || "—"), "Takeaway / decision wanted: " + (D.brief.goal || "—"), "Tone: " + D.brief.tone, "", "NOTES FROM THE PRESENTER", D.notes || "(none)", ""];
+    Object.keys(D.DS).forEach(function (id) {
+      var d = D.DS[id], st = colStats(d);
+      o.push("TABLE " + id + ' "' + d.name + '" — ' + d.rows.length + " rows. Columns: " + st.join("; "));
+      o.push(d.cols.join(" | ")); d.rows.slice(0, 40).forEach(function (r) { o.push(r.join(" | ")); }); if (d.rows.length > 40) o.push("… " + (d.rows.length - 40) + " more rows"); o.push("");
+    });
+    var ims = Object.keys(D.IM); if (ims.length) o.push("PICTURES: " + ims.map(function (id) { return id + ' "' + D.IM[id].name + '"'; }).join(", "));
+    return o.join("\n");
+  }
+  var RULES = [
+    "You are a senior strategy consultant (McKinsey / BCG standard) writing a deck for vivo India's top management, in the house style of vivo Business Innovation (BI).",
+    "Write the storyline the way a CXO reads: answer first (pyramid principle), then the evidence, then what you need from them.",
+    "Structure: cover → executive summary (layout kpis or messages) → 2-4 sections, each opened by a section slide → asks (decisions needed) → closing. Add an agenda slide only for decks of 10 slides or more.",
+    "Every title except cover, agenda, section and closing is an ACTION TITLE: one sentence that states the takeaway (the 'so what'), at most 14 words. Never a topic label like 'App usage'.",
+    "NUMBERS: use ONLY numbers that appear in the material. Never invent, estimate, extrapolate, or compute new percentages. If a number is not in the material, make the point in words.",
+    "Charts and tables never contain typed numbers: point to a TABLE id and its EXACT column names, and the app draws them from the person's data. Pick the chart that fits: col for comparing up to 8 items, bar for rankings or long names, line for months/trends, pie/doughnut only for parts of a whole (max 6).",
+    "Bullets: at most 5 per slide, at most 16 words each, each starts with the insight, no filler words ('very', 'various', 'significant').",
+    "One message per slide. Vary layouts; never 3 slides in a row with the same layout.",
+    "Each slide gets 'notes': 2-3 sentences the presenter can say.",
+    "Return ONLY JSON, no commentary: {\"title\":\"…\",\"period\":\"…\",\"slides\":[{\"layout\":\"…\", …fields…, \"notes\":\"…\"}]}"
+  ];
+  function layoutsDoc() { return "LAYOUTS and their fields (title and subtitle are allowed on all):\n" + Object.keys(BIDECK.DESCRIBE).map(function (k) { return "- " + k + ": " + BIDECK.DESCRIBE[k]; }).join("\n"); }
+  function cleanSlides(arr) { return (arr || []).filter(function (s) { return s && BIDECK.LAYOUTS[s.layout]; }).slice(0, 30); }
+
+  // ---------- 3 storyline ----------
+  function vStory() {
+    VIEW.innerHTML = '<div class="pv"><h3>✨ Build the storyline</h3><div class="best">The AI reads your brief, points and tables and writes the whole deck — action titles, the right chart for each message, speaker notes. About 1 minute.</div>' +
+      '<div class="lays">' + Object.keys(LNAME).map(function (k) { return "<span>" + LNAME[k] + "</span>"; }).join("") + "</div>" +
+      '<label class="lb">Anything specific? (optional)</label><input class="tx" id="sx" placeholder="e.g. open with the hall of fame; keep the 2027 plan to 2 slides">' +
+      '<div class="bar2"><button class="btn pri" id="sg">' + (D.slides.length ? "↻ Write it again" : "✨ Write the deck") + "</button>" + (D.slides.length ? '<button class="btn ghost" id="sv">See the ' + D.slides.length + " slides →</button>" : "") + '</div><div class="prog" id="sp" style="display:none"><i></i></div><div class="hint" id="sm"></div></div>';
+    if ($("sv")) $("sv").onclick = function () { go("slides"); };
+    $("sg").onclick = function () {
+      if (D.slides.length && !confirm("Replace the current slides with a new storyline?")) return;
+      var btn = this; btn.disabled = true; $("sp").style.display = ""; $("sm").textContent = "Writing the storyline…";
+      var x = $("sx").value.trim();
+      job({ task: "think", json: true, maxTokens: 7000, temperature: 0.4, system: RULES.join("\n") + "\n\n" + layoutsDoc(), prompt: material() + "\n\nWrite about " + D.brief.len + " slides." + (x ? "\nAlso: " + x : "") }, function (ms) { $("sp").firstChild.style.width = Math.min(95, ms / 900) + "%"; $("sm").textContent = "Writing the storyline… " + Math.round(ms / 1000) + " s"; })
+        .then(function (r) {
+          var j = parseJ(r.text), sl = cleanSlides(j.slides); if (!sl.length) throw new Error("The AI's deck had no usable slides — try again");
+          D.slides = sl; D.deck = { title: j.title || D.brief.title, period: j.period || D.brief.period }; D.review = null; D.by = r.provider + " · " + r.model; save(); go("slides");
+        }).catch(function (e) { btn.disabled = false; $("sp").style.display = "none"; $("sm").innerHTML = '<span style="color:#B3261E">⚠ ' + esc(e.message) + "</span>"; });
+    };
+  }
+
+  // ---------- 4 slides ----------
+  function allowed() { return BIDECK.allowedSet({ text: D.notes + "\n" + D.brief.goal + "\n" + D.brief.title + "\n" + D.brief.period, DS: D.DS }); }
+  function fitScale(box) { var s = box.querySelector(".bislide"); if (s) s.style.transform = "scale(" + box.clientWidth / 1333 + ")"; }
+  function deckInfo() { return { title: D.deck.title || D.brief.title, period: D.deck.period || D.brief.period }; }
+  function vSlides() {
+    if (!D.slides.length) { VIEW.innerHTML = '<div class="pv"><h3>No slides yet</h3><div class="best">Build the storyline first.</div><div class="bar2"><button class="btn pri" id="g3">✨ Build the storyline</button></div></div>'; $("g3").onclick = function () { go("story"); }; return; }
+    var al = allowed(), flagsN = 0;
+    var html = D.slides.map(function (sl, i) {
+      var fl = BIDECK.numCheck(sl, al); flagsN += fl.length;
+      return '<div class="th"><div class="fr" data-open="' + i + '">' + BIDECK.toHtml(BIDECK.build(sl, deckInfo(), i + 1, D.DS, D.IM), fl) + "</div>" +
+        (fl.length ? '<div class="warn">⚠ Not in your material: ' + esc(fl.join(", ")) + "</div>" : "") +
+        '<div class="ft"><b>' + (i + 1) + " · " + esc(LNAME[sl.layout] || sl.layout) + '</b><button data-up="' + i + '" title="Move up">↑</button><button data-dn="' + i + '" title="Move down">↓</button><button data-dup="' + i + '" title="Copy">⧉</button><button data-del="' + i + '" title="Delete">🗑</button><button data-open="' + i + '">✏️ Edit</button></div></div>';
+    }).join("");
+    VIEW.innerHTML = '<div class="pv"><h3>' + esc(deckInfo().title) + '</h3><div class="best">' + D.slides.length + " slides" + (D.by ? " · written by " + esc(D.by) : "") + " · tap a slide to edit</div>" +
+      (flagsN ? '<div class="fx" style="border-color:#E09B10">⚠ <b>' + flagsN + ' number(s) are not in your material</b> — highlighted on the slides. Correct them or add the source to your points before presenting.</div>' : '<div class="fx" style="border-color:#2E9D6A">✅ Every number on the slides comes from your material.</div>') +
+      '<div class="row2"><button class="btn ghost sm" id="sa">➕ Add a slide</button><button class="btn ghost sm" id="sr">🧐 CXO check</button><button class="btn pri sm" id="se">⬇ Export</button></div></div><div class="thumbs">' + html + "</div>";
+    [].forEach.call(VIEW.querySelectorAll(".th .fr"), fitScale);
+    var mv = function (i, d) { var j = i + d; if (j < 0 || j >= D.slides.length) return; var t = D.slides[i]; D.slides[i] = D.slides[j]; D.slides[j] = t; save(); vSlides(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-up]"), function (b) { b.onclick = function () { mv(+b.dataset.up, -1); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-dn]"), function (b) { b.onclick = function () { mv(+b.dataset.dn, 1); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-dup]"), function (b) { b.onclick = function () { var i = +b.dataset.dup; D.slides.splice(i + 1, 0, clone(D.slides[i])); save(); vSlides(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { if (!confirm("Delete this slide?")) return; D.slides.splice(+b.dataset.del, 1); save(); vSlides(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-open]"), function (b) { b.onclick = function () { edit(+b.dataset.open); }; });
+    $("sa").onclick = function () { D.slides.push({ layout: "messages", title: "New slide — write the takeaway here", items: [{ title: "First point", text: "Supporting line" }] }); save(); edit(D.slides.length - 1); };
+    $("sr").onclick = function () { go("review"); }; $("se").onclick = function () { go("export"); };
+  }
+  var FIELDS = { cover: ["title", "subtitle", "kpis"], agenda: ["title", "kicker", "subtitle2", "items"], section: ["kicker", "title", "subtitle"], kpis: ["title", "subtitle", "kpis", "chart", "bullets"], chart: ["title", "subtitle", "chart", "bullets"], ranking: ["title", "subtitle", "chart", "bullets"], messages: ["title", "subtitle", "items"], compare: ["title", "subtitle", "left", "right"], timeline: ["title", "subtitle", "items"], cards: ["title", "subtitle", "items"], table: ["title", "subtitle", "table", "bullets"], image: ["title", "subtitle", "image", "bullets"], asks: ["title", "kicker", "subtitle2", "items"], closing: ["title", "subtitle"] };
+  function itemsTxt(sl) { return (sl.items || []).map(function (q) { return [q.title || "", q.text || (q.bullets || []).join("; "), q.status || q.tag || "", q.result || ""].join(" | ").replace(/( \| )+$/, ""); }).join("\n"); }
+  function txtItems(t, lay) { return t.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) { var p = l.split("|").map(function (x) { return x.trim(); }), q = { title: p[0] }; if (lay === "timeline") { q.bullets = (p[1] || "").split(";").map(function (x) { return x.trim(); }).filter(Boolean); if (p[2]) q.tag = p[2]; if (p[3]) q.result = p[3]; var tg = q.tag; if (!tg && /^Q\d/i.test(q.title)) { q.tag = q.title.split(/\s/)[0]; q.title = q.title.slice(q.tag.length).trim(); } } else { if (p[1]) q.text = p[1]; if (p[2]) q.status = p[2]; } return q; }); }
+  function edit(i) {
+    var sl = D.slides[i], ov, F = FIELDS[sl.layout] || ["title", "bullets"], dsOpt = function (cur) { return '<option value="">—</option>' + Object.keys(D.DS).map(function (id) { return '<option value="' + id + '"' + (id === cur ? " selected" : "") + ">" + id + " · " + esc(D.DS[id].name) + "</option>"; }).join(""); };
+    var f = function (k) {
+      if (k === "title" || k === "subtitle" || k === "kicker" || k === "subtitle2") return '<label class="lb">' + { title: "Title (the takeaway)", subtitle: "Subtitle", kicker: "Big word / number", subtitle2: "Side text" }[k] + '</label><input class="tx" data-f="' + k + '" value="' + esc(sl[k] || "") + '">';
+      if (k === "bullets") return '<label class="lb">Points (one per line)</label><textarea class="tx" rows="4" data-f="bullets">' + esc((sl.bullets || []).join("\n")) + "</textarea>" + (F.indexOf("chart") >= 0 || F.indexOf("table") >= 0 ? '<label class="lb">Heading of the points box</label><input class="tx" data-f="insightTitle" value="' + esc(sl.insightTitle || "") + '" placeholder="Key insights">' : "");
+      if (k === "kpis") return '<label class="lb">Headline numbers — Label | Value | small note</label><textarea class="tx" rows="4" data-f="kpis">' + esc((sl.kpis || []).map(function (q) { return [q.label, q.value, q.sub || ""].join(" | ").replace(/ \| $/, ""); }).join("\n")) + "</textarea>";
+      if (k === "items") return '<label class="lb">' + (sl.layout === "timeline" ? "Phases — Title | point; point | Q1 | result" : sl.layout === "cards" ? "Cards — Title | text | Live / Pilot / Upcoming / Done / Risk" : "Rows — Title | supporting line") + '</label><textarea class="tx" rows="6" data-f="items">' + esc(itemsTxt(sl)) + "</textarea>";
+      if (k === "left" || k === "right") { var c = sl[k] || {}; return '<label class="lb">' + (k === "left" ? "Left column" : "Right column") + ' — first line is the heading</label><textarea class="tx" rows="4" data-f="' + k + '">' + esc([c.title || ""].concat(c.bullets || []).join("\n")) + "</textarea>"; }
+      if (k === "chart" || k === "table") { var c2 = sl[k] || {}; return '<label class="lb">' + (k === "chart" ? "Chart" : "Table") + ' from a table</label><div class="g2"><select class="tx" data-f="' + k + '.data">' + dsOpt(c2.data) + "</select>" + (k === "chart" ? '<select class="tx" data-f="chart.kind">' + [["", "Auto"], ["col", "Columns"], ["bar", "Bars"], ["line", "Line"], ["pie", "Pie"], ["doughnut", "Doughnut"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === (c2.kind || "") ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" : "") + "</div>" +
+        (k === "chart" ? '<div class="g2"><input class="tx" data-f="chart.x" placeholder="Label column" value="' + esc(c2.x || "") + '"><input class="tx" data-f="chart.y" placeholder="Value column(s), comma" value="' + esc([].concat(c2.y || []).join(", ")) + '"></div><div class="g2"><input class="tx" data-f="chart.title" placeholder="Chart heading" value="' + esc(c2.title || "") + '"><input class="tx" data-f="chart.top" placeholder="Show top N (optional)" value="' + esc(c2.top || "") + '"></div>' :
+          '<div class="g2"><input class="tx" data-f="table.cols" placeholder="Columns, comma (blank = all)" value="' + esc((c2.cols || []).join(", ")) + '"><input class="tx" data-f="table.top" placeholder="Rows to show" value="' + esc(c2.top || "") + '"></div>') +
+        '<div class="hint">Columns: ' + (c2.data && D.DS[c2.data] ? esc(D.DS[c2.data].cols.join(", ")) : "pick a table") + "</div>"; }
+      if (k === "image") return '<label class="lb">Picture</label><select class="tx" data-f="image"><option value="">—</option>' + Object.keys(D.IM).map(function (id) { return '<option value="' + id + '"' + (id === sl.image ? " selected" : "") + ">" + id + " · " + esc(D.IM[id].name) + "</option>"; }).join("") + "</select>";
+      return "";
+    };
+    var body = '<div class="big" id="eb"></div><div class="ed"><label class="lb">Layout</label><select class="tx" id="el">' + Object.keys(LNAME).map(function (k) { return '<option value="' + k + '"' + (k === sl.layout ? " selected" : "") + ">" + LNAME[k] + "</option>"; }).join("") + "</select>" + F.map(f).join("") +
+      '<label class="lb">Speaker notes</label><textarea class="tx" rows="3" data-f="notes">' + esc(sl.notes || "") + "</textarea>" +
+      '<label class="lb">✨ Ask the AI to change this slide</label><div class="row2" style="margin-top:2px"><input class="tx" id="ea" style="flex:1" placeholder="e.g. sharper title · make it a ranking · fewer words"><button class="btn ghost sm" id="eg">Go</button></div></div>';
+    var read = function () {
+      var n = clone(sl);
+      [].forEach.call(ov.querySelectorAll("[data-f]"), function (el) {
+        var k = el.dataset.f, v = el.value;
+        if (k === "bullets") n.bullets = v.split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+        else if (k === "kpis") n.kpis = v.split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean).map(function (l) { var p = l.split("|").map(function (x) { return x.trim(); }); return { label: p[0], value: p[1] || "", sub: p[2] || "" }; });
+        else if (k === "items") n.items = txtItems(v, n.layout);
+        else if (k === "left" || k === "right") { var ls2 = v.split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean); n[k] = { title: ls2[0] || "", bullets: ls2.slice(1) }; }
+        else if (k.indexOf(".") > 0) { var a = k.split("."), o = n[a[0]] = n[a[0]] || {}; if (a[1] === "y" || a[1] === "cols") o[a[1]] = v.split(",").map(function (x) { return x.trim(); }).filter(Boolean); else if (a[1] === "top") { if (+v) o.top = +v; else delete o.top; } else if (v) o[a[1]] = v; else delete o[a[1]]; }
+        else if (v) n[k] = v; else delete n[k];
+      });
+      n.layout = ov.querySelector("#el").value; return n;
+    };
+    var paint = function () { var n = read(), b = ov.querySelector("#eb"); b.innerHTML = BIDECK.toHtml(BIDECK.build(n, deckInfo(), i + 1, D.DS, D.IM), BIDECK.numCheck(n, allowed())); fitScale(b); };
+    ov = sheet("Slide " + (i + 1), "", [["💾", "Save", function () { D.slides[i] = read(); save(); vSlides(); }, "pri"]], body);
+    paint(); var tmr; ov.addEventListener("input", function () { clearTimeout(tmr); tmr = setTimeout(paint, 250); });
+    ov.querySelector("#el").onchange = function () { D.slides[i] = read(); save(); ov.remove(); edit(i); };
+    ov.querySelector("#eg").onclick = function () {
+      var ask = ov.querySelector("#ea").value.trim(); if (!ask) return toast("Say what to change");
+      var btn = this; btn.disabled = true; btn.textContent = "…";
+      api({ action: "ar-chat", req: { task: "think", json: true, sensitive: !!D.conf, maxTokens: 1800, temperature: 0.4, system: RULES.join("\n") + "\n\n" + layoutsDoc() + "\n\nYou are editing ONE slide. Return ONLY that slide's JSON object.", prompt: material().slice(0, 30000) + "\n\nCURRENT SLIDE:\n" + JSON.stringify(read()) + "\n\nCHANGE: " + ask } }).then(function (r) {
+        btn.disabled = false; btn.textContent = "Go";
+        if (!r.ok) return toast(r.error);
+        try { var j = parseJ(r.text); if (j.slides) j = j.slides[0]; if (!j || !BIDECK.LAYOUTS[j.layout]) throw new Error("No usable slide came back"); D.slides[i] = j; save(); ov.remove(); edit(i); } catch (e) { toast(e.message); }
+      });
+    };
+  }
+
+  // ---------- 5 CXO check ----------
+  function vReview() {
+    if (!D.slides.length) return go("slides");
+    var R0 = D.review;
+    VIEW.innerHTML = '<div class="pv"><h3>🧐 CXO check</h3><div class="best">A strict reviewer reads the deck the way your management will: is the message clear in 30 seconds, does each slide earn its place, are the asks specific?</div>' +
+      '<div class="bar2"><button class="btn pri" id="rg">' + (R0 ? "↻ Check again" : "Check the deck") + '</button><button class="btn ghost" id="rv">👁 Check the look (pictures)</button></div><div class="prog" id="rp" style="display:none"><i></i></div><div class="hint" id="rm"></div><div id="ro"></div></div>';
+    if (R0) showReview(R0);
+    $("rg").onclick = function () {
+      var btn = this; btn.disabled = true; $("rp").style.display = ""; $("rm").textContent = "Reading the deck…";
+      var sys = "You are the chief of staff to vivo India's CEO. You review decks before they reach top management and you are strict: consulting-grade storyline, action titles, one message per slide, evidence for every claim, specific asks with owners and dates. Return ONLY JSON: {\"score\":0-100,\"verdict\":\"one sentence\",\"strengths\":[\"…\"],\"fixes\":[{\"slide\":n,\"issue\":\"what is wrong\",\"fix\":\"what to do\",\"title\":\"better action title if the title is the problem, else omit\"}]}. Max 10 fixes, most important first. Never suggest numbers that are not in the deck or the material.";
+      job({ task: "think", json: true, maxTokens: 3000, temperature: 0.2, system: sys, prompt: "BRIEF: " + D.brief.title + " · " + D.brief.aud + " · goal: " + D.brief.goal + "\n\nDECK:\n" + D.slides.map(function (s, i) { return (i + 1) + ". " + JSON.stringify(s); }).join("\n") }, function (ms) { $("rp").firstChild.style.width = Math.min(95, ms / 500) + "%"; })
+        .then(function (r) { var j = parseJ(r.text); D.review = j; save(); btn.disabled = false; $("rp").style.display = "none"; $("rm").textContent = ""; showReview(j); steps(); })
+        .catch(function (e) { btn.disabled = false; $("rp").style.display = "none"; $("rm").innerHTML = '<span style="color:#B3261E">⚠ ' + esc(e.message) + "</span>"; });
+    };
+    $("rv").onclick = function () {
+      var btn = this; btn.disabled = true; $("rm").textContent = "Taking pictures of the slides…";
+      shots(Math.min(8, D.slides.length), 0.5).then(function (imgs) {
+        $("rm").textContent = "Looking at the slides…";
+        return api({ action: "ar-chat", req: { task: "vision", sensitive: !!D.conf, maxTokens: 1500, images: imgs, prompt: "These are slides " + "1-" + imgs.length + " of a top-management deck. As a senior presentation designer, list concrete visual problems only: text overflowing or cut off, cramped or empty areas, unreadable small text, misalignment, chart hard to read, too many words. Format: 'Slide n: problem → fix'. If a slide is fine, skip it. End with one line overall." } });
+      }).then(function (r) { btn.disabled = false; $("rm").textContent = ""; $("ro").insertAdjacentHTML("afterbegin", '<div class="out">' + (r.ok ? "👁 " + esc(r.text) : "⚠ " + esc(r.error)) + "</div>"); })
+        .catch(function (e) { btn.disabled = false; $("rm").textContent = "⚠ " + e.message; });
+    };
+  }
+  function showReview(j) {
+    $("ro").innerHTML = '<div class="score"><b>' + esc(j.score) + '</b><div><b style="font-size:14px">/ 100</b><div>' + esc(j.verdict || "") + "</div></div></div>" +
+      ((j.strengths || []).length ? '<div class="hint" style="margin-top:6px">👍 ' + (j.strengths || []).map(esc).join(" · ") + "</div>" : "") +
+      (j.fixes || []).map(function (x, k) { var s = D.slides[(+x.slide || 0) - 1]; return '<div class="fx"><span class="n">Slide ' + esc(x.slide) + "</span> — " + esc(x.issue) + "<br>👉 " + esc(x.fix) + (x.title && s ? '<br><i>“' + esc(x.title) + '”</i><br><button class="btn ghost sm" data-ap="' + k + '">Use this title</button>' : "") + (s ? ' <button class="btn ghost sm" data-ed="' + (x.slide - 1) + '">✏️ Open slide</button>' : "") + "</div>"; }).join("") +
+      ((j.fixes || []).some(function (x) { return x.title; }) ? '<div class="bar2"><button class="btn pri sm" id="rall">Use all suggested titles</button></div>' : "");
+    var ap = function (x) { var s = D.slides[(+x.slide || 0) - 1]; if (s && x.title) { s.title = x.title; x.done = 1; } };
+    [].forEach.call($("ro").querySelectorAll("[data-ap]"), function (b) { b.onclick = function () { ap(j.fixes[+b.dataset.ap]); save(); b.textContent = "✓ Used"; b.disabled = true; }; });
+    [].forEach.call($("ro").querySelectorAll("[data-ed]"), function (b) { b.onclick = function () { edit(+b.dataset.ed); }; });
+    if ($("rall")) $("rall").onclick = function () { (j.fixes || []).forEach(ap); save(); toast("Titles updated"); go("slides"); };
+  }
+
+  // ---------- pictures of slides (PDF, vision) ----------
+  function shots(n, scale) {
+    return libI().then(function () {
+      var host = document.createElement("div"); host.style.cssText = "position:fixed;left:-20000px;top:0"; document.body.appendChild(host);
+      var out = [], i = 0;
+      return new Promise(function (res, rej) {
+        (function nx() {
+          if (i >= n) { host.remove(); return res(out); }
+          host.innerHTML = BIDECK.toHtml(BIDECK.build(D.slides[i], deckInfo(), i + 1, D.DS, D.IM));
+          var el = host.firstChild;
+          Promise.all([].map.call(el.querySelectorAll("img"), function (im) { return im.complete ? 1 : new Promise(function (r) { im.onload = im.onerror = r; }); })).then(function () {
+            return window.htmlToImage.toJpeg(el, { quality: 0.92, pixelRatio: scale || 1.5, backgroundColor: "#ffffff", width: 1333, height: 750 });
+          }).then(function (u) { out.push(u); i++; nx(); }).catch(function (e) { host.remove(); rej(e); });
+        })();
+      });
+    });
+  }
+
+  // ---------- 6 export ----------
+  function fname(ext) { return (deckInfo().title || "Executive deck").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 60) + "." + ext; }
+  function vExport() {
+    if (!D.slides.length) return go("slides");
+    var fl = 0, al = allowed(); D.slides.forEach(function (s) { fl += BIDECK.numCheck(s, al).length; });
+    VIEW.innerHTML = '<div class="pv"><h3>⬇ Export</h3><div class="best">PowerPoint keeps every text box and chart editable (charts are real PowerPoint charts with your data inside). Speaker notes go with it.</div>' +
+      (fl ? '<div class="fx" style="border-color:#E09B10">⚠ ' + fl + ' number(s) are not in your material. <button class="btn ghost sm" id="xs">Review them</button></div>' : "") +
+      '<div class="bar2"><button class="btn pri" id="xp">📊 PowerPoint (.pptx)</button><button class="btn ghost" id="xf">📄 PDF</button><button class="btn ghost" id="xj">🗂 Save the draft file</button></div><div class="hint" id="xm"></div>' +
+      '<div class="row2"><input type="file" id="xo" accept=".json" style="display:none"><button class="btn ghost sm" id="xob">📂 Open a saved draft</button><button class="btn ghost sm" id="xn">🆕 Start a new deck</button></div></div>';
+    if ($("xs")) $("xs").onclick = function () { go("slides"); };
+    $("xp").onclick = function () { var b = this; b.disabled = true; $("xm").textContent = "Building the PowerPoint…"; libP().then(function () { return BIDECK.pptx(deckInfo(), D.slides, D.DS, D.IM); }).then(function (blob) { download(blob, fname("pptx")); $("xm").textContent = "✅ Downloaded " + fname("pptx"); b.disabled = false; }).catch(function (e) { $("xm").textContent = "⚠ " + e.message; b.disabled = false; }); };
+    $("xf").onclick = function () { var b = this; b.disabled = true; $("xm").textContent = "Drawing " + D.slides.length + " pages…"; shots(D.slides.length, 1.6).then(function (imgs) { var pdf = new window.jspdf.jsPDF({ orientation: "landscape", unit: "in", format: [13.333, 7.5] }); imgs.forEach(function (u, i) { if (i) pdf.addPage([13.333, 7.5], "landscape"); pdf.addImage(u, "JPEG", 0, 0, 13.333, 7.5); }); download(pdf.output("blob"), fname("pdf")); $("xm").textContent = "✅ Downloaded " + fname("pdf"); b.disabled = false; }).catch(function (e) { $("xm").textContent = "⚠ " + e.message; b.disabled = false; }); };
+    $("xj").onclick = function () { download(new Blob([JSON.stringify(D)], { type: "application/json" }), fname("deck.json")); };
+    $("xob").onclick = function () { $("xo").click(); };
+    $("xo").onchange = function () { var f = this.files[0]; if (!f) return; f.text().then(function (t) { var j = JSON.parse(t); if (!j.slides) throw new Error("Not a deck draft"); D = j; save(); toast("Draft opened"); go("slides"); }).catch(function (e) { toast(e.message); }); };
+    $("xn").onclick = function () { if (!confirm("Clear this deck and start a new one? (Save the draft file first if you need it.)")) return; ls(KEY, null); D = { brief: { title: "", aud: "Top management review", period: "", goal: "", len: 12, tone: "Confident, crisp, data-led" }, notes: "", DS: {}, IM: {}, slides: [], deck: {} }; go("brief"); };
+  }
+
+  window.addEventListener("resize", function () { [].forEach.call(document.querySelectorAll(".th .fr,.big"), fitScale); });
+  if (AUTH && AUTH.token) api({ action: "tl-use", tool: "execdeck" });
+  go(D.slides.length ? "slides" : D.brief.title ? "mat" : "brief");
+})();
+</script>
+<script src="kpi-data.js"></script>
+</body>
+</html>
