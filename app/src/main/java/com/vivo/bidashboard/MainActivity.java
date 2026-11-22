@@ -3294,11 +3294,26 @@ public class MainActivity extends FragmentActivity {
     }
     private SharedPreferences permPrefs() { return getSharedPreferences("bot".equals(pKind) ? "bot_runs" : "perm_runs", MODE_PRIVATE); }
     private boolean botPageOk(WebView w) {
-        try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && Uri.parse(u).getPath().startsWith("/portalbot"); }
+        try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && (Uri.parse(u).getPath().startsWith("/portalbot") || Uri.parse(u).getPath().startsWith("/imeiunblock")); }
         catch (Throwable t) { return false; }
     }
     private static boolean botHostOk(String u) {
         try { Uri x = Uri.parse(u); String h = String.valueOf(x.getHost()).toLowerCase(); return "https".equals(x.getScheme()) && h.matches("([a-z0-9-]+\\.)*vivo\\.(xyz|com|com\\.cn|in)"); } catch (Throwable t) { return false; }
+    }
+    // Outlook on the web — only for reading IMEI unblock request mails (vivo_mail.js reads; it never sends, moves or deletes)
+    private static boolean mailHostOk(String u) {
+        try { Uri x = Uri.parse(u); String h = String.valueOf(x.getHost()).toLowerCase(); return "https".equals(x.getScheme()) && h.matches("outlook\\.(office|office365|live)\\.com|outlook\\.cloud\\.microsoft"); } catch (Throwable t) { return false; }
+    }
+    private final java.util.HashMap<String, String> extraJs = new java.util.HashMap<>();
+    private String assetJs(String name) {
+        if (extraJs.containsKey(name)) return extraJs.get(name);
+        String r = "";
+        try (java.io.InputStream in = getAssets().open(name)) {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] b = new byte[8192]; int n;
+            while ((n = in.read(b)) > 0) bo.write(b, 0, n);
+            r = bo.toString("UTF-8");
+        } catch (Throwable e) { r = ""; }
+        extraJs.put(name, r); return r;
     }
     private String botScript() {
         if (bJs != null) return bJs;
@@ -3360,10 +3375,11 @@ public class MainActivity extends FragmentActivity {
                 if (job == null || job.length() > 3_000_000) return "bad";
                 JSONObject j = new JSONObject(job);
                 String m = j.optString("mode");
-                if (!j.optString("id").matches("[A-Za-z0-9_-]{4,30}") || !("rec".equals(m) || "play".equals(m))) return "bad";
+                if (!j.optString("id").matches("[A-Za-z0-9_-]{4,30}") || !("rec".equals(m) || "play".equals(m) || "mail".equals(m) || "imq".equals(m))) return "bad";
                 if ("play".equals(m) && (j.optJSONArray("steps") == null || j.optJSONArray("rows") == null)) return "bad";
+                if ("imq".equals(m) && j.optJSONArray("imeis") == null) return "bad";
                 String u = url == null ? "" : url.trim();
-                if (!botHostOk(u)) return "bad";
+                if ("mail".equals(m) ? !mailHostOk(u) : !botHostOk(u)) return "bad";
                 if (!j.has("start")) j.put("start", u);
                 j.put("url", u);
                 ui.post(() -> { pKind = "bot"; showPerm(w, j); });
@@ -3462,7 +3478,7 @@ public class MainActivity extends FragmentActivity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.WHITE);
-        page.addView(profileHeaderBar("bot".equals(pKind) ? ("rec".equals(job.optString("mode")) ? "● vivo portal · recording" : "🤖 vivo portal · running your recording") : (job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
+        page.addView(profileHeaderBar("bot".equals(pKind) && "mail".equals(job.optString("mode")) ? "📥 Outlook · reading unblock request mails" : "bot".equals(pKind) && "imq".equals(job.optString("mode")) ? "🔍 vivo portal · checking IMEI activation" : "bot".equals(pKind) ? ("rec".equals(job.optString("mode")) ? "● vivo portal · recording" : "🤖 vivo portal · running your recording") : (job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
         uBanner = new TextView(this);
         uBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
         uBanner.setTextColor(Color.parseColor("#111111"));
@@ -3490,8 +3506,10 @@ public class MainActivity extends FragmentActivity {
             if (pStop) c.put("stop", true);
             boolean bot = "bot".equals(pKind);
             if (!bot && uCred != null && uSameHost()) c.put("fill", new JSONObject().put("u", uCred.optString("u")).put("p", uCred.optString("p")));
-            String fn = bot ? "__biBotRun" : "__biPermRun";
-            String js = "(function(){try{if(!window." + fn + "){" + (bot ? botScript() : permScript()) + "}return window." + fn + "(" + c + ");}catch(e){return JSON.stringify({s:'wait',msg:String(e&&e.message||e)});}})()";
+            String bm = bot ? pJob.optString("mode") : "";
+            String fn = !bot ? "__biPermRun" : "mail".equals(bm) ? "__biMailRun" : "imq".equals(bm) ? "__biImqRun" : "__biBotRun";
+            String src = !bot ? permScript() : "mail".equals(bm) ? assetJs("vivo_mail.js") : "imq".equals(bm) ? assetJs("vivo_imq.js") : botScript();
+            String js = "(function(){try{if(!window." + fn + "){" + src + "}return window." + fn + "(" + c + ");}catch(e){return JSON.stringify({s:'wait',msg:String(e&&e.message||e)});}})()";
             vivoWeb.evaluateJavascript(js, v -> {
                 try {
                     if (v == null || "null".equals(v) || pDone || !inPerm) return;
