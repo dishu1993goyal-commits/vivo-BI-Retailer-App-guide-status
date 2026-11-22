@@ -1,6 +1,6 @@
 // Runs the vivo BI vWork helper (vivo_vw.js) inside the person's own vWork tab, about once a second, and hands the result
 // back to the BI page that asked. The person logs in to vWork themselves; nothing is saved, released or changed in vWork.
-const OK_VW = u => /^https:\/\/in-vwork\.vivo\.xyz\//.test(u) || /^http:\/\/localhost(:\d+)?\//.test(u);
+const OK_VW = u => /^https:\/\/([a-z0-9-]+\.)*vivo\.xyz\//.test(u) || /^http:\/\/localhost(:\d+)?\//.test(u);
 let RUN = null;   // { job, biTab, vwTab, first, code, ticks }
 async function latestCode(origin) {
   try { const r = await fetch(origin + "/vivo_vw.js?v=" + Date.now(), { cache: "no-store" }); if (r.ok) { const t = await r.text(); if (t.includes("__biVwRun")) return t; } } catch (e) { }
@@ -26,7 +26,7 @@ async function tick() {
     let tab; try { tab = await chrome.tabs.get(R0.vwTab); } catch (e) { return send({ s: "stopped", mode: "vw", id: R0.job.id, rep: R0.job.rep, msg: "The vWork tab was closed" }, true); }
     if (tab.status === "complete" && OK_VW(tab.url || "")) {
       await inject(R0.vwTab, R0.code);
-      const [{ result } = {}] = await chrome.scripting.executeScript({ target: { tabId: R0.vwTab }, world: "MAIN", func: j => window.__biVwRun ? window.__biVwRun(j) : null, args: [R0.first ? R0.job : null] }).catch(() => [{}]);
+      const [{ result } = {}] = await chrome.scripting.executeScript({ target: { tabId: R0.vwTab }, world: "MAIN", func: j => window.__biVwRun ? window.__biVwRun(j) : null, args: [R0.job] }).catch(() => [{}]);
       if (result) {
         R0.first = false; let r = {}; try { r = JSON.parse(result); } catch (e) { }
         if (r.s === "grab" && r.url && !R0.grabbing) {   // vWork's export file: download it here and hand it to the BI page

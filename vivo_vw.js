@@ -8,7 +8,7 @@
   var REPS = {
     app: { kind: "ana", saved: /^retailer app usability$/i, title: "Retailer App usability (Visit Details analysis)" },
     sd: { kind: "export", app: /^retailer support d/i, last: 1, file: /retailer issue feedback/i, title: "Retailer Support Desk" },
-    comp: { kind: "export", app: /^competitor tracking$/i, menu: /^upload (history|records?)$/i, col: /^creation time$/i, fields: [/^level i agent$/i, /^store code$/i, /^creation time$/i], names: "Level I agent, Store code, Creation time", file: /^upload record/i, title: "Competition upload records" },
+    comp: { kind: "export", app: /^competitor tracking$/i, menu: /^upload (history|records?)$/i, col: /^creation time\b/i, fields: [/^level i agent$/i, /^store code$/i, /^creation time$/i], names: "Level I agent, Store code, Creation time", file: /^upload record/i, title: "Competition upload records" },
     visit: { app: /^visit form$/i, menu: /^personnel visit( report)?$/i, dim: /^by area$/i, date: /date of visit/i, first: /^sales area$/i, firstAs: "State", title: "Staff visit report by area" }
   };
   // vWork opens apps inside frames: look in the page and in every same-site frame
@@ -20,8 +20,20 @@
   function tap(e) { try { e.scrollIntoView({ block: "center" }); } catch (x) { } ["pointerdown", "mousedown", "pointerup", "mouseup"].forEach(function (t) { try { e.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: e.ownerDocument.defaultView || W })); } catch (x) { } }); e.click(); }
   function findAll(re) { var a = [].filter.call(qa("a,span,div,li,button,p,td,label"), function (e) { var t = txt(e); return t.length <= 40 && re.test(t) && vis(e); }); return a.filter(function (e) { return !a.some(function (o) { return o !== e && e.contains(o); }); }); }
   function find(re, root, maxLen) { var best = null; [].forEach.call((root ? root.querySelectorAll.bind(root) : qa)("a,span,div,li,button,p,td,label,h1,h2,h3,h4"), function (e) { var t = txt(e); if (t.length <= (maxLen || 40) && re.test(t) && vis(e) && (!best || best.contains(e))) best = e; }); return best; }
-  function load() { try { return JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
-  function save(S) { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
+  var WN = "__bivw:";
+  function load() {
+    var a = null, b = null; try { a = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { }
+    try { if (String(W.name).indexOf(WN) === 0) b = JSON.parse(W.name.slice(WN.length)); } catch (e) { }
+    return a && b ? ((b.sv || 0) > (a.sv || 0) ? b : a) : a || b;
+  }
+  function save(S) { if (!S) return; S.sv = Date.now(); var j = JSON.stringify(S); try { sessionStorage.setItem(KEY, j); } catch (e) { } try { W.name = WN + j; } catch (e) { } }
+  // the report itself sits in a window from another vivo site (itbi-in / vform-in…) that this page can't read: open that window on its own
+  function foreignFrame() {
+    var best = null, ba = 0;
+    [].forEach.call(D.querySelectorAll("iframe,frame"), function (f) { var ok = false; try { ok = !!f.contentDocument; } catch (x) { } if (ok || !vis(f)) return; var src = String(f.src || ""); if (!/^https:\/\/([a-z0-9-]+\.)*vivo\.(xyz|com|in)\//i.test(src) && !/^http:\/\/(localhost|127\.0\.0\.1):\d+\//.test(src)) return; var r = f.getBoundingClientRect(), ar = r.width * r.height; if (ar > ba && ar > innerWidth * innerHeight * 0.2) { ba = ar; best = src; } });
+    return best;
+  }
+  function hop(S, url, why) { S.hops = (S.hops || 0) + 1; save(S); if (S.hops > 6) return false; setTimeout(function () { location.href = url; }, 50); return true; }
   function out(o) { return JSON.stringify(o); }
   function setInput(el, v) { el.focus(); try { el.select(); } catch (e) { } var ok = false; try { ok = el.ownerDocument.execCommand("insertText", false, v); } catch (e) { } if (!ok || el.value !== v) { Object.getOwnPropertyDescriptor((el.ownerDocument.defaultView || W).HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); } }
   function enter(el) { ["keydown", "keypress", "keyup"].forEach(function (t) { el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true })); }); }
@@ -165,6 +177,7 @@
     if (A === "find") {   // IT Operations → Visit Details → 🔍 Data exploration
       if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
       var onVD = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; }) || (leaf(/^copy data$/i)[0] && leaf(/^visit date\s*:?$/i)[0]);
+      var ff4 = !onVD && !isCanvas() && foreignFrame(); if (ff4 && sinceA() > 2) { S.at0 = S.tick; hop(S, ff4); return outR({ s: "run", pct: 4, msg: "Opening the Visit Details window…" }); }
       if (onVD) { go("explore"); return outR({ s: "run", pct: 5, msg: "Visit Details open — opening Data exploration" }); }
       var vd = find(/^visit details$/i); if (vd && sinceA() % 6 === 1) tap(vd);
       var it = find(/^it operations$/i); if (!vd && it && sinceA() % 8 === 3) tap(it);
@@ -305,6 +318,9 @@
       if (R.kind === "ana") return ana(S, R, fin, since, step);
 
       if (S.st === "open") {   // Workbench → the report's app
+        var ff0 = !ready() && foreignFrame();
+        if (ff0 && (R.kind === "export" || R.kind === "ana")) { S.st = R.kind === "ana" ? "open" : "menu"; S.t0 = S.tick; hop(S, ff0); return out({ s: "run", pct: 10, msg: "Opening the report window…" }); }
+        if (ff0 && R.menu) { step("org"); return out({ s: "run", pct: 12, msg: "Report open" }); }
         if (R.menu ? (find(R.menu) || ready()) : ready()) { step("menu"); return out({ s: "run", pct: 12, msg: "Report open" }); }
         if (S.appTapped && since() < 8) return out({ s: "run", pct: 8, msg: "Opening…" });
         var aa = findAll(R.app), a = R.last ? aa[aa.length - 1] : aa[0];
@@ -316,6 +332,9 @@
       }
       if (S.st === "menu") {
         var m = R.menu ? find(R.menu) : null; if (!R.menu) S.menuTapped = 1; if (m && (!S.menuTapped || since() % 8 === 7)) { tap(m); S.menuTapped = 1; save(S); }
+        var ff1 = !ready() && since() > 3 && foreignFrame();
+        if (ff1 && R.kind === "export") { S.t0 = S.tick; hop(S, ff1); return out({ s: "run", pct: 14, msg: "Opening the report window…" }); }
+        if (ff1) { step("org"); return out({ s: "run", pct: 15, msg: "Report open — choosing ALL first" }); }
         if ((S.menuTapped && since() > 1 && ready()) || (since() > 3 && ready())) { step("org"); return out({ s: "run", pct: 15, msg: "Report open" }); }
         if (since() > 20) { S.mloops = (S.mloops || 0) + 1; if (S.mloops > 2) return fin("err", "The report page didn't show what the helper expects", { diag: diag(S) }); step("open"); }
         return out({ s: "run", pct: 12, msg: "Opening the report…" });
@@ -324,11 +343,17 @@
       if (S.st === "xdate") {   // the date filter under the column heading (e.g. Creation time): Start time ~ End time
         var th = [].filter.call(qa("th,[class*=header-cell],[class*=cell]"), function (e) { return vis(e) && R.col.test(txt(e)); })[0];
         var rgs = [].filter.call(qa(".ant-picker-range,.el-date-editor--datetimerange,.el-date-editor--daterange,[class*=range-picker],[class*=picker-range]"), vis);
-        if (!th || !rgs.length) { if (since() > 20) return fin("err", "Couldn't find the date filter", { diag: diag(S) }); return out({ s: "run", pct: 22, msg: "Looking for the date filter…" }); }
-        var cx = th.getBoundingClientRect(), mid = cx.left + cx.width / 2;
-        rgs.sort(function (a, b) { var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return Math.abs(ra.left + ra.width / 2 - mid) - Math.abs(rb.left + rb.width / 2 - mid); });
-        var xi = [].filter.call(rgs[0].querySelectorAll("input"), vis);
-        if (xi.length < 2) return out({ s: "run", pct: 22, msg: "Looking for the date filter…" });
+        var ff3 = !th && foreignFrame(); if (ff3) { S.t0 = S.tick; hop(S, ff3); return out({ s: "run", pct: 20, msg: "Opening the report window…" }); }
+        var xi = [];
+        if (th) {
+          var cx = th.getBoundingClientRect(), mid = cx.left + cx.width / 2, dist = function (e) { var r = e.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - mid); };
+          if (rgs.length) { rgs.sort(function (a, b) { return dist(a) - dist(b); }); if (dist(rgs[0]) < 260) xi = [].filter.call(rgs[0].querySelectorAll("input"), vis); }
+          if (xi.length < 2) {   // Start time ~ End time boxes under the column (any date-picker kind)
+            var st0 = [].filter.call(qa("input"), function (i) { return vis(i) && /start/i.test(i.placeholder || ""); }).sort(function (a, b) { return dist(a) - dist(b); })[0];
+            if (st0) { var sr = st0.getBoundingClientRect(), en0 = [].filter.call(qa("input"), function (i) { var r = i.getBoundingClientRect(); return vis(i) && i !== st0 && /end/i.test(i.placeholder || "") && Math.abs(r.top - sr.top) < 12 && r.left > sr.left && r.left - sr.right < 160; })[0]; if (en0 && dist(st0) < 300) xi = [st0, en0]; }
+          }
+        }
+        if (!th || xi.length < 2) { if (since() > 20) return fin("err", "Couldn't find the date filter", { diag: diag(S) }); return out({ s: "run", pct: 22, msg: "Looking for the date filter…" }); }
         var tm = /\d:\d\d/.test(xi[0].value + xi[1].value + (xi[0].placeholder || "")) || S.tries % 2 === 1, f0 = S.from.replace(/-/g, "/") + (tm ? " 00:00:00" : ""), f1 = S.to.replace(/-/g, "/") + (tm ? " 23:59:59" : "");
         var dOk = function (v, d) { var q = v.replace(/[-.]/g, "/").match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/); return q && q[1] + "-" + ("0" + q[2]).slice(-2) + "-" + ("0" + q[3]).slice(-2) === d; };
         if (dOk(xi[0].value, S.from) && dOk(xi[1].value, S.to)) {
@@ -373,6 +398,7 @@
         var pcOpen = [].some.call(qa("div,span,h1,h2,h3,h4"), function (e) { return vis(e) && /^process cent(er|re)$/i.test(txt(e)) && e.getBoundingClientRect().top < 140; });
         if (pcOpen) { step("xdl"); return out({ s: "run", pct: 62, msg: "Process center open" }); }
         if (since() < 2) return out({ s: "run", pct: 58, msg: "Export started…" });
+        if (!/^in-vwork\./i.test(location.hostname) && since() > 3) { S.t0 = S.tick; hop(S, "https://in-vwork.vivo.xyz/vwork/"); return out({ s: "run", pct: 60, msg: "Back to vWork for the Process center…" }); }
         var lk = [].filter.call(qa("a,span,button,div"), function (e) { return vis(e) && /process cent(er|re)|download cent(er|re)/i.test(txt(e)) && txt(e).length < 60 && !e.querySelector("a,button"); })[0]
           || [].filter.call(qa("[title],[aria-label]"), function (e) { return vis(e) && /process|download|task|export/i.test(e.getAttribute("title") + " " + e.getAttribute("aria-label")) && e.getBoundingClientRect().top < 90; })[0]
           || [].filter.call(qa("[class*=cloud],[class*=download],[class*=process],[class*=task-center],[class*=taskCenter]"), function (e) { var r = e.getBoundingClientRect(); return vis(e) && r.top < 90 && r.left > innerWidth * 0.4; })[0];
@@ -408,11 +434,12 @@
         if (since() > 20) { step("dim"); return out({ s: "run", pct: 22, msg: "Couldn't switch to ALL — continuing" }); }
         return out({ s: "run", pct: 18, msg: "Opening the organisation list…" });
       }
-      if (S.st === "orgwait") { if (since() > 4 || (find(R.date) && !busy())) step(find(R.date) ? "dim" : "open"); return out({ s: "run", pct: 24, msg: "Loading for ALL…" }); }
+      if (S.st === "orgwait") { if (since() > 4 || (find(R.date) && !busy())) step("dim"); return out({ s: "run", pct: 24, msg: "Loading for ALL…" }); }
       if (S.st === "dim") { step("date"); }
       if (S.st === "date") {   // the month: a preset (This month / Last month) or typed dates
         var lab = find(R.date), box = lab ? (lab.closest(".ant-form-item,.el-form-item,[class*=item]") || lab.parentElement) : null;
         var ins = box ? [].filter.call(box.querySelectorAll("input"), vis) : []; if (ins.length < 2) ins = [].filter.call(qa(".ant-picker-range input,.el-range-input"), vis);
+        var ff2 = ins.length < 2 && foreignFrame(); if (ff2) { S.t0 = S.tick; hop(S, ff2); return out({ s: "run", pct: 27, msg: "Opening the report window…" }); }
         if (ins.length < 2) { if (since() > 15) return fin("err", "Couldn't find the date boxes", { diag: diag(S) }); return out({ s: "run", pct: 28, msg: "Looking for the date of visit…" }); }
         var fmt = function (d, pad) { var p = d.split("-"); return pad ? p[0] + "/" + p[1] + "/" + p[2] : p[0] + "/" + (+p[1]) + "/" + (+p[2]); }, pad = /\/0\d/.test(ins[0].value);
         var want0 = fmt(S.from, pad), want1 = fmt(S.to, pad), same = function () { return (ins[0].value === want0 || ins[0].value === fmt(S.from, !pad)) && (ins[1].value === want1 || ins[1].value === fmt(S.to, !pad)); };
