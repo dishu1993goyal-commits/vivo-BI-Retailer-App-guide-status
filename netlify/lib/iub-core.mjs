@@ -328,6 +328,74 @@ export async function iubAction(b, ctx) {
     for (const it of x.items) if ((it.status === "ho_review" || it.status === "with_partner") && (!im.size || im.has(it.imei))) { it.status = "withdrawn"; it.fAt = t; it.fBy = by; it.fRemark = "Withdrawn by vivo"; n++; await store.delete(`iubopen:${it.imei}`); }
     await store.set(`iubb:${x.id}`, x); return json(200, { ok: true, withdrawn: n });
   }
+  // ======================= 📥 Mail requests (HO): unblock requests read from Outlook → one row per IMEI → portal check → unblock =======================
+  //   iubm:cfg   { me, senders:[email or @domain], keywords:[…], partners:{ domain: name }, days, max, ai }
+  //   iubm:rows  [{ id, imei, from, fromName, partner, at, subject, remark, mk, added, act, chk, chkAt, unb, unbAt, unbMsg }]
+  if (/^iub-mail-/.test(b.action)) {
+    if (!isHO) return hoOnly();
+    const MDEF = { me: "", senders: [], keywords: ["unblock", "unflag", "release", "rollback", "roll back", "unblocking", "unflagging"], partners: { "paytmpayments.com": "Paytm", "paytm.com": "Paytm", "bajajfinserv.in": "Bajaj Finserv", "bajajfinance.in": "Bajaj Finserv", "idfcfirstbank.com": "IDFC First", "tvscredit.com": "TVS Credit", "hdbfs.com": "HDB Financial", "pinelabs.com": "Pine Labs", "innoviti.com": "Innoviti", "benow.in": "BeNow", "icicibank.com": "ICICI Bank", "hdfcbank.com": "HDFC Bank", "kotak.com": "Kotak", "homecredit.co.in": "Home Credit", "dmifinance.in": "DMI Finance", "cholams.murugappa.com": "Chola" }, days: 7, max: 60, ai: true };
+    const M = Object.assign({}, MDEF, (await store.get("iubm:cfg")) || {});
+    const rowsOf = async () => (await store.get("iubm:rows")) || [];
+    if (b.action === "iub-mail-cfg") {
+      if (b.save) {
+        const c = b.cfg || {}, lst = (v, n, m) => (Array.isArray(v) ? v : String(v || "").split(/[,;\n]+/)).map((x) => str(x, m).toLowerCase()).filter(Boolean).slice(0, n);
+        M.me = str(c.me, 120).toLowerCase(); M.senders = lst(c.senders, 120, 120); M.keywords = lst(c.keywords, 30, 40); if (!M.keywords.length) M.keywords = MDEF.keywords;
+        if (c.partners && typeof c.partners === "object") { M.partners = {}; Object.keys(c.partners).slice(0, 120).forEach((k) => { const d = low(k).replace(/^@/, ""); if (d && c.partners[k]) M.partners[d] = str(c.partners[k], 60); }); }
+        M.days = Math.min(90, Math.max(1, +c.days || 7)); M.max = Math.min(300, Math.max(5, +c.max || 60)); M.ai = c.ai !== false;
+        await store.set("iubm:cfg", M);
+      }
+      return json(200, { ok: true, cfg: M });
+    }
+    if (b.action === "iub-mail-list") return json(200, { ok: true, rows: await rowsOf(), cfg: M });
+    if (b.action === "iub-mail-add") {   // mails read from Outlook (app / computer bookmark / pasted) → IMEI rows
+      const luhn = (x) => { let s = 0; for (let i = 0; i < 15; i++) { let d = +x[14 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; } return s % 10 === 0; };
+      const kwRe = new RegExp("\\b(" + M.keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*")).join("|") + ")", "i");
+      const okSender = (e) => !M.senders.length || M.senders.some((s) => s.startsWith("@") ? e.endsWith(s) : s.includes("@") ? e === s : e.endsWith("@" + s) || e.endsWith("." + s));
+      const partnerOf = (e, name) => { const d = e.split("@")[1] || ""; const k = Object.keys(M.partners).find((p) => d === p || d.endsWith("." + p)); if (k) return M.partners[k]; const base = d.split(".").slice(-2, -1)[0] || ""; return base ? base.charAt(0).toUpperCase() + base.slice(1) : str(name, 40); };
+      const rows = await rowsOf(), have = new Set(rows.map((r) => r.mk + "|" + r.imei)), seenMk = new Set(rows.map((r) => r.mk));
+      let skipped = { sender: 0, keyword: 0, noImei: 0, dup: 0, mine: 0 }; const fresh = [];
+      for (const m of (Array.isArray(b.mails) ? b.mails : []).slice(0, 400)) {
+        const from = low(m.from).replace(/^.*<|>.*$/g, ""), text = String(m.text || "").slice(0, 60000), subject = str(m.subject, 200), at = +m.at || Date.parse(m.at) || t;
+        if (M.me && from === M.me) { skipped.mine++; continue; }
+        if (!okSender(from)) { skipped.sender++; continue; }
+        if (!kwRe.test(subject + " " + text)) { skipped.keyword++; continue; }
+        const mk = str(m.key, 120) || (from + "|" + at + "|" + subject).slice(0, 200);
+        const ims = [...new Set((text + " " + subject).match(/(?<!\d)\d{15}(?!\d)/g) || [])].filter(luhn);
+        if (!ims.length) { skipped.noImei++; continue; }
+        let n = 0;
+        ims.forEach((imei) => { if (have.has(mk + "|" + imei)) return; have.add(mk + "|" + imei); n++; fresh.push({ id: nid(t), imei, from, fromName: str(m.fromName, 60), partner: partnerOf(from, m.fromName), at, subject, remark: "", mk, added: t, act: null, chk: "", chkAt: 0, unb: "", unbAt: 0, unbMsg: "" }); });
+        if (!n) skipped.dup++;
+        if (!seenMk.has(mk) && n) { seenMk.add(mk); fresh.filter((r) => r.mk === mk).forEach((r) => { r._ctx = (subject + " — " + text).slice(0, 1500); }); }
+      }
+      // remarks: one short line per mail (AI when allowed, else the sentence around the keyword)
+      const byMk = {}; fresh.forEach((r) => { if (r._ctx) byMk[r.mk] = r._ctx; });
+      const plain = (c) => { const s = c.split(/(?<=[.!?\n])\s+/).find((x) => kwRe.test(x)) || c; return str(s, 140); };
+      let rem = {};
+      const keys = Object.keys(byMk);
+      if (M.ai && keys.length && ctx.askAI) {
+        try {
+          const r = await ctx.askAI(env, "Follow the instructions and answer now.", keys.map((k, i) => i + ". " + byMk[k].replace(/\s+/g, " ").slice(0, 900)).join("\n"), [], ctx.aiFetch, { system: "Each numbered item is an e-mail (subject — body) asking vivo to unblock / unflag / release IMEIs. For each, write a remark of at most 14 words: what is asked and why (e.g. 'Unblock failed – timeout at 16/11 12:00; partner asks retry'). Reply JSON only: {\"r\":[\"remark for 0\",\"remark for 1\",...]}", label: "MAILS", json: true, maxTokens: 1500 });
+          const j = r.ok ? JSON.parse(String(r.text).replace(/^[^{]*/, "").replace(/[^}]*$/, "")) : null; if (j && Array.isArray(j.r)) keys.forEach((k, i) => { if (j.r[i]) rem[k] = str(j.r[i], 160); });
+        } catch (e) { }
+      }
+      fresh.forEach((r) => { r.remark = rem[r.mk] || plain((byMk[r.mk] || r.subject).replace(/\s+/g, " ")); delete r._ctx; });
+      const all = fresh.concat(rows).slice(0, 5000); await store.set("iubm:rows", all);
+      return json(200, { ok: true, added: fresh.length, mails: new Set(fresh.map((r) => r.mk)).size, skipped, rows: all });
+    }
+    if (b.action === "iub-mail-chk") {   // results of the portal activation check { imei: { found, act, model } }
+      const R = b.res || {}, rows = await rowsOf(); let n = 0;
+      rows.forEach((r) => { const x = R[r.imei]; if (!x) return; n++; r.chkAt = t; r.act = x.found ? str(x.act, 40) : null; r.model = str(x.model, 60); r.chk = !x.found ? "not_found" : x.act ? "activated" : "not_activated"; });
+      await store.set("iubm:rows", rows); return json(200, { ok: true, updated: n, rows });
+    }
+    if (b.action === "iub-mail-unb") {   // result of the portal unblock upload for these IMEIs
+      const ims = new Set((b.imeis || []).map(String)), failed = new Set((b.failed || []).map(String)), rows = await rowsOf();
+      rows.forEach((r) => { if (!ims.has(r.imei)) return; r.unbAt = t; r.unb = b.result === "success" || (b.result === "partial" && !failed.has(r.imei)) ? "unblocked" : b.result === "queued" ? "uploading" : "failed"; r.unbMsg = str(b.msg, 200); });
+      await store.set("iubm:rows", rows); return json(200, { ok: true, rows });
+    }
+    if (b.action === "iub-mail-mark") { const ids = new Set(b.ids || []), rows = await rowsOf(); rows.forEach((r) => { if (ids.has(r.id)) { r.rep = b.rep ? t : 0; } }); await store.set("iubm:rows", rows); return json(200, { ok: true, rows }); }
+    if (b.action === "iub-mail-del") { const ids = new Set(b.ids || []), rows = (await rowsOf()).filter((r) => !ids.has(r.id)); await store.set("iubm:rows", rows); return json(200, { ok: true, rows }); }
+    return json(400, { ok: false, error: "Unknown action" });
+  }
   if (b.action === "iub-ai") {
     const L = await allB(), P = {};
     L.forEach((x) => x.items.forEach((it) => { const z = P[x.partner] || (P[x.partner] = { partner: x.partner, total: 0, hoCheck: 0, withPartner: 0, unblockedByPartner: 0, stillBlocked: 0, vivoQueue: 0, vivoUnblocked: 0, vivoFailed: 0, closed: 0, hoursWaiting: [] }); z.total++;

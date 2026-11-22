@@ -399,7 +399,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   var VIEW = $("view"), TOK = "", ME = null, TAB = "dash", LIST = null, F = { stage: "open", pid: "", state: "", q: "" }, NB = {};
   try { TOK = (new URLSearchParams(location.search).get("p") || "").replace(/[^a-f0-9]/g, ""); } catch (e) { }
-  try { var h0 = location.hash.replace("#", ""); if (/^(dash|new|verify|final|queue|list|cfg)$/.test(h0)) TAB = h0; } catch (e) { }
+  try { var h0 = location.hash.replace("#", ""); if (/^(dash|new|mail|verify|final|queue|list|cfg)$/.test(h0)) TAB = h0; } catch (e) { }
   var ST_C = { ho_review: "", not_required: "m", with_partner: "o", unblocked: "g", partner_failed: "r", vivo_queue: "", vivo_unblocked: "g", vivo_failed: "r", closed: "m", withdrawn: "m", ho_unblocked: "g", ho_failed: "m" };
   var REASONS = ["Customer closed / cancelled the loan", "Loan not disbursed", "Device returned / replaced", "Wrong IMEI financed", "Duplicate finance on IMEI", "Retailer request — sale cancelled", "Other"];
   function papi(body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", p: TOK }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection." }; }); }
@@ -440,15 +440,15 @@ td.n,th.n{text-align:right;white-space:nowrap}
       try { localStorage.setItem("biw-return", JSON.stringify(location.pathname + location.search + location.hash)); } catch (e) { }
       VIEW.innerHTML = '<div class="card empty"><div class="big">🔐</div><b>Please log in first</b><div class="muted" style="margin:6px 0 12px">Log in to the vivo BI portal — you’ll come straight back to this page.</div><a class="btn pri" href="/">Log in</a></div>'; return;
     }
-    api({ action: "iub-me" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ME = r; if (!ME.isHO && /^(verify|final|queue|cfg)$/.test(TAB)) TAB = "dash"; counts(); draw(); ubPending(); });
+    api({ action: "iub-me" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ME = r; if (!ME.isHO && /^(mail|verify|final|queue|cfg)$/.test(TAB)) TAB = "dash"; counts(); draw(); ubPending(); });
   }
   function counts() { if (!ME.isHO) return; api({ action: "iub-list", stage: "x-none" }).then(function (r) { if (!r.ok) return; var by = r.stats.by; NB = { verify: by.ho_review || 0, final: (by.unblocked || 0) + (by.partner_failed || 0) + (by.vivo_failed || 0), queue: by.vivo_queue || 0 }; [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { var n = NB[b.dataset.t]; var old = b.querySelector(".bd"); if (old) old.remove(); if (n) b.insertAdjacentHTML("beforeend", '<span class="bd">' + n + "</span>"); }); }); }
   window.__pageBack = function () { if (TOK || TAB === "dash") return false; TAB = "dash"; draw(); return true; };
   function draw() {
-    var tabs = [["dash", "📊 Dashboard"], ["new", "➕ Raise"]].concat(ME.isHO ? [["verify", "🔎 HO check"], ["final", "🏁 Final check"], ["queue", "🔓 vivo unblock"]] : []).concat([["list", "📋 All IMEIs"]]).concat(ME.isHO ? [["cfg", "⚙️ E-mail set-up"]] : []);
+    var tabs = [["dash", "📊 Dashboard"], ["new", "➕ Raise"]].concat(ME.isHO ? [["mail", "📥 Mail requests"], ["verify", "🔎 HO check"], ["final", "🏁 Final check"], ["queue", "🔓 vivo unblock"]] : []).concat([["list", "📋 All IMEIs"]]).concat(ME.isHO ? [["cfg", "⚙️ E-mail set-up"]] : []);
     VIEW.innerHTML = '<div class="seg" style="overflow-x:auto;white-space:nowrap">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (TAB === t[0] ? "on" : "") + '">' + t[1] + (NB[t[0]] ? '<span class="bd">' + NB[t[0]] + "</span>" : "") + "</button>"; }).join("") + '</div><div id="tp"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; try { history.replaceState(null, "", "#" + TAB); } catch (e) { } draw(); }; });
-    ({ dash: tDash, "new": tNew, verify: function () { tDecide("verify"); }, final: function () { tDecide("final"); }, queue: tQueue, list: tList, cfg: tCfg })[TAB]();
+    ({ mail: tMail, dash: tDash, "new": tNew, verify: function () { tDecide("verify"); }, final: function () { tDecide("final"); }, queue: tQueue, list: tList, cfg: tCfg })[TAB]();
   }
   function go(tab, stage) { TAB = tab; if (stage !== undefined) F.stage = stage; try { history.replaceState(null, "", "#" + tab); } catch (e) { } counts(); draw(); }
 
@@ -590,6 +590,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   }
   function ubRecord(r) {
     if (!r || !r.id) return;
+    if (/^ML/.test(r.id)) return mlUnbResult(r);
     if (r.state !== "done") { toast("vivo portal closed — nothing recorded"); return; }
     var go2 = function (ims) {
       var v = ubRead(r.text, ims), ack = function () { try { UB && UB.ack(r.id); } catch (e) { } };
@@ -620,6 +621,165 @@ td.n,th.n{text-align:right;white-space:nowrap}
       [].forEach.call($("tp").querySelectorAll("[data-part]"), function (b) { b.onclick = function () { sheet("Which IMEIs failed?", "Paste the IMEIs the vivo portal rejected (or upload its result file). The rest are marked unblocked.", [["✔", "Save result", function (ov) { var L = (ov.querySelector("#pf").value.match(/\d{15}/g) || []); if (!L.length) { toast("Paste at least one 15-digit IMEI"); return false; } res(b.dataset.part, "partial", L); }, "pri"], ["📥", "Upload the portal's result file", function () { pickFile(function (S) { var ci = S.hd.findIndex(function (c) { return /imei/.test(c); }), cs = S.hd.findIndex(function (c) { return /status|result|remark|message/.test(c); }), L = []; S.rows.forEach(function (row) { var im = String(row[ci] || "").replace(/\D/g, ""); if (im.length === 15 && (cs < 0 || /fail|error|invalid|not|reject/i.test(String(row[cs] || "")))) L.push(im); }); if (!L.length) return toast("No failed IMEIs found in that file"); res(b.dataset.part, "partial", L); }); }]], '<textarea class="tx fx" id="pf" style="min-height:90px;margin-top:8px" placeholder="IMEIs that failed"></textarea>'); }; });
       [].forEach.call($("tp").querySelectorAll("[data-ml]"), function (b) { b.onclick = function () { b.disabled = true; api({ action: "iub-run-mail", id: b.dataset.ml }).then(function (x) { toast(x.ok ? "📧 " + x.sent + " partner e-mail(s) sent" : x.error); tQueue(); }); }; });
     });
+  }
+
+  // ======================= 📥 Mail requests (HO): Outlook → rows per IMEI → portal activation check → unblock → reply =======================
+  var BB = window.BIBot && window.BIBot.version ? window.BIBot : null, MR = null, MSEL = {}, MF = { st: "all", q: "" }, MCFG = null, PORTAL = "https://in-transfer.vivo.xyz/login.htm";
+  var CHK_L = { activated: ["g", "Activated"], not_activated: ["o", "Not activated"], not_found: ["r", "Not found"] }, UNB_L = { unblocked: ["g", "Unblocked ✅"], failed: ["r", "Unblock failed"], uploading: ["", "Uploading…"] };
+  var mrid = function (p) { return p + Date.now().toString(36).slice(-7) + Math.random().toString(36).slice(2, 5); };
+  var b64j = function (o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }, unb64j = function (s) { try { return JSON.parse(decodeURIComponent(escape(atob(String(s).trim())))); } catch (e) { return null; } };
+  function mlSet(r) { if (r && r.rows) MR = r.rows; }
+  function tMail() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    api({ action: "iub-mail-list" }).then(function (r) { if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } MR = r.rows; MCFG = r.cfg; mlDraw(); mlPending(); });
+  }
+  function mlRows() {
+    var q = MF.q.toLowerCase();
+    return (MR || []).filter(function (x) {
+      var st = MF.st === "all" ? true : MF.st === "new" ? !x.chk : MF.st === "unb" ? !!x.unb : MF.st === "rep" ? x.unb === "unblocked" && !x.rep : x.chk === MF.st;
+      return st && (!q || (x.imei + " " + x.from + " " + x.partner + " " + x.remark + " " + x.subject).toLowerCase().indexOf(q) >= 0);
+    });
+  }
+  function mlDraw() {
+    var L = mlRows(), sel = L.filter(function (x) { return MSEL[x.id]; }), cnt = function (f) { return (MR || []).filter(f).length; };
+    var tiles = [["all", "All rows", MR.length, ""], ["new", "Not checked", cnt(function (x) { return !x.chk; }), ""], ["not_activated", "Not activated", cnt(function (x) { return x.chk === "not_activated"; }), "o"], ["activated", "Activated", cnt(function (x) { return x.chk === "activated"; }), "g"], ["not_found", "Not found", cnt(function (x) { return x.chk === "not_found"; }), "r"], ["unb", "Unblock done / tried", cnt(function (x) { return !!x.unb; }), "g"], ["rep", "Unblocked · reply due", cnt(function (x) { return x.unb === "unblocked" && !x.rep; }), "o"]];
+    $("tp").innerHTML = '<div class="card"><b>📥 Unblock request mails</b><div class="muted" style="font-size:12.5px;line-height:1.55;margin-top:3px">Reads your Outlook for unblock / unflag / release mails from the senders in ✉️ Set-up and makes <b>one row per IMEI</b>. Then: 🔍 check activation on the IMEI Query System → 🔓 unblock the <b>not activated</b> ones → ↩️ reply to the same mail. You sign in to Outlook and the portal yourself; nothing is sent without you tapping Send.</div>' +
+      '<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn pri sm" id="mread">📥 Read Outlook now</button><button class="btn ghost sm" id="mpaste">📋 Paste / upload mails</button><button class="btn ghost sm" id="mcfg">✉️ Set-up</button></div><div id="mdk"></div></div>' +
+      '<div class="kp" style="margin-top:10px">' + tiles.map(function (t) { return '<div class="kt ' + t[3] + (MF.st === t[0] ? " on" : "") + '" data-mst="' + t[0] + '" style="cursor:pointer' + (MF.st === t[0] ? ";outline:2px solid #4D5BF9" : "") + '"><div class="l">' + t[1] + '</div><div class="v">' + t[2] + "</div></div>"; }).join("") + "</div>" +
+      '<div class="row" style="gap:6px;margin-top:8px"><input class="tx" id="mq" placeholder="Search IMEI, sender, partner…" value="' + esc(MF.q) + '" style="flex:1"><label style="display:flex;gap:6px;align-items:center;font-size:12.5px;white-space:nowrap"><input type="checkbox" id="mall"' + (L.length && sel.length === L.length ? " checked" : "") + "> All " + L.length + "</label></div>" +
+      '<div class="card" style="position:sticky;top:0;z-index:4;margin-top:8px;padding:10px"><div class="muted" style="font-size:12px;margin-bottom:6px"><b>' + sel.length + "</b> selected</div>" +
+      '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn pri sm" id="mchk"' + (sel.length ? "" : " disabled") + '>🔍 Check activation</button><button class="btn sm" id="munb" style="background:#B42318;color:#fff"' + (sel.length ? "" : " disabled") + '>🔓 Unblock not activated</button><button class="btn ghost sm" id="mrep"' + (sel.length ? "" : " disabled") + '>↩️ Reply to mail</button><button class="btn ghost sm" id="mxl">⬇ Excel</button><button class="btn ghost sm" id="mdel"' + (sel.length ? "" : " disabled") + ">🗑</button></div></div>" +
+      (L.length ? '<div class="tbw"><table class="tb"><tr><th></th><th>IMEI</th><th>From · partner</th><th>Received</th><th>Remark</th><th>Portal</th><th>Unblock / reply</th></tr>' + L.slice(0, 800).map(function (x) {
+        var c = CHK_L[x.chk], u = UNB_L[x.unb];
+        return '<tr><td><input type="checkbox" data-ms="' + x.id + '"' + (MSEL[x.id] ? " checked" : "") + '></td><td><b class="fx">' + x.imei + "</b>" + (x.model ? "<br><small>" + esc(x.model) + "</small>" : "") + "</td><td>" + esc(x.from) + "<br><small><b>" + esc(x.partner) + "</b></small></td><td><small>" + when(x.at) + "</small></td><td><small>" + esc(x.remark) + "</small></td><td>" + (c ? pill("", c[1]).replace('class="pill ', 'class="pill ' + c[0] + " ") + (x.act ? "<br><small>" + esc(x.act) + "</small>" : "") : '<small class="muted">not checked</small>') + "</td><td>" + (u ? '<span class="pill ' + u[0] + '">' + u[1] + "</span>" : "") + (x.rep ? '<br><small class="muted">↩️ reply drafted</small>' : "") + "</td></tr>";
+      }).join("") + "</table></div>" : '<div class="card empty" style="margin-top:10px"><div class="big">📭</div><b>No rows here</b><div class="muted" style="font-size:12.5px">Tap 📥 Read Outlook now.</div></div>');
+    [].forEach.call($("tp").querySelectorAll("[data-mst]"), function (d) { d.onclick = function () { MF.st = d.dataset.mst; MSEL = {}; mlDraw(); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-ms]"), function (c) { c.onchange = function () { if (c.checked) MSEL[c.dataset.ms] = 1; else delete MSEL[c.dataset.ms]; mlDraw(); }; });
+    $("mq").oninput = function () { MF.q = $("mq").value; clearTimeout(mlDraw.t); mlDraw.t = setTimeout(function () { var p = $("mq").selectionStart; mlDraw(); $("mq").focus(); try { $("mq").setSelectionRange(p, p); } catch (e) { } }, 350); };
+    $("mall").onchange = function () { MSEL = {}; if ($("mall").checked) L.forEach(function (x) { MSEL[x.id] = 1; }); mlDraw(); };
+    $("mcfg").onclick = mlCfg; $("mread").onclick = mlRead; $("mpaste").onclick = mlPaste;
+    $("mxl").onclick = function () { var R = sel.length ? sel : L; download(xlsx([{ name: "Unblock requests", rows: [["IMEI", "Sender e-mail", "Sender name", "Partner", "Mail received", "Subject", "Remark", "Portal status", "Activation date", "Model", "Checked at", "Unblock", "Unblock message", "Reply drafted"]].concat(R.map(function (x) { return [x.imei, x.from, x.fromName || "", x.partner, when(x.at), x.subject, x.remark, x.chk ? CHK_L[x.chk][1] : "Not checked", x.act || "", x.model || "", x.chkAt ? when(x.chkAt) : "", x.unb ? UNB_L[x.unb][1].replace(" ✅", "") : "", x.unbMsg || "", x.rep ? when(x.rep) : ""]; })) }]), "IMEI_unblock_requests_" + new Date().toISOString().slice(0, 10) + ".xlsx"); };
+    $("mdel").onclick = function () { if (!confirm("Remove " + sel.length + " row(s) from this list? (Nothing changes in Outlook or the portal.)")) return; api({ action: "iub-mail-del", ids: sel.map(function (x) { return x.id; }) }).then(function (r) { mlSet(r); MSEL = {}; mlDraw(); }); };
+    $("mchk").onclick = function () { mlCheck(sel); };
+    $("munb").onclick = function () { mlUnblock(sel); };
+    $("mrep").onclick = function () { mlReply(sel); };
+  }
+  // ---- set-up ----
+  function mlCfg() {
+    var C = MCFG || {};
+    sheet("✉️ Mail set-up", "Which Outlook mails count as unblock requests", [["💾", "Save", function (ov) {
+      var g = function (id) { return ov.querySelector("#" + id).value; }, P = {};
+      g("mp").split(/\n+/).forEach(function (l) { var m = l.split(/\s*[=:,]\s*/); if (m[0] && m[1]) P[m[0].trim()] = m.slice(1).join(" ").trim(); });
+      api({ action: "iub-mail-cfg", save: true, cfg: { me: g("mme"), senders: g("ms"), keywords: g("mk"), partners: P, days: g("md"), max: g("mx"), ai: ov.querySelector("#mai").checked } }).then(function (r) { if (!r.ok) return toast(r.error); MCFG = r.cfg; toast("Saved"); });
+    }, "pri"]],
+      '<label class="lb">Your e-mail (your own replies are skipped)</label><input class="tx" id="mme" value="' + esc(C.me || "") + '" placeholder="dishant.goyal@vivo.in">' +
+      '<label class="lb">Senders — e-mail IDs or @domains, one per line <small class="muted">empty = anyone</small></label><textarea class="tx" id="ms" rows="5" placeholder="edc.techops@paytmpayments.com&#10;@paytmpayments.com&#10;@tvscredit.com">' + esc((C.senders || []).join("\n")) + "</textarea>" +
+      '<label class="lb">Words that make it an unblock request <small class="muted">any one is enough</small></label><input class="tx" id="mk" value="' + esc((C.keywords || []).join(", ")) + '">' +
+      '<label class="lb">Partner names by domain <small class="muted">domain = Partner, one per line</small></label><textarea class="tx" id="mp" rows="5">' + esc(Object.keys(C.partners || {}).map(function (k) { return k + " = " + C.partners[k]; }).join("\n")) + "</textarea>" +
+      '<div class="g2"><div><label class="lb">Read mails of the last (days)</label><input class="tx" id="md" type="number" value="' + (C.days || 7) + '"></div><div><label class="lb">At most (mails per read)</label><input class="tx" id="mx" type="number" value="' + (C.max || 60) + '"></div></div>' +
+      '<label style="display:flex;gap:8px;font-size:13px;margin-top:10px"><input type="checkbox" id="mai"' + (C.ai !== false ? " checked" : "") + "> AI writes the short remark (else the sentence with the request word)</label>" +
+      '<div class="help" style="margin-top:10px">Only 15-digit numbers that pass the IMEI check digit are taken — order IDs, phone numbers and Excel-style 8.65E+14 are ignored. IMEIs that are only inside a picture or attachment can’t be read — paste them with 📋.</div>');
+  }
+  function mlQuery() { var K = (MCFG && MCFG.keywords && MCFG.keywords.length ? MCFG.keywords : ["unblock", "unflag", "release", "rollback"]).filter(function (k) { return !/\s/.test(k); }).slice(0, 8); return K.join(" OR "); }
+  // ---- read Outlook: app window, or a bookmark on Outlook web on a computer ----
+  function mlRead() {
+    var job = { id: mrid("mr"), mode: "mail", q: mlQuery(), max: (MCFG && MCFG.max) || 60, days: (MCFG && MCFG.days) || 7 };
+    if (BB) { var r = BB.run(JSON.stringify(job), "https://outlook.office.com/mail/"); if (r !== "ok") toast(r === "busy" ? "Another portal window is open" : r === "bad" ? "Update the vivo BI app to 7.9 to read Outlook" : "Couldn't open Outlook (" + r + ")"); return; }
+    mlDesk(job, "/vivo_mail.js", "__biMailRun", "Outlook on the web (outlook.office.com)");
+  }
+  function mlDesk(job, src, fn, where) {
+    fetch(src + "?v=" + Date.now()).then(function (r) { return r.text(); }).then(function (code) {
+      var boot = code.replace(/\/\*[\s\S]*?\*\//g, "") + ";(function(){if(window.__biL)return;var J=null,c=prompt('Paste the job code from the vivo BI tool');if(!c)return;try{J=JSON.parse(decodeURIComponent(escape(atob(c.trim()))))}catch(e){alert('That code is not valid');return}var bar=document.createElement('div');bar.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;background:#12163A;color:#fff;font:14px system-ui;padding:10px 14px;border-radius:12px';document.body.appendChild(bar);var first=J;window.__biL=setInterval(function(){var r=JSON.parse(window." + fn + "(first));first=J;J.stop=false;bar.textContent='vivo BI · '+(r.msg||r.s);if(r.s==='done'||r.s==='stopped'||r.s==='err'){clearInterval(window.__biL);window.__biL=0;var out=btoa(unescape(encodeURIComponent(JSON.stringify(r))));try{navigator.clipboard.writeText(out)}catch(e){}bar.innerHTML='✅ '+r.msg+' — the result code is copied. Paste it in the vivo BI tool. <button id=__bic style=margin-left:8px>Copy again</button>';document.getElementById('__bic').onclick=function(){prompt('Copy this result code',out)};}},1200);})();";
+      var href = "javascript:" + encodeURIComponent("(function(){" + boot + "})()");
+      $("mdk").innerHTML = '<div class="help w" style="margin-top:10px"><b>On a computer (Chrome / Edge)</b><br>1) Drag this to the bookmarks bar: <a class="btn ghost sm" id="mbm" href="#">📥 vivo BI helper</a><br>2) <button class="btn ghost sm" id="mcj">Copy job code</button><br>3) Open <b>' + esc(where) + '</b>, sign in, click the bookmark and paste the code. Keep the tab open until it says ✅.<br>4) Paste the result code here:</div><textarea class="tx" id="mrc" rows="2" placeholder="Result code"></textarea><div class="bar2"><button class="btn pri sm" id="mrb">Use result</button></div>';
+      $("mbm").setAttribute("href", href); $("mbm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar"); };
+      $("mcj").onclick = function () { var t = b64j(job); try { navigator.clipboard.writeText(t).then(function () { toast("Job code copied"); }, function () { prompt("Copy:", t); }); } catch (e) { prompt("Copy:", t); } };
+      $("mrb").onclick = function () { var x = unb64j($("mrc").value); if (!x) return toast("That code is not valid"); mlGot(x); };
+    });
+  }
+  // results from the app window / bookmark
+  function mlGot(r) {
+    if (!r) return;
+    if (r.mode === "mail" && r.mails) {
+      if (!r.mails.length) return toast(r.msg || "No mails read");
+      toast("Reading " + r.mails.length + " mails…");
+      return api({ action: "iub-mail-add", mails: r.mails }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var k = x.skipped; sheet("📥 " + x.added + " new IMEI rows", "From " + x.mails + " mail(s)", [], '<div class="help">Read ' + r.mails.length + " mail(s). Skipped: " + k.sender + " other senders · " + k.keyword + " without an unblock word · " + k.noImei + " without a valid IMEI · " + k.dup + " already listed · " + k.mine + " your own.</div>"); MF.st = "new"; MSEL = {}; if (TAB === "mail") mlDraw(); });
+    }
+    if (r.mode === "imq" && r.res) {
+      return api({ action: "iub-mail-chk", res: r.res }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var v = Object.keys(r.res).map(function (k) { return r.res[k]; }); toast("🔍 " + v.length + " checked · " + v.filter(function (y) { return y.found && !y.act; }).length + " not activated · " + v.filter(function (y) { return y.found && y.act; }).length + " activated · " + v.filter(function (y) { return !y.found; }).length + " not found"); MF.st = "not_activated"; MSEL = {}; if (TAB === "mail") mlDraw(); });
+    }
+    if (r.s === "err") toast("⚠ " + (r.msg || "Stopped"));
+  }
+  function mlPending() { if (!BB) return; try { JSON.parse(BB.pending() || "[]").forEach(function (p) { var st = null; try { st = JSON.parse(p.status || "null"); } catch (e) { } BB.ack(p.id); if (st && (st.mode === "mail" || st.mode === "imq")) mlGot(st); else if (/^m[rq]/.test(p.id) && p.state !== "done") toast("Window closed — nothing read"); }); } catch (e) { } }
+  window.__biBotDone = function () { setTimeout(mlPending, 300); };
+  // ---- 🔍 activation check on the IMEI Query System ----
+  function mlCheck(sel) {
+    var ims = sel.map(function (x) { return x.imei; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    var job = { id: mrid("mq"), mode: "imq", imeis: ims, chunk: 50 };
+    if (BB) { var r = BB.run(JSON.stringify(job), UBCFG.url || PORTAL); if (r !== "ok") toast(r === "busy" ? "Another portal window is open" : r === "bad" ? "Update the vivo BI app to 7.9 for the automatic check" : "Couldn't open the portal (" + r + ")"); else toast("Log in to the portal (you type the captcha) — the app then checks " + ims.length + " IMEIs"); return; }
+    mlDesk(job, "/vivo_imq.js", "__biImqRun", "the IMEI Query System (in-transfer.vivo.xyz)");
+  }
+  // ---- 🔓 unblock: only selected IMEIs whose portal check says Not activated ----
+  function mlUnblock(sel) {
+    var ok = sel.filter(function (x) { return x.chk === "not_activated" && x.unb !== "unblocked"; }), ims = ok.map(function (x) { return x.imei; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    var skip = sel.length - ok.length;
+    if (!ims.length) return toast(skip ? "Only IMEIs checked as “Not activated” can be unblocked — run 🔍 Check activation first" : "Select IMEIs");
+    sheet("🔓 Unblock " + ims.length + " IMEI" + (ims.length > 1 ? "s" : "") + " on the vivo portal?", "File with one column IMEI → Unblock Imeis → Batch Unblock", [["🔓", UB ? "Yes, unblock now" : "Download the file", function () { mlUnbGo(ims); }, "danger"]],
+      '<div class="help w">This unblocks the IMEIs on the IMEI Query System. Only IMEIs checked as <b>Not activated</b> are included' + (skip ? " (" + skip + " selected IMEI(s) left out: activated, not found, not checked or already unblocked)" : "") + '.</div><div class="tbw" style="max-height:220px"><table class="tb">' + ims.map(function (i) { return '<tr><td class="fx">' + i + "</td></tr>"; }).join("") + "</table></div>");
+  }
+  function mlUnbGo(ims) {
+    var id = "ML" + Date.now().toString(36).toUpperCase().slice(-8), name = "IMEI_unblock_" + id + ".xlsx", blob = xlsx([{ name: "Sheet1", rows: [["IMEI"]].concat(ims.map(function (i) { return [i]; })) }]);
+    try { localStorage.setItem("iubm-run-" + id, JSON.stringify(ims)); } catch (e) { }
+    if (!UB) {
+      download(blob, name);
+      sheet("Upload it on the portal", "", [["✅", "Portal said success", function () { mlUnbSave(id, ims, "success", [], "Uploaded by hand"); }, "pri"], ["❌", "Portal said failure", function () { mlUnbSave(id, ims, "failure", [], "Uploaded by hand"); }]], '<div class="help">IMEI Query System → <b>Imeis Query → Unblock Imeis</b> → Choose File → <b>' + esc(name) + '</b> → <b>Batch Unblock</b>. Then tell this tool what the portal said.</div>');
+      return;
+    }
+    var fr = new FileReader(); fr.onload = function () { var r = UB.run(id, String(fr.result).split(",")[1], name, UBCFG.url || ""); if (r !== "ok") toast(r === "busy" ? "The vivo portal is already open" : "Couldn't start the vivo portal (" + r + ")"); else api({ action: "iub-mail-unb", imeis: ims, result: "queued" }).then(mlSet); }; fr.readAsDataURL(blob);
+  }
+  function mlUnbSave(id, ims, result, failed, msg) { api({ action: "iub-mail-unb", imeis: ims, result: result, failed: failed || [], msg: msg }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); try { localStorage.removeItem("iubm-run-" + id); } catch (e) { } try { UB && UB.ack(id); } catch (e) { } toast(result === "success" ? "✅ Marked unblocked — select them and tap ↩️ Reply to mail" : result === "partial" ? "⚠️ Partly unblocked" : "❌ Marked failed"); MF.st = "unb"; MSEL = {}; if (TAB === "mail") mlDraw(); }); }
+  function mlUnbResult(r) {   // the app's portal uploader finished a "ML…" run
+    var ims = []; try { ims = JSON.parse(localStorage.getItem("iubm-run-" + r.id) || "[]"); } catch (e) { }
+    if (r.state !== "done") { toast("vivo portal closed — nothing recorded"); return; }
+    var v = ubRead(r.text, ims), msg = "vivo portal: " + String(r.text || "").slice(0, 180);
+    if (v) return mlUnbSave(r.id, ims, v.result, v.failed, msg);
+    sheet("What did the vivo portal say?", "“" + esc(r.text || "(no message)") + "”", [["✅", "It worked", function () { mlUnbSave(r.id, ims, "success", [], msg); }, "pri"], ["❌", "It failed", function () { mlUnbSave(r.id, ims, "failure", [], msg); }]], "");
+  }
+  // ---- ↩️ reply to the same mail ----
+  function mlReply(sel) {
+    var by = {}; sel.forEach(function (x) { (by[x.mk] = by[x.mk] || []).push(x); });
+    var G = Object.keys(by).map(function (k) { var L = by[k], f = L[0], first = /^[A-Z][a-z]+$/.test((f.fromName || "").split(/\s+/)[0]) ? f.fromName.split(/\s+/)[0] : "Team", ims = L.map(function (x) { return x.imei; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+      return { mk: k, rows: L, from: f.from, subject: f.subject, notDone: L.filter(function (x) { return x.unb !== "unblocked"; }).length,
+        text: "Hi " + first + ",\n\nBased on your request, the IMEI" + (ims.length > 1 ? "s below have" : " below has") + " been unblocked successfully from vivo's end:\n" + ims.join("\n") + "\n\nPlease check and let us know in case of any issue.\n\nRegards,\n" + ((AUTH && (AUTH.fullName || AUTH.username)) || "") + "\nvivo India" }; });
+    var ov = sheet("↩️ Reply to " + G.length + " mail" + (G.length > 1 ? "s" : ""), BB ? "Opens the same mail in Outlook, presses Reply all and types the text. You read it and tap Send." : "Opens a reply in Outlook on the web with the text. You read it and tap Send.", [],
+      G.map(function (g, i) { return '<div class="card" style="margin-top:8px"><b style="font-size:13px">' + esc(g.subject || "(no subject)") + '</b><div class="muted" style="font-size:12px">To: ' + esc(g.from) + " · " + g.rows.length + " IMEI(s)" + (g.notDone ? ' · <b style="color:#B42318">' + g.notDone + " not marked unblocked</b>" : "") + '</div><textarea class="tx" data-rt="' + i + '" rows="7" style="margin-top:6px;font-size:12.5px">' + esc(g.text) + '</textarea><div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">' + (BB ? '<button class="btn pri sm" data-rs="' + i + '">↩️ Reply in Outlook</button>' : '<button class="btn pri sm" data-rw="' + i + '">🌐 Reply in Outlook web</button>') + (window.BIMail && window.BIMail.compose ? '<button class="btn ghost sm" data-rn="' + i + '">✉️ New mail in Outlook app</button>' : "") + '<button class="btn ghost sm" data-rc="' + i + '">📋 Copy text</button></div></div>'; }).join(""));
+    var txtOf = function (i) { return ov.querySelector('[data-rt="' + i + '"]').value; }, mark = function (g) { api({ action: "iub-mail-mark", ids: g.rows.map(function (x) { return x.id; }), rep: true }).then(mlSet); };
+    [].forEach.call(ov.querySelectorAll("[data-rs]"), function (b) { b.onclick = function () { var g = G[+b.dataset.rs], r = BB.run(JSON.stringify({ id: mrid("mp"), mode: "mail", reply: { from: g.from, subject: g.subject, text: txtOf(+b.dataset.rs) } }), "https://outlook.office.com/mail/"); if (r !== "ok") return toast(r === "bad" ? "Update the vivo BI app to 7.9" : "Couldn't open Outlook (" + r + ")"); mark(g); }; });
+    [].forEach.call(ov.querySelectorAll("[data-rw]"), function (b) { b.onclick = function () { var g = G[+b.dataset.rw]; window.open("https://outlook.office.com/mail/deeplink/compose?to=" + encodeURIComponent(g.from) + "&subject=" + encodeURIComponent(/^re:/i.test(g.subject) ? g.subject : "RE: " + g.subject) + "&body=" + encodeURIComponent(txtOf(+b.dataset.rw)), "_blank"); mark(g); }; });
+    [].forEach.call(ov.querySelectorAll("[data-rn]"), function (b) { b.onclick = function () { var g = G[+b.dataset.rn]; window.BIMail.compose(JSON.stringify({ to: [g.from], cc: [], subject: /^re:/i.test(g.subject) ? g.subject : "RE: " + g.subject, body: txtOf(+b.dataset.rn), files: [] })); mark(g); }; });
+    [].forEach.call(ov.querySelectorAll("[data-rc]"), function (b) { b.onclick = function () { var t = txtOf(+b.dataset.rc); try { navigator.clipboard.writeText(t).then(function () { toast("Copied"); }); } catch (e) { prompt("Copy:", t); } }; });
+  }
+  // ---- 📋 paste or upload mails (when Outlook can't be read automatically) ----
+  function mlPaste() {
+    sheet("📋 Paste or upload mails", "Each block becomes one mail", [["➕", "Add", function (ov) {
+      var mails = [], from = ov.querySelector("#pf").value.trim(), subj = ov.querySelector("#ps").value.trim(), t = ov.querySelector("#pt").value;
+      if (t.trim()) t.split(/\n\s*-{3,}\s*\n/).forEach(function (blk, i) { var fm = blk.match(/from:\s*[^\n]*?([\w.%+'-]+@[\w.-]+\.\w+)/i), sm = blk.match(/subject:\s*([^\n]+)/i); mails.push({ key: "paste|" + Date.now() + "|" + i, from: (fm && fm[1]) || from, at: Date.now(), subject: (sm && sm[1]) || subj || "Pasted mail", text: blk }); });
+      var go = function (M) { if (!M.length) return toast("Paste a mail or choose .eml files"); if (M.some(function (m) { return !m.from; })) return toast("Type the sender e-mail"); mlGot({ mode: "mail", mails: M }); };
+      var fs = ov.querySelector("#pe").files; if (!fs.length) return go(mails);
+      Promise.all([].map.call(fs, function (f) { return f.text().then(emlParse); })).then(function (E) { go(mails.concat(E.filter(Boolean))); });
+    }, "pri"]],
+      '<label class="lb">Sender e-mail (if the text has no “From:” line)</label><input class="tx" id="pf" placeholder="someone@partner.com"><label class="lb">Subject</label><input class="tx" id="ps"><label class="lb">Mail text <small class="muted">several mails: put a line with --- between them</small></label><textarea class="tx" id="pt" rows="8"></textarea><label class="lb">Or .eml files (Outlook web → ⋯ → Download)</label><input type="file" id="pe" accept=".eml,.txt" multiple>');
+  }
+  function emlParse(raw) {
+    try {
+      var hEnd = raw.search(/\r?\n\r?\n/), H = raw.slice(0, hEnd).replace(/\r?\n[ \t]+/g, " "), hd = function (n) { var m = H.match(new RegExp("^" + n + ":\\s*(.*)$", "im")); return m ? m[1].trim() : ""; };
+      var dec = function (s) { return s.replace(/=\?([^?]+)\?([BQ])\?([^?]*)\?=/gi, function (a, cs, e, x) { try { return /b/i.test(e) ? decodeURIComponent(escape(atob(x))) : x.replace(/_/g, " ").replace(/=([0-9A-F]{2})/gi, function (q, h) { return String.fromCharCode(parseInt(h, 16)); }); } catch (z) { return x; } }); };
+      var body = raw.slice(hEnd), m = body.match(/Content-Type:\s*text\/plain[\s\S]*?\r?\n\r?\n([\s\S]*?)(\r?\n--|$)/i) || body.match(/Content-Type:\s*text\/html[\s\S]*?\r?\n\r?\n([\s\S]*?)(\r?\n--|$)/i), part = m ? m[1] : body, pre = m ? body.slice(0, body.indexOf(m[1])) : H;
+      if (/base64/i.test(pre.slice(-300))) { try { part = decodeURIComponent(escape(atob(part.replace(/\s+/g, "")))); } catch (e) { } } else if (/quoted-printable/i.test(pre.slice(-300))) part = part.replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/gi, function (q, h) { return String.fromCharCode(parseInt(h, 16)); });
+      part = part.replace(/<br\s*\/?>|<\/(p|div|tr)>/gi, "\n").replace(/<\/t[dh]>/gi, " \t").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+      var from = (hd("From").match(/[\w.%+'-]+@[\w.-]+\.\w+/) || [""])[0], at = Date.parse(hd("Date")) || Date.now();
+      return { key: (from + "|" + at + "|" + hd("Subject")).slice(0, 200), from: from, fromName: dec(hd("From")).replace(/<.*$/, "").replace(/"/g, "").trim(), at: at, subject: dec(hd("Subject")), text: part.slice(0, 20000) };
+    } catch (e) { return null; }
   }
 
   // ---------- all IMEIs ----------
@@ -685,7 +845,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       paint();
     });
   }
-  window.addEventListener("hashchange", function () { var h = location.hash.replace("#", ""); if (!TOK && ME && /^(dash|new|verify|final|queue|list|cfg)$/.test(h) && h !== TAB && (ME.isHO || !/^(verify|final|queue|cfg)$/.test(h))) { TAB = h; counts(); draw(); } });
+  window.addEventListener("hashchange", function () { var h = location.hash.replace("#", ""); if (!TOK && ME && /^(dash|new|mail|verify|final|queue|list|cfg)$/.test(h) && h !== TAB && (ME.isHO || !/^(mail|verify|final|queue|cfg)$/.test(h))) { TAB = h; counts(); draw(); } });
   if (TOK) partner(); else staff();
 })();
 </script>

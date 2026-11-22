@@ -1213,6 +1213,13 @@ export const LINK_CATALOG = {
 "iub-cfg",
 "iub-list",
 "iub-lookup",
+"iub-mail-add",
+"iub-mail-cfg",
+"iub-mail-chk",
+"iub-mail-del",
+"iub-mail-list",
+"iub-mail-mark",
+"iub-mail-unb",
 "iub-me",
 "iub-p-list",
 "iub-p-update",
@@ -1232,6 +1239,10 @@ export const LINK_CATALOG = {
 [
 "new",
 "➕ Raise"
+],
+[
+"mail",
+"📥 Mail requests"
 ],
 [
 "verify",
