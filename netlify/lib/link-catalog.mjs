@@ -1673,6 +1673,23 @@ export const LINK_CATALOG = {
 ]
 ]
 },
+"airouter.html": {
+"id": "airouter",
+"icon": "🔀",
+"name": "AI Router (free AI keys)",
+"ho": true,
+"acts": [
+"ar-chat",
+"ar-check",
+"ar-get",
+"ar-key-add",
+"ar-key-del",
+"ar-save",
+"ar-save-order",
+"tl-use"
+],
+"tabs": []
+},
 "config.html": {
 "id": "config",
 "icon": "⚙️",

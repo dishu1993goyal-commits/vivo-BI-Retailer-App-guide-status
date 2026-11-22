@@ -48,6 +48,7 @@ import { tlkAction, tlkPublic, linkGate } from "./tlk-core.mjs";
 import { uxAction, uxPublic } from "./ux-core.mjs";
 import { lxAction, vgPublic, csPublic } from "./lx-core.mjs";
 import { bzAction } from "./bz-core.mjs";
+import { arAction, loadRouter, routerChat, makeLog } from "./router-core.mjs";
 import { bmAction } from "./bm-core.mjs";
 import { salAction, salPublic } from "./sal-core.mjs";
 import { salesAction } from "./sales-core.mjs";
@@ -278,7 +279,15 @@ async function askGroq(key, system, contents, fetchImpl, opts = {}) {
   return { ok: false, error: last };
 }
 
+let ROUTERCACHE = { at: 0, cfg: null };
 export async function askAI(env, question, context, history, fetchImpl = fetch, opts = {}) {
+  if (env && env.__AIR && env.__AIR.custom && !opts.noRouter) {   // 🔀 AI Router first (many free providers, fallback); the old single-key path stays as the last resort
+    const msgs = [];
+    (Array.isArray(history) ? history : []).slice(-6).forEach((h) => { if (h && h.q) msgs.push({ role: "user", content: String(h.q).slice(0, 600) }); if (h && h.a) msgs.push({ role: "assistant", content: String(h.a).slice(0, 1200) }); });
+    msgs.push({ role: "user", content: (opts.label || "DASHBOARD DATA") + ":\n" + String(context || "").slice(0, 14000) + "\n\nQUESTION: " + String(question).slice(0, 800) });
+    const r = await routerChat(env.__AIR, { task: opts.task || "think", system: opts.system || AI_SYSTEM, messages: msgs, json: !!opts.json, maxTokens: opts.maxTokens || 1800, temperature: opts.json ? 0.3 : 0.6 }, fetchImpl, { budgetMs: 20000, callMs: 14000, log: env.__AIRLOG });
+    if (r.ok) { const text = opts.raw ? r.text : cleanAI(r.text); if (text) return { ok: true, text, model: r.provider + "/" + r.model }; }
+  }
   if (!env || (!env.GEMINI_API_KEY && !env.GROQ_API_KEY)) return { ok: false, error: "AI is not set up yet.", notConfigured: true };
   const contents = [];
   (Array.isArray(history) ? history : []).slice(-6).forEach((h) => {
@@ -519,6 +528,10 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (KEYCACHE.groq) env = Object.assign({}, env, { GROQ_API_KEY: KEYCACHE.groq });
   }
   if (req.headers.get("x-bi-app") !== "1") return json(403, { ok: false, error: "Not allowed" });
+  try {   // 🔀 AI Router: every AI answer of the app goes through the keys saved there first (cached a minute)
+    if (Date.now() - ROUTERCACHE.at > 60000) ROUTERCACHE = { at: Date.now(), cfg: await loadRouter(store, env) };
+    env = Object.assign({}, env, { __AIR: ROUTERCACHE.cfg, __AIRLOG: makeLog(store), __AIRFETCH: aiFetch });
+  } catch (e) { }
 
   let b;
   try { b = await req.json(); } catch { return json(400, { ok: false, error: "Bad request" }); }
@@ -920,7 +933,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-report-ai", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(bp|ph|ap|cr|dx|cs|vg|rpl|bot|eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv|du)-/;
+  const NEW_PREFIX = /^(bp|ph|ap|cr|dx|cs|vg|rpl|bot|eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv|du|ar)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username), lnk = /^lnk_/i.test(String(b.username || "")), recKey = key ? (lnk ? "lnkuser:" + key : uKeyOf(key)) : "";
     const rec = key ? await store.get(recKey) : null;
@@ -1077,6 +1090,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^ux-/.test(b.action)) return uxAction(b, surveyCtx());
     if (/^(dx|cs|vg|rpl|bot)-/.test(b.action)) return lxAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^(bp|ph|ap|cr|du)-/.test(b.action)) return bzAction(b, surveyCtx());
+    if (/^ar-/.test(b.action)) return arAction(b, Object.assign(surveyCtx(), { jobFetch, siteUrl: env.SITE_URL || "" }));
     if (/^so-/.test(b.action)) return salesAction(b, surveyCtx());
     if (/^roi-/.test(b.action)) return roiAction(b, surveyCtx());
     if (/^(lh|ls|lt|mp|cv)-/.test(b.action)) return bixAction(b, surveyCtx());

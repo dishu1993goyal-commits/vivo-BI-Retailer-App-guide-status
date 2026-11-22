@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AI Router</title>
+<style>
+/*@@CSS@@*/
+.pv{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 1px 8px rgba(20,24,51,.06);border:1px solid #EEF0F6}
+.pv.off{opacity:.6}
+.pv h3{margin:0;font-size:15.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pv .best{color:var(--mut);font-size:12.5px;margin-top:2px}
+.st{font-size:11px;font-weight:800;border-radius:99px;padding:2px 9px}
+.st.ok{background:#E3F6EC;color:#1C7A4B}.st.some{background:#FFF4DB;color:#8A5B00}.st.fail{background:#FDE7E7;color:#B3261E}.st.none{background:#EEF0F6;color:#5A607E}
+.keys{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.kc{display:inline-flex;align-items:center;gap:6px;background:#F3F4FA;border-radius:99px;padding:4px 6px 4px 10px;font-size:12.5px;font-family:ui-monospace,monospace}
+.kc button{border:0;background:#fff;border-radius:99px;width:22px;height:22px;cursor:pointer;font-size:12px}
+.row2{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.row2 input{flex:1;min-width:180px}
+.sw{display:flex;align-items:center;gap:8px;font-size:13px;margin-top:8px;cursor:pointer}
+.mt{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.mt div{background:#F7F8FC;border-radius:10px;padding:7px 9px;font-size:11.5px;color:var(--mut)}.mt b{display:block;color:var(--ink);font-size:12px;word-break:break-all}
+.use{font-size:12px;color:var(--mut);margin-top:6px}
+.chainv{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+.chainv span{background:#EEF1FF;color:#1B2A8C;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:700}
+.chainv i{color:var(--mut);font-style:normal}
+.how{font-size:12.5px;background:#F7F8FC;border-radius:10px;padding:8px 10px;margin-top:8px}
+.hero2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.hero2 .tl{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 1px 8px rgba(20,24,51,.06)}.hero2 .tl b{display:block;font-size:22px}.hero2 .tl span{font-size:12px;color:var(--mut)}
+.ord{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.ord div{display:flex;align-items:center;gap:8px;background:#F7F8FC;border-radius:10px;padding:6px 10px;font-size:13px}
+.ord div span{flex:1}.ord button{border:0;background:#fff;border-radius:8px;padding:3px 8px;cursor:pointer}
+.tabs2{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0 2px}.tabs2 button{border:0;background:#EEF0F6;border-radius:99px;padding:8px 14px;font-weight:800;cursor:pointer;font:inherit;font-weight:800}.tabs2 button.on{background:#12163A;color:#fff}
+.out{white-space:pre-wrap;background:#F7F8FC;border-radius:12px;padding:10px;font-size:13px;margin-top:8px;max-height:360px;overflow:auto}
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#airouter">📘 How to</a></div>
+  <h1>🔀 AI Router</h1><p>Free AI keys from many providers in one place — every AI tool uses the best one for the job and moves to the next when one is busy</p>
+</div>
+<div class="wrap" id="view"></div>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view"), HO = !!(AUTH && AUTH.app === "admin"), D = null, TAB = "keys";
+  var TN = { think: "🧠 Thinking & writing", fast: "⚡ Quick edits", vision: "👁 Reading pictures" };
+  function load() { return api({ action: "ar-get" }).then(function (r) { if (!r.ok) throw new Error(r.error || "Couldn't load"); D = r; draw(); }); }
+  function stBadge(p) { if (!p.keys.length && !p.fixed) return '<span class="st none">no key</span>'; return p.status === "ok" ? '<span class="st ok">working</span>' : p.status === "some" ? '<span class="st some">some keys fail</span>' : p.status === "fail" ? '<span class="st fail">not working</span>' : '<span class="st none">not checked</span>'; }
+  function chainOf(task) {
+    var pref = { think: ["gemini", "github", "cerebras", "groq", "mistral", "openrouter", "sambanova", "nvidia", "cloudflare"], fast: ["groq", "cerebras", "gemini", "sambanova", "mistral", "github", "openrouter", "nvidia", "cloudflare"], vision: ["gemini", "github", "groq", "mistral", "openrouter"] }[task];
+    var order = D.order.length ? D.order.concat(pref.filter(function (x) { return D.order.indexOf(x) < 0; })) : pref;
+    return order.map(function (id) { return D.providers.filter(function (p) { return p.id === id; })[0]; }).filter(function (p) { return p && p.on && (p.keys.length || p.fixed) && (task !== "vision" || p.vision) && (!p.acctNeeded || p.acct); });
+  }
+  function draw() {
+    if (!HO) { VIEW.innerHTML = '<div class="card"><b>Only HO can manage the AI Router.</b><p class="muted">Every AI tool in the app already uses it.</p></div>'; return; }
+    var withKey = D.providers.filter(function (p) { return p.keys.length || p.fixed; }), ok = D.providers.reduce(function (a, p) { return a + (p.use ? p.use.ok : 0); }, 0), lim = D.providers.reduce(function (a, p) { return a + (p.use ? p.use.lim : 0); }, 0);
+    VIEW.innerHTML = '<div class="hero2"><div class="tl"><b>' + withKey.length + '</b><span>of ' + D.providers.length + ' providers connected</span></div><div class="tl"><b>' + ok + '</b><span>AI answers today</span></div><div class="tl"><b>' + lim + '</b><span>times a free limit was hit (moved on)</span></div></div>' +
+      '<div class="tabs2">' + [["keys", "🔑 Providers & keys"], ["chain", "🔀 Who answers first"], ["test", "🧪 Try it"]].map(function (t) { return '<button data-t="' + t[0] + '"' + (TAB === t[0] ? ' class="on"' : "") + ">" + t[1] + "</button>"; }).join("") + "</div><div id='tb'></div>";
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; draw(); }; });
+    if (TAB === "keys") tKeys(); else if (TAB === "chain") tChain(); else tTest();
+  }
+  function tKeys() {
+    $("tb").innerHTML = '<div class="help">Sign up for each provider\'s <b>free plan</b> with a work or personal account, create a key and paste it here. Keys are saved on the server and never shown again (only the last 4 characters). Add up to 6 keys per provider — the router takes turns between them. Free limits change often; ✅ Check shows what each key can do today.</div>' +
+      D.providers.map(function (p) {
+        var u = p.use;
+        return '<div class="pv' + (p.on ? "" : " off") + '" data-id="' + p.id + '"><h3>' + esc(p.name) + " " + stBadge(p) + (p.conf ? ' <span class="st ok">🔒 OK for confidential</span>' : "") + '</h3><div class="best">' + esc(p.best) + (p.vision ? " · reads pictures" : "") + "</div>" +
+          '<div class="keys">' + (p.keys.length || p.fixed ? p.keys.map(function (k, i) { return '<span class="kc">' + esc(k) + '<button data-del="' + i + '" title="Remove">✕</button></span>'; }).join("") + (p.fixed ? '<span class="kc" style="padding-right:10px" title="Saved in the app settings / Affordability → AI keys">🔧 ' + p.fixed + " key from app settings</span>" : "") : '<span class="muted" style="font-size:12.5px">No key yet</span>') + "</div>" +
+          '<div class="row2"><input class="tx" type="password" autocomplete="off" placeholder="Paste a ' + esc(p.name.split(" (")[0]) + ' API key" data-k>' + (p.acctNeeded ? '<input class="tx" placeholder="Account ID' + (p.acct ? " (saved " + esc(p.acct) + ")" : "") + '" data-acct>' : "") + '<button class="btn pri sm" data-add>＋ Add key</button>' + (p.keys.length || p.fixed ? '<button class="btn ghost sm" data-chk>✅ Check</button>' : "") + "</div>" +
+          '<div class="how">🆓 <a href="' + esc(p.signup) + '" target="_blank" rel="noopener">Get a free key</a> — ' + esc(p.how) + "</div>" +
+          ((p.keys.length || p.fixed) ? '<div class="mt">' + ["think", "fast", "vision"].filter(function (t) { return p.pick[t]; }).map(function (t) { return "<div>" + TN[t] + "<b>" + esc((p.models[t] || p.pick[t][0] || "—")) + "</b></div>"; }).join("") + "</div>" : "") +
+          '<label class="sw"><input type="checkbox" data-on' + (p.on ? " checked" : "") + "> Use this provider</label>" +
+          '<label class="sw"><input type="checkbox" data-conf' + (p.conf ? " checked" : "") + "> 🔒 OK for confidential work <span class='muted' style='font-size:11.5px'>(tick only after reading the provider's terms on how it uses your data)</span></label>" +
+          ((p.keys.length || p.fixed) ? '<details style="margin-top:6px"><summary class="muted" style="font-size:12.5px;cursor:pointer">Choose models yourself (optional)</summary><div class="mt">' + ["think", "fast", "vision"].filter(function (t) { return p.pick[t]; }).map(function (t) { return "<div>" + TN[t] + '<input class="tx" style="margin-top:4px;font-size:12px" data-m="' + t + '" list="ml-' + p.id + '" placeholder="' + esc(p.pick[t][0] || "") + '" value="' + esc(p.models[t] || "") + '"></div>'; }).join("") + '</div><datalist id="ml-' + p.id + '">' + p.found.map(function (m) { return '<option value="' + esc(m) + '">'; }).join("") + '</datalist><button class="btn ghost sm" data-sm style="margin-top:6px">Save models</button></details>' : "") +
+          (u ? '<div class="use">Today: ' + u.ok + " answers · " + u.lim + " free-limit hits · " + u.err + " errors" + (u.ok ? " · avg " + Math.round(u.ms / u.ok / 100) / 10 + " s" : "") + (u.last && u.last !== "ok" ? " · last: " + esc(u.last) : "") + "</div>" : "") +
+          '<div class="out" data-res style="display:none"></div></div>';
+      }).join("");
+    [].forEach.call($("tb").querySelectorAll(".pv"), function (c) {
+      var id = c.dataset.id, q = function (s) { return c.querySelector(s); };
+      q("[data-add]").onclick = function () { var k = q("[data-k]").value.trim(), ac = q("[data-acct]") ? q("[data-acct]").value.trim() : ""; if (!k) return toast("Paste the key first"); api({ action: "ar-key-add", id: id, key: k, acct: ac }).then(function (r) { if (!r.ok) return toast(r.error); toast("Key saved — checking it…"); return load().then(function () { chk(id); }); }); };
+      if (q("[data-chk]")) q("[data-chk]").onclick = function () { chk(id); };
+      [].forEach.call(c.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { if (!confirm("Remove this key?")) return; api({ action: "ar-key-del", id: id, i: +b.dataset.del }).then(load); }; });
+      q("[data-on]").onchange = function () { api({ action: "ar-save", id: id, on: this.checked }).then(load); };
+      q("[data-conf]").onchange = function () { api({ action: "ar-save", id: id, conf: this.checked }).then(load); };
+      if (q("[data-sm]")) q("[data-sm]").onclick = function () { var m = {}; [].forEach.call(c.querySelectorAll("[data-m]"), function (i) { m[i.dataset.m] = i.value.trim(); }); api({ action: "ar-save", id: id, models: m }).then(function () { toast("Models saved"); load(); }); };
+    });
+  }
+  function chk(id) {
+    var c = $("tb").querySelector('.pv[data-id="' + id + '"]'), o = c && c.querySelector("[data-res]"); if (o) { o.style.display = ""; o.textContent = "Checking every key…"; }
+    api({ action: "ar-check", id: id }).then(function (r) {
+      if (!r.ok) { if (o) o.textContent = "⚠ " + r.error; return; }
+      var t = r.keys.map(function (k) { return (k.ok ? "✅ " : "❌ ") + k.key + (k.ok ? " · answered in " + (k.ms / 1000).toFixed(1) + " s" : " · " + (k.status === 429 ? "at its free limit right now" : k.status === 401 || k.status === 403 ? "key refused (wrong key or missing permission)" : k.err)); }).join("\n") + "\n" + (r.models ? r.models + " models found" : "Using the standard models");
+      load().then(function () { var c2 = $("tb").querySelector('.pv[data-id="' + id + '"]'), o2 = c2 && c2.querySelector("[data-res]"); if (o2) { o2.style.display = ""; o2.textContent = t; } });
+    });
+  }
+  function tChain() {
+    var all = D.providers.map(function (p) { return p.id; }), ord = D.order.length ? D.order.concat(all.filter(function (x) { return D.order.indexOf(x) < 0; })) : null;
+    $("tb").innerHTML = ["think", "fast", "vision"].map(function (t) { var ch = chainOf(t); return '<div class="pv"><h3>' + TN[t] + '</h3><div class="chainv">' + (ch.length ? ch.map(function (p, i) { return (i ? "<i>→</i>" : "") + "<span>" + esc(p.name.split(" (")[0]) + "</span>"; }).join("") : '<span style="background:#FDE7E7;color:#B3261E">no provider with a key</span>') + "</div></div>"; }).join("") +
+      '<div class="pv"><h3>Your own order (optional)</h3><div class="best">By default each kind of job has its own best order (above). Set an order here to put your favourite providers first for everything.</div><div class="ord" id="ord">' +
+      (ord || all).map(function (id, i) { var p = D.providers.filter(function (x) { return x.id === id; })[0]; return "<div><b>" + (i + 1) + "</b><span>" + esc(p.name) + (p.keys.length ? "" : " <i class='muted'>(no key)</i>") + '</span><button data-up="' + i + '">▲</button><button data-dn="' + i + '">▼</button></div>'; }).join("") +
+      '</div><div class="bar2"><button class="btn pri sm" id="os">Save this order</button>' + (D.order.length ? '<button class="btn ghost sm" id="or">Use the default orders</button>' : "") + "</div></div>";
+    var cur = (ord || all).slice();
+    var redraw = function () { D.order = cur.slice(); tChain(); D.order = D.order; };
+    [].forEach.call($("tb").querySelectorAll("[data-up]"), function (b) { b.onclick = function () { var i = +b.dataset.up; if (i < 1) return; var x = cur[i]; cur[i] = cur[i - 1]; cur[i - 1] = x; D.order = cur; tChain(); }; });
+    [].forEach.call($("tb").querySelectorAll("[data-dn]"), function (b) { b.onclick = function () { var i = +b.dataset.dn; if (i >= cur.length - 1) return; var x = cur[i]; cur[i] = cur[i + 1]; cur[i + 1] = x; D.order = cur; tChain(); }; });
+    $("os").onclick = function () { api({ action: "ar-save-order", order: cur }).then(function () { toast("Order saved"); load(); }); };
+    if ($("or")) $("or").onclick = function () { api({ action: "ar-save-order", order: [] }).then(function () { toast("Back to the default orders"); load(); }); };
+  }
+  function tTest() {
+    $("tb").innerHTML = '<div class="pv"><h3>🧪 Ask the router</h3><div class="best">See which provider answers and how fast.</div><label class="lb">Kind of job</label><div class="seg2 row2">' + ["think", "fast", "vision"].map(function (t) { return '<label class="sw" style="margin:0"><input type="radio" name="tk" value="' + t + '"' + (t === "think" ? " checked" : "") + "> " + TN[t] + "</label>"; }).join(" ") + '</div><textarea class="tx" id="tq" rows="3" placeholder="e.g. Write 3 crisp headline titles for a slide showing Retailer App usage rising from 12% to 19.8% this year">Write 3 crisp headline titles for a management slide: Retailer App usage rose from 12% to 19.8% this year, top 5 states average 59%.</textarea><div class="row2"><input type="file" id="ti" accept="image/*" style="display:none"><button class="btn ghost sm" id="tib">🖼 Add a picture</button><label class="sw" style="margin:0"><input type="checkbox" id="tc"> 🔒 Confidential (only providers marked OK)</label></div><div class="bar2"><button class="btn pri" id="tg">Ask</button></div><div class="out" id="to" style="display:none"></div></div>';
+    var img = null;
+    $("tib").onclick = function () { $("ti").click(); };
+    $("ti").onchange = function () { var f = this.files[0]; if (!f) return; var r = new FileReader(); r.onload = function () { shrink(r.result, function (u) { img = u; $("tib").textContent = "🖼 Picture added"; document.querySelector('input[name=tk][value=vision]').checked = true; }); }; r.readAsDataURL(f); };
+    $("tg").onclick = function () {
+      var task = document.querySelector("input[name=tk]:checked").value, t0 = Date.now(); $("to").style.display = ""; $("to").textContent = "Asking…";
+      api({ action: "ar-chat", req: { task: task, prompt: $("tq").value, images: img ? [img] : undefined, sensitive: $("tc").checked, maxTokens: 700 } }).then(function (r) {
+        $("to").textContent = r.ok ? "✅ " + r.provider + " · " + r.model + " · " + ((Date.now() - t0) / 1000).toFixed(1) + " s\n\n" + r.text : "⚠ " + r.error;
+      });
+    };
+  }
+  function shrink(u, cb) { var im = new Image(); im.onload = function () { var k = Math.min(1, 1280 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); cb(c.toDataURL("image/jpeg", 0.85)); }; im.src = u; }
+  if (AUTH && AUTH.token) api({ action: "tl-use", tool: "airouter" });
+  if (!HO) draw(); else load().catch(function (e) { VIEW.innerHTML = '<div class="card err">' + esc(e.message) + "</div>"; });
+})();
+</script>
+</body>
+</html>
