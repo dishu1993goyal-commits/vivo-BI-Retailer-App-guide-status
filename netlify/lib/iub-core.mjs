@@ -333,7 +333,7 @@ export async function iubAction(b, ctx) {
   //   iubm:rows  [{ id, imei, from, fromName, partner, at, subject, remark, mk, added, act, chk, chkAt, unb, unbAt, unbMsg }]
   if (/^iub-mail-/.test(b.action)) {
     if (!isHO) return hoOnly();
-    const MDEF = { me: "", senders: [], keywords: ["unblock", "unflag", "release", "rollback", "roll back", "unblocking", "unflagging"], partners: { "paytmpayments.com": "Paytm", "paytm.com": "Paytm", "bajajfinserv.in": "Bajaj Finserv", "bajajfinance.in": "Bajaj Finserv", "idfcfirstbank.com": "IDFC First", "tvscredit.com": "TVS Credit", "hdbfs.com": "HDB Financial", "pinelabs.com": "Pine Labs", "innoviti.com": "Innoviti", "benow.in": "BeNow", "icicibank.com": "ICICI Bank", "hdfcbank.com": "HDFC Bank", "kotak.com": "Kotak", "homecredit.co.in": "Home Credit", "dmifinance.in": "DMI Finance", "cholams.murugappa.com": "Chola" }, days: 7, max: 60, ai: true };
+    const MDEF = { me: "", senders: [], keywords: ["unblock", "unflag", "release", "rollback", "roll back", "unblocking", "unflagging"], partners: { "paytmpayments.com": "Paytm", "paytm.com": "Paytm", "bajajfinserv.in": "Bajaj Finserv", "bajajfinance.in": "Bajaj Finserv", "idfcfirstbank.com": "IDFC First", "tvscredit.com": "TVS Credit", "hdbfs.com": "HDB Financial", "pinelabs.com": "Pine Labs", "innoviti.com": "Innoviti", "benow.in": "BeNow", "icicibank.com": "ICICI Bank", "hdfcbank.com": "HDFC Bank", "kotak.com": "Kotak", "homecredit.co.in": "Home Credit", "dmifinance.in": "DMI Finance", "cholams.murugappa.com": "Chola" }, days: 7, max: 60, ai: true, match: "both", scope: "text" };
     const M = Object.assign({}, MDEF, (await store.get("iubm:cfg")) || {});
     const rowsOf = async () => (await store.get("iubm:rows")) || [];
     if (b.action === "iub-mail-cfg") {
@@ -341,7 +341,7 @@ export async function iubAction(b, ctx) {
         const c = b.cfg || {}, lst = (v, n, m) => (Array.isArray(v) ? v : String(v || "").split(/[,;\n]+/)).map((x) => str(x, m).toLowerCase()).filter(Boolean).slice(0, n);
         M.me = str(c.me, 120).toLowerCase(); M.senders = lst(c.senders, 120, 120); M.keywords = lst(c.keywords, 30, 40); if (!M.keywords.length) M.keywords = MDEF.keywords;
         if (c.partners && typeof c.partners === "object") { M.partners = {}; Object.keys(c.partners).slice(0, 120).forEach((k) => { const d = low(k).replace(/^@/, ""); if (d && c.partners[k]) M.partners[d] = str(c.partners[k], 60); }); }
-        M.days = Math.min(90, Math.max(1, +c.days || 7)); M.max = Math.min(300, Math.max(5, +c.max || 60)); M.ai = c.ai !== false;
+        M.days = Math.min(90, Math.max(1, +c.days || 7)); M.max = Math.min(300, Math.max(5, +c.max || 60)); M.ai = c.ai !== false; M.match = ["both", "either", "subject", "sender"].includes(c.match) ? c.match : "both"; M.scope = c.scope === "subject" ? "subject" : "text";
         await store.set("iubm:cfg", M);
       }
       return json(200, { ok: true, cfg: M });
@@ -350,15 +350,15 @@ export async function iubAction(b, ctx) {
     if (b.action === "iub-mail-add") {   // mails read from Outlook (app / computer bookmark / pasted) → IMEI rows
       const luhn = (x) => { let s = 0; for (let i = 0; i < 15; i++) { let d = +x[14 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; } return s % 10 === 0; };
       const kwRe = new RegExp("\\b(" + M.keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*")).join("|") + ")", "i");
-      const okSender = (e) => !M.senders.length || M.senders.some((s) => s.startsWith("@") ? e.endsWith(s) : s.includes("@") ? e === s : e.endsWith("@" + s) || e.endsWith("." + s));
+      const okSender = (e, nm) => M.senders.some((s) => s.startsWith("@") ? e.endsWith(s) : s.includes("@") ? e === s : s.includes(".") ? e.endsWith("@" + s) || e.endsWith("." + s) : low(nm).includes(s));   // e-mail, @domain, domain or a display name
+      const matchOk = (from, nm, subject, text) => { const sw = kwRe.test(subject + (M.scope === "text" ? " " + text : "")), sd = !M.senders.length || okSender(from, nm); return M.match === "either" ? sw || (M.senders.length && sd) : M.match === "sender" ? sd : M.match === "subject" ? sw : sw && sd; };
       const partnerOf = (e, name) => { const d = e.split("@")[1] || ""; const k = Object.keys(M.partners).find((p) => d === p || d.endsWith("." + p)); if (k) return M.partners[k]; const base = d.split(".").slice(-2, -1)[0] || ""; return base ? base.charAt(0).toUpperCase() + base.slice(1) : str(name, 40); };
       const rows = await rowsOf(), have = new Set(rows.map((r) => r.mk + "|" + r.imei)), seenMk = new Set(rows.map((r) => r.mk));
       let skipped = { sender: 0, keyword: 0, noImei: 0, dup: 0, mine: 0 }; const fresh = [];
       for (const m of (Array.isArray(b.mails) ? b.mails : []).slice(0, 400)) {
         const from = low(m.from).replace(/^.*<|>.*$/g, ""), text = String(m.text || "").slice(0, 60000), subject = str(m.subject, 200), at = +m.at || Date.parse(m.at) || t;
         if (M.me && from === M.me) { skipped.mine++; continue; }
-        if (!okSender(from)) { skipped.sender++; continue; }
-        if (!kwRe.test(subject + " " + text)) { skipped.keyword++; continue; }
+        if (!matchOk(from, m.fromName, subject, text)) { if (M.senders.length && !okSender(from, m.fromName)) skipped.sender++; else skipped.keyword++; continue; }
         const mk = str(m.key, 120) || (from + "|" + at + "|" + subject).slice(0, 200);
         const ims = [...new Set((text + " " + subject).match(/(?<!\d)\d{15}(?!\d)/g) || [])].filter(luhn);
         if (!ims.length) { skipped.noImei++; continue; }

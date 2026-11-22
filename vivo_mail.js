@@ -43,6 +43,12 @@
     for (var e = hit, k = 0; e && e !== D.body && k < 12; e = e.parentElement, k++) { var r = e.getBoundingClientRect(); chain.push(e.tagName.toLowerCase() + (e.getAttribute("role") ? "[role=" + e.getAttribute("role") + "]" : "") + (e.id ? "#" + e.id.slice(0, 30) : "") + (e.getAttribute("aria-label") ? "[aria=" + e.getAttribute("aria-label").slice(0, 40) + "]" : "") + " " + Math.round(r.width) + "x" + Math.round(r.height)); }
     return "w=" + innerWidth + " roles=" + JSON.stringify(roles) + " chain=" + chain.join(" < ");
   }
+  // does this list row (sender + subject + first line) match the set-up? Only matching rows are opened.
+  function rowMatch(t, F) {
+    t = String(t || "").toLowerCase(); var subj = KW.test(t), snd = !F.senders.length || F.senders.some(function (x) { var k = x.replace(/^@/, ""); return k && t.indexOf(k) >= 0; });
+    return F.mode === "either" ? (subj || (F.senders.length && snd)) : F.mode === "sender" ? snd : F.mode === "subject" ? subj : subj && snd;
+  }
+  function searching() { var sb = searchBox(); return (sb && sb.value && sb.value.trim().length > 1) || /\b(top results|all results|results)\b/i.test(txt(D.body).slice(0, 3000)); }
   function backToList() {
     var b = [].filter.call(D.querySelectorAll("button,[role=button]"), function (e) { var a = (e.getAttribute("aria-label") || e.getAttribute("title") || txt(e)).trim(); return vis(e) && /^(back|go back|close|back to (message )?list|close reading pane)$/i.test(a); })[0];
     if (b) tap(b); else history.back();
@@ -74,7 +80,7 @@
       var S = load();
       if (job && job.mode === "mail" && job.reply && (!S || S.id !== job.id)) { var R0 = job.reply, sj = String(R0.subject || "").replace(/^((re|fw|fwd)\s*:\s*)+/i, "").replace(/["]/g, "").slice(0, 80); S = { id: job.id, reply: R0, q: (R0.from ? "from:" + R0.from + " " : "") + (sj ? '"' + sj + '"' : ""), st: "search", tick: 0, seen: {} }; save(S); }
       if (job && job.kw && job.kw.length) { try { KW = new RegExp(job.kw.map(function (k) { return String(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"); }).join("|"), "i"); } catch (e) { } }
-      if (job && job.mode === "mail" && !job.reply && (!S || S.id !== job.id)) { S = { id: job.id, q: String(job.q || "unblock"), max: Math.min(300, job.max || 60), since: Date.now() - (job.days || 7) * 864e5, st: "search", done0: {}, mails: [], seen: {}, cur: null, tick: 0, idle: 0 }; save(S); }
+      if (job && job.mode === "mail" && !job.reply && (!S || S.id !== job.id)) { S = { flt: { mode: job.match || "both", senders: (job.senders || []).map(function (x) { return String(x).toLowerCase().trim(); }).filter(Boolean) }, research: 0, id: job.id, q: String(job.q || "unblock"), max: Math.min(300, job.max || 60), since: Date.now() - (job.days || 7) * 864e5, st: "search", done0: {}, mails: [], seen: {}, cur: null, tick: 0, idle: 0 }; save(S); }
       if (!S) return out({ s: "err", msg: "No job" });
       if (S.done) return out(S.done);
       var fin = function (s, msg) { S.done = { s: s, mode: "mail", id: S.id, msg: msg, mails: S.mails }; save(S); return out(S.done); };
@@ -119,9 +125,11 @@
           if (S.tick - S.t0 === 20) wide();
           return out({ s: "run", pct: 0, msg: "Waiting for the results list…" });
         }
+        if (!searching() && S.research < 15) { S.research++; S.st = "search"; save(S); return out({ s: "run", pct: pct, msg: "Searching again…" }); }   // Outlook left the search (e.g. after Back)
         var nx = null;
         for (var q = 0; q < L.length && !nx; q++) {
           var e1 = L[q], id1 = idOf(e1); if (S.seen[id1]) continue;
+          if (S.flt && !rowMatch(txt(e1), S.flt)) { S.seen[id1] = 1; S.skipped = (S.skipped || 0) + 1; continue; }   // other sender / subject — not opened
           var d1 = when((txt(e1).match(/(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s+\d{1,2}[-\/.]\d{1,2}([-\/.]\d{2,4})?|\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4}|(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s+\d{1,2}:\d{2}|\b\d{1,2}:\d{2}\s*(am|pm)?\b/i) || [""])[0]);
           if (d1 && d1 < S.since) { S.seen[id1] = 1; S.older = (S.older || 0) + 1; continue; }   // older than the period — not opened
           nx = e1;
@@ -130,11 +138,11 @@
           var sc = L[L.length - 1]; while (sc && sc !== D.body && !(sc.scrollHeight > sc.clientHeight + 10 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
           if (sc && sc !== D.body) sc.scrollTop = sc.scrollTop + sc.clientHeight * 0.9; else W.scrollBy(0, innerHeight * 0.9);
           S.idle++; save(S);
-          if (S.idle > 5) return fin("done", "Read " + S.mails.length + " mails" + (S.older ? " · " + S.older + " older ones skipped" : ""));
+          if (S.idle > 5) return fin("done", "Read " + S.mails.length + " mails" + (S.skipped ? " · " + S.skipped + " other mails not opened" : "") + (S.older ? " · " + S.older + " older ones skipped" : ""));
           return out({ s: "run", pct: pct, msg: "Loading more mails…" });
         }
         S.idle = 0; S.seen[idOf(nx)] = 1; S.cur = { subj: txt(nx).slice(0, 300), row: txt(nx), t0: S.tick, exp: 0 }; tap(nx); S.st = "read"; save(S);
-        return out({ s: "run", pct: pct, msg: "Opening mail " + Object.keys(S.seen).length + "…" });
+        return out({ s: "run", pct: pct, msg: "Opening a matching mail · " + S.mails.length + " read" + (S.skipped ? " · " + S.skipped + " other mails skipped" : "") });
       }
       if (S.st === "read") {
         var p = pane(); if (!p || !bodies(p).length) { p = D.body; if (!bodies(p).length) { if (S.tick - S.cur.t0 > 12) { S.st = items().length ? "list" : "back"; S.t0 = S.tick; save(S); } return out({ s: "run", pct: pct, msg: "Opening the mail…" }); } }

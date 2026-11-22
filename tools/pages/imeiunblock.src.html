@@ -306,11 +306,15 @@
     sheet("✉️ Mail set-up", "Which Outlook mails count as unblock requests", [["💾", "Save", function (ov) {
       var g = function (id) { return ov.querySelector("#" + id).value; }, P = {};
       g("mp").split(/\n+/).forEach(function (l) { var m = l.split(/\s*[=:,]\s*/); if (m[0] && m[1]) P[m[0].trim()] = m.slice(1).join(" ").trim(); });
-      api({ action: "iub-mail-cfg", save: true, cfg: { me: g("mme"), senders: g("ms"), keywords: g("mk"), partners: P, days: g("md"), max: g("mx"), ai: ov.querySelector("#mai").checked } }).then(function (r) { if (!r.ok) return toast(r.error); MCFG = r.cfg; toast("Saved"); });
+      var mt = ov.querySelector("input[name=mmt]:checked"), scp = ov.querySelector("input[name=msc]:checked");
+      api({ action: "iub-mail-cfg", save: true, cfg: { match: mt ? mt.value : "both", scope: scp ? scp.value : "text", me: g("mme"), senders: g("ms"), keywords: g("mk"), partners: P, days: g("md"), max: g("mx"), ai: ov.querySelector("#mai").checked } }).then(function (r) { if (!r.ok) return toast(r.error); MCFG = r.cfg; toast("Saved"); });
     }, "pri"]],
       '<label class="lb">Your e-mail (your own replies are skipped)</label><input class="tx" id="mme" value="' + esc(C.me || "") + '" placeholder="dishant.goyal@vivo.in">' +
-      '<label class="lb">Senders — e-mail IDs or @domains, one per line <small class="muted">empty = anyone</small></label><textarea class="tx" id="ms" rows="5" placeholder="edc.techops@paytmpayments.com&#10;@paytmpayments.com&#10;@tvscredit.com">' + esc((C.senders || []).join("\n")) + "</textarea>" +
-      '<label class="lb">Words that make it an unblock request <small class="muted">any one is enough</small></label><input class="tx" id="mk" value="' + esc((C.keywords || []).join(", ")) + '">' +
+      '<label class="lb">Which mails to open</label>' + [["both", "Sender AND subject word both match", "best — skips ads and other mails"], ["either", "Sender OR subject word", "catches more, may open a few extra"], ["subject", "Only the subject words", "any sender"], ["sender", "Only the senders", "every mail from them"]].map(function (o) { return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:6px 0"><input type="radio" name="mmt" value="' + o[0] + '"' + ((C.match || "both") === o[0] ? " checked" : "") + '><span><b>' + o[1] + '</b> <small class="muted">' + o[2] + "</small></span></label>"; }).join("") +
+      '<label class="lb">Senders — e-mail IDs, @domains or names as Outlook shows them, one per line</label><textarea class="tx" id="ms" rows="5" placeholder="edc.techops@paytmpayments.com&#10;@paytmpayments.com&#10;@tvscredit.com">' + esc((C.senders || []).join("\n")) + "</textarea>" +
+      '<label class="lb">Subject words <small class="muted">any one is enough</small></label><input class="tx" id="mk" value="' + esc((C.keywords || []).join(", ")) + '">' +
+      '<div style="display:flex;gap:14px;font-size:12.5px;margin-top:6px"><label><input type="radio" name="msc" value="subject"' + (C.scope === "subject" ? " checked" : "") + '> in the subject only</label><label><input type="radio" name="msc" value="text"' + (C.scope !== "subject" ? " checked" : "") + '> in the subject or mail text</label></div>' +
+      '<div class="help" style="font-size:12px;margin-top:6px">In the Outlook list the tool sees the sender, subject and first line. Mails that don\'t match are <b>not opened</b>. People inside vivo show by name in Outlook — add their name (e.g. Rama Shankar) as a sender.</div>' +
       '<label class="lb">Partner names by domain <small class="muted">domain = Partner, one per line</small></label><textarea class="tx" id="mp" rows="5">' + esc(Object.keys(C.partners || {}).map(function (k) { return k + " = " + C.partners[k]; }).join("\n")) + "</textarea>" +
       '<div class="g2"><div><label class="lb">Read mails of the last (days)</label><input class="tx" id="md" type="number" value="' + (C.days || 7) + '"></div><div><label class="lb">At most (mails per read)</label><input class="tx" id="mx" type="number" value="' + (C.max || 60) + '"></div></div>' +
       '<label style="display:flex;gap:8px;font-size:13px;margin-top:10px"><input type="checkbox" id="mai"' + (C.ai !== false ? " checked" : "") + "> AI writes the short remark (else the sentence with the request word)</label>" +
@@ -319,7 +323,7 @@
   function mlQuery() { var K = (MCFG && MCFG.keywords && MCFG.keywords.length ? MCFG.keywords : ["unblock", "unflag", "release", "rollback"]).filter(function (k) { return !/\s/.test(k); }).slice(0, 8); return K.join(" OR "); }
   // ---- read Outlook: app window, or a bookmark on Outlook web on a computer ----
   function mlRead() {
-    var job = { id: mrid("mr"), mode: "mail", q: mlQuery(), kw: (MCFG && MCFG.keywords) || [], max: (MCFG && MCFG.max) || 60, days: (MCFG && MCFG.days) || 7 };
+    var job = { id: mrid("mr"), mode: "mail", q: mlQuery(), kw: (MCFG && MCFG.keywords) || [], senders: (MCFG && MCFG.senders) || [], match: (MCFG && MCFG.match) || "both", max: (MCFG && MCFG.max) || 60, days: (MCFG && MCFG.days) || 7 };
     if (BB) { var r = BB.run(JSON.stringify(job), "https://outlook.office.com/mail/"); if (r !== "ok") toast(r === "busy" ? "Another portal window is open" : r === "bad" ? "Update the vivo BI app to 7.9 to read Outlook" : "Couldn't open Outlook (" + r + ")"); return; }
     mlDesk(job, "/vivo_mail.js", "__biMailRun", "Outlook on the web (outlook.office.com)");
   }
