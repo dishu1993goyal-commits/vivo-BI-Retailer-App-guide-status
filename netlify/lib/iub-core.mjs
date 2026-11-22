@@ -354,10 +354,11 @@ export async function iubAction(b, ctx) {
       const matchOk = (from, nm, subject, text) => { const sw = kwRe.test(subject + (M.scope === "text" ? " " + text : "")), sd = !M.senders.length || okSender(from, nm); return M.match === "either" ? sw || (M.senders.length && sd) : M.match === "sender" ? sd : M.match === "subject" ? sw : sw && sd; };
       const partnerOf = (e, name) => { const d = e.split("@")[1] || ""; const k = Object.keys(M.partners).find((p) => d === p || d.endsWith("." + p)); if (k) return M.partners[k]; const base = d.split(".").slice(-2, -1)[0] || ""; return base ? base.charAt(0).toUpperCase() + base.slice(1) : str(name, 40); };
       const rows = await rowsOf(), have = new Set(rows.map((r) => r.mk + "|" + r.imei)), seenMk = new Set(rows.map((r) => r.mk));
-      let skipped = { sender: 0, keyword: 0, noImei: 0, dup: 0, mine: 0 }; const fresh = [];
+      let skipped = { sender: 0, keyword: 0, noImei: 0, dup: 0, mine: 0, old: 0 }; const since = t - M.days * 864e5 - 36e5; const fresh = [];
       for (const m of (Array.isArray(b.mails) ? b.mails : []).slice(0, 400)) {
         const from = low(m.from).replace(/^.*<|>.*$/g, ""), text = String(m.text || "").slice(0, 60000), subject = str(m.subject, 200), at = +m.at || Date.parse(m.at) || t;
         if (M.me && from === M.me) { skipped.mine++; continue; }
+        if (!b.manual && at < since) { skipped.old++; continue; }   // older than the set-up period
         if (!matchOk(from, m.fromName, subject, text)) { if (M.senders.length && !okSender(from, m.fromName)) skipped.sender++; else skipped.keyword++; continue; }
         const mk = str(m.key, 120) || (from + "|" + at + "|" + subject).slice(0, 200);
         const ims = [...new Set((text + " " + subject).match(/(?<!\d)\d{15}(?!\d)/g) || [])].filter(luhn);

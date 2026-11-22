@@ -343,7 +343,7 @@
     if (r.mode === "mail" && r.mails && !(r.s === "err" && r.diag && !r.mails.length)) {
       if (!r.mails.length) return toast(r.msg || "No mails read");
       toast("Reading " + r.mails.length + " mails…");
-      return api({ action: "iub-mail-add", mails: r.mails }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var k = x.skipped; sheet("📥 " + x.added + " new IMEI rows", "From " + x.mails + " mail(s)", [], '<div class="help">Read ' + r.mails.length + " mail(s). Skipped: " + k.sender + " other senders · " + k.keyword + " without an unblock word · " + k.noImei + " without a valid IMEI · " + k.dup + " already listed · " + k.mine + " your own.</div>"); MF.st = "new"; MSEL = {}; if (TAB === "mail") mlDraw(); });
+      return api({ action: "iub-mail-add", mails: r.mails, manual: !!r.manual }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var k = x.skipped; sheet("📥 " + x.added + " new IMEI rows", "From " + x.mails + " mail(s)", [], '<div class="help">Read ' + r.mails.length + " mail(s). Skipped: " + k.sender + " other senders · " + k.keyword + " without an unblock word · " + k.noImei + " without a valid IMEI · " + k.dup + " already listed · " + k.mine + " your own" + (k.old ? " · " + k.old + " older than " + ((MCFG && MCFG.days) || 7) + " days" : "") + ".</div>"); MF.st = "new"; MSEL = {}; if (TAB === "mail") mlDraw(); });
     }
     if (r.mode === "imq" && r.res) {
       return api({ action: "iub-mail-chk", res: r.res }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var v = Object.keys(r.res).map(function (k) { return r.res[k]; }); toast("🔍 " + v.length + " checked · " + v.filter(function (y) { return y.found && !y.act; }).length + " not activated · " + v.filter(function (y) { return y.found && y.act; }).length + " activated · " + v.filter(function (y) { return !y.found; }).length + " not found"); MF.st = "not_activated"; MSEL = {}; if (TAB === "mail") mlDraw(); });
@@ -405,7 +405,7 @@
     sheet("📋 Paste or upload mails", "Each block becomes one mail", [["➕", "Add", function (ov) {
       var mails = [], from = ov.querySelector("#pf").value.trim(), subj = ov.querySelector("#ps").value.trim(), t = ov.querySelector("#pt").value;
       if (t.trim()) t.split(/\n\s*-{3,}\s*\n/).forEach(function (blk, i) { var fm = blk.match(/from:\s*[^\n]*?([\w.%+'-]+@[\w.-]+\.\w+)/i), sm = blk.match(/subject:\s*([^\n]+)/i); mails.push({ key: "paste|" + Date.now() + "|" + i, from: (fm && fm[1]) || from, at: Date.now(), subject: (sm && sm[1]) || subj || "Pasted mail", text: blk }); });
-      var go = function (M) { if (!M.length) return toast("Paste a mail or choose .eml files"); if (M.some(function (m) { return !m.from; })) return toast("Type the sender e-mail"); mlGot({ mode: "mail", mails: M }); };
+      var go = function (M) { if (!M.length) return toast("Paste a mail or choose .eml files"); if (M.some(function (m) { return !m.from; })) return toast("Type the sender e-mail"); mlGot({ mode: "mail", mails: M, manual: true }); };
       var fs = ov.querySelector("#pe").files; if (!fs.length) return go(mails);
       Promise.all([].map.call(fs, function (f) { return f.text().then(emlParse); })).then(function (E) { go(mails.concat(E.filter(Boolean))); });
     }, "pri"]],

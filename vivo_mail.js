@@ -13,14 +13,26 @@
   function load() { try { return JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
   function save(S) { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
   function out(o) { return JSON.stringify(o); }
-  function when(s) {   // Outlook header dates: "Thu 19-11-2026 10:45", "Mon 11/16/2026 6:05 PM", "19 November 2026 10:45", "Yesterday 18:02", "10:45"
-    s = String(s || ""); var now = new Date(), m;
-    if ((m = s.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i))) { var a = +m[1], b = +m[2], day = b > 12 ? b : a, mon = b > 12 ? a : b, h = +m[4]; if (m[6]) h = h % 12 + (/pm/i.test(m[6]) ? 12 : 0); return new Date(+m[3], mon - 1, day, h, +m[5]).getTime(); }
-    if ((m = s.match(/\b(\d{1,2})[-\/.](\d{1,2})\b(?![-\/.]\d)/)) && !/:/.test(s.slice(m.index - 1, m.index))) { var dd = new Date(now.getFullYear(), +m[2] - 1, +m[1]); if (dd - now > 864e5) dd.setFullYear(dd.getFullYear() - 1); return dd.getTime(); }
-    if ((m = s.match(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s+(\d{1,2}):(\d{2})/i))) { var wd = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(m[1].slice(0, 3).toLowerCase()), d2 = new Date(now); d2.setHours(+m[2], +m[3], 0, 0); while (d2.getDay() !== wd || d2 > now) d2.setDate(d2.getDate() - 1); return d2.getTime(); }
-    var t = Date.parse(s.replace(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s*/i, "")); if (!isNaN(t)) return t;
-    if ((m = s.match(/(yesterday|today)?\s*(\d{1,2}):(\d{2})\s*(AM|PM)?/i))) { var d0 = new Date(now); if (/yesterday/i.test(m[1] || "")) d0.setDate(d0.getDate() - 1); var hh = +m[2] % 12 + (/pm/i.test(m[4] || "") ? 12 : 0); if (!m[4]) hh = +m[2]; d0.setHours(hh, +m[3], 0, 0); return d0.getTime(); }
+  // Dates as Outlook shows them → time in ms (0 = not a date). Day comes before month (India), unless that's impossible.
+  var MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  var DATE_RE = /\b\d{1,2}[-\/.]\d{1,2}[-\/.]\d{2,4}(?:,?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?)?|\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?(?:\s+\d{4})?(?:,?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?)?|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:,?\s+\d{4})?(?:,?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?)?|\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+\d{1,2}[-\/.]\d{1,2}\b(?![-\/.:]\d)|\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+\d{1,2}:\d{2}(?:\s*[AP]M)?|\b(?:yesterday|today)(?:\s+\d{1,2}:\d{2}(?:\s*[AP]M)?)?|\b\d{1,2}:\d{2}\s*(?:[AP]M)?\b|\b\d{1,2}[-\/.]\d{1,2}\b(?![-\/.:]\d)/i;
+  function when(s) {
+    s = String(s || "").trim(); var now = new Date(), m, Y = now.getFullYear();
+    var hm = function (str) { var x = String(str).match(/(\d{1,2}):(\d{2})\s*([AP]M)?/i); if (!x) return [12, 0]; var h = +x[1]; if (x[3]) h = h % 12 + (/pm/i.test(x[3]) ? 12 : 0); return [h, +x[2]]; };
+    var fix = function (d) { if (d - now > 2 * 864e5) d.setFullYear(d.getFullYear() - 1); return d.getTime(); };   // a date without a year can't be in the future
+    if ((m = s.match(/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) { var a = +m[1], b = +m[2], y = +m[3] < 100 ? 2000 + +m[3] : +m[3], day = a > 12 ? a : b > 12 ? b : a, mon = a > 12 ? b : b > 12 ? a : b, t1 = hm(s.slice(m.index + m[0].length)); return new Date(y, mon - 1, day, t1[0], t1[1]).getTime(); }
+    if ((m = s.match(/(\d{1,2})\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?(?:\s+(\d{4}))?/i)) || (m = s.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:,?\s+(\d{4}))?/i))) {
+      var isDM = /^\d/.test(m[1]), dd = isDM ? +m[1] : +m[2], mm = MON[(isDM ? m[2] : m[1]).slice(0, 3).toLowerCase()], t2 = hm(s.slice(m.index + m[0].length)), d = new Date(m[3] ? +m[3] : Y, mm, dd, t2[0], t2[1]);
+      return m[3] ? d.getTime() : fix(d);
+    }
+    if ((m = s.match(/(\d{1,2})[-\/.](\d{1,2})(?![-\/.:]\d)/))) { var p = +m[1], q = +m[2], d3 = new Date(Y, (p > 12 ? q : q > 12 ? p : q) - 1, p > 12 ? p : q > 12 ? q : p, 12, 0); return fix(d3); }
+    if ((m = s.match(/(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+(\d{1,2}):(\d{2})/i))) { var wd = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"].indexOf(m[1].slice(0, 3).toLowerCase()), t3 = hm(s), d2 = new Date(now); d2.setHours(t3[0], t3[1], 0, 0); for (var k = 0; k < 8 && (d2.getDay() !== wd || d2 > now); k++) d2.setDate(d2.getDate() - 1); return d2.getTime(); }
+    if ((m = s.match(/(yesterday|today)/i)) || (m = s.match(/^\s*\d{1,2}:\d{2}/))) { var d0 = new Date(now), t4 = hm(s); if (/yesterday/i.test(m[0])) d0.setDate(d0.getDate() - 1); d0.setHours(t4[0], t4[1], 0, 0); return d0.getTime(); }
     return 0;
+  }
+  function dateIn(t) {   // the date shown in a list row / mail header (looks at the first lines first, where Outlook puts it)
+    var L = String(t || "").split(/\n/), head = L.slice(0, 3).join("\n"), m = head.match(DATE_RE) || String(t || "").match(DATE_RE);
+    return m ? when(m[0]) : 0;
   }
   function searchBox() { return [].filter.call(D.querySelectorAll("#topSearchInput,input[aria-label*='Search' i],input[placeholder*='Search' i]"), vis)[0] || null; }
   var KW = /unblock|unflag|release|roll\s*back|unbock/i;
@@ -72,8 +84,7 @@
       var box = b, head = "";
       for (var i = 0; i < 8 && box.parentElement && box !== p; i++) { box = box.parentElement; head = txt(box).replace(txt(b), ""); if (EM.test(head)) break; }
       var from = (head.match(EM) || [""])[0].toLowerCase(), nm = (head.split(/\n/).map(function (x) { return x.trim(); }).filter(function (x) { return x && !/^(to|cc|from)\b/i.test(x); })[0] || "").replace(/<.*$/, "").trim();
-      var dl = head.match(/(mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+[^\n]{6,30}|\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4}\s+\d{1,2}:\d{2}(\s*[AP]M)?|(yesterday|today)\s+\d{1,2}:\d{2}(\s*[AP]M)?/i);
-      var at = (dl && when(dl[0])) || fallbackAt || Date.now();
+      var dm = head.match(DATE_RE), at = (dm && when(dm[0])) || fallbackAt || 0;
       out.push({ key: (from + "|" + at + "|" + subject).slice(0, 200), from: from, fromName: nm.slice(0, 60), at: at, subject: subject, text: txt(b).slice(0, 6000) });
     });
     return out;
@@ -148,7 +159,7 @@
         for (var q = 0; q < L.length && !nx; q++) {
           var e1 = L[q], id1 = idOf(e1); if (S.seen[id1]) continue;
           if (S.flt && !rowMatch(txt(e1), S.flt)) { S.seen[id1] = 1; S.skipped = (S.skipped || 0) + 1; continue; }   // other sender / subject — not opened
-          var d1 = when((txt(e1).match(/(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s+\d{1,2}[-\/.]\d{1,2}([-\/.]\d{2,4})?|\d{1,2}[-\/.]\d{1,2}[-\/.]\d{4}|(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s+\d{1,2}:\d{2}|\b\d{1,2}:\d{2}\s*(am|pm)?\b/i) || [""])[0]);
+          var d1 = dateIn(txt(e1));
           if (d1 && d1 < S.since) { S.seen[id1] = 1; S.older = (S.older || 0) + 1; continue; }   // older than the period — not opened
           nx = e1;
         }
@@ -168,7 +179,8 @@
         var subjEl = p.querySelector("[role=heading],h1,h2,[id*='Subject'],[class*='subject' i]"), subject = (subjEl ? txt(subjEl) : S.cur.subj).slice(0, 200);
         var got = readPane(subject, 0, p), old = 0, rowFrom = (S.cur.row.match(EM) || [""])[0].toLowerCase();
         got.forEach(function (m) { if (!m.from) { var t1 = p.querySelector("[title*='@']"); m.from = t1 ? ((t1.getAttribute("title").match(EM) || [""])[0]).toLowerCase() : rowFrom; m.key = (m.from + "|" + m.at + "|" + subject).slice(0, 200); } });
-        got.forEach(function (m) { if (m.at && m.at < S.since) { old++; return; } if (!S.done0[m.key]) { S.done0[m.key] = 1; S.mails.push(m); } });
+        var rowAt = dateIn(S.cur.row);
+        got.forEach(function (m) { if (!m.at) m.at = rowAt; if (!m.at) { S.nodate = (S.nodate || 0) + 1; m.at = Date.now(); } if (m.at < S.since) { old++; return; } if (!S.done0[m.key]) { S.done0[m.key] = 1; S.mails.push(m); } });
         if (got.length && old === got.length) S.oldRun = (S.oldRun || 0) + 1; else S.oldRun = 0;
         if (items().length) S.st = "list"; else { S.st = "back"; S.t0 = S.tick; }
         save(S);
