@@ -514,6 +514,18 @@ export const LINK_CATALOG = {
 ],
 "tabs": []
 },
+"promostudio.html": {
+"id": "promostudio",
+"icon": "📣",
+"name": "Offer & promo creatives (AI)",
+"ho": false,
+"acts": [
+"ar-job",
+"ar-job-get",
+"tl-use"
+],
+"tabs": []
+},
 "deckstudio.html": {
 "id": "deckstudio",
 "icon": "🎬",

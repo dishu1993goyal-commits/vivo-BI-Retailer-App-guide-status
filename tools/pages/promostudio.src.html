@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offer & promo creatives</title>
+<style>
+/*@@CSS@@*/
+.guide-a{color:#fff;text-decoration:none;font-size:12px;border:1px solid rgba(255,255,255,.5);border-radius:99px;padding:3px 10px}
+.pv{background:var(--card);border-radius:16px;padding:14px;margin-top:10px;box-shadow:0 1px 8px rgba(20,24,51,.06);border:1px solid #EEF0F6}
+.pv h3{margin:0 0 2px;font-size:15.5px}.pv .best{color:var(--mut);font-size:12.5px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}@media(max-width:560px){.g2,.g3{grid-template-columns:1fr}}
+.row2{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.lay{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}@media(max-width:900px){.lay{grid-template-columns:1fr}}
+.stick{position:sticky;top:8px}
+.prev{position:relative;overflow:hidden;border-radius:12px;box-shadow:0 4px 20px rgba(20,24,51,.15);background:#fff;margin-top:8px}
+.prev>div{transform-origin:0 0;position:absolute;left:0;top:0}
+.ths{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:8px}
+.ths button{border:2px solid transparent;border-radius:12px;padding:0;overflow:hidden;cursor:pointer;background:#fff;height:120px;position:relative}
+.ths button.on{border-color:#12163A}.ths button>div{transform-origin:0 0;position:absolute;left:0;top:0;pointer-events:none}
+.ths button span{position:absolute;left:0;right:0;bottom:0;background:rgba(255,255,255,.92);font-size:10.5px;font-weight:800;padding:3px}
+.seg{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.seg button{border:0;background:#EEF0F6;border-radius:99px;padding:8px 12px;font:inherit;font-weight:800;font-size:12.5px;cursor:pointer}.seg button.on{background:#12163A;color:#fff}
+.pic{display:flex;align-items:center;gap:8px;background:#F3F4FA;border-radius:12px;padding:6px 8px;margin-top:6px;font-size:12.5px}
+.pic img{width:54px;height:40px;object-fit:cover;border-radius:6px}.pic select{flex:1;min-width:0}.pic button{border:0;background:#fff;border-radius:99px;width:24px;height:24px;cursor:pointer}
+.fx{border-left:3px solid #E09B10;background:#FFF8E8;border-radius:10px;padding:8px 10px;margin-top:8px;font-size:12.5px}
+.ok{border-left-color:#2E9D6A;background:#EEF8F2}
+.prog{height:6px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;background:#3F5BFF;width:0;transition:width .5s}
+.hint{font-size:12px;color:var(--mut);margin-top:3px}
+details.ed{margin-top:8px;border:1px solid #EEF0F6;border-radius:12px;padding:6px 10px}details.ed summary{font-weight:800;font-size:13.5px;cursor:pointer;padding:4px 0}
+details.ed textarea.tx{font-size:13px}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#promostudio">📘 How to</a></div>
+  <h1>📣 Offer & promo creatives</h1><p>Offer mailers, posters, posts and status creatives in the BI promotion style — AI writes the words from your offer facts, you pick the look</p>
+</div>
+<div class="wrap" id="view"></div>
+<script src="/deck/deck-engine.js?v=2"></script>
+<script src="/deck/creative-engine.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var KEY = "promostudio:draft", C = window.BICREATIVE, VIEW = $("view");
+  var D = ls(KEY) || {};
+  D.brief = D.brief || { facts: "", aud: "Customers", lang: "English", tone: "Premium & clear" };
+  D.IM = D.IM || {}; D.fmt = D.fmt || "newsletter"; D.theme = D.theme || "magenta"; D.spec = D.spec || null; D.conf = !!D.conf;
+  function save() { try { ls(KEY, D); } catch (e) { try { var c = JSON.parse(JSON.stringify(D)); c.IM = {}; ls(KEY, c); toast("Pictures are too big to keep after closing — the rest is saved"); } catch (e2) { } } }
+  function lib(src, test) { return test() ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load " + src)); }; document.head.appendChild(s); }); }
+  function libI() { return lib("/vendor/html-to-image.js", function () { return !!window.htmlToImage; }).then(function () { return lib("/vendor/jspdf/jspdf.umd.min.js", function () { return !!(window.jspdf && window.jspdf.jsPDF); }); }); }
+  function nextId(o) { var i = 1; while (o["I" + i]) i++; return "I" + i; }
+  function shrink(u, max, cb) { var im = new Image(); im.onload = function () { var k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); cb(c.toDataURL("image/jpeg", 0.88)); }; im.src = u; }
+  function parseJ(t) { var s = String(t || "").replace(/```(json)?/g, ""), a = s.indexOf("{"), b = s.lastIndexOf("}"); if (a < 0 || b < a) throw new Error("The AI didn't return a creative — try again"); return JSON.parse(s.slice(a, b + 1)); }
+  function job(req, onTick) {
+    req.sensitive = !!D.conf;
+    return api({ action: "ar-job", req: req }).then(function (r) {
+      if (!r.ok) throw new Error(r.error || "AI is not available");
+      var t0 = Date.now();
+      return new Promise(function (res, rej) { (function poll() { api({ action: "ar-job-get", job: r.job }).then(function (g) {
+        if (!g.ok) return rej(new Error(g.error));
+        if (g.st === "done") { if (!g.res || !g.res.ok) return rej(new Error((g.res && g.res.error) || "AI couldn't finish")); return res(g.res); }
+        if (Date.now() - t0 > 240000) return rej(new Error("The AI is taking too long — try again"));
+        if (onTick) onTick(Date.now() - t0); setTimeout(poll, 2000); }); })(); });
+    });
+  }
+  function roleOf(id) { var s = D.spec || {}; if (s.hero === id) return "hero"; if (s.banner === id) return "banner"; if (((s.screens || {}).items || []).some(function (q) { return q.img === id; })) return "screen"; return ""; }
+  function setRole(id, role) {
+    var s = D.spec = D.spec || {}; if (s.hero === id) delete s.hero; if (s.banner === id) delete s.banner;
+    s.screens = s.screens || { kicker: "Inside the app", title: "What you will see", items: [] }; s.screens.items = (s.screens.items || []).filter(function (q) { return q.img !== id; });
+    if (role === "hero") s.hero = id; else if (role === "banner") s.banner = id; else if (role === "screen" && s.screens.items.length < 3) s.screens.items.push({ img: id, label: D.IM[id].name });
+  }
+
+  // ---------- page ----------
+  function draw() {
+    var b = D.brief, ims = Object.keys(D.IM);
+    VIEW.innerHTML = '<div class="lay"><div>' +
+      '<div class="pv"><h3>1 · What are you promoting?</h3><div class="best">Write the real facts — offer, who gets it, amounts, dates, how to avail, T&C. The AI only uses what you write here; anything you leave out stays out.</div>' +
+      '<textarea class="tx" id="bf" rows="8" placeholder="e.g. Student offer on vivo X500 series and V-series. Verified students get special price + Easy EMI from partners. Retailer opens vivo Retailer App → Special Offers → Student tab, uploads front & back of student ID, enters IMEI, books EMI. Valid at all vivo retailers till 31 Dec. Working professionals: Corporate offer with official e-mail OTP. T&C apply.">' + esc(b.facts) + "</textarea>" +
+      '<div class="g3"><div><label class="lb">For</label><select class="tx" id="ba">' + ["Customers", "Retailers", "Sales team & promoters", "Employees (internal)"].map(function (x) { return "<option" + (x === b.aud ? " selected" : "") + ">" + x + "</option>"; }).join("") + '</select></div><div><label class="lb">Language</label><select class="tx" id="bl">' + ["English", "Hindi", "Hinglish"].map(function (x) { return "<option" + (x === b.lang ? " selected" : "") + ">" + x + "</option>"; }).join("") + '</select></div><div><label class="lb">Feel</label><select class="tx" id="bt">' + ["Premium & clear", "Youthful & energetic", "Festive", "Corporate & formal"].map(function (x) { return "<option" + (x === b.tone ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="sw" style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:8px"><input type="checkbox" id="bc"' + (D.conf ? " checked" : "") + "> 🔒 Confidential (only AI providers HO marked OK)</label>" +
+      '<div class="row2"><button class="btn pri" id="bw">' + (D.spec && D.spec.h1 ? "↻ Write again" : "✨ Write the creative") + '</button><span class="hint" id="bm"></span></div><div class="prog" id="bp" style="display:none"><i></i></div></div>' +
+      '<div class="pv"><h3>🖼 Pictures</h3><div class="best">Product shot (top), a banner, and up to 3 app screenshots — use your own approved visuals.</div>' +
+      ims.map(function (id) { var r = roleOf(id); return '<div class="pic"><img src="' + D.IM[id].url + '"><select class="tx" data-role="' + id + '"><option value="">Not used</option><option value="hero"' + (r === "hero" ? " selected" : "") + '>Product (top)</option><option value="banner"' + (r === "banner" ? " selected" : "") + '>Banner (middle)</option><option value="screen"' + (r === "screen" ? " selected" : "") + '>App screen</option></select><button data-del="' + id + '">✕</button></div>'; }).join("") +
+      '<div class="row2"><input type="file" id="pf" accept="image/*" multiple style="display:none"><button class="btn ghost sm" id="pa">🖼 Add pictures</button></div></div>' +
+      (D.spec && D.spec.h1 ? edits() : "") +
+      '</div><div class="stick">' +
+      (D.spec && D.spec.h1 ? '<div class="pv"><h3>2 · Pick the look</h3><div class="seg" id="fm">' + Object.keys(C.FMT).map(function (k) { return '<button data-f="' + k + '" class="' + (k === D.fmt ? "on" : "") + '">' + C.FMT[k].name + "</button>"; }).join("") + '</div><div class="ths" id="ths">' + Object.keys(C.TH).map(function (k) { return '<button data-t="' + k + '" class="' + (k === D.theme ? "on" : "") + '"><div></div><span>' + C.TH[k].name + "</span></button>"; }).join("") + "</div>" +
+        '<div id="nc"></div><div class="prev" id="pv"><div></div></div>' +
+        '<div class="row2"><button class="btn pri sm" data-x="png">⬇ PNG</button><button class="btn ghost sm" data-x="jpg">JPG</button><button class="btn ghost sm" data-x="pdf">PDF</button><button class="btn ghost sm" data-x="all">All 4 sizes</button>' + (navigator.share ? '<button class="btn ghost sm" data-x="share">📲 Share</button>' : "") + '</div><div class="hint" id="xm"></div>' +
+        '<div class="row2"><button class="btn ghost sm" id="sj">🗂 Save draft file</button><input type="file" id="oj" accept=".json" style="display:none"><button class="btn ghost sm" id="ob">📂 Open draft</button><button class="btn ghost sm" id="nw">🆕 New</button></div></div>'
+        : '<div class="pv"><h3>Preview</h3><div class="best">Write your offer facts and tap ✨ — the creative appears here in 7 looks and 4 sizes: mailer, square post, status and A4 poster.</div></div>') +
+      "</div></div>";
+    wire(); if (D.spec && D.spec.h1) { thumbs(); preview(); }
+  }
+  function lines(a, f) { return (a || []).map(f).join("\n"); }
+  function edits() {
+    var s = D.spec, bi = (s.benefits || {}), st = (s.steps || {}), el = (s.eligibility || {}), co = s.callout || {}, ct = s.cta || {};
+    var ta = function (k, label, val, rows, hint) { return '<label class="lb">' + label + '</label><textarea class="tx" rows="' + (rows || 3) + '" data-e="' + k + '">' + esc(val) + "</textarea>" + (hint ? '<div class="hint">' + hint + "</div>" : ""); };
+    var tx = function (k, label, val) { return '<div><label class="lb">' + label + '</label><input class="tx" data-e="' + k + '" value="' + esc(val || "") + '"></div>'; };
+    return '<div class="pv"><h3>✏️ Words</h3><div class="best">Change anything — the preview updates as you type. Leave a box empty to hide that part.</div>' +
+      '<details class="ed" open><summary>Top</summary><div class="g2">' + tx("tag", "Tag", s.tag) + tx("brand", "Brand", s.brand || "vivo") + "</div><div class=\"g2\">" + tx("h1", "Headline", s.h1) + tx("h2", "Headline line 2 (accent colour)", s.h2) + "</div>" + tx("sub", "One line under it", s.sub) + ta("chips", "Chips (one per line)", lines(s.chips, String), 3) + ta("stats", "Big numbers — value | label (up to 3)", lines(s.stats, function (q) { return q.value + " | " + q.label; }), 3) + "</details>" +
+      '<details class="ed"><summary>Why you will love it</summary>' + tx("benefits.title", "Heading", bi.title) + ta("benefits", "emoji | title | line (3 or 6)", lines(bi.items, function (q) { return [q.emoji || "", q.title || "", q.text || ""].join(" | "); }), 6) + "</details>" +
+      '<details class="ed"><summary>How to avail</summary>' + tx("steps.title", "Heading", st.title) + ta("steps", "title | line | emoji (in order)", lines(st.items, function (q) { return [q.title || "", q.text || "", q.emoji || ""].join(" | "); }), 6) + "</details>" +
+      '<details class="ed"><summary>Who can avail · note · ending</summary>' + ta("elig", "Who can avail (one per line)", lines(el.items, String), 2) + tx("callout", "Note box — emoji | title | line", co.title ? [co.emoji || "", co.title, co.text || ""].join(" | ") : "") +
+      tx("cta.title", "Ending headline", ct.title) + tx("cta.sub", "Ending line", ct.sub) + ta("cta.chips", "Ending chips (one per line)", lines(ct.chips, String), 2) + tx("tnc", "T&C line", s.tnc) +
+      tx("screens.title", "App screens heading", (s.screens || {}).title) + "</details></div>";
+  }
+  function readEdits() {
+    var s = D.spec, sp = function (v) { return v.split("|").map(function (x) { return x.trim(); }); }, ls2 = function (v) { return v.split(/\n/).map(function (x) { return x.trim(); }).filter(Boolean); };
+    [].forEach.call(VIEW.querySelectorAll("[data-e]"), function (el) {
+      var k = el.dataset.e, v = el.value;
+      if (k === "chips") s.chips = ls2(v);
+      else if (k === "stats") s.stats = ls2(v).map(function (l) { var p = sp(l); return { value: p[0], label: p[1] || "" }; }).slice(0, 3);
+      else if (k === "benefits") { s.benefits = s.benefits || {}; s.benefits.items = ls2(v).map(function (l) { var p = sp(l); return p.length === 1 ? { title: p[0] } : { emoji: p[0], title: p[1], text: p[2] || "" }; }); }
+      else if (k === "steps") { s.steps = s.steps || {}; s.steps.items = ls2(v).map(function (l) { var p = sp(l); return { title: p[0], text: p[1] || "", emoji: p[2] || "" }; }); }
+      else if (k === "elig") { s.eligibility = s.eligibility || { kicker: "Eligibility", title: "Who can avail" }; s.eligibility.items = ls2(v); }
+      else if (k === "callout") { var p = sp(v); s.callout = p[1] ? { emoji: p[0], title: p[1], text: p[2] || "" } : p[0] ? { title: p[0] } : null; }
+      else if (k === "cta.chips") { s.cta = s.cta || {}; s.cta.chips = ls2(v); }
+      else if (k.indexOf(".") > 0) { var a = k.split("."); s[a[0]] = s[a[0]] || {}; s[a[0]][a[1]] = v.trim(); }
+      else s[k] = v.trim();
+    });
+  }
+  function fitPrev(box, w, h) { var inner = box.firstChild, k = box.clientWidth / w; inner.style.transform = "scale(" + k + ")"; box.style.height = Math.round(h * k) + "px"; }
+  function thumbs() {
+    [].forEach.call(VIEW.querySelectorAll("#ths button"), function (b) {
+      var host = b.firstChild; host.innerHTML = C.render(D.spec, "newsletter", b.dataset.t, D.IM); host.style.transform = "scale(" + (b.clientWidth / 1080) + ")";
+    });
+  }
+  var PT;
+  function preview() {
+    var box = $("pv"); if (!box) return; var F = C.FMT[D.fmt];
+    C.mount(box.firstChild, D.spec, D.fmt, D.theme, D.IM).then(function (el) { fitPrev(box, F.w, F.h || el.scrollHeight); });
+    var al = BIDECK.allowedSet({ text: D.brief.facts, DS: {} }), bad = BIDECK.numCheck({ bullets: C.texts(D.spec) }, al);
+    $("nc").innerHTML = bad.length ? '<div class="fx">⚠ Not in your offer facts: <b>' + esc(bad.join(", ")) + "</b> — correct it or add it to the facts before sharing.</div>" : '<div class="fx ok">✅ Every number comes from your offer facts.</div>';
+  }
+  function wire() {
+    $("bf").oninput = function () { D.brief.facts = this.value; save(); };
+    $("ba").onchange = function () { D.brief.aud = this.value; save(); }; $("bl").onchange = function () { D.brief.lang = this.value; save(); }; $("bt").onchange = function () { D.brief.tone = this.value; save(); };
+    $("bc").onchange = function () { D.conf = this.checked; save(); };
+    $("bw").onclick = write;
+    $("pa").onclick = function () { $("pf").click(); };
+    $("pf").onchange = function () { var fs = [].slice.call(this.files), n = fs.length; fs.forEach(function (f) { var r = new FileReader(); r.onload = function () { shrink(r.result, 1600, function (u) { var id = nextId(D.IM); D.IM[id] = { name: f.name.replace(/\.[^.]+$/, "").slice(0, 30), url: u }; var s = D.spec = D.spec || {}; if (!s.hero) s.hero = id; else if (!s.banner) s.banner = id; else setRole(id, "screen"); save(); if (--n === 0) draw(); }); }; r.readAsDataURL(f); }); };
+    [].forEach.call(VIEW.querySelectorAll("[data-role]"), function (s0) { s0.onchange = function () { setRole(s0.dataset.role, s0.value); save(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { setRole(b.dataset.del, ""); delete D.IM[b.dataset.del]; save(); draw(); }; });
+    if (!(D.spec && D.spec.h1)) return;
+    [].forEach.call(VIEW.querySelectorAll("#fm button"), function (b) { b.onclick = function () { D.fmt = b.dataset.f; save(); [].forEach.call(VIEW.querySelectorAll("#fm button"), function (x) { x.classList.toggle("on", x === b); }); preview(); }; });
+    [].forEach.call(VIEW.querySelectorAll("#ths button"), function (b) { b.onclick = function () { D.theme = b.dataset.t; save(); [].forEach.call(VIEW.querySelectorAll("#ths button"), function (x) { x.classList.toggle("on", x === b); }); preview(); }; });
+    VIEW.addEventListener("input", function (e) { if (!e.target.dataset.e) return; clearTimeout(PT); PT = setTimeout(function () { readEdits(); save(); preview(); }, 300); });
+    [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { exportAs(b.dataset.x); }; });
+    $("sj").onclick = function () { download(new Blob([JSON.stringify(D)], { type: "application/json" }), fname() + ".creative.json"); };
+    $("ob").onclick = function () { $("oj").click(); };
+    $("oj").onchange = function () { var f = this.files[0]; if (!f) return; f.text().then(function (t) { var j = JSON.parse(t); if (!j.brief) throw new Error("Not a creative draft"); D = j; save(); draw(); }).catch(function (e) { toast(e.message); }); };
+    $("nw").onclick = function () { if (!confirm("Start a new creative? (Save the draft file first if you need it.)")) return; ls(KEY, null); D = { brief: { facts: "", aud: "Customers", lang: "English", tone: "Premium & clear" }, IM: {}, fmt: "newsletter", theme: "magenta", spec: null }; draw(); };
+  }
+
+  // ---------- AI ----------
+  function write() {
+    if (D.brief.facts.trim().length < 20) return toast("Write the offer facts first");
+    var btn = $("bw"); btn.disabled = true; $("bp").style.display = ""; $("bm").textContent = "Writing…";
+    var b = D.brief, keep = D.spec || {};
+    var sys = "You are a senior brand copywriter for vivo India. You write promotional mailers in the house style of the vivo Business Innovation team: a bold two-line headline (line 2 in the accent colour), a one-line promise, 3 chips, benefits as short cards, how-to-avail as numbered steps, an optional note box that cross-sells, and a closing call to action.\n" +
+      "RULES: Use ONLY facts in the brief. Never invent offer amounts, prices, percentages, dates, partner names, model names or eligibility. If a fact is missing, leave it out. Numbers in 'stats' must be real numbers from the brief or simple counts of what you wrote (e.g. number of steps). " +
+      "Short words for busy readers: headline lines 1-3 words, chips 2-3 words with one emoji, card titles 2-4 words, lines max 9 words. Steps in the exact order the brief gives. One emoji per card/step, relevant, no faces. " +
+      "Language: " + (b.lang === "Hindi" ? "Hindi in Devanagari; keep product names, app names and button names in English" : b.lang === "Hinglish" ? "Hinglish (Hindi in Roman script, the way Indian retail staff write)" : "simple Indian English") + ". Audience: " + b.aud + ". Feel: " + b.tone + ".\n" +
+      "Pick the theme that fits: students/youth → magenta, midnight or sunset; working professionals/corporate → corporate; retailers or sales teams → royal or vivo; eco/health/fresh → fresh; festive → sunset or magenta.\n" +
+      "Return ONLY JSON in this shape: " + C.SCHEMA;
+    job({ task: "think", json: true, maxTokens: 2500, temperature: 0.6, system: sys, prompt: "OFFER FACTS:\n" + b.facts }, function (ms) { $("bp").firstChild.style.width = Math.min(95, ms / 300) + "%"; })
+      .then(function (r) {
+        var j = parseJ(r.text); if (!j.h1) throw new Error("The AI's creative had no headline — try again");
+        ["hero", "banner"].forEach(function (k) { if (keep[k]) j[k] = keep[k]; });
+        j.screens = Object.assign({ kicker: "Inside the app", title: "What you will see" }, j.screens || {}, { items: ((keep.screens || {}).items) || [] });
+        if (j.theme && C.TH[j.theme] && !(D.spec && D.spec.h1)) D.theme = j.theme;
+        D.spec = j; D.by = r.provider + " · " + r.model; save(); draw(); toast("✨ Written — pick the look and size");
+      }).catch(function (e) { btn.disabled = false; $("bp").style.display = "none"; $("bm").innerHTML = '<span style="color:#B3261E">⚠ ' + esc(e.message) + "</span>"; });
+  }
+
+  // ---------- export ----------
+  function fname(fmt) { var s = D.spec || {}; return ((s.tag ? s.tag + " " : "") + (s.h1 || "creative") + " " + (s.h2 || "")).replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").slice(0, 50) + (fmt ? "_" + fmt : ""); }
+  function snap(fmt, type) {
+    var F = C.FMT[fmt], host = document.createElement("div"); host.style.cssText = "position:fixed;left:-30000px;top:0;width:" + F.w + "px"; document.body.appendChild(host);
+    return libI().then(function () { return C.mount(host, D.spec, fmt, D.theme, D.IM); }).then(function (el) {
+      var h = F.h || el.scrollHeight, o = { width: F.w, height: h, pixelRatio: fmt === "poster" ? 2 : 1, backgroundColor: "#ffffff", cacheBust: false };
+      return (type === "jpg" ? window.htmlToImage.toJpeg(el, Object.assign({ quality: 0.93 }, o)) : window.htmlToImage.toPng(el, o)).then(function (u) { host.remove(); return { url: u, w: F.w, h: h }; });
+    }).catch(function (e) { host.remove(); throw e; });
+  }
+  function blobOf(u) { var m = String(u).match(/^data:([^;,]+)(;base64)?,(.*)$/); if (!m) return Promise.reject(new Error("Couldn't draw the picture")); var bin = m[2] ? atob(m[3]) : decodeURIComponent(m[3]), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return Promise.resolve(new Blob([a], { type: m[1] })); }
+  function exportAs(x) {
+    var m = $("xm"); m.textContent = "Making…";
+    var p;
+    if (x === "png" || x === "jpg") p = snap(D.fmt, x).then(function (r) { return blobOf(r.url); }).then(function (b) { download(b, fname(D.fmt) + "." + x); });
+    else if (x === "pdf") p = snap(D.fmt, "jpg").then(function (r) { var pdf = new window.jspdf.jsPDF({ unit: "px", format: [r.w, r.h], orientation: r.w > r.h ? "landscape" : "portrait", hotfixes: ["px_scaling"] }); pdf.addImage(r.url, "JPEG", 0, 0, r.w, r.h); download(pdf.output("blob"), fname(D.fmt) + ".pdf"); });
+    else if (x === "all") p = Object.keys(C.FMT).reduce(function (q, f) { return q.then(function () { m.textContent = "Making " + C.FMT[f].name + "…"; return snap(f, "png").then(function (r) { return blobOf(r.url); }).then(function (b) { download(b, fname(f) + ".png"); }); }); }, Promise.resolve());
+    else if (x === "share") p = snap(D.fmt, "jpg").then(function (r) { return blobOf(r.url); }).then(function (b) { var file = new File([b], fname(D.fmt) + ".jpg", { type: "image/jpeg" }); if (navigator.canShare && !navigator.canShare({ files: [file] })) { download(b, file.name); return; } return navigator.share({ files: [file], title: (D.spec.h1 || "") + " " + (D.spec.h2 || "") }).catch(function () { }); });
+    p.then(function () { m.textContent = "✅ Done"; }).catch(function (e) { m.textContent = "⚠ " + (e.message || e); });
+  }
+
+  window.addEventListener("resize", function () { if (D.spec && D.spec.h1) { thumbs(); preview(); } });
+  if (AUTH && AUTH.token) api({ action: "tl-use", tool: "promostudio" });
+  draw();
+})();
+</script>
+</body>
+</html>
