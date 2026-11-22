@@ -83,18 +83,30 @@
     return { rows: out, bad: bad };
   }
   function ana(S, R, fin, since, step) {
-    if (!S.sl) { S.sl = slices(S.from, S.to, 4); S.si = 0; S.cz = ""; S.n = 0; S.ast = "find"; save(S); }
+    if (!S.sl) { S.sl = [[S.from, S.to]]; S.si = 0; S.cz = ""; S.n = 0; S.cap = 10000; S.ast = "find"; save(S); }
     var outR = function (o) { save(S); return out(o); }, pct = function (a) { return Math.round(10 + 85 * (S.si + a) / S.sl.length); };
     var A = S.ast, sinceA = function () { return S.tick - (S.at0 || 0); }, go = function (st) { S.ast = st; S.at0 = S.tick; S.tries = 0; save(S); };
     var gen = [].filter.call(qa("button"), function (b) { return vis(b) && /generate/i.test(txt(b)); })[0];
     var chip = function () { var c = [].filter.call(qa("div,span"), function (e) { return vis(e) && /^visit date\s*:/i.test(txt(e)) && txt(e).length < 60; }); return c.filter(function (e) { return !c.some(function (o) { return o !== e && e.contains(o); }); })[0]; };
     if (A === "find") {   // the saved analysis open with Generate and the Visit Date filter
-      if (gen && find(R.saved) && chip()) { go("date"); return outR({ s: "run", pct: 8, msg: "Analysis open" }); }
+      if (gen && find(R.saved) && chip()) { go("lim"); return outR({ s: "run", pct: 8, msg: "Analysis open" }); }
       var sv = find(R.saved); if (sv && sinceA() % 6 === 1) tap(sv);
       var vd = find(/^visit details$/i); if (!sv && vd && sinceA() % 8 === 2) tap(vd);
       var it = find(/^it operations$/i); if (!sv && !vd && it && sinceA() % 8 === 3) tap(it);
       if (sinceA() > 25) return outR({ s: "you", msg: "Open IT Operations → Visit Details → your saved analysis “Retailer app usability” — the helper then reads the month" });
       return outR({ s: "run", pct: 4, msg: "Opening IT Operations → Visit Details…" });
+    }
+    if (A === "lim") {   // "Result display" (rows shown, 10000 by default): raise it as far as vWork allows, so the month comes in one go
+      var lab = [].filter.call(qa("div,span,label"), function (e) { return vis(e) && !e.children.length && /^result$|^result\s*display$/i.test(txt(e)); })[0], li = null;
+      if (lab) { var lr = lab.getBoundingClientRect(); li = [].filter.call(qa("input"), function (i) { var r = i.getBoundingClientRect(); return vis(i) && Math.abs(r.top + r.height / 2 - (lr.top + lr.height / 2)) < 30 && r.left > lr.left && r.left - lr.right < 160; })[0]; }
+      if (!li) li = [].filter.call(qa("input"), function (i) { return vis(i) && /^\d{4,}$/.test(i.value) && +i.value >= 1000; })[0];
+      if (!li) { S.cap = 10000; S.sl = slices(S.from, S.to, 4); go("date"); return outR({ s: "run", pct: 9, msg: "Result display not found — reading the month 4 days at a time" }); }
+      var cv = parseInt(String(li.value).replace(/\D/g, "")) || 0;
+      if (S.tries === 0) { S.tries = 1; save(S); setInput(li, "1000000"); enter(li); try { li.blur(); li.dispatchEvent(new Event("blur", { bubbles: true })); } catch (x) { } return outR({ s: "run", pct: 9, msg: "Raising Result display…" }); }
+      if (sinceA() < 3) return outR({ s: "run", pct: 9, msg: "Raising Result display…" });
+      S.cap = cv >= 10000 ? cv : 10000;
+      if (S.cap < 60000) S.sl = slices(S.from, S.to, S.cap >= 30000 ? 10 : 4);
+      go("date"); return outR({ s: "run", pct: 10, msg: "Result display: " + S.cap.toLocaleString() + " rows" + (S.sl.length > 1 ? " — reading the month in " + S.sl.length + " parts" : " — reading the whole month at once") });
     }
     var cur = S.sl[S.si]; S.cur = cur;
     var dlg = [].filter.call(qa("div"), function (e) { return vis(e) && /fixed time/i.test(txt(e)) && /select time/i.test(txt(e)) && e.getBoundingClientRect().width < innerWidth * 0.95; });
@@ -138,11 +150,11 @@
         var P = parseCopy(W.__biCopied, S); W.__biCopied = null;
         if (!P) return fin("err", "Copy data gave an unexpected format", { diag: diag(S) });
         if (P.bad > P.rows.length && S.tries < 2) { S.tries++; go("gen"); return outR({ s: "run", pct: pct(0.6), msg: "Old result still showing — generating again…" }); }
-        if (P.rows.length >= 9990 && cur[0] < cur[1]) {   // hit the 10,000-row result limit: read this slice in two halves
+        if (P.rows.length >= S.cap - 10 && cur[0] < cur[1]) {   // hit the Result display limit: read this slice in two halves
           var half = Math.floor((new Date(cur[1]) - new Date(cur[0])) / 864e5 / 2); S.sl.splice(S.si, 1, [cur[0], addDays(cur[0], half)], [addDays(cur[0], half + 1), cur[1]]); go("date");
-          return outR({ s: "run", pct: pct(0.6), msg: "Over 10,000 rows — reading " + cur[0] + " → " + cur[1] + " in two parts" });
+          return outR({ s: "run", pct: pct(0.6), msg: "Over " + S.cap.toLocaleString() + " rows — reading " + cur[0] + " → " + cur[1] + " in two parts" });
         }
-        if (P.rows.length >= 9990) return fin("err", "A single day has over 10,000 rows — download it from vWork yourself", { diag: diag(S) });
+        if (P.rows.length >= S.cap - 10) return fin("err", "A single day has over " + S.cap.toLocaleString() + " rows — download it from vWork yourself", { diag: diag(S) });
         S.cz += (S.cz && P.rows.length ? ";" : "") + P.rows.join(";"); S.n += P.rows.length; S.got = (S.got || []).concat([[cur[0], cur[1], P.rows.length]]); S.si++;
         if (S.si >= S.sl.length) return fin("done", "Read " + S.n.toLocaleString() + " rows of Retailer App logs (" + S.sl.length + " parts)", { fz: S.fz, cz: S.cz, n: S.n, parts: S.got });
         go("date"); return outR({ s: "run", pct: pct(0), msg: "Part " + S.si + " of " + S.sl.length + " read (" + P.rows.length + " rows)" });
