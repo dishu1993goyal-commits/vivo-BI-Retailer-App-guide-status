@@ -3294,7 +3294,7 @@ public class MainActivity extends FragmentActivity {
     }
     private SharedPreferences permPrefs() { return getSharedPreferences("bot".equals(pKind) ? "bot_runs" : "perm_runs", MODE_PRIVATE); }
     private boolean botPageOk(WebView w) {
-        try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && (Uri.parse(u).getPath().startsWith("/portalbot") || Uri.parse(u).getPath().startsWith("/imeiunblock")); }
+        try { String u = w == null ? null : w.getUrl(); return !STATE_APP && smsPageOk(w) && u != null && Uri.parse(u).getPath() != null && (Uri.parse(u).getPath().startsWith("/portalbot") || Uri.parse(u).getPath().startsWith("/imeiunblock") || Uri.parse(u).getPath().startsWith("/dashupdate")); }
         catch (Throwable t) { return false; }
     }
     private static boolean botHostOk(String u) {
@@ -3304,6 +3304,10 @@ public class MainActivity extends FragmentActivity {
     private static boolean mailHostOk(String u) {
         try { Uri x = Uri.parse(u); String h = String.valueOf(x.getHost()).toLowerCase(); return "https".equals(x.getScheme()) && h.matches("outlook\\.(office|office365|live)\\.com|outlook\\.cloud\\.microsoft"); } catch (Throwable t) { return false; }
     }
+    // helper scripts beyond rec/play: mode "vw" → vivo_vw.js with window.__biVwRun (read-only report readers, newest copy from the BI site)
+    private static boolean extMode(String m) { return m != null && m.matches("[a-z]{2,6}") && !"rec".equals(m) && !"play".equals(m); }
+    private static String extName(String m) { return "vivo_" + m + ".js"; }
+    private static String extFn(String m) { return "__bi" + Character.toUpperCase(m.charAt(0)) + m.substring(1) + "Run"; }
     private final java.util.concurrent.ConcurrentHashMap<String, String> extraJs = new java.util.concurrent.ConcurrentHashMap<>();
     private String assetJs(String name) {
         if (extraJs.containsKey(name)) return extraJs.get(name);
@@ -3375,16 +3379,16 @@ public class MainActivity extends FragmentActivity {
                 if (job == null || job.length() > 3_000_000) return "bad";
                 JSONObject j = new JSONObject(job);
                 String m = j.optString("mode");
-                if (!j.optString("id").matches("[A-Za-z0-9_-]{4,30}") || !("rec".equals(m) || "play".equals(m) || "mail".equals(m) || "imq".equals(m))) return "bad";
+                if (!j.optString("id").matches("[A-Za-z0-9_-]{4,30}") || !("rec".equals(m) || "play".equals(m) || extMode(m))) return "bad";
                 if ("play".equals(m) && (j.optJSONArray("steps") == null || j.optJSONArray("rows") == null)) return "bad";
                 if ("imq".equals(m) && j.optJSONArray("imeis") == null) return "bad";
                 String u = url == null ? "" : url.trim();
                 if ("mail".equals(m) ? !mailHostOk(u) : !botHostOk(u)) return "bad";
-                if ("mail".equals(m) || "imq".equals(m)) {   // take the newest helper script from the same BI site (fixes ship with the website); the bundled copy is the fallback
+                if (extMode(m)) {   // take the newest helper script from the same BI site (fixes ship with the website); the bundled copy is the fallback
                     try {
                         java.util.concurrent.FutureTask<String> pu = new java.util.concurrent.FutureTask<>(w::getUrl); ui.post(pu);
                         Uri o = Uri.parse(pu.get(2, java.util.concurrent.TimeUnit.SECONDS));
-                        String name = "mail".equals(m) ? "vivo_mail.js" : "vivo_imq.js", fn = "mail".equals(m) ? "__biMailRun" : "__biImqRun";
+                        String name = extName(m), fn = extFn(m);
                         if ("https".equals(o.getScheme()) && o.getHost() != null) {
                             java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://" + o.getHost() + "/" + name + "?v=" + System.currentTimeMillis()).openConnection();
                             c.setConnectTimeout(4000); c.setReadTimeout(5000);
@@ -3397,6 +3401,7 @@ public class MainActivity extends FragmentActivity {
                             c.disconnect();
                         }
                     } catch (Throwable ignored) { }
+                    if (assetJs(extName(m)).isEmpty()) return "bad";
                 }
                 if (!j.has("start")) j.put("start", u);
                 j.put("url", u);
@@ -3496,7 +3501,7 @@ public class MainActivity extends FragmentActivity {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Color.WHITE);
-        page.addView(profileHeaderBar("bot".equals(pKind) && "mail".equals(job.optString("mode")) ? "📥 Outlook · reading unblock request mails" : "bot".equals(pKind) && "imq".equals(job.optString("mode")) ? "🔍 vivo portal · checking IMEI activation" : "bot".equals(pKind) ? ("rec".equals(job.optString("mode")) ? "● vivo portal · recording" : "🤖 vivo portal · running your recording") : (job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
+        page.addView(profileHeaderBar("bot".equals(pKind) && "mail".equals(job.optString("mode")) ? "📥 Outlook · reading unblock request mails" : "bot".equals(pKind) && "imq".equals(job.optString("mode")) ? "🔍 vivo portal · checking IMEI activation" : "bot".equals(pKind) && "vw".equals(job.optString("mode")) ? "📊 vWork · reading the report for the dashboard" : "bot".equals(pKind) ? ("rec".equals(job.optString("mode")) ? "● vivo portal · recording" : "🤖 vivo portal · running your recording") : (job.optBoolean("dry") ? "🔍 vivo portal · check only" : "✅ vivo portal · product permissions"), this::permAskClose));
         uBanner = new TextView(this);
         uBanner.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f);
         uBanner.setTextColor(Color.parseColor("#111111"));
@@ -3525,8 +3530,8 @@ public class MainActivity extends FragmentActivity {
             boolean bot = "bot".equals(pKind);
             if (!bot && uCred != null && uSameHost()) c.put("fill", new JSONObject().put("u", uCred.optString("u")).put("p", uCred.optString("p")));
             String bm = bot ? pJob.optString("mode") : "";
-            String fn = !bot ? "__biPermRun" : "mail".equals(bm) ? "__biMailRun" : "imq".equals(bm) ? "__biImqRun" : "__biBotRun";
-            String src = !bot ? permScript() : "mail".equals(bm) ? assetJs("vivo_mail.js") : "imq".equals(bm) ? assetJs("vivo_imq.js") : botScript();
+            String fn = !bot ? "__biPermRun" : extMode(bm) ? extFn(bm) : "__biBotRun";
+            String src = !bot ? permScript() : extMode(bm) ? assetJs(extName(bm)) : botScript();
             String js = "(function(){try{if(!window." + fn + "){" + src + "}return window." + fn + "(" + c + ");}catch(e){return JSON.stringify({s:'wait',msg:String(e&&e.message||e)});}})()";
             vivoWeb.evaluateJavascript(js, v -> {
                 try {
