@@ -41,7 +41,7 @@
 <body>
 <div class="hero">
   <div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><a class="guide-a" href="guide.html#execdeck">📘 How to</a></div>
-  <h1>🏛 Executive deck</h1><p>Top-management decks in the BI style — AI writes the storyline from your own numbers, you check, it exports to PowerPoint and PDF</p>
+  <h1>🏛 Executive deck</h1><p>Top-management decks in the BI style — AI writes the storyline from your own numbers (or rebuilds your old PPT), you check, it exports to PowerPoint, PDF and a narrated video</p>
 </div>
 <div class="wrap">
   <div class="stp" id="stp"></div>
@@ -122,7 +122,10 @@
   function shrink(u, cb) { var im = new Image(); im.onload = function () { var k = Math.min(1, 1600 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); cb(c.toDataURL("image/jpeg", 0.85)); }; im.src = u; }
   function vMat() {
     var ds = Object.keys(D.DS), im = Object.keys(D.IM);
-    VIEW.innerHTML = '<div class="pv"><h3>📝 Your points</h3><div class="best">Paste the facts, wins, issues and plans — bullet notes are fine. Every number the AI uses must come from here or from your tables.</div>' +
+    VIEW.innerHTML = '<div class="pv"><h3>🩺 Deck doctor — start from an existing PowerPoint</h3><div class="best">Add your current deck: its text, tables, charts, pictures and notes come in as material, the AI diagnoses it, then rebuilds it into a top-management deck — keeping every fact and number you had.</div>' +
+      (D.doctor ? '<div class="fx"><b>📥 ' + esc(D.doctor.name) + "</b> · " + D.doctor.slides.length + " slides read" + (D.before ? '<br><b>Diagnosis: ' + esc(D.before.score) + "/100</b> — " + esc(D.before.verdict || "") + (D.before.fixes || []).slice(0, 5).map(function (x) { return "<br>• " + (x.slide ? "Slide " + esc(x.slide) + ": " : "") + esc(x.issue); }).join("") : '<br><button class="btn ghost sm" id="mdx">🩺 Diagnose it</button>') + "</div>" : "") +
+      '<div class="row2"><input type="file" id="mdf" accept=".pptx" style="display:none"><button class="btn ghost sm" id="mdb">📥 ' + (D.doctor ? "Use another PowerPoint" : "Add a PowerPoint (.pptx)") + '</button><span class="hint" id="mdm"></span></div></div>' +
+      '<div class="pv"><h3>📝 Your points</h3><div class="best">Paste the facts, wins, issues and plans — bullet notes are fine. Every number the AI uses must come from here or from your tables.</div>' +
       '<textarea class="tx" id="mn" rows="9" placeholder="e.g.\n• Retailer app: 55K+ retailers onboarded, usage 12% (Jul) → 19.8% (Nov)\n• IP Guard live in 7 states + HO\n• VBA pilot Chhattisgarh: 90% of policy logic configured\n• 2027: Retailer App 3.0, DPDPA training in 22 more states">' + esc(D.notes) + "</textarea></div>" +
       '<div class="pv"><h3>📊 Tables</h3><div class="best">Charts and tables are drawn from these — the AI only picks which columns to show, so numbers on charts are always your numbers.</div>' +
       (ds.length ? ds.map(function (id) { var d = D.DS[id]; return '<span class="chip"><b>' + id + "</b> " + esc(d.name) + ' · ' + d.rows.length + " rows · " + d.cols.length + ' cols <button data-dd="' + id + '">✕</button></span>'; }).join("") : '<div class="hint">No tables yet.</div>') +
@@ -145,6 +148,9 @@
         '<label class="lb">Name</label><input class="tx" placeholder="e.g. State scores"><textarea class="tx" rows="8" style="margin-top:8px;font-family:monospace;font-size:12px"></textarea>');
     };
     $("mk").onclick = kpiPick;
+    $("mdb").onclick = function () { $("mdf").click(); };
+    $("mdf").onchange = function () { var f0 = this.files[0]; if (!f0) return; $("mdm").textContent = "Reading " + f0.name + "…"; importPptx(f0).then(function (n) { toast(n + " slides read"); vMat(); diagnose(); }).catch(function (e) { $("mdm").textContent = "⚠ " + e.message; }); };
+    if ($("mdx")) $("mdx").onclick = diagnose;
     $("mn2").onclick = function () { if (!D.notes.trim() && !Object.keys(D.DS).length) return toast("Add your points or a table first"); go("story"); };
   }
   function kpiPick() {
@@ -223,7 +229,7 @@
       if (D.slides.length && !confirm("Replace the current slides with a new storyline?")) return;
       var btn = this; btn.disabled = true; $("sp").style.display = ""; $("sm").textContent = "Writing the storyline…";
       var x = $("sx").value.trim();
-      job({ task: "think", json: true, maxTokens: 7000, temperature: 0.4, system: RULES.join("\n") + "\n\n" + layoutsDoc(), prompt: material() + "\n\nWrite about " + D.brief.len + " slides." + (x ? "\nAlso: " + x : "") }, function (ms) { $("sp").firstChild.style.width = Math.min(95, ms / 900) + "%"; $("sm").textContent = "Writing the storyline… " + Math.round(ms / 1000) + " s"; })
+      job({ task: "think", json: true, maxTokens: 7000, temperature: 0.4, system: RULES.join("\n") + "\n\n" + layoutsDoc(), prompt: material() + (D.doctor ? "\n\nREBUILD MODE: the material contains the person's existing deck (ORIGINAL DECK). Rebuild it into a top-management deck: keep every fact, number, project and name they had (drop nothing important), keep their order unless the story is clearly stronger another way, turn topic titles into action titles, merge thin slides, split overloaded ones, put the answer first and the asks at the end. Use their tables (TABLE ids) for charts." + (D.before && D.before.fixes ? " Fix these problems a reviewer found: " + D.before.fixes.map(function (q) { return q.issue; }).join("; ") : "") : "") + "\n\nWrite about " + D.brief.len + " slides." + (x ? "\nAlso: " + x : "") }, function (ms) { $("sp").firstChild.style.width = Math.min(95, ms / 900) + "%"; $("sm").textContent = "Writing the storyline… " + Math.round(ms / 1000) + " s"; })
         .then(function (r) {
           var j = parseJ(r.text), sl = cleanSlides(j.slides); if (!sl.length) throw new Error("The AI's deck had no usable slides — try again");
           D.slides = sl; D.deck = { title: j.title || D.brief.title, period: j.period || D.brief.period }; D.review = null; D.by = r.provider + " · " + r.model; save(); go("slides");
@@ -315,7 +321,7 @@
     if (R0) showReview(R0);
     $("rg").onclick = function () {
       var btn = this; btn.disabled = true; $("rp").style.display = ""; $("rm").textContent = "Reading the deck…";
-      var sys = "You are the chief of staff to vivo India's CEO. You review decks before they reach top management and you are strict: consulting-grade storyline, action titles, one message per slide, evidence for every claim, specific asks with owners and dates. Return ONLY JSON: {\"score\":0-100,\"verdict\":\"one sentence\",\"strengths\":[\"…\"],\"fixes\":[{\"slide\":n,\"issue\":\"what is wrong\",\"fix\":\"what to do\",\"title\":\"better action title if the title is the problem, else omit\"}]}. Max 10 fixes, most important first. Never suggest numbers that are not in the deck or the material.";
+      var sys = REVIEW;
       job({ task: "think", json: true, maxTokens: 3000, temperature: 0.2, system: sys, prompt: "BRIEF: " + D.brief.title + " · " + D.brief.aud + " · goal: " + D.brief.goal + "\n\nDECK:\n" + D.slides.map(function (s, i) { return (i + 1) + ". " + JSON.stringify(s); }).join("\n") }, function (ms) { $("rp").firstChild.style.width = Math.min(95, ms / 500) + "%"; })
         .then(function (r) { var j = parseJ(r.text); D.review = j; save(); btn.disabled = false; $("rp").style.display = "none"; $("rm").textContent = ""; showReview(j); steps(); })
         .catch(function (e) { btn.disabled = false; $("rp").style.display = "none"; $("rm").innerHTML = '<span style="color:#B3261E">⚠ ' + esc(e.message) + "</span>"; });
@@ -329,8 +335,9 @@
         .catch(function (e) { btn.disabled = false; $("rm").textContent = "⚠ " + e.message; });
     };
   }
+  var REVIEW = "You are the chief of staff to vivo India's CEO. You review decks before they reach top management and you are strict: consulting-grade storyline, action titles, one message per slide, evidence for every claim, specific asks with owners and dates. Return ONLY JSON: {\"score\":0-100,\"verdict\":\"one sentence\",\"strengths\":[\"…\"],\"fixes\":[{\"slide\":n,\"issue\":\"what is wrong\",\"fix\":\"what to do\",\"title\":\"better action title if the title is the problem, else omit\"}]}. Max 10 fixes, most important first. Never suggest numbers that are not in the deck or the material.";
   function showReview(j) {
-    $("ro").innerHTML = '<div class="score"><b>' + esc(j.score) + '</b><div><b style="font-size:14px">/ 100</b><div>' + esc(j.verdict || "") + "</div></div></div>" +
+    $("ro").innerHTML = '<div class="score"><b>' + esc(j.score) + '</b><div><b style="font-size:14px">/ 100' + (D.before && D.before.score != null ? " · original deck was " + esc(D.before.score) : "") + "</b><div>" + esc(j.verdict || "") + "</div></div></div>" +
       ((j.strengths || []).length ? '<div class="hint" style="margin-top:6px">👍 ' + (j.strengths || []).map(esc).join(" · ") + "</div>" : "") +
       (j.fixes || []).map(function (x, k) { var s = D.slides[(+x.slide || 0) - 1]; return '<div class="fx"><span class="n">Slide ' + esc(x.slide) + "</span> — " + esc(x.issue) + "<br>👉 " + esc(x.fix) + (x.title && s ? '<br><i>“' + esc(x.title) + '”</i><br><button class="btn ghost sm" data-ap="' + k + '">Use this title</button>' : "") + (s ? ' <button class="btn ghost sm" data-ed="' + (x.slide - 1) + '">✏️ Open slide</button>' : "") + "</div>"; }).join("") +
       ((j.fixes || []).some(function (x) { return x.title; }) ? '<div class="bar2"><button class="btn pri sm" id="rall">Use all suggested titles</button></div>' : "");
@@ -365,15 +372,183 @@
     var fl = 0, al = allowed(); D.slides.forEach(function (s) { fl += BIDECK.numCheck(s, al).length; });
     VIEW.innerHTML = '<div class="pv"><h3>⬇ Export</h3><div class="best">PowerPoint keeps every text box and chart editable (charts are real PowerPoint charts with your data inside). Speaker notes go with it.</div>' +
       (fl ? '<div class="fx" style="border-color:#E09B10">⚠ ' + fl + ' number(s) are not in your material. <button class="btn ghost sm" id="xs">Review them</button></div>' : "") +
-      '<div class="bar2"><button class="btn pri" id="xp">📊 PowerPoint (.pptx)</button><button class="btn ghost" id="xf">📄 PDF</button><button class="btn ghost" id="xj">🗂 Save the draft file</button></div><div class="hint" id="xm"></div>' +
+      '<div class="bar2"><button class="btn pri" id="xp">📊 PowerPoint (.pptx)</button><button class="btn ghost" id="xf">📄 PDF</button><button class="btn ghost" id="xv">🎬 Narrated video</button><button class="btn ghost" id="xj">🗂 Save the draft file</button></div><div class="hint" id="xm"></div>' +
       '<div class="row2"><input type="file" id="xo" accept=".json" style="display:none"><button class="btn ghost sm" id="xob">📂 Open a saved draft</button><button class="btn ghost sm" id="xn">🆕 Start a new deck</button></div></div>';
     if ($("xs")) $("xs").onclick = function () { go("slides"); };
     $("xp").onclick = function () { var b = this; b.disabled = true; $("xm").textContent = "Building the PowerPoint…"; libP().then(function () { return BIDECK.pptx(deckInfo(), D.slides, D.DS, D.IM); }).then(function (blob) { download(blob, fname("pptx")); $("xm").textContent = "✅ Downloaded " + fname("pptx"); b.disabled = false; }).catch(function (e) { $("xm").textContent = "⚠ " + e.message; b.disabled = false; }); };
     $("xf").onclick = function () { var b = this; b.disabled = true; $("xm").textContent = "Drawing " + D.slides.length + " pages…"; shots(D.slides.length, 1.6).then(function (imgs) { var pdf = new window.jspdf.jsPDF({ orientation: "landscape", unit: "in", format: [13.333, 7.5] }); imgs.forEach(function (u, i) { if (i) pdf.addPage([13.333, 7.5], "landscape"); pdf.addImage(u, "JPEG", 0, 0, 13.333, 7.5); }); download(pdf.output("blob"), fname("pdf")); $("xm").textContent = "✅ Downloaded " + fname("pdf"); b.disabled = false; }).catch(function (e) { $("xm").textContent = "⚠ " + e.message; b.disabled = false; }); };
+    $("xv").onclick = videoSheet;
     $("xj").onclick = function () { download(new Blob([JSON.stringify(D)], { type: "application/json" }), fname("deck.json")); };
     $("xob").onclick = function () { $("xo").click(); };
     $("xo").onchange = function () { var f = this.files[0]; if (!f) return; f.text().then(function (t) { var j = JSON.parse(t); if (!j.slides) throw new Error("Not a deck draft"); D = j; save(); toast("Draft opened"); go("slides"); }).catch(function (e) { toast(e.message); }); };
     $("xn").onclick = function () { if (!confirm("Clear this deck and start a new one? (Save the draft file first if you need it.)")) return; ls(KEY, null); D = { brief: { title: "", aud: "Top management review", period: "", goal: "", len: 12, tone: "Confident, crisp, data-led" }, notes: "", DS: {}, IM: {}, slides: [], deck: {} }; go("brief"); };
+  }
+
+  // ---------- 🩺 Deck doctor: read a .pptx (text, tables, charts, pictures, notes) ----------
+  function libZ() { return lib("/vendor/jszip.min.js", function () { return !!window.JSZip; }); }
+  function xml(t) { return new DOMParser().parseFromString(t, "application/xml"); }
+  function tags(n, q) { return [].slice.call(n.getElementsByTagName(q)); }
+  function relsOf(z, path) { var rp = path.replace(/([^/]+)$/, "_rels/$1.rels"), f = z.file(rp); if (!f) return Promise.resolve([]); return f.async("string").then(function (t) { return tags(xml(t), "Relationship").map(function (r) { var tg = r.getAttribute("Target"), base = path.replace(/[^/]+$/, ""), full = tg.charAt(0) === "/" ? tg.slice(1) : (base + tg).split("/").reduce(function (a, s0) { if (s0 === "..") a.pop(); else if (s0 !== ".") a.push(s0); return a; }, []).join("/"); return { id: r.getAttribute("Id"), type: (r.getAttribute("Type") || "").split("/").pop(), path: full }; }); }); }
+  function paraText(n) { return tags(n, "a:p").map(function (p) { return tags(p, "a:t").map(function (t) { return t.textContent; }).join(""); }).filter(function (x) { return x.trim(); }); }
+  function importPptx(file) {
+    var z;
+    return libZ().then(function () { return file.arrayBuffer(); }).then(function (b) { return JSZip.loadAsync(b); }).then(function (z0) {
+      z = z0; var pf = z.file("ppt/presentation.xml"); if (!pf) throw new Error("This isn't a PowerPoint (.pptx) file");
+      return Promise.all([pf.async("string"), relsOf(z, "ppt/presentation.xml")]);
+    }).then(function (a) {
+      var R0 = {}; a[1].forEach(function (r) { R0[r.id] = r.path; });
+      var order = tags(xml(a[0]), "p:sldId").map(function (n) { return R0[n.getAttribute("r:id")]; }).filter(Boolean);
+      var out = [], pics = [];
+      return order.reduce(function (pr, path, i) { return pr.then(function () {
+        return Promise.all([z.file(path).async("string"), relsOf(z, path)]).then(function (b) {
+          var doc = xml(b[0]), rels = b[1], title = "", body = [], sl = { n: i + 1, tables: 0 };
+          tags(doc, "p:sp").forEach(function (sp) { var ph = sp.getElementsByTagName("p:ph")[0], ty = ph ? ph.getAttribute("type") : "", tx = paraText(sp); if (!tx.length) return; if (!title && (ty === "title" || ty === "ctrTitle")) title = tx.join(" "); else body.push.apply(body, tx); });
+          tags(doc, "a:tbl").forEach(function (tb) { var rows = tags(tb, "a:tr").map(function (tr) { return tags(tr, "a:tc").map(function (tc) { return paraText(tc).join(" "); }); }); if (rows.length > 1 && rows[0].length > 1) { addDataset("Slide " + (i + 1) + " · " + (title || "table").slice(0, 30), rows[0], rows.slice(1).map(function (r) { return r.map(function (c) { var v = BIDECK.num(c); return v != null && /\d/.test(c) && !/[a-z]{3}/i.test(c) ? v : c; }); })); sl.tables++; } });
+          var jobs = rels.map(function (r) {
+            if (r.type === "chart" && z.file(r.path)) return z.file(r.path).async("string").then(function (t) {
+              var cd = xml(t), sers = tags(cd, "c:ser"); if (!sers.length) return;
+              var pts = function (n) { if (!n) return []; var m = []; tags(n, "c:pt").forEach(function (p) { m[+p.getAttribute("idx")] = (p.getElementsByTagName("c:v")[0] || {}).textContent; }); return m; };
+              var cats = pts(sers[0].getElementsByTagName("c:cat")[0]), cols = ["Category"], rows = cats.map(function (c) { return [c]; });
+              sers.forEach(function (se, k) { var nm = tags(se.getElementsByTagName("c:tx")[0] || se, "c:v")[0]; cols.push(nm && se.getElementsByTagName("c:tx")[0] ? nm.textContent : "Series " + (k + 1)); var v = pts(se.getElementsByTagName("c:val")[0]); rows.forEach(function (r, j) { r.push(v[j] != null ? +v[j] : ""); }); });
+              if (rows.length) { addDataset("Slide " + (i + 1) + " · chart" + (title ? " · " + title.slice(0, 24) : ""), cols, rows); sl.tables++; }
+            });
+            if (r.type === "image" && z.file(r.path) && /\.(png|jpe?g|webp)$/i.test(r.path)) return z.file(r.path).async("uint8array").then(function (u) { if (u.length > 40000) pics.push({ n: i + 1, size: u.length, u: u, ext: r.path.split(".").pop().toLowerCase(), title: title }); });
+            if (r.type === "notesSlide" && z.file(r.path)) return z.file(r.path).async("string").then(function (t) { sl.notes = paraText(xml(t)).filter(function (x) { return !/^\d+$/.test(x.trim()); }).join(" ").slice(0, 1200); });
+          });
+          return Promise.all(jobs).then(function () { sl.title = title || body.shift() || ""; sl.text = body.join("\n").slice(0, 2500); out.push(sl); });
+        }); }); }, Promise.resolve()).then(function () {
+        // keep the biggest distinct pictures (logos and icons are small), at most 8
+        var seen = {}; pics.sort(function (a2, b2) { return b2.size - a2.size; });
+        var keep = pics.filter(function (q) { var k = q.size; if (seen[k]) return false; seen[k] = 1; return true; }).slice(0, 8);
+        return Promise.all(keep.map(function (q) { return new Promise(function (res) { var bl = new Blob([q.u], { type: "image/" + (q.ext === "jpg" ? "jpeg" : q.ext) }), fr = new FileReader(); fr.onload = function () { shrink(fr.result, function (u2) { var id = nextId("I", D.IM); D.IM[id] = { name: ("Slide " + q.n + " " + (q.title || "picture")).slice(0, 40), url: u2 }; res(); }); }; fr.readAsDataURL(bl); }); }));
+      }).then(function () {
+        D.doctor = { name: file.name, slides: out }; D.before = null;
+        var txt = "ORIGINAL DECK — " + file.name + "\n" + out.map(function (q) { return "Slide " + q.n + ": " + q.title + (q.text ? "\n" + q.text : "") + (q.notes ? "\n(Notes: " + q.notes + ")" : "") + (q.tables ? "\n(has " + q.tables + " table/chart — see TABLES)" : ""); }).join("\n\n");
+        D.notes = (D.notes && D.notes.indexOf("ORIGINAL DECK") < 0 ? D.notes + "\n\n" : "") + txt;
+        if (!D.brief.title) D.brief.title = out[0] && out[0].title ? out[0].title.slice(0, 80) : file.name.replace(/\.pptx$/i, "");
+        if (D.brief.len < Math.min(20, out.length)) D.brief.len = [6, 8, 10, 12, 14, 16, 20].find(function (n) { return n >= Math.min(20, out.length); }) || 20;
+        save(); return out.length;
+      });
+    });
+  }
+  function diagnose() {
+    if (!D.doctor) return;
+    var m = $("mdm"); if (m) m.textContent = "🩺 Diagnosing the original deck…";
+    job({ task: "think", json: true, maxTokens: 2500, temperature: 0.2, system: REVIEW, prompt: "This is the person's ORIGINAL deck, before any rebuild. Audience: " + D.brief.aud + ".\n\n" + D.doctor.slides.map(function (q) { return q.n + ". TITLE: " + q.title + "\n" + q.text; }).join("\n\n").slice(0, 40000) })
+      .then(function (r) { D.before = parseJ(r.text); save(); if (STEP === "mat") vMat(); })
+      .catch(function (e) { if ($("mdm")) $("mdm").textContent = "⚠ Diagnosis: " + e.message; });
+  }
+
+  // ---------- 🎬 narrated video ----------
+  var VLANG = { en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu", bn: "Bengali", mr: "Marathi", gu: "Gujarati", kn: "Kannada", ml: "Malayalam", pa: "Punjabi", or: "Odia" };
+  function videoSheet() {
+    D.vid = D.vid || { lang: "en", voice: "f", cap: true, lines: {} };
+    var V0 = D.vid, L = V0.lines[V0.lang] || [];
+    var body = '<div class="g2"><div><label class="lb">Language</label><select class="tx" id="vl">' + Object.keys(VLANG).map(function (k) { return '<option value="' + k + '"' + (k === V0.lang ? " selected" : "") + ">" + VLANG[k] + "</option>"; }).join("") + '</select></div><div><label class="lb">Voice</label><select class="tx" id="vv"><option value="f"' + (V0.voice === "f" ? " selected" : "") + '>Female</option><option value="m"' + (V0.voice === "m" ? " selected" : "") + '>Male</option><option value="off"' + (V0.voice === "off" ? " selected" : "") + ">No voice (captions + music-free)</option></select></div></div>" +
+      '<label class="sw"><input type="checkbox" id="vc"' + (V0.cap ? " checked" : "") + "> Show captions on the video</label>" +
+      '<div class="row2"><button class="btn ghost sm" id="vw">✨ Write the narration' + (V0.lang !== "en" ? " in " + VLANG[V0.lang] : "") + '</button><span class="hint" id="vm">Or edit below — empty slides use the speaker notes.</span></div>' +
+      D.slides.map(function (sl, i) { return '<label class="lb">' + (i + 1) + " · " + esc((sl.title || LNAME[sl.layout] || "").slice(0, 70)) + '</label><textarea class="tx" rows="2" data-vn="' + i + '">' + esc(L[i] != null ? L[i] : (V0.lang === "en" ? sl.notes || "" : "")) + "</textarea>"; }).join("") +
+      '<div class="prog" id="vp" style="display:none"><i></i></div><div class="hint" id="vs"></div>';
+    var ov = sheet("🎬 Narrated video", "Each slide is shown while its line is spoken — MP4, 1280×720", [["🎬", "Make the video", function () { keep(); makeVideo(ov); return false; }, "pri"]], body);
+    var keep = function () { V0.lang = ov.querySelector("#vl").value; V0.voice = ov.querySelector("#vv").value; V0.cap = ov.querySelector("#vc").checked; V0.lines[V0.lang] = [].map.call(ov.querySelectorAll("[data-vn]"), function (t) { return t.value.trim(); }); save(); };
+    ov.querySelector("#vl").onchange = function () { var l = this.value; V0.lines[V0.lang] = [].map.call(ov.querySelectorAll("[data-vn]"), function (t) { return t.value.trim(); }); V0.lang = l; save(); ov.remove(); videoSheet(); };
+    ov.querySelector("#vw").onclick = function () {
+      var b = this; b.disabled = true; ov.querySelector("#vm").textContent = "Writing…";
+      job({ task: "think", json: true, maxTokens: 5000, temperature: 0.5, system: "You write the voice-over for a narrated video of a vivo India top-management deck. Spoken " + VLANG[V0.lang] + (V0.lang !== "en" ? " (natural spoken style; keep product names, KPI names and numbers as they are)" : "") + ", confident presenter, first person plural ('we'). For each slide 2-4 short sentences (about 12-20 seconds): say the takeaway first, then the one or two numbers that prove it, then the bridge to the next slide. Cover and section slides: one sentence. Use ONLY numbers that are on the slide. Return ONLY JSON {\"lines\":[\"…\", …]} with exactly one entry per slide, in order.", prompt: "DECK: " + deckInfo().title + "\n" + D.slides.map(function (s0, i) { return (i + 1) + ". " + JSON.stringify(s0); }).join("\n") })
+        .then(function (r) { var j = parseJ(r.text), ln = j.lines || []; [].forEach.call(ov.querySelectorAll("[data-vn]"), function (t, i) { if (ln[i]) t.value = String(ln[i]); }); keep(); b.disabled = false; ov.querySelector("#vm").textContent = "✅ Narration written — edit anything, then make the video."; })
+        .catch(function (e) { b.disabled = false; ov.querySelector("#vm").textContent = "⚠ " + e.message; });
+    };
+  }
+  function b64buf(b64) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+  function decodeA(ac, buf) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); }); }
+  function chunks(t) { var out = [], cur = ""; String(t).split(/(?<=[.!?।])\s+/).forEach(function (s0) { if ((cur + " " + s0).length > 650 && cur) { out.push(cur); cur = s0; } else cur = cur ? cur + " " + s0 : s0; }); if (cur) out.push(cur); return out; }
+  function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function makeVideo(ov) {
+    var V0 = D.vid, lines = D.slides.map(function (sl, i) { var l = (V0.lines[V0.lang] || [])[i]; return String(l || (V0.lang === "en" ? sl.notes : "") || "").trim(); });
+    var st = ov.querySelector("#vs"), pg = ov.querySelector("#vp"), prog = function (x) { pg.style.display = ""; pg.firstChild.style.width = Math.round(x * 100) + "%"; };
+    var AC = window.AudioContext || window.webkitAudioContext, ac = null, voiced = V0.voice !== "off" && lines.some(Boolean);
+    if (voiced && AC) { try { ac = new AC(); ac.resume(); } catch (e) { ac = null; } }
+    if (!window.VideoEncoder && !(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream)) return toast("This device can't make video — try Chrome on a laptop or Android.");
+    var imgs = [], bufs = D.slides.map(function () { return []; }), firstErr = "";
+    st.textContent = "Drawing the slides…"; prog(0.02);
+    shots(D.slides.length, 1280 / 1333).then(function (u) {
+      return Promise.all(u.map(function (x) { return new Promise(function (res) { var im = new Image(); im.onload = function () { res(im); }; im.src = x; }); }));
+    }).then(function (ims) {
+      imgs = ims; if (!voiced || !ac) return;
+      var q = []; lines.forEach(function (l, i) { chunks(l).forEach(function (c, k) { q.push({ i: i, k: k, t: c }); }); });
+      var done = 0, fatal = false;
+      var one = function (it, tries) { return api({ action: "ar-tts", lang: V0.lang, voice: V0.voice, text: it.t }).then(function (r) {
+        if (r.ok && r.b64) return decodeA(ac, b64buf(r.b64)).then(function (b) { bufs[it.i][it.k] = b; }).catch(function () { });
+        if (r.retry && tries < 2) return wait(Math.min(20, r.retry) * 1000).then(function () { return one(it, tries + 1); });
+        if (r.notConfigured) fatal = true; if (!firstErr) firstErr = r.error || "no voice"; }); };
+      var worker = function () { var it = q.shift(); if (!it || fatal) return Promise.resolve(); return one(it, 0).then(function () { done++; st.textContent = "🎙️ Voice-over… " + done + " clips"; prog(0.1 + 0.3 * done / (done + q.length)); return worker(); }); };
+      return Promise.all([worker(), worker(), worker()]);
+    }).then(function () {
+      var has = bufs.some(function (b) { return b.some(Boolean); }); if (voiced && !has) { toast("No AI voice (" + (firstErr || "unavailable") + ") — making the video with captions"); voiced = false; }
+      // timeline
+      var T0 = [], t = 600, SEG = [];
+      D.slides.forEach(function (sl, i) {
+        var ad = bufs[i].reduce(function (a, b) { return a + (b ? b.duration : 0); }, 0), words = (lines[i] || "").split(/\s+/).filter(Boolean).length;
+        var dur = voiced && ad ? ad * 1000 + 1100 : Math.max(sl.layout === "cover" || sl.layout === "section" || sl.layout === "closing" ? 3500 : 5000, words / 2.5 * 1000 + 800);
+        T0.push({ s: t, d: dur, text: lines[i] }); var at = t + 450; bufs[i].forEach(function (b) { if (b) { SEG.push({ at: at, b: b }); at += b.duration * 1000; } }); t += dur;
+      });
+      var total = t + 400, W = 1280, H = 720, cv = document.createElement("canvas"); cv.width = W; cv.height = H; var g = cv.getContext("2d");
+      var capAt = function (k, el) { var tx = T0[k].text; if (!tx || !V0.cap) return ""; var parts = tx.match(/[^.!?।]+[.!?।]*/g) || [tx], tot = tx.length, f = Math.max(0, Math.min(0.999, (el - 450) / Math.max(1, T0[k].d - 1100))), c = 0; for (var j = 0; j < parts.length; j++) { c += parts[j].length; if (c / tot > f) return parts[j].trim(); } return parts[parts.length - 1].trim(); };
+      var wrap = function (s0, maxW) { var ws = s0.split(" "), ls2 = [], cur = ""; ws.forEach(function (w0) { var tt = cur ? cur + " " + w0 : w0; if (g.measureText(tt).width > maxW && cur) { ls2.push(cur); cur = w0; } else cur = tt; }); if (cur) ls2.push(cur); return ls2.slice(-2); };
+      var drawImg = function (k, el, alpha) { var p = Math.min(1, el / T0[k].d), z = 1 + 0.03 * p, w = W * z, h = H * z; g.globalAlpha = alpha; g.drawImage(imgs[k], (W - w) / 2, (H - h) * 0.4, w, h); g.globalAlpha = 1; };
+      var drawAt = function (ms) {
+        g.fillStyle = "#14205B"; g.fillRect(0, 0, W, H);
+        var k = 0; while (k < T0.length - 1 && ms >= T0[k + 1].s) k++;
+        var el = ms - T0[k].s; if (el < 0) { drawImg(0, 0, Math.max(0, ms / 600)); return; }
+        if (k > 0 && el < 450) { drawImg(k - 1, T0[k - 1].d + el, 1); drawImg(k, el, el / 450); } else drawImg(k, el, 1);
+        var c = capAt(k, el); if (c) { g.font = "600 26px 'Trebuchet MS',Arial,sans-serif"; var ls2 = wrap(c, W - 220), bh = 22 + ls2.length * 34; g.fillStyle = "rgba(16,21,51,.82)"; var bw = Math.min(W - 160, Math.max.apply(null, ls2.map(function (x) { return g.measureText(x).width; })) + 48); g.beginPath(); if (g.roundRect) g.roundRect((W - bw) / 2, H - bh - 30, bw, bh, 14); else g.rect((W - bw) / 2, H - bh - 30, bw, bh); g.fill(); g.fillStyle = "#fff"; g.textAlign = "center"; ls2.forEach(function (x, j) { g.fillText(x, W / 2, H - bh - 30 + 40 + j * 34); }); g.textAlign = "left"; }
+      };
+      var fname2 = fname("mp4").replace(/\.mp4$/, "_video.mp4");
+      var finish = function (blob, ext) { if (ac) { try { ac.close(); } catch (e) { } } download(blob, fname2.replace(/mp4$/, ext)); prog(1); st.textContent = "✅ Video ready — " + Math.round(total / 1000) + " s " + ext.toUpperCase() + (voiced ? " with voice-over" : ""); };
+      return fastCfg(voiced).then(function (fv) {
+        if (fv) {
+          var FPS = 25, NF = Math.ceil(total / 1000 * FPS), err = null;
+          var mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: /^vp09/.test(fv.vc) ? "vp9" : "avc", width: W, height: H, frameRate: FPS }, audio: fv.ac ? { codec: fv.ac[1], numberOfChannels: 1, sampleRate: 48000 } : undefined, fastStart: "in-memory", firstTimestampBehavior: "offset" });
+          var venc = new VideoEncoder({ output: function (c, m) { mux.addVideoChunk(c, m); }, error: function (e) { err = e; } });
+          venc.configure({ codec: fv.vc, width: W, height: H, bitrate: 3500000, framerate: FPS });
+          var audio = function () { if (!fv.ac) return Promise.resolve(); var SR = 48000, oac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(total / 1000 * SR) + SR, SR);
+            SEG.forEach(function (sg) { var src = oac.createBufferSource(); src.buffer = sg.b; src.connect(oac.destination); src.start(sg.at / 1000); });
+            return oac.startRendering().then(function (buf) { var d = buf.getChannelData(0), aenc = new AudioEncoder({ output: function (c, m) { mux.addAudioChunk(c, m); }, error: function (e) { err = e; } }); aenc.configure({ codec: fv.ac[0], sampleRate: SR, numberOfChannels: 1, bitrate: 96000 });
+              for (var o = 0; o < d.length; o += 4800) { var n = Math.min(4800, d.length - o), ad = new AudioData({ format: "f32", sampleRate: SR, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(o / SR * 1e6), data: d.slice(o, o + n) }); aenc.encode(ad); ad.close(); }
+              return aenc.flush(); }); };
+          return new Promise(function (res, rej) { var i = 0, step = function () {
+            if (err) return rej(err); if (venc.encodeQueueSize > 6) return setTimeout(step, 4);
+            for (var lim = Math.min(NF, i + 8); i < lim; i++) { drawAt(i * 1000 / FPS); var fr = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) }); venc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close(); }
+            prog(0.4 + 0.55 * i / NF); st.textContent = "⚡ Rendering the video… " + Math.round(i / NF * 100) + "%";
+            if (i < NF) return setTimeout(step, 0);
+            venc.flush().then(audio).then(function () { if (err) throw err; mux.finalize(); res(new Blob([mux.target.buffer], { type: "video/mp4" })); }).catch(rej);
+          }; step(); }).then(function (b) { finish(b, "mp4"); });
+        }
+        // fallback: record in real time
+        var vs = cv.captureStream(30), dest = voiced && ac && ac.createMediaStreamDestination ? ac.createMediaStreamDestination() : null;
+        var stream = dest ? new MediaStream([vs.getVideoTracks()[0]].concat(dest.stream.getAudioTracks())) : vs;
+        var mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].find(function (m) { return MediaRecorder.isTypeSupported(m); }) || "", ext = /mp4/.test(mime) ? "mp4" : "webm";
+        var rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 3500000 } : {}), parts = [];
+        rec.ondataavailable = function (e) { if (e.data.size) parts.push(e.data); };
+        return new Promise(function (res) {
+          rec.onstop = function () { finish(new Blob(parts, { type: ext === "mp4" ? "video/mp4" : "video/webm" }), ext); res(); };
+          var base = dest ? ac.currentTime + 0.2 : 0, t1 = performance.now();
+          if (dest) SEG.forEach(function (sg) { var src = ac.createBufferSource(); src.buffer = sg.b; src.connect(dest); src.connect(ac.destination); src.start(base + sg.at / 1000); });
+          st.textContent = "Recording " + Math.round(total / 1000) + " s — keep this screen open"; rec.start(500);
+          (function frame() { var el = dest ? (ac.currentTime - base) * 1000 : performance.now() - t1; drawAt(Math.max(0, el)); prog(0.4 + 0.6 * Math.min(1, el / total)); if (el < total) requestAnimationFrame(frame); else setTimeout(function () { rec.stop(); }, 300); })();
+        });
+      });
+    }).catch(function (e) { st.textContent = "⚠ " + (e.message || e); if (ac) { try { ac.close(); } catch (e2) { } } });
+  }
+  function fastCfg(voiced) {
+    if (!window.VideoEncoder || !window.VideoFrame) return Promise.resolve(null);
+    var C = ["avc1.640028", "avc1.4d0028", "avc1.42001f", "vp09.00.31.08"], i = 0;
+    var tryV = function () { if (i >= C.length) return Promise.resolve(null); var c = C[i++]; return VideoEncoder.isConfigSupported({ codec: c, width: 1280, height: 720, bitrate: 3500000, framerate: 25 }).then(function (r) { return r.supported ? c : tryV(); }).catch(tryV); };
+    return tryV().then(function (vc) {
+      if (!vc) return null; if (!voiced) return { vc: vc, ac: null }; if (!window.AudioEncoder || !window.AudioData) return null;
+      var A2 = [["mp4a.40.2", "aac"], ["opus", "opus"]], j = 0, tryA = function () { if (j >= A2.length) return Promise.resolve(null); var a = A2[j++]; return AudioEncoder.isConfigSupported({ codec: a[0], sampleRate: 48000, numberOfChannels: 1, bitrate: 96000 }).then(function (r) { return r.supported ? { vc: vc, ac: a } : tryA(); }).catch(tryA); };
+      return tryA();
+    }).then(function (cfg) { return cfg ? lib("/vendor/mp4muxer/mp4-muxer.min.js", function () { return !!window.Mp4Muxer; }).then(function () { return window.Mp4Muxer ? cfg : null; }).catch(function () { return null; }) : null; });
   }
 
   window.addEventListener("resize", function () { [].forEach.call(document.querySelectorAll(".th .fr,.big"), fitScale); });

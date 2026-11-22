@@ -4,6 +4,7 @@
 //   airouter:use:<day> { [id]: { ok, err, lim, ms } }          arjob:<id> { req, by, at, st, res }   (long jobs run in arjob-background)
 // Keys are write-only: pages only ever see the last 4 characters.
 import { randomBytes } from "node:crypto";
+import { manTts, LANGS as TTS_LANGS } from "./man-core.mjs";
 
 const J = (s, o) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json" } });
 
@@ -192,6 +193,13 @@ export async function arAction(b, ctx) {
     if (ctx.jobFetch && ctx.siteUrl) { try { await ctx.jobFetch(ctx.siteUrl + "/.netlify/functions/arjob-background", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ job: id }) }); } catch (e) { } }
     else { runArJob(store, id, f, ctx.env || {}); }   // tests / local: run here
     return J(200, { ok: true, job: id });
+  }
+  if (a === "ar-tts") {   // voice-over for decks and creatives (any signed-in user; same engines and cache as tool manuals)
+    const dk = "airouter:tts:" + day() + ":" + app + ":" + (rec.username || ""), n = ((await store.get(dk)) || 0) + 1;
+    if (n > (ho ? 400 : 120)) return J(200, { ok: false, error: "Daily voice limit reached for your account." });
+    await store.set(dk, n);
+    const lang = TTS_LANGS[b.lang] ? b.lang : "en";
+    return manTts({ text: b.text, voice: b.voice }, ctx, lang);
   }
   if (a === "ar-job-get") { const j = await store.get("arjob:" + String(b.job || "").replace(/[^a-f0-9]/g, "")); if (!j) return J(200, { ok: false, error: "Job not found" }); return J(200, { ok: true, st: j.st, res: j.res || null }); }
   if (a === "ar-status") { const ids = PROVIDERS.filter((p) => cfg.prov[p.id].keys.length && cfg.prov[p.id].on).map((p) => p.id); return J(200, { ok: true, providers: ids, vision: ids.some((id) => PBY[id].vision), conf: ids.some((id) => cfg.prov[id].conf) }); }

@@ -503,12 +503,13 @@ export const LINK_CATALOG = {
 "execdeck.html": {
 "id": "execdeck",
 "icon": "🏛",
-"name": "Executive deck (AI)",
+"name": "Executive deck & Deck doctor (AI)",
 "ho": false,
 "acts": [
 "ar-chat",
 "ar-job",
 "ar-job-get",
+"ar-tts",
 "tl-use"
 ],
 "tabs": []

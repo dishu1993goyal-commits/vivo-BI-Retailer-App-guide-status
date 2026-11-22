@@ -179,7 +179,7 @@ async function ttsSarvam(key, text, lang, voice, f) {   // Sarvam AI Bulbul: Ind
   }
   return { ok: false, error: "Sarvam voice " + last };
 }
-async function manTts(b, ctx, lang) {
+export async function manTts(b, ctx, lang) {
   const { store } = ctx, f = ctx.aiFetch || fetch, kc = (await store.get("config:aikeys")) || {}, env = Object.assign({}, ctx.env || {}, { SARVAM_API_KEY: (ctx.env && ctx.env.SARVAM_API_KEY) || kc.sarvam || "", GROQ_API_KEY: (ctx.env && ctx.env.GROQ_API_KEY) || kc.groq || "" });
   const text = String(b.text || "").replace(/[\u{1F000}-\u{1FAFF}\u2600-\u27BF]/gu, "").replace(/\s+/g, " ").trim().slice(0, 700), voice = b.voice === "m" ? "m" : "f";
   if (!text) return json(400, { ok: false, error: "Nothing to read." });
