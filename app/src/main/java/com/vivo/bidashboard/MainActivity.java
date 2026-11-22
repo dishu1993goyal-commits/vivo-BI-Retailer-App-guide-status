@@ -3304,7 +3304,7 @@ public class MainActivity extends FragmentActivity {
     private static boolean mailHostOk(String u) {
         try { Uri x = Uri.parse(u); String h = String.valueOf(x.getHost()).toLowerCase(); return "https".equals(x.getScheme()) && h.matches("outlook\\.(office|office365|live)\\.com|outlook\\.cloud\\.microsoft"); } catch (Throwable t) { return false; }
     }
-    private final java.util.HashMap<String, String> extraJs = new java.util.HashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, String> extraJs = new java.util.concurrent.ConcurrentHashMap<>();
     private String assetJs(String name) {
         if (extraJs.containsKey(name)) return extraJs.get(name);
         String r = "";
@@ -3380,6 +3380,24 @@ public class MainActivity extends FragmentActivity {
                 if ("imq".equals(m) && j.optJSONArray("imeis") == null) return "bad";
                 String u = url == null ? "" : url.trim();
                 if ("mail".equals(m) ? !mailHostOk(u) : !botHostOk(u)) return "bad";
+                if ("mail".equals(m) || "imq".equals(m)) {   // take the newest helper script from the same BI site (fixes ship with the website); the bundled copy is the fallback
+                    try {
+                        java.util.concurrent.FutureTask<String> pu = new java.util.concurrent.FutureTask<>(w::getUrl); ui.post(pu);
+                        Uri o = Uri.parse(pu.get(2, java.util.concurrent.TimeUnit.SECONDS));
+                        String name = "mail".equals(m) ? "vivo_mail.js" : "vivo_imq.js", fn = "mail".equals(m) ? "__biMailRun" : "__biImqRun";
+                        if ("https".equals(o.getScheme()) && o.getHost() != null) {
+                            java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL("https://" + o.getHost() + "/" + name + "?v=" + System.currentTimeMillis()).openConnection();
+                            c.setConnectTimeout(4000); c.setReadTimeout(5000);
+                            if (c.getResponseCode() == 200) {
+                                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] bb = new byte[8192]; int n;
+                                try (java.io.InputStream in = c.getInputStream()) { while ((n = in.read(bb)) > 0 && bo.size() < 400_000) bo.write(bb, 0, n); }
+                                String js = bo.toString("UTF-8");
+                                if (js.contains(fn)) extraJs.put(name, js);
+                            }
+                            c.disconnect();
+                        }
+                    } catch (Throwable ignored) { }
+                }
                 if (!j.has("start")) j.put("start", u);
                 j.put("url", u);
                 ui.post(() -> { pKind = "bot"; showPerm(w, j); });
