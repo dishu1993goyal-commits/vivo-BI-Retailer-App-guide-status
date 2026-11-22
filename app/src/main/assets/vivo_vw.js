@@ -8,8 +8,8 @@
   var REPS = {
     app: { kind: "ana", saved: /^retailer app usability$/i, title: "Retailer App usability (Visit Details analysis)" },
     sd: { kind: "export", app: /^retailer support d/i, last: 1, file: /retailer issue feedback/i, title: "Retailer Support Desk" },
-    comp: { kind: "export", app: /^competitor tracking$/i, menu: /^upload history$/i, col: /^creation time$/i, fields: [/^level i agent$/i, /^store code$/i, /^creation time$/i], names: "Level I agent, Store code, Creation time", file: /^upload record/i, title: "Competition upload records" },
-    visit: { app: /^visit form$/i, menu: /^personnel visit$/i, dim: /^by area$/i, date: /date of visit/i, first: /^sales area$/i, firstAs: "State", title: "Staff visit report by area" }
+    comp: { kind: "export", app: /^competitor tracking$/i, menu: /^upload (history|records?)$/i, col: /^creation time$/i, fields: [/^level i agent$/i, /^store code$/i, /^creation time$/i], names: "Level I agent, Store code, Creation time", file: /^upload record/i, title: "Competition upload records" },
+    visit: { app: /^visit form$/i, menu: /^personnel visit( report)?$/i, dim: /^by area$/i, date: /date of visit/i, first: /^sales area$/i, firstAs: "State", title: "Staff visit report by area" }
   };
   // vWork opens apps inside frames: look in the page and in every same-site frame
   function docs() { var out = [D]; for (var i = 0; i < out.length && i < 20; i++) { [].forEach.call(out[i].querySelectorAll("iframe,frame"), function (f) { try { var d = f.contentDocument; if (d && d.body && out.indexOf(d) < 0) { var r = f.getBoundingClientRect(); if (r.width > 0 && r.height > 0) out.push(d); } } catch (x) { } }); } return out; }
@@ -30,7 +30,8 @@
     var heads = [].filter.call(qa("th"), vis).map(txt).filter(Boolean).slice(0, 30);
     var top = [].filter.call(qa("header *,[class*=header] *"), function (e) { return vis(e) && !e.children.length && txt(e).length > 1 && txt(e).length < 50 && e.getBoundingClientRect().top < 90; }).map(txt).slice(0, 25);
     var ins = [].filter.call(qa("input"), vis).map(function (i) { return (i.placeholder || "") + "=" + i.value; }).slice(0, 12);
-    return "step=" + S.st + " url=" + location.pathname + location.hash.slice(0, 60) + " | headings=" + heads.join("/") + " | top=" + top.join("/") + " | inputs=" + ins.join(", ");
+    var fr = [].slice.call(D.querySelectorAll("iframe,frame")), blocked = fr.filter(function (f) { try { return !f.contentDocument; } catch (x) { return true; } }).length;
+    return "step=" + S.st + "/" + (S.ast || "") + " frames=" + fr.length + (blocked ? " (" + blocked + " not readable: " + fr.map(function (f) { return String(f.src).slice(0, 60); }).join(" ; ") + ")" : "") + " url=" + location.pathname + location.hash.slice(0, 60) + " | headings=" + heads.join("/") + " | top=" + top.join("/") + " | inputs=" + ins.join(", ");
   }
   // the organisation switch at the top right ("Rajasthan - Bubugao …" → ALL)
   function orgTrigger() {
@@ -53,7 +54,7 @@
     return { heads: heads, fi: fi, rows: rows };
   }
   function fre(R) { return new RegExp(R.file.source.replace(/^\^/, "") + "[\\s_]*(\\d{14})", "i"); }
-  function ready() { var R = REPS[(load() || {}).rep] || {}; return R.kind === "export" ? (R.col ? [].some.call(qa("th"), function (e) { return vis(e) && R.col.test(txt(e)); }) : [].some.call(qa("button,a,span"), function (e) { return vis(e) && /^export\b.{0,3}$/i.test(txt(e)); })) : !!(find(R.dim) || find(R.date)); }
+  function ready() { var R = REPS[(load() || {}).rep] || {}; return R.kind === "export" ? (R.col ? [].some.call(qa("th,[class*=header] *,[class*=title]"), function (e) { return vis(e) && R.col.test(txt(e)); }) : [].some.call(qa("button,a,span"), function (e) { return vis(e) && /^export\b.{0,3}$/i.test(txt(e)); })) : !!(find(R.dim) || find(R.date)); }
   function t14() { var d = new Date(Date.now() - 120000), p = function (n) { return ("0" + n).slice(-2); }; return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
   function pager() { var n = [].filter.call(qa(".ant-pagination-next,.el-pagination .btn-next,.btn-next"), vis)[0]; if (!n) return null; if (/disabled/.test(n.className) || n.getAttribute("aria-disabled") === "true" || n.disabled) return null; return n; }
 
@@ -82,19 +83,130 @@
       var fi = fz.indexOf(m); if (fi < 0) { fi = fz.length; fz.push(m); } out.push(id + "|" + fi + "|" + dd + "|" + (isFinite(n) ? n : 1)); });
     return { rows: out, bad: bad };
   }
+  // ---- Data exploration canvas (IT Operations → Visit Details → 🔍 Data exploration): drag fields, set filters
+  function leaf(re, root) { var a = [].filter.call(root ? root.querySelectorAll("*") : qa("*"), function (e) { if (!vis(e)) return false; var t = txt(e); return t.length < 60 && re.test(t) && ![].some.call(e.children, function (c) { return re.test(txt(c)); }); }); return a; }
+  function zone(name) {   // Row / Column / Value / Result Filter → { el, chips[], x, y } (where to drop)
+    var lab = leaf(name === "filter" ? /^result filter$/i : new RegExp("^" + name + "$", "i"))[0]; if (!lab) return null;
+    var lr = lab.getBoundingClientRect(), el = lab, r;
+    for (var i = 0; i < 6 && el.parentElement; i++) { el = el.parentElement; r = el.getBoundingClientRect(); if (name === "filter" ? r.height >= 70 : r.width >= 300) break; }
+    r = el.getBoundingClientRect();
+    var chips = [].filter.call(el.querySelectorAll("*"), function (e) { var t = txt(e); return vis(e) && e !== lab && !e.contains(lab) && t && t.length < 600 && !/please drag|drag item|^row$|^column$|^value$|^result filter$/i.test(t) && e.children.length <= 6 && e.getBoundingClientRect().height < 400 && e.getBoundingClientRect().width > 40; });
+    chips = chips.filter(function (e) { var inn = chips.filter(function (o) { return o !== e && e.contains(o); }); return !inn.length || (inn.length < 2 && !inn.some(function (o) { return txt(o).length >= txt(e).length * 0.6; })); });
+    chips = chips.filter(function (e) { return !chips.some(function (o) { return o !== e && o.contains(e); }); });
+    var x = name === "filter" ? r.left + r.width / 2 : Math.min(r.right - 40, Math.max(lr.right + 80, chips.length ? chips[chips.length - 1].getBoundingClientRect().right + 60 : lr.right + 80)), y = name === "filter" ? r.top + Math.min(r.height / 2, 40) : r.top + r.height / 2;
+    return { el: el, chips: chips, x: x, y: y, doc: el.ownerDocument };
+  }
+  function hasChip(z, re) { return z && z.chips.some(function (c) { return re.test(txt(c)); }); }
+  function fire(el, type, x, y, dt) {
+    var w = el.ownerDocument.defaultView || W, o = { bubbles: true, cancelable: true, view: w, clientX: x, clientY: y, screenX: x, screenY: y, buttons: /up|end|drop/.test(type) ? 0 : 1, button: 0, pointerId: 1, isPrimary: true, pointerType: "mouse" };
+    var ev; try { ev = /^drag|^drop/.test(type) ? new w.DragEvent(type, Object.assign(o, { dataTransfer: dt })) : /^pointer/.test(type) ? new w.PointerEvent(type, o) : new w.MouseEvent(type, o); } catch (x2) { ev = new w.MouseEvent(type, o); }
+    el.dispatchEvent(ev);
+  }
+  function drag(src, z, mode) {   // mode 0: HTML5 drag & drop events · mode 1: mouse / pointer moves
+    try { src.scrollIntoView({ block: "center" }); } catch (x) { }
+    var r = src.getBoundingClientRect(), sx = r.left + Math.min(r.width / 2, 40), sy = r.top + r.height / 2, d = z.doc, tgt = d.elementFromPoint(z.x, z.y) || z.el;
+    if (mode === 0) {
+      var dt; try { dt = new (d.defaultView || W).DataTransfer(); } catch (x) { dt = null; }
+      fire(src, "pointerdown", sx, sy); fire(src, "mousedown", sx, sy); fire(src, "dragstart", sx, sy, dt); fire(src, "drag", sx, sy, dt);
+      fire(tgt, "dragenter", z.x, z.y, dt); fire(tgt, "dragover", z.x, z.y, dt); fire(tgt, "dragover", z.x + 2, z.y, dt); fire(tgt, "drop", z.x + 2, z.y, dt); fire(src, "dragend", z.x, z.y, dt);
+    } else {
+      fire(src, "pointerdown", sx, sy); fire(src, "mousedown", sx, sy);
+      for (var i = 1; i <= 8; i++) { var x = sx + (z.x - sx) * i / 8, y = sy + (z.y - sy) * i / 8, e = d.elementFromPoint(x, y) || d.body; fire(e, "pointermove", x, y); fire(e, "mousemove", x, y); if (i === 8) { fire(e, "pointerover", x, y); fire(e, "mouseover", x, y); fire(e, "mouseenter", x, y); } }
+      fire(tgt, "pointermove", z.x + 1, z.y); fire(tgt, "mousemove", z.x + 1, z.y); fire(tgt, "pointerup", z.x + 1, z.y); fire(tgt, "mouseup", z.x + 1, z.y);
+    }
+  }
+  function dimItem(name, z) {   // the field in the Dimension list (left), exact name
+    var re = new RegExp("^(t\\s+)?" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i"), zx = z ? z.el.getBoundingClientRect().left : innerWidth;
+    var a = leaf(re).filter(function (e) { var r = e.getBoundingClientRect(); return r.left < zx - 20 && r.height < 40; });
+    return a.sort(function (p, q) { return p.getBoundingClientRect().left - q.getBoundingClientRect().left; })[0];
+  }
+  function chipMenu(chip, re) {   // a chip's ▾ menu → item (Filter / Edit filter)
+    var it = leaf(re).filter(function (e) { return e.getBoundingClientRect().height < 40; })[0]; if (it) { tap(it); return true; }
+    for (var up = 0; up < 2 && chip.parentElement && chip.parentElement.getBoundingClientRect().height < 50 && txt(chip.parentElement).length < txt(chip).length + 6; up++) chip = chip.parentElement;
+    var ic = [].filter.call(chip.querySelectorAll("i,svg,span,em,b"), function (e) { return vis(e) && (!txt(e) || /^[▾▼⌄v]$/.test(txt(e))); });
+    ic.sort(function (p, q) { return q.getBoundingClientRect().right - p.getBoundingClientRect().right; });
+    try { chip.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true })); chip.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); } catch (x) { }
+    tap(ic[0] || chip); return false;
+  }
+  function hasOk(e) { return [].some.call(e.querySelectorAll("button"), function (b) { return /^(ok|confirm)$/i.test(txt(b)); }); }
+  function listDlg() { var a = [].filter.call(qa("div"), function (e) { var t = txt(e); return vis(e) && /basic screening/i.test(t) && /select all/i.test(t) && hasOk(e) && e.getBoundingClientRect().width < innerWidth * 0.8; }); return a.filter(function (e) { return !a.some(function (o) { return o !== e && e.contains(o); }); })[0]; }
+  function listPick(S, word) {   // search → select all → OK. Returns "done" when OK was pressed with something selected
+    var dl = listDlg(); if (!dl) return "nodlg";
+    var inp = [].filter.call(dl.querySelectorAll("input"), function (i) { return vis(i) && i.type !== "checkbox" && i.type !== "radio"; })[0];
+    if (inp && inp.value.toLowerCase() !== word.toLowerCase()) { setInput(inp, word); try { inp.dispatchEvent(new KeyboardEvent("keyup", { key: "a", bubbles: true })); } catch (x) { } S.lp = S.tick; return "typed"; }
+    if (S.tick - (S.lp || 0) < 2) return "wait";
+    var sel = (txt(dl).match(/view selected\s*\[?\(?\s*(\d+)/i) || [])[1];
+    if (/no data found/i.test(txt(dl)) && !(+sel)) { var sd = leaf(/search from database/i, dl)[0]; if (sd && S.tick - (S.sdb || 0) > 4) { tap(sd); S.sdb = S.tick; } return "wait"; }
+    if (!(+sel)) { var sa = leaf(/^select all$/i, dl)[0]; if (sa) tap(sa); return "wait"; }
+    var ok = [].filter.call(dl.querySelectorAll("button"), function (b) { return vis(b) && /^(ok|confirm)$/i.test(txt(b)); })[0]; if (ok) { tap(ok); return "done:" + sel; }
+    return "wait";
+  }
+  function isCanvas() { return !!(leaf(/^result filter$/i)[0] && leaf(/^dimension$/i)[0] && leaf(/^row$/i)[0] && leaf(/^value$/i)[0]); }
+  function exploreIcon() {   // the 🔍 "Data exploration" icon over the Visit Details result (right side)
+    var t = [].filter.call(qa("[title],[aria-label],[data-title],[data-original-title],[data-tip]"), function (e) { return vis(e) && /exploration/i.test([e.getAttribute("title"), e.getAttribute("aria-label"), e.getAttribute("data-title"), e.getAttribute("data-original-title"), e.getAttribute("data-tip")].join(" ")); })[0];
+    return t || null;
+  }
+  function toolbarIcons() {   // small icons on the right above "Copy data"
+    var cp = leaf(/^copy data$/i)[0]; if (!cp) return [];
+    var cr = cp.getBoundingClientRect();
+    var a = [].filter.call(qa("i,svg,span,button,a,div"), function (e) { var r = e.getBoundingClientRect(); return vis(e) && r.width >= 10 && r.width <= 34 && r.height >= 10 && r.height <= 34 && r.bottom <= cr.top + 4 && r.bottom > cr.top - 70 && r.left > cr.left - 260 && !txt(e); });
+    a = a.filter(function (e) { return !a.some(function (o) { return o !== e && e.contains(o); }); });
+    return a.sort(function (p, q) { return p.getBoundingClientRect().left - q.getBoundingClientRect().left; });
+  }
   function ana(S, R, fin, since, step) {
     if (!S.sl) { S.sl = [[S.from, S.to]]; S.si = 0; S.cz = ""; S.n = 0; S.cap = 10000; S.ast = "find"; save(S); }
     var outR = function (o) { save(S); return out(o); }, pct = function (a) { return Math.round(10 + 85 * (S.si + a) / S.sl.length); };
     var A = S.ast, sinceA = function () { return S.tick - (S.at0 || 0); }, go = function (st) { S.ast = st; S.at0 = S.tick; S.tries = 0; save(S); };
     var gen = [].filter.call(qa("button"), function (b) { return vis(b) && /generate/i.test(txt(b)); })[0];
-    var chip = function () { var c = [].filter.call(qa("div,span"), function (e) { return vis(e) && /^visit date\s*:/i.test(txt(e)) && txt(e).length < 60; }); return c.filter(function (e) { return !c.some(function (o) { return o !== e && e.contains(o); }); })[0]; };
-    if (A === "find") {   // the saved analysis open with Generate and the Visit Date filter
-      if (gen && find(R.saved) && chip()) { go("lim"); return outR({ s: "run", pct: 8, msg: "Analysis open" }); }
-      var sv = find(R.saved); if (sv && sinceA() % 6 === 1) tap(sv);
-      var vd = find(/^visit details$/i); if (!sv && vd && sinceA() % 8 === 2) tap(vd);
-      var it = find(/^it operations$/i); if (!sv && !vd && it && sinceA() % 8 === 3) tap(it);
-      if (sinceA() > 25) return outR({ s: "you", msg: "Open IT Operations → Visit Details → your saved analysis “Retailer app usability” — the helper then reads the month" });
-      return outR({ s: "run", pct: 4, msg: "Opening IT Operations → Visit Details…" });
+    var chip = function () {   // the Visit Date filter: chip in Result Filter ("Visit Date : (…)") or the Visit Date field in Row
+      var zf = zone("filter"), c = zf && zf.chips.filter(function (e) { return /^visit date\s*:/i.test(txt(e)); })[0]; if (c) return c;
+      var zr = zone("row"); return zr && zr.chips.filter(function (e) { return /^visit date\s*\(/i.test(txt(e)) || /^visit date$/i.test(txt(e)); })[0];
+    };
+    if (A === "find") {   // IT Operations → Visit Details → 🔍 Data exploration
+      if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
+      var onVD = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; }) || (leaf(/^copy data$/i)[0] && leaf(/^visit date\s*:?$/i)[0]);
+      if (onVD) { go("explore"); return outR({ s: "run", pct: 5, msg: "Visit Details open — opening Data exploration" }); }
+      var vd = find(/^visit details$/i); if (vd && sinceA() % 6 === 1) tap(vd);
+      var it = find(/^it operations$/i); if (!vd && it && sinceA() % 8 === 3) tap(it);
+      if (sinceA() > 30) return outR({ s: "you", msg: "Open IT Operations → Visit Details in vWork — the helper then builds the Retailer App logs" });
+      return outR({ s: "run", pct: 3, msg: "Opening IT Operations → Visit Details…" });
+    }
+    if (A === "explore") {
+      if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
+      var ex = exploreIcon();
+      if (!ex) {   // no title on the icons: hover them one by one until the tooltip says "Data exploration"
+        var tip = leaf(/^data exploration$/i)[0], icons = toolbarIcons();
+        if (tip && S.hov != null && icons[S.hov]) ex = icons[S.hov];
+        else if (icons.length) { S.hov = ((S.hov == null ? -1 : S.hov) + 1) % icons.length; var h = icons[S.hov]; ["pointerover", "pointerenter", "mouseover", "mouseenter", "mousemove"].forEach(function (t) { try { h.dispatchEvent(new MouseEvent(t, { bubbles: t.indexOf("enter") < 0, clientX: h.getBoundingClientRect().left + 5, clientY: h.getBoundingClientRect().top + 5 })); } catch (x) { } }); save(S); }
+      }
+      if (ex && sinceA() - (S.exT || -9) > 4) { tap(ex); S.exT = sinceA(); save(S); }
+      if (sinceA() > 40) return fin("err", "Couldn't open Data exploration on Visit Details", { diag: diag(S) });
+      return outR({ s: "run", pct: 5, msg: ex ? "Opening Data exploration…" : "Looking for the Data exploration icon…" });
+    }
+    if (A === "build") {   // Row: Job No. · Menu path · Visit Date — Value: Job No. (COUNT) — Result Filter: Sub-post
+      var NEED = [["Job No.", "row", /^job no\.?(\s|$)/i], ["Menu path", "row", /^menu path/i], ["Visit Date", "row", /^visit date/i], ["Job No.", "value", /^job no/i], ["Sub-post", "filter", /^sub-?post/i]];
+      for (var ni = 0; ni < NEED.length; ni++) {
+        var nd = NEED[ni], z = zone(nd[1]); if (!z) return outR({ s: "run", pct: 7, msg: "Reading the exploration screen…" });
+        if (hasChip(z, nd[2])) continue;
+        if (S.ni !== ni) { S.ni = ni; S.dt = 0; S.dlast = -9; save(S); }
+        if (S.tick - S.dlast < 3) return outR({ s: "run", pct: 7 + ni, msg: "Adding " + nd[0] + " to " + (nd[1] === "filter" ? "Result Filter" : nd[1][0].toUpperCase() + nd[1].slice(1)) + "…" });
+        if (S.dt >= 8) return fin("err", "Couldn't drag " + nd[0] + " to " + nd[1] + " — drag it yourself and press 🤖 again", { diag: diag(S) });
+        var src = dimItem(nd[0], zone("filter")); if (!src) { var sb = [].filter.call(qa("input"), function (i) { return vis(i) && /keyword|search/i.test(i.placeholder || ""); })[0]; if (sb && !S.typedF) { setInput(sb, ""); S.typedF = 1; } return outR({ s: "run", pct: 7, msg: "Looking for " + nd[0] + " in the field list…" }); }
+        drag(src, z, S.dt % 2); S.dt++; S.dlast = S.tick; save(S);
+        return outR({ s: "run", pct: 7 + ni, msg: "Dragging " + nd[0] + " → " + (nd[1] === "filter" ? "Result Filter" : nd[1]) + "…" });
+      }
+      go("fsub"); return outR({ s: "run", pct: 8, msg: "Fields in place" });
+    }
+    if (A === "fsub" || A === "fmenu") {   // Sub-post = every "Retailer" post · Menu path = every "vMessage" page
+      var isSub = A === "fsub", zf2 = zone("filter"), fc = zf2 && zf2.chips.filter(function (e) { return (isSub ? /^sub-?post\s*=/i : /^menu path\s*=/i).test(txt(e)); })[0];
+      if (fc && !/unlimited/i.test(txt(fc)) && !listDlg()) { go(isSub ? "fmenu" : "lim"); return outR({ s: "run", pct: 9, msg: (isSub ? "Sub-post" : "Menu path") + " filter set" }); }
+      var lpr = listPick(S, isSub ? "Retailer" : "vmessage");
+      if (/^done/.test(lpr)) return outR({ s: "run", pct: 9, msg: (isSub ? "Sub-post: " : "Menu path: ") + lpr.slice(5) + " selected" });
+      if (lpr !== "nodlg") return outR({ s: "run", pct: 9, msg: isSub ? "Choosing every Retailer post…" : "Choosing every vMessage page…" });
+      if (sinceA() > 45) return fin("err", "Couldn't set the " + (isSub ? "Sub-post" : "Menu path") + " filter", { diag: diag(S) });
+      if (sinceA() % 4 === 1) { var host = isSub ? fc : (zone("row") || { chips: [] }).chips.filter(function (e) { return /^menu path/i.test(txt(e)); })[0]; if (host) chipMenu(host, isSub ? /^edit filter$/i : /^filter$/i); }
+      else if (sinceA() % 4 === 2) { var mi = leaf(isSub ? /^edit filter$/i : /^filter$/i).filter(function (e) { return e.getBoundingClientRect().height < 40; })[0]; if (mi) tap(mi); }
+      return outR({ s: "run", pct: 9, msg: "Opening the " + (isSub ? "Sub-post" : "Menu path") + " filter…" });
     }
     if (A === "lim") {   // "Result display" (rows shown, 10000 by default): raise it as far as vWork allows, so the month comes in one go
       var lab = [].filter.call(qa("div,span,label"), function (e) { return vis(e) && !e.children.length && /^result$|^result\s*display$/i.test(txt(e)); })[0], li = null;
@@ -109,24 +221,25 @@
       go("date"); return outR({ s: "run", pct: 10, msg: "Result display: " + S.cap.toLocaleString() + " rows" + (S.sl.length > 1 ? " — reading the month in " + S.sl.length + " parts" : " — reading the whole month at once") });
     }
     var cur = S.sl[S.si]; S.cur = cur;
-    var dlg = [].filter.call(qa("div"), function (e) { return vis(e) && /fixed time/i.test(txt(e)) && /select time/i.test(txt(e)) && e.getBoundingClientRect().width < innerWidth * 0.95; });
+    var dlg = [].filter.call(qa("div"), function (e) { return vis(e) && /fixed time/i.test(txt(e)) && /dynamic time/i.test(txt(e)) && hasOk(e) && e.getBoundingClientRect().width < innerWidth * 0.95; });
     dlg = dlg.filter(function (e) { return !dlg.some(function (o) { return o !== e && e.contains(o); }); })[0];
     if (A === "date") {
       if (dlg) { go("set"); return outR({ s: "run", pct: pct(0.1), msg: "Dates " + cur[0] + " → " + cur[1] + "…" }); }
       var c = chip(); if (!c) { if (sinceA() > 15) return fin("err", "Couldn't find the Visit Date filter of the analysis", { diag: diag(S) }); return outR({ s: "run", pct: pct(0), msg: "Looking for the Visit Date filter…" }); }
-      if (sinceA() % 4 === 0) { tap(c); var ar = c.parentElement && [].filter.call(c.parentElement.querySelectorAll("[class*=arrow],[class*=icon],svg,i"), vis)[0]; if (sinceA() >= 8 && ar) tap(ar); }
-      if (sinceA() > 4) { var fm = find(/^filter$/i); if (fm) tap(fm); }
+      if (sinceA() % 4 === 0) { if (/^visit date\s*:/i.test(txt(c))) { tap(c); if (sinceA() >= 8) chipMenu(c, /^edit filter$/i); } else chipMenu(c, /^filter$/i); }
+      if (sinceA() % 4 === 2) { var fm = leaf(/^(edit )?filter$/i).filter(function (e) { return e.getBoundingClientRect().height < 40; })[0]; if (fm) tap(fm); }
       if (sinceA() > 24) return fin("err", "The Visit Date filter didn't open", { diag: diag(S) });
       return outR({ s: "run", pct: pct(0), msg: "Opening the Visit Date filter…" });
     }
     if (A === "set") {
       if (!dlg) { go("date"); return outR({ s: "run", pct: pct(0), msg: "Reopening the filter…" }); }
       var st = (txt(dlg).match(/select time\s*:?\s*(\d{4}-\d\d-\d\d)\s*(?:to|~|-)\s*(\d{4}-\d\d-\d\d)/i) || []);
-      if (st[1] === cur[0] && st[2] === cur[1]) { var okb = [].filter.call(dlg.querySelectorAll("button"), function (b) { return vis(b) && /^(ok|confirm)$/i.test(txt(b)); })[0]; if (okb) { tap(okb); go("gen"); return outR({ s: "run", pct: pct(0.3), msg: "Dates set " + cur[0] + " → " + cur[1] }); } }
+      if (!st[1]) { var iv = [].filter.call(dlg.querySelectorAll("input"), vis).map(function (i) { return i.value; }); if (/^\d{4}-\d\d-\d\d$/.test(iv[0] || "") && /^\d{4}-\d\d-\d\d$/.test(iv[1] || "")) st = [0, iv[0], iv[1]]; }
+      if (st[1] === cur[0] && st[2] === cur[1]) { var okb = [].filter.call(dlg.querySelectorAll("button"), function (b) { return vis(b) && /^(ok|confirm)$/i.test(txt(b)); })[0]; if (okb) { tap(okb); go("dchk"); return outR({ s: "run", pct: pct(0.3), msg: "Dates set " + cur[0] + " → " + cur[1] }); } }
       S.tries++; save(S); if (S.tries > 20) return fin("err", "Couldn't set the dates " + cur[0] + " → " + cur[1] + " (shows " + (st[1] || "?") + " → " + (st[2] || "?") + ")", { diag: diag(S) });
       if (/dynamic/i.test(txt(dlg)) && S.tries === 1) { var fx = [].filter.call(dlg.querySelectorAll("div,span"), function (e) { return vis(e) && /^fixed time$/i.test(txt(e)); })[0]; if (fx) tap(fx); }
       var di = [].filter.call(dlg.querySelectorAll("input"), vis);
-      if (di.length >= 2 && S.tries <= 2) { setInput(di[0], cur[0]); enter(di[0]); setInput(di[1], cur[1]); enter(di[1]); return outR({ s: "run", pct: pct(0.2), msg: "Typing the dates…" }); }
+      if (di.length >= 2 && S.tries <= 2 && !S.noType) { setInput(di[0], cur[0]); enter(di[0]); setInput(di[1], cur[1]); enter(di[1]); return outR({ s: "run", pct: pct(0.2), msg: "Typing the dates…" }); }
       // pick on the calendar: month panel "Nov 2026", start day then end day
       var MN = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"], want = MN[+cur[0].slice(5, 7) - 1] + " " + cur[0].slice(0, 4);
       var heads = [].filter.call(dlg.querySelectorAll("div,span,button"), function (e) { return vis(e) && !e.children.length && txt(e).toLowerCase() === want; });
@@ -135,6 +248,14 @@
       var cellOf = function (d) { var n = +d.slice(8); return panelCells.filter(function (e) { return +txt(e) === n; }).sort(function (a, b) { return n > 20 ? b.getBoundingClientRect().top - a.getBoundingClientRect().top : a.getBoundingClientRect().top - b.getBoundingClientRect().top; })[0]; };
       var c0 = cellOf(cur[0]), c1 = cellOf(cur[1]); if (!c0 || !c1) return outR({ s: "run", pct: pct(0.2), msg: "Reading the calendar…" });
       tap(c0); tap(c1); return outR({ s: "run", pct: pct(0.25), msg: "Picking " + cur[0] + " → " + cur[1] + " on the calendar…" });
+    }
+    if (A === "dchk") {   // the filter chip must now show the dates; typed dates that vWork ignored → pick them on the calendar
+      if (dlg) { if (sinceA() > 4) go("set"); return outR({ s: "run", pct: pct(0.3), msg: "Closing the filter…" }); }
+      var zc = zone("filter"), dc = zc && zc.chips.filter(function (e) { return /^visit date\s*:/i.test(txt(e)); })[0];
+      if (dc && txt(dc).indexOf(cur[0]) >= 0 && txt(dc).indexOf(cur[1]) >= 0) { go("gen"); return outR({ s: "run", pct: pct(0.32), msg: "Visit Date " + cur[0] + " → " + cur[1] }); }
+      if (sinceA() < 3) return outR({ s: "run", pct: pct(0.3), msg: "Checking the dates…" });
+      if (dc && !S.noType) { S.noType = 1; go("date"); return outR({ s: "run", pct: pct(0.3), msg: "Dates didn't take — picking them on the calendar" }); }
+      go("gen"); return outR({ s: "run", pct: pct(0.32), msg: "Generate…" });
     }
     if (A === "gen") {
       if (dlg) { if (sinceA() > 6) go("set"); return outR({ s: "run", pct: pct(0.3), msg: "Closing the filter…" }); }
@@ -184,7 +305,7 @@
       if (R.kind === "ana") return ana(S, R, fin, since, step);
 
       if (S.st === "open") {   // Workbench → the report's app
-        if (R.menu ? find(R.menu) : (S.appTapped && ready())) { step("menu"); return out({ s: "run", pct: 12, msg: "Report open" }); }
+        if (R.menu ? (find(R.menu) || ready()) : ready()) { step("menu"); return out({ s: "run", pct: 12, msg: "Report open" }); }
         if (S.appTapped && since() < 8) return out({ s: "run", pct: 8, msg: "Opening…" });
         var aa = findAll(R.app), a = R.last ? aa[aa.length - 1] : aa[0];
         if (a) { tap(a); S.appTapped = 1; if (R.menu) { step("menu"); } else { S.t0 = S.tick; save(S); }  return out({ s: "run", pct: 8, msg: "Opening " + txt(a) + "…" }); }
@@ -195,8 +316,8 @@
       }
       if (S.st === "menu") {
         var m = R.menu ? find(R.menu) : null; if (!R.menu) S.menuTapped = 1; if (m && (!S.menuTapped || since() % 8 === 7)) { tap(m); S.menuTapped = 1; save(S); }
-        if (S.menuTapped && since() > 1 && ready()) { step("org"); return out({ s: "run", pct: 15, msg: "Report open" }); }
-        if (since() > 20) { step("open"); }
+        if ((S.menuTapped && since() > 1 && ready()) || (since() > 3 && ready())) { step("org"); return out({ s: "run", pct: 15, msg: "Report open" }); }
+        if (since() > 20) { S.mloops = (S.mloops || 0) + 1; if (S.mloops > 2) return fin("err", "The report page didn't show what the helper expects", { diag: diag(S) }); step("open"); }
         return out({ s: "run", pct: 12, msg: "Opening the report…" });
       }
       if (R.kind === "export" && S.st === "org") step(R.col ? "xdate" : "xwait");
