@@ -3420,6 +3420,58 @@ public class MainActivity extends FragmentActivity {
             } catch (Throwable e) { return "[]"; }
         }
         @JavascriptInterface public void ack(String id) { if (id != null) getSharedPreferences("bot_runs", MODE_PRIVATE).edit().remove(id).apply(); }
+        /** a report file the vWork helper downloaded: base64, 1 MB per part ("" after the end). Only for the BI tool page. */
+        @JavascriptInterface public String file(String id, int part) {
+            try {
+                java.util.concurrent.FutureTask<Boolean> page = new java.util.concurrent.FutureTask<>(() -> botPageOk(w));
+                ui.post(page);
+                if (!page.get(2, java.util.concurrent.TimeUnit.SECONDS) || id == null || !id.matches("[A-Za-z0-9_-]{4,30}") || part < 0) return "";
+                java.io.File f = new java.io.File(getCacheDir(), "botdl_" + id + ".bin"); if (!f.exists()) return "";
+                long off = (long) part * 1048576L; if (off >= f.length()) return "";
+                try (java.io.RandomAccessFile rf = new java.io.RandomAccessFile(f, "r")) { rf.seek(off); byte[] b = new byte[(int) Math.min(1048576L, f.length() - off)]; rf.readFully(b); return android.util.Base64.encodeToString(b, android.util.Base64.NO_WRAP); }
+            } catch (Throwable e) { return ""; }
+        }
+        @JavascriptInterface public void fileDone(String id) { try { if (id != null && id.matches("[A-Za-z0-9_-]{4,30}")) new java.io.File(getCacheDir(), "botdl_" + id + ".bin").delete(); } catch (Throwable ignored) { } }
+    }
+    // the vWork helper pressed Download in vWork's own Process center: keep the file for the BI tool (read-only reports; max 60 MB)
+    private volatile boolean pGrab;
+    private void botGrab(String url, String name) {
+        if (pGrab || pDone || !inPerm || !"bot".equals(pKind) || pJob == null || !extMode(pJob.optString("mode"))) return;
+        Uri x; try { x = Uri.parse(url); } catch (Throwable t) { return; }
+        String h = String.valueOf(x.getHost()).toLowerCase();
+        if (!"https".equals(x.getScheme()) || !(botHostOk(url) || h.endsWith(".amazonaws.com") || h.endsWith(".aliyuncs.com"))) return;
+        pGrab = true;
+        final String id = pJob.optString("id"), ck = CookieManager.getInstance().getCookie(url), ua = vivoWeb != null ? vivoWeb.getSettings().getUserAgentString() : null;
+        unblockBanner("⬇ Downloading the report from vWork…", "#E8F0FE");
+        new Thread(() -> {
+            String err = null; long size = 0; String fname = name;
+            try {
+                java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                c.setConnectTimeout(15000); c.setReadTimeout(60000); c.setInstanceFollowRedirects(true);
+                if (ck != null && botHostOk(url)) c.setRequestProperty("Cookie", ck);
+                if (ua != null) c.setRequestProperty("User-Agent", ua);
+                if (c.getResponseCode() != 200) throw new Exception("vWork answered " + c.getResponseCode());
+                String cd = c.getHeaderField("Content-Disposition");
+                if ((fname == null || fname.isEmpty()) && cd != null) { java.util.regex.Matcher m = java.util.regex.Pattern.compile("filename\\*?=(?:UTF-8'')?\"?([^\";]+)").matcher(cd); if (m.find()) fname = java.net.URLDecoder.decode(m.group(1), "UTF-8"); }
+                if (fname == null || fname.isEmpty()) fname = Uri.parse(url).getLastPathSegment();
+                java.io.File f = new java.io.File(getCacheDir(), "botdl_" + id + ".bin");
+                try (java.io.InputStream in = c.getInputStream(); java.io.FileOutputStream o = new java.io.FileOutputStream(f)) {
+                    byte[] b = new byte[65536]; int n;
+                    while ((n = in.read(b)) > 0) { size += n; if (size > 60L * 1048576L) throw new Exception("The file is bigger than 60 MB"); o.write(b, 0, n); }
+                }
+                c.disconnect();
+            } catch (Throwable t) { err = String.valueOf(t.getMessage()); }
+            final String e2 = err, n2 = fname; final long sz = size;
+            ui.post(() -> {
+                if (pDone || !inPerm) return;
+                try {
+                    JSONObject r = new JSONObject(pLast.isEmpty() ? "{}" : pLast);
+                    r.put("mode", pJob.optString("mode")).put("id", id).put("rep", pJob.optString("rep")).put("from", pJob.optString("from")).put("to", pJob.optString("to"));
+                    if (e2 == null) { r.put("s", "done").put("file", true).put("fname", n2 == null ? "" : n2).put("size", sz).put("msg", "Downloaded " + (n2 == null ? "the report" : n2) + " (" + (sz / 1024) + " KB)"); pLast = r.toString(); permFinish("done", "✅ Report downloaded — going back to the tool.", "#E6F4EA"); }
+                    else { r.put("s", "err").put("msg", "Download failed: " + e2); pLast = r.toString(); permFinish("err", "⚠ Download failed: " + e2 + "\nTap here to go back.", "#FDECEC"); }
+                } catch (Throwable ignored) { }
+            });
+        }).start();
     }
     private String permScript() {
         if (pJs != null) return pJs;
@@ -3492,6 +3544,8 @@ public class MainActivity extends FragmentActivity {
             }
             @Override public void onPageFinished(WebView view, String url) { super.onPageFinished(view, url); CookieManager.getInstance().flush(); }
         });
+        pGrab = false;
+        vivoWeb.setDownloadListener((dUrl, dUa, dCd, dMime, dLen) -> botGrab(dUrl, android.webkit.URLUtil.guessFileName(dUrl, dCd, dMime)));
         vivoWeb.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onJsAlert(WebView view, String url, String message, android.webkit.JsResult result) {
                 if (uOnLogin || pDone) return false;
@@ -3549,6 +3603,8 @@ public class MainActivity extends FragmentActivity {
                     }
                     if (uOnLogin) { uOnLogin = false; unblockKeepCookies(); if (!"bot".equals(pKind)) unblockAskSave(); }
                     if ("wait".equals(s)) return;
+                    if ("grab".equals(s)) { botGrab(r.optString("url"), r.optString("fname")); return; }
+                    if (pGrab) return;
                     pLast = raw;
                     if ("rec".equals(s)) { unblockBanner("● Recording · " + r.optInt("n") + " steps. Do the task once, slowly.\nWhen finished, tap Finish on the portal's dark bar (or tap here).", "#FDECEC"); return; }
                     if ("you".equals(s)) { unblockBanner("👉 " + msg, "#FFF4E5"); return; }
