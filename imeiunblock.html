@@ -683,7 +683,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   function mlQuery() { var K = (MCFG && MCFG.keywords && MCFG.keywords.length ? MCFG.keywords : ["unblock", "unflag", "release", "rollback"]).filter(function (k) { return !/\s/.test(k); }).slice(0, 8); return K.join(" OR "); }
   // ---- read Outlook: app window, or a bookmark on Outlook web on a computer ----
   function mlRead() {
-    var job = { id: mrid("mr"), mode: "mail", q: mlQuery(), max: (MCFG && MCFG.max) || 60, days: (MCFG && MCFG.days) || 7 };
+    var job = { id: mrid("mr"), mode: "mail", q: mlQuery(), kw: (MCFG && MCFG.keywords) || [], max: (MCFG && MCFG.max) || 60, days: (MCFG && MCFG.days) || 7 };
     if (BB) { var r = BB.run(JSON.stringify(job), "https://outlook.office.com/mail/"); if (r !== "ok") toast(r === "busy" ? "Another portal window is open" : r === "bad" ? "Update the vivo BI app to 7.9 to read Outlook" : "Couldn't open Outlook (" + r + ")"); return; }
     mlDesk(job, "/vivo_mail.js", "__biMailRun", "Outlook on the web (outlook.office.com)");
   }
@@ -700,7 +700,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
   // results from the app window / bookmark
   function mlGot(r) {
     if (!r) return;
-    if (r.mode === "mail" && r.mails) {
+    if (r.mode === "mail" && r.mails && !(r.s === "err" && r.diag && !r.mails.length)) {
       if (!r.mails.length) return toast(r.msg || "No mails read");
       toast("Reading " + r.mails.length + " mails…");
       return api({ action: "iub-mail-add", mails: r.mails }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var k = x.skipped; sheet("📥 " + x.added + " new IMEI rows", "From " + x.mails + " mail(s)", [], '<div class="help">Read ' + r.mails.length + " mail(s). Skipped: " + k.sender + " other senders · " + k.keyword + " without an unblock word · " + k.noImei + " without a valid IMEI · " + k.dup + " already listed · " + k.mine + " your own.</div>"); MF.st = "new"; MSEL = {}; if (TAB === "mail") mlDraw(); });
@@ -708,6 +708,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     if (r.mode === "imq" && r.res) {
       return api({ action: "iub-mail-chk", res: r.res }).then(function (x) { if (!x.ok) return toast(x.error); mlSet(x); var v = Object.keys(r.res).map(function (k) { return r.res[k]; }); toast("🔍 " + v.length + " checked · " + v.filter(function (y) { return y.found && !y.act; }).length + " not activated · " + v.filter(function (y) { return y.found && y.act; }).length + " activated · " + v.filter(function (y) { return !y.found; }).length + " not found"); MF.st = "not_activated"; MSEL = {}; if (TAB === "mail") mlDraw(); });
     }
+    if (r.s === "err" && r.diag) { sheet("⚠ " + (r.msg || "Couldn't read Outlook"), "Send these details to whoever maintains this tool", [["📋", "Copy details", function () { try { navigator.clipboard.writeText(r.diag).then(function () { toast("Copied"); }); } catch (e) { prompt("Copy:", r.diag); } return false; }, "pri"]], '<div class="help w">Outlook showed the results, but the tool couldn\'t find the mail rows on that screen. Meanwhile use 📋 Paste / upload mails.</div><pre style="white-space:pre-wrap;font-size:11px;max-height:240px;overflow:auto">' + esc(r.diag) + "</pre>"); return; }
     if (r.s === "err") toast("⚠ " + (r.msg || "Stopped"));
   }
   function mlPending() { if (!BB) return; try { JSON.parse(BB.pending() || "[]").forEach(function (p) { var st = null; try { st = JSON.parse(p.status || "null"); } catch (e) { } BB.ack(p.id); if (st && (st.mode === "mail" || st.mode === "imq")) mlGot(st); else if (/^m[rq]/.test(p.id) && p.state !== "done") toast("Window closed — nothing read"); }); } catch (e) { } }
