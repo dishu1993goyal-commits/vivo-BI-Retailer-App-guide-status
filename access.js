@@ -4,9 +4,18 @@
 // One-tool links: a browser signed in from a shared link may only stay on that one tool page.
 (function () {
   try {
-    var w = JSON.parse(localStorage.getItem("biw-auth") || "null"); if (!w || !w.link || !w.link.page) return;
-    var L = w.link, pages = (L.pages && L.pages.length ? L.pages : [L.page]).map(function (p) { return String(p).toLowerCase(); });
-    var here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+    var w = JSON.parse(localStorage.getItem("biw-auth") || "null"), here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+    var portal = here === "index.html" || here === "hub.html", LS = localStorage, pg = function (x) { var L0 = x.link; return (L0.pages && L0.pages.length ? L0.pages : [L0.page]).map(function (p) { return String(p).toLowerCase(); }); };
+    // The normal portal address always opens the dashboard: a shared-link session is put aside here (and the person's own login, if one was put aside when the link was opened, comes back).
+    if (w && w.link && portal) {
+      LS.setItem("biw-auth-link", JSON.stringify(w));
+      var main = LS.getItem("biw-auth-main"); if (main) { LS.setItem("biw-auth", main); LS.removeItem("biw-auth-main"); } else LS.removeItem("biw-auth");
+      if (here !== "index.html") location.reload(); return;
+    }
+    // A shared tool page opened again on a browser with no login of its own: the link session put aside earlier opens it
+    if ((!w || !w.token) && !portal && here !== "open.html") { var lk = JSON.parse(LS.getItem("biw-auth-link") || "null"); if (lk && lk.link && lk.token && pg(lk).indexOf(here) >= 0) { LS.setItem("biw-auth", JSON.stringify(lk)); location.reload(); return; } }
+    if (!w || !w.link || !w.link.page) return;
+    var L = w.link, pages = pg(w);
     if (here !== "open.html" && pages.indexOf(here) < 0) { location.replace("/" + pages[0]); return; }
     window.BI_LINK = L;
     var tool = (L.tools || []).filter(function (x) { return String(x.page).toLowerCase() === here; })[0] || { name: L.tool, tabs: [], all: [] };

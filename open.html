@@ -198,7 +198,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 </style>
 <script src="theme.js?v=8"></script>
 <script src="lang.js?v=3" defer></script>
-<script src="access.js?v=3"></script>
+<script src="access.js?v=4"></script>
 <script src="cust.js?v=65"></script>
 </head>
 <body>
@@ -399,14 +399,14 @@ td.n,th.n{text-align:right;white-space:nowrap}
       ((r.tools || []).length > 1 ? '<div style="margin-top:8px">' + r.tools.map(function (x) { return '<div style="padding:6px 0;border-top:1px solid #EEF0F6;font-size:13.5px">' + x.icon + " " + esc(x.name) + "</div>"; }).join("") + "</div>" : "") +
       (r.ask ? '<label class="lb">Your name</label><input class="tx" id="nm" autocomplete="name"><label class="lb">Mobile number</label><input class="tx" id="mb" inputmode="numeric" maxlength="10" autocomplete="tel">' : "") +
       (r.pin ? '<label class="lb">PIN (from the sender)</label><input class="tx" id="pn" inputmode="numeric" maxlength="8" type="password">' : "") +
-      (other ? '<div class="help w">This browser is logged in to the BI dashboard as <b>' + esc(cur.username) + "</b>. Opening this link here will sign that login out on this browser.</div>" : "") +
+      (other ? '<div class="help w">This browser is logged in to the BI dashboard as <b>' + esc(cur.username) + "</b>. Your own login is kept aside: the normal portal address still opens the dashboard.</div>" : "") +
       '<div class="bar2" style="margin-top:12px"><button class="btn pri" id="go" style="width:100%">Open ' + esc(r.tool) + "</button></div></div>";
     $("go").onclick = function () {
       var b = { action: "tlk-p-join", k: K }; if (r.ask) { b.name = $("nm").value.trim(); b.mobile = $("mb").value.trim(); if (b.name.length < 2 || !/^[6-9]\d{9}$/.test(b.mobile)) return toast("Enter your name and 10-digit mobile"); } if (r.pin) b.pin = $("pn").value.trim();
       $("go").disabled = true;
       pub(b).then(function (x) {
         $("go").disabled = false; if (!x.ok) return toast(x.error || "Couldn't open");
-        try { localStorage.setItem("biw-auth", JSON.stringify({ app: x.app, username: x.username, token: x.token, link: { id: id, page: x.page, pages: x.pages || [x.page], tools: x.tools || [], demo: !!x.demo, tool: x.tool, label: x.label } })); localStorage.removeItem("biw-role"); } catch (e) { return toast("Please allow this site to store data (turn off private mode)"); }
+        try { if (cur && cur.token && !cur.link) localStorage.setItem("biw-auth-main", JSON.stringify(cur)); localStorage.removeItem("biw-auth-link"); localStorage.setItem("biw-auth", JSON.stringify({ app: x.app, username: x.username, token: x.token, link: { id: id, page: x.page, pages: x.pages || [x.page], tools: x.tools || [], demo: !!x.demo, tool: x.tool, label: x.label } })); localStorage.removeItem("biw-role"); } catch (e) { return toast("Please allow this site to store data (turn off private mode)"); }
         location.replace("/" + x.page);
       });
     };
