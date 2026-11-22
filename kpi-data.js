@@ -14,7 +14,8 @@ window.KPIDATA = (function () {
       var KE = new Function("var module; " + html.slice(e0 + '<script id="s-eng">'.length, e1) + "; return KE;")();
       var RAW = D.rawlog[0], SETUP = D.setup[0];
       var codes = (SETUP.states || []).map(function (s) { return { code: String(s.code || ""), state: s.state }; }).filter(function (x) { return x.code; }).sort(function (x, y) { return y.code.length - x.code.length; });
-      return { KE: KE, RAW: RAW, SETUP: SETUP, states: (SETUP.states || []).map(function (s) { return s.state; }), span: KE.span(RAW),
+      var META = (D.meta && D.meta[0]) || {};
+      return { KE: KE, RAW: RAW, SETUP: SETUP, META: META, people: META.people || {}, states: (SETUP.states || []).map(function (s) { return s.state; }), span: KE.span(RAW),
         stateOfRid: function (rid) { var r = String(rid || "").toUpperCase(); for (var i = 0; i < codes.length; i++) if (r.indexOf(codes[i].code) === 0) return codes[i].state; return ""; },
         months: function () { var set = {}; RAW.days.forEach(function (d) { set[d.slice(0, 7)] = 1; }); return Object.keys(set).sort(); } };
     });

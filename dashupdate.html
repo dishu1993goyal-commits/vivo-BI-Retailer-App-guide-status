@@ -206,6 +206,57 @@ td.n,th.n{text-align:right;white-space:nowrap}
 .ent input{width:72px;padding:6px;border:1px solid #D5D9EE;border-radius:8px;font:inherit;font-size:12.5px}
 .steps{counter-reset:s;margin:6px 0 0;padding:0;list-style:none}.steps li{counter-increment:s;position:relative;padding:4px 0 4px 30px;font-size:13px;line-height:1.5}.steps li:before{content:counter(s);position:absolute;left:0;top:4px;width:22px;height:22px;border-radius:50%;background:#4D5BF9;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
 .big{font-size:40px;text-align:center}
+/* ---- dark dashboard theme for Rankings + Key indicators ---- */
+body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12163A 0%,#1D1A4A 55%,#3A2E14 130%)}body.dkb .tabs2 button{background:#1A1F48;color:#B8C0F0}body.dkb .tabs2 button.on{background:linear-gradient(90deg,#E6CF86,#C9A64B);color:#1A1405}
+.dk{color:#E8EBFF;font-size:13px}.dk b{color:#fff}.dk .sp{flex:1}
+.dk-row{display:flex;gap:10px;align-items:center}
+.dk-hero{background:radial-gradient(120% 140% at 0% 0%,#2A2F7A 0%,#151A44 45%,#0E1230 100%);border:1px solid rgba(230,207,134,.25);border-radius:20px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.dk-eyebrow{font-size:10.5px;letter-spacing:.14em;color:#E6CF86;font-weight:800}.dk-title{font-size:22px;font-weight:900;color:#fff;line-height:1.2}
+.dk-pub{font-size:11px;color:#9AA3D6;background:rgba(255,255,255,.06);border-radius:99px;padding:4px 10px;white-space:nowrap}
+.dk-chips{display:flex;gap:6px;overflow:auto;margin-top:12px;padding-bottom:2px}.dk-chips button{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#C9CFF5;border-radius:99px;padding:6px 12px;font-weight:800;font-size:12px;white-space:nowrap}.dk-chips button.on{background:#E6CF86;color:#1A1405;border-color:#E6CF86}
+.dk-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}@media(min-width:640px){.dk-tiles{grid-template-columns:repeat(4,1fr)}}
+.dk-tile{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:10px 12px}.dk-tile span{display:block;font-size:10.5px;color:#9AA3D6;font-weight:700;text-transform:uppercase;letter-spacing:.06em}.dk-tile b{display:block;font-size:17px;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dk-tile small{font-size:11.5px;color:#9AA3D6}
+.up,.dk-tile em.up{color:#2FD08A;font-style:normal;font-weight:800}.dn,.dk-tile em.dn{color:#FF6B7A;font-style:normal;font-weight:800}
+.dk-card{background:#141938;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:14px;margin-top:12px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.dk-h{font-size:14.5px;font-weight:900;color:#fff;margin-bottom:10px}.dk-mut{color:#8E97C9;font-size:11.5px}.dk-gold{color:#E6CF86!important}.dk-big{font-size:34px;font-weight:900;color:#fff;line-height:1.1}
+.dk-empty{text-align:center;padding:30px;font-size:15px}
+.dk-av{border-radius:50%;object-fit:cover;border:2px solid rgba(230,207,134,.7);flex:none;display:inline-flex}.dk-ini{align-items:center;justify-content:center;background:linear-gradient(135deg,#4D5BF9,#9B7BFF);color:#fff;font-weight:900}
+.dk-mv{font-size:10.5px;font-weight:900;margin-left:4px}.dk-mv.up{color:#2FD08A}.dk-mv.dn{color:#FF6B7A}.dk-mv.eq{color:#7F88B8}
+/* podium */
+.dk-hof{background:linear-gradient(180deg,#1B1F4A 0%,#141938 70%)}
+.dk-pod{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin-top:6px}
+.dk-pc{flex:1;max-width:190px;display:flex;flex-direction:column;align-items:center;text-align:center;cursor:pointer;gap:3px}.dk-pc b{font-size:13px;line-height:1.2}.dk-pc small{font-size:10.5px;color:#9AA3D6;min-height:13px}
+.dk-medal{font-size:26px;margin-top:-16px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.dk-block{width:100%;border-radius:12px 12px 4px 4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:10px;margin-top:6px;position:relative}
+.dk-block span{font-size:20px;font-weight:900;color:#1A1405}.dk-block i{font-style:normal;font-weight:900;font-size:12px;color:rgba(26,20,5,.7)}.dk-block .dk-mv{position:absolute;bottom:6px}
+.p1 .dk-block{height:120px;background:linear-gradient(180deg,#F5E3A3,#C9A64B);box-shadow:0 0 30px rgba(230,207,134,.35)}.p2 .dk-block{height:92px;background:linear-gradient(180deg,#E7EAF5,#9EA6C2)}.p3 .dk-block{height:74px;background:linear-gradient(180deg,#F0C49B,#B4743F)}
+.p1 .dk-av{box-shadow:0 0 0 4px rgba(230,207,134,.3),0 0 24px rgba(230,207,134,.5)}
+.dk-hof45{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.dk-hf{display:flex;gap:8px;align-items:center;min-width:0;overflow:hidden;background:rgba(255,255,255,.05);border-radius:12px;padding:8px;cursor:pointer}.dk-hf b{font-size:12.5px}.dk-hf>div{min-width:0}.dk-hf>div b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dk-hf small{display:block;font-size:10.5px;color:#9AA3D6}
+/* bars */
+.dk-leg{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11px;color:#B8C0F0;margin:4px 0 8px}.dk-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.dk-bars{display:flex;flex-direction:column;gap:6px}.dk-br{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px}.dk-br:hover .dk-st{color:#E6CF86}
+.dk-rk{width:20px;text-align:right;font-weight:900;color:#E6CF86;flex:none}.dk-st{width:108px;flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#D8DCF8}
+.dk-track{flex:1;height:14px;background:rgba(255,255,255,.06);border-radius:7px;display:flex;overflow:hidden;position:relative}.dk-track i{display:block;height:100%}.dk-track i+i{box-shadow:inset 1px 0 0 rgba(10,13,36,.6)}.dk-track em{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.85}
+.dk-track i.lost{background:repeating-linear-gradient(45deg,rgba(255,107,122,.45) 0 4px,rgba(255,107,122,.12) 4px 8px)}
+.dk-sc{width:38px;text-align:right;flex:none}
+/* heatmap */
+.dk-scroll{overflow:auto;max-height:520px}.dk-hm{border-collapse:separate;border-spacing:3px;width:100%;font-size:11.5px}.dk-hm th{font-size:10px;color:#9AA3D6;font-weight:800;text-align:center;padding:4px;position:sticky;top:0;background:#141938;line-height:1.25}.dk-hm th:first-child{text-align:left}
+.dk-hm td{text-align:center;color:#fff;font-weight:800;border-radius:6px;padding:6px 4px;min-width:44px}.dk-hm td:first-child{text-align:left;background:transparent;font-weight:600;color:#D8DCF8;white-space:nowrap;min-width:120px}.dk-hm tr{cursor:pointer}
+.dk-two{display:grid;grid-template-columns:1fr;gap:0 12px}@media(min-width:640px){.dk-two{grid-template-columns:1fr 1fr}}
+.dk-lead{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.05)}.dk-lead:first-of-type{border-top:0}.dk-lead small{display:block;font-size:10.5px;color:#8E97C9}
+.dk-dot{width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;flex:none;color:#fff;font-weight:900}
+.dk-att{background:rgba(255,107,122,.06);border:1px solid rgba(255,107,122,.18);border-radius:14px;padding:10px;margin-top:8px}
+.dk-goal{background:rgba(230,207,134,.1);border:1px solid rgba(230,207,134,.3);border-radius:12px;padding:8px 10px;margin:8px 0;font-size:12.5px;line-height:1.5}
+.dk-act{display:flex;gap:10px;margin-top:10px;line-height:1.45}.dk-n{width:24px;height:24px;border-radius:50%;color:#0A0D24;font-weight:900;display:flex;align-items:center;justify-content:center;flex:none;font-size:12px}
+.dk-tip{font-size:12px;color:#C9CFF5;margin-top:3px}.dk-gain{display:inline-block;background:rgba(47,208,138,.15);color:#2FD08A;font-weight:800;border-radius:99px;padding:1px 8px;font-size:11px;margin-left:4px}
+.dk-rings{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px}.dk-rc{display:flex;flex-direction:column;align-items:center;text-align:center;background:rgba(255,255,255,.04);border-radius:14px;padding:8px 4px}.dk-rc b{font-size:11.5px;margin-top:2px}.dk-rc small{font-size:10.5px;color:#8E97C9}
+.dk-mini{display:grid;grid-template-columns:1fr;gap:10px}@media(min-width:640px){.dk-mini{grid-template-columns:1fr 1fr}}.dk-mc{background:rgba(255,255,255,.04);border-radius:14px;padding:10px}.dk-mc b{font-size:12.5px}
+.dk-gap{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px}.dk-gap>span:first-child{width:130px;flex:none;color:#D8DCF8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dk-gap b{width:56px;text-align:right;flex:none}
+.dk-plan{border-color:rgba(47,208,138,.35);background:linear-gradient(180deg,#13253A,#141938)}
+.dk-btn{background:rgba(255,255,255,.08)!important;color:#fff!important;border:1px solid rgba(255,255,255,.15)!important}
+.dk-sel{background:#0E1230;color:#fff;border:1px solid rgba(230,207,134,.4);border-radius:12px;padding:9px 12px;font:inherit;font-weight:700;max-width:230px}
+.dk-tabs2{display:flex;gap:6px;overflow:auto;margin-bottom:10px}.dk-tabs2 button{border:1px solid rgba(255,255,255,.12);background:transparent;color:#B8C0F0;border-radius:99px;padding:6px 11px;font-size:11.5px;font-weight:800;white-space:nowrap}.dk-tabs2 button.on{background:#fff;color:#0A0D24}
+.dk-foot{text-align:center;color:#6670A6;font-size:11px;margin:14px 0 6px}
 </style>
 <script src="theme.js?v=8"></script>
 <script src="lang.js?v=3" defer></script>
@@ -214,7 +265,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
 </head>
 <body>
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📊</span></div>
-  <h1>KPI Dashboard</h1><p>State rankings and key indicators — HO updates the month from vWork in one go</p></div>
+  <h1>KPI Dashboard</h1><p>State rankings, hall of fame, KPI analysis and action plans</p></div>
 <div class="wrap"><div class="tabs2" id="tabs"></div><div id="view"><div class="loading"><div class="spin"></div>Loading…</div></div></div>
 <script src="/kpi-data.js?v=4"></script>
 <script>
@@ -407,47 +458,152 @@ td.n,th.n{text-align:right;white-space:nowrap}
   function load(force) {
     if (force) { DATA = null; try { KPIDATA.load = KPIDATA.load; } catch (e) { } }
     return Promise.all([KPIDATA.load(), fetch("/api/dpub?meta=1", { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })]).then(function (R) {
-      DATA = R[0]; PUBM = R[1]; var ms = DATA.months(); if (!F.m || ms.indexOf(F.m) < 0) F.m = ms[ms.length - 1] || ""; draw();
+      DATA = R[0]; PUBM = R[1]; var ms = allMonths(); if (!F.m || ms.indexOf(F.m) < 0) F.m = ms[ms.length - 1] || ""; draw();
     }, function (e) { VIEW.innerHTML = '<div class="card empty"><b>' + esc(e.message || "Couldn't load the dashboard data") + "</b></div>"; });
   }
-  function draw() { ({ dash: tDash, kpi: tKpi, upd: tUpd, src: tSrc })[TAB](); }
-  // ======================= rankings for everyone (same engine and data as the dashboard) =======================
+  function draw() { document.body.classList.toggle("dkb", TAB === "dash" || TAB === "kpi"); ({ dash: tDash, kpi: tKpi, upd: tUpd, src: tSrc })[TAB](); }
+  // ======================= 📊 Rankings + 📈 Key indicators (dark theme, charts, podium, action plans) =======================
+  var KC = { new: "#9B7BFF", app: "#6C7BFF", sales: "#2FD08A", visit: "#FFB547", comp: "#3EC6F0", vnotice: "#FF6FAE" };
+  var KI = { new: "🧩", app: "📱", sales: "🎯", visit: "📍", comp: "🥊", vnotice: "📢" };
+  var MEDAL = ["🥇", "🥈", "🥉", "🏅", "🏅"];
   function score(m) { if (!DATA || !m) return null; try { return DATA.KE.scorePeriod(DATA.RAW, DATA.SETUP, m + "-01", lastDay(m), "Total"); } catch (e) { return null; } }
   function stRows(sp) { return ((sp && sp.kpi_state) || []).filter(function (r) { return r.state && r.code !== "PAN" && r.state !== "Total" && r.state !== "PAN India"; }); }
-  function pubLine() { return PUBM ? '<div class="muted" style="font-size:12px">Updated ' + dt(PUBM.at) + (PUBM.by ? " by " + esc(PUBM.by) : "") + (PUBM.months && PUBM.months.length ? " · data up to " + mLab(PUBM.months[PUBM.months.length - 1]) : "") + "</div>" : ""; }
-  function mSel() { var ms = DATA.months().slice().reverse(); return '<select class="tx" id="msel" style="max-width:180px">' + ms.map(function (m) { return '<option value="' + m + '"' + (m === F.m ? " selected" : "") + ">" + mLab(m) + "</option>"; }).join("") + "</select>"; }
+  var SC = {}; function scoreC(m) { if (!(m in SC)) SC[m] = score(m); return SC[m]; }
+  function ctx(m) {   // everything the two tabs need for one month
+    var sp = scoreC(m), R = stRows(sp).slice().sort(function (a, b) { return (a.rank || 99) - (b.rank || 99); }), P = {}; stRows(scoreC(prevM(m))).forEach(function (r) { P[r.state] = r; });
+    var K = sp ? DATA.KE.KPIS.filter(function (k) { return sp.cfg[k] && sp.cfg[k].w > 0; }) : [];
+    return { m: m, sp: sp, R: R, P: P, K: K, w: function (k) { return sp.cfg[k].w; }, nm: function (k) { return (sp.cfg[k] && sp.cfg[k].name) || DATA.KE.DEFNAME[k]; }, pts: function (r, k) { return r[DATA.KE.PTS[k]] || 0; }, ach: function (r, k) { var v = r[k]; return v == null ? 0 : Math.max(0, Math.min(1, v)); } };
+  }
+  function pubLine() { return PUBM ? '<span class="dk-pub">🕒 Updated ' + dt(PUBM.at) + (PUBM.months && PUBM.months.length ? " · data till " + mLab(PUBM.months[PUBM.months.length - 1]) : "") + "</span>" : ""; }
+  var AM = null; function allMonths() { if (!AM) { var cur = (function () { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2); })(); AM = DATA.KE.dataMonths(DATA.RAW, DATA.SETUP).filter(function (m) { return m <= cur && stRows(scoreC(m)).length; }); if (!AM.length) AM = DATA.months(); } return AM; }
+  function monthChips() { var ms = allMonths().slice(-12).reverse(); return '<div class="dk-chips">' + ms.map(function (m) { return '<button data-m="' + m + '"' + (m === F.m ? ' class="on"' : "") + ">" + mShort(m) + "</button>"; }).join("") + "</div>"; }
+  function bindChips() { [].forEach.call(VIEW.querySelectorAll("[data-m]"), function (b) { b.onclick = function () { F.m = b.dataset.m; draw(); }; }); }
+  function av(state, size) {
+    var p = DATA.people && DATA.people[state], img = p && p.i, ini = String(state).replace(/[^A-Za-z ]/g, "").split(" ").map(function (x) { return x[0]; }).join("").slice(0, 2).toUpperCase();
+    return img ? '<img class="dk-av" style="width:' + size + "px;height:" + size + 'px" src="' + esc(img) + '" alt="">' : '<span class="dk-av dk-ini" style="width:' + size + "px;height:" + size + "px;font-size:" + Math.round(size * 0.36) + 'px">' + esc(ini || "?") + "</span>";
+  }
+  function mv(r, P) { var o = P[r.state]; if (!o || !o.rank || !r.rank) return ""; var d = o.rank - r.rank; return d ? '<span class="dk-mv ' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" + d : "▼" + -d) + "</span>" : '<span class="dk-mv eq">•</span>'; }
+  function ring(pct, color, size, label, txt) {   // SVG donut gauge
+    var r = size / 2 - 6, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0));
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + " " + size + '"><circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8"/><circle cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="8" stroke-linecap="round" stroke-dasharray="' + (c * v / 100).toFixed(1) + " " + c.toFixed(1) + '" transform="rotate(-90 ' + size / 2 + " " + size / 2 + ')"/><text x="50%" y="' + (label ? "47%" : "53%") + '" text-anchor="middle" fill="#fff" font-size="' + Math.round(size * 0.22) + '" font-weight="800">' + (txt != null ? txt : Math.round(v) + "%") + "</text>" + (label ? '<text x="50%" y="66%" text-anchor="middle" fill="#9AA3D6" font-size="' + Math.round(size * 0.11) + '">' + esc(label) + "</text>" : "") + "</svg>";
+  }
+  function lineSvg(labels, series, o) {   // themed line chart: series [{name, values, color, dash, dots}]
+    o = o || {}; var W = 640, H = o.h || 210, L = 34, Rr = 24, T = 14, B = 26, all = []; series.forEach(function (s) { s.values.forEach(function (v) { if (v != null && isFinite(v)) all.push(v); }); });
+    if (!all.length) return '<div class="dk-mut">No data</div>';
+    var lo = o.min != null ? o.min : Math.min.apply(null, all), hi = o.max != null ? o.max : Math.max.apply(null, all); if (hi - lo < 1e-9) { hi += 1; lo -= 1; } if (o.inv) { var t0 = lo; lo = hi; hi = t0; }
+    var x = function (i) { return L + (labels.length < 2 ? (W - L - Rr) / 2 : i * (W - L - Rr) / (labels.length - 1)); }, y = function (v) { return T + (H - T - B) * (1 - (v - lo) / (hi - lo)); };
+    var g = ""; for (var k = 0; k <= 4; k++) { var v = lo + (hi - lo) * k / 4, yy = y(v); g += '<line x1="' + L + '" x2="' + (W - Rr) + '" y1="' + yy + '" y2="' + yy + '" stroke="rgba(255,255,255,.07)"/><text x="' + (L - 6) + '" y="' + (yy + 4) + '" text-anchor="end" fill="#7F88B8" font-size="10">' + (o.fmt ? o.fmt(v) : Math.round(v)) + "</text>"; }
+    labels.forEach(function (l, i) { g += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle" fill="#7F88B8" font-size="10">' + esc(l) + "</text>"; });
+    series.forEach(function (s) {
+      var pts = s.values.map(function (v, i) { return v == null || !isFinite(v) ? null : [x(i), y(v)]; }), d = "", started = false;
+      pts.forEach(function (p) { if (!p) { started = false; return; } d += (started ? " L" : " M") + p[0].toFixed(1) + " " + p[1].toFixed(1); started = true; });
+      if (s.area && pts.filter(Boolean).length > 1) { var f = pts.filter(Boolean); g += '<path d="M' + f[0][0] + " " + (H - B) + " L" + f.map(function (p) { return p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" L") + " L" + f[f.length - 1][0] + " " + (H - B) + ' Z" fill="' + s.color + '" opacity=".14"/>'; }
+      g += '<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="' + (s.w || 2.6) + '" stroke-linejoin="round" stroke-linecap="round"' + (s.dash ? ' stroke-dasharray="5 5"' : "") + "/>";
+      pts.forEach(function (p, i) { if (p && (s.dots !== false)) g += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3.6" fill="#0E1230" stroke="' + s.color + '" stroke-width="2.2"><title>' + esc(s.name + " · " + labels[i] + ": " + (o.fmt ? o.fmt(s.values[i]) : s.values[i])) + "</title></circle>"; });
+    });
+    return '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto">' + g + '</svg><div class="dk-leg">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+  }
+  function heat(p) { var h = Math.round(Math.max(0, Math.min(1, p)) * 120); return "hsl(" + h + ",70%," + (28 + p * 10) + "%)"; }
+  // action plan: where the points are lost, how many each KPI can give, what to do
+  var TIPS = {
+    app: function (r) { var f = [["sa", "Scheme announcements", "share every new scheme in the Retailer App and ask ASMs to show retailers where to read it"], ["sp", "Scheme payouts", "publish payout statements in the app and tell retailers to check their payout there"], ["an", "Announcements & notifications", "send notices through the app instead of WhatsApp, and follow up with retailers who haven't opened them"], ["av", "App visits", "run a daily app-login drive at counters with promoters and ASMs"]].sort(function (a, b) { return (r[a[0]] || 0) - (r[b[0]] || 0); })[0]; return "Weakest app feature: <b>" + f[1] + "</b> (" + p1((r[f[0]] || 0) * 100) + "%) — " + f[2] + "."; },
+    sales: function () { return "Configure VBA targets for every eligible store before the 5th of the month and check the list mid-month for stores still without a target."; },
+    visit: function () { return "Plan visits for every unvisited store in the beat plan, track valid visits daily and close gaps in districts with low coverage."; },
+    comp: function (r) { return /support/i.test(r.option || "") ? "Close support desk queries within the TAT and clear the pending queue every week." : "Run a weekly competition upload drive — every active store uploads competition prices / displays at least once a week."; },
+    vnotice: function () { return "Send at least one v-Notice in the month to all eligible retailers and check the sent / eligible ratio."; },
+    new: function () { return "Complete at least one new implementation module this month and record it with HO."; }
+  };
+  function plan(C, r) {
+    var best = {}; C.K.forEach(function (k) { best[k] = Math.max.apply(null, C.R.map(function (x) { return C.ach(x, k); }).concat([0])); });
+    var avg = {}; C.K.forEach(function (k) { avg[k] = C.R.reduce(function (a, x) { return a + C.ach(x, k); }, 0) / Math.max(1, C.R.length); });
+    var opp = C.K.map(function (k) { var w = C.w(k), got = C.pts(r, k), lost = Math.max(0, w - got), tgt = Math.max(C.ach(r, k), Math.min(1, Math.max(avg[k], C.ach(r, k) + (best[k] - C.ach(r, k)) * 0.5))), gain = Math.max(0, (tgt - C.ach(r, k)) * w); return { k: k, w: w, got: got, lost: lost, ach: C.ach(r, k), avg: avg[k], best: best[k], tgt: tgt, gain: gain }; }).sort(function (a, b) { return b.lost - a.lost; });
+    var i = C.R.indexOf(r), next = i > 0 ? C.R[i - 1] : null, need = next ? Math.max(0.1, (next.score || 0) - (r.score || 0) + 0.1) : 0;
+    return { opp: opp, next: next, need: need, top: opp.filter(function (o) { return o.lost > 0.05; }).slice(0, 3) };
+  }
+  function planHtml(C, r, short) {
+    var P = plan(C, r), out = "";
+    if (P.next) out += '<div class="dk-goal">🎯 <b>' + p1(P.need) + ' points</b> to overtake <b>#' + P.next.rank + " " + esc(P.next.state) + "</b>" + (P.top[0] ? " — biggest chance: " + KI[P.top[0].k] + " " + esc(C.nm(P.top[0].k)) + " (+" + p1(P.top[0].gain) + " pts if raised to " + Math.round(P.top[0].tgt * 100) + "%)" : "") + "</div>";
+    else out += '<div class="dk-goal">👑 Rank 1 — keep every KPI at this level' + (P.top[0] ? "; the only room left is " + esc(C.nm(P.top[0].k)) + " (" + p1(P.top[0].lost) + " pts)" : "") + ".</div>";
+    (short ? P.top.slice(0, 2) : P.top).forEach(function (o, j) {
+      out += '<div class="dk-act"><span class="dk-n" style="background:' + KC[o.k] + '">' + (j + 1) + '</span><div><b>' + KI[o.k] + " " + esc(C.nm(o.k)) + '</b> <span class="dk-mut">' + Math.round(o.ach * 100) + "% · PAN avg " + Math.round(o.avg * 100) + "% · best " + Math.round(o.best * 100) + "% · losing " + p1(o.lost) + " of " + p1(o.w) + ' pts</span><div class="dk-tip">' + (TIPS[o.k] ? TIPS[o.k](r) : "") + (o.gain > 0.05 ? ' <span class="dk-gain">Target ' + Math.round(o.tgt * 100) + "% → +" + p1(o.gain) + " pts</span>" : "") + "</div></div></div>";
+    });
+    if (!P.top.length) out += '<div class="dk-mut">Full points on every KPI 👏</div>';
+    return out;
+  }
   function tDash() {
-    if (!DATA) return;
-    var sp = score(F.m), R = stRows(sp), pv = stRows(score(prevM(F.m))), pr = {}; pv.forEach(function (r) { pr[r.state] = r; });
-    if (!R.length) { VIEW.innerHTML = '<div class="card">' + mSel() + '</div><div class="card empty"><div class="big">📭</div><b>No scores for ' + mLab(F.m) + "</b></div>"; $("msel").onchange = function () { F.m = this.value; draw(); }; return; }
-    var K = DATA.KE.KPIS.filter(function (k) { return sp.cfg[k] && sp.cfg[k].w > 0; }), PTS = DATA.KE.PTS, nm = function (k) { return (sp.cfg[k] && sp.cfg[k].name) || DATA.KE.DEFNAME[k]; };
-    R.sort(function (a, b) { return (a.rank || 99) - (b.rank || 99); });
-    var mx = Math.max.apply(null, R.map(function (r) { return r.score || 0; }).concat([1]));
-    VIEW.innerHTML = '<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">' + mSel() + '<span class="sp"></span>' + pubLine() + '</div>' +
-      '<div class="kpis"><div class="kpi"><b>🥇 ' + esc(R[0].state) + '</b><span>Rank 1 · ' + p1(R[0].score) + ' points</span></div><div class="kpi"><b>' + p1(R.reduce(function (a, r) { return a + (r.score || 0); }, 0) / R.length) + '</b><span>Average score of ' + R.length + ' states</span></div>' +
-      (pv.length ? (function () { var up = R.filter(function (r) { return pr[r.state] && pr[r.state].rank && r.rank < pr[r.state].rank; }).sort(function (a, b) { return (pr[b.state].rank - b.rank) - (pr[a.state].rank - a.rank); })[0]; return up ? '<div class="kpi"><b>⬆ ' + esc(up.state) + '</b><span>Moved up ' + (pr[up.state].rank - up.rank) + " places vs " + mShort(prevM(F.m)) + "</span></div>" : ""; })() : "") + "</div></div>" +
-      '<div class="card"><b>🏆 State ranking · ' + mLab(F.m) + '</b><div class="scroll"><table class="tb"><tr><th>#</th><th>State</th><th>Score</th>' + K.map(function (k) { return "<th>" + esc(nm(k)) + "<br><small>" + p1(sp.cfg[k].w) + " pts</small></th>"; }).join("") + "</tr>" +
-      R.filter(function (r) { return !F.st || r.state === F.st; }).map(function (r) { var o = pr[r.state], mv = o && o.rank && r.rank ? o.rank - r.rank : 0;
-        return "<tr><td><b>" + (r.rank || "–") + "</b>" + (mv ? ' <span class="mv ' + (mv > 0 ? "up" : "dn") + '">' + (mv > 0 ? "▲" + mv : "▼" + -mv) + "</span>" : "") + "</td><td><b>" + esc(r.state) + '</b><br><small class="muted">' + esc(r.admin || "") + '</small></td><td><div class="hb"><i style="width:' + Math.max(4, (r.score || 0) / mx * 70) + 'px"></i><b>' + p1(r.score) + "</b></div></td>" +
-          K.map(function (k) { return "<td>" + p1(r[PTS[k]]) + '<br><small class="muted">' + (r[k] == null ? "" : p1(r[k] * (r[k] <= 1 ? 100 : 1)) + "%") + "</small></td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" +
-      '<div class="muted" style="font-size:11.5px;margin-top:6px">Points per KPI with the KPI value below. Same calculation as the BI KPI Dashboard. ▲▼ = places moved vs ' + mLab(prevM(F.m)) + ".</div></div>";
-    $("msel").onchange = function () { F.m = this.value; draw(); };
+    if (!DATA) return; var C = ctx(F.m), R = C.R, P = C.P;
+    if (!R.length) { VIEW.innerHTML = '<div class="dk"><div class="dk-hero">' + monthChips() + '</div><div class="dk-card dk-empty">📭 No scores for ' + mLab(F.m) + "</div></div>"; bindChips(); return; }
+    var avgS = R.reduce(function (a, r) { return a + (r.score || 0); }, 0) / R.length, ups = R.filter(function (r) { var o = P[r.state]; return o && o.rank && r.rank < o.rank; }), dns = R.filter(function (r) { var o = P[r.state]; return o && o.rank && r.rank > o.rank; });
+    var riser = ups.slice().sort(function (a, b) { return (P[b.state].rank - b.rank) - (P[a.state].rank - a.rank); })[0];
+    var panPrev = Object.keys(P).length ? Object.keys(P).reduce(function (a, s) { return a + (P[s].score || 0); }, 0) / Object.keys(P).length : null;
+    var top5 = R.slice(0, 5), pod = [top5[1], top5[0], top5[2]].filter(Boolean), mx = Math.max.apply(null, R.map(function (r) { return r.score || 0; }).concat([1]));
+    var kpiLead = C.K.map(function (k) { var b = R.slice().sort(function (a, c) { return C.ach(c, k) - C.ach(a, k); })[0]; return { k: k, s: b, v: C.ach(b, k) }; });
+    var h = '<div class="dk">' +
+      '<div class="dk-hero"><div class="dk-row"><div><div class="dk-eyebrow">BI KPI DASHBOARD · ' + esc(mLab(F.m).toUpperCase()) + '</div><div class="dk-title">State rankings</div></div><span class="sp"></span>' + pubLine() + "</div>" + monthChips() +
+      '<div class="dk-tiles"><div class="dk-tile"><span>Rank 1</span><b>' + esc(R[0].state) + "</b><small>" + p1(R[0].score) + ' pts</small></div><div class="dk-tile"><span>PAN India avg</span><b>' + p1(avgS) + "</b><small>" + (panPrev != null ? (avgS >= panPrev ? '<em class="up">▲ ' : '<em class="dn">▼ ') + p1(Math.abs(avgS - panPrev)) + "</em> vs " + mShort(prevM(F.m)) : "of 100") + '</small></div><div class="dk-tile"><span>Moved up</span><b>' + ups.length + "</b><small>" + dns.length + ' moved down</small></div><div class="dk-tile"><span>Top riser</span><b>' + (riser ? esc(riser.state) : "–") + "</b><small>" + (riser ? "▲ " + (P[riser.state].rank - riser.rank) + " places" : "") + "</small></div></div></div>" +
+      // hall of fame
+      '<div class="dk-card dk-hof"><div class="dk-h">🏆 Hall of fame · Top 5</div><div class="dk-pod">' + pod.map(function (r) { var i = R.indexOf(r); return '<div class="dk-pc p' + (i + 1) + '" data-st="' + esc(r.state) + '">' + av(r.state, i === 0 ? 74 : 60) + '<div class="dk-medal">' + MEDAL[i] + '</div><b>' + esc(r.state) + '</b><small>' + esc(r.admin || "") + '</small><div class="dk-block"><span>' + p1(r.score) + "</span><i>#" + (i + 1) + "</i>" + mv(r, P) + "</div></div>"; }).join("") + "</div>" +
+      '<div class="dk-hof45">' + top5.slice(3).map(function (r, j) { return '<div class="dk-hf" data-st="' + esc(r.state) + '">' + av(r.state, 40) + '<div><b>#' + (j + 4) + " " + esc(r.state) + "</b><small>" + esc(r.admin || "") + '</small></div><span class="sp"></span><span style="text-align:right;flex:none"><b class="dk-gold">' + p1(r.score) + "</b><br>" + mv(r, P) + "</span></div>"; }).join("") + "</div></div>" +
+      // stacked bars per state
+      '<div class="dk-card"><div class="dk-h">📊 Score by state · points from each KPI</div><div class="dk-leg">' + C.K.map(function (k) { return '<span><i style="background:' + KC[k] + '"></i>' + esc(C.nm(k)) + " (" + p1(C.w(k)) + ")</span>"; }).join("") + '</div><div class="dk-bars">' +
+      R.map(function (r) { return '<div class="dk-br" data-st="' + esc(r.state) + '"><span class="dk-rk">' + (r.rank || "–") + '</span><span class="dk-st">' + esc(r.state) + '</span><span class="dk-track">' + C.K.map(function (k) { var v = C.pts(r, k); return v > 0 ? '<i style="width:' + (v / 100 * 100).toFixed(2) + "%;background:" + KC[k] + '" title="' + esc(C.nm(k) + ": " + p1(v) + " pts") + '"></i>' : ""; }).join("") + '</span><b class="dk-sc">' + p1(r.score) + "</b>" + mv(r, P) + "</div>"; }).join("") + '</div><div class="dk-mut" style="margin-top:6px">Bar length = total score out of 100. Tap a state for its key indicators and action plan.</div></div>' +
+      // heatmap
+      '<div class="dk-card"><div class="dk-h">🌡 KPI heatmap · achievement %</div><div class="dk-scroll"><table class="dk-hm"><tr><th>State</th>' + C.K.map(function (k) { return '<th style="color:' + KC[k] + '">' + KI[k] + "<br>" + esc(C.nm(k)) + "</th>"; }).join("") + "</tr>" + R.map(function (r) { return '<tr data-st="' + esc(r.state) + '"><td><b>' + (r.rank || "–") + ".</b> " + esc(r.state) + "</td>" + C.K.map(function (k) { var a = C.ach(r, k); return '<td style="background:' + heat(a) + '">' + Math.round(a * 100) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div></div>" +
+      // KPI leaders + movers
+      '<div class="dk-two"><div class="dk-card"><div class="dk-h">⭐ KPI leaders</div>' + kpiLead.map(function (x) { return '<div class="dk-lead"><span class="dk-dot" style="background:' + KC[x.k] + '">' + KI[x.k] + '</span><div><small>' + esc(C.nm(x.k)) + "</small><b>" + esc(x.s.state) + '</b></div><span class="sp"></span><b style="color:' + KC[x.k] + '">' + Math.round(x.v * 100) + "%</b></div>"; }).join("") + "</div>" +
+      '<div class="dk-card"><div class="dk-h">🔀 Movers vs ' + mShort(prevM(F.m)) + "</div>" + (ups.length + dns.length ? ups.slice().sort(function (a, b) { return (P[b.state].rank - b.rank) - (P[a.state].rank - a.rank); }).slice(0, 4).concat(dns.slice().sort(function (a, b) { return (a.rank - P[a.state].rank) < (b.rank - P[b.state].rank) ? 1 : -1; }).slice(0, 3)).map(function (r) { var d = P[r.state].rank - r.rank; return '<div class="dk-lead"><span class="dk-dot" style="background:' + (d > 0 ? "#1F8F5F" : "#B23B4B") + '">' + (d > 0 ? "▲" : "▼") + '</span><div><b>' + esc(r.state) + "</b><small>#" + P[r.state].rank + " → #" + r.rank + '</small></div><span class="sp"></span><b class="' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "+" : "") + d + "</b></div>"; }).join("") : '<div class="dk-mut">No earlier month to compare.</div>') + "</div></div>" +
+      // needs attention
+      '<div class="dk-card"><div class="dk-h">🚨 Needs attention · bottom 3 and their action plan</div>' + R.slice(-3).reverse().map(function (r) { return '<div class="dk-att"><div class="dk-row">' + av(r.state, 36) + '<div><b>#' + r.rank + " " + esc(r.state) + '</b><small class="dk-mut"> ' + esc(r.admin || "") + '</small></div><span class="sp"></span><b class="dk-gold">' + p1(r.score) + "</b></div>" + planHtml(C, r, true) + "</div>"; }).join("") + "</div>" +
+      '<div class="dk-foot">Same calculation as the BI KPI Dashboard · points out of 100 · ▲▼ places moved vs ' + mLab(prevM(F.m)) + "</div></div>";
+    VIEW.innerHTML = h; bindChips();
+    [].forEach.call(VIEW.querySelectorAll("[data-st]"), function (e) { e.onclick = function () { F.st = e.dataset.st; TAB = "kpi"; tabs(); draw(); window.scrollTo(0, 0); }; });
   }
   function tKpi() {
     if (!DATA) return;
-    var ms = DATA.months().slice(-6), S = DATA.states, rows = {}, sps = ms.map(function (m) { return score(m); });
-    var K = DATA.KE.KPIS.filter(function (k) { return sps.some(function (sp) { return sp && sp.cfg[k] && sp.cfg[k].w > 0; }); });
-    S.forEach(function (s) { rows[s] = ms.map(function (m, i) { var r = stRows(sps[i]).filter(function (x) { return x.state === s; })[0]; return r || null; }); });
-    var st = F.st || "", pick = function (s) { return !st || s === st; };
-    var lastSp = sps[sps.length - 1] || { cfg: {} }, nm = function (k) { return (lastSp.cfg[k] && lastSp.cfg[k].name) || DATA.KE.DEFNAME[k]; };
-    var pan = function (i, f) { var v = S.filter(pick).map(function (s) { return rows[s][i] && rows[s][i][f]; }).filter(function (x) { return x != null && isFinite(x); }); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; };
-    VIEW.innerHTML = '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><select class="tx" id="stsel" style="max-width:220px"><option value="">PAN India (average)</option>' + S.map(function (s) { return '<option' + (s === st ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" + pubLine() + "</div>" +
-      '<div class="kpis">' + ["score"].concat(K).map(function (k) { var f = k === "score" ? "score" : DATA.KE.PTS[k], a = pan(ms.length - 1, f), b = pan(ms.length - 2, f), d = a != null && b != null ? a - b : null; return '<div class="kpi"><b>' + p1(a) + (d != null && Math.abs(d) >= 0.05 ? ' <span class="mv ' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + p1(Math.abs(d)) + "</span>" : "") + "</b><span>" + esc(k === "score" ? "Total score" : nm(k)) + " · " + mShort(ms[ms.length - 1]) + "</span></div>"; }).join("") + "</div></div>" +
-      '<div class="card"><b>📈 Month by month' + (st ? " · " + esc(st) : " · PAN India average") + '</b><div class="scroll"><table class="tb"><tr><th>KPI</th>' + ms.map(function (m) { return "<th>" + mShort(m) + "</th>"; }).join("") + "</tr>" +
-      ["score"].concat(K).map(function (k) { var f = k === "score" ? "score" : DATA.KE.PTS[k], vals = ms.map(function (m, i) { return pan(i, f); }), mx = Math.max.apply(null, vals.map(function (v) { return v || 0; }).concat([1])); return "<tr><td><b>" + esc(k === "score" ? "Total score" : nm(k)) + "</b></td>" + vals.map(function (v) { return '<td><div class="hb"><i style="width:' + Math.max(3, (v || 0) / mx * 40) + 'px"></i>' + p1(v) + "</div></td>"; }).join("") + "</tr>"; }).join("") + "</table></div></div>" +
-      (st ? "" : '<div class="card"><b>🔁 Rank by month</b><div class="scroll"><table class="tb"><tr><th>State</th>' + ms.map(function (m) { return "<th>" + mShort(m) + "</th>"; }).join("") + "</tr>" + S.slice().sort(function (a, b) { var x = rows[a][ms.length - 1], y = rows[b][ms.length - 1]; return ((x && x.rank) || 99) - ((y && y.rank) || 99); }).map(function (s) { return "<tr><td><b>" + esc(s) + "</b></td>" + rows[s].map(function (r) { return "<td>" + (r && r.rank ? r.rank : "–") + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div></div>");
+    var ms = allMonths().filter(function (m) { return m <= F.m; }).slice(-6); if (!ms.length) ms = allMonths().slice(-6);
+    var Cs = ms.map(ctx), C = Cs[Cs.length - 1], st = F.st && C.R.some(function (r) { return r.state === F.st; }) ? F.st : "", r = st ? C.R.filter(function (x) { return x.state === st; })[0] : null;
+    if (!C.R.length) { VIEW.innerHTML = '<div class="dk"><div class="dk-hero">' + monthChips() + '</div><div class="dk-card dk-empty">📭 No scores for ' + mLab(F.m) + "</div></div>"; bindChips(); return; }
+    var avgOf = function (Cx, f) { return Cx.R.length ? Cx.R.reduce(function (a, x) { return a + (f(x) || 0); }, 0) / Cx.R.length : null; }, rowOf = function (Cx) { return st ? Cx.R.filter(function (x) { return x.state === st; })[0] || null : null; };
+    var sel = '<select class="dk-sel" id="stsel"><option value="">🇮🇳 PAN India</option>' + C.R.map(function (x) { return '<option value="' + esc(x.state) + '"' + (x.state === st ? " selected" : "") + ">#" + x.rank + " " + esc(x.state) + "</option>"; }).join("") + "</select>";
+    var labels = ms.map(mShort), h = '<div class="dk"><div class="dk-hero"><div class="dk-row">' + (r ? av(st, 56) : '<span class="dk-av dk-ini" style="width:56px;height:56px;font-size:24px">🇮🇳</span>') + '<div><div class="dk-eyebrow">KEY INDICATORS · ' + esc(mLab(C.m).toUpperCase()) + '</div><div class="dk-title">' + esc(st || "PAN India") + "</div>" + (r ? '<div class="dk-mut">' + esc(r.admin || "") + " · Rank <b class=\"dk-gold\">#" + r.rank + "</b> of " + C.R.length + " " + mv(r, C.P) + "</div>" : '<div class="dk-mut">Average of ' + C.R.length + " states</div>") + '</div></div><div class="dk-row" style="margin-top:10px">' + sel + '<span class="sp"></span>' + pubLine() + "</div>" + monthChips() + "</div>";
+    // score + rings
+    var sc = r ? r.score : avgOf(C, function (x) { return x.score; }), pv = r ? (C.P[st] && C.P[st].score) : (Object.keys(C.P).length ? Object.keys(C.P).reduce(function (a, s) { return a + (C.P[s].score || 0); }, 0) / Object.keys(C.P).length : null);
+    h += '<div class="dk-card"><div class="dk-row" style="gap:14px;align-items:center">' + ring(sc, "#E6CF86", 118, "of 100", p1(sc)) + '<div><div class="dk-h" style="margin:0">' + (r ? "Rank" : "Average score") + '</div><div class="dk-big">' + (r ? '#' + r.rank + '<small style="font-size:15px;color:#8E97C9"> of ' + C.R.length + "</small>" : p1(sc)) + "</div>" + (pv != null ? '<div class="' + (sc >= pv ? "up" : "dn") + '">' + (sc >= pv ? "▲ " : "▼ ") + p1(Math.abs(sc - pv)) + " pts vs " + mShort(prevM(C.m)) + "</div>" : "") + (r ? '<div class="dk-mut">PAN India avg ' + p1(avgOf(C, function (x) { return x.score; })) + " · Rank 1 " + p1(C.R[0].score) + "</div>" : "") + '</div></div><div class="dk-rings">' +
+      C.K.map(function (k) { var a = r ? C.ach(r, k) : avgOf(C, function (x) { return C.ach(x, k); }), pts = r ? C.pts(r, k) : avgOf(C, function (x) { return C.pts(x, k); }); return '<div class="dk-rc">' + ring(a * 100, KC[k], 92) + "<b>" + KI[k] + " " + esc(C.nm(k)) + "</b><small>" + p1(pts) + " / " + p1(C.w(k)) + " pts</small></div>"; }).join("") + "</div></div>";
+    // trend chart
+    var ser = [{ name: st || "PAN India", values: Cs.map(function (Cx) { var x = rowOf(Cx); return st ? (x ? x.score : null) : avgOf(Cx, function (y) { return y.score; }); }), color: "#E6CF86", area: true, w: 3 }];
+    if (st) ser.push({ name: "PAN India avg", values: Cs.map(function (Cx) { return avgOf(Cx, function (y) { return y.score; }); }), color: "#6C7BFF", dash: true });
+    ser.push({ name: "Rank 1", values: Cs.map(function (Cx) { return Cx.R[0] ? Cx.R[0].score : null; }), color: "#2FD08A", dash: true, dots: false });
+    h += '<div class="dk-card"><div class="dk-h">📈 Score trend · last ' + ms.length + " months</div>" + lineSvg(labels, ser, { min: 0, fmt: function (v) { return Math.round(v); } }) + "</div>";
+    if (st) h += '<div class="dk-card"><div class="dk-h">🧭 Rank journey</div>' + lineSvg(labels, [{ name: "Rank of " + st, values: Cs.map(function (Cx) { var x = rowOf(Cx); return x ? x.rank : null; }), color: "#FF6FAE", w: 3 }], { min: 1, max: C.R.length, inv: true, h: 170, fmt: function (v) { return "#" + Math.round(v); } }) + "</div>";
+    // KPI small multiples
+    h += '<div class="dk-card"><div class="dk-h">🧪 Each KPI month by month · achievement %</div><div class="dk-mini">' + C.K.map(function (k) {
+      var vals = Cs.map(function (Cx) { if (!Cx.sp || !(Cx.sp.cfg[k] && Cx.sp.cfg[k].w > 0)) return null; var x = rowOf(Cx); return st ? (x ? Cx.ach(x, k) * 100 : null) : avgOf(Cx, function (y) { return Cx.ach(y, k); }) * 100; }), last = vals[vals.length - 1], prev = vals[vals.length - 2];
+      return '<div class="dk-mc"><div class="dk-row"><b>' + KI[k] + " " + esc(C.nm(k)) + '</b><span class="sp"></span><b style="color:' + KC[k] + '">' + (last == null ? "–" : Math.round(last) + "%") + "</b>" + (last != null && prev != null && Math.abs(last - prev) >= 0.5 ? ' <span class="' + (last >= prev ? "up" : "dn") + '" style="font-size:11px">' + (last >= prev ? "▲" : "▼") + Math.round(Math.abs(last - prev)) + "</span>" : "") + "</div>" + lineSvg(labels, [{ name: C.nm(k), values: vals, color: KC[k], area: true }], { min: 0, max: 100, h: 120, fmt: function (v) { return Math.round(v) + "%"; } }).replace(/<div class="dk-leg">[\s\S]*$/, "") + "</div>";
+    }).join("") + "</div></div>";
+    // gap analysis + plan, or PAN view: state comparison per KPI
+    if (r) {
+      var Pn = plan(C, r);
+      h += '<div class="dk-card"><div class="dk-h">🕳 Where the points are lost</div>' + Pn.opp.map(function (o) { return '<div class="dk-gap"><span>' + KI[o.k] + " " + esc(C.nm(o.k)) + '</span><span class="dk-track"><i style="width:' + (o.got / Math.max(o.w, 0.01) * 100) + "%;background:" + KC[o.k] + '"></i><i class="lost" style="width:' + (o.lost / Math.max(o.w, 0.01) * 100) + '%"></i></span><b>' + p1(o.got) + "/" + p1(o.w) + "</b></div>"; }).join("") + '<div class="dk-mut" style="margin-top:4px">Coloured = points earned · striped = points lost this month.</div></div>';
+      h += '<div class="dk-card dk-plan"><div class="dk-h">✅ Action plan · ' + esc(st) + " · " + esc(mLab(nextMonth(C.m))) + "</div>" + planHtml(C, r, false) + '<div class="bar2"><button class="btn sm dk-btn" id="cpp">📋 Copy action plan</button><button class="btn sm dk-btn" id="wap">🟢 Share on WhatsApp</button></div></div>';
+    } else {
+      h += '<div class="dk-card"><div class="dk-h">🗺 Every state on each KPI</div><div class="dk-tabs2">' + C.K.map(function (k, i) { return '<button data-kk="' + k + '"' + (i === 0 ? ' class="on"' : "") + ">" + KI[k] + " " + esc(C.nm(k)) + "</button>"; }).join("") + '</div><div id="kbars"></div></div>';
+    }
+    h += '<div class="dk-foot">Same calculation as the BI KPI Dashboard</div></div>';
+    VIEW.innerHTML = h; bindChips();
     $("stsel").onchange = function () { F.st = this.value; draw(); };
+    if (r) {
+      var txt = function () { var P2 = plan(C, r); return "📊 " + st + " · " + mLab(C.m) + "\nScore " + p1(r.score) + " · Rank #" + r.rank + " of " + C.R.length + (P2.next ? "\n🎯 " + p1(P2.need) + " pts to overtake #" + P2.next.rank + " " + P2.next.state : "") + "\n\nAction plan for " + mLab(nextMonth(C.m)) + ":\n" + P2.top.map(function (o, i) { return (i + 1) + ". " + C.nm(o.k) + " — now " + Math.round(o.ach * 100) + "% (PAN avg " + Math.round(o.avg * 100) + "%), losing " + p1(o.lost) + " pts. " + (TIPS[o.k] ? TIPS[o.k](r).replace(/<[^>]+>/g, "") : "") + (o.gain > 0.05 ? " Target " + Math.round(o.tgt * 100) + "% = +" + p1(o.gain) + " pts." : ""); }).join("\n"); };
+      $("cpp").onclick = function () { var t = txt(); try { navigator.clipboard.writeText(t).then(function () { toast("Copied"); }); } catch (e) { prompt("Copy:", t); } };
+      $("wap").onclick = function () { window.open("https://wa.me/?text=" + encodeURIComponent(txt()), "_blank"); };
+    } else {
+      var kb = function (k) { [].forEach.call(VIEW.querySelectorAll("[data-kk]"), function (b) { b.classList.toggle("on", b.dataset.kk === k); }); var L2 = C.R.slice().sort(function (a, b) { return C.ach(b, k) - C.ach(a, k); }), avg = avgOf(C, function (x) { return C.ach(x, k); });
+        $("kbars").innerHTML = '<div class="dk-bars">' + L2.map(function (x) { var a = C.ach(x, k); return '<div class="dk-br" data-st2="' + esc(x.state) + '"><span class="dk-st">' + esc(x.state) + '</span><span class="dk-track"><i style="width:' + (a * 100) + "%;background:" + (a >= avg ? KC[k] : "rgba(255,255,255,.28)") + '"></i><em style="left:' + (avg * 100) + '%"></em></span><b class="dk-sc">' + Math.round(a * 100) + "%</b></div>"; }).join("") + '</div><div class="dk-mut" style="margin-top:6px">White line = PAN India average (' + Math.round(avg * 100) + "%). Grey bars are below average.</div>";
+        [].forEach.call(VIEW.querySelectorAll("[data-st2]"), function (e) { e.onclick = function () { F.st = e.dataset.st2; draw(); window.scrollTo(0, 0); }; }); };
+      [].forEach.call(VIEW.querySelectorAll("[data-kk]"), function (b) { b.onclick = function () { kb(b.dataset.kk); }; }); kb(C.K[0]);
+    }
   }
+  function nextMonth(m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) + 1; if (mo > 12) { mo = 1; y++; } return y + "-" + ("0" + mo).slice(-2); }
   // ======================= HO: update a month from the vWork exports =======================
   // Each source = one sheet of the dashboard's import template. Files are recognised by their headings.
   var SRC = [
