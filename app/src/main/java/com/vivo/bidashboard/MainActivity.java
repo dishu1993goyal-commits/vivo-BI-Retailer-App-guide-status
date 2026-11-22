@@ -3546,6 +3546,18 @@ public class MainActivity extends FragmentActivity {
         });
         pGrab = false;
         vivoWeb.setDownloadListener((dUrl, dUa, dCd, dMime, dLen) -> botGrab(dUrl, android.webkit.URLUtil.guessFileName(dUrl, dCd, dMime)));
+        // vWork shows some reports inside windows from other vivo sites (itbi-in, vform-in…): put the read-only helper in every vivo window
+        // of this portal view, so the page can pass the job on to the window that holds the report
+        try {
+            String bmode = "bot".equals(pKind) ? pJob.optString("mode") : "";
+            if ("vw".equals(bmode) && androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                String hjs = assetJs(extName(bmode));
+                if (!hjs.isEmpty()) {
+                    java.util.Set<String> rules = new java.util.HashSet<>(java.util.Arrays.asList("https://*.vivo.xyz", "https://*.vivo.com", "https://*.vivo.in"));
+                    androidx.webkit.WebViewCompat.addDocumentStartJavaScript(vivoWeb, "(function(){if(window.__biVwRun)return;" + hjs + "})();", rules);
+                }
+            }
+        } catch (Throwable ignored) { }
         vivoWeb.setWebChromeClient(new WebChromeClient() {
             @Override public boolean onJsAlert(WebView view, String url, String message, android.webkit.JsResult result) {
                 if (uOnLogin || pDone) return false;
