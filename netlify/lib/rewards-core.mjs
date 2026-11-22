@@ -6,7 +6,7 @@
 //   rww:<app>:<username>          { app, username, name, state, earned:[{id, rule, title, pts, period, at, badge, why}], spent, held }
 //   rwr:<id>                      { id, user:{app,username,name,state}, item:{id,name,points,cat}, pts, status, code, note, at, doneAt, by }
 //   rwrun:<period>                { at, by, credited, users }
-import { loadKE } from "./autorep-core.mjs";
+import { loadKE, siteDash } from "./autorep-core.mjs";
 import { randomBytes } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
@@ -74,7 +74,7 @@ export async function runPeriod(store, pool, period, { siteFetch = fetch, env = 
   const cfg = cleanCfg(await store.get("config:rewards")), R = periodRange(period); if (!R) throw new Error("Bad period");
   const rules = cfg.rules.filter((r) => r.on && r.pts > 0);
   let D = null;
-  if (rules.some((r) => RULE_TYPES[r.type].scope === "state")) { const res = await siteFetch((env.SITE_URL || "") + "/index.html?v=" + t); if (!res.ok) throw new Error("couldn't read the dashboard (" + res.status + ")"); D = loadKE(await res.text()); }
+  if (rules.some((r) => RULE_TYPES[r.type].scope === "state")) D = await siteDash(siteFetch, env, t);
   const cur = D ? await stateRows(D, R) : null, prev = D ? await stateRows(D, periodRange(prevPeriod(period))) : null;
   const users = (await pool(await store.list("user:state:"), 40, (k) => store.get(k))).filter((u) => u && !u.disabled && u.username);
   const credit = {};   // userKey -> [entries]

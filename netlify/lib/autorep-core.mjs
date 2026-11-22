@@ -14,12 +14,20 @@ const KNAME = { app: "Retailer App usage", sales: "Sales achievement", visit: "C
 const pct = (v) => (v == null ? "—" : Math.round(v * 1000) / 10 + "%");
 
 // ---- read the dashboard data + KPI engine from the published site ----
-export function loadKE(html) {
+// the dashboard file + the newest data HO published from the Dashboard updater (/api/dpub), same as the dashboard shows
+export async function siteDash(fetchImpl, env, t) {
+  const [r0, rp] = await Promise.all([fetchImpl((env.SITE_URL || "") + "/index.html?v=" + t), fetchImpl((env.SITE_URL || "") + "/api/dpub?v=" + t).catch(() => null)]);
+  if (!r0.ok) throw new Error("couldn't read the dashboard (" + r0.status + ")");
+  let pub = null; try { if (rp && rp.status === 200) pub = await rp.json(); } catch (e) { pub = null; }
+  return loadKE(await r0.text(), pub);
+}
+export function loadKE(html, pub) {
   const tag = '<script type="application/json" id="dd">';
   const d0 = html.indexOf(tag), d1 = html.indexOf("</script>", d0);
   const e0 = html.indexOf('<script id="s-eng">'), e1 = html.indexOf("</script>", e0);
   if (d0 < 0 || e0 < 0) throw new Error("dashboard data not found in index.html");
   const D = JSON.parse(html.slice(d0 + tag.length, d1));
+  if (pub) ["rawlog", "setup"].forEach((k) => { if (pub[k] && pub[k][0]) D[k] = pub[k]; });
   const sandbox = { module: { exports: {} } };
   vm.runInNewContext(html.slice(e0 + '<script id="s-eng">'.length, e1) + ";module.exports = KE;", sandbox, { timeout: 20000 });
   return { KE: sandbox.module.exports, RAW: D.rawlog[0], SETUP: D.setup[0] };
@@ -80,9 +88,7 @@ async function fieldStats(store, t) {
 // Generates and delivers one run. deps: { fetchImpl (to read the site), mailFetch, env, now }
 export async function runAutoReport(store, env, { fetchImpl = fetch, mailFetch = fetch, now = () => Date.now(), by = "auto" } = {}) {
   const t = now();
-  const r0 = await fetchImpl((env.SITE_URL || "") + "/index.html?v=" + t);
-  if (!r0.ok) throw new Error("couldn't read the dashboard (" + r0.status + ")");
-  const rep = buildReport(loadKE(await r0.text()), { field: await fieldStats(store, t) });
+  const rep = buildReport(await siteDash(fetchImpl, env, t), { field: await fieldStats(store, t) });
   const id = t.toString(36) + randomBytes(3).toString("hex");
   const run = Object.assign({ id, at: t, by }, rep);
   await store.set(`autorep:${id}`, run);

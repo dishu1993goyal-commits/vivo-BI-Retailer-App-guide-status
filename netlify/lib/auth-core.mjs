@@ -920,7 +920,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-report-ai", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(bp|ph|ap|cr|dx|cs|vg|rpl|bot|eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv)-/;
+  const NEW_PREFIX = /^(bp|ph|ap|cr|dx|cs|vg|rpl|bot|eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv|du)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username), lnk = /^lnk_/i.test(String(b.username || "")), recKey = key ? (lnk ? "lnkuser:" + key : uKeyOf(key)) : "";
     const rec = key ? await store.get(recKey) : null;
@@ -1076,7 +1076,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^tlk-/.test(b.action)) return tlkAction(b, surveyCtx());
     if (/^ux-/.test(b.action)) return uxAction(b, surveyCtx());
     if (/^(dx|cs|vg|rpl|bot)-/.test(b.action)) return lxAction(b, Object.assign(surveyCtx(), { jobFetch }));
-    if (/^(bp|ph|ap|cr)-/.test(b.action)) return bzAction(b, surveyCtx());
+    if (/^(bp|ph|ap|cr|du)-/.test(b.action)) return bzAction(b, surveyCtx());
     if (/^so-/.test(b.action)) return salesAction(b, surveyCtx());
     if (/^roi-/.test(b.action)) return roiAction(b, surveyCtx());
     if (/^(lh|ls|lt|mp|cv)-/.test(b.action)) return bixAction(b, surveyCtx());

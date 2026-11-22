@@ -12,6 +12,11 @@ from PIL import Image
 PREVIEW = "--preview" in sys.argv
 p = "index.html"
 t = open(p, encoding="utf-8").read()
+# published-data loader (Dashboard updater): keep it in every new dashboard file
+if '<script id="s-pub">' not in t:
+    _sp = open("tools/s-pub.html", encoding="utf-8").read()
+    _i = t.find('<script id="s-d3">') if t.find('<script id="s-d3">') > 0 else t.find('<script id="s-shim">')
+    if _i > 0: t = t[:_i] + _sp + t[_i:]
 
 HEAD = ('<script id="biw-gate">(function(){var u=navigator.userAgent;if(/; wv\\)/.test(u)||window.AndroidDL||window.BIAI)return;'
         'document.documentElement.classList.add("biw-web","biw-locked");})();</script>'

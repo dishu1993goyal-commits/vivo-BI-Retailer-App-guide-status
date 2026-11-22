@@ -1,0 +1,11 @@
+<script id="s-pub">
+// Published updates: HO publishes new KPI data from the Dashboard updater; every copy of the dashboard (web and apps) takes the
+// newest data here, before the dashboard starts. Nothing changes when there is no newer publication or the network is off.
+(function () { try {
+  var el = document.getElementById('dd'); if (!el || window.__DD || /[?&]nopub\b/.test(location.search)) return;
+  var D = JSON.parse(el.textContent), M = (D.meta && D.meta[0]) || {}; if (M.shareable || M.gated) { window.__DD = D; return; }
+  var x = new XMLHttpRequest(); x.open('GET', '/api/dpub?have=' + encodeURIComponent(M.pubver || ''), false); x.send(null);
+  if (x.status === 200 && x.responseText && x.responseText.charAt(0) === '{') { var P = JSON.parse(x.responseText); ['rawlog', 'setup', 'vbm', 'rsd', 'ho'].forEach(function (k) { if (P[k] && P[k][0]) D[k] = P[k]; }); var pm = (P.meta && P.meta[0]) || {}; pm.people = pm.people || M.people; D.meta = [Object.assign({}, M, pm, {pubver: x.getResponseHeader('X-Dpub-Ver') || P.ver || 'pub', pubat: P.at || 0})]; }
+  window.__DD = D;
+} catch (e) { } })();
+</script>

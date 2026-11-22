@@ -21,6 +21,48 @@ export async function bzAction(b, ctx) {
   const { store, t, app, rec, pool } = ctx, ho = app === "admin", by = rec.fullName || rec.username || "", a = b.action;
   const hoOnly = () => J(403, { ok: false, error: "Only HO can use this" });
 
+  // ---------------- 📊 Dashboard updater: publish the KPI data for everyone (dashboard + apps read it from /api/dpub) ----------------
+  //   dpub:meta { ver, at, by, months, note, size }   dpub:data = gzip(JSON {rawlog, setup, meta, vbm, rsd, ho})   dpub:prev:* = the version before (undo)
+  //   du:src  the month's raw exports / entries kept between sessions { [month]: { [source]: { rows, file, at, by } } } (big log rows stay in the browser)
+  if (/^du-/.test(a)) {
+    if (a === "du-meta") return J(200, { ok: true, meta: (await store.get("dpub:meta")) || null, prev: (await store.get("dpub:prev:meta")) || null });
+    if (!ho) return hoOnly();
+    if (a === "du-put") {   // chunked upload of the gzip data (base64 parts)
+      const ver = String(b.ver || "").replace(/[^\w-]/g, "").slice(0, 30), n = +b.n, total = +b.total;
+      if (!ver || !(n >= 0) || !(total > 0) || total > 40 || n >= total || typeof b.part !== "string" || b.part.length > 4_500_000) return J(400, { ok: false, error: "Bad upload" });
+      await store.set("dpub:up:" + ver + ":" + n, { p: b.part });
+      if (n < total - 1) return J(200, { ok: true, got: n + 1 });
+      const parts = []; for (let i = 0; i < total; i++) { const x = await store.get("dpub:up:" + ver + ":" + i); if (!x) return J(400, { ok: false, error: "Part " + (i + 1) + " is missing — publish again" }); parts.push(Buffer.from(x.p, "base64")); }
+      const buf = Buffer.concat(parts);
+      if (buf.length < 1000 || buf[0] !== 0x1f || buf[1] !== 0x8b) return J(400, { ok: false, error: "The data isn't a gzip file" });
+      const old = await store.get("dpub:meta");
+      if (old && store.getStream) { try { const res = new Response(await store.getStream("dpub:data")); const ob = Buffer.from(await res.arrayBuffer()); if (ob.length) { await store.setBinary("dpub:prev:data", ob); await store.set("dpub:prev:meta", old); } } catch (e) { } }
+      await store.setBinary("dpub:data", buf);
+      const meta = { ver, at: t, by, months: (Array.isArray(b.months) ? b.months : []).slice(0, 24).map((m) => String(m).slice(0, 7)), note: String(b.note || "").slice(0, 300), size: buf.length };
+      await store.set("dpub:meta", meta);
+      for (let i = 0; i < total; i++) await store.delete("dpub:up:" + ver + ":" + i);
+      return J(200, { ok: true, meta });
+    }
+    if (a === "du-undo") {   // go back to the version before the last publish
+      const pm = await store.get("dpub:prev:meta"); if (!pm) return J(400, { ok: false, error: "No earlier version to go back to" });
+      const res = new Response(await store.getStream("dpub:prev:data")), ob = Buffer.from(await res.arrayBuffer());
+      await store.setBinary("dpub:data", ob); const meta = Object.assign({}, pm, { ver: pm.ver + "u" + t.toString(36), restoredAt: t, by });
+      await store.set("dpub:meta", meta); await store.delete("dpub:prev:meta"); return J(200, { ok: true, meta });
+    }
+    if (a === "du-src") {   // month's small inputs (state × month entries, notes about uploaded exports)
+      const m = String(b.month || "").slice(0, 7); if (!/^\d{4}-\d{2}$/.test(m)) return J(400, { ok: false, error: "Bad month" });
+      const k = "du:src:" + m, cur = (await store.get(k)) || {};
+      if (b.save && b.src && typeof b.src === "object") { Object.keys(b.src).slice(0, 20).forEach((s) => { cur[s] = Object.assign({}, b.src[s], { at: t, by }); }); const sz = JSON.stringify(cur).length; if (sz > 3_000_000) return J(400, { ok: false, error: "Too big to keep on the server" }); await store.set(k, cur); }
+      return J(200, { ok: true, src: cur });
+    }
+    if (a === "du-cfg") {   // vWork report names / notes per source (set once by HO)
+      const C = (await store.get("du:cfg")) || {};
+      if (b.save && b.cfg && typeof b.cfg === "object") { Object.keys(b.cfg).slice(0, 20).forEach((s) => { C[s] = { report: String(b.cfg[s].report || "").slice(0, 200), path: String(b.cfg[s].path || "").slice(0, 300), note: String(b.cfg[s].note || "").slice(0, 300) }; }); await store.set("du:cfg", C); }
+      return J(200, { ok: true, cfg: C });
+    }
+    return J(400, { ok: false, error: "Unknown action" });
+  }
+
   // ---------------- Bundle Pair Engine ----------------
   if (/^bp-/.test(a)) {
     if (!ho) return hoOnly();

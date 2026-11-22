@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>KPI Dashboard updater</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:10px 0 4px}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#B54708}.pill.r{background:#FDECEC;color:#B42318}
+.help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}.help.g{background:#E6F4EA}
+.bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tabs2{display:flex;gap:6px;overflow:auto;margin:10px 0}.tabs2 button{border:0;border-radius:99px;padding:8px 14px;font-weight:800;font-size:13px;background:#EEF0F6;color:var(--ink2);white-space:nowrap}.tabs2 button.on{background:#12163A;color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}.kpi{background:#F7F8FC;border-radius:12px;padding:10px}.kpi b{display:block;font-size:20px}.kpi span{font-size:11.5px;color:var(--mut)}
+.tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px;white-space:nowrap;position:sticky;top:0}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
+.scroll{overflow:auto;max-height:480px;margin-top:8px}
+.src{border:1px solid #E3E6F3;border-radius:14px;padding:12px;margin-top:8px;background:#fff}.src.ok{border-color:#9FD3B0;background:#F6FCF8}.src h4{margin:0;font-size:14px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.src .muted{font-size:12px}
+.drop{border:2px dashed #C9CEF2;border-radius:14px;padding:18px;text-align:center;cursor:pointer;background:#FAFBFF;margin-top:8px;font-size:13px}
+.hb{display:flex;align-items:center;gap:6px}.hb i{display:block;height:9px;border-radius:99px;background:#4D5BF9}
+.mv{font-size:11px;font-weight:800}.mv.up{color:#13693F}.mv.dn{color:#B42318}
+.ent input{width:72px;padding:6px;border:1px solid #D5D9EE;border-radius:8px;font:inherit;font-size:12.5px}
+.steps{counter-reset:s;margin:6px 0 0;padding:0;list-style:none}.steps li{counter-increment:s;position:relative;padding:4px 0 4px 30px;font-size:13px;line-height:1.5}.steps li:before{content:counter(s);position:absolute;left:0;top:4px;width:22px;height:22px;border-radius:50%;background:#4D5BF9;color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.big{font-size:40px;text-align:center}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=3"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">📊</span></div>
+  <h1>KPI Dashboard</h1><p>State rankings and key indicators — HO updates the month from vWork in one go</p></div>
+<div class="wrap"><div class="tabs2" id="tabs"></div><div id="view"><div class="loading"><div class="spin"></div>Loading…</div></div></div>
+<script src="/kpi-data.js?v=4"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), HO = !!(AUTH && AUTH.app === "admin"), DATA = null, PUBM = null, TAB = HO ? "upd" : "dash", F = { m: "", st: "" };
+  var TABS = [["dash", "📊 Rankings"], ["kpi", "📈 Key indicators"]].concat(HO ? [["upd", "⬆ Update from vWork"], ["src", "⚙️ vWork reports"]] : []);
+  var nf = function (n) { return n == null || !isFinite(n) ? "–" : Math.round(n).toLocaleString("en-IN"); }, p1 = function (x) { return x == null || !isFinite(x) ? "–" : (Math.round(x * 10) / 10).toFixed(1); };
+  var MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var mLab = function (m) { return MONS[+m.slice(5, 7) - 1] + " " + m.slice(0, 4); }, mShort = function (m) { return MONS[+m.slice(5, 7) - 1] + "'" + m.slice(2, 4); };
+  var lastDay = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + ("0" + new Date(Date.UTC(y, mo, 0)).getUTCDate()).slice(-2); };
+  var prevM = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) - 1; if (mo < 1) { mo = 12; y--; } return y + "-" + ("0" + mo).slice(-2); };
+  function tabs() { $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '"' + (TAB === t[0] ? ' class="on"' : "") + ">" + t[1] + "</button>"; }).join(""); [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; tabs(); draw(); }; }); }
+  function load(force) {
+    if (force) { DATA = null; try { KPIDATA.load = KPIDATA.load; } catch (e) { } }
+    return Promise.all([KPIDATA.load(), fetch("/api/dpub?meta=1", { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })]).then(function (R) {
+      DATA = R[0]; PUBM = R[1]; var ms = DATA.months(); if (!F.m || ms.indexOf(F.m) < 0) F.m = ms[ms.length - 1] || ""; draw();
+    }, function (e) { VIEW.innerHTML = '<div class="card empty"><b>' + esc(e.message || "Couldn't load the dashboard data") + "</b></div>"; });
+  }
+  function draw() { ({ dash: tDash, kpi: tKpi, upd: tUpd, src: tSrc })[TAB](); }
+  // ======================= rankings for everyone (same engine and data as the dashboard) =======================
+  function score(m) { if (!DATA || !m) return null; try { return DATA.KE.scorePeriod(DATA.RAW, DATA.SETUP, m + "-01", lastDay(m), "Total"); } catch (e) { return null; } }
+  function stRows(sp) { return ((sp && sp.kpi_state) || []).filter(function (r) { return r.state && r.code !== "PAN" && r.state !== "Total" && r.state !== "PAN India"; }); }
+  function pubLine() { return PUBM ? '<div class="muted" style="font-size:12px">Updated ' + dt(PUBM.at) + (PUBM.by ? " by " + esc(PUBM.by) : "") + (PUBM.months && PUBM.months.length ? " · data up to " + mLab(PUBM.months[PUBM.months.length - 1]) : "") + "</div>" : ""; }
+  function mSel() { var ms = DATA.months().slice().reverse(); return '<select class="tx" id="msel" style="max-width:180px">' + ms.map(function (m) { return '<option value="' + m + '"' + (m === F.m ? " selected" : "") + ">" + mLab(m) + "</option>"; }).join("") + "</select>"; }
+  function tDash() {
+    if (!DATA) return;
+    var sp = score(F.m), R = stRows(sp), pv = stRows(score(prevM(F.m))), pr = {}; pv.forEach(function (r) { pr[r.state] = r; });
+    if (!R.length) { VIEW.innerHTML = '<div class="card">' + mSel() + '</div><div class="card empty"><div class="big">📭</div><b>No scores for ' + mLab(F.m) + "</b></div>"; $("msel").onchange = function () { F.m = this.value; draw(); }; return; }
+    var K = DATA.KE.KPIS.filter(function (k) { return sp.cfg[k] && sp.cfg[k].w > 0; }), PTS = DATA.KE.PTS, nm = function (k) { return (sp.cfg[k] && sp.cfg[k].name) || DATA.KE.DEFNAME[k]; };
+    R.sort(function (a, b) { return (a.rank || 99) - (b.rank || 99); });
+    var mx = Math.max.apply(null, R.map(function (r) { return r.score || 0; }).concat([1]));
+    VIEW.innerHTML = '<div class="card"><div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">' + mSel() + '<span class="sp"></span>' + pubLine() + '</div>' +
+      '<div class="kpis"><div class="kpi"><b>🥇 ' + esc(R[0].state) + '</b><span>Rank 1 · ' + p1(R[0].score) + ' points</span></div><div class="kpi"><b>' + p1(R.reduce(function (a, r) { return a + (r.score || 0); }, 0) / R.length) + '</b><span>Average score of ' + R.length + ' states</span></div>' +
+      (pv.length ? (function () { var up = R.filter(function (r) { return pr[r.state] && pr[r.state].rank && r.rank < pr[r.state].rank; }).sort(function (a, b) { return (pr[b.state].rank - b.rank) - (pr[a.state].rank - a.rank); })[0]; return up ? '<div class="kpi"><b>⬆ ' + esc(up.state) + '</b><span>Moved up ' + (pr[up.state].rank - up.rank) + " places vs " + mShort(prevM(F.m)) + "</span></div>" : ""; })() : "") + "</div></div>" +
+      '<div class="card"><b>🏆 State ranking · ' + mLab(F.m) + '</b><div class="scroll"><table class="tb"><tr><th>#</th><th>State</th><th>Score</th>' + K.map(function (k) { return "<th>" + esc(nm(k)) + "<br><small>" + p1(sp.cfg[k].w) + " pts</small></th>"; }).join("") + "</tr>" +
+      R.filter(function (r) { return !F.st || r.state === F.st; }).map(function (r) { var o = pr[r.state], mv = o && o.rank && r.rank ? o.rank - r.rank : 0;
+        return "<tr><td><b>" + (r.rank || "–") + "</b>" + (mv ? ' <span class="mv ' + (mv > 0 ? "up" : "dn") + '">' + (mv > 0 ? "▲" + mv : "▼" + -mv) + "</span>" : "") + "</td><td><b>" + esc(r.state) + '</b><br><small class="muted">' + esc(r.admin || "") + '</small></td><td><div class="hb"><i style="width:' + Math.max(4, (r.score || 0) / mx * 70) + 'px"></i><b>' + p1(r.score) + "</b></div></td>" +
+          K.map(function (k) { return "<td>" + p1(r[PTS[k]]) + '<br><small class="muted">' + (r[k] == null ? "" : p1(r[k] * (r[k] <= 1 ? 100 : 1)) + "%") + "</small></td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" +
+      '<div class="muted" style="font-size:11.5px;margin-top:6px">Points per KPI with the KPI value below. Same calculation as the BI KPI Dashboard. ▲▼ = places moved vs ' + mLab(prevM(F.m)) + ".</div></div>";
+    $("msel").onchange = function () { F.m = this.value; draw(); };
+  }
+  function tKpi() {
+    if (!DATA) return;
+    var ms = DATA.months().slice(-6), S = DATA.states, rows = {}, sps = ms.map(function (m) { return score(m); });
+    var K = DATA.KE.KPIS.filter(function (k) { return sps.some(function (sp) { return sp && sp.cfg[k] && sp.cfg[k].w > 0; }); });
+    S.forEach(function (s) { rows[s] = ms.map(function (m, i) { var r = stRows(sps[i]).filter(function (x) { return x.state === s; })[0]; return r || null; }); });
+    var st = F.st || "", pick = function (s) { return !st || s === st; };
+    var lastSp = sps[sps.length - 1] || { cfg: {} }, nm = function (k) { return (lastSp.cfg[k] && lastSp.cfg[k].name) || DATA.KE.DEFNAME[k]; };
+    var pan = function (i, f) { var v = S.filter(pick).map(function (s) { return rows[s][i] && rows[s][i][f]; }).filter(function (x) { return x != null && isFinite(x); }); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; };
+    VIEW.innerHTML = '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><select class="tx" id="stsel" style="max-width:220px"><option value="">PAN India (average)</option>' + S.map(function (s) { return '<option' + (s === st ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + "</select>" + pubLine() + "</div>" +
+      '<div class="kpis">' + ["score"].concat(K).map(function (k) { var f = k === "score" ? "score" : DATA.KE.PTS[k], a = pan(ms.length - 1, f), b = pan(ms.length - 2, f), d = a != null && b != null ? a - b : null; return '<div class="kpi"><b>' + p1(a) + (d != null && Math.abs(d) >= 0.05 ? ' <span class="mv ' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + p1(Math.abs(d)) + "</span>" : "") + "</b><span>" + esc(k === "score" ? "Total score" : nm(k)) + " · " + mShort(ms[ms.length - 1]) + "</span></div>"; }).join("") + "</div></div>" +
+      '<div class="card"><b>📈 Month by month' + (st ? " · " + esc(st) : " · PAN India average") + '</b><div class="scroll"><table class="tb"><tr><th>KPI</th>' + ms.map(function (m) { return "<th>" + mShort(m) + "</th>"; }).join("") + "</tr>" +
+      ["score"].concat(K).map(function (k) { var f = k === "score" ? "score" : DATA.KE.PTS[k], vals = ms.map(function (m, i) { return pan(i, f); }), mx = Math.max.apply(null, vals.map(function (v) { return v || 0; }).concat([1])); return "<tr><td><b>" + esc(k === "score" ? "Total score" : nm(k)) + "</b></td>" + vals.map(function (v) { return '<td><div class="hb"><i style="width:' + Math.max(3, (v || 0) / mx * 40) + 'px"></i>' + p1(v) + "</div></td>"; }).join("") + "</tr>"; }).join("") + "</table></div></div>" +
+      (st ? "" : '<div class="card"><b>🔁 Rank by month</b><div class="scroll"><table class="tb"><tr><th>State</th>' + ms.map(function (m) { return "<th>" + mShort(m) + "</th>"; }).join("") + "</tr>" + S.slice().sort(function (a, b) { var x = rows[a][ms.length - 1], y = rows[b][ms.length - 1]; return ((x && x.rank) || 99) - ((y && y.rank) || 99); }).map(function (s) { return "<tr><td><b>" + esc(s) + "</b></td>" + rows[s].map(function (r) { return "<td>" + (r && r.rank ? r.rank : "–") + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div></div>");
+    $("stsel").onchange = function () { F.st = this.value; draw(); };
+  }
+  // ======================= HO: update a month from the vWork exports =======================
+  // Each source = one sheet of the dashboard's import template. Files are recognised by their headings.
+  var SRC = [
+    ["app", "📱", "Retailer App logs", "Retailer App Logs", "Retailer ID · Feature Name · Visit Date · No. of visits", "log"],
+    ["visit", "📍", "Customer visit report", "Visit Report", "State · Zone · … · Number of planned visits · Visit coverage", "log"],
+    ["comp", "🥊", "Competition uploads", "Competition Logs", "Store code · State · Upload date", "log"],
+    ["sd", "🎧", "Support desk (vWork Process Center)", "Support Desk Logs", "Process name · Doc Num · … · Creation date · Handle Time(m)", "log"],
+    ["vbm", "🛠", "VBM issue feedback", "VBM Support Desk", "Doc Num · Description · Issue Type · Creation date", "log"],
+    ["sell", "📦", "Retailer sell-out (vWork)", "Retailer Sell-out", "Retailer ID / code · units (qty) · date", "log"],
+    ["setup", "🏪", "Eligible retailers & stores", "Monthly Setup", "State × eligible retailers, eligible stores, active VBA stores", "ent"],
+    ["sales", "🎯", "Sales target (VBA targets configured)", "Sales Target", "State × % / Yes / No", "ent"],
+    ["vn", "📢", "v-Notice", "v-Notice", "State × Yes / No or %", "ent"]];
+  var SI = {}; SRC.forEach(function (s) { SI[s[0]] = s; });
+  var U = { m: "", files: {}, ent: {}, notes: null, frame: null, busy: false };   // files[src] = { name, rows (sheet rows), n, skipped }
+  function defMonth() { var d = new Date(); d.setDate(d.getDate() - 20); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2); }
+  function libX() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the Excel reader")); }; document.head.appendChild(s); }); }
+  var nrm = function (s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase(); };
+  function cellTxt(v) { if (v instanceof Date && !isNaN(v)) { var p = function (n) { return ("0" + n).slice(-2); }; return v.getFullYear() + "-" + p(v.getMonth() + 1) + "-" + p(v.getDate()) + (v.getHours() || v.getMinutes() ? " " + p(v.getHours()) + ":" + p(v.getMinutes()) : ""); } return v == null ? "" : v; }
+  function monthOf(v) {   // a date cell → YYYY-MM (Excel date, 2026-11-05, 05-11-2026, 05/11/2026 10:00, Nov 5 2026)
+    if (v instanceof Date && !isNaN(v)) return v.getFullYear() + "-" + ("0" + (v.getMonth() + 1)).slice(-2);
+    if (typeof v === "number" && v > 30000 && v < 80000) { var d = new Date(Math.round((v - 25569) * 864e5)); return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2); }
+    var s = String(v || "").trim(), m;
+    if ((m = /^(\d{4})[-\/.](\d{1,2})/.exec(s))) return m[1] + "-" + ("0" + m[2]).slice(-2);
+    if ((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/.exec(s))) { var y = +m[3] < 100 ? 2000 + +m[3] : +m[3], a = +m[1], b = +m[2], mo = a > 12 ? b : b > 12 ? a : b; return y + "-" + ("0" + mo).slice(-2); }
+    var t = Date.parse(s); if (!isNaN(t)) { var d2 = new Date(t); return d2.getFullYear() + "-" + ("0" + (d2.getMonth() + 1)).slice(-2); }
+    return "";
+  }
+  // which source is this sheet? → { src, hi (heading row), dateCol }
+  function detect(rows, sheetName) {
+    var nm = nrm(sheetName);
+    for (var i = 0; i < Math.min(rows.length, 8); i++) {
+      var H = (rows[i] || []).map(nrm), has = function (re) { return H.findIndex(function (h) { return re.test(h); }); }, j = function (re) { return has(re) >= 0; };
+      if (j(/^doc\s*num/) && (j(/issue type/) || j(/resolution/) || j(/evaluation/) || /vbm/.test(nm))) return { src: "vbm", hi: i, dc: has(/creation date/) };
+      if (j(/^doc\s*num/) && (j(/process name/) || j(/handle time/) || j(/current handler/))) return { src: "sd", hi: i, dc: has(/creation date/) };
+      if (j(/planned visits?/) || j(/visit coverage/) || (j(/^zone$/) && j(/number of stores/))) return { src: "visit", hi: i, dc: -1 };
+      if (j(/store\s*code/) && j(/upload\s*date/)) return { src: "comp", hi: i, dc: has(/upload\s*date/) };
+      if (j(/feature/) && j(/retailer|user\s*id|dealer|^id$/) && j(/date/)) return { src: "app", hi: i, dc: has(/date/) };
+      if (j(/retailer\s*(id|code)|dealer\s*code|customer\s*code|store\s*code|^id$/) && j(/qty|quantity|units?|sell\s*-?\s*out|sales\s*qty|pcs|volume/)) return { src: "sell", hi: i, dc: has(/date|month|period/) };
+    }
+    return null;
+  }
+  function readFile(f) {
+    return libX().then(function () { return f.arrayBuffer(); }).then(function (buf) {
+      var wb = XLSX.read(buf, { type: "array", cellDates: true }), out = [];
+      wb.SheetNames.forEach(function (sn) { var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: "" }); if (rows.length < 2) return; var d = detect(rows, sn); out.push({ sheet: sn, rows: rows, d: d }); });
+      return out;
+    });
+  }
+  function addFiles(list) {
+    var fl = [].slice.call(list || []); if (!fl.length) return;
+    toast("Reading " + fl.length + " file(s)…");
+    Promise.all(fl.map(function (f) { return readFile(f).then(function (S) { return { f: f, S: S }; }, function (e) { return { f: f, err: e.message }; }); })).then(function (R) {
+      var msg = [];
+      R.forEach(function (x) {
+        if (x.err) { msg.push("❌ " + x.f.name + ": " + x.err); return; }
+        var used = 0;
+        x.S.forEach(function (s) {
+          if (!s.d) return; used++;
+          var src = s.d.src, H = s.rows[s.d.hi], body = s.rows.slice(s.d.hi + 1).filter(function (r) { return r.some(function (v) { return String(v).trim() !== ""; }); });
+          var inM = function (r) { return s.d.dc < 0 || !r[s.d.dc] || monthOf(r[s.d.dc]) === U.m; }, keep = body.filter(inM), skipped = body.length - keep.length;
+          var out;
+          if (src === "sell") {   // one row per retailer with the units of the month
+            var ci = H.map(nrm).findIndex(function (h) { return /retailer\s*(id|code)|dealer\s*code|customer\s*code|store\s*code|^id$/.test(h); }), qi = H.map(nrm).findIndex(function (h) { return /qty|quantity|units?|sell\s*-?\s*out|sales\s*qty|pcs|volume/.test(h); }), sum = {};
+            keep.forEach(function (r) { var id = String(r[ci] || "").trim().toUpperCase(), q = typeof r[qi] === "number" ? r[qi] : parseFloat(String(r[qi]).replace(/,/g, "")); if (id && isFinite(q)) sum[id] = (sum[id] || 0) + q; });
+            out = [["Retailer ID", mShort(U.m) + " units"]].concat(Object.keys(sum).map(function (k) { return [k, sum[k]]; }));
+          } else if (src === "vbm") out = s.rows.slice(0, s.d.hi + 1).concat(keep);   // VBM keeps its two heading rows
+          else out = [H].concat(keep);
+          out = out.map(function (r) { return r.map(cellTxt); });
+          var old = U.files[src];
+          if (old && src !== "sell" && src !== "vbm") out = old.rows.concat(out.slice(1));   // several files of the same kind add up
+          else if (old && src === "sell") { var m2 = {}; old.rows.slice(1).concat(out.slice(1)).forEach(function (r) { m2[r[0]] = (m2[r[0]] || 0) + (+r[1] || 0); }); out = [out[0]].concat(Object.keys(m2).map(function (k) { return [k, m2[k]]; })); }
+          U.files[src] = { name: (old ? old.name + " + " : "") + x.f.name, rows: out, n: out.length - (src === "vbm" ? s.d.hi + 1 : 1), skipped: (old ? old.skipped : 0) + skipped };
+          msg.push("✅ " + x.f.name + (x.S.length > 1 ? " (" + s.sheet + ")" : "") + " → " + SI[src][2] + ": " + nf(U.files[src].n) + " rows for " + mLab(U.m) + (skipped ? " · " + nf(skipped) + " rows of other months left out" : ""));
+        });
+        if (!used) msg.push("❓ " + x.f.name + ": not recognised — its headings don't match any vWork report below. Check it is the raw export.");
+      });
+      U.notes = null; U.dd = null; tUpd(); sheet("Files read", mLab(U.m), [], '<div class="help" style="white-space:pre-line">' + esc(msg.join("\n")) + "</div>");
+    });
+  }
+  function denNear(state, m) { var den = (DATA.SETUP.den) || {}, ks = Object.keys(den).sort(), b = null; ks.forEach(function (k) { if (k <= m && den[k][state] && den[k][state].elig > 0) b = den[k][state]; }); return b; }
+  function entDefault(src) {
+    var S = DATA.SETUP, st = DATA.states, m = U.m, pm = prevM(m), o = {};
+    if (src === "setup") st.forEach(function (s) { var d0 = S.den && S.den[m] && S.den[m][s], d = (d0 && d0.elig > 0 ? d0 : denNear(s, m)) || {}; o[s] = [d.elig || 0, d.stores || 0, d.vstores || 0]; });
+    else { var key = src, src2 = (S[key] && (S[key][m] || S[key][pm])) || {}; st.forEach(function (s) { var v = src2[s]; o[s] = v == null ? "" : v >= 0.9999 ? "Yes" : v > 0 ? Math.round(v * 1000) / 10 + "%" : "No"; }); }
+    return o;
+  }
+  function entRows(src) {
+    var E = U.ent[src]; if (!E) return null; var st = DATA.states;
+    if (src === "setup") return [["State", "Month (YYYY-MM)", "Onboarded / eligible retailers", "Eligible stores", "Active VBA stores"]].concat(st.map(function (s) { var v = E[s] || [0, 0, 0]; return [s, U.m, +v[0] || 0, +v[1] || 0, +v[2] || 0]; }));
+    return [["State", mShort(U.m)]].concat(st.map(function (s) { return [s, E[s] == null ? "" : E[s]]; }));
+  }
+  function tUpd() {
+    if (!DATA) return; U.m = U.m || defMonth();
+    var got = SRC.filter(function (s) { return U.files[s[0]] || U.ent[s[0]]; }).length;
+    VIEW.innerHTML = '<div class="card"><b>⬆ Update the dashboard for a month</b><ol class="steps"><li>Choose the month.</li><li>Download the vWork reports of that month (see ⚙️ vWork reports) and drop them all below — the tool knows which is which and arranges them into the dashboard template.</li><li>Check / fill the small state tables (eligible retailers, sales target, v-Notice).</li><li>🔍 Check — the dashboard\'s own import reads it and shows the new ranking.</li><li>📤 Publish — the dashboard, both apps and this page update for every state.</li></ol>' +
+      '<label class="lb">Month</label><input class="tx" type="month" id="um" value="' + U.m + '" style="max-width:200px">' + (PUBM ? '<div class="help">Last published ' + dt(PUBM.at) + (PUBM.by ? " by " + esc(PUBM.by) : "") + (PUBM.months && PUBM.months.length ? " · months " + PUBM.months.map(mShort).join(", ") : "") + "</div>" : "") +
+      '<div class="drop" id="dz">📎 <b>Drop or choose the vWork exports</b><br><small class="muted">.xlsx / .xls / .csv · several at once · rows of other months are left out</small></div><input type="file" id="fi" multiple accept=".xlsx,.xls,.csv" style="display:none"></div>' +
+      SRC.map(function (s) { var f = U.files[s[0]], e = U.ent[s[0]], ok = f || e;
+        return '<div class="src' + (ok ? " ok" : "") + '"><h4>' + s[1] + " " + esc(s[2]) + ' <span class="pill' + (ok ? " g" : "") + '">' + (f ? nf(f.n) + " rows" : e ? "entered" : "not added") + "</span></h4>" +
+          '<div class="muted">→ template sheet <b>' + esc(s[3]) + (s[0] === "visit" ? " " + mShort(U.m).replace("'", "-") : "") + "</b> · " + esc(s[4]) + "</div>" + (f ? '<div class="muted">📄 ' + esc(f.name) + (f.skipped ? " · " + nf(f.skipped) + " rows of other months left out" : "") + "</div>" : "") +
+          '<div class="bar2" style="margin-top:6px">' + (s[5] === "ent" ? '<button class="btn ' + (e ? "ghost" : "pri") + ' sm" data-ent="' + s[0] + '">✏️ ' + (e ? "Edit" : "Fill / check") + "</button>" : "") + (ok ? '<button class="btn ghost sm" data-rm="' + s[0] + '">✕ Remove</button>' : "") + "</div></div>"; }).join("") +
+      '<div class="card" style="position:sticky;bottom:0;z-index:5"><div class="muted" style="font-size:12px"><b>' + got + "</b> of " + SRC.length + ' sources added. Sources you leave out keep the data already in the dashboard.</div><div class="bar2"><button class="btn pri" id="uchk"' + (got ? "" : " disabled") + '>🔍 Check</button><button class="btn" id="upub" style="background:#13693F;color:#fff"' + (U.notes && U.notes.ok && U.dd ? "" : " disabled") + '>📤 Publish</button><button class="btn ghost sm" id="uxl"' + (got ? "" : " disabled") + '>⬇ Import file</button>' + (PUBM ? '<button class="btn ghost sm" id="uundo">↩ Undo last publish</button>' : "") + '</div><div id="ures"></div></div>';
+    $("um").onchange = function () { if (Object.keys(U.files).length && !confirm("Changing the month clears the files added for " + mLab(U.m) + ". Continue?")) { this.value = U.m; return; } U.m = this.value; U.files = {}; U.ent = {}; U.notes = null; loadEnt(); };
+    $("dz").onclick = function () { $("fi").value = ""; $("fi").click(); }; $("fi").onchange = function () { addFiles($("fi").files); };
+    $("dz").ondragover = function (e) { e.preventDefault(); }; $("dz").ondrop = function (e) { e.preventDefault(); addFiles(e.dataTransfer.files); };
+    [].forEach.call(VIEW.querySelectorAll("[data-ent]"), function (b) { b.onclick = function () { entSheet(b.dataset.ent); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { delete U.files[b.dataset.rm]; delete U.ent[b.dataset.rm]; U.notes = null; saveEnt(); tUpd(); }; });
+    $("uchk").onclick = check; $("upub").onclick = publish; $("uxl").onclick = function () { download(book(), "BI_KPI_Import_" + U.m + ".xlsx"); };
+    if ($("uundo")) $("uundo").onclick = function () { if (!confirm("Go back to the dashboard data before the last publish?")) return; api({ action: "du-undo" }).then(function (r) { if (!r.ok) return toast(r.error); toast("Back to the earlier version"); PUBM = r.meta; KPIDATA_reset(); }); };
+    if (U.notes) showNotes();
+  }
+  function KPIDATA_reset() { location.reload(); }
+  function loadEnt() { api({ action: "du-src", month: U.m }).then(function (r) { U.ent = {}; if (r.ok) Object.keys(r.src || {}).forEach(function (k) { if (r.src[k].ent) U.ent[k] = r.src[k].ent; }); tUpd(); }); }
+  function saveEnt() { var o = {}; ["setup", "sales", "vn"].forEach(function (k) { o[k] = { ent: U.ent[k] || null }; }); api({ action: "du-src", month: U.m, save: true, src: o }); }
+  function entSheet(src) {
+    var E = U.ent[src] || entDefault(src), st = DATA.states, isSet = src === "setup";
+    var ov = sheet(SI[src][1] + " " + SI[src][2] + " · " + mLab(U.m), isSet ? "Filled from the latest month in the dashboard — change what's different" : "Yes / No or a % per state · filled from " + mLab(prevM(U.m)), [["💾", "Save", function (o) {
+      var N = {}; st.forEach(function (s, i) { if (isSet) N[s] = [0, 1, 2].map(function (j) { return +(o.querySelector('[data-e="' + i + "-" + j + '"]').value || 0); }); else N[s] = o.querySelector('[data-e="' + i + '-0"]').value.trim(); });
+      U.ent[src] = N; U.notes = null; saveEnt(); tUpd(); }, "pri"], ["📋", "Paste from Excel", function (o) { var t = prompt("Paste the rows (State then the value" + (isSet ? "s: retailers, stores, VBA stores" : "") + ") straight from Excel:"); if (!t) return false; var map = {}; t.split(/\r?\n/).forEach(function (l) { var c = l.split("\t"); if (c[0]) map[nrm(c[0])] = c.slice(1); }); st.forEach(function (s, i) { var c = map[nrm(s)]; if (!c) return; (isSet ? [0, 1, 2] : [0]).forEach(function (j) { var el = o.querySelector('[data-e="' + i + "-" + j + '"]'); if (el && c[j] != null) el.value = String(c[j]).replace(/,/g, "").trim(); }); }); toast("Pasted"); return false; }]],
+      '<div class="scroll ent"><table class="tb"><tr><th>State</th>' + (isSet ? "<th>Eligible retailers</th><th>Eligible stores</th><th>Active VBA stores</th>" : "<th>" + mShort(U.m) + "</th>") + "</tr>" + st.map(function (s, i) { var v = E[s]; return "<tr><td>" + esc(s) + "</td>" + (isSet ? [0, 1, 2].map(function (j) { return '<td><input inputmode="numeric" data-e="' + i + "-" + j + '" value="' + esc(v ? v[j] : 0) + '"></td>'; }).join("") : '<td><input data-e="' + i + '-0" value="' + esc(v == null ? "" : v) + '" placeholder="Yes / No / %"></td>'); }).join("") + "</tr>" + "</table></div>");
+  }
+  function book() {
+    var S = [];
+    SRC.forEach(function (s) {
+      var k = s[0], f = U.files[k], rows = f ? f.rows : entRows(k); if (!rows) return;
+      S.push({ name: k === "visit" ? "Visit Report " + mShort(U.m).replace("'", "-") : s[3], rows: rows });
+    });
+    return xlsx(S);
+  }
+  // the dashboard itself (hidden) reads the file with its normal Import data, so every KPI is calculated exactly as in the dashboard
+  function frame() {
+    if (U.frame && U.frame.contentWindow && U.frame.contentWindow.BIDASH) return Promise.resolve(U.frame);
+    return new Promise(function (res, rej) {
+      var f = document.createElement("iframe"); f.style.cssText = "position:fixed;left:-10000px;top:0;width:1280px;height:900px;border:0;opacity:0;pointer-events:none"; f.src = "/index.html?du=" + Date.now(); document.body.appendChild(f); U.frame = f;
+      var t0 = Date.now(); (function poll() { try { var w = f.contentWindow; if (w && w.BIDASH && w.BIDASH.ready() && w.document.getElementById("i-file")) return res(f); } catch (e) { } if (Date.now() - t0 > 120000) return rej(new Error("The dashboard didn't load — check the internet and try again")); setTimeout(poll, 600); })();
+    });
+  }
+  function wait(fn, ms) { var t0 = Date.now(); return new Promise(function (res, rej) { (function p() { var v; try { v = fn(); } catch (e) { } if (v) return res(v); if (Date.now() - t0 > ms) return rej(new Error("The dashboard took too long")); setTimeout(p, 400); })(); }); }
+  function check() {
+    if (U.busy) return; U.busy = true; $("ures").innerHTML = '<div class="loading"><div class="spin"></div>Opening the dashboard and reading the data… (up to a minute)</div>';
+    var blob = book();
+    frame().then(function (f) {
+      var w = f.contentWindow, d = w.document, inp = d.getElementById("i-file"), go = d.getElementById("i-go"), rs = d.getElementById("i-res"), rp = d.getElementById("i-replace");
+      if (rp) rp.checked = false; rs.textContent = "";
+      var dt2 = new w.DataTransfer(); dt2.items.add(new w.File([blob], "BI_KPI_Import_" + U.m + ".xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); inp.files = dt2.files; inp.dispatchEvent(new w.Event("change", { bubbles: true }));
+      return wait(function () { var t = rs.textContent; return t && !/^Reading|^Checking/.test(t) ? true : null; }, 120000).then(function () {
+        var lines = [].map.call(rs.children.length ? rs.children : [rs], function (x) { return x.textContent; });
+        U.notes = { ok: !go.disabled, lines: lines };
+        if (!U.notes.ok) { U.busy = false; tUpd(); return; }
+        $("ures").innerHTML = '<div class="loading"><div class="spin"></div>Calculating the new ranking…</div>';
+        var dv0 = w.BIDASH.dv(); go.click();   // apply inside the hidden copy only — nothing is published yet
+        return wait(function () { return w.BIDASH.dv() !== dv0 && !rs.textContent ? true : /Could not apply/.test(rs.textContent) ? "err" : null; }, 120000).then(function (r) {
+          if (r === "err") { U.notes = { ok: false, lines: lines.concat([rs.textContent]) }; U.busy = false; tUpd(); return; }
+          U.dd = w.BIDASH.dd(); U.months = w.BIDASH.months(); U.notes.rank = rankHtml(w.KE, U.dd); U.busy = false; tUpd();
+        });
+      });
+    }).catch(function (e) { U.busy = false; $("ures").innerHTML = '<div class="help w">' + esc(e.message) + "</div>"; });
+  }
+  function showNotes() {
+    var N = U.notes; $("ures").innerHTML = '<div class="help ' + (N.ok ? "g" : "w") + '"><b>' + (N.ok ? "✅ Ready to publish — the dashboard read the file" : "⚠️ The dashboard couldn't use this file") + '</b><div style="font-size:12px;margin-top:4px">' + N.lines.map(function (l) { return "• " + esc(l); }).join("<br>") + "</div></div>" + (N.rank ? N.rank : "");
+  }
+  function rankHtml(KE, DD) {
+    var sp; try { sp = KE.scorePeriod(DD.rawlog[0], DD.setup[0], U.m + "-01", lastDay(U.m), "Total"); } catch (e) { return ""; }
+    var R = stRows(sp).sort(function (a, b) { return (a.rank || 99) - (b.rank || 99); }); if (!R.length) return '<div class="help w">No scores for ' + mLab(U.m) + " after this update — check KPI Setup for this quarter in the dashboard.</div>";
+    var old = {}; stRows(score(U.m)).forEach(function (r) { old[r.state] = r; });
+    return '<div class="card" style="margin-top:8px"><b>Preview · ' + mLab(U.m) + ' ranking after this update</b><div class="scroll" style="max-height:300px"><table class="tb"><tr><th>#</th><th>State</th><th>Score</th><th>Now in dashboard</th></tr>' + R.map(function (r) { var o = old[r.state]; return "<tr><td><b>" + (r.rank || "–") + "</b></td><td>" + esc(r.state) + "</td><td><b>" + p1(r.score) + "</b></td><td class=\"muted\">" + (o ? "#" + (o.rank || "–") + " · " + p1(o.score) : "–") + "</td></tr>"; }).join("") + "</table></div></div>";
+  }
+  function publish() {
+    if (!U.notes || !U.notes.ok || !U.dd || U.busy) return;
+    if (!confirm("Publish " + mLab(U.m) + " to the dashboard for every state?")) return;
+    U.busy = true;
+    Promise.resolve().then(function () {
+      var DD = U.dd, months = U.months, ver = Date.now().toString(36);
+      var txt = JSON.stringify(DD); $("ures").innerHTML = '<div class="loading"><div class="spin"></div>Compressing ' + nf(txt.length / 1e6 * 10) / 10 + ' MB…</div>';
+      var cs = new Blob([txt]).stream().pipeThrough(new CompressionStream("gzip"));
+      return new Response(cs).arrayBuffer().then(function (ab) {
+        var u8 = new Uint8Array(ab), CH = 3000000, parts = []; for (var i = 0; i < u8.length; i += CH) parts.push(u8.subarray(i, i + CH));
+        var b64 = function (a) { var s = "", k = 0; for (; k < a.length; k += 32768) s += String.fromCharCode.apply(null, a.subarray(k, k + 32768)); return btoa(s); };
+        var n = 0; return (function next() { $("ures").innerHTML = '<div class="loading"><div class="spin"></div>Uploading ' + (n + 1) + " of " + parts.length + "…</div>"; return api({ action: "du-put", ver: ver, n: n, total: parts.length, part: b64(parts[n]), months: months, note: mLab(U.m) }).then(function (r) { if (!r.ok) throw new Error(r.error); n++; return n < parts.length ? next() : r; }); })();
+      });
+    }).then(function (r) {
+      U.busy = false; PUBM = r.meta; U.notes = null; U.files = {}; U.dd = null;
+      sheet("✅ Published", mLab(U.m), [["🔄", "See the new ranking", function () { location.reload(); return false; }, "pri"]], '<div class="help g">The dashboard, the Admin and State apps and this page now show the new data for everyone (they pick it up the next time they open). Share this tool\'s link (🔗 Tool links) with the states for the rankings and key indicators.</div>');
+      try { U.frame.remove(); } catch (e) { } U.frame = null; tUpd();
+    }).catch(function (e) { U.busy = false; $("ures").innerHTML = '<div class="help w">Not published: ' + esc(e.message || e) + "</div>"; });
+  }
+  // ======================= HO: where each report is in vWork (for the team and for the vWork robot) =======================
+  function tSrc() {
+    api({ action: "du-cfg" }).then(function (r) {
+      var C = (r.ok && r.cfg) || {};
+      VIEW.innerHTML = '<div class="card"><b>⚙️ vWork reports for each KPI</b><div class="help">Write once where each report is in vWork (menu path, report name, filters). Everyone updating the dashboard then follows the same steps — and it is what the vWork robot will use to download the reports by itself.</div>' +
+        SRC.map(function (s) { var c = C[s[0]] || {}; return '<div class="src"><h4>' + s[1] + " " + esc(s[2]) + '</h4><div class="muted">Template sheet: ' + esc(s[3]) + " · needs: " + esc(s[4]) + '</div><label class="lb">vWork report name</label><input class="tx" data-c="' + s[0] + '-report" value="' + esc(c.report || "") + '" placeholder="e.g. Sell-out detail report"><label class="lb">Menu path & filters</label><input class="tx" data-c="' + s[0] + '-path" value="' + esc(c.path || "") + '" placeholder="e.g. Report Center → Sales → Sell-out → Date: whole month → Export"><label class="lb">Note</label><input class="tx" data-c="' + s[0] + '-note" value="' + esc(c.note || "") + '"></div>'; }).join("") +
+        '<div class="bar2"><button class="btn pri" id="csv">💾 Save</button></div></div>';
+      $("csv").onclick = function () { var o = {}; SRC.forEach(function (s) { o[s[0]] = { report: VIEW.querySelector('[data-c="' + s[0] + '-report"]').value, path: VIEW.querySelector('[data-c="' + s[0] + '-path"]').value, note: VIEW.querySelector('[data-c="' + s[0] + '-note"]').value }; }); api({ action: "du-cfg", save: true, cfg: o }).then(function (x) { toast(x.ok ? "Saved" : x.error); }); };
+    });
+  }
+  tabs(); load().then(function () { if (HO && TAB === "upd") loadEnt(); });
+})();
+</script>
+</body>
+</html>

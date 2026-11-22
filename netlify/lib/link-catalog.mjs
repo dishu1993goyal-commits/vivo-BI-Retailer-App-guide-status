@@ -290,6 +290,36 @@ export const LINK_CATALOG = {
 ]
 ]
 },
+"dashupdate.html": {
+"id": "dashupdate",
+"icon": "📊",
+"name": "KPI Dashboard · rankings",
+"ho": false,
+"acts": [
+"du-cfg",
+"du-put",
+"du-src",
+"du-undo"
+],
+"tabs": [
+[
+"dash",
+"📊 Rankings"
+],
+[
+"kpi",
+"📈 Key indicators"
+],
+[
+"upd",
+"⬆ Update from vWork"
+],
+[
+"src",
+"⚙️ vWork reports"
+]
+]
+},
 "reports.html": {
 "id": "reports",
 "icon": "📑",

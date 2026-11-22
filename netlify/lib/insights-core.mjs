@@ -8,7 +8,7 @@
 //   insseen:<app>:<key>    { ids:[] }                      alerts already seen
 //   insdeck:<slug>:<per>   { at, snapAt, ai }              AI narrative for a review deck
 import "../../insights-engine.js";
-import { loadKE } from "./autorep-core.mjs";
+import { loadKE, siteDash } from "./autorep-core.mjs";
 import { groqJSON, aiKeys } from "./aff-core.mjs";
 import { randomBytes, createHash } from "node:crypto";
 const E = globalThis.INSENG;
@@ -22,9 +22,7 @@ const nid = (t) => t.toString(36) + randomBytes(3).toString("hex");
 export async function getSnapshot(store, env, { fetchImpl = fetch, now = () => Date.now(), force = false } = {}) {
   const c = await store.get("insnap");
   if (c && c.snap && !force && now() - c.at < SNAP_TTL) return c;
-  const r = await fetchImpl((env.SITE_URL || "") + "/index.html?v=" + now());
-  if (!r.ok) { if (c && c.snap) return c; throw new Error("couldn't read the dashboard (" + r.status + ")"); }
-  const D = loadKE(await r.text());
+  let D; try { D = await siteDash(fetchImpl, env, now()); } catch (e) { if (c && c.snap) return c; throw e; }
   const snap = E.snapshot(D, { lists: true });
   const lists = snap.lists; delete snap.lists;
   const at = now();
