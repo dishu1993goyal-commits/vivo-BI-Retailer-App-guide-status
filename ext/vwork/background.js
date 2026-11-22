@@ -50,7 +50,7 @@ chrome.runtime.onMessage.addListener((m, sender, reply) => {
     const url = OK_VW(m.url || "") ? m.url : "https://in-vwork.vivo.xyz/vwork/";
     const host = new URL(url).origin;
     // reuse an open vWork tab (already logged in), otherwise open one
-    let tabs = await chrome.tabs.query({ url: host + "/*" }), tab = tabs[0];
+    let tabs = (await chrome.tabs.query({ url: host + "/*" })).filter(t => t.id !== sender.tab.id), tab = tabs[0];
     if (tab) { await chrome.tabs.update(tab.id, { active: true }); await chrome.windows.update(tab.windowId, { focused: true }); }
     else tab = await chrome.tabs.create({ url, index: sender.tab.index + 1 });
     RUN = { job: m.job, biTab: sender.tab.id, vwTab: tab.id, first: true, code: await latestCode(new URL(sender.tab.url).origin), ticks: 0 };

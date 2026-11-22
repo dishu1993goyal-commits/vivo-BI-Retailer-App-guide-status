@@ -1,12 +1,41 @@
 {
   "manifest_version": 3,
   "name": "vivo BI vWork helper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lets the vivo BI KPI Dashboard tool open vWork and read the KPI reports for you. Read-only: it never saves, releases or changes anything in vWork.",
-  "permissions": ["scripting", "tabs", "storage"],
-  "host_permissions": ["https://in-vwork.vivo.xyz/*", "https://*.amazonaws.com/*", "https://*.aliyuncs.com/*", "https://vivo-business-innovation-dashboard-22.netlify.app/*", "http://localhost/*"],
-  "background": { "service_worker": "background.js" },
-  "content_scripts": [{ "matches": ["https://vivo-business-innovation-dashboard-22.netlify.app/*", "http://localhost/*"], "js": ["bridge.js"], "run_at": "document_start" }],
-  "icons": { "128": "icon128.png" },
-  "action": { "default_title": "vivo BI vWork helper", "default_icon": "icon128.png" }
+  "permissions": [
+    "scripting",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://in-vwork.vivo.xyz/*",
+    "https://*.amazonaws.com/*",
+    "https://*.aliyuncs.com/*",
+    "https://vivo-business-innovation-dashboard-22.netlify.app/*",
+    "http://localhost/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://vivo-business-innovation-dashboard-22.netlify.app/*",
+        "http://localhost/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "icons": {
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_title": "vivo BI vWork helper",
+    "default_icon": "icon128.png"
+  }
 }
