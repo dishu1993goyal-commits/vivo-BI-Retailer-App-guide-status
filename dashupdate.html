@@ -669,6 +669,12 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
             var ci = H.map(nrm).findIndex(function (h) { return /retailer\s*(id|code)|dealer\s*code|customer\s*code|store\s*code|^id$/.test(h); }), qi = H.map(nrm).findIndex(function (h) { return /qty|quantity|units?|sell\s*-?\s*out|sales\s*qty|pcs|volume/.test(h); }), sum = {};
             keep.forEach(function (r) { var id = String(r[ci] || "").trim().toUpperCase(), q = typeof r[qi] === "number" ? r[qi] : parseFloat(String(r[qi]).replace(/,/g, "")); if (id && isFinite(q)) sum[id] = (sum[id] || 0) + q; });
             out = [["Retailer ID", mShort(U.m) + " units"]].concat(Object.keys(sum).map(function (k) { return [k, sum[k]]; }));
+          } else if (src === "visit") {   // vWork "Staff visit report By area": keep only the state and zone total rows (the export has 200k+ area rows)
+            var hn = H.map(nrm), cx = function (re) { return hn.findIndex(function (h) { return re.test(h); }); }, cS = cx(/^state$/), cZ = cx(/^zone$/), deep = [cx(/^district$/), cx(/^sub\s*district$/), cx(/^town/), cx(/^area$/)].filter(function (c) { return c >= 0; });
+            var bl = function (r, c) { return c < 0 || r[c] == null || String(r[c]).trim() === ""; }, isTot = function (r) { return deep.every(function (c) { return bl(r, c); }); }, hasTot = {};
+            keep.forEach(function (r) { if (isTot(r) && bl(r, cZ)) hasTot[String(r[cS]).trim()] = 1; });
+            var k2 = keep.filter(function (r) { return !hasTot[String(r[cS]).trim()] || isTot(r); });
+            skipped = 0; out = [H].concat(k2); s.trimmed = keep.length - k2.length;
           } else if (src === "vbm") out = s.rows.slice(0, s.d.hi + 1).concat(keep);   // VBM keeps its two heading rows
           else out = [H].concat(keep);
           out = out.map(function (r) { return r.map(cellTxt); });
@@ -676,7 +682,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
           if (old && src !== "sell" && src !== "vbm") out = old.rows.concat(out.slice(1));   // several files of the same kind add up
           else if (old && src === "sell") { var m2 = {}; old.rows.slice(1).concat(out.slice(1)).forEach(function (r) { m2[r[0]] = (m2[r[0]] || 0) + (+r[1] || 0); }); out = [out[0]].concat(Object.keys(m2).map(function (k) { return [k, m2[k]]; })); }
           U.files[src] = { name: (old ? old.name + " + " : "") + x.f.name, rows: out, n: out.length - (src === "vbm" ? s.d.hi + 1 : 1), skipped: (old ? old.skipped : 0) + skipped };
-          msg.push("✅ " + x.f.name + (x.S.length > 1 ? " (" + s.sheet + ")" : "") + " → " + SI[src][2] + ": " + nf(U.files[src].n) + " rows for " + mLab(U.m) + (skipped ? " · " + nf(skipped) + " rows of other months left out" : ""));
+          msg.push("✅ " + x.f.name + (x.S.length > 1 ? " (" + s.sheet + ")" : "") + " → " + SI[src][2] + ": " + nf(U.files[src].n) + " rows for " + mLab(U.m) + (skipped ? " · " + nf(skipped) + " rows of other months left out" : "") + (s.trimmed ? " · kept state & zone totals (" + nf(s.trimmed) + " area rows not needed)" : ""));
         });
         if (!used) msg.push("❓ " + x.f.name + ": not recognised — its headings don't match any vWork report below. Check it is the raw export.");
       });
@@ -704,17 +710,58 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
       SRC.map(function (s) { var f = U.files[s[0]], e = U.ent[s[0]], ok = f || e;
         return '<div class="src' + (ok ? " ok" : "") + '"><h4>' + s[1] + " " + esc(s[2]) + ' <span class="pill' + (ok ? " g" : "") + '">' + (f ? nf(f.n) + " rows" : e ? "entered" : "not added") + "</span></h4>" +
           '<div class="muted">→ template sheet <b>' + esc(s[3]) + (s[0] === "visit" ? " " + mShort(U.m).replace("'", "-") : "") + "</b> · " + esc(s[4]) + "</div>" + (f ? '<div class="muted">📄 ' + esc(f.name) + (f.skipped ? " · " + nf(f.skipped) + " rows of other months left out" : "") + "</div>" : "") +
-          '<div class="bar2" style="margin-top:6px">' + (s[5] === "ent" ? '<button class="btn ' + (e ? "ghost" : "pri") + ' sm" data-ent="' + s[0] + '">✏️ ' + (e ? "Edit" : "Fill / check") + "</button>" : "") + (ok ? '<button class="btn ghost sm" data-rm="' + s[0] + '">✕ Remove</button>' : "") + "</div></div>"; }).join("") +
+          '<div class="bar2" style="margin-top:6px">' + (s[5] === "ent" ? '<button class="btn ' + (e ? "ghost" : "pri") + ' sm" data-ent="' + s[0] + '">✏️ ' + (e ? "Edit" : "Fill / check") + "</button>" : "") + (VWR[s[0]] ? '<button class="btn ' + (ok ? "ghost" : "pri") + ' sm" data-vw="' + s[0] + '">🤖 Get from vWork</button>' : "") + (ok ? '<button class="btn ghost sm" data-rm="' + s[0] + '">✕ Remove</button>' : "") + "</div></div>"; }).join("") +
       '<div class="card" style="position:sticky;bottom:0;z-index:5"><div class="muted" style="font-size:12px"><b>' + got + "</b> of " + SRC.length + ' sources added. Sources you leave out keep the data already in the dashboard.</div><div class="bar2"><button class="btn pri" id="uchk"' + (got ? "" : " disabled") + '>🔍 Check</button><button class="btn" id="upub" style="background:#13693F;color:#fff"' + (U.notes && U.notes.ok && U.dd ? "" : " disabled") + '>📤 Publish</button><button class="btn ghost sm" id="uxl"' + (got ? "" : " disabled") + '>⬇ Import file</button>' + (PUBM ? '<button class="btn ghost sm" id="uundo">↩ Undo last publish</button>' : "") + '</div><div id="ures"></div></div>';
     $("um").onchange = function () { if (Object.keys(U.files).length && !confirm("Changing the month clears the files added for " + mLab(U.m) + ". Continue?")) { this.value = U.m; return; } U.m = this.value; U.files = {}; U.ent = {}; U.notes = null; loadEnt(); };
     $("dz").onclick = function () { $("fi").value = ""; $("fi").click(); }; $("fi").onchange = function () { addFiles($("fi").files); };
     $("dz").ondragover = function (e) { e.preventDefault(); }; $("dz").ondrop = function (e) { e.preventDefault(); addFiles(e.dataTransfer.files); };
     [].forEach.call(VIEW.querySelectorAll("[data-ent]"), function (b) { b.onclick = function () { entSheet(b.dataset.ent); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-vw]"), function (b) { b.onclick = function () { vwGet(b.dataset.vw); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { delete U.files[b.dataset.rm]; delete U.ent[b.dataset.rm]; U.notes = null; saveEnt(); tUpd(); }; });
     $("uchk").onclick = check; $("upub").onclick = publish; $("uxl").onclick = function () { download(book(), "BI_KPI_Import_" + U.m + ".xlsx"); };
     if ($("uundo")) $("uundo").onclick = function () { if (!confirm("Go back to the dashboard data before the last publish?")) return; api({ action: "du-undo" }).then(function (r) { if (!r.ok) return toast(r.error); toast("Back to the earlier version"); PUBM = r.meta; KPIDATA_reset(); }); };
     if (U.notes) showNotes();
   }
+  // ---- vWork robot: the app opens vWork, the person logs in, the helper (vivo_vw.js) picks ALL + the month, presses Query and reads the state rows. Nothing is saved or changed in vWork.
+  var VWR = { visit: { name: "Customer visit report", where: "vWork → Visit Form → Personnel visit" } }, VWURL = "https://in-vwork.vivo.xyz/vwork/";
+  var BB = window.BIBot && window.BIBot.version ? window.BIBot : null;
+  function b64j(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
+  function unb64j(t) { try { return JSON.parse(decodeURIComponent(escape(atob(String(t || "").trim())))); } catch (e) { return null; } }
+  function vwJob(src) {
+    var p = U.m.split("-"), last = new Date(+p[0], +p[1], 0).getDate(), now = new Date(), to = U.m + "-" + String(last).padStart(2, "0");
+    if (+p[0] === now.getFullYear() && +p[1] === now.getMonth() + 1) to = U.m + "-" + String(now.getDate()).padStart(2, "0");
+    return { id: "vw" + Date.now().toString(36), mode: "vw", rep: src, from: U.m + "-01", to: to };
+  }
+  function vwGet(src) {
+    if (!U.m) return toast("Choose the month first");
+    var job = vwJob(src), R0 = VWR[src];
+    if (BB) {
+      var r = BB.run(JSON.stringify(job), VWURL);
+      if (r === "ok") return toast("Log in to vWork yourself — the app then reads " + R0.name + " for " + job.from + " → " + job.to);
+      if (r !== "bad") return toast(r === "busy" ? "Another portal window is open" : "Couldn't open vWork (" + r + ")");
+      toast("Update the vivo BI Admin app to 8.1 for this — or use it on a computer below");
+    }
+    var ov = sheet("🤖 " + R0.name + " from vWork", mLab(U.m) + " · " + job.from + " → " + job.to, [], '<div class="help">The helper opens <b>' + esc(R0.where) + '</b>, chooses <b>ALL</b>, sets the dates, presses <b>Query</b> and reads the state rows. It never saves, releases or exports anything. You log in yourself.</div><div id="vdk"><div class="muted">Loading…</div></div>');
+    fetch("/vivo_vw.js?v=" + Date.now()).then(function (x) { return x.text(); }).then(function (code) {
+      var boot = code.replace(/\/\*[\s\S]*?\*\//g, "") + ";(function(){if(window.__biL)return;var J=null,c=prompt('Paste the job code from the vivo BI tool');if(!c)return;try{J=JSON.parse(decodeURIComponent(escape(atob(c.trim()))))}catch(e){alert('That code is not valid');return}var bar=document.createElement('div');bar.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;background:#12163A;color:#fff;font:14px system-ui;padding:10px 14px;border-radius:12px';document.body.appendChild(bar);var first=J;window.__biL=setInterval(function(){var r=JSON.parse(window.__biVwRun(first));first=null;bar.textContent='vivo BI · '+(r.msg||r.s);if(r.s==='done'||r.s==='stopped'||r.s==='err'){clearInterval(window.__biL);window.__biL=0;var out=btoa(unescape(encodeURIComponent(JSON.stringify(r))));try{navigator.clipboard.writeText(out)}catch(e){}bar.innerHTML=(r.s==='done'?'✅ ':'⚠️ ')+r.msg+' — the result code is copied. Paste it in the vivo BI tool. <button id=__bic style=margin-left:8px>Copy again</button>';document.getElementById('__bic').onclick=function(){prompt('Copy this result code',out)};}},1200);})();";
+      var href = "javascript:" + encodeURIComponent("(function(){" + boot + "})()"), d = ov.querySelector("#vdk");
+      d.innerHTML = '<div class="help w" style="margin-top:10px"><b>On a computer (Chrome / Edge)</b><br>1) Drag this to the bookmarks bar: <a class="btn ghost sm" id="vbm" href="#">📊 vivo BI vWork helper</a><br>2) <button class="btn ghost sm" id="vcj">Copy job code</button><br>3) Open <b>in-vwork.vivo.xyz</b>, log in, stay on the Workbench, click the bookmark and paste the code. Keep the tab open until it says ✅.<br>4) Paste the result code here:</div><textarea class="tx" id="vrc" rows="2" placeholder="Result code"></textarea><div class="bar2"><button class="btn pri sm" id="vrb">Use result</button></div>';
+      d.querySelector("#vbm").setAttribute("href", href); d.querySelector("#vbm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar"); };
+      d.querySelector("#vcj").onclick = function () { var t = b64j(job); try { navigator.clipboard.writeText(t).then(function () { toast("Job code copied"); }, function () { prompt("Copy:", t); }); } catch (e) { prompt("Copy:", t); } };
+      d.querySelector("#vrb").onclick = function () { var x = unb64j(d.querySelector("#vrc").value); if (!x) return toast("That code is not valid"); ov.remove(); vwGot(x); };
+    });
+  }
+  function vwGot(r) {
+    if (!r || r.mode !== "vw") return;
+    if (r.s !== "done" || !r.rows || r.rows.length < 2) { sheet("vWork", r.s === "stopped" ? "Stopped" : "Couldn't read the report", [], '<div class="err">' + esc(r.msg || "Nothing read") + "</div>" + (r.diag ? '<div class="help" style="word-break:break-word;font-size:11px">What the helper saw (share this with the BI admin): ' + esc(r.diag) + "</div>" : "")); return; }
+    if (r.from && r.from.slice(0, 7) !== U.m) return toast("That result is for " + r.from.slice(0, 7) + " — choose that month first");
+    var src = r.rep, rows = r.rows.map(function (x) { return x.map(cellTxt); });
+    U.files[src] = { name: "vWork " + r.from + " → " + r.to, rows: rows, n: rows.length - 1, skipped: 0 }; U.notes = null; U.dd = null; tUpd();
+    toast("✅ " + (rows.length - 1) + " state rows read from vWork");
+  }
+  function vwPending() { if (!BB || !BB.pending) return; try { JSON.parse(BB.pending() || "[]").forEach(function (p) { var st = null; try { st = JSON.parse(p.status || "null"); } catch (e) { } if (/^vw/.test(p.id)) { BB.ack(p.id); if (st && st.mode === "vw") vwGot(st); else if (p.state !== "done") toast("vWork window closed — nothing read"); } }); } catch (e) { } }
+  window.__biBotDone = function () { setTimeout(vwPending, 300); };
+  setTimeout(vwPending, 1500);
   function KPIDATA_reset() { location.reload(); }
   function loadEnt() { api({ action: "du-src", month: U.m }).then(function (r) { U.ent = {}; if (r.ok) Object.keys(r.src || {}).forEach(function (k) { if (r.src[k].ent) U.ent[k] = r.src[k].ent; }); tUpd(); }); }
   function saveEnt() { var o = {}; ["setup", "sales", "vn"].forEach(function (k) { o[k] = { ent: U.ent[k] || null }; }); api({ action: "du-src", month: U.m, save: true, src: o }); }

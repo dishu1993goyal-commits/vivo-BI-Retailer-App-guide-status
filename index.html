@@ -7375,7 +7375,7 @@ window.HOX = (function () {
       setup.visit = JSON.parse(JSON.stringify(setup.visit || {})); if (pick.vmap) { setup.vmap = {}; sh[pick.vmap].slice(1).forEach(r => { if (r && r[0]) setup.vmap[String(r[0]).trim()] = r[1] == null ? '' : String(r[1]).trim(); }); }
       vsheets.forEach(vn => {
         const grid = sh[vn], hd = (grid[0] || []).map(h => KE.nrm(h)), ix = re => hd.findIndex(h => re.test(h));
-        const cS = ix(/^state$/), cZ = ix(/^zone$/), cD = ix(/^district$/), cA = ix(/^area$/), cN = ix(/^number of stores$/), cP = ix(/number of planned visits/), cT = ix(/number of actual visits/), cU = ix(/unvisited/), cV = ix(/number of valid visits/), cB = ix(/abnormal/);
+        const cS = ix(/^state$/), cZ = ix(/^zone$/), cD = ix(/^district$/), cA = ix(/^area$/), cSD = ix(/^sub\s*district$/), cTV = ix(/^town/), cN = ix(/^number of stores$/), cP = ix(/number of planned visits/), cT = ix(/number of actual visits/), cU = ix(/unvisited/), cV = ix(/number of valid visits/), cB = ix(/abnormal/);
         const mm = parseMonth(vn.replace(/^.*visit\s*report[\s_\-:]*/i, ''));
         if (cS < 0 || cN < 0 || cT < 0 || cV < 0) { rep.notes.push(vn + ': heading row not found. Paste the vscan Staff visit report with its headings in row 1.'); return; }
         if (!mm) { rep.notes.push(vn + ': add the month to the sheet name, for example Visit Report Oct-26.'); return; }
@@ -7386,7 +7386,7 @@ window.HOX = (function () {
           const raw = String(r[cS]).trim(), a = acc[raw] || (acc[raw] = {l1: [0, 0, 0, 0, 0, 0], l2: {}, lf: [0, 0, 0, 0, 0, 0]});
           const row = [num(r, cN), num(r, cP), num(r, cT), num(r, cV), num(r, cU), num(r, cB)], has = c => c >= 0 && r[c] != null && String(r[c]).trim() !== '';
           const add = (t, u) => { for (let j = 0; j < 6; j++) t[j] += u[j]; };
-          if (!has(cZ)) add(a.l1, row); else if (!has(cD)) { const z = String(r[cZ]).trim(); add(a.l2[z] || (a.l2[z] = [0, 0, 0, 0, 0, 0]), row); } else if (cA >= 0 && has(cA)) add(a.lf, row);
+          if (!has(cZ) && !has(cD) && !has(cSD) && !has(cTV) && !has(cA)) add(a.l1, row); else if (has(cZ) && !has(cD) && !has(cSD) && !has(cTV) && !has(cA)) { const z = String(r[cZ]).trim(); add(a.l2[z] || (a.l2[z] = [0, 0, 0, 0, 0, 0]), row); } else if (cA >= 0 && has(cA)) add(a.lf, row);
         }
         const out = {}; let rows = 0;
         Object.keys(acc).forEach(raw => {
