@@ -33,6 +33,27 @@
     [].forEach.call(D.querySelectorAll("iframe,frame"), function (f) { var ok = false; try { ok = !!f.contentDocument; } catch (x) { } if (ok || !vis(f)) return; var src = String(f.src || ""); if (!/^https:\/\/([a-z0-9-]+\.)*vivo\.(xyz|com|in)\//i.test(src) && !/^http:\/\/(localhost|127\.0\.0\.1):\d+\//.test(src)) return; var r = f.getBoundingClientRect(), ar = r.width * r.height; if (ar > ba && ar > innerWidth * innerHeight * 0.2) { ba = ar; best = src; } });
     return best;
   }
+  // pick a date range on an open calendar (any picker): month header "Nov 2026" → start day → end day → OK
+  var MN3 = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  function calHeads(root) { return leaf(/^([a-z]{3,9})\s*(\d{4})$|^(\d{4})\s*([a-z]{3,9})$|^(\d{4})\s*年\s*(\d{1,2})\s*月$/i, root).map(function (e) { var t = txt(e).toLowerCase(), m = t.match(/([a-z]{3})[a-z]*\s*(\d{4})|(\d{4})\s*([a-z]{3})|(\d{4})\s*年\s*(\d{1,2})/), y, mo; if (!m) return null; if (m[1]) { y = +m[2]; mo = MN3.indexOf(m[1]); } else if (m[3]) { y = +m[3]; mo = MN3.indexOf(m[4]); } else { y = +m[5]; mo = +m[6] - 1; } return mo < 0 ? null : { e: e, k: y * 12 + mo }; }).filter(Boolean); }
+  function calPick(a, b) {
+    var ka = +a.slice(0, 4) * 12 + (+a.slice(5, 7) - 1), H = calHeads(); if (!H.length) return "noheader";
+    var h = H.filter(function (x) { return x.k === ka; })[0];
+    if (!h) { var dir = H[0].k > ka ? -1 : 1, nav = [].filter.call(qa("button,span,a,i"), function (e) { var c = String(e.className && e.className.baseVal != null ? e.className.baseVal : e.className); return vis(e) && (dir < 0 ? /prev(?!.*year)|[‹<](?!<)/.test(c + " " + txt(e)) && !/super-prev|prev-year|«/.test(c + txt(e)) : /next(?!.*year)|[›>](?!>)/.test(c + " " + txt(e)) && !/super-next|next-year|»/.test(c + txt(e))); }); if (nav[0]) tap(nav[0]); return "nav"; }
+    var hb = h.e.getBoundingClientRect(), cells = [].filter.call(qa("td,div,span"), function (e) { var r = e.getBoundingClientRect(), cl = String(e.className || "") + " " + String((e.parentElement || {}).className || ""); return vis(e) && !e.children.length && /^\d{1,2}$/.test(txt(e)) && r.top >= hb.bottom - 2 && r.top < hb.bottom + 320 && Math.abs(r.left + r.width / 2 - (hb.left + hb.width / 2)) < 200 && !/disabled|other|prev-month|next-month|not-current|-out|cell-out|is-other/i.test(cl); });
+    var cellOf = function (d) { var n = +d.slice(8); return cells.filter(function (e) { return +txt(e) === n; }).sort(function (p, q) { return n > 20 ? q.getBoundingClientRect().top - p.getBoundingClientRect().top : p.getBoundingClientRect().top - q.getBoundingClientRect().top; })[0]; };
+    var c0 = cellOf(a); if (!c0) return "nocell";
+    tap(c0);
+    var kb = +b.slice(0, 4) * 12 + (+b.slice(5, 7) - 1), hb2 = H.filter(function (x) { return x.k === kb; })[0];
+    if (!hb2) return "start";   // end month not shown: next tick moves the calendar
+    if (hb2 !== h) { hb = hb2.e.getBoundingClientRect(); cells = [].filter.call(qa("td,div,span"), function (e) { var r = e.getBoundingClientRect(), cl = String(e.className || "") + " " + String((e.parentElement || {}).className || ""); return vis(e) && !e.children.length && /^\d{1,2}$/.test(txt(e)) && r.top >= hb.bottom - 2 && r.top < hb.bottom + 320 && Math.abs(r.left + r.width / 2 - (hb.left + hb.width / 2)) < 200 && !/disabled|other|prev-month|next-month|not-current|-out|cell-out|is-other/i.test(cl); }); }
+    var c1 = cellOf(b); if (c1) tap(c1);
+    var ok = [].filter.call(qa("button,a,span"), function (e) { return vis(e) && /^(ok|confirm|确定)$/i.test(txt(e)); })[0]; if (ok) setTimeout(function () { tap(ok); }, 120);
+    return "picked";
+  }
+  // ---- report windows from other vivo sites: the helper runs inside them too (app 8.3 / browser helper 1.0.3) and this page passes the job on
+  function subFrame(origin) { var best = null, ba = 0; [].forEach.call(D.querySelectorAll("iframe,frame"), function (f) { var src = String(f.src || ""); if (src.indexOf(origin) !== 0 || !vis(f)) return; var r = f.getBoundingClientRect(); if (r.width * r.height > ba) { ba = r.width * r.height; best = f; } }); return best; }
+  function delegate(S, src) { var o = src.match(/^https?:\/\/[^\/]+/)[0]; S.deleg = o; S.subN = (S.subN || 0) + 1; S.subJob = Object.assign({}, S.job || {}, { id: S.id + "f" + S.subN, sub: true }); S.dt0 = S.tick; W.__biVwSub = null; save(S); }
   function hop(S, url, why) { S.hops = (S.hops || 0) + 1; save(S); if (S.hops > 6) return false; setTimeout(function () { location.href = url; }, 50); return true; }
   function out(o) { return JSON.stringify(o); }
   function setInput(el, v) { el.focus(); try { el.select(); } catch (e) { } var ok = false; try { ok = el.ownerDocument.execCommand("insertText", false, v); } catch (e) { } if (!ok || el.value !== v) { Object.getOwnPropertyDescriptor((el.ownerDocument.defaultView || W).HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); } }
@@ -56,18 +77,20 @@
     var t = [].filter.call(qa("table"), function (x) { return vis(x) && x.querySelector("th"); }), heads = null, rows = [];
     t.forEach(function (x) { var th = [].map.call(x.querySelectorAll("thead th"), txt); if (th.some(function (h) { return R.first.test(h); })) heads = th; });
     if (!heads) return null;
-    var fi = heads.findIndex(function (h) { return R.first.test(h); });
-    t.forEach(function (x) {
+    var fi = heads.findIndex(function (h) { return R.first.test(h); }), best = {}, order = [];
+    [].filter.call(qa("table"), vis).forEach(function (x) {   // header and body are often two separate tables
       [].forEach.call(x.querySelectorAll("tbody tr"), function (tr) {
-        if (/ant-table-row-level-[1-9]/.test(tr.className) || /measure|placeholder|expanded-row/.test(tr.className)) return;
-        var td = [].map.call(tr.children, txt); if (td.length < heads.length - 1 || !td[fi]) return; rows.push(td);
+        if (/ant-table-row-level-[1-9]/.test(tr.className) || /measure|placeholder|expanded-row/.test(tr.className) || tr.getAttribute("aria-hidden") === "true") return;
+        var td = [].map.call(tr.children, txt); if (td.length < 3 || !td[fi] || /^\d+(\.\d+)?%?$/.test(td[fi])) return;
+        var k = td[fi]; if (!best[k]) order.push(k); if (!best[k] || td.length > best[k].length) best[k] = td;   // fixed-column copies are shorter: keep the full row
       });
     });
+    rows = order.map(function (k) { return best[k]; });
     return { heads: heads, fi: fi, rows: rows };
   }
   function fre(R) { return new RegExp(R.file.source.replace(/^\^/, "") + "[\\s_]*(\\d{14})", "i"); }
   function ready() { var R = REPS[(load() || {}).rep] || {}; return R.kind === "export" ? (R.col ? [].some.call(qa("th,[class*=header] *,[class*=title]"), function (e) { return vis(e) && R.col.test(txt(e)); }) : [].some.call(qa("button,a,span"), function (e) { return vis(e) && /^export\b.{0,3}$/i.test(txt(e)); })) : !!(find(R.dim) || find(R.date)); }
-  function t14() { var d = new Date(Date.now() - 120000), p = function (n) { return ("0" + n).slice(-2); }; return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
+  function t14() { var d = new Date(Date.now() - 600000), p = function (n) { return ("0" + n).slice(-2); }; return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
   function pager() { var n = [].filter.call(qa(".ant-pagination-next,.el-pagination .btn-next,.btn-next"), vis)[0]; if (!n) return null; if (/disabled/.test(n.className) || n.getAttribute("aria-disabled") === "true" || n.disabled) return null; return n; }
 
   // ---- Retailer App logs: IT Operations → Visit Details → the saved analysis "Retailer app usability" (rows Job No. · Menu path · Visit Date, value COUNT).
@@ -177,7 +200,7 @@
     if (A === "find") {   // IT Operations → Visit Details → 🔍 Data exploration
       if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
       var onVD = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; }) || (leaf(/^copy data$/i)[0] && leaf(/^visit date\s*:?$/i)[0]);
-      var ff4 = !onVD && !isCanvas() && foreignFrame(); if (ff4 && sinceA() > 2) { S.at0 = S.tick; hop(S, ff4); return outR({ s: "run", pct: 4, msg: "Opening the Visit Details window…" }); }
+      var ff4 = !onVD && !isCanvas() && foreignFrame(); if (ff4 && sinceA() > 2) { delegate(S, ff4); return outR({ s: "run", pct: 4, msg: "Working inside the Visit Details window…" }); }
       if (onVD) { go("explore"); return outR({ s: "run", pct: 5, msg: "Visit Details open — opening Data exploration" }); }
       var vd = find(/^visit details$/i); if (vd && sinceA() % 6 === 1) tap(vd);
       var it = find(/^it operations$/i); if (!vd && it && sinceA() % 8 === 3) tap(it);
@@ -302,10 +325,15 @@
     return outR({ s: "run", pct: 50, msg: "Working…" });
   }
 
+  if (!W.__biVwL) { W.__biVwL = 1; W.addEventListener("message", function (e) {
+    var d = e.data; if (!d || typeof d !== "object") return;
+    if (d.biVwCmd === "tick" && W !== W.top && e.source === W.parent) { var r; try { r = JSON.parse(W.__biVwRun(d.job)); } catch (x) { r = { s: "run", msg: String(x && x.message || x) }; } try { e.source.postMessage({ biVwRes: 1, r: r }, "*"); } catch (x) { } }
+    if (d.biVwRes && W === W.top) W.__biVwSub = d.r;
+  }); }
   W.__biVwRun = function (job) {
     try {
       var S = load();
-      if (job && job.mode === "vw" && (!S || S.id !== job.id)) { S = { id: job.id, rep: job.rep, from: job.from, to: job.to, preset: job.preset || "", st: "open", app: !!job.app, parts: job.parts || null, tick: 0, t0: 0, rows: [], seen: {}, heads: null, pages: 0, tries: 0 }; if (S.parts && S.parts.length) { S.from = S.parts[0][0]; S.to = S.parts[0][1]; } save(S); try { sessionStorage.removeItem(KEY + "u"); } catch (x) { } }
+      if (job && job.mode === "vw" && (!S || S.id !== job.id)) { S = { id: job.id, rep: job.rep, from: job.from, to: job.to, preset: job.preset || "", st: "open", app: !!job.app, parts: job.parts || null, tick: 0, t0: 0, rows: [], seen: {}, heads: null, pages: 0, tries: 0 }; if (S.parts && S.parts.length) { S.from = S.parts[0][0]; S.to = S.parts[0][1]; } S.job = { mode: "vw", rep: job.rep, from: job.from, to: job.to, parts: job.parts || null, app: !!job.app }; S.sub = !!job.sub; save(S); try { sessionStorage.removeItem(KEY + "u"); } catch (x) { } }
       if (!S) return out({ s: "err", msg: "No job" });
       if (S.done) return out(S.done);
       var R = REPS[S.rep]; if (!R) return out({ s: "err", msg: "Unknown report" });
@@ -314,12 +342,21 @@
       if ([].some.call(qa("input[type=password]"), vis)) return out({ s: "login" });
       S.tick++; save(S);
       var since = function () { return S.tick - S.t0; }, step = function (st) { S.st = st; S.t0 = S.tick; save(S); };
-      if (S.tick > (R.kind === "ana" ? 1500 : 260)) return fin("err", "vWork took too long", { diag: diag(S) });
+      if (S.tick > (R.kind === "ana" ? 1500 : 400)) return fin("err", "vWork took too long", { diag: diag(S) });
+      if (S.deleg) {   // the report runs inside the other vivo window: pass the job on, relay its answer
+        var fr = subFrame(S.deleg), sub = W.__biVwSub;
+        if (fr) try { fr.contentWindow.postMessage({ biVwCmd: "tick", job: job && job.stop ? Object.assign({}, S.subJob, { stop: true }) : S.subJob }, "*"); } catch (x) { }
+        if (sub && sub.s === "handback") { S.deleg = null; S.st = sub.st; S.t14 = sub.t14; S.t0 = S.tick; W.__biVwSub = null; save(S); return out({ s: "run", pct: 60, msg: "Back in vWork…" }); }
+        if (sub && /^(done|err|stopped)$/.test(sub.s)) { S.done = Object.assign({}, sub, { id: S.id, mode: "vw", rep: S.rep }); if (sub.s !== "done" && sub.diag) S.done.diag = "[report window] " + sub.diag; save(S); return out(S.done); }
+        if (sub && (sub.s === "login" || sub.s === "you" || sub.s === "grab")) return out(sub);
+        if (!sub && S.tick - S.dt0 > 25) return fin("err", fr ? "The report window didn't answer — update the app to 8.3 (computer: vWork helper 1.0.3)" : "The report window closed", { diag: diag(S) });
+        return out(sub ? { s: "run", pct: sub.pct, msg: sub.msg } : { s: "run", pct: 20, msg: "Starting inside the report window…" });
+      }
       if (R.kind === "ana") return ana(S, R, fin, since, step);
 
       if (S.st === "open") {   // Workbench → the report's app
         var ff0 = !ready() && foreignFrame();
-        if (ff0 && (R.kind === "export" || R.kind === "ana")) { S.st = R.kind === "ana" ? "open" : "menu"; S.t0 = S.tick; hop(S, ff0); return out({ s: "run", pct: 10, msg: "Opening the report window…" }); }
+        if (ff0 && (R.kind === "export" || R.kind === "ana")) { delegate(S, ff0); return out({ s: "run", pct: 10, msg: "Working inside the report window…" }); }
         if (ff0 && R.menu) { step("org"); return out({ s: "run", pct: 12, msg: "Report open" }); }
         if (R.menu ? (find(R.menu) || ready()) : ready()) { step("menu"); return out({ s: "run", pct: 12, msg: "Report open" }); }
         if (S.appTapped && since() < 8) return out({ s: "run", pct: 8, msg: "Opening…" });
@@ -333,7 +370,7 @@
       if (S.st === "menu") {
         var m = R.menu ? find(R.menu) : null; if (!R.menu) S.menuTapped = 1; if (m && (!S.menuTapped || since() % 8 === 7)) { tap(m); S.menuTapped = 1; save(S); }
         var ff1 = !ready() && since() > 3 && foreignFrame();
-        if (ff1 && R.kind === "export") { S.t0 = S.tick; hop(S, ff1); return out({ s: "run", pct: 14, msg: "Opening the report window…" }); }
+        if (ff1 && R.kind === "export") { delegate(S, ff1); return out({ s: "run", pct: 14, msg: "Working inside the report window…" }); }
         if (ff1) { step("org"); return out({ s: "run", pct: 15, msg: "Report open — choosing ALL first" }); }
         if ((S.menuTapped && since() > 1 && ready()) || (since() > 3 && ready())) { step("org"); return out({ s: "run", pct: 15, msg: "Report open" }); }
         if (since() > 20) { S.mloops = (S.mloops || 0) + 1; if (S.mloops > 2) return fin("err", "The report page didn't show what the helper expects", { diag: diag(S) }); step("open"); }
@@ -343,7 +380,7 @@
       if (S.st === "xdate") {   // the date filter under the column heading (e.g. Creation time): Start time ~ End time
         var th = [].filter.call(qa("th,[class*=header-cell],[class*=cell]"), function (e) { return vis(e) && R.col.test(txt(e)); })[0];
         var rgs = [].filter.call(qa(".ant-picker-range,.el-date-editor--datetimerange,.el-date-editor--daterange,[class*=range-picker],[class*=picker-range]"), vis);
-        var ff3 = !th && foreignFrame(); if (ff3) { S.t0 = S.tick; hop(S, ff3); return out({ s: "run", pct: 20, msg: "Opening the report window…" }); }
+        var ff3 = !th && foreignFrame(); if (ff3) { delegate(S, ff3); return out({ s: "run", pct: 20, msg: "Working inside the report window…" }); }
         var xi = [];
         if (th) {
           var cx = th.getBoundingClientRect(), mid = cx.left + cx.width / 2, dist = function (e) { var r = e.getBoundingClientRect(); return Math.abs(r.left + r.width / 2 - mid); };
@@ -398,7 +435,7 @@
         var pcOpen = [].some.call(qa("div,span,h1,h2,h3,h4"), function (e) { return vis(e) && /^process cent(er|re)$/i.test(txt(e)) && e.getBoundingClientRect().top < 140; });
         if (pcOpen) { step("xdl"); return out({ s: "run", pct: 62, msg: "Process center open" }); }
         if (since() < 2) return out({ s: "run", pct: 58, msg: "Export started…" });
-        if (!/^in-vwork\./i.test(location.hostname) && since() > 3) { S.t0 = S.tick; hop(S, "https://in-vwork.vivo.xyz/vwork/"); return out({ s: "run", pct: 60, msg: "Back to vWork for the Process center…" }); }
+        if (S.sub) return out({ s: "handback", st: "xpc", t14: S.t14, pct: 60, msg: "Export started — back to vWork for the Process center" });
         var lk = [].filter.call(qa("a,span,button,div"), function (e) { return vis(e) && /process cent(er|re)|download cent(er|re)/i.test(txt(e)) && txt(e).length < 60 && !e.querySelector("a,button"); })[0]
           || [].filter.call(qa("[title],[aria-label]"), function (e) { return vis(e) && /process|download|task|export/i.test(e.getAttribute("title") + " " + e.getAttribute("aria-label")) && e.getBoundingClientRect().top < 90; })[0]
           || [].filter.call(qa("[class*=cloud],[class*=download],[class*=process],[class*=task-center],[class*=taskCenter]"), function (e) { var r = e.getBoundingClientRect(); return vis(e) && r.top < 90 && r.left > innerWidth * 0.4; })[0];
@@ -425,6 +462,7 @@
         S.fname = (txt(best).match(new RegExp(R.file.source.replace(/^\^/, "") + "[\\s_]*\\d{14}\\.\\w+", "i")) || [""])[0]; S.clicked = 1; S.t0 = S.tick; save(S); tap(dl);
         return out({ s: "run", pct: 80, msg: "Download…" });
       }
+      if (S.st === "org" && S.sub) S.st = "dim";   // inside the report window: ALL was chosen in vWork already
       if (S.st === "org") {   // whole organisation, not one distributor
         var o = orgTrigger();
         if (!o || /^all$/i.test(txt(o))) { step("dim"); return out({ s: "run", pct: 22, msg: "Organisation: ALL" }); }
@@ -439,19 +477,24 @@
       if (S.st === "date") {   // the month: a preset (This month / Last month) or typed dates
         var lab = find(R.date), box = lab ? (lab.closest(".ant-form-item,.el-form-item,[class*=item]") || lab.parentElement) : null;
         var ins = box ? [].filter.call(box.querySelectorAll("input"), vis) : []; if (ins.length < 2) ins = [].filter.call(qa(".ant-picker-range input,.el-range-input"), vis);
-        var ff2 = ins.length < 2 && foreignFrame(); if (ff2) { S.t0 = S.tick; hop(S, ff2); return out({ s: "run", pct: 27, msg: "Opening the report window…" }); }
+        var ff2 = ins.length < 2 && foreignFrame(); if (ff2) { delegate(S, ff2); return out({ s: "run", pct: 27, msg: "Working inside the report window…" }); }
         if (ins.length < 2) { if (since() > 15) return fin("err", "Couldn't find the date boxes", { diag: diag(S) }); return out({ s: "run", pct: 28, msg: "Looking for the date of visit…" }); }
         var fmt = function (d, pad) { var p = d.split("-"); return pad ? p[0] + "/" + p[1] + "/" + p[2] : p[0] + "/" + (+p[1]) + "/" + (+p[2]); }, pad = /\/0\d/.test(ins[0].value);
         var want0 = fmt(S.from, pad), want1 = fmt(S.to, pad), same = function () { return (ins[0].value === want0 || ins[0].value === fmt(S.from, !pad)) && (ins[1].value === want1 || ins[1].value === fmt(S.to, !pad)); };
         if (same()) { var esc0 = D.activeElement; if (esc0 && esc0.blur) esc0.blur(); D.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true })); step("query"); return out({ s: "run", pct: 35, msg: "Dates set: " + want0 + " – " + want1 }); }
         S.tries++; save(S);
+        if (!S.noCal && S.tries <= 8) {   // calendar: open the picker, tap the first and last day
+          if (S.tries % 4 === 1) { tap(ins[0]); try { ins[0].click(); } catch (x) { } return out({ s: "run", pct: 29, msg: "Opening the calendar…" }); }
+          var cp = calPick(S.from, S.to); if (cp === "noheader" && S.tries >= 4) S.noCal = 1;
+          return out({ s: "run", pct: 30, msg: cp === "picked" ? "Picking " + S.from + " → " + S.to + " on the calendar…" : "Finding the month on the calendar…" });
+        }
         if (S.preset && S.tries <= 3) {   // open the picker and tap the preset
           if (S.tries === 1) tap(ins[0]);
           var pr = [].filter.call(qa("li,span,div,a"), function (e) { return vis(e) && !e.children.length && txt(e).toLowerCase() === S.preset.toLowerCase(); })[0];
           if (pr) tap(pr);
           return out({ s: "run", pct: 30, msg: "Choosing “" + S.preset + "”…" });
         }
-        if (S.tries > 10) return fin("err", "Couldn't set the dates (" + ins[0].value + " – " + ins[1].value + ")", { diag: diag(S) });
+        if (S.tries > 16) return fin("err", "Couldn't set the dates (" + ins[0].value + " – " + ins[1].value + ")", { diag: diag(S) });
         tap(ins[0]); setInput(ins[0], S.tries % 2 ? want0 : fmt(S.from, !pad)); enter(ins[0]);
         setInput(ins[1], S.tries % 2 ? want1 : fmt(S.to, !pad)); enter(ins[1]);
         return out({ s: "run", pct: 30, msg: "Typing the dates…" });

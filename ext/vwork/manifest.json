@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "vivo BI vWork helper",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Lets the vivo BI KPI Dashboard tool open vWork and read the KPI reports for you. Read-only: it never saves, releases or changes anything in vWork.",
   "permissions": [
     "scripting",
@@ -13,7 +13,8 @@
     "https://*.amazonaws.com/*",
     "https://*.aliyuncs.com/*",
     "https://vivo-business-innovation-dashboard-22.netlify.app/*",
-    "http://localhost/*"
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "background.js"

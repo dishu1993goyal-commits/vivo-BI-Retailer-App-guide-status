@@ -7,10 +7,14 @@ async function latestCode(origin) {
   return null;
 }
 async function inject(tabId, code) {
-  // newest helper from the BI site; if vWork's page rules block it, the copy inside this extension
-  if (code) { try { await chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", func: c => { if (window.__biVwRun) return; const s = document.createElement("script"); s.textContent = c; (document.head || document.documentElement).appendChild(s); s.remove(); }, args: [code] }); } catch (e) { } }
-  const [{ result } = {}] = await chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", func: () => !!window.__biVwRun }).catch(() => [{}]);
-  if (!result) await chrome.scripting.executeScript({ target: { tabId }, world: "MAIN", files: ["vivo_vw.js"] }).catch(() => { });
+  // every window of the tab (vWork shows some reports inside windows from other vivo sites); newest helper from the BI site,
+  // and where the page's rules block that, the copy inside this extension
+  const has = async () => (await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, world: "MAIN", func: () => !!window.__biVwRun }).catch(() => [])) || [];
+  let res = await has(); if (res.length && res.every(r => r.result)) return;
+  const miss = res.filter(r => !r.result).map(r => r.frameId);
+  if (code) await chrome.scripting.executeScript({ target: { tabId, frameIds: miss }, world: "MAIN", func: c => { if (window.__biVwRun) return; const s = document.createElement("script"); s.textContent = c; (document.head || document.documentElement).appendChild(s); s.remove(); }, args: [code] }).catch(() => { });
+  res = await has(); const miss2 = res.filter(r => !r.result).map(r => r.frameId);
+  if (miss2.length) await chrome.scripting.executeScript({ target: { tabId, frameIds: miss2 }, world: "MAIN", files: ["vivo_vw.js"] }).catch(() => { });
 }
 function b64(buf) { let s = ""; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i += 32768) s += String.fromCharCode.apply(null, a.subarray(i, i + 32768)); return btoa(s); }
 async function send(r, final) {
