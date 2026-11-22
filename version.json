@@ -1,6 +1,6 @@
 {
-  "versionCode": 48,
-  "versionName": "8.2",
+  "versionCode": 49,
+  "versionName": "8.3",
   "notes": [
     "New: Portal task recorder (Admin app) — record a task once on a vivo portal, then the app repeats it for every Excel row. You log in and type every password and captcha yourself; the app stops and waits for you at those steps.",
     "Product permissions keep working as in 7.5."
