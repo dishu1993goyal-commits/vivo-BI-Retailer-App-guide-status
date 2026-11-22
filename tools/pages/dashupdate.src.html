@@ -10,6 +10,8 @@
 .pill{display:inline-block;font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 8px;background:#EEF0FF;color:#3346C9;white-space:nowrap}.pill.g{background:#E6F4EA;color:#13693F}.pill.o{background:#FFF4E5;color:#B54708}.pill.r{background:#FDECEC;color:#B42318}
 .help{background:#F7F8FC;border-radius:12px;padding:10px 12px;font-size:12.5px;margin-top:8px;line-height:1.6}.help.w{background:#FFF4E5}.help.g{background:#E6F4EA}
 .bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.tabs2 .xpb{margin-left:auto;background:#E9C46A!important;color:#12163A!important}
+.seg{display:inline-flex;background:#EEF0F6;border-radius:99px;padding:3px;gap:2px}.seg button{border:0;background:none;border-radius:99px;padding:7px 14px;font-weight:800;font-size:12.5px;color:#5A607E;cursor:pointer}.seg button.on{background:#12163A;color:#fff}
 .tabs2{display:flex;gap:6px;overflow:auto;margin:10px 0}.tabs2 button{border:0;border-radius:99px;padding:8px 14px;font-weight:800;font-size:13px;background:#EEF0F6;color:var(--ink2);white-space:nowrap}.tabs2 button.on{background:#12163A;color:#fff}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:8px}.kpi{background:#F7F8FC;border-radius:12px;padding:10px}.kpi b{display:block;font-size:20px}.kpi span{font-size:11.5px;color:var(--mut)}
 .tb{width:100%;border-collapse:collapse;font-size:12.5px}.tb th{background:#F3F4FA;color:var(--mut);font-size:11px;text-align:left;padding:6px;white-space:nowrap;position:sticky;top:0}.tb td{border-top:1px solid #EEF0F6;padding:6px;vertical-align:top}
@@ -90,7 +92,43 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   var mLab = function (m) { return MONS[+m.slice(5, 7) - 1] + " " + m.slice(0, 4); }, mShort = function (m) { return MONS[+m.slice(5, 7) - 1] + "'" + m.slice(2, 4); };
   var lastDay = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7); return m + "-" + ("0" + new Date(Date.UTC(y, mo, 0)).getUTCDate()).slice(-2); };
   var prevM = function (m) { var y = +m.slice(0, 4), mo = +m.slice(5, 7) - 1; if (mo < 1) { mo = 12; y--; } return y + "-" + ("0" + mo).slice(-2); };
-  function tabs() { $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '"' + (TAB === t[0] ? ' class="on"' : "") + ">" + t[1] + "</button>"; }).join(""); [].forEach.call($("tabs").children, function (b) { b.onclick = function () { TAB = b.dataset.t; tabs(); draw(); }; }); }
+  function tabs() {
+    $("tabs").innerHTML = TABS.map(function (t) { return '<button data-t="' + t[0] + '"' + (TAB === t[0] ? ' class="on"' : "") + ">" + t[1] + "</button>"; }).join("") + (TAB === "dash" || TAB === "kpi" ? '<button id="xpb" class="xpb">⬇ Export</button>' : "");
+    [].forEach.call($("tabs").querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; tabs(); draw(); }; });
+    if ($("xpb")) $("xpb").onclick = xpMenu;
+  }
+  // ---- export Rankings / Key indicators as PDF, PNG, JPG image or PowerPoint (pictures of what is on screen)
+  var LIBP = {};
+  function lib(src, ok) { if (ok()) return Promise.resolve(); return LIBP[src] || (LIBP[src] = new Promise(function (res, rej) { var sc = document.createElement("script"); sc.src = src; sc.onload = res; sc.onerror = function () { delete LIBP[src]; rej(new Error("Couldn't load " + src)); }; document.head.appendChild(sc); })); }
+  function xpMenu() {
+    var ov = sheet("⬇ Export " + (TAB === "dash" ? "Rankings" : "Key indicators"), "What is on screen now, as you see it", [], '<div class="bar2" style="flex-wrap:wrap">' + [["pdf", "📄 PDF"], ["png", "🖼 PNG"], ["jpg", "📷 Image (JPG)"], ["ppt", "📊 PowerPoint"]].map(function (x) { return '<button class="btn pri" data-x="' + x[0] + '">' + x[1] + "</button>"; }).join("") + '</div><div class="help">PDF and PowerPoint get one page / slide per section.</div>');
+    [].forEach.call(ov.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { ov.remove(); xport(b.dataset.x); }; });
+  }
+  function xport(kind) {
+    var root = VIEW, cards = [].filter.call(root.children, function (e) { return e.offsetHeight > 30; }), bg = getComputedStyle(document.body).backgroundColor || "#0A0D24";
+    var title = (TAB === "dash" ? "Rankings" : "Key indicators"), stamp = new Date().toISOString().slice(0, 10), base = "BI_KPI_" + title.replace(/\s/g, "_") + "_" + stamp;
+    var opt = { pixelRatio: 2, backgroundColor: bg, cacheBust: true, filter: function (n) { return !(n.classList && (n.classList.contains("noexp") || n.id === "xpb")); } };
+    toast("Preparing the " + kind.toUpperCase() + "…");
+    return lib("/vendor/html-to-image.js", function () { return window.htmlToImage; }).then(function () {
+      var H = window.htmlToImage;
+      if (kind === "png") return H.toBlob(root, opt).then(function (b) { download(b, base + ".png"); });
+      if (kind === "jpg") return H.toJpeg(root, Object.assign({}, opt, { quality: 0.92 })).then(function (u) { return fetch(u).then(function (r) { return r.blob(); }); }).then(function (b) { download(b, base + ".jpg"); });
+      var shots = [];
+      return cards.reduce(function (p, c) { return p.then(function () { return (kind === "pdf" ? H.toJpeg(c, Object.assign({}, opt, { pixelRatio: 1.6, quality: 0.9 })) : H.toPng(c, Object.assign({}, opt, { pixelRatio: 1.6 }))).then(function (u) { shots.push({ u: u, w: c.offsetWidth, h: c.offsetHeight }); }); }); }, Promise.resolve()).then(function () {
+        if (kind === "pdf") return lib("/vendor/jspdf/jspdf.umd.min.js", function () { return window.jspdf; }).then(function () {
+          var d = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" }), PW = d.internal.pageSize.getWidth(), PH = d.internal.pageSize.getHeight();
+          shots.forEach(function (sh, i) { if (i) d.addPage(); d.setFillColor(10, 13, 36); d.rect(0, 0, PW, PH, "F"); var k = Math.min((PW - 40) / sh.w, (PH - 56) / sh.h), w = sh.w * k, h = sh.h * k; d.addImage(sh.u, "JPEG", (PW - w) / 2, 36 + (PH - 56 - h) / 2, w, h); d.setTextColor(200, 205, 235); d.setFontSize(9); d.text("vivo BI · KPI Dashboard · " + title + " · " + stamp + " · " + (i + 1) + "/" + shots.length, 20, 22); });
+          download(d.output("blob"), base + ".pdf");
+        });
+        return lib("/vendor/pptx/pptxgen.bundle.js", function () { return window.PptxGenJS; }).then(function () {
+          var P = new window.PptxGenJS(); P.layout = "LAYOUT_WIDE";   // 13.33 x 7.5 in
+          var t0 = P.addSlide(); t0.background = { color: "0A0D24" }; t0.addText("BI KPI Dashboard", { x: 0.6, y: 2.4, w: 12, h: 1, fontSize: 40, bold: true, color: "FFFFFF" }); t0.addText(title + " · " + stamp, { x: 0.6, y: 3.4, w: 12, h: 0.6, fontSize: 20, color: "E9C46A" });
+          shots.forEach(function (sh) { var sl = P.addSlide(); sl.background = { color: "0A0D24" }; var k = Math.min(12.6 / (sh.w / 96), 6.9 / (sh.h / 96)), w = sh.w / 96 * k, h = sh.h / 96 * k; sl.addImage({ data: sh.u, x: (13.33 - w) / 2, y: (7.5 - h) / 2, w: w, h: h }); });
+          return P.write({ outputType: "blob" }).then(function (b) { download(b, base + ".pptx"); });
+        });
+      });
+    }).then(function () { toast("✅ " + title + " exported"); }, function (e) { toast("Export failed: " + (e && e.message || e)); });
+  }
   function load(force) {
     if (force) { DATA = null; try { KPIDATA.load = KPIDATA.load; } catch (e) { } }
     return Promise.all([KPIDATA.load(), fetch("/api/dpub?meta=1", { cache: "no-cache" }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })]).then(function (R) {
@@ -253,10 +291,38 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
     ["sales", "🎯", "Sales target (VBA targets configured)", "Sales Target", "100% for every state by default · change a state only if needed", "ent"],
     ["vn", "📢", "v-Notice", "v-Notice", "100% for every state by default · change a state only if needed", "ent"]];
   var SI = {}; SRC.forEach(function (s) { SI[s[0]] = s; });
-  var U = { m: "", files: {}, ent: {}, notes: null, frame: null, busy: false };   // files[src] = { name, rows (sheet rows), n, skipped }
+  var U = { m: "", pm: "month", from: "", to: "", ms: [], files: {}, ent: {}, notes: null, frame: null, busy: false };   // files[src] = { name, rows (sheet rows), n, skipped }
   function defMonth() { var d = new Date(); d.setDate(d.getDate() - 20); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2); }
   function libX() { return window.XLSX ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { rej(new Error("Couldn't load the Excel reader")); }; document.head.appendChild(s); }); }
   var nrm = function (s) { return String(s == null ? "" : s).replace(/\s+/g, " ").trim().toLowerCase(); };
+  // ---- the period to update: a month, a date range or a quarter. U.ms = the months it touches, U.m = the last of them
+  function p2(n) { return ("0" + n).slice(-2); }
+  function ymd(d) { return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()); }
+  function todayS() { return ymd(new Date()); }
+  function mEnd(m) { var p = m.split("-"); return m + "-" + p2(new Date(+p[0], +p[1], 0).getDate()); }
+  function setPeriod(pm, a, b) {   // month: a = YYYY-MM · range: a, b = YYYY-MM-DD · quarter: a = YYYY-Qn
+    var f, t;
+    if (pm === "quarter") { var y = +a.slice(0, 4), q = +a.slice(-1); f = y + "-" + p2(q * 3 - 2) + "-01"; t = mEnd(y + "-" + p2(q * 3)); }
+    else if (pm === "range") { f = a <= b ? a : b; t = a <= b ? b : a; }
+    else { f = a + "-01"; t = mEnd(a); }
+    if (t > todayS() && f <= todayS()) t = todayS();   // a quarter or month still running: up to today (no empty future months in the dashboard)
+    U.pm = pm; U.pa = a; U.from = f; U.to = t; U.ms = [];
+    for (var m = f.slice(0, 7); m <= t.slice(0, 7); m = nextM(m)) U.ms.push(m);
+    U.m = U.ms[U.ms.length - 1];
+  }
+  function nextM(m) { var p = m.split("-"), d = new Date(+p[0], +p[1], 1); return d.getFullYear() + "-" + p2(d.getMonth() + 1); }
+  function dLab(d) { var p = d.split("-"); return +p[2] + " " + ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+p[1] - 1] + " " + p[0]; }
+  function pLab() { if (U.pm === "quarter") return "Q" + U.pa.slice(-1) + " " + U.pa.slice(0, 4) + " (" + U.ms.map(mShort).join(", ") + ")"; if (U.pm === "range") return dLab(U.from) + " – " + dLab(U.to); return mLab(U.m); }
+  function pKey() { return U.pm === "month" ? U.m : U.from + "_" + U.to; }
+  function dayOf(v) {   // a date cell → YYYY-MM-DD
+    if (v instanceof Date && !isNaN(v)) return ymd(v);
+    if (typeof v === "number" && v > 30000 && v < 80000) { var d = new Date(Math.round((v - 25569) * 864e5)); return d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate()); }
+    var s0 = String(v || "").trim(), m;
+    if ((m = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/.exec(s0))) return m[1] + "-" + p2(+m[2]) + "-" + p2(+m[3]);
+    if ((m = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/.exec(s0))) { var y = +m[3] < 100 ? 2000 + +m[3] : +m[3], a = +m[1], b = +m[2], mo = a > 12 ? b : b > 12 ? a : b, dd = a > 12 ? a : b > 12 ? b : a; return y + "-" + p2(mo) + "-" + p2(dd); }
+    var t = Date.parse(s0); if (!isNaN(t)) return ymd(new Date(t));
+    return "";
+  }
   function cellTxt(v) { if (v instanceof Date && !isNaN(v)) { var p = function (n) { return ("0" + n).slice(-2); }; return v.getFullYear() + "-" + p(v.getMonth() + 1) + "-" + p(v.getDate()) + (v.getHours() || v.getMinutes() ? " " + p(v.getHours()) + ":" + p(v.getMinutes()) : ""); } return v == null ? "" : v; }
   function monthOf(v) {   // a date cell → YYYY-MM (Excel date, 2026-11-05, 05-11-2026, 05/11/2026 10:00, Nov 5 2026)
     if (v instanceof Date && !isNaN(v)) return v.getFullYear() + "-" + ("0" + (v.getMonth() + 1)).slice(-2);
@@ -296,19 +362,19 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
     var fl = [].slice.call(list || []); if (!fl.length) return;
     toast("Reading " + fl.length + " file(s)…");
     Promise.all(fl.map(function (f) { return readFile(f).then(function (S) { return { f: f, S: S }; }, function (e) { return { f: f, err: e.message }; }); })).then(function (R) {
-      var msg = [];
+      var msg = [], pend = [];
       R.forEach(function (x) {
         if (x.err) { msg.push("❌ " + x.f.name + ": " + x.err); return; }
         var used = 0;
         x.S.forEach(function (s) {
           if (!s.d) return; used++;
           var src = s.d.src, H = s.rows[s.d.hi], body = s.rows.slice(s.d.hi + 1).filter(function (r) { return r.some(function (v) { return String(v).trim() !== ""; }); });
-          var inM = function (r) { return s.d.dc < 0 || !r[s.d.dc] || monthOf(r[s.d.dc]) === U.m; }, keep = body.filter(inM), skipped = body.length - keep.length;
+          var inM = function (r) { if (s.d.dc < 0 || !r[s.d.dc]) return true; var d = dayOf(r[s.d.dc]); return d ? d >= U.from && d <= U.to : monthOf(r[s.d.dc]) === U.m; }, keep = body.filter(inM), skipped = body.length - keep.length;
           var out;
-          if (src === "sell") {   // one row per retailer with the units of the month
+          if (src === "sell") {   // one row per retailer with the units of each month of the period
             var ci = H.map(nrm).findIndex(function (h) { return /retailer\s*(id|code)|dealer\s*code|customer\s*code|store\s*code|^id$/.test(h); }), qi = H.map(nrm).findIndex(function (h) { return /qty|quantity|units?|sell\s*-?\s*out|sales\s*qty|pcs|volume/.test(h); }), sum = {};
-            keep.forEach(function (r) { var id = String(r[ci] || "").trim().toUpperCase(), q = typeof r[qi] === "number" ? r[qi] : parseFloat(String(r[qi]).replace(/,/g, "")); if (id && isFinite(q)) sum[id] = (sum[id] || 0) + q; });
-            out = [["Retailer ID", mShort(U.m) + " units"]].concat(Object.keys(sum).map(function (k) { return [k, sum[k]]; }));
+            keep.forEach(function (r) { var id = String(r[ci] || "").trim().toUpperCase(), q = typeof r[qi] === "number" ? r[qi] : parseFloat(String(r[qi]).replace(/,/g, "")), mi = s.d.dc >= 0 && r[s.d.dc] ? Math.max(0, U.ms.indexOf((dayOf(r[s.d.dc]) || "").slice(0, 7))) : U.ms.length - 1; if (id && isFinite(q)) { var a0 = sum[id] || (sum[id] = U.ms.map(function () { return 0; })); a0[mi] += q; } });
+            out = [["Retailer ID"].concat(U.ms.map(function (m) { return mShort(m) + " units"; }))].concat(Object.keys(sum).map(function (k) { return [k].concat(sum[k]); }));
           } else if (src === "visit") {   // vWork "Staff visit report By area": keep only the state and zone total rows (the export has 200k+ area rows)
             var hn = H.map(nrm), cx = function (re) { return hn.findIndex(function (h) { return re.test(h); }); }, cS = cx(/^state$/), cZ = cx(/^zone$/), deep = [cx(/^district$/), cx(/^sub\s*district$/), cx(/^town/), cx(/^area$/)].filter(function (c) { return c >= 0; });
             var bl = function (r, c) { return c < 0 || r[c] == null || String(r[c]).trim() === ""; }, isTot = function (r) { return deep.every(function (c) { return bl(r, c); }); }, hasTot = {};
@@ -322,16 +388,31 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
           } else if (src === "vbm") out = s.rows.slice(0, s.d.hi + 1).concat(keep);   // VBM keeps its two heading rows
           else out = [H].concat(keep);
           out = out.map(function (r) { return r.map(cellTxt); });
+          if (src === "visit" && U.ms.length > 1) { pend.push([x.f.name, out.map(function (r) { return r.map(cellTxt); })]); msg.push("📍 " + x.f.name + " → Customer visit report: choose which month it is for"); return; }
           var old = U.files[src];
+          if (old && src === "visit") old = null;   // a new visit report replaces the old one
           if (old && src !== "sell" && src !== "vbm") out = old.rows.concat(out.slice(1));   // several files of the same kind add up
-          else if (old && src === "sell") { var m2 = {}; old.rows.slice(1).concat(out.slice(1)).forEach(function (r) { m2[r[0]] = (m2[r[0]] || 0) + (+r[1] || 0); }); out = [out[0]].concat(Object.keys(m2).map(function (k) { return [k, m2[k]]; })); }
+          else if (old && src === "sell") { var m2 = {}; old.rows.slice(1).concat(out.slice(1)).forEach(function (r) { var a1 = m2[r[0]] || (m2[r[0]] = U.ms.map(function () { return 0; })); for (var i = 1; i < r.length; i++) a1[i - 1] += +r[i] || 0; }); out = [out[0]].concat(Object.keys(m2).map(function (k) { return [k].concat(m2[k]); })); }
           U.files[src] = { name: (old ? old.name + " + " : "") + x.f.name, rows: out, n: out.length - (src === "vbm" ? s.d.hi + 1 : 1), skipped: (old ? old.skipped : 0) + skipped };
-          msg.push("✅ " + x.f.name + (x.S.length > 1 ? " (" + s.sheet + ")" : "") + " → " + SI[src][2] + ": " + nf(U.files[src].n) + " rows for " + mLab(U.m) + (skipped ? " · " + nf(skipped) + " rows of other months left out" : "") + (s.trimmed ? (src === "visit" ? " · kept state & zone totals (" + nf(s.trimmed) + " area rows not needed)" : " · " + nf(s.trimmed) + " repeat rows of the same store and day merged") : ""));
+          msg.push("✅ " + x.f.name + (x.S.length > 1 ? " (" + s.sheet + ")" : "") + " → " + SI[src][2] + ": " + nf(U.files[src].n) + " rows for " + pLab() + (skipped ? " · " + nf(skipped) + " rows outside the period left out" : "") + (s.trimmed ? (src === "visit" ? " · kept state & zone totals (" + nf(s.trimmed) + " area rows not needed)" : " · " + nf(s.trimmed) + " repeat rows of the same store and day merged") : ""));
         });
         if (!used) msg.push("❓ " + x.f.name + ": not recognised — its headings don't match any vWork report below. Check it is the raw export.");
       });
-      U.notes = null; U.dd = null; tUpd(); sheet("Files read", mLab(U.m), [], '<div class="help" style="white-space:pre-line">' + esc(msg.join("\n")) + "</div>");
+      U.notes = null; U.dd = null; tUpd(); sheet("Files read", pLab(), [], '<div class="help" style="white-space:pre-line">' + esc(msg.join("\n")) + "</div>");
+      pend.forEach(function (v) { visitAsk(v[0], v[1]); });
     });
+  }
+  // the visit report has no dates (vWork adds up the dates chosen there): for a quarter, one report per month
+  function visitAsk(name, rows) {
+    var ov = sheet("📍 Which month is this visit report for?", name, [], '<div class="help">The Customer visit report has no dates inside — vWork adds up the dates you chose there. Pick the month it covers.</div><div class="bar2" style="flex-wrap:wrap">' + U.ms.map(function (m) { return '<button class="btn pri sm" data-vm="' + m + '">' + mLab(m) + "</button>"; }).join("") + "</div>");
+    [].forEach.call(ov.querySelectorAll("[data-vm]"), function (b) { b.onclick = function () { ov.remove(); visitPut(b.dataset.vm, name, rows); tUpd(); toast("✅ Visit report → " + mLab(b.dataset.vm)); }; });
+  }
+  function visitPut(m, name, rows) {
+    var f = U.files.visit && U.files.visit.byM ? U.files.visit : { byM: {}, names: {} };
+    f.byM[m] = rows; f.names[m] = name;
+    var ks = Object.keys(f.byM).sort(); f.n = ks.reduce(function (a, k) { return a + f.byM[k].length - 1; }, 0); f.skipped = 0;
+    f.name = ks.map(function (k) { return mShort(k) + ": " + f.names[k]; }).join(" · ") + (U.ms.length > 1 && ks.length < U.ms.length ? " · still missing " + U.ms.filter(function (k) { return !f.byM[k]; }).map(mShort).join(", ") : "");
+    f.rows = f.byM[ks[ks.length - 1]]; U.files.visit = f; U.notes = null; U.dd = null;
   }
   function denNear(state, m) { var den = (DATA.SETUP.den) || {}, ks = Object.keys(den).sort(), b = null; ks.forEach(function (k) { if (k <= m && den[k][state] && den[k][state].elig > 0) b = den[k][state]; }); return b; }
   function entDefault(src) {
@@ -342,27 +423,35 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   }
   function entRows(src) {
     var E = U.ent[src]; if (!E) return null; var st = DATA.states;
-    if (src === "setup") return [["State", "Month (YYYY-MM)", "Onboarded / eligible retailers", "Eligible stores", "Active VBA stores"]].concat(st.map(function (s) { var v = E[s] || [0, 0, 0]; return [s, U.m, +v[0] || 0, +v[1] || 0, +v[2] || 0]; }));
-    return [["State", mShort(U.m)]].concat(st.map(function (s) { return [s, E[s] == null ? "" : E[s]]; }));
+    if (src === "setup") { var o = [["State", "Month (YYYY-MM)", "Onboarded / eligible retailers", "Eligible stores", "Active VBA stores"]]; U.ms.forEach(function (m) { st.forEach(function (s) { var v = E[s] || [0, 0, 0]; o.push([s, m, +v[0] || 0, +v[1] || 0, +v[2] || 0]); }); }); return o; }
+    return [["State"].concat(U.ms.map(mShort))].concat(st.map(function (s) { return [s].concat(U.ms.map(function () { return E[s] == null ? "" : E[s]; })); }));
   }
+  function qOf(m) { return m.slice(0, 4) + "-Q" + Math.ceil(+m.slice(5, 7) / 3); }
+  function qOpts() { var o = [], d = new Date(), y = d.getFullYear(), q = Math.ceil((d.getMonth() + 1) / 3); for (var i = 0; i < 8; i++) { var k = y + "-Q" + q, a = (q * 3 - 2), lab = "Q" + q + " " + y + " (" + ["Jan–Mar", "Apr–Jun", "Jul–Sep", "Oct–Dec"][q - 1] + ")"; o.push('<option value="' + k + '"' + (U.pa === k ? " selected" : "") + ">" + lab + (i === 0 ? " · so far" : "") + "</option>"); if (--q < 1) { q = 4; y--; } } return o.join(""); }
   function tUpd() {
-    if (!DATA) return; U.m = U.m || defMonth();
+    if (!DATA) return; if (!U.ms.length) setPeriod("month", U.m || defMonth());
     var got = SRC.filter(function (s) { return U.files[s[0]] || U.ent[s[0]]; }).length;
-    VIEW.innerHTML = '<div class="card"><b>⬆ Update the dashboard for a month</b><ol class="steps"><li>Choose the month.</li><li>Download the vWork reports of that month (see ⚙️ vWork reports) and drop them all below — the tool knows which is which and arranges them into the dashboard template.</li><li>Check / fill the small state tables (eligible retailers, sales target, v-Notice).</li><li>🔍 Check — the dashboard\'s own import reads it and shows the new ranking.</li><li>📤 Publish — the dashboard, both apps and this page update for every state.</li></ol>' +
-      '<label class="lb">Month</label><input class="tx" type="month" id="um" value="' + U.m + '" style="max-width:200px">' + (PUBM ? '<div class="help">Last published ' + dt(PUBM.at) + (PUBM.by ? " by " + esc(PUBM.by) : "") + (PUBM.months && PUBM.months.length ? " · months " + PUBM.months.map(mShort).join(", ") : "") + "</div>" : "") +
-      '<div class="drop" id="dz">📎 <b>Drop or choose the vWork exports</b><br><small class="muted">.xlsx / .xls / .csv · several at once · rows of other months are left out</small></div><input type="file" id="fi" multiple accept=".xlsx,.xls,.csv" style="display:none"></div>' +
+    VIEW.innerHTML = '<div class="card"><b>⬆ Update the dashboard</b><ol class="steps"><li>Choose the period: a month, a date range (e.g. 1–10 Nov) or a quarter.</li><li>Get the vWork reports of that period with 🤖 Get from vWork, or download them (see ⚙️ vWork reports) and drop them all below — the tool knows which is which and arranges them into the dashboard template.</li><li>Check / fill the small state tables (eligible retailers, sales target, v-Notice).</li><li>🔍 Check — the dashboard\'s own import reads it and shows the new ranking.</li><li>📤 Publish — the dashboard, both apps and this page update for every state.</li></ol>' +
+      '<label class="lb">Period</label><div class="seg" id="upm">' + [["month", "Month"], ["range", "Date range"], ["quarter", "Quarter"]].map(function (x) { return '<button data-pm="' + x[0] + '"' + (U.pm === x[0] ? ' class="on"' : "") + ">" + x[1] + "</button>"; }).join("") + "</div>" +
+      '<div class="bar2" style="align-items:flex-end;margin-top:6px">' + (U.pm === "month" ? '<input class="tx" type="month" id="um" value="' + U.m + '" style="max-width:200px">' : U.pm === "range" ? '<div><label class="lb" style="margin:0">From</label><input class="tx" type="date" id="ufr" value="' + U.from + '" max="' + todayS() + '" style="max-width:180px"></div><div><label class="lb" style="margin:0">To</label><input class="tx" type="date" id="uto" value="' + U.to + '" max="' + todayS() + '" style="max-width:180px"></div>' : '<select class="tx" id="uq" style="max-width:240px">' + qOpts() + "</select>") + "</div>" +
+      '<div class="help">Updating <b>' + esc(pLab()) + "</b>" + (U.pm !== "month" ? " · " + dLab(U.from) + " → " + dLab(U.to > todayS() ? todayS() : U.to) : "") + (U.ms.length > 1 ? " · " + U.ms.length + " months: each KPI is filled for every month (the Customer visit report needs one report per month)" : "") + "</div>" + (PUBM ? '<div class="help">Last published ' + dt(PUBM.at) + (PUBM.by ? " by " + esc(PUBM.by) : "") + (PUBM.months && PUBM.months.length ? " · months " + PUBM.months.map(mShort).join(", ") : "") + "</div>" : "") +
+      '<div class="drop" id="dz">📎 <b>Drop or choose the vWork exports</b><br><small class="muted">.xlsx / .xls / .csv · several at once · rows outside the period are left out</small></div><input type="file" id="fi" multiple accept=".xlsx,.xls,.csv" style="display:none"></div>' +
       SRC.map(function (s) { var f = U.files[s[0]], e = U.ent[s[0]], ok = f || e;
         return '<div class="src' + (ok ? " ok" : "") + '"><h4>' + s[1] + " " + esc(s[2]) + ' <span class="pill' + (ok ? " g" : "") + '">' + (f ? nf(f.n) + " rows" : e ? "entered" : "not added") + "</span></h4>" +
-          '<div class="muted">→ template sheet <b>' + esc(s[3]) + (s[0] === "visit" ? " " + mShort(U.m).replace("'", "-") : "") + "</b> · " + esc(s[4]) + "</div>" + (f ? '<div class="muted">📄 ' + esc(f.name) + (f.skipped ? " · " + nf(f.skipped) + " rows of other months left out" : "") + "</div>" : "") +
+          '<div class="muted">→ template sheet <b>' + esc(s[3]) + (s[0] === "visit" ? " " + U.ms.map(function (m) { return mShort(m).replace("'", "-"); }).join(", ") : "") + "</b> · " + esc(s[4]) + "</div>" + (f ? '<div class="muted">📄 ' + esc(f.name) + (f.skipped ? " · " + nf(f.skipped) + " rows outside the period left out" : "") + "</div>" : "") +
           '<div class="bar2" style="margin-top:6px">' + (s[5] === "ent" ? '<button class="btn ' + (e ? "ghost" : "pri") + ' sm" data-ent="' + s[0] + '">✏️ ' + (e ? "Edit" : "Fill / check") + "</button>" : "") + (VWR[s[0]] ? '<button class="btn ' + (ok ? "ghost" : "pri") + ' sm" data-vw="' + s[0] + '">🤖 Get from vWork</button>' : "") + (ok ? '<button class="btn ghost sm" data-rm="' + s[0] + '">✕ Remove</button>' : "") + "</div></div>"; }).join("") +
       '<div class="card" style="position:sticky;bottom:0;z-index:5"><div class="muted" style="font-size:12px"><b>' + got + "</b> of " + SRC.length + ' sources added. Sources you leave out keep the data already in the dashboard.</div><div class="bar2"><button class="btn pri" id="uchk"' + (got ? "" : " disabled") + '>🔍 Check</button><button class="btn" id="upub" style="background:#13693F;color:#fff"' + (U.notes && U.notes.ok && U.dd ? "" : " disabled") + '>📤 Publish</button><button class="btn ghost sm" id="uxl"' + (got ? "" : " disabled") + '>⬇ Import file</button>' + (PUBM ? '<button class="btn ghost sm" id="uundo">↩ Undo last publish</button>' : "") + '</div><div id="ures"></div></div>';
-    $("um").onchange = function () { if (Object.keys(U.files).length && !confirm("Changing the month clears the files added for " + mLab(U.m) + ". Continue?")) { this.value = U.m; return; } U.m = this.value; U.files = {}; U.ent = {}; U.notes = null; loadEnt(); };
+    var chg = function (pm, a, b) { if (Object.keys(U.files).length && !confirm("Changing the period clears the files added for " + pLab() + ". Continue?")) { tUpd(); return; } setPeriod(pm, a, b); U.files = {}; U.ent = {}; U.notes = null; U.dd = null; loadEnt(); };
+    [].forEach.call($("upm").children, function (b) { b.onclick = function () { var pm = b.dataset.pm; if (pm === U.pm) return; if (pm === "month") chg(pm, U.m); else if (pm === "range") chg(pm, U.m + "-01", mEnd(U.m) > todayS() ? todayS() : mEnd(U.m)); else chg(pm, qOf(U.m)); }; });
+    if ($("um")) $("um").onchange = function () { if (this.value) chg("month", this.value); };
+    if ($("ufr")) $("ufr").onchange = $("uto").onchange = function () { var a = $("ufr").value, b = $("uto").value; if (a && b) chg("range", a, b); };
+    if ($("uq")) $("uq").onchange = function () { chg("quarter", this.value); };
     $("dz").onclick = function () { $("fi").value = ""; $("fi").click(); }; $("fi").onchange = function () { addFiles($("fi").files); };
     $("dz").ondragover = function (e) { e.preventDefault(); }; $("dz").ondrop = function (e) { e.preventDefault(); addFiles(e.dataTransfer.files); };
     [].forEach.call(VIEW.querySelectorAll("[data-ent]"), function (b) { b.onclick = function () { entSheet(b.dataset.ent); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-vw]"), function (b) { b.onclick = function () { vwGet(b.dataset.vw); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { delete U.files[b.dataset.rm]; delete U.ent[b.dataset.rm]; U.notes = null; saveEnt(); tUpd(); }; });
-    $("uchk").onclick = check; $("upub").onclick = publish; $("uxl").onclick = function () { download(book(), "BI_KPI_Import_" + U.m + ".xlsx"); };
+    $("uchk").onclick = check; $("upub").onclick = publish; $("uxl").onclick = function () { download(book(), "BI_KPI_Import_" + pKey() + ".xlsx"); };
     if ($("uundo")) $("uundo").onclick = function () { if (!confirm("Go back to the dashboard data before the last publish?")) return; api({ action: "du-undo" }).then(function (r) { if (!r.ok) return toast(r.error); toast("Back to the earlier version"); PUBM = r.meta; KPIDATA_reset(); }); };
     if (U.notes) showNotes();
   }
@@ -372,12 +461,12 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   function b64j(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
   function unb64j(t) { try { return JSON.parse(decodeURIComponent(escape(atob(String(t || "").trim())))); } catch (e) { return null; } }
   function vwJob(src) {
-    var p = U.m.split("-"), last = new Date(+p[0], +p[1], 0).getDate(), now = new Date(), to = U.m + "-" + String(last).padStart(2, "0");
-    if (+p[0] === now.getFullYear() && +p[1] === now.getMonth() + 1) to = U.m + "-" + String(now.getDate()).padStart(2, "0");
-    return { id: "vw" + Date.now().toString(36), mode: "vw", rep: src, from: U.m + "-01", to: to };
+    var td = todayS(), to = U.to > td ? td : U.to, j = { id: "vw" + Date.now().toString(36), mode: "vw", rep: src, from: U.from, to: to };
+    if (src === "visit" && U.ms.length > 1) j.parts = U.ms.map(function (m) { var a = m + "-01" < U.from ? U.from : m + "-01", b = mEnd(m) > to ? to : mEnd(m); return [a, b]; }).filter(function (x) { return x[0] <= x[1]; });   // one visit report per month
+    return j;
   }
   function vwGet(src) {
-    if (!U.m) return toast("Choose the month first");
+    if (!U.from) return toast("Choose the period first");
     var job = vwJob(src), R0 = VWR[src];
     if (BB) {
       if (R0.file && !BB.file) { toast("Update the vivo BI Admin app to 8.2 for this — or use it on a computer below"); }
@@ -386,7 +475,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
       if (r && r !== "bad") return toast(r === "busy" ? "Another portal window is open" : "Couldn't open vWork (" + r + ")");
       if (r === "bad") toast("Update the vivo BI Admin app to " + (R0.file ? "8.2" : "8.1") + " for this — or use it on a computer below");
     }
-    var ov = sheet("🤖 " + R0.name + " from vWork", mLab(U.m) + " · " + job.from + " → " + job.to, [], '<div class="help">' + (R0.ana ? 'The helper opens <b>' + esc(R0.where) + '</b> , raises <b>Result display</b> to the highest number vWork allows (it starts at 10,000), sets the Visit Date filter to the month, presses <b>Generate</b> and <b>Copy data</b>. If vWork still caps the rows, it reads the month in parts by itself. Keep the saved analysis as it is (rows Job No. · Menu path · Visit Date, value Job No. COUNT, your Sub-post and Menu path filters).' : R0.file ? 'The helper opens <b>' + esc(R0.where) + '</b>, sets the dates, exports only the columns the dashboard needs and presses <b>Download</b> in the Process center. Then drop the downloaded file in this tool.' : 'The helper opens <b>' + esc(R0.where) + '</b>, chooses <b>ALL</b>, sets the dates, presses <b>Query</b> and reads the state rows.') + ' It never saves, releases or changes anything in vWork. You log in yourself.</div><div id="vdk"><div class="muted">Loading…</div></div>');
+    var ov = sheet("🤖 " + R0.name + " from vWork", pLab() + " · " + job.from + " → " + job.to + (job.parts ? " · " + job.parts.length + " months, one by one" : ""), [], '<div class="help">' + (R0.ana ? 'The helper opens <b>' + esc(R0.where) + '</b> , raises <b>Result display</b> to the highest number vWork allows (it starts at 10,000), sets the Visit Date filter to the month, presses <b>Generate</b> and <b>Copy data</b>. If vWork still caps the rows, it reads the month in parts by itself. Keep the saved analysis as it is (rows Job No. · Menu path · Visit Date, value Job No. COUNT, your Sub-post and Menu path filters).' : R0.file ? 'The helper opens <b>' + esc(R0.where) + '</b>, sets the dates, exports only the columns the dashboard needs and presses <b>Download</b> in the Process center. Then drop the downloaded file in this tool.' : 'The helper opens <b>' + esc(R0.where) + '</b>, chooses <b>ALL</b>, sets the dates, presses <b>Query</b> and reads the state rows.') + ' It never saves, releases or changes anything in vWork. You log in yourself.</div><div id="vdk"><div class="muted">Loading…</div></div>');
     fetch("/vivo_vw.js?v=" + Date.now()).then(function (x) { return x.text(); }).then(function (code) {
       var boot = code.replace(/\/\*[\s\S]*?\*\//g, "") + ";(function(){if(window.__biL)return;var J=null,c=prompt('Paste the job code from the vivo BI tool');if(!c)return;try{J=JSON.parse(decodeURIComponent(escape(atob(c.trim()))))}catch(e){alert('That code is not valid');return}var bar=document.createElement('div');bar.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;background:#12163A;color:#fff;font:14px system-ui;padding:10px 14px;border-radius:12px';document.body.appendChild(bar);var first=J;window.__biL=setInterval(function(){var r=JSON.parse(window.__biVwRun(first));first=null;bar.textContent='vivo BI · '+(r.msg||r.s);if(r.s==='done'||r.s==='stopped'||r.s==='err'){clearInterval(window.__biL);window.__biL=0;var out=btoa(unescape(encodeURIComponent(JSON.stringify(r))));try{navigator.clipboard.writeText(out)}catch(e){}bar.innerHTML=(r.s==='done'?'✅ ':'⚠️ ')+r.msg+' — the result code is copied. Paste it in the vivo BI tool. <button id=__bic style=margin-left:8px>Copy again</button>';document.getElementById('__bic').onclick=function(){prompt('Copy this result code',out)};}},1200);})();";
       var href = "javascript:" + encodeURIComponent("(function(){" + boot + "})()"), d = ov.querySelector("#vdk");
@@ -399,7 +488,8 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   function vwGot(r) {
     if (!r || r.mode !== "vw") return;
     if (r.s !== "done" || (!r.file && r.cz == null && (!r.rows || r.rows.length < 2))) { sheet("vWork", r.s === "stopped" ? "Stopped" : "Couldn't read the report", [], '<div class="err">' + esc(r.msg || "Nothing read") + "</div>" + (r.diag ? '<div class="help" style="word-break:break-word;font-size:11px">What the helper saw (share this with the BI admin): ' + esc(r.diag) + "</div>" : "")); return; }
-    if (r.from && r.from.slice(0, 7) !== U.m) return toast("That result is for " + r.from.slice(0, 7) + " — choose that month first");
+    var r0 = r.parts && r.parts.length ? r.parts[0].from : r.from;
+    if (r0 && (r0 < U.from || r0 > U.to)) return toast("That result is for " + r0 + " → " + (r.to || "") + " — choose that period first");
     if (r.file === "browser") return toast("✅ " + (r.fname || "The file") + " is in your Downloads — drop it in the box above");
     if (r.file) {   // the app downloaded vWork's export: read it in 1 MB parts and add it like a dropped file
       if (!BB || !BB.file) return toast("Update the app to 8.2");
@@ -409,8 +499,10 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
       addFiles([new File(parts, r.fname || ("vWork_" + r.rep + ".xlsx"))]); return;
     }
     var src = r.rep, rows;
-    if (r.cz != null) { var ym = r.from.slice(0, 7), fz = r.fz || []; rows = [["Job No.", "Menu path", "Visit Date", "Job No.-1"]].concat(r.cz ? r.cz.split(";").map(function (x) { var q = x.split("|"); return [q[0], fz[+q[1]] || "", ym + "-" + q[2], +q[3] || 1]; }) : []); }
+    if (src === "visit" && r.parts) { r.parts.forEach(function (pt) { if (pt.rows && pt.rows.length > 1) visitPut(pt.from.slice(0, 7), "vWork " + pt.from + " → " + pt.to, pt.rows.map(function (x) { return x.map(cellTxt); })); }); tUpd(); return toast("✅ Customer visit read for " + r.parts.length + " month(s)"); }
+    if (r.cz != null) { var ym = r.from.slice(0, 7), fz = r.fz || []; rows = [["Job No.", "Menu path", "Visit Date", "Job No.-1"]].concat(r.cz ? r.cz.split(";").map(function (x) { var q = x.split("|"), dd = q[2].length === 2 ? ym + "-" + q[2] : q[2]; return [q[0], fz[+q[1]] || "", dd, +q[3] || 1]; }) : []); }
     else rows = r.rows.map(function (x) { return x.map(cellTxt); });
+    if (src === "visit") { visitPut(U.ms.length > 1 ? r.from.slice(0, 7) : U.m, "vWork " + r.from + " → " + r.to, rows); tUpd(); return toast("✅ " + nf(rows.length - 1) + " state rows read from vWork"); }
     U.files[src] = { name: "vWork " + r.from + " → " + r.to, rows: rows, n: rows.length - 1, skipped: 0 }; U.notes = null; U.dd = null; tUpd();
     toast("✅ " + nf(rows.length - 1) + (r.cz != null ? " Retailer App log rows" : " state rows") + " read from vWork");
   }
@@ -421,7 +513,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   function loadEnt() { api({ action: "du-src", month: U.m }).then(function (r) { U.ent = {}; if (r.ok) Object.keys(r.src || {}).forEach(function (k) { if (r.src[k].ent) U.ent[k] = r.src[k].ent; });
     ["sales", "vn"].forEach(function (k) { if (!U.ent[k]) { var o = {}; DATA.states.forEach(function (st) { o[st] = "Yes"; }); U.ent[k] = o; } });   // every state uses Sales Target and v-Notice: full score (100%) unless changed here
     tUpd(); }); }
-  function saveEnt() { var o = {}; ["setup", "sales", "vn"].forEach(function (k) { o[k] = { ent: U.ent[k] || null }; }); api({ action: "du-src", month: U.m, save: true, src: o }); }
+  function saveEnt() { var o = {}; ["setup", "sales", "vn"].forEach(function (k) { o[k] = { ent: U.ent[k] || null }; }); U.ms.forEach(function (m) { api({ action: "du-src", month: m, save: true, src: o }); }); }
   function entSheet(src) {
     var E = U.ent[src] || entDefault(src), st = DATA.states, isSet = src === "setup";
     var ov = sheet(SI[src][1] + " " + SI[src][2] + " · " + mLab(U.m), isSet ? "Filled from the latest month in the dashboard — change what's different" : "Yes / No or a % per state · filled from " + mLab(prevM(U.m)), [["💾", "Save", function (o) {
@@ -433,7 +525,8 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
     var S = [];
     SRC.forEach(function (s) {
       var k = s[0], f = U.files[k], rows = f ? f.rows : entRows(k); if (!rows) return;
-      S.push({ name: k === "visit" ? "Visit Report " + mShort(U.m).replace("'", "-") : s[3], rows: rows });
+      if (k === "visit") { var bm = f.byM || {}; if (!f.byM) bm[U.m] = f.rows; Object.keys(bm).sort().forEach(function (m) { S.push({ name: "Visit Report " + mShort(m).replace("'", "-"), rows: bm[m] }); }); return; }
+      S.push({ name: s[3], rows: rows });
     });
     return xlsx(S);
   }
@@ -477,7 +570,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   }
   function publish() {
     if (!U.notes || !U.notes.ok || !U.dd || U.busy) return;
-    if (!confirm("Publish " + mLab(U.m) + " to the dashboard for every state?")) return;
+    if (!confirm("Publish " + pLab() + " to the dashboard for every state?")) return;
     U.busy = true;
     Promise.resolve().then(function () {
       var DD = U.dd, months = U.months, ver = Date.now().toString(36);
@@ -490,7 +583,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
       });
     }).then(function (r) {
       U.busy = false; PUBM = r.meta; U.notes = null; U.files = {}; U.dd = null;
-      sheet("✅ Published", mLab(U.m), [["🔄", "See the new ranking", function () { location.reload(); return false; }, "pri"]], '<div class="help g">The dashboard, the Admin and State apps and this page now show the new data for everyone (they pick it up the next time they open). Share this tool\'s link (🔗 Tool links) with the states for the rankings and key indicators.</div>');
+      sheet("✅ Published", pLab(), [["🔄", "See the new ranking", function () { location.reload(); return false; }, "pri"]], '<div class="help g">The dashboard, the Admin and State apps and this page now show the new data for everyone (they pick it up the next time they open). Share this tool\'s link (🔗 Tool links) with the states for the rankings and key indicators.</div>');
       try { U.frame.remove(); } catch (e) { } U.frame = null; tUpd();
     }).catch(function (e) { U.busy = false; $("ures").innerHTML = '<div class="help w">Not published: ' + esc(e.message || e) + "</div>"; });
   }

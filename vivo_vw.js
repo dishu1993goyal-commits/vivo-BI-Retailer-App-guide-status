@@ -79,7 +79,7 @@
     var fz = S.fz || (S.fz = []), out = [], bad = 0;
     L.slice(hi + 1).forEach(function (r) { var id = String(r[cj] || "").trim(), m = String(r[cm] || "").trim(), dd = String(r[cd] || "").trim().slice(0, 10).replace(/\//g, "-"), n = cn >= 0 ? parseFloat(r[cn]) : 1;
       if (!id || !m || !/^\d{4}-\d\d-\d\d$/.test(dd) || /^total/i.test(id)) return; if (dd < S.cur[0] || dd > S.cur[1]) { bad++; return; }
-      var fi = fz.indexOf(m); if (fi < 0) { fi = fz.length; fz.push(m); } out.push(id + "|" + fi + "|" + dd.slice(8) + "|" + (isFinite(n) ? n : 1)); });
+      var fi = fz.indexOf(m); if (fi < 0) { fi = fz.length; fz.push(m); } out.push(id + "|" + fi + "|" + dd + "|" + (isFinite(n) ? n : 1)); });
     return { rows: out, bad: bad };
   }
   function ana(S, R, fin, since, step) {
@@ -171,7 +171,7 @@
   W.__biVwRun = function (job) {
     try {
       var S = load();
-      if (job && job.mode === "vw" && (!S || S.id !== job.id)) { S = { id: job.id, rep: job.rep, from: job.from, to: job.to, preset: job.preset || "", st: "open", app: !!job.app, tick: 0, t0: 0, rows: [], seen: {}, heads: null, pages: 0, tries: 0 }; save(S); try { sessionStorage.removeItem(KEY + "u"); } catch (x) { } }
+      if (job && job.mode === "vw" && (!S || S.id !== job.id)) { S = { id: job.id, rep: job.rep, from: job.from, to: job.to, preset: job.preset || "", st: "open", app: !!job.app, parts: job.parts || null, tick: 0, t0: 0, rows: [], seen: {}, heads: null, pages: 0, tries: 0 }; if (S.parts && S.parts.length) { S.from = S.parts[0][0]; S.to = S.parts[0][1]; } save(S); try { sessionStorage.removeItem(KEY + "u"); } catch (x) { } }
       if (!S) return out({ s: "err", msg: "No job" });
       if (S.done) return out(S.done);
       var R = REPS[S.rep]; if (!R) return out({ s: "err", msg: "Unknown report" });
@@ -319,6 +319,11 @@
         var H = T.heads.slice(T.fi); H[0] = R.firstAs; S.heads = H;
         T.rows.forEach(function (r) { var row = r.slice(T.fi); row[0] = row[0].replace(/^[^A-Za-z0-9(]+/, "").trim(); var k = row[0]; if (!S.seen[k]) { S.seen[k] = 1; S.rows.push(row); } });
         var nx = pager(); if (nx && S.pages < 20) { tap(nx); S.pages++; S.t0 = S.tick; save(S); return out({ s: "run", pct: 70, msg: "Page " + (S.pages + 1) + "…" }); }
+        if (S.parts && S.parts.length) {   // several months: one report each, same screen, new dates
+          S.res = (S.res || []).concat([{ from: S.from, to: S.to, rows: [S.heads].concat(S.rows) }]); S.pi = (S.pi || 0) + 1;
+          if (S.pi < S.parts.length) { S.from = S.parts[S.pi][0]; S.to = S.parts[S.pi][1]; S.rows = []; S.seen = {}; S.heads = null; S.pages = 0; S.tries = 0; step("date"); return out({ s: "run", pct: 50, msg: "Month " + S.pi + " of " + S.parts.length + " read — next " + S.from + " → " + S.to }); }
+          return fin("done", "Read " + S.res.length + " months of " + R.title, { parts: S.res, from: S.parts[0][0], to: S.parts[S.parts.length - 1][1] });
+        }
         return fin("done", "Read " + S.rows.length + " rows of " + R.title);
       }
       return out({ s: "run", pct: 50, msg: "Working…" });
