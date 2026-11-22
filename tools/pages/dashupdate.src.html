@@ -435,6 +435,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
       '<label class="lb">Period</label><div class="seg" id="upm">' + [["month", "Month"], ["range", "Date range"], ["quarter", "Quarter"]].map(function (x) { return '<button data-pm="' + x[0] + '"' + (U.pm === x[0] ? ' class="on"' : "") + ">" + x[1] + "</button>"; }).join("") + "</div>" +
       '<div class="bar2" style="align-items:flex-end;margin-top:6px">' + (U.pm === "month" ? '<input class="tx" type="month" id="um" value="' + U.m + '" style="max-width:200px">' : U.pm === "range" ? '<div><label class="lb" style="margin:0">From</label><input class="tx" type="date" id="ufr" value="' + U.from + '" max="' + todayS() + '" style="max-width:180px"></div><div><label class="lb" style="margin:0">To</label><input class="tx" type="date" id="uto" value="' + U.to + '" max="' + todayS() + '" style="max-width:180px"></div>' : '<select class="tx" id="uq" style="max-width:240px">' + qOpts() + "</select>") + "</div>" +
       '<div class="help">Updating <b>' + esc(pLab()) + "</b>" + (U.pm !== "month" ? " · " + dLab(U.from) + " → " + dLab(U.to > todayS() ? todayS() : U.to) : "") + (U.ms.length > 1 ? " · " + U.ms.length + " months: each KPI is filled for every month (the Customer visit report needs one report per month)" : "") + "</div>" + (PUBM ? '<div class="help">Last published ' + dt(PUBM.at) + (PUBM.by ? " by " + esc(PUBM.by) : "") + (PUBM.months && PUBM.months.length ? " · months " + PUBM.months.map(mShort).join(", ") : "") + "</div>" : "") +
+      (!BB ? (EXT ? '<div class="help g">🤖 vWork helper is on — the Get from vWork buttons open vWork directly.</div>' : '<div class="help w">🤖 On a computer, Get from vWork needs the vivo BI vWork helper once. <a href="#" id="exts">Set it up</a></div>') : "") +
       '<div class="drop" id="dz">📎 <b>Drop or choose the vWork exports</b><br><small class="muted">.xlsx / .xls / .csv · several at once · rows outside the period are left out</small></div><input type="file" id="fi" multiple accept=".xlsx,.xls,.csv" style="display:none"></div>' +
       SRC.map(function (s) { var f = U.files[s[0]], e = U.ent[s[0]], ok = f || e;
         return '<div class="src' + (ok ? " ok" : "") + '"><h4>' + s[1] + " " + esc(s[2]) + ' <span class="pill' + (ok ? " g" : "") + '">' + (f ? nf(f.n) + " rows" : e ? "entered" : "not added") + "</span></h4>" +
@@ -446,6 +447,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
     if ($("um")) $("um").onchange = function () { if (this.value) chg("month", this.value); };
     if ($("ufr")) $("ufr").onchange = $("uto").onchange = function () { var a = $("ufr").value, b = $("uto").value; if (a && b) chg("range", a, b); };
     if ($("uq")) $("uq").onchange = function () { chg("quarter", this.value); };
+    if ($("exts")) $("exts").onclick = function (e) { e.preventDefault(); extSheet(); };
     $("dz").onclick = function () { $("fi").value = ""; $("fi").click(); }; $("fi").onchange = function () { addFiles($("fi").files); };
     $("dz").ondragover = function (e) { e.preventDefault(); }; $("dz").ondrop = function (e) { e.preventDefault(); addFiles(e.dataTransfer.files); };
     [].forEach.call(VIEW.querySelectorAll("[data-ent]"), function (b) { b.onclick = function () { entSheet(b.dataset.ent); }; });
@@ -475,15 +477,38 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
       if (r && r !== "bad") return toast(r === "busy" ? "Another portal window is open" : "Couldn't open vWork (" + r + ")");
       if (r === "bad") toast("Update the vivo BI Admin app to " + (R0.file ? "8.2" : "8.1") + " for this — or use it on a computer below");
     }
-    var ov = sheet("🤖 " + R0.name + " from vWork", pLab() + " · " + job.from + " → " + job.to + (job.parts ? " · " + job.parts.length + " months, one by one" : ""), [], '<div class="help">' + (R0.ana ? 'The helper opens <b>' + esc(R0.where) + '</b> , raises <b>Result display</b> to the highest number vWork allows (it starts at 10,000), sets the Visit Date filter to the month, presses <b>Generate</b> and <b>Copy data</b>. If vWork still caps the rows, it reads the month in parts by itself. Keep the saved analysis as it is (rows Job No. · Menu path · Visit Date, value Job No. COUNT, your Sub-post and Menu path filters).' : R0.file ? 'The helper opens <b>' + esc(R0.where) + '</b>, sets the dates, exports only the columns the dashboard needs and presses <b>Download</b> in the Process center. Then drop the downloaded file in this tool.' : 'The helper opens <b>' + esc(R0.where) + '</b>, chooses <b>ALL</b>, sets the dates, presses <b>Query</b> and reads the state rows.') + ' It never saves, releases or changes anything in vWork. You log in yourself.</div><div id="vdk"><div class="muted">Loading…</div></div>');
-    fetch("/vivo_vw.js?v=" + Date.now()).then(function (x) { return x.text(); }).then(function (code) {
-      var boot = code.replace(/\/\*[\s\S]*?\*\//g, "") + ";(function(){if(window.__biL)return;var J=null,c=prompt('Paste the job code from the vivo BI tool');if(!c)return;try{J=JSON.parse(decodeURIComponent(escape(atob(c.trim()))))}catch(e){alert('That code is not valid');return}var bar=document.createElement('div');bar.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;background:#12163A;color:#fff;font:14px system-ui;padding:10px 14px;border-radius:12px';document.body.appendChild(bar);var first=J;window.__biL=setInterval(function(){var r=JSON.parse(window.__biVwRun(first));first=null;bar.textContent='vivo BI · '+(r.msg||r.s);if(r.s==='done'||r.s==='stopped'||r.s==='err'){clearInterval(window.__biL);window.__biL=0;var out=btoa(unescape(encodeURIComponent(JSON.stringify(r))));try{navigator.clipboard.writeText(out)}catch(e){}bar.innerHTML=(r.s==='done'?'✅ ':'⚠️ ')+r.msg+' — the result code is copied. Paste it in the vivo BI tool. <button id=__bic style=margin-left:8px>Copy again</button>';document.getElementById('__bic').onclick=function(){prompt('Copy this result code',out)};}},1200);})();";
-      var href = "javascript:" + encodeURIComponent("(function(){" + boot + "})()"), d = ov.querySelector("#vdk");
-      d.innerHTML = '<div class="help w" style="margin-top:10px"><b>On a computer (Chrome / Edge)</b><br>1) Drag this to the bookmarks bar: <a class="btn ghost sm" id="vbm" href="#">📊 vivo BI vWork helper</a><br>2) <button class="btn ghost sm" id="vcj">Copy job code</button><br>3) Open <b>in-vwork.vivo.xyz</b>, log in, stay on the Workbench, click the bookmark and paste the code. Keep the tab open until it says ✅.<br>4) Paste the result code here:</div><textarea class="tx" id="vrc" rows="2" placeholder="Result code"></textarea><div class="bar2"><button class="btn pri sm" id="vrb">Use result</button></div>';
-      d.querySelector("#vbm").setAttribute("href", href); d.querySelector("#vbm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar"); };
-      d.querySelector("#vcj").onclick = function () { var t = b64j(job); try { navigator.clipboard.writeText(t).then(function () { toast("Job code copied"); }, function () { prompt("Copy:", t); }); } catch (e) { prompt("Copy:", t); } };
-      d.querySelector("#vrb").onclick = function () { var x = unb64j(d.querySelector("#vrc").value); if (!x) return toast("That code is not valid"); ov.remove(); vwGot(x); };
-    });
+    if (!BB && EXT) {   // computer with the vivo BI vWork helper: straight to vWork, no codes
+      job.app = true; VWRUN = job;
+      window.postMessage({ biVw: "run", job: job, url: VWURL }, "*");
+      vwBar("Opening vWork… log in there if it asks (only the first time). Then keep that tab open — the result comes back here by itself.");
+      return;
+    }
+    if (BB) return;
+    return extSheet(src);
+  }
+  // ---- computer: the "vivo BI vWork helper" (Chrome / Edge extension) runs the robot in the person's own vWork tab
+  var EXT = null, VWRUN = null;
+  window.addEventListener("message", function (e) {
+    if (e.source !== window || !e.data || typeof e.data !== "object") return;
+    if (e.data.biVwExt) { var was = EXT; EXT = e.data.biVwExt; if (!was && TAB === "upd") try { tUpd(); } catch (x) { } }
+    if (e.data.biVwAck && !e.data.biVwAck.ok) { vwBar(null); toast("The vWork helper couldn't start — reload this page and try again"); }
+    if (e.data.biVwStatus) { var st = e.data.biVwStatus; vwBar(st.s === "login" ? "🔐 Log in to vWork in its tab (only needed the first time) — the helper continues by itself." : st.s === "you" ? "👆 " + st.msg : "🤖 " + (st.msg || "Working…") + (st.pct ? " · " + st.pct + "%" : "")); }
+    if (e.data.biVwResult) { vwBar(null); var rr = e.data.biVwResult; VWRUN = null;
+      if (rr.b64) { var bin = atob(rr.b64), u8 = new Uint8Array(bin.length); for (var q = 0; q < bin.length; q++) u8[q] = bin.charCodeAt(q); addFiles([new File([u8], rr.fname || ("vWork_" + rr.rep + ".xlsx"))]); return; }
+      vwGot(rr); }
+  });
+  window.postMessage({ biVw: "ping" }, "*");
+  function vwBar(t) {
+    var b = $("vwbar"); if (!t) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement("div"); b.id = "vwbar"; b.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:99990;background:#12163A;color:#fff;border-radius:14px;padding:11px 14px;font:600 13.5px system-ui;display:flex;gap:10px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.3)"; b.innerHTML = '<span id="vwbt" style="flex:1"></span><button class="btn ghost sm" id="vwbs" style="color:#fff;border-color:#fff4">Stop</button>'; document.body.appendChild(b); b.querySelector("#vwbs").onclick = function () { window.postMessage({ biVw: "stop" }, "*"); vwBar(null); }; }
+    b.querySelector("#vwbt").textContent = t;
+  }
+  function extSheet(src) {   // one-time set-up on a computer
+    var ov = sheet("🤖 Add the vivo BI vWork helper (one time)", "Chrome or Edge on a computer", [],
+      '<div class="help">A web page isn\'t allowed to work inside another website, so on a computer the robot runs through a small helper added to Chrome / Edge once. After that, 🤖 Get from vWork opens vWork straight away — you log in only the first time, and every report is read by itself. The helper only reads reports; it never saves, releases or changes anything in vWork.</div>' +
+      '<ol class="steps"><li><a class="btn pri sm" href="/vivo-bi-vwork-helper.zip" download>⬇ Download the helper</a> and unzip it (right-click → Extract all).</li><li>Open <b>chrome://extensions</b> (Edge: <b>edge://extensions</b>) and switch on <b>Developer mode</b> (top right in Chrome, left side in Edge).</li><li>Click <b>Load unpacked</b> and choose the unzipped <b>vivo-bi-vwork-helper</b> folder.</li><li>Come back here and reload this page — the 🤖 buttons then open vWork directly.</li></ol>' +
+      '<div class="help w">If your company PC doesn\'t allow extensions, use the Admin app on your phone (🤖 works there without any set-up) or download the report in vWork and drop it in the box above.</div>');
+    return ov;
   }
   function vwGot(r) {
     if (!r || r.mode !== "vw") return;
