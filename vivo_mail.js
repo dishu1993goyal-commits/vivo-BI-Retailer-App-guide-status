@@ -49,6 +49,13 @@
     return F.mode === "either" ? (subj || (F.senders.length && snd)) : F.mode === "sender" ? snd : F.mode === "subject" ? subj : subj && snd;
   }
   function searching() { var sb = searchBox(); return (sb && sb.value && sb.value.trim().length > 1) || /\b(top results|all results|results)\b/i.test(txt(D.body).slice(0, 3000)); }
+  function doSearch(sb, q) {   // type like a person (so Outlook's own code sees it), then Enter and the search button
+    tap(sb); sb.focus(); try { sb.select(); } catch (e) { }
+    var ok = false; try { ok = D.execCommand("insertText", false, q); } catch (e) { }
+    if (!ok || sb.value !== q) { var P = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value"); P.set.call(sb, q); sb.dispatchEvent(new Event("input", { bubbles: true })); sb.dispatchEvent(new Event("change", { bubbles: true })); }
+    ["keydown", "keypress", "keyup"].forEach(function (t) { sb.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true })); });
+    setTimeout(function () { var box = sb.closest("[role=search],#searchBoxId,form") || sb.parentElement, go = box && [].filter.call(box.querySelectorAll("button"), function (b) { return vis(b) && /search/i.test(b.getAttribute("aria-label") || b.title || "") && !/clear|exit|close|back|filter/i.test(b.getAttribute("aria-label") || ""); })[0]; if (go && sb.value) tap(go); }, 300);
+  }
   function backToList() {
     var b = [].filter.call(D.querySelectorAll("button,[role=button]"), function (e) { var a = (e.getAttribute("aria-label") || e.getAttribute("title") || txt(e)).trim(); return vis(e) && /^(back|go back|close|back to (message )?list|close reading pane)$/i.test(a); })[0];
     if (b) tap(b); else history.back();
@@ -78,7 +85,7 @@
   W.__biMailRun = function (job) {
     try {
       var S = load();
-      if (job && job.mode === "mail" && job.reply && (!S || S.id !== job.id)) { var R0 = job.reply, sj = String(R0.subject || "").replace(/^((re|fw|fwd)\s*:\s*)+/i, "").replace(/["]/g, "").slice(0, 80); S = { id: job.id, reply: R0, q: (R0.from ? "from:" + R0.from + " " : "") + (sj ? '"' + sj + '"' : ""), st: "search", tick: 0, seen: {} }; save(S); }
+      if (job && job.mode === "mail" && job.reply && (!S || S.id !== job.id)) { var R0 = job.reply, sj = String(R0.subject || "").replace(/^((re|fw|fwd)\s*:\s*)+/i, "").replace(/["]/g, "").trim(); S = { id: job.id, reply: R0, q: R0.imei || sj.slice(0, 60), sj: sj.toLowerCase().replace(/\s+/g, " ").slice(0, 40), st: "search", tick: 0, seen: {}, tries: 0 }; save(S); }
       if (job && job.kw && job.kw.length) { try { KW = new RegExp(job.kw.map(function (k) { return String(k).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s*"); }).join("|"), "i"); } catch (e) { } }
       if (job && job.mode === "mail" && !job.reply && (!S || S.id !== job.id)) { S = { flt: { mode: job.match || "both", senders: (job.senders || []).map(function (x) { return String(x).toLowerCase().trim(); }).filter(Boolean) }, research: 0, id: job.id, q: String(job.q || "unblock"), max: Math.min(300, job.max || 60), since: Date.now() - (job.days || 7) * 864e5, st: "search", done0: {}, mails: [], seen: {}, cur: null, tick: 0, idle: 0 }; save(S); }
       if (!S) return out({ s: "err", msg: "No job" });
@@ -90,25 +97,36 @@
       S.tick++; save(S); if (S.tick === 1 || S.tick % 10 === 0) wide();
       var pct = S.reply ? 50 : Math.min(99, Math.round(S.mails.length / S.max * 100));
       if (S.st === "search") {
-        var sb = searchBox(); if (!sb) { save(S); return out({ s: "run", pct: 0, msg: "Waiting for Outlook to load…" }); }
-        tap(sb); var P = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value"); P.set.call(sb, S.q); sb.dispatchEvent(new Event("input", { bubbles: true }));
-        ["keydown", "keypress", "keyup"].forEach(function (t) { sb.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })); });
-        S.st = "list"; S.t0 = S.tick; save(S); return out({ s: "run", pct: 0, msg: "Searching: " + S.q });
+        var sb = searchBox();
+        if (!sb) { var sbtn = [].filter.call(D.querySelectorAll("#searchBoxId,[role=search],button[aria-label='Search' i],[aria-label='Open search' i]"), vis)[0]; if (sbtn) tap(sbtn); save(S); return out({ s: "run", pct: 0, msg: "Opening search…" }); }
+        doSearch(sb, S.q); S.st = "list"; S.t0 = S.tick; S.tries = (S.tries || 0) + 1; save(S); return out({ s: "run", pct: 0, msg: "Searching: " + S.q });
       }
       if (S.reply && S.st === "list") {
         if (S.tick - S.t0 < 3) return out({ s: "run", pct: 20, msg: "Finding the mail…" });
-        var L1 = items(); if (!L1.length) { if (S.tick - S.t0 > 25) return fin("err", "Couldn't find that mail in Outlook"); return out({ s: "run", pct: 20, msg: "Finding the mail…" }); }
-        tap(L1[0]); S.st = "rpane"; S.t0 = S.tick; save(S); return out({ s: "run", pct: 40, msg: "Opening the mail…" });
+        if (!searching() && S.tries < 3 && S.tick - S.t0 > 5) { S.st = "search"; save(S); return out({ s: "run", pct: 20, msg: "Searching again…" }); }
+        var from = String(S.reply.from || "").toLowerCase(), local = from.split("@")[0], L1 = [].filter.call(D.querySelectorAll("[role=listbox] [role=option],div[data-convid],[role=option],[role=row],[role=listitem]"), function (e) { return vis(e) && !inPane(e) && txt(e).length > 8; });
+        L1 = L1.filter(function (e) { return !L1.some(function (o) { return o !== e && e.contains(o); }) && !S.seen[idOf(e)]; });
+        var score = function (e) { var t = txt(e).toLowerCase().replace(/\s+/g, " "); return (S.reply.imei && t.indexOf(S.reply.imei) >= 0 ? 4 : 0) + (S.sj && t.indexOf(S.sj.slice(0, 25)) >= 0 ? 2 : 0) + (from && (t.indexOf(from) >= 0 || t.indexOf(local) >= 0) ? 1 : 0); };
+        var best = null, bs = searching() ? 0 : 2; L1.forEach(function (e) { var sc = score(e); if (sc > bs) { bs = sc; best = e; } });
+        if (!best && searching() && L1.length) best = L1[0];   // the search was for this IMEI — the first result is the request (checked after opening)
+        if (!best) { if (S.tick - S.t0 > 30) return fin("err", "Couldn't find the mail in Outlook — reply yourself; the text is ready to paste"); return out({ s: "run", pct: 20, msg: "Finding the mail…" }); }
+        S.seen[idOf(best)] = 1; tap(best); S.st = "rpane"; S.t0 = S.tick; save(S); return out({ s: "run", pct: 40, msg: "Opening the mail…" });
       }
       if (S.reply && S.st === "rpane") {
-        var p1 = pane(), rb = p1 && [].filter.call(p1.querySelectorAll("button,[role=button],[role=menuitem]"), function (e) { return vis(e) && /^reply all$/i.test((e.getAttribute("aria-label") || txt(e)).trim()); }).pop();
-        if (!rb) rb = [].filter.call(D.querySelectorAll("button,[role=button]"), function (e) { return vis(e) && /^reply all$/i.test((e.getAttribute("aria-label") || txt(e)).trim()); })[0];
-        if (!rb) { if (S.tick - S.t0 > 15) return fin("err", "Couldn't find Reply all — reply yourself; the text is ready to paste"); return out({ s: "run", pct: 50, msg: "Opening the mail…" }); }
+        var p0 = pane(), pt = p0 && bodies(p0).length ? txt(p0).toLowerCase() : "";
+        if (!pt) { p0 = D.body; pt = bodies(p0).length ? txt(p0).toLowerCase() : ""; }
+        if (!pt) { if (S.tick - S.t0 > 15) { S.st = "list"; S.t0 = S.tick - 3; save(S); } return out({ s: "run", pct: 50, msg: "Opening the mail…" }); }
+        var right = (S.reply.imei && pt.indexOf(S.reply.imei) >= 0) || (S.sj && pt.replace(/\s+/g, " ").indexOf(S.sj.slice(0, 25)) >= 0);
+        if (!right) { S.wrong = (S.wrong || 0) + 1; if (S.wrong > 4) return fin("err", "Couldn't find the mail in Outlook — reply yourself; the text is ready to paste"); if (!items().length) backToList(); S.st = "list"; S.t0 = S.tick - 3; save(S); return out({ s: "run", pct: 40, msg: "That's not the mail — trying the next one…" }); }
+        var isRA = function (e) { var a = (e.getAttribute("aria-label") || e.getAttribute("title") || txt(e)).trim(); return vis(e) && /^reply all\b/i.test(a); };
+        var rb = [].filter.call(p0.querySelectorAll("button,[role=button],[role=menuitem]"), isRA).pop() || [].filter.call(D.querySelectorAll("button,[role=button],[role=menuitem]"), isRA)[0];
+        if (!rb) { if (S.tick - S.t0 > 15) return fin("err", "Couldn't find Reply all — reply yourself; the text is ready to paste"); return out({ s: "run", pct: 55, msg: "Looking for Reply all…" }); }
         tap(rb); S.st = "type"; S.t0 = S.tick; save(S); return out({ s: "run", pct: 60, msg: "Reply all…" });
       }
       if (S.reply && S.st === "type") {
-        var ed = [].filter.call(D.querySelectorAll("div[contenteditable=true][aria-label*='Message body' i],div[contenteditable=true][role=textbox]"), vis)[0];
-        if (!ed) { if (S.tick - S.t0 > 15) return fin("err", "The reply box didn't open — reply yourself; the text is ready to paste"); return out({ s: "run", pct: 70, msg: "Opening the reply…" }); }
+        var EDS = [].filter.call(D.querySelectorAll("[contenteditable=true]"), function (e) { var r = e.getBoundingClientRect(); return vis(e) && r.height > 30 && r.width > 150 && !e.parentElement.closest("[contenteditable=true]"); });
+        var ed = EDS.filter(function (e) { return /message body|body/i.test(e.getAttribute("aria-label") || ""); })[0] || EDS.sort(function (a, b) { return b.getBoundingClientRect().height - a.getBoundingClientRect().height; })[0];
+        if (!ed) { if (S.tick - S.t0 > 25) return fin("err", "The reply box didn't open — reply yourself; the text is ready to paste"); return out({ s: "run", pct: 70, msg: "Opening the reply…" }); }
         ed.focus(); try { var sel = W.getSelection(), rg = D.createRange(); rg.setStart(ed, 0); rg.collapse(true); sel.removeAllRanges(); sel.addRange(rg); } catch (e) { }
         var ok = false; try { ok = D.execCommand("insertText", false, S.reply.text); } catch (e) { }
         if (!ok) { var div = D.createElement("div"); div.innerText = S.reply.text; ed.insertBefore(div, ed.firstChild); ed.dispatchEvent(new Event("input", { bubbles: true })); }
