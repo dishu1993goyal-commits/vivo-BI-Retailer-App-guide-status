@@ -292,9 +292,7 @@ window.__biPermRun = function (c) {
     try {
       if (!(await openRoleScreen())) throw new Error("Could not open System Config → Permissions Config → Role Permission. Open it yourself and run again. Seen: " + diag());
       await settle();
-      try { S.roles = await readRoles(); } catch (e) { if (e instanceof Stop) throw e; }
-      if (c.allRoles || !roles.length) { roles = S.roles.slice(); total = (roles.length || 1) * (models.length || 1); }
-      if (!roles.length) throw new Error("No roles found in the portal's role list");
+      if (!roles.length) throw new Error("No role selected — pick the partner role(s) to read");   // only the selected roles are read; other roles are not opened
       log("Reading permissions — " + roles.length + " role(s)" + (models.length ? " × " + models.length + " model(s)" : ", every product") + " · nothing will be changed");
       var targets = models.length ? models : [""];
       for (var i = 0; i < roles.length; i++) {

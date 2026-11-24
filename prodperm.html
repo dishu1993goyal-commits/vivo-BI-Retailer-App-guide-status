@@ -412,8 +412,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<b style="display:block;margin-top:14px">2 · Models</b><div class="muted" style="font-size:12.5px">One per line — what you would type in the portal\'s TypeName search (e.g. V70).</div><textarea class="tx" id="mo" rows="4" style="margin-top:6px" placeholder="V70&#10;Y500&#10;T5 Pro">' + esc((CFG.lastModels || []).join("\n")) + '</textarea>' +
       '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ex"' + (CFG.exact ? " checked" : "") + '><i></i><span>Exact model only — “V70” will not include V70 Elite, V70 FE …</span></label><div class="muted" style="font-size:12px;margin-top:4px" id="exh"></div>' +
       '<div class="bar2"><button class="btn sec" id="dry" style="flex:1">🔍 Check only</button><button class="btn pri" id="go" style="flex:1">✅ Set permissions</button></div><div class="muted" style="font-size:12px;margin-top:6px" id="cnt"></div>' +
-      '<div style="border-top:1px dashed #DADDF0;margin-top:14px;padding-top:12px"><b>📋 See what is already permitted</b><div class="muted" style="font-size:12.5px;margin-top:2px">The app goes through the portal and lists every product / model that is already ticked under each role — it never clicks a tick box. Models above are optional here: leave them empty to read every product.</div>' +
-      '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="ar"><i></i><span>All roles in the portal (ignore the roles list)</span></label>' +
+      '<div style="border-top:1px dashed #DADDF0;margin-top:14px;padding-top:12px"><b>📋 See what is already permitted</b><div class="muted" style="font-size:12.5px;margin-top:2px">Only the role(s) in the list above are read: for each one the app opens its product list on the portal, goes through every page and lists the products / models already ticked — it never clicks a tick box. Models are optional here: leave them empty to read every product of that role.</div>' +
       '<div class="bar2"><button class="btn sec" id="rd" style="flex:1">📋 Read current permissions</button></div></div></div>' + where +
       '<div class="help">🔒 It only <b>adds</b> ticks — a box that is already ticked is never touched, so nothing is removed. For every product it ticks <b>all</b> states. The captcha is always typed by you.</div>' +
       (PB ? "" : '<div class="bar2"><button class="btn ghost" id="paste" style="flex:1">📋 Paste result</button></div>') + '<div id="res"></div><div id="perms"></div>' +
@@ -433,12 +432,12 @@ td.n,th.n{text-align:right;white-space:nowrap}
     return "javascript:(function(){if(!/vivo/i.test(location.hostname)){alert('Open the vivo portal first, log in, then click this bookmark.');return;}var c=prompt('Paste the job code from the BI tool');if(!c)return;var j;try{j=JSON.parse(decodeURIComponent(escape(atob(c.replace(/^BIJOB:/,'').trim()))));}catch(e){alert('That is not a job code. Copy it again from the BI tool.');return;}j.panel=true;var go=function(){window.__biPermRun(j);};if(window.__biPermRun)return go();var s=document.createElement('script');s.src='" + src + "?t='+Date.now();s.onload=go;s.onerror=function(){alert('Could not load the helper. Use the Admin app instead.');};document.body.appendChild(s);})()";
   }
   function start(dry, read) {
-    var roles = lines($("ro").value), models = lines($("mo").value), exact = $("ex").checked, all = read && $("ar").checked;
-    if (read) { if (all) roles = []; if (!all && !roles.length) return toast("Add at least one role, or tick “All roles in the portal”"); }
+    var roles = lines($("ro").value), models = lines($("mo").value), exact = $("ex").checked;
+    if (read && !roles.length) return toast("Pick the partner role(s) to read");
     else if (!roles.length || !models.length) return toast("Add at least one role and one model");
     if (roles.length > 80 || models.length > 200) return toast("Too many — up to 80 roles and 200 models in one run");
     var job = { id: (read ? "R" : "P") + Date.now().toString(36).toUpperCase(), roles: roles, models: models, exact: exact, dry: !!dry };
-    if (read) { job.read = true; job.allRoles = !!all; }
+    if (read) job.read = true;
     var run = function () {
       api({ action: "pp-draft", roles: roles, models: models, exact: exact }); keepJob(job);
       if (PB) { var r = PB.run(JSON.stringify(job), ""); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start the run"); return; }
