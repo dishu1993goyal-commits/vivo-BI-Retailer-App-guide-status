@@ -30,7 +30,9 @@ export async function ppAction(b, ctx) {
       roles: list(b.roles, 80, 60), models: list(b.models, 200, 60),
       res: (Array.isArray(s.res) ? s.res : []).slice(0, 4000).map((x) => ({ role: str(x.role, 60), model: str(x.model, 60), found: num(x.found), ticked: num(x.ticked), already: num(x.already), failed: num(x.failed), states: num(x.states), note: str(x.note, 240), names: list(x.names, READ ? 5000 : 120, 80),
         cols: READ ? (Array.isArray(x.cols) ? x.cols : []).slice(0, 10).map((v) => str(v, 40)) : undefined,
-        rows: READ ? (Array.isArray(x.rows) ? x.rows : []).slice(0, 5000).map((r) => (Array.isArray(r) ? r : []).slice(0, 10).map((v) => str(v, 80))) : undefined })),
+        rows: READ ? (Array.isArray(x.rows) ? x.rows : []).slice(0, 5000).map((r) => (Array.isArray(r) ? r : []).slice(0, 10).map((v) => str(v, 80))) : undefined,
+        all: READ ? (Array.isArray(x.all) ? x.all : []).slice(0, 8000).map((r) => (Array.isArray(r) ? r : []).slice(0, 10).map((v) => str(v, 80))) : undefined,
+        on: READ ? (Array.isArray(x.on) ? x.on : []).slice(0, 8000).map((v) => (v ? 1 : 0)) : undefined })),
       log: (Array.isArray(s.log) ? s.log : []).slice(-250).map((x) => str(x, 240))
     };
     if (!run.roles.length) run.roles = [...new Set(run.res.map((x) => x.role))]; if (!run.models.length) run.models = [...new Set(run.res.map((x) => x.model))];
@@ -40,9 +42,10 @@ export async function ppAction(b, ctx) {
       run.res.forEach((x) => { (by[x.role] = by[x.role] || []).push(x); });
       for (const role of Object.keys(by)) {
         const L = by[role]; if (L.some((x) => x.failed)) continue;
-        const seen = new Set(), rows = [];
+        const seen = new Set(), rows = [], seenA = new Set(), all = [], on = [];
         L.forEach((x) => x.rows.forEach((r) => { const k = r.join("|"); if (!seen.has(k)) { seen.add(k); rows.push(r); } }));
-        await store.set("pp:perm:" + role.toLowerCase().slice(0, 60), { role, at: run.at, by: run.by, run: id, filter: run.models.length && !L.every((x) => x.model === "(all products)") ? run.models : [], total: L.reduce((a, x) => a + x.found, 0), cols: (L[0] && L[0].cols) || [], rows });
+        L.forEach((x) => (x.all || []).forEach((r, i) => { const k = r.join("|"); if (!seenA.has(k)) { seenA.add(k); all.push(r); on.push(x.on[i] ? 1 : 0); } }));
+        await store.set("pp:perm:" + role.toLowerCase().slice(0, 60), { role, at: run.at, by: run.by, run: id, filter: run.models.length && !L.every((x) => x.model === "(all products)") ? run.models : [], total: L.reduce((a, x) => a + x.found, 0), cols: (L[0] && L[0].cols) || [], rows, all, on });
       }
     }
     const pr = list(s.roles, 200, 60);

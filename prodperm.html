@@ -393,7 +393,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
     return ov;
   }
-  var CMP = { a: "", b: "" }, VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {}, PERMS = [], OPEN = {}, Q = "";
+  var AM = { role: "", q: "", f: "all", sel: {} }, CMP = { a: "", b: "" }, VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {}, PERMS = [], OPEN = {}, Q = "";
   var lines = function (v) { var seen = {}; return String(v || "").split(/[\n,;]+/).map(function (x) { return x.replace(/\s+/g, " ").trim(); }).filter(function (x) { var k = x.toLowerCase(); if (!x || seen[k]) return false; seen[k] = 1; return true; }); };
   var b64 = function (s) { return btoa(unescape(encodeURIComponent(s))); }, unb64 = function (s) { return decodeURIComponent(escape(atob(s))); };
   try { JOBS = JSON.parse(localStorage.getItem("pp-jobs") || "{}"); } catch (e) { }
@@ -491,6 +491,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<div class="muted" style="font-size:12.5px;margin-top:2px">What each role (company) has ticked, as read from the portal. Tap a role to see its products.</div>' +
       '<div class="srch"><input class="tx" id="pq" placeholder="Search a role or a product / model (e.g. V70)" value="' + esc(Q) + '"><button class="btn pri sm" id="px">⬇ Excel</button></div>' +
       (prodNames.length ? '<div class="help" style="background:#EEF6FF"><b>Which roles have it</b><div style="overflow:auto;max-height:260px;margin-top:6px"><table class="tb"><tr><th>Product / model</th><th>Roles that have it ticked</th></tr>' + prodNames.slice(0, 300).map(function (n) { return "<tr><td>" + esc(n) + "</td><td>" + esc(byProd[n].join(", ")) + ' <span class="pill g">' + byProd[n].length + "</span></td></tr>"; }).join("") + "</table></div></div>" : "") +
+      '<div id="am"></div>' +
       (PERMS.length >= 2 ? '<div class="help" style="background:#F3F0FF"><b>⚖ Compare two roles</b><div class="muted" style="font-size:12px">See which permitted products one role has and the other is missing.</div><div class="srch"><select class="tx" id="ca">' + PERMS.map(function (p) { return "<option" + (p.role === CMP.a ? " selected" : "") + ">" + esc(p.role) + "</option>"; }).join("") + '</select><select class="tx" id="cb">' + PERMS.map(function (p, i) { return "<option" + (p.role === CMP.b || (!CMP.b && i === 1) ? " selected" : "") + ">" + esc(p.role) + "</option>"; }).join("") + '</select><button class="btn pri sm" id="cgo">Compare</button></div><div id="cres"></div></div>' : "") +
       '<div style="overflow:auto;margin-top:10px"><table class="tb"><tr><th>Role / company</th><th>Ticked</th><th>Checked</th><th>Read on</th><th></th></tr>' +
       list.map(function (p) {
@@ -500,11 +501,52 @@ td.n,th.n{text-align:right;white-space:nowrap}
       }).join("") + "</table></div></div>";
     var pq = $("pq"), tmr; pq.oninput = function () { clearTimeout(tmr); tmr = setTimeout(function () { Q = pq.value.trim(); drawPerms(); var n = $("pq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
     $("px").onclick = function () { exportPerms(PERMS, "Product_permissions_all_roles"); };
+    drawAll();
     if ($("cgo")) { $("cgo").onclick = function () { CMP.a = $("ca").value; CMP.b = $("cb").value; compare(); }; if (CMP.a && CMP.b) compare(); }
     [].forEach.call(el.querySelectorAll("tr.pr"), function (tr) { tr.onclick = function () { var r = tr.getAttribute("data-role"); if (OPEN[r]) delete OPEN[r]; else OPEN[r] = 1; drawPerms(); }; });
     [].forEach.call(el.querySelectorAll("[data-x1]"), function (b) { b.onclick = function () { var p = PERMS.filter(function (x) { return x.role === b.getAttribute("data-x1"); }); exportPerms(p, "Product_permissions_" + p[0].role.replace(/[^\w-]+/g, "_")); }; });
     [].forEach.call(el.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { var r = b.getAttribute("data-del"); if (!confirm("Remove the saved list of “" + r + "” from the app? (Nothing changes on the portal.)")) return; api({ action: "pp-pdel", role: r }).then(function () { delete OPEN[r]; loadPerms(); }); }; });
   }
+  // ---------- every model of a role (ticked or not): filter, select, copy, Excel ----------
+  function drawAll() {
+    var el = $("am"); if (!el) return;
+    var L = PERMS.filter(function (p) { return p.all && p.all.length; });
+    if (!L.length) { el.innerHTML = '<div class="help" style="background:#F7F8FC"><b>🗂 All models of a role</b><div class="muted" style="font-size:12px">Read a role again with 📋 Read current permissions — the full model list (ticked and not ticked) then appears here.</div></div>'; return; }
+    if (!L.some(function (p) { return p.role === AM.role; })) { AM.role = L[0].role; AM.sel = {}; }
+    var P = L.filter(function (p) { return p.role === AM.role; })[0], ni = nameIdx(P), ii = (P.cols || []).findIndex(function (c) { return /type\s*id|^id$/i.test(c); });
+    var key = function (r) { return String(ii >= 0 && r[ii] ? r[ii] : r[ni]); }, q = AM.q.toLowerCase();
+    var shown = []; P.all.forEach(function (r, i) { var on = !!P.on[i]; if (AM.f === "on" && !on) return; if (AM.f === "off" && on) return; if (q && r.join(" ").toLowerCase().indexOf(q) < 0) return; shown.push({ r: r, on: on, k: key(r) }); });
+    var nSel = Object.keys(AM.sel).length, nOn = P.on.reduce(function (a, v) { return a + v; }, 0);
+    el.innerHTML = '<div class="help" style="background:#F2FBF6"><b>🗂 All models of a role</b> <span class="muted" style="font-size:12px">— every model on the portal for this role, ticked or not</span>' +
+      '<div class="srch" style="flex-direction:column"><select class="tx" id="amr">' + L.map(function (p) { return "<option" + (p.role === AM.role ? " selected" : "") + ">" + esc(p.role) + "</option>"; }).join("") + '</select><input class="tx" id="amq" placeholder="Filter models (e.g. V70, 256GB)" value="' + esc(AM.q) + '"></div>' +
+      '<div class="chips" id="amf">' + [["all", "All " + P.all.length], ["on", "✓ Ticked " + nOn], ["off", "Not ticked " + (P.all.length - nOn)]].map(function (f) { return '<button data-f="' + f[0] + '" class="' + (AM.f === f[0] ? "on" : "") + '">' + f[1] + "</button>"; }).join("") + "</div>" +
+      '<div class="bar2"><button class="btn ghost sm" id="ams">☑ Select shown (' + shown.length + ')</button><button class="btn ghost sm" id="amc">Clear</button><button class="btn ghost sm" id="amcp">📋 Copy ' + (nSel ? nSel + " selected" : "shown") + '</button><button class="btn ghost sm" id="amx">⬇ Excel ' + (nSel ? nSel + " selected" : "shown") + '</button><button class="btn pri sm" id="amu"' + (nSel ? "" : " disabled") + '>➕ Use selected for Set permissions</button></div>' +
+      '<div class="muted" style="font-size:12px;margin-top:6px">Showing ' + shown.length + " of " + P.all.length + " · " + nSel + " selected · read " + fmtAt(P.at) + "</div>" +
+      '<div class="plist" style="max-height:380px"><table class="tb"><tr><th><input type="checkbox" id="amall"' + (shown.length && shown.every(function (x) { return AM.sel[x.k]; }) ? " checked" : "") + '></th><th>Ticked</th>' + (P.cols || []).map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>" +
+      shown.slice(0, 1500).map(function (x) { return '<tr><td><input type="checkbox" data-k="' + esc(x.k) + '"' + (AM.sel[x.k] ? " checked" : "") + "></td><td>" + (x.on ? '<span class="pill g">✓ yes</span>' : '<span class="pill m">no</span>') + "</td>" + x.r.map(function (v) { return "<td>" + esc(v) + "</td>"; }).join("") + "</tr>"; }).join("") +
+      (shown.length > 1500 ? '<tr><td colspan="12" class="muted">First 1500 shown — use the filter to narrow down (Excel has all).</td></tr>' : "") + (shown.length ? "" : '<tr><td colspan="12" class="muted">No model matches.</td></tr>') + "</table></div></div>";
+    var pick = function () { var M = {}; P.all.forEach(function (r, i) { M[key(r)] = { r: r, on: !!P.on[i] }; }); var ks = Object.keys(AM.sel); return ks.length ? ks.map(function (k) { return M[k]; }).filter(Boolean) : shown; };
+    $("amr").onchange = function () { AM.role = this.value; AM.sel = {}; drawAll(); };
+    var t; $("amq").oninput = function () { var v = this.value; clearTimeout(t); t = setTimeout(function () { AM.q = v.trim(); drawAll(); var n = $("amq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+    [].forEach.call(el.querySelectorAll("#amf [data-f]"), function (b) { b.onclick = function () { AM.f = b.dataset.f; drawAll(); }; });
+    $("ams").onclick = function () { shown.forEach(function (x) { AM.sel[x.k] = 1; }); drawAll(); };
+    $("amc").onclick = function () { AM.sel = {}; drawAll(); };
+    $("amall").onchange = function () { var on = this.checked; shown.forEach(function (x) { if (on) AM.sel[x.k] = 1; else delete AM.sel[x.k]; }); drawAll(); };
+    [].forEach.call(el.querySelectorAll("[data-k]"), function (c) { c.onchange = function () { if (c.checked) AM.sel[c.dataset.k] = 1; else delete AM.sel[c.dataset.k]; var b = Object.keys(AM.sel).length; $("amcp").textContent = "📋 Copy " + (b ? b + " selected" : "shown"); $("amx").textContent = "⬇ Excel " + (b ? b + " selected" : "shown"); $("amu").disabled = !b; }; });
+    $("amcp").onclick = function () {
+      var txt = pick().map(function (x) { return x.r[ni]; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).join("\n"); if (!txt) return toast("Nothing to copy");
+      var ok = function () { toast("Copied " + txt.split("\n").length + " model name(s)"); };
+      try { navigator.clipboard.writeText(txt).then(ok, function () { fallback(); }); } catch (e) { fallback(); }
+      function fallback() { var ta = document.createElement("textarea"); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); ok(); } catch (e) { toast("Copy failed"); } ta.remove(); }
+    };
+    $("amx").onclick = function () { var X = pick(); if (!X.length) return toast("Nothing to export"); download(xlsx([{ name: "Models", rows: [["Role / company", "Ticked"].concat(P.cols || [])].concat(X.map(function (x) { return [P.role, x.on ? "Yes" : "No"].concat(x.r); })) }]), "Models_" + P.role.replace(/[^\w-]+/g, "_") + (Object.keys(AM.sel).length ? "_selected" : "") + ".xlsx"); };
+    $("amu").onclick = function () {
+      var X = pick(), names = X.map(function (x) { return x.r[ni]; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+      sheet("Use " + names.length + " model(s)", "Fill the Set permissions form", [["➕", "Fill the form", function (ov) { $("ro").value = ov.querySelector("#amto").value.trim() || P.role; $("mo").value = names.join("\n"); $("ex").checked = true; $("ro").oninput(); window.scrollTo(0, 0); toast("Filled — tap Check only first, then Set permissions"); }, "pri"]],
+        '<label class="lb">For which role(s)?</label><textarea class="tx" id="amto" rows="3" placeholder="one per line">' + esc(P.role) + '</textarea><div class="muted" style="font-size:12px;margin-top:6px">Exact model names are filled and “Exact model only” is switched on. Already-ticked ones are skipped.</div>');
+    };
+  }
+
   // ---------- compare two roles ----------
   function keyed(p) {   // product key = TypeId when the portal shows it, else the product name
     var ii = (p.cols || []).findIndex(function (c) { return /type\s*id|^id$/i.test(c); }), ni = nameIdx(p), M = {};
