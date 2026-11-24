@@ -4,6 +4,8 @@
 // type the model in TypeName → Search → tick each product that is not ticked → in the state window tick all → close.
 // It never clicks a box that is already ticked, so it can only add permissions, never remove them.
 //   window.__biPermRun({ id, roles:[…], models:[…], exact:false, dry:false, fill:{u,p}, stop:false, panel:false })
+// READ mode ({ read:true, allRoles, roles, models }) only looks: for each role it opens Set Product Permission, searches
+// (all products, or the given models) and lists every product that is already ticked. It never clicks a tick box.
 // returns a JSON string: { s: login|run|done|stopped|err, msg, pct, res:[…], roles:[…], log:[…] }
 window.__biPermRun = function (c) {
   "use strict";
@@ -41,11 +43,13 @@ window.__biPermRun = function (c) {
   try { S = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { }
   if (!S) S = { done: {}, log: [], roles: [], state: "run" };
   var R = W.__biPerm = { id: c.id, stop: false, msg: "Starting…", state: S.state === "done" ? "done" : "run", cur: 0 };
-  var roles = (c.roles || []).map(function (x) { return String(x).trim(); }).filter(Boolean), models = (c.models || []).map(function (x) { return String(x).trim(); }).filter(Boolean), total = roles.length * models.length || 1;
+  var READ = !!c.read;
+  var roles = (c.roles || []).map(function (x) { return String(x).trim(); }).filter(Boolean), models = (c.models || []).map(function (x) { return String(x).trim(); }).filter(Boolean), total = (roles.length || 1) * (READ ? (models.length || 1) : models.length) || 1;
   var save = function () { S.state = R.state; if (S.log.length > 600) S.log = S.log.slice(-600); try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } };
   var log = function (t) { var d = new Date(); S.log.push(("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2) + " " + t); R.msg = t; paint(); };
   var res = function () { var L = []; roles.forEach(function (r) { models.forEach(function (m) { var x = S.done[r + "|" + m]; if (x) L.push(x); }); }); return L; };
-  R.status = function () { return JSON.stringify({ s: R.state, msg: R.msg, pct: Math.round(Object.keys(S.done).length * 100 / total), res: res(), roles: S.roles, log: S.log.slice(-250), dry: !!c.dry }); };
+  if (READ) res = function () { var L = []; Object.keys(S.done).forEach(function (k) { L.push(S.done[k]); }); return L; };
+  R.status = function () { var fin = R.state !== "run", r = res(); if (READ && !fin) r = r.map(function (x) { return Object.assign({}, x, { rows: [], names: [] }); }); return JSON.stringify({ s: R.state, msg: R.msg, pct: Math.min(100, Math.round(Object.keys(S.done).length * 100 / total)), res: r, roles: S.roles, log: S.log.slice(-250), dry: !!c.dry, read: READ }); };
 
   var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
   function Stop() { this.stop = true; }
@@ -96,16 +100,18 @@ window.__biPermRun = function (c) {
     docs().forEach(function (d) {
       [].forEach.call(d.querySelectorAll("div.datagrid-view"), function (v) {
         if (!vis(v)) return;
-        var H = {}; [].forEach.call(v.querySelectorAll(".datagrid-header td[field]"), function (td) { var t = norm(txt(td)); if (t) H[t] = td.getAttribute("field"); });
+        var H = {}, HL = []; [].forEach.call(v.querySelectorAll(".datagrid-header td[field]"), function (td) { var lt = txt(td), t = norm(lt); if (t && !H[t]) { H[t] = td.getAttribute("field"); HL.push([lt, td.getAttribute("field")]); } });
         var wrap = v.closest(".datagrid") || v.parentNode;
         G.push({
-          v: v, d: d, H: H, win: v.closest(".window,.window-body,.dialog"), wrap: wrap,
+          v: v, d: d, H: H, HL: HL, win: v.closest(".window,.window-body,.dialog"), wrap: wrap,
           headCb: function () { return v.querySelector(".datagrid-header-check input[type=checkbox]"); },
           rows: function () {
             var M = {}, L = [];
             [].forEach.call(v.querySelectorAll(".datagrid-body tr.datagrid-row"), function (tr) { var i = tr.getAttribute("datagrid-row-index"); if (i == null) return; if (!M[i]) { M[i] = { trs: [] }; L.push(M[i]); } M[i].trs.push(tr); });
             L.forEach(function (r) {
               r.cell = function (name) { var f = H[name]; if (!f) return ""; for (var i = 0; i < r.trs.length; i++) { var td = r.trs[i].querySelector('td[field="' + f + '"]'); if (td) return txt(td); } return ""; };
+              r.byField = function (f) { for (var i = 0; i < r.trs.length; i++) { var td = r.trs[i].querySelector('td[field="' + f + '"]'); if (td) return txt(td); } return ""; };
+              r.on = function () { var b = r.cb(); if (b) return !!b.checked; return r.trs.some(function (tr) { return /datagrid-row-checked/.test(tr.className); }); };
               r.cb = function () { for (var i = 0; i < r.trs.length; i++) { var x = r.trs[i].querySelector(".datagrid-cell-check input[type=checkbox],td input[type=checkbox]"); if (x) return x; } return null; };
             });
             return L;
@@ -248,6 +254,70 @@ window.__biPermRun = function (c) {
     if (!x.found) x.note = "No product found for “" + model + "”";
     return x;
   }
+  // ---------- READ: list what is already ticked for the role on screen (never clicks a tick box) ----------
+  async function readTicked(role, model) {
+    var x = { role: role, model: model || "(all products)", found: 0, ticked: 0, already: 0, failed: 0, states: 0, note: "", names: [], cols: [], rows: [] }, g = prodGrid();
+    if (!g) { x.note = "Product list is not on the screen"; x.failed = 1; return x; }
+    var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
+    if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
+    if (inp) {
+      setv(inp, model || ""); await sleep(200);
+      var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp);
+      if (sb) { tap(sb); await settle(); await sleep(400); }
+      else if (model) { x.note = "Search button not found"; x.failed = 1; return x; }
+    } else if (model) { x.note = "Search box “TypeName” not found"; x.failed = 1; return x; }
+    var key = norm(model || "");
+    if (model) await until(function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); return !rr.length || rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); }, 9000);
+    await biggestPage(prodGrid); await firstPage(prodGrid);
+    g = prodGrid(); if (!g) { x.note = "Product list closed unexpectedly"; x.failed = 1; return x; }
+    var flds = g.HL.filter(function (h) { return h[0] && !/^(ck|checkbox)$/i.test(h[1]); }).slice(0, 10);
+    x.cols = flds.map(function (h) { return h[0]; });
+    var seen = {};
+    for (var p = 0; p < 400; p++) {
+      chk(); g = prodGrid(); if (!g) break;
+      if (norm(roleOnScreen()) !== norm(role)) { x.failed = 1; x.note = "Role on the screen changed — stopped reading"; return x; }
+      g.rows().forEach(function (r) {
+        var id = r.cell("typeid") || r.cell("typename"); if (!id || seen[id]) return;
+        if (model && (c.exact ? !(norm(r.cell("typename")) === key || norm(r.cell("typename")).replace(/[(（].*$/, "") === key) : norm(r.cell("typename")).indexOf(key) < 0)) return;
+        seen[id] = 1; x.found++;
+        if (r.on()) { x.already++; x.names.push(r.cell("typename") || id); x.rows.push(flds.map(function (h) { return r.byField(h[1]); })); }
+      });
+      R.msg = role + " · reading page " + (p + 1) + " · " + x.already + " ticked of " + x.found; paint();
+      if (!(await nextPage(prodGrid))) break;
+    }
+    if (!x.found) x.note = model ? "No product found for “" + model + "”" : "The product list was empty";
+    return x;
+  }
+  async function mainRead() {
+    try {
+      if (!(await openRoleScreen())) throw new Error("Could not open System Config → Permissions Config → Role Permission. Open it yourself and run again. Seen: " + diag());
+      await settle();
+      try { S.roles = await readRoles(); } catch (e) { if (e instanceof Stop) throw e; }
+      if (c.allRoles || !roles.length) { roles = S.roles.slice(); total = (roles.length || 1) * (models.length || 1); }
+      if (!roles.length) throw new Error("No roles found in the portal's role list");
+      log("Reading permissions — " + roles.length + " role(s)" + (models.length ? " × " + models.length + " model(s)" : ", every product") + " · nothing will be changed");
+      var targets = models.length ? models : [""];
+      for (var i = 0; i < roles.length; i++) {
+        var role = roles[i]; chk();
+        if (targets.every(function (m) { return S.done[role + "|" + m]; })) continue;
+        if (!(await openRoleScreen())) throw new Error("Lost the Role Permission screen. Seen: " + diag());
+        log("Role " + role + " — opening its product list");
+        var err = await pickRole(role);
+        if (err) { log("✗ " + role + ": " + err); targets.forEach(function (m) { S.done[role + "|" + m] = { role: role, model: m || "(all products)", found: 0, ticked: 0, already: 0, failed: 1, states: 0, note: err, names: [], cols: [], rows: [] }; }); save(); continue; }
+        for (var j = 0; j < targets.length; j++) {
+          chk(); var m = targets[j]; if (S.done[role + "|" + m]) continue;
+          var x = await readTicked(role, m); S.done[role + "|" + m] = x; save();
+          log((x.failed ? "⚠ " : "● ") + role + (m ? " · " + m : "") + ": " + x.already + " ticked of " + x.found + " product(s)" + (x.note ? " — " + x.note : ""));
+        }
+        var b = find(/^back$/i); if (b) { tap(b); await settle(); await sleep(500); }
+      }
+      R.state = "done"; log("Finished reading — nothing was changed.");
+    } catch (e) {
+      if (e instanceof Stop) { R.state = "stopped"; log("Stopped by you."); }
+      else { R.state = "err"; log("Stopped: " + (e && e.message || e)); }
+    }
+    save(); paint();
+  }
   async function main() {
     try {
       if (!roles.length || !models.length) throw new Error("No roles or models in this job");
@@ -303,6 +373,6 @@ window.__biPermRun = function (c) {
       if (R.state !== "run") box.querySelector("[data-s]").style.display = "none";
     } catch (e) { }
   }
-  if (R.state !== "done") main(); else paint();
+  if (R.state !== "done") (READ ? mainRead : main)(); else paint();
   return R.status();
 };
