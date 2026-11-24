@@ -94,6 +94,38 @@ window.__biPermRun = function (c) {
     try { el.blur(); } catch (e) { }
   }
 
+  // type into an EasyUI box the way the portal itself reads it (its jQuery value), not only the visible text
+  function typeIn(el, v) {
+    setv(el, v);
+    var w = el.ownerDocument.defaultView || W, $j = w.jQuery || w.$, span = el.closest && el.closest("span.textbox,span.searchbox,span.combo"), tgt = span && span.previousElementSibling;
+    if ($j && tgt) {
+      var d = $j(tgt);
+      ["searchbox", "combobox", "combo", "numberbox", "textbox"].some(function (k) { if (!d.data(k)) return false; try { d[k]("setValue", v); if (d[k]("getText") !== v) try { d[k]("setText", v); } catch (e) { } return true; } catch (e) { return false; } });
+    }
+  }
+  function pressEnter(el) {
+    var w = el.ownerDocument.defaultView || W;
+    ["keydown", "keypress", "keyup"].forEach(function (t) { try { el.dispatchEvent(new w.KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true })); } catch (e) { } });
+    var $j = w.jQuery || w.$; if ($j) try { var ev = $j.Event("keydown"); ev.keyCode = ev.which = 13; $j(el).trigger(ev); } catch (e) { }
+  }
+  // search the product list for one model and wait until the list shows only that model (the portal filters it — no paging through everything)
+  async function searchModel(g, model) {
+    var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
+    if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
+    if (!inp) return { err: "Search box “TypeName” not found" };
+    var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp);
+    if (!sb) { var seen = {}; [].forEach.call(g.d.querySelectorAll("a,button,input[type=button]"), function (e) { var t = txt(e); if (t && t.length < 20 && vis(e)) seen[t] = 1; }); return { err: "Search button not found. Buttons seen: " + Object.keys(seen).slice(0, 25).join(" | ") }; }
+    var key = norm(model), filtered = function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); return !rr.length || rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); };
+    for (var tries = 0; tries < 3; tries++) {
+      typeIn(inp, model); await sleep(150);
+      if (tries === 1) pressEnter(inp); else tap(sb);
+      await settle(); await sleep(250);
+      if (await until(filtered, tries ? 4000 : 6000, 150)) return { ok: true };
+    }
+    return { ok: false };
+  }
+  async function morePages(get) { var g = get(), p = g && g.pager(), n = p && p.querySelector(".pagination-next"); if (!n) return false; var a = n.closest("a,.l-btn") || n; return !(/l-btn-disabled/.test(a.className) || a.disabled); }
+
   // ---------- EasyUI datagrid, read the way it is drawn ----------
   function grids() {
     var G = [];
@@ -218,19 +250,21 @@ window.__biPermRun = function (c) {
   async function doModel(role, model) {
     var x = { role: role, model: model, found: 0, ticked: 0, already: 0, failed: 0, states: 0, note: "", names: [] }, g = prodGrid();
     if (!g) { x.note = "Product list is not on the screen"; x.failed = 1; return x; }
-    var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
-    if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
-    if (!inp) { x.note = "Search box “TypeName” not found"; x.failed = 1; return x; }
-    setv(inp, model); await sleep(200);
-    var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp); if (!sb) { var seen = {}; [].forEach.call(g.d.querySelectorAll("a,button,input[type=button]"), function (e) { var t = txt(e); if (t && t.length < 20 && vis(e)) seen[t] = 1; }); x.note = "Search button not found. Buttons seen: " + Object.keys(seen).slice(0, 25).join(" | "); x.failed = 1; return x; }
-    tap(sb); await settle(); await sleep(400);
+    var t0 = Date.now(), sr = await searchModel(g, model);
+    if (sr.err) { x.note = sr.err; x.failed = 1; return x; }
+    if (!sr.ok) { x.note = "the portal did not filter by “" + model + "” — checked the full list instead (slower)"; log("⚠ " + role + " · " + model + ": search filter did not apply — going through the full list"); }
     var key = norm(model), match = function (r) { var n = norm(r.cell("typename")); return c.exact ? (n === key || n.replace(/[(（].*$/, "") === key) : n.indexOf(key) >= 0; };
-    await until(function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); return !rr.length || rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); }, 9000);
-    await biggestPage(prodGrid); await firstPage(prodGrid);
+    if (await morePages(prodGrid)) await biggestPage(prodGrid);   // only when the filtered list has more than one page
+    await firstPage(prodGrid);
+    { var gq = prodGrid(); log("🔎 " + role + " · " + model + ": " + (gq ? gq.rows().length : 0) + " product(s) on the list after search (" + ((Date.now() - t0) / 1000).toFixed(1) + " s)"); }
     var seen = {};
     for (var p = 0; p < 60; p++) {
       for (var guard = 0; guard < 400; guard++) {
         chk(); g = prodGrid(); if (!g) { x.note = "Product list closed unexpectedly"; x.failed++; return x; }
+        if (sr.ok && g.rows().some(function (r) { return norm(r.cell("typename")).indexOf(key) < 0; })) {   // the portal reloaded the full list after a tick — search the model again
+          var s2 = await searchModel(g, model); g = prodGrid(); if (!g) { x.note = "Product list closed unexpectedly"; x.failed++; return x; }
+          if (!s2.ok) sr.ok = false;
+        }
         var row = g.rows().filter(function (r) { var id = r.cell("typeid") || r.cell("typename"); return id && !seen[id] && match(r); })[0];
         if (!row) break;
         var id = row.cell("typeid") || row.cell("typename"), name = row.cell("typename"), cb = row.cb();
@@ -261,7 +295,7 @@ window.__biPermRun = function (c) {
     var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
     if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
     if (inp) {
-      setv(inp, model || ""); await sleep(200);
+      typeIn(inp, model || ""); await sleep(200);
       var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp);
       if (sb) { tap(sb); await settle(); await sleep(400); }
       else if (model) { x.note = "Search button not found"; x.failed = 1; return x; }
