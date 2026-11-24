@@ -16,6 +16,9 @@
 .code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#12163A;color:#D7DBFF;border-radius:10px;padding:10px;max-height:240px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin-top:8px}
 .bm{display:inline-block;background:#4D5BF9;color:#fff;border-radius:10px;padding:9px 14px;font-weight:700;text-decoration:none;cursor:grab}
 .big{font-size:40px;text-align:center}
+.pr{cursor:pointer}.pr:hover td{background:#FAFBFF}.pr td.n b{color:#13693F}
+.plist{max-height:420px;overflow:auto;margin:4px 0 10px;border:1px solid #EEF0F6;border-radius:10px}
+.srch{display:flex;gap:8px;margin-top:8px}.srch input{flex:1}
 </style>
 </head>
 <body>
@@ -26,11 +29,11 @@
 (function () {
   "use strict";
   /*@@CORE@@*/
-  var VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {};
+  var VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {}, PERMS = [], OPEN = {}, Q = "";
   var lines = function (v) { var seen = {}; return String(v || "").split(/[\n,;]+/).map(function (x) { return x.replace(/\s+/g, " ").trim(); }).filter(function (x) { var k = x.toLowerCase(); if (!x || seen[k]) return false; seen[k] = 1; return true; }); };
   var b64 = function (s) { return btoa(unescape(encodeURIComponent(s))); }, unb64 = function (s) { return decodeURIComponent(escape(atob(s))); };
   try { JOBS = JSON.parse(localStorage.getItem("pp-jobs") || "{}"); } catch (e) { }
-  var keepJob = function (j) { JOBS[j.id] = { roles: j.roles, models: j.models, dry: j.dry, at: Date.now() }; var ks = Object.keys(JOBS).sort(function (a, b) { return JOBS[b].at - JOBS[a].at; }); ks.slice(12).forEach(function (k) { delete JOBS[k]; }); try { localStorage.setItem("pp-jobs", JSON.stringify(JOBS)); } catch (e) { } };
+  var keepJob = function (j) { JOBS[j.id] = { roles: j.roles, models: j.models, dry: j.dry, read: !!j.read, at: Date.now() }; var ks = Object.keys(JOBS).sort(function (a, b) { return JOBS[b].at - JOBS[a].at; }); ks.slice(12).forEach(function (k) { delete JOBS[k]; }); try { localStorage.setItem("pp-jobs", JSON.stringify(JOBS)); } catch (e) { } };
 
   function load() {
     api({ action: "pp-get" }).then(function (r) {
@@ -39,20 +42,24 @@
     });
   }
   function draw() {
-    var where = PB ? '<div class="help"><b>How it works here (Admin app)</b><br>1. Tap <b>Check only</b> first — it only counts what would be ticked, nothing changes.<br>2. Tap <b>Set permissions</b>. The vivo portal opens inside the app; type the captcha and log in.<br>3. The app then does the ticking: role → Set Product Permission → search model → tick each product → tick all states. Keep the app open.<br>4. When it finishes you come back here with the result.</div>'
+    var where = PB ? '<div class="help"><b>How it works here (Admin app)</b><br>1. Tap <b>Check only</b> first — it only counts what would be ticked, nothing changes.<br>2. Tap <b>Set permissions</b>. The vivo portal opens inside the app; type the captcha and log in.<br>3. The app then does the ticking: role → Set Product Permission → search model → tick each product → tick all states. Keep the app open.<br>4. When it finishes you come back here with the result.<br><b>📋 Read current permissions</b> works the same way but only looks — the list of ticked products per role appears below.</div>'
       : '<div class="help"><b>On a computer (Chrome / Edge)</b><br>1. One time: drag this button to your bookmarks bar → <a class="bm" id="bm" href="#">✅ vivo BI permissions</a><br>2. Fill roles and models above and tap <b>Check only</b> or <b>Set permissions</b> — a job code is copied.<br>3. Open the vivo portal, log in, click the bookmark and paste the job code. A small box shows the progress.<br>4. When it finishes, press <b>Copy result</b> in that box and paste it here with <b>Paste result</b>.<br><span class="muted">On a phone, use the Admin app (update to version 7.5) — there it is a single tap.</span></div>';
     VIEW.innerHTML = '<div class="card"><b>1 · Partner roles</b><div class="muted" style="font-size:12.5px">One per line, exactly as in the portal\'s Role Name column (e.g. hdfc, paytm).</div><textarea class="tx" id="ro" rows="4" style="margin-top:6px" placeholder="hdfc&#10;paytm&#10;bajajnew">' + esc((CFG.lastRoles || []).join("\n")) + '</textarea>' + (CFG.roles.length ? '<div class="muted" style="font-size:12px;margin-top:6px">Roles read from the portal last time — tap to add or remove:</div><div class="chips" id="rc"></div>' : '<div class="muted" style="font-size:12px;margin-top:6px">After the first run, the portal\'s role names appear here as tap-to-pick buttons.</div>') +
       '<b style="display:block;margin-top:14px">2 · Models</b><div class="muted" style="font-size:12.5px">One per line — what you would type in the portal\'s TypeName search (e.g. V70).</div><textarea class="tx" id="mo" rows="4" style="margin-top:6px" placeholder="V70&#10;Y500&#10;T5 Pro">' + esc((CFG.lastModels || []).join("\n")) + '</textarea>' +
       '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ex"' + (CFG.exact ? " checked" : "") + '><i></i><span>Exact model only — “V70” will not include V70 Elite, V70 FE …</span></label><div class="muted" style="font-size:12px;margin-top:4px" id="exh"></div>' +
-      '<div class="bar2"><button class="btn sec" id="dry" style="flex:1">🔍 Check only</button><button class="btn pri" id="go" style="flex:1">✅ Set permissions</button></div><div class="muted" style="font-size:12px;margin-top:6px" id="cnt"></div></div>' + where +
+      '<div class="bar2"><button class="btn sec" id="dry" style="flex:1">🔍 Check only</button><button class="btn pri" id="go" style="flex:1">✅ Set permissions</button></div><div class="muted" style="font-size:12px;margin-top:6px" id="cnt"></div>' +
+      '<div style="border-top:1px dashed #DADDF0;margin-top:14px;padding-top:12px"><b>📋 See what is already permitted</b><div class="muted" style="font-size:12.5px;margin-top:2px">The app goes through the portal and lists every product / model that is already ticked under each role — it never clicks a tick box. Models above are optional here: leave them empty to read every product.</div>' +
+      '<label class="tg" style="margin-top:8px;font-size:13px"><input type="checkbox" id="ar"><i></i><span>All roles in the portal (ignore the roles list)</span></label>' +
+      '<div class="bar2"><button class="btn sec" id="rd" style="flex:1">📋 Read current permissions</button></div></div></div>' + where +
       '<div class="help">🔒 It only <b>adds</b> ticks — a box that is already ticked is never touched, so nothing is removed. For every product it ticks <b>all</b> states. The captcha is always typed by you.</div>' +
-      (PB ? "" : '<div class="bar2"><button class="btn ghost" id="paste" style="flex:1">📋 Paste result</button></div>') + '<div id="res"></div>' +
-      '<div class="sh" style="margin-top:16px"><span><b>History</b></span></div>' + (RUNS.length ? RUNS.map(function (r) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-run="' + r.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + new Date(r.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + '</b><span class="pill ' + (r.dry ? "m" : r.state === "done" && !r.failed ? "g" : r.state === "done" ? "o" : "r") + '">' + (r.dry ? "Check only" : r.state === "done" ? (r.failed ? "Done · " + r.failed + " problem(s)" : "Done") : r.state === "stopped" ? "Stopped" : "Error") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + r.roles + " role(s) × " + r.models + " model(s) · " + r.ticked + (r.dry ? " to tick" : " ticked") + " · " + esc(r.by) + "</div></div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:8px">No runs yet.</div>');
+      (PB ? "" : '<div class="bar2"><button class="btn ghost" id="paste" style="flex:1">📋 Paste result</button></div>') + '<div id="res"></div><div id="perms"></div>' +
+      '<div class="sh" style="margin-top:16px"><span><b>History</b></span></div>' + (RUNS.length ? RUNS.map(function (r) { return '<div class="card" style="margin-top:8px;cursor:pointer" data-run="' + r.id + '"><div class="row" style="gap:6px"><b style="flex:1">' + new Date(r.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + '</b><span class="pill ' + (r.read ? "" : r.dry ? "m" : r.state === "done" && !r.failed ? "g" : r.state === "done" ? "o" : "r") + '">' + (r.read ? "Read permissions" : r.dry ? "Check only" : r.state === "done" ? (r.failed ? "Done · " + r.failed + " problem(s)" : "Done") : r.state === "stopped" ? "Stopped" : "Error") + '</span></div><div class="muted" style="font-size:12px;margin-top:2px">' + (r.read ? r.roles + " role(s) read · " + (r.listed || 0) + " ticked products listed" : r.roles + " role(s) × " + r.models + " model(s) · " + r.ticked + (r.dry ? " to tick" : " ticked")) + " · " + esc(r.by) + "</div></div>"; }).join("") : '<div class="muted" style="font-size:12.5px;margin-top:8px">No runs yet.</div>');
     var ro = $("ro"), mo = $("mo");
     var chips = function () { var rc = $("rc"); if (!rc) return; var cur = lines(ro.value).map(function (x) { return x.toLowerCase(); }); rc.innerHTML = CFG.roles.map(function (r, i) { return '<button data-r="' + i + '" class="' + (cur.indexOf(r.toLowerCase()) >= 0 ? "on" : "") + '">' + esc(r) + "</button>"; }).join(""); [].forEach.call(rc.querySelectorAll("[data-r]"), function (b) { b.onclick = function () { var r = CFG.roles[+b.dataset.r], L = lines(ro.value), i = L.map(function (x) { return x.toLowerCase(); }).indexOf(r.toLowerCase()); if (i >= 0) L.splice(i, 1); else L.push(r); ro.value = L.join("\n"); upd(); }; }); };
     var upd = function () { var a = lines(ro.value).length, b = lines(mo.value).length; $("cnt").textContent = a && b ? a + " role(s) × " + b + " model(s) = " + a * b + " searches. Roughly 3 seconds per product variant that needs a tick." : ""; $("exh").textContent = $("ex").checked ? "" : "Now: “V70” ticks every product whose name contains V70 — same as searching V70 and ticking the whole list."; chips(); };
     ro.oninput = mo.oninput = $("ex").onchange = upd; upd();
-    $("dry").onclick = function () { start(true); }; $("go").onclick = function () { start(false); };
+    $("dry").onclick = function () { start(true); }; $("go").onclick = function () { start(false); }; $("rd").onclick = function () { start(true, true); };
+    loadPerms();
     if ($("paste")) $("paste").onclick = pasteResult;
     if ($("bm")) { $("bm").href = bookmarklet(); $("bm").onclick = function (e) { e.preventDefault(); toast("Drag it to the bookmarks bar (don't click it here)"); }; }
     [].forEach.call(VIEW.querySelectorAll("[data-run]"), function (c) { c.onclick = function () { api({ action: "pp-run", id: c.dataset.run }).then(function (r) { if (!r.ok) return toast(r.error); show(r.run, true); }); }; });
@@ -61,11 +68,13 @@
     var src = location.origin + "/vivo_perm.js";
     return "javascript:(function(){if(!/vivo/i.test(location.hostname)){alert('Open the vivo portal first, log in, then click this bookmark.');return;}var c=prompt('Paste the job code from the BI tool');if(!c)return;var j;try{j=JSON.parse(decodeURIComponent(escape(atob(c.replace(/^BIJOB:/,'').trim()))));}catch(e){alert('That is not a job code. Copy it again from the BI tool.');return;}j.panel=true;var go=function(){window.__biPermRun(j);};if(window.__biPermRun)return go();var s=document.createElement('script');s.src='" + src + "?t='+Date.now();s.onload=go;s.onerror=function(){alert('Could not load the helper. Use the Admin app instead.');};document.body.appendChild(s);})()";
   }
-  function start(dry) {
-    var roles = lines($("ro").value), models = lines($("mo").value), exact = $("ex").checked;
-    if (!roles.length || !models.length) return toast("Add at least one role and one model");
+  function start(dry, read) {
+    var roles = lines($("ro").value), models = lines($("mo").value), exact = $("ex").checked, all = read && $("ar").checked;
+    if (read) { if (all) roles = []; if (!all && !roles.length) return toast("Add at least one role, or tick “All roles in the portal”"); }
+    else if (!roles.length || !models.length) return toast("Add at least one role and one model");
     if (roles.length > 80 || models.length > 200) return toast("Too many — up to 80 roles and 200 models in one run");
-    var job = { id: "P" + Date.now().toString(36).toUpperCase(), roles: roles, models: models, exact: exact, dry: !!dry };
+    var job = { id: (read ? "R" : "P") + Date.now().toString(36).toUpperCase(), roles: roles, models: models, exact: exact, dry: !!dry };
+    if (read) { job.read = true; job.allRoles = !!all; }
     var run = function () {
       api({ action: "pp-draft", roles: roles, models: models, exact: exact }); keepJob(job);
       if (PB) { var r = PB.run(JSON.stringify(job), ""); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start the run"); return; }
@@ -78,7 +87,7 @@
   }
   function record(id, status) {
     var j = JOBS[id] || {};
-    return api({ action: "pp-log", id: id, status: status, roles: j.roles || [], models: j.models || [], dry: !!j.dry }).then(function (r) { if (!r.ok) { toast(r.error); return null; } if (r.run.roles.length && status.roles && status.roles.length) CFG.roles = status.roles; return r.run; });
+    return api({ action: "pp-log", id: id, status: status, roles: j.roles || [], models: j.models || [], dry: !!j.dry, read: !!(j.read || status.read) }).then(function (r) { if (!r.ok) { toast(r.error); return null; } if (r.run.roles.length && status.roles && status.roles.length) CFG.roles = status.roles; return r.run; });
   }
   function pending() {   // results the app kept while this page was closed
     if (!PB) return; var L = [];
@@ -91,7 +100,63 @@
   function pasteResult() {
     sheet("Paste result", "From the box on the vivo portal → Copy result", [["📥", "Save result", function () { var m = /BIPERM:([A-Za-z0-9_-]+):([A-Za-z0-9+\/=]+)/.exec($("pr").value.replace(/\s+/g, "")), st = null; if (m) try { st = JSON.parse(unb64(m[2])); } catch (e) { } if (!st) { toast("That doesn't look like a result — copy it again"); return false; } record(m[1], st).then(function (run) { if (run) api({ action: "pp-get" }).then(function (r) { if (r.ok) { CFG = r.cfg; RUNS = r.runs; draw(); show(run); } }); }); }, "pri"]], '<textarea class="tx" id="pr" rows="5" placeholder="BIPERM:…"></textarea>');
   }
+  function showRead(run, scroll) {
+    var R = run.res, roles = {}, tick = 0, prob = 0;
+    R.forEach(function (x) { roles[x.role] = 1; tick += x.already || 0; prob += x.failed || 0; });
+    var head = run.state === "done" ? "📋 Read finished — nothing was changed" : run.state === "stopped" ? "⏸ Reading stopped before the end" : "⚠ Reading stopped with an error";
+    $("res").innerHTML = '<div class="card" style="margin-top:12px"><b>' + head + "</b>" + (run.state === "err" && run.msg ? '<div style="color:#B42318;font-size:12.5px;margin-top:4px">' + esc(run.msg) + "</div>" : "") +
+      '<div class="kp"><div><b>' + Object.keys(roles).length + '</b><span>roles read</span></div><div><b style="color:#13693F">' + tick + '</b><span>products ticked</span></div><div><b>' + R.reduce(function (a, x) { return a + (x.found || 0); }, 0) + '</b><span>products checked</span></div><div><b style="color:' + (prob ? "#B42318" : "inherit") + '">' + prob + "</b><span>problems</span></div></div>" +
+      '<div style="overflow:auto;margin-top:10px"><table class="tb"><tr><th>Role</th><th>Searched</th><th>Checked</th><th>Ticked</th><th>Note</th></tr>' + R.map(function (x) { return "<tr><td>" + esc(x.role) + "</td><td>" + esc(x.model) + '</td><td class="n">' + (x.found || 0) + '</td><td class="n"><b style="color:#13693F">' + (x.already || 0) + "</b></td><td" + (x.failed ? ' style="color:#B42318"' : "") + ">" + esc(x.note || "") + "</td></tr>"; }).join("") + "</table></div>" +
+      '<div class="muted" style="font-size:12px;margin-top:6px">The full product list of each role is below in <b>Current permissions</b>' + (run.state !== "done" ? " (saved only when a read finishes without stopping)" : "") + '.</div><div class="bar2"><button class="btn ghost sm" id="rl">📜 Log</button></div><div id="rlog"></div></div>';
+    $("rl").onclick = function () { $("rlog").innerHTML = $("rlog").innerHTML ? "" : '<div class="code">' + esc((run.log || []).join("\n") || "No log") + "</div>"; };
+    loadPerms(true);
+    if (scroll !== false) try { $("res").scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { }
+  }
+
+  // ---------- current permissions per role (latest read) ----------
+  function loadPerms(open) { api({ action: "pp-perms" }).then(function (r) { if (!r.ok) return; PERMS = r.perms || []; if (open && PERMS.length && !Object.keys(OPEN).length) OPEN[PERMS[0].role] = 1; drawPerms(); }); }
+  function nameIdx(p) { var i = (p.cols || []).findIndex(function (c) { return /type\s*name|product|model/i.test(c); }); return i < 0 ? 0 : i; }
+  function fmtAt(t) { return new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); }
+  function drawPerms() {
+    var el = $("perms"); if (!el) return;
+    if (!PERMS.length) { el.innerHTML = ""; return; }
+    var q = Q.toLowerCase(), roleHit = function (p) { return !q || p.role.toLowerCase().indexOf(q) >= 0; }, rowHit = function (r) { return !q || r.join(" ").toLowerCase().indexOf(q) >= 0; };
+    var list = PERMS.filter(function (p) { return roleHit(p) || p.rows.some(rowHit); });
+    var byProd = {}; if (q) PERMS.forEach(function (p) { var ni = nameIdx(p); p.rows.forEach(function (r) { if (r.join(" ").toLowerCase().indexOf(q) >= 0) { var n = r[ni] || r.join(" "); (byProd[n] = byProd[n] || []).push(p.role); } }); });
+    var prodNames = Object.keys(byProd).sort();
+    el.innerHTML = '<div class="card" style="margin-top:14px"><div class="row" style="gap:6px;align-items:center"><b style="flex:1">📋 Current permissions on the portal</b><span class="pill">' + PERMS.length + ' role(s)</span></div>' +
+      '<div class="muted" style="font-size:12.5px;margin-top:2px">What each role (company) has ticked, as read from the portal. Tap a role to see its products.</div>' +
+      '<div class="srch"><input class="tx" id="pq" placeholder="Search a role or a product / model (e.g. V70)" value="' + esc(Q) + '"><button class="btn pri sm" id="px">⬇ Excel</button></div>' +
+      (prodNames.length ? '<div class="help" style="background:#EEF6FF"><b>Which roles have it</b><div style="overflow:auto;max-height:260px;margin-top:6px"><table class="tb"><tr><th>Product / model</th><th>Roles that have it ticked</th></tr>' + prodNames.slice(0, 300).map(function (n) { return "<tr><td>" + esc(n) + "</td><td>" + esc(byProd[n].join(", ")) + ' <span class="pill g">' + byProd[n].length + "</span></td></tr>"; }).join("") + "</table></div></div>" : "") +
+      '<div style="overflow:auto;margin-top:10px"><table class="tb"><tr><th>Role / company</th><th>Ticked</th><th>Checked</th><th>Read on</th><th></th></tr>' +
+      list.map(function (p) {
+        var rows = p.rows.filter(function (r) { return roleHit(p) || rowHit(r); }), on = OPEN[p.role] || (q && !roleHit(p));
+        return '<tr class="pr" data-role="' + esc(p.role) + '"><td><b>' + esc(p.role) + "</b>" + (p.filter && p.filter.length ? '<div class="muted" style="font-size:11px">only: ' + esc(p.filter.join(", ")) + "</div>" : "") + '</td><td class="n"><b>' + p.rows.length + '</b></td><td class="n">' + p.total + '</td><td style="white-space:nowrap;font-size:11.5px">' + fmtAt(p.at) + '</td><td class="n">' + (on ? "▾" : "▸") + "</td></tr>" +
+          (on ? '<tr><td colspan="5" style="padding:0 0 0 6px"><div class="plist"><table class="tb"><tr><th>#</th>' + (p.cols || []).map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>" + rows.slice(0, 2000).map(function (r, i) { return '<tr><td class="n">' + (i + 1) + "</td>" + r.map(function (v) { return "<td>" + esc(v) + "</td>"; }).join("") + "</tr>"; }).join("") + (rows.length ? "" : '<tr><td colspan="9" class="muted">Nothing ticked for this role.</td></tr>') + '</table></div><div class="bar2" style="margin:-4px 0 10px"><button class="btn ghost sm" data-x1="' + esc(p.role) + '">⬇ Excel — ' + esc(p.role) + '</button><button class="btn ghost sm" data-del="' + esc(p.role) + '">🗑 Remove</button><span class="muted" style="font-size:11.5px">read by ' + esc(p.by || "") + "</span></div></td></tr>" : "");
+      }).join("") + "</table></div></div>";
+    var pq = $("pq"), tmr; pq.oninput = function () { clearTimeout(tmr); tmr = setTimeout(function () { Q = pq.value.trim(); drawPerms(); var n = $("pq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
+    $("px").onclick = function () { exportPerms(PERMS, "Product_permissions_all_roles"); };
+    [].forEach.call(el.querySelectorAll("tr.pr"), function (tr) { tr.onclick = function () { var r = tr.getAttribute("data-role"); if (OPEN[r]) delete OPEN[r]; else OPEN[r] = 1; drawPerms(); }; });
+    [].forEach.call(el.querySelectorAll("[data-x1]"), function (b) { b.onclick = function () { var p = PERMS.filter(function (x) { return x.role === b.getAttribute("data-x1"); }); exportPerms(p, "Product_permissions_" + p[0].role.replace(/[^\w-]+/g, "_")); }; });
+    [].forEach.call(el.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { var r = b.getAttribute("data-del"); if (!confirm("Remove the saved list of “" + r + "” from the app? (Nothing changes on the portal.)")) return; api({ action: "pp-pdel", role: r }).then(function () { delete OPEN[r]; loadPerms(); }); }; });
+  }
+  function exportPerms(L, name) {
+    var cols = []; L.forEach(function (p) { (p.cols || []).forEach(function (c) { if (cols.indexOf(c) < 0) cols.push(c); }); });
+    var flat = [["Role / company"].concat(cols)];
+    L.forEach(function (p) { p.rows.forEach(function (r) { flat.push([p.role].concat(cols.map(function (c) { var i = (p.cols || []).indexOf(c); return i < 0 ? "" : r[i]; }))); }); });
+    var summary = [["Role / company", "Products ticked", "Products checked", "Only these models", "Read on", "Read by"]].concat(L.map(function (p) { return [p.role, p.rows.length, p.total, (p.filter || []).join(", ") || "all products", fmtAt(p.at), p.by || ""]; }));
+    var sheets = [{ name: "Summary", rows: summary }, { name: "Role - product list", rows: flat }];
+    if (L.length > 1) {
+      var prods = {}, order = [];
+      L.forEach(function (p) { var ni = nameIdx(p); p.rows.forEach(function (r) { var n = r[ni]; if (!n) return; if (!prods[n]) { prods[n] = {}; order.push(n); } prods[n][p.role] = 1; }); });
+      order.sort();
+      sheets.push({ name: "Product x role", rows: [["Product / model"].concat(L.map(function (p) { return p.role; }), ["Roles"])].concat(order.map(function (n) { var c = 0; return [n].concat(L.map(function (p) { if (prods[n][p.role]) { c++; return "✓"; } return ""; }), [c]); })) });
+    }
+    download(xlsx(sheets), name + ".xlsx");
+  }
+
   function show(run, scroll) {
+    if (run.read) return showRead(run, scroll);
     var R = run.res, sum = function (k) { return R.reduce(function (a, x) { return a + (x[k] || 0); }, 0); }, bad = R.filter(function (x) { return x.failed || (!x.found && !x.failed); });
     var head = run.dry ? "🔍 Check only — nothing was changed" : run.state === "done" ? "✅ Finished" : run.state === "stopped" ? "⏸ Stopped before the end" : "⚠ Stopped with an error";
     $("res").innerHTML = '<div class="card" style="margin-top:12px"><b>' + head + '</b>' + (run.state === "err" && run.msg ? '<div style="color:#B42318;font-size:12.5px;margin-top:4px">' + esc(run.msg) + "</div>" : "") + '<div class="kp"><div><b>' + sum("found") + "</b><span>products found</span></div><div><b style=\"color:#13693F\">" + sum("ticked") + "</b><span>" + (run.dry ? "to tick" : "ticked now") + "</span></div><div><b>" + sum("already") + '</b><span>already ticked</span></div><div><b style="color:' + (sum("failed") ? "#B42318" : "inherit") + '">' + sum("failed") + "</b><span>problems</span></div></div>" +

@@ -1861,6 +1861,8 @@ export const LINK_CATALOG = {
 "pp-draft",
 "pp-get",
 "pp-log",
+"pp-pdel",
+"pp-perms",
 "pp-run"
 ],
 "tabs": []
