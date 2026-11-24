@@ -10,8 +10,8 @@ android {
         applicationId 'com.vivo.bidashboard'
         minSdk 24
         targetSdk 34
-        versionCode 52
-        versionName '8.6'
+        versionCode 53
+        versionName '8.7'
     }
 
     buildFeatures {

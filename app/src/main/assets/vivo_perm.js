@@ -49,7 +49,7 @@ window.__biPermRun = function (c) {
   var log = function (t) { var d = new Date(); S.log.push(("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2) + ":" + ("0" + d.getSeconds()).slice(-2) + " " + t); R.msg = t; paint(); };
   var res = function () { var L = []; roles.forEach(function (r) { models.forEach(function (m) { var x = S.done[r + "|" + m]; if (x) L.push(x); }); }); return L; };
   if (READ) res = function () { var L = []; Object.keys(S.done).forEach(function (k) { L.push(S.done[k]); }); return L; };
-  R.status = function () { var fin = R.state !== "run", r = res(); if (READ && !fin) r = r.map(function (x) { return Object.assign({}, x, { rows: [], names: [] }); }); return JSON.stringify({ s: R.state, msg: R.msg, pct: Math.min(100, Math.round(Object.keys(S.done).length * 100 / total)), res: r, roles: S.roles, log: S.log.slice(-250), dry: !!c.dry, read: READ }); };
+  R.status = function () { var fin = R.state !== "run", r = res(); if (READ && !fin) r = r.map(function (x) { return Object.assign({}, x, { rows: [], names: [], all: [], on: [] }); }); return JSON.stringify({ s: R.state, msg: R.msg, pct: Math.min(100, Math.round(Object.keys(S.done).length * 100 / total)), res: r, roles: S.roles, log: S.log.slice(-250), dry: !!c.dry, read: READ }); };
 
   var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
   function Stop() { this.stop = true; }
@@ -290,7 +290,7 @@ window.__biPermRun = function (c) {
   }
   // ---------- READ: list what is already ticked for the role on screen (never clicks a tick box) ----------
   async function readTicked(role, model) {
-    var x = { role: role, model: model || "(all products)", found: 0, ticked: 0, already: 0, failed: 0, states: 0, note: "", names: [], cols: [], rows: [] }, g = prodGrid();
+    var x = { role: role, model: model || "(all products)", found: 0, ticked: 0, already: 0, failed: 0, states: 0, note: "", names: [], cols: [], rows: [], all: [], on: [] }, g = prodGrid();
     if (!g) { x.note = "Product list is not on the screen"; x.failed = 1; return x; }
     var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
     if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
@@ -314,7 +314,9 @@ window.__biPermRun = function (c) {
         var id = r.cell("typeid") || r.cell("typename"); if (!id || seen[id]) return;
         if (model && (c.exact ? !(norm(r.cell("typename")) === key || norm(r.cell("typename")).replace(/[(（].*$/, "") === key) : norm(r.cell("typename")).indexOf(key) < 0)) return;
         seen[id] = 1; x.found++;
-        if (r.on()) { x.already++; x.names.push(r.cell("typename") || id); x.rows.push(flds.map(function (h) { return r.byField(h[1]); })); }
+        var vals = flds.map(function (h) { return r.byField(h[1]); }), ticked = r.on();
+        x.all.push(vals); x.on.push(ticked ? 1 : 0);
+        if (ticked) { x.already++; x.names.push(r.cell("typename") || id); x.rows.push(flds.map(function (h) { return r.byField(h[1]); })); }
       });
       R.msg = role + " · reading page " + (p + 1) + " · " + x.already + " ticked of " + x.found; paint();
       if (!(await nextPage(prodGrid))) break;
@@ -335,7 +337,7 @@ window.__biPermRun = function (c) {
         if (!(await openRoleScreen())) throw new Error("Lost the Role Permission screen. Seen: " + diag());
         log("Role " + role + " — opening its product list");
         var err = await pickRole(role);
-        if (err) { log("✗ " + role + ": " + err); targets.forEach(function (m) { S.done[role + "|" + m] = { role: role, model: m || "(all products)", found: 0, ticked: 0, already: 0, failed: 1, states: 0, note: err, names: [], cols: [], rows: [] }; }); save(); continue; }
+        if (err) { log("✗ " + role + ": " + err); targets.forEach(function (m) { S.done[role + "|" + m] = { role: role, model: m || "(all products)", found: 0, ticked: 0, already: 0, failed: 1, states: 0, note: err, names: [], cols: [], rows: [], all: [], on: [] }; }); save(); continue; }
         for (var j = 0; j < targets.length; j++) {
           chk(); var m = targets[j]; if (S.done[role + "|" + m]) continue;
           var x = await readTicked(role, m); S.done[role + "|" + m] = x; save();
