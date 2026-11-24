@@ -393,7 +393,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
     [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
     return ov;
   }
-  var VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {}, PERMS = [], OPEN = {}, Q = "";
+  var CMP = { a: "", b: "" }, VIEW = $("view"), PB = window.BIPerm && window.BIPerm.version ? window.BIPerm : null, CFG = { roles: [], lastRoles: [], lastModels: [], exact: false }, RUNS = [], JOBS = {}, PERMS = [], OPEN = {}, Q = "";
   var lines = function (v) { var seen = {}; return String(v || "").split(/[\n,;]+/).map(function (x) { return x.replace(/\s+/g, " ").trim(); }).filter(function (x) { var k = x.toLowerCase(); if (!x || seen[k]) return false; seen[k] = 1; return true; }); };
   var b64 = function (s) { return btoa(unescape(encodeURIComponent(s))); }, unb64 = function (s) { return decodeURIComponent(escape(atob(s))); };
   try { JOBS = JSON.parse(localStorage.getItem("pp-jobs") || "{}"); } catch (e) { }
@@ -491,6 +491,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       '<div class="muted" style="font-size:12.5px;margin-top:2px">What each role (company) has ticked, as read from the portal. Tap a role to see its products.</div>' +
       '<div class="srch"><input class="tx" id="pq" placeholder="Search a role or a product / model (e.g. V70)" value="' + esc(Q) + '"><button class="btn pri sm" id="px">⬇ Excel</button></div>' +
       (prodNames.length ? '<div class="help" style="background:#EEF6FF"><b>Which roles have it</b><div style="overflow:auto;max-height:260px;margin-top:6px"><table class="tb"><tr><th>Product / model</th><th>Roles that have it ticked</th></tr>' + prodNames.slice(0, 300).map(function (n) { return "<tr><td>" + esc(n) + "</td><td>" + esc(byProd[n].join(", ")) + ' <span class="pill g">' + byProd[n].length + "</span></td></tr>"; }).join("") + "</table></div></div>" : "") +
+      (PERMS.length >= 2 ? '<div class="help" style="background:#F3F0FF"><b>⚖ Compare two roles</b><div class="muted" style="font-size:12px">See which permitted products one role has and the other is missing.</div><div class="srch"><select class="tx" id="ca">' + PERMS.map(function (p) { return "<option" + (p.role === CMP.a ? " selected" : "") + ">" + esc(p.role) + "</option>"; }).join("") + '</select><select class="tx" id="cb">' + PERMS.map(function (p, i) { return "<option" + (p.role === CMP.b || (!CMP.b && i === 1) ? " selected" : "") + ">" + esc(p.role) + "</option>"; }).join("") + '</select><button class="btn pri sm" id="cgo">Compare</button></div><div id="cres"></div></div>' : "") +
       '<div style="overflow:auto;margin-top:10px"><table class="tb"><tr><th>Role / company</th><th>Ticked</th><th>Checked</th><th>Read on</th><th></th></tr>' +
       list.map(function (p) {
         var rows = p.rows.filter(function (r) { return roleHit(p) || rowHit(r); }), on = OPEN[p.role] || (q && !roleHit(p));
@@ -499,9 +500,45 @@ td.n,th.n{text-align:right;white-space:nowrap}
       }).join("") + "</table></div></div>";
     var pq = $("pq"), tmr; pq.oninput = function () { clearTimeout(tmr); tmr = setTimeout(function () { Q = pq.value.trim(); drawPerms(); var n = $("pq"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 250); };
     $("px").onclick = function () { exportPerms(PERMS, "Product_permissions_all_roles"); };
+    if ($("cgo")) { $("cgo").onclick = function () { CMP.a = $("ca").value; CMP.b = $("cb").value; compare(); }; if (CMP.a && CMP.b) compare(); }
     [].forEach.call(el.querySelectorAll("tr.pr"), function (tr) { tr.onclick = function () { var r = tr.getAttribute("data-role"); if (OPEN[r]) delete OPEN[r]; else OPEN[r] = 1; drawPerms(); }; });
     [].forEach.call(el.querySelectorAll("[data-x1]"), function (b) { b.onclick = function () { var p = PERMS.filter(function (x) { return x.role === b.getAttribute("data-x1"); }); exportPerms(p, "Product_permissions_" + p[0].role.replace(/[^\w-]+/g, "_")); }; });
     [].forEach.call(el.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { var r = b.getAttribute("data-del"); if (!confirm("Remove the saved list of “" + r + "” from the app? (Nothing changes on the portal.)")) return; api({ action: "pp-pdel", role: r }).then(function () { delete OPEN[r]; loadPerms(); }); }; });
+  }
+  // ---------- compare two roles ----------
+  function keyed(p) {   // product key = TypeId when the portal shows it, else the product name
+    var ii = (p.cols || []).findIndex(function (c) { return /type\s*id|^id$/i.test(c); }), ni = nameIdx(p), M = {};
+    p.rows.forEach(function (r) { var k = String(ii >= 0 && r[ii] ? r[ii] : r[ni] || r.join("|")).toLowerCase(); M[k] = r; });
+    return M;
+  }
+  function compare() {
+    var A = PERMS.filter(function (p) { return p.role === CMP.a; })[0], B = PERMS.filter(function (p) { return p.role === CMP.b; })[0], el = $("cres");
+    if (!A || !B) return; if (A === B) { el.innerHTML = '<div class="muted" style="margin-top:8px">Pick two different roles.</div>'; return; }
+    var MA = keyed(A), MB = keyed(B), onlyA = [], onlyB = [], both = [];
+    Object.keys(MA).forEach(function (k) { (MB[k] ? both : onlyA).push(MA[k]); }); Object.keys(MB).forEach(function (k) { if (!MA[k]) onlyB.push(MB[k]); });
+    var ni = nameIdx(A), cols = A.cols || [], sortN = function (L) { return L.sort(function (x, y) { return String(x[ni]).localeCompare(String(y[ni])); }); };
+    sortN(onlyA); sortN(onlyB); sortN(both);
+    var tbl = function (L, empty) { return L.length ? '<div class="plist" style="max-height:260px"><table class="tb"><tr><th>#</th>' + cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>" + L.map(function (r, i) { return '<tr><td class="n">' + (i + 1) + "</td>" + r.map(function (v) { return "<td>" + esc(v) + "</td>"; }).join("") + "</tr>"; }).join("") + "</table></div>" : '<div class="muted" style="font-size:12.5px;margin:4px 0 10px">' + empty + "</div>"; };
+    var old = Math.abs(A.at - B.at) > 864e5 ? '<div style="font-size:12px;color:#8A5300;margin-top:6px">⚠ The two roles were read on different days (' + fmtAt(A.at) + " / " + fmtAt(B.at) + ") — read both again for an exact comparison.</div>" : "";
+    var flt = (A.filter && A.filter.length) || (B.filter && B.filter.length) ? '<div style="font-size:12px;color:#8A5300;margin-top:4px">⚠ One of the lists was read for some models only — compare lists read with all products.</div>' : "";
+    el.innerHTML = '<div class="kp" style="grid-template-columns:repeat(3,1fr)"><div><b style="color:#B42318">' + onlyA.length + "</b><span>only in " + esc(A.role) + ' · missing in ' + esc(B.role) + '</span></div><div><b style="color:#B42318">' + onlyB.length + "</b><span>only in " + esc(B.role) + " · missing in " + esc(A.role) + '</span></div><div><b style="color:#13693F">' + both.length + "</b><span>in both</span></div></div>" + old + flt +
+      '<b style="display:block;margin-top:10px">Missing in ' + esc(B.role) + " <span class=\"muted\" style=\"font-weight:400\">(ticked in " + esc(A.role) + ")</span></b>" + tbl(onlyA, "Nothing — " + esc(B.role) + " has everything " + esc(A.role) + " has.") +
+      (onlyA.length ? '<div class="bar2" style="margin:-4px 0 8px"><button class="btn ghost sm" id="fillB">➕ Prepare to give these to ' + esc(B.role) + "</button></div>" : "") +
+      '<b style="display:block;margin-top:6px">Missing in ' + esc(A.role) + " <span class=\"muted\" style=\"font-weight:400\">(ticked in " + esc(B.role) + ")</span></b>" + tbl(onlyB, "Nothing — " + esc(A.role) + " has everything " + esc(B.role) + " has.") +
+      (onlyB.length ? '<div class="bar2" style="margin:-4px 0 8px"><button class="btn ghost sm" id="fillA">➕ Prepare to give these to ' + esc(A.role) + "</button></div>" : "") +
+      '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700;font-size:13px">In both roles (' + both.length + ")</summary>" + tbl(both, "No product in common.") + "</details>" +
+      '<div class="bar2"><button class="btn pri sm" id="cx">⬇ Excel — comparison</button></div>';
+    var fill = function (role, L) { $("ro").value = role; $("mo").value = L.map(function (r) { return r[ni]; }).filter(Boolean).filter(function (v, i, a) { return a.indexOf(v) === i; }).join("\n"); $("ex").checked = true; $("ro").oninput(); window.scrollTo(0, 0); toast("Filled: " + role + " + " + L.length + " exact model name(s). Tap Check only first, then Set permissions."); };
+    if ($("fillB")) $("fillB").onclick = function () { fill(B.role, onlyA); };
+    if ($("fillA")) $("fillA").onclick = function () { fill(A.role, onlyB); };
+    $("cx").onclick = function () {
+      var head = ["Product key"].concat(cols), row = function (r) { return [""].concat(r); };
+      var sh = function (L) { return [cols.slice()].concat(L.map(function (r) { return r.slice(); })); };
+      download(xlsx([
+        { name: "Summary", rows: [["Compare", A.role + " vs " + B.role], ["Only in " + A.role + " (missing in " + B.role + ")", onlyA.length], ["Only in " + B.role + " (missing in " + A.role + ")", onlyB.length], ["In both", both.length], [A.role + " read on", fmtAt(A.at)], [B.role + " read on", fmtAt(B.at)]] },
+        { name: ("Missing in " + B.role).slice(0, 31), rows: sh(onlyA) }, { name: ("Missing in " + A.role).slice(0, 31), rows: sh(onlyB) }, { name: "In both", rows: sh(both) }
+      ]), "Compare_" + (A.role + "_vs_" + B.role).replace(/[^\w-]+/g, "_") + ".xlsx");
+    };
   }
   function exportPerms(L, name) {
     var cols = []; L.forEach(function (p) { (p.cols || []).forEach(function (c) { if (cols.indexOf(c) < 0) cols.push(c); }); });
