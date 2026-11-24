@@ -48,7 +48,7 @@
       '<b style="display:block;margin-top:14px">2 · Models</b><div class="muted" style="font-size:12.5px">One per line — what you would type in the portal\'s TypeName search (e.g. V70).</div><textarea class="tx" id="mo" rows="4" style="margin-top:6px" placeholder="V70&#10;Y500&#10;T5 Pro">' + esc((CFG.lastModels || []).join("\n")) + '</textarea>' +
       '<label class="tg" style="margin-top:10px;font-size:13px"><input type="checkbox" id="ex"' + (CFG.exact ? " checked" : "") + '><i></i><span>Exact model only — “V70” will not include V70 Elite, V70 FE …</span></label><div class="muted" style="font-size:12px;margin-top:4px" id="exh"></div>' +
       '<div class="bar2"><button class="btn sec" id="dry" style="flex:1">🔍 Check only</button><button class="btn pri" id="go" style="flex:1">✅ Set permissions</button></div><div class="muted" style="font-size:12px;margin-top:6px" id="cnt"></div>' +
-      '<div style="border-top:1px dashed #DADDF0;margin-top:14px;padding-top:12px"><b>📋 See what is already permitted</b><div class="muted" style="font-size:12.5px;margin-top:2px">Only the role(s) in the list above are read: for each one the app opens its product list on the portal, goes through every page and lists the products / models already ticked — it never clicks a tick box. Models are optional here: leave them empty to read every product of that role.</div>' +
+      '<div style="border-top:1px dashed #DADDF0;margin-top:14px;padding-top:12px"><b>📋 See what is already permitted</b><div class="muted" style="font-size:12.5px;margin-top:2px">Only the role(s) in the list above are read: for each one the app opens its product list on the portal, goes through every page and lists the products / models already ticked — it never clicks a tick box. No model needs to be entered — the models box is ignored here.</div>' +
       '<div class="bar2"><button class="btn sec" id="rd" style="flex:1">📋 Read current permissions</button></div></div></div>' + where +
       '<div class="help">🔒 It only <b>adds</b> ticks — a box that is already ticked is never touched, so nothing is removed. For every product it ticks <b>all</b> states. The captcha is always typed by you.</div>' +
       (PB ? "" : '<div class="bar2"><button class="btn ghost" id="paste" style="flex:1">📋 Paste result</button></div>') + '<div id="res"></div><div id="perms"></div>' +
@@ -70,10 +70,10 @@
   function start(dry, read) {
     var roles = lines($("ro").value), models = lines($("mo").value), exact = $("ex").checked;
     if (read && !roles.length) return toast("Pick the partner role(s) to read");
-    else if (!roles.length || !models.length) return toast("Add at least one role and one model");
+    else if (!read && (!roles.length || !models.length)) return toast("Add at least one role and one model");
     if (roles.length > 80 || models.length > 200) return toast("Too many — up to 80 roles and 200 models in one run");
     var job = { id: (read ? "R" : "P") + Date.now().toString(36).toUpperCase(), roles: roles, models: models, exact: exact, dry: !!dry };
-    if (read) job.read = true;
+    if (read) { job.read = true; job.models = []; models = []; }   // read: every ticked model of the role — the models box is not used
     var run = function () {
       api({ action: "pp-draft", roles: roles, models: models, exact: exact }); keepJob(job);
       if (PB) { var r = PB.run(JSON.stringify(job), ""); if (r !== "ok") toast(r === "busy" ? "Another portal run is still open" : r === "blocked" ? "Open this tool from the Admin app's Tools page" : "Couldn't start the run"); return; }
