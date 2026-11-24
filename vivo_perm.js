@@ -98,6 +98,7 @@ window.__biPermRun = function (c) {
   function typeIn(el, v) {
     setv(el, v);
     var w = el.ownerDocument.defaultView || W, $j = w.jQuery || w.$, span = el.closest && el.closest("span.textbox,span.searchbox,span.combo"), tgt = span && span.previousElementSibling;
+    if (tgt && tgt.tagName === "INPUT") try { tgt.value = v; } catch (e) { }
     if ($j && tgt) {
       var d = $j(tgt);
       ["searchbox", "combobox", "combo", "numberbox", "textbox"].some(function (k) { if (!d.data(k)) return false; try { d[k]("setValue", v); if (d[k]("getText") !== v) try { d[k]("setText", v); } catch (e) { } return true; } catch (e) { return false; } });
@@ -109,19 +110,40 @@ window.__biPermRun = function (c) {
     var $j = w.jQuery || w.$; if ($j) try { var ev = $j.Event("keydown"); ev.keyCode = ev.which = 13; $j(el).trigger(ev); } catch (e) { }
   }
   // search the product list for one model and wait until the list shows only that model (the portal filters it — no paging through everything)
+  function boxCandidates(d) {   // the TypeName search box — tried in this order until the list really filters
+    var ok = function (e) { return e && vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && !e.closest(".datagrid-view,.datagrid-pager,.pagination,.window,.combo-panel"); }, out = [];
+    var add = function (e) { if (ok(e) && out.indexOf(e) < 0) out.push(e); };
+    // 1) a box whose own id / name / placeholder says TypeName (EasyUI keeps the name on a hidden twin next to the visible box)
+    [].forEach.call(d.querySelectorAll("input"), function (e) {
+      var tag = [e.id, e.name, e.placeholder, e.getAttribute("textboxname"), e.getAttribute("comboname")].join(" ");
+      if (/type_?name|typename|type\s*name/i.test(tag)) { if (/hidden/i.test(e.type) || !vis(e)) { var sp = e.nextElementSibling && /textbox|combo|searchbox/.test(e.nextElementSibling.className) ? e.nextElementSibling : e.parentNode; add(sp && sp.querySelector("input.textbox-text,input:not([type=hidden])")); } else add(e); }
+    });
+    // 2) the first box after a “TypeName:” label that is not a column heading of the list
+    var labs = []; [].forEach.call(d.querySelectorAll("span,label,td,div,b,font"), function (e) { var t = txt(e); if (t.length < 16 && /^type\s*name\s*[:：]?$/i.test(t) && vis(e) && !e.closest(".datagrid-header,.datagrid-view,.window") && ![].some.call(e.children, function (k) { return /^type\s*name/i.test(txt(k)); })) labs.push(e); });
+    labs.forEach(function (lab) { add([].filter.call(d.querySelectorAll("input"), function (e) { return ok(e) && (lab.compareDocumentPosition(e) & 4); })[0]); });
+    // 3) any other text box on the product screen's tool bar
+    [].forEach.call(d.querySelectorAll("input"), add);
+    return out.slice(0, 4);
+  }
+  // search the product list for one model and wait until the list shows only that model (the portal filters it — no paging through everything)
   async function searchModel(g, model) {
-    var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
-    if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
-    if (!inp) return { err: "Search box “TypeName” not found" };
-    var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp);
-    if (!sb) { var seen = {}; [].forEach.call(g.d.querySelectorAll("a,button,input[type=button]"), function (e) { var t = txt(e); if (t && t.length < 20 && vis(e)) seen[t] = 1; }); return { err: "Search button not found. Buttons seen: " + Object.keys(seen).slice(0, 25).join(" | ") }; }
-    var key = norm(model), filtered = function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); return !rr.length || rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); };
-    for (var tries = 0; tries < 3; tries++) {
-      typeIn(inp, model); await sleep(150);
-      if (tries === 1) pressEnter(inp); else tap(sb);
-      await settle(); await sleep(250);
-      if (await until(filtered, tries ? 4000 : 6000, 150)) return { ok: true };
+    var cands = boxCandidates(g.d);
+    if (!cands.length) return { err: "Search box “TypeName” not found" };
+    var key = norm(model), before = (function () { var q = prodGrid(), p = q && q.pager(); return (q ? q.rows().length : 0) + "|" + (p ? txt(p) : ""); })();
+    var filtered = function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); if (!rr.length) return true; return rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); };
+    for (var ci = 0; ci < cands.length; ci++) {
+      var inp = cands[ci], sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp);
+      if (!sb) continue;
+      for (var tries = 0; tries < 2; tries++) {
+        typeIn(inp, model); await sleep(150);
+        if (tries === 1) pressEnter(inp); else tap(sb);
+        await settle(); await sleep(250);
+        if (await until(filtered, tries ? 5000 : 12000, 150)) { if (ci || tries) log("   (search worked with box #" + (ci + 1) + (tries ? " + Enter" : "") + ")"); return { ok: true }; }
+      }
+      log("   ✗ box #" + (ci + 1) + " [" + [inp.id, inp.name, inp.className].filter(Boolean).join(" ").slice(0, 60) + "] value “" + inp.value + "” → list did not filter");
     }
+    var bt = []; [].forEach.call(g.d.querySelectorAll("a,button,input[type=button]"), function (e) { var t = txt(e); if (t && t.length < 20 && vis(e) && bt.indexOf(t) < 0) bt.push(t); });
+    log("   buttons on screen: " + bt.slice(0, 20).join(" | ") + " · list before: " + before);
     return { ok: false };
   }
   async function morePages(get) { var g = get(), p = g && g.pager(), n = p && p.querySelector(".pagination-next"); if (!n) return false; var a = n.closest("a,.l-btn") || n; return !(/l-btn-disabled/.test(a.className) || a.disabled); }
@@ -292,16 +314,9 @@ window.__biPermRun = function (c) {
   async function readTicked(role, model) {
     var x = { role: role, model: model || "(all products)", found: 0, ticked: 0, already: 0, failed: 0, states: 0, note: "", names: [], cols: [], rows: [], all: [], on: [] }, g = prodGrid();
     if (!g) { x.note = "Product list is not on the screen"; x.failed = 1; return x; }
-    var lab = find(/^type\s*name\s*[:：]?$/i, g.d), inp = null;
-    if (lab) inp = [].filter.call(g.d.querySelectorAll("input"), function (e) { return vis(e) && !/^(checkbox|radio|button|submit|hidden|file)$/i.test(e.type || "") && (lab.compareDocumentPosition(e) & 4) && !e.closest(".datagrid-view,.window"); })[0];
-    if (inp) {
-      typeIn(inp, model || ""); await sleep(200);
-      var sb = nearBtn(/^(search|query|查询|搜索)$/i, g.d, inp);
-      if (sb) { tap(sb); await settle(); await sleep(400); }
-      else if (model) { x.note = "Search button not found"; x.failed = 1; return x; }
-    } else if (model) { x.note = "Search box “TypeName” not found"; x.failed = 1; return x; }
     var key = norm(model || "");
-    if (model) await until(function () { var q = prodGrid(); if (!q) return false; var rr = q.rows(); return !rr.length || rr.every(function (r) { return norm(r.cell("typename")).indexOf(key) >= 0; }); }, 9000);
+    if (model) { var sr = await searchModel(g, model); if (sr.err) { x.note = sr.err; x.failed = 1; return x; } }
+    else { var cb0 = boxCandidates(g.d)[0]; if (cb0 && cb0.value) { typeIn(cb0, ""); var sb0 = nearBtn(/^(search|query|查询|搜索)$/i, g.d, cb0); if (sb0) { tap(sb0); await settle(); await sleep(400); } } }
     await biggestPage(prodGrid); await firstPage(prodGrid);
     g = prodGrid(); if (!g) { x.note = "Product list closed unexpectedly"; x.failed = 1; return x; }
     var flds = g.HL.filter(function (h) { return h[0] && !/^(ck|checkbox)$/i.test(h[1]); }).slice(0, 10);
