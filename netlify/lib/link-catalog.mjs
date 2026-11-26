@@ -1551,6 +1551,12 @@ export const LINK_CATALOG = {
 "man-shots-get",
 "man-shots-save",
 "man-tts",
+"man-vid-del",
+"man-vid-get",
+"man-vid-list",
+"man-vid-save",
+"man-vid-script",
+"man-vid-see",
 "man-voice"
 ],
 "tabs": []

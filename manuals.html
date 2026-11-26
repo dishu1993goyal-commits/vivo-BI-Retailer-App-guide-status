@@ -418,12 +418,295 @@ td.n,th.n{text-align:right;white-space:nowrap}
     var f = it.file + (it.hash ? "#" + it.hash : ""), base = it.id.replace(/^tool:|^tab:|^adm:/, "");
     return G.find(function (g) { return g[0] === base; }) || G.find(function (g) { return g[9] && String(g[9]).replace(/^t:/, "") === f; }) || G.find(function (g) { return g[9] && String(g[9]).replace(/^t:/, "").split("#")[0] === it.file && it.file !== "index.html"; }) || null;
   }
+  // ================= 🎬 manual from a demo video / screen recording =================
+  // The recording stays on this device: key frames are read by AI, the script is edited here and saved (with small thumbnails),
+  // and the voiced video / PPT / PDF are made in the browser.
+  var VS = null, VS_TONE = "friendly trainer", VS_CAP = true, VS_SHORT = false;
+  function vidCard() {
+    return '<div class="card" style="border:2px dashed #C9CEF5"><div class="step"><span class="n">🎬</span><div style="flex:1"><b>Start from a demo video or screen recording</b><div class="muted" style="font-size:12px">Import a recording you already have. AI watches it and writes a step-by-step script you can edit (or paste your own), then makes a video with AI voice-over, a PowerPoint and a PDF.</div>' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="vsopen">🎬 Import video</button><button class="btn ghost sm" id="vslist">📂 Saved video scripts</button></div></div></div></div>';
+  }
+  function vsWire() { if ($("vsopen")) $("vsopen").onclick = function () { VS = { frames: [], script: null, lang: LANG, aud: AUD }; vsPick(); }; if ($("vslist")) $("vslist").onclick = vsList; }
+  var vfmt = function (t) { t = Math.max(0, Math.round(t || 0)); return Math.floor(t / 60) + ":" + ("0" + (t % 60)).slice(-2); };
+  function vsPick(keepFrames) {
+    var i = document.createElement("input"); i.type = "file"; i.accept = "video/*";
+    i.onchange = function () {
+      var f = i.files && i.files[0]; if (!f) return; if (f.size > 1.5e9) return toast("That video is too large (max 1.5 GB)");
+      if (VS.url) { try { URL.revokeObjectURL(VS.url); } catch (e) { } }
+      VS.file = f; VS.url = URL.createObjectURL(f);
+      if (keepFrames && VS.frames.length) { VS.name = VS.name || f.name; vsView(); toast("Video attached — you can make the voiced video now"); return; }
+      vsView(); vsBusy(true, "Opening the video…");
+      lib2("/vidframes.js?v=1", function () { return window.VidFrames; }).then(function () {
+        return VidFrames.pick(f, { max: 18, onProgress: function (p, m) { vsBusy(true, m, p); } });
+      }).then(function (r) { VS.name = r.name; VS.dur = r.dur; VS.w = r.w; VS.h = r.h; VS.frames = r.frames; VS.script = null; VS.id = ""; vsBusy(false); vsView(); toast(r.frames.length + " key frames found — remove any you don't need, then let AI write the script"); })
+        .catch(function (e) { vsBusy(false, ""); toast(e.message || "Couldn't read the video"); vsView(); });
+    };
+    i.click();
+  }
+  function lib2(src, test) { return test() ? Promise.resolve() : new Promise(function (res) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); }); }
+  function vsBusy(on, msg, p) { var b = $("vsp"); if (!b) return; b.style.display = on ? "" : "none"; if (p != null) b.firstChild.style.width = Math.round(p * 100) + "%"; $("vss").textContent = msg || ""; [].forEach.call(VIEW.querySelectorAll("[data-vb]"), function (x) { x.disabled = !!on; }); }
+  function vsList() {
+    api({ action: "man-vid-list" }).then(function (r) {
+      if (!r.ok) return toast(r.error); if (!r.rows.length) return toast("No saved video scripts yet");
+      var ov = sheet("📂 Saved video scripts", "Open one to edit the script or export again (choose the video file again to make the voiced video).", [], r.rows.map(function (x) { return '<div class="row" style="gap:10px;align-items:center;border-top:1px solid #EEF0F6;padding:8px 0;cursor:pointer" data-vo="' + esc(x.id) + '">' + (x.thumb ? '<img src="' + x.thumb + '" style="width:54px;height:54px;object-fit:cover;border-radius:8px">' : "") + '<div style="flex:1"><b style="font-size:13.5px">' + esc(x.title || x.name) + '</b><div class="muted" style="font-size:12px">' + x.steps + " steps · " + vfmt(x.dur) + " · " + esc(x.lang) + " · " + esc(x.by || "") + '</div></div><button class="btn ghost sm" data-vd="' + esc(x.id) + '">🗑</button></div>'; }).join(""));
+      [].forEach.call(ov.querySelectorAll("[data-vo]"), function (row) { row.onclick = function (e) {
+        if (e.target.closest("[data-vd]")) { if (!confirm("Delete this saved script?")) return; api({ action: "man-vid-del", id: e.target.closest("[data-vd]").dataset.vd }).then(function () { row.remove(); }); return; }
+        api({ action: "man-vid-get", id: row.dataset.vo }).then(function (g) { if (!g.ok) return toast(g.error); var x = g.item; ov.remove(); VS = { id: x.id, name: x.name, dur: x.dur, w: x.w, h: x.h, lang: x.lang, aud: x.aud, frames: x.frames.map(function (f) { return { t: f.t, thumb: f.thumb, src: "" }; }), script: x.script }; VS_TONE = x.tone || VS_TONE; vsView(); });
+      }; });
+    });
+  }
+  function vsSteps() { return VS.script ? VS.script.steps.filter(function (s) { return !s.skip && VS.frames[s.f]; }) : []; }
+  function vsView() {
+    if (!VS) return draw();
+    var S = VS.script, F = VS.frames;
+    VIEW.innerHTML = '<div class="row" style="gap:8px;margin-bottom:8px"><button class="btn ghost sm" id="vsback">← Tool manuals</button><b style="flex:1;align-self:center">🎬 ' + esc((S && S.title) || VS.name || "Demo video") + "</b></div>" +
+      '<div class="card"><div class="step"><span class="n">1</span><div style="flex:1"><b>The recording</b><div class="muted" style="font-size:12px">' + (VS.name ? esc(VS.name) + " · " + vfmt(VS.dur) + " · " + F.length + " key frames" + (VS.url ? "" : " · ⚠️ video file not attached (choose it again to make the voiced video)") : "") + '</div>' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="vsre" data-vb>📂 ' + (VS.url ? "Choose another video" : F.length ? "Attach the video file" : "Choose video") + '</button></div><div class="prog" id="vsp" style="display:none"><i></i></div><div class="muted" id="vss" style="font-size:12px;margin-top:4px"></div>' +
+      '<div class="shots" style="margin-top:8px">' + F.map(function (f, i) { return '<div class="shot"><img src="' + (f.thumb || f.src) + '" alt=""><button data-vrm="' + i + '" title="Remove">✕</button><div>' + (i + 1) + " · " + vfmt(f.t) + "</div></div>"; }).join("") + "</div></div></div></div>" +
+      '<div class="card"><div class="step"><span class="n">2</span><div style="flex:1"><b>Script — AI writes it, you edit it</b><div class="g2"><div><label class="lb">Language</label><select class="tx" id="vsl">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === VS.lang ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Style</label><select class="tx" id="vst2">' + [["friendly trainer", "Friendly trainer"], ["formal corporate", "Formal corporate"], ["energetic and motivating", "Energetic & motivating"], ["simple, for retailers", "Simple, for retailers"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === VS_TONE ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="lb">What is this video about? (optional, helps the AI)</label><input class="tx" id="vsn" placeholder="e.g. vivo Retailer App — how a retailer checks scheme payouts" value="' + esc(VS.note || "") + '">' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="vsai" data-vb' + (F.some(function (f) { return f.src; }) ? "" : " disabled") + ">✨ " + (S ? "Rewrite with AI" : "AI watches & writes the script") + '</button><button class="btn sec sm" id="vspaste" data-vb>📋 Paste my own script</button>' + (S ? '<button class="btn ghost sm" id="vssave" data-vb>💾 Save</button><button class="btn ghost sm" id="vstxt">⬇ Script .txt</button><button class="btn ghost sm" id="vssrt">⬇ Subtitles .srt</button>' : "") + "</div>" +
+      (S ? '<label class="lb">Video title</label><input class="tx" data-vk="title" value="' + esc(S.title || "") + '"><label class="lb">🎬 Opening line</label><textarea class="tx" rows="2" data-vk="intro">' + esc(S.intro || "") + "</textarea>" +
+        S.steps.map(function (s, j) { var f = F[s.f] || {}; return '<div style="display:flex;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #EEF0F6;' + (s.skip ? "opacity:.45" : "") + '"><img src="' + (f.thumb || f.src || "") + '" style="width:64px;max-height:120px;object-fit:cover;object-position:top;border-radius:8px;flex:none;background:#111"><div style="flex:1;min-width:0"><div class="row" style="gap:6px;align-items:center"><b style="font-size:12px;color:var(--mut)">' + vfmt(f.t) + '</b><input class="tx" data-vs="' + j + '" data-vf="title" value="' + esc(s.title) + '" style="flex:1;margin:0;padding:6px 8px"><label style="font-size:11.5px;display:flex;gap:3px;align-items:center;white-space:nowrap"><input type="checkbox" data-vs="' + j + '" data-vf="skip"' + (s.skip ? " checked" : "") + "> skip</label></div>" +
+          '<textarea class="tx" rows="3" data-vs="' + j + '" data-vf="text" style="margin-top:4px">' + esc(s.text) + "</textarea></div></div>"; }).join("") +
+        '<label class="lb">👋 Closing line</label><textarea class="tx" rows="2" data-vk="outro">' + esc(S.outro || "") + "</textarea>" : '<div class="muted" style="font-size:12px;margin-top:8px">No script yet. ✨ AI writes one step per key frame, in the chosen language — or paste yours.</div>') + "</div></div></div>" +
+      (S ? '<div class="card"><div class="step"><span class="n">3</span><div style="flex:1"><b>Export</b><div class="exp"><button data-vx="vid" data-vb>🎬 Video + AI voice<small>The recording, step titles, captions and the spoken script (MP4)</small></button><button data-vx="pptx" data-vb>📊 PowerPoint<small>One slide per step, script in the notes</small></button><button data-vx="pdf" data-vb>📄 PDF guide<small>Same slides as a PDF</small></button>' + (SEL ? '<button data-vx="man" data-vb>📘 Full tool manual<small>Use these frames as the screens of “' + esc(SEL.name) + '”</small></button>' : "") + "</div>" +
+        '<div class="row" style="gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12.5px;font-weight:700">🎙️ Voice</span><select class="tx" id="vsv" style="max-width:200px"><option value="f"' + (VOICE === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (VOICE === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (VOICE === "off" ? " selected" : "") + '>No voice</option></select><button class="btn ghost sm" id="vsvset" type="button">⚙️ Voice settings</button></div>' +
+        '<div class="row" style="gap:14px;margin-top:6px;flex-wrap:wrap;font-size:12.5px"><label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="vscap"' + (VS_CAP ? " checked" : "") + '> Show captions</label><label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="vssh"' + (VS_SHORT ? " checked" : "") + "> Shorten long pauses in the recording</label></div></div></div></div>" : "");
+    var sync = function () { VS.note = $("vsn").value; VS.lang = $("vsl").value; VS_TONE = $("vst2").value; if (!VS.script) return; [].forEach.call(VIEW.querySelectorAll("[data-vk]"), function (e) { VS.script[e.dataset.vk] = e.value; }); [].forEach.call(VIEW.querySelectorAll("[data-vs]"), function (e) { var s = VS.script.steps[+e.dataset.vs]; if (e.dataset.vf === "skip") s.skip = e.checked; else s[e.dataset.vf] = e.value; }); VS.note = $("vsn").value; VS.lang = $("vsl").value; VS_TONE = $("vst2").value; };
+    VS.sync = sync;
+    $("vsback").onclick = function () { sync(); draw(); };
+    $("vsre").onclick = function () { sync(); vsPick(F.length && !VS.url); };
+    [].forEach.call(VIEW.querySelectorAll("[data-vrm]"), function (b) { b.onclick = function () { sync(); var k = +b.dataset.vrm; VS.frames.splice(k, 1); if (VS.script) { VS.script.steps = VS.script.steps.filter(function (s) { return s.f !== k; }).map(function (s) { if (s.f > k) s.f--; return s; }); } vsView(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-vs][data-vf=skip]"), function (c) { c.onchange = function () { sync(); vsView(); }; });
+    $("vsai").onclick = function () { sync(); vsAI(); };
+    $("vspaste").onclick = function () { sync(); vsPaste(); };
+    if ($("vssave")) $("vssave").onclick = function () { sync(); vsSave(true); };
+    if ($("vstxt")) $("vstxt").onclick = function () { sync(); download(new Blob([vsText()], { type: "text/plain" }), vsName("txt")); };
+    if ($("vssrt")) $("vssrt").onclick = function () { sync(); download(new Blob([vsSrt()], { type: "text/plain" }), vsName("srt")); };
+    if ($("vsv")) { $("vsv").onchange = function () { VOICE = this.value; }; $("vscap").onchange = function () { VS_CAP = this.checked; }; $("vssh").onchange = function () { VS_SHORT = this.checked; }; $("vsvset").onclick = function () { voiceSettings(); }; }
+    [].forEach.call(VIEW.querySelectorAll("[data-vx]"), function (b) { b.onclick = function () { sync(); var x = b.dataset.vx; if (x === "vid") vsVideo(); else if (x === "pptx") vsPptx(); else if (x === "pdf") vsPdf(); else vsToManual(); }; });
+  }
+  var vsName = function (ext) { return ("Demo_" + String((VS.script && VS.script.title) || VS.name || "video").replace(/\.[a-z0-9]+$/i, "").replace(/\W+/g, "_").slice(0, 40) + "_" + VS.lang + "." + ext); };
+  function vsAI() {
+    var F = VS.frames.filter(function (f) { return f.src; }); if (!F.length) return toast("Choose the video again — AI needs the full-size frames");
+    var seen = [], n = 0;
+    var batch = function (tries) {
+      if (n >= F.length) return Promise.resolve();
+      var part = F.slice(n, n + 3); vsBusy(true, "🤖 AI is watching frames " + (n + 1) + "–" + (n + part.length) + " of " + F.length + "…", 0.05 + 0.75 * n / F.length);
+      return api({ action: "man-vid-see", frames: part.map(function (f) { return f.src; }), offset: n, times: part.map(function (f) { return f.t; }), about: VS.note || "" }).then(function (r) {
+        if (!r.ok) { if (tries < 1) return batch(tries + 1); throw new Error(r.error); }
+        part.forEach(function (f, k) { seen.push(Object.assign({ t: f.t }, r.frames[k] || { screen: "Frame " + (n + k + 1) })); }); n += part.length; return batch(0);
+      });
+    };
+    batch(0).then(function () { vsBusy(true, "✍️ Writing the step-by-step script…", 0.85); return api({ action: "man-vid-script", seen: seen, lang: VS.lang, aud: AUD, tone: VS_TONE, name: VS.name, about: VS.note || "", note: VS.note || "" }); })
+      .then(function (r) { if (!r.ok) throw new Error(r.error); VS.script = r.script; vsBusy(false); vsView(); vsSave(false); toast("✅ Script ready — " + vsSteps().length + " steps. Edit anything, then export."); })
+      .catch(function (e) { vsBusy(false); toast(e.message || "AI couldn't write the script"); });
+  }
+  function vsPaste() {
+    var ov = sheet("📋 Paste your own script", "One paragraph per step, in order (blank line between). You can also start lines with Intro:, Step 3: or Outro:. Steps match the key frames in order.", [["✓", "Use this script", function (o) {
+      var raw = o.querySelector("#vsraw").value.trim(); if (!raw) { toast("Paste the script first"); return false; }
+      var S = VS.script || { title: VS.name || "Demo", intro: "", outro: "", steps: VS.frames.map(function (f, i) { return { f: i, title: "Step " + (i + 1), text: "", skip: false }; }) };
+      var paras = raw.split(/\n\s*\n|\n(?=\s*(?:step\s*\d+|intro|outro|closing|opening)\s*[:.\-–])/i).map(function (p) { return p.trim(); }).filter(Boolean), act = S.steps.filter(function (s) { return !s.skip; }), k = 0;
+      paras.forEach(function (p) {
+        var m = /^\s*(intro|opening|outro|closing|step\s*(\d+))\s*[:.\-–]\s*/i.exec(p), body = m ? p.slice(m[0].length) : p;
+        if (m && /^(intro|opening)/i.test(m[1])) S.intro = body; else if (m && /^(outro|closing)/i.test(m[1])) S.outro = body;
+        else if (m && m[2]) { var st = act[+m[2] - 1]; if (st) st.text = body; }
+        else if (act[k]) act[k++].text = body; else S.outro = (S.outro ? S.outro + " " : "") + body;
+      });
+      VS.script = S; vsView(); toast("Script placed on " + Math.min(paras.length, act.length) + " steps — check and edit"); }, "pri"]],
+      '<textarea class="tx" id="vsraw" rows="12" placeholder="Intro: In this video you will learn…\n\nOpen the app and tap Schemes…\n\nNow tap the November booster…\n\nOutro: That\'s it!"></textarea>');
+    setTimeout(function () { var t = ov.querySelector("#vsraw"); if (t) t.focus(); }, 50);
+  }
+  function vsSave(say) {
+    if (!VS.script) return;
+    var small = function (src) { return new Promise(function (res) { if (!src) return res(""); var im = new Image(); im.onload = function () { var k = Math.min(1, 260 / im.width), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", 0.55)); }; im.onerror = function () { res(""); }; im.src = src; }); };
+    Promise.all(VS.frames.map(function (f) { return small(f.thumb || f.src); })).then(function (th) {
+      return api({ action: "man-vid-save", id: VS.id || "", name: VS.name, lang: VS.lang, aud: AUD, tone: VS_TONE, dur: VS.dur, w: VS.w, h: VS.h, frames: VS.frames.map(function (f, i) { return { t: f.t, thumb: th[i] }; }), script: VS.script });
+    }).then(function (r) { if (r.ok) { VS.id = r.id; if (say) toast("💾 Saved — open it later from 📂 Saved video scripts"); } else if (say) toast(r.error); });
+  }
+  function vsText() { var S = VS.script; return (S.title || "") + "\n\n" + (S.intro ? "Intro: " + S.intro + "\n\n" : "") + vsSteps().map(function (s, i) { return "Step " + (i + 1) + " — " + s.title + " (" + vfmt(VS.frames[s.f].t) + ")\n" + s.text; }).join("\n\n") + (S.outro ? "\n\nOutro: " + S.outro : "") + "\n"; }
+  function vsSrt() { var T = vsTimeline(null), ts = function (ms) { var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, x = Math.floor(ms % 1000); return [h, m, s].map(function (v) { return ("0" + v).slice(-2); }).join(":") + "," + ("00" + x).slice(-3); }; return T.sc.filter(function (q) { return q.text; }).map(function (q, i) { return (i + 1) + "\n" + ts(q.start + 150) + " --> " + ts(q.start + q.dur - 200) + "\n" + q.text + "\n"; }).join("\n"); }
+  // scenes on the output timeline. voice: { id → seconds } (null = estimate from words)
+  function vsTimeline(voice) {
+    var S = VS.script, act = vsSteps(), sc = [], at = 0, est = function (t) { return Math.max(1.2, String(t || "").split(/\s+/).filter(Boolean).length / 2.4); };
+    var vd = function (id, t) { return voice ? (voice[id] || 0) : est(t); };
+    var add = function (q) { q.start = at; at += q.dur; sc.push(q); };
+    add({ k: "intro", id: "intro", text: S.intro || "", dur: Math.max(3200, (vd("intro", S.intro) + 0.8) * 1000) });
+    act.forEach(function (s, i) { var t0 = VS.frames[s.f].t, nx = act[i + 1] ? VS.frames[act[i + 1].f].t : VS.dur || t0 + 4, seg = Math.max(0.6, nx - t0) * 1000, v = vd("s" + i, s.text) * 1000;
+      if (VS_SHORT) seg = Math.min(seg, Math.max(4000, v + 1500));
+      add({ k: "step", id: "s" + i, n: i + 1, of: act.length, s: s, f: s.f, vs: Math.max(0, t0 - 0.3), seg: seg, text: s.text || "", title: s.title || "", dur: Math.max(seg, v + 700, 2500) }); });
+    add({ k: "outro", id: "outro", text: S.outro || "", dur: Math.max(3000, (vd("outro", S.outro) + 0.8) * 1000) });
+    return { sc: sc, total: at };
+  }
+  // ---- drawing one 1280×720 picture (used by the video, the PDF and the PPT) ----
+  function vsWrap(g, text, maxW) { var w = String(text || "").split(/\s+/), L = [], cur = ""; w.forEach(function (x) { var t = cur ? cur + " " + x : x; if (g.measureText(t).width > maxW && cur) { L.push(cur); cur = x; } else cur = t; }); if (cur) L.push(cur); return L; }
+  function vsRR(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function vsDraw(g, q, img, el, total, opt) {
+    opt = opt || {}; var W = 1280, H = 720, port = (VS.h || 16) > (VS.w || 9) * 1.1, f = q.dur ? Math.min(1, el / q.dur) : 0;
+    var bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#151A4A"); bg.addColorStop(1, "#3A2A8C"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.textBaseline = "top";
+    if (q.k === "intro" || q.k === "outro") {
+      var S = VS.script, intro = q.k === "intro";
+      if (img) { var ih = 560, iw = Math.min(520, ih * img.width / img.height); ih = iw * img.height / img.width; if (ih > 600) { ih = 600; iw = ih * img.width / img.height; } g.save(); g.globalAlpha = 0.95; vsRR(g, W - iw - 70, (H - ih) / 2, iw, ih, 22); g.clip(); g.drawImage(img, W - iw - 70, (H - ih) / 2, iw, ih); g.restore(); }
+      g.fillStyle = "#9DF0FF"; g.font = "800 22px " + CSSF; g.fillText(intro ? "STEP-BY-STEP GUIDE" : "✅ ALL DONE", 80, 150);
+      g.fillStyle = "#fff"; g.font = "800 54px " + CSSF; var tl = vsWrap(g, intro ? S.title || VS.name : "That's it!", img ? 620 : 1100).slice(0, 3); tl.forEach(function (l, i) { g.fillText(l, 80, 196 + i * 64); });
+      g.fillStyle = "#DDE3FF"; g.font = "28px " + CSSF; var y0 = 220 + tl.length * 64; vsWrap(g, q.text || (intro ? vsSteps().length + " steps" : ""), img ? 600 : 1100).slice(0, 6).forEach(function (l, i) { g.fillText(l, 80, y0 + i * 40); });
+    } else {
+      var vw, vh, vx, vy;
+      if (port) { vh = 640; vw = vh * (VS.w || 9) / (VS.h || 16); vx = 90; vy = 40; g.fillStyle = "#0B0D1E"; vsRR(g, vx - 12, vy - 12, vw + 24, vh + 24, 40); g.fill(); }
+      else { vw = W - 80; vh = vw * (VS.h || 9) / (VS.w || 16); var maxH = VS_CAP || opt.still ? 520 : 640; if (vh > maxH) { vh = maxH; vw = vh * (VS.w || 16) / (VS.h || 9); } vx = (W - vw) / 2; vy = 70; }
+      if (img) { g.save(); vsRR(g, vx, vy, vw, vh, port ? 30 : 14); g.clip(); g.fillStyle = "#000"; g.fillRect(vx, vy, vw, vh); var IW = img.videoWidth || img.width, IH = img.videoHeight || img.height, k = Math.min(vw / IW, vh / IH), dw = IW * k, dh = IH * k; g.drawImage(img, vx + (vw - dw) / 2, vy + (vh - dh) / 2, dw, dh); g.restore(); }
+      // step chip + title
+      var chip = "STEP " + q.n + " / " + q.of, tx = port ? vx + vw + 60 : 40, ty = port ? 70 : 18;
+      g.font = "800 18px " + CSSF; var cw = g.measureText(chip).width + 28; g.fillStyle = "#6C5CFF"; vsRR(g, tx, ty, cw, 34, 17); g.fill(); g.fillStyle = "#fff"; g.fillText(chip, tx + 14, ty + 8);
+      if (port) {
+        g.font = "800 42px " + CSSF; var tw = W - tx - 60, tl2 = vsWrap(g, q.title, tw).slice(0, 3); tl2.forEach(function (l, i) { g.fillText(l, tx, ty + 56 + i * 52); });
+        if (VS_CAP || opt.still) { g.fillStyle = "#DDE3FF"; g.font = "28px " + CSSF; var L2 = vsWrap(g, q.text, tw), yy = ty + 80 + tl2.length * 52; L2.slice(0, Math.floor((H - 60 - yy) / 40)).forEach(function (l, i) { g.fillText(l, tx, yy + i * 40); }); }
+      } else {
+        g.fillStyle = "#fff"; g.font = "800 26px " + CSSF; g.fillText(vsWrap(g, q.title, W - cw - 120)[0] || "", tx + cw + 14, ty + 4);
+        if (VS_CAP || opt.still) {
+          // the sentence being spoken now
+          var sen = String(q.text || "").match(/[^.!?।]+[.!?।]*/g) || [], tot = sen.reduce(function (a, x) { return a + x.length; }, 0) || 1, pos = f * tot * 1.08, acc = 0, cur = sen[0] || "";
+          if (!opt.still) for (var j = 0; j < sen.length; j++) { acc += sen[j].length; if (pos <= acc) { cur = sen[j]; break; } cur = sen[j]; }
+          var txt2 = opt.still ? q.text : cur.trim(); g.font = "26px " + CSSF; var L3 = vsWrap(g, txt2, W - 160).slice(0, opt.still ? 3 : 2);
+          if (L3.length) { var bh = 22 + L3.length * 36; g.fillStyle = "rgba(10,12,30,.82)"; vsRR(g, 60, H - bh - 26, W - 120, bh, 14); g.fill(); g.fillStyle = "#fff"; L3.forEach(function (l, i) { g.fillText(l, 80, H - bh - 15 + i * 36); }); }
+        }
+      }
+    }
+    if (total) { g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(0, H - 6, W, 6); g.fillStyle = "#7CF0D8"; g.fillRect(0, H - 6, W * Math.min(1, opt.at / total), 6); }
+  }
+  function vsImg(src) { return new Promise(function (res) { if (!src) return res(null); var im = new Image(); im.onload = function () { res(im); }; im.onerror = function () { res(null); }; im.src = src; }); }
+  function vsStills() {   // one 1280×720 canvas per scene (for PPT / PDF)
+    var T = vsTimeline(null);
+    return Promise.all(T.sc.map(function (q) { var fr = q.k === "step" ? VS.frames[q.f] : VS.frames[0]; return vsImg(fr ? fr.src || fr.thumb : ""); })).then(function (ims) {
+      return T.sc.map(function (q, i) { var c = document.createElement("canvas"); c.width = 1280; c.height = 720; vsDraw(c.getContext("2d"), q, ims[i], 0, 0, { still: true }); return { q: q, c: c, img: ims[i] }; });
+    });
+  }
+  function vsPdf() {
+    vsBusy(true, "📄 Making the PDF…", 0.2);
+    Promise.all([lib("pdf"), vsStills()]).then(function (x) { var L = x[1], J = window.jspdf.jsPDF, doc = new J({ orientation: "landscape", unit: "px", format: [1280, 720], hotfixes: ["px_scaling"] });
+      L.forEach(function (o, i) { if (i) doc.addPage([1280, 720], "landscape"); doc.addImage(o.c.toDataURL("image/jpeg", 0.88), "JPEG", 0, 0, 1280, 720); });
+      download(doc.output("blob"), vsName("pdf")); vsBusy(false, "✅ PDF ready — " + L.length + " pages"); }).catch(function (e) { vsBusy(false, "❌ " + (e.message || e)); });
+  }
+  function vsPptx() {
+    vsBusy(true, "📊 Making the PowerPoint…", 0.2);
+    Promise.all([lib("pptx"), Promise.all(VS.frames.map(function (f) { return vsImg(f.src || f.thumb); }))]).then(function (x) {
+      var ims = x[1], P = new PptxGenJS(); P.layout = "LAYOUT_WIDE"; P.title = VS.script.title || VS.name;
+      var S = VS.script, act = vsSteps(), B = "4D5BF9", INK = "1B1D2E", MU = "6B7090";
+      var pic = function (im) { if (!im) return null; var c = document.createElement("canvas"), k = Math.min(1, 1100 / Math.max(im.width, im.height)); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return { data: c.toDataURL("image/jpeg", 0.85), r: im.width / im.height }; };
+      var t = P.addSlide(); t.background = { color: "151A4A" }; t.addText("STEP-BY-STEP GUIDE", { x: 0.7, y: 1.4, w: 7, h: 0.4, fontSize: 14, bold: true, color: "9DF0FF", charSpacing: 3 }); t.addText(S.title || VS.name, { x: 0.7, y: 1.9, w: 7.2, h: 1.6, fontSize: 36, bold: true, color: "FFFFFF", valign: "top" }); t.addText(S.intro || "", { x: 0.7, y: 3.7, w: 6.8, h: 1.6, fontSize: 16, color: "DDE3FF", valign: "top" }); t.addText(act.length + " steps", { x: 0.7, y: 6.3, w: 4, h: 0.4, fontSize: 13, color: "9DA6E0" });
+      var p0 = pic(ims[0]); if (p0) { var h0 = 5.6, w0 = Math.min(4.6, h0 * p0.r); h0 = w0 / p0.r; t.addImage({ data: p0.data, x: 12.6 - w0, y: (7.5 - h0) / 2, w: w0, h: h0, rounding: false }); }
+      t.addNotes(S.intro || "");
+      act.forEach(function (s, i) {
+        var sl = P.addSlide(); sl.background = { color: "F5F6FB" }; var p = pic(ims[s.f]), port = p && p.r < 1;
+        var iw = port ? Math.min(3.4, 6.3 * p.r) : 7.6, ih = p ? iw / p.r : 0; if (ih > 6.3) { ih = 6.3; iw = ih * p.r; }
+        if (p) sl.addImage({ data: p.data, x: 0.5, y: (7.5 - ih) / 2, w: iw, h: ih });
+        var tx = 0.5 + iw + 0.45, tw = 13.33 - tx - 0.5;
+        sl.addShape(P.ShapeType.roundRect, { x: tx, y: 0.7, w: 1.6, h: 0.42, fill: { color: B }, rectRadius: 0.21, line: { type: "none" } }); sl.addText("STEP " + (i + 1) + " / " + act.length, { x: tx, y: 0.7, w: 1.6, h: 0.42, fontSize: 11, bold: true, color: "FFFFFF", align: "center", valign: "middle" });
+        sl.addText(s.title || "", { x: tx, y: 1.3, w: tw, h: 1.1, fontSize: 26, bold: true, color: INK, valign: "top" });
+        sl.addText(s.text || "", { x: tx, y: 2.5, w: tw, h: 3.9, fontSize: 16, color: INK, valign: "top" });
+        sl.addText("⏱ " + vfmt(VS.frames[s.f].t) + " in the recording", { x: tx, y: 6.6, w: tw, h: 0.35, fontSize: 11, color: MU });
+        sl.addNotes(s.text || "");
+      });
+      var e = P.addSlide(); e.background = { color: "151A4A" }; e.addText("✅ That's it!", { x: 0.7, y: 2.2, w: 12, h: 1, fontSize: 40, bold: true, color: "FFFFFF" }); e.addText(S.outro || "", { x: 0.7, y: 3.4, w: 11.5, h: 2, fontSize: 18, color: "DDE3FF", valign: "top" }); e.addNotes(S.outro || "");
+      return P.write({ outputType: "blob" });
+    }).then(function (blob) { download(new Blob([blob], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }), vsName("pptx")); vsBusy(false, "✅ PowerPoint ready — " + (vsSteps().length + 2) + " slides, script in the speaker notes"); })
+      .catch(function (e) { vsBusy(false, "❌ " + (e.message || e)); });
+  }
+  function vsToManual() {
+    if (!SEL) return toast("Choose the tool in Tool manuals first");
+    Promise.all(VS.frames.map(function (f) { return vsImg(f.src || f.thumb); })).then(function (ims) {
+      var act = vsSteps(); SHOTS = act.slice(0, 10).map(function (s) { var im = ims[s.f]; if (!im) return null; var k = 390 / im.width, c = document.createElement("canvas"); c.width = 390; c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return { src: c.toDataURL("image/jpeg", 0.82), label: s.title || "Step", w: 390, h: c.height, marks: [] }; }).filter(Boolean);
+      MAN = null; draw(); toast(SHOTS.length + " screens added to step 2 — now ✨ Write manual");
+    });
+  }
+  // ---- 🎬 the voiced video ----
+  function vsVoices(ac, T) {
+    var clips = {}, q = T.sc.filter(function (x) { return x.text && x.text.trim(); }), done = 0, err = "", fatal = false;
+    var one = function (x, tries) { return api({ action: "man-tts", tool: SEL ? SEL.id : "video", lang: VS.lang, voice: VOICE, text: x.text }).then(function (r) {
+      if (r.ok && r.b64) return decode(ac, b64buf(r.b64)).then(function (b) { clips[x.id] = b; }).catch(function () { });
+      if (r.retry && tries < 2) return wait(Math.min(20, r.retry) * 1000).then(function () { return one(x, tries + 1); });
+      if (r.notConfigured) fatal = true; if (!err) err = r.error || "no voice"; }).catch(function (e) { if (!err) err = e.message || String(e); }); };
+    var worker = function () { var x = q.shift(); if (!x || fatal) return Promise.resolve(); return one(x, 0).then(function () { done++; vsBusy(true, "🎙️ Making the voice-over… " + done + " clips", 0.05 + 0.3 * done / (done + q.length + 1)); return worker(); }); };
+    return Promise.all([worker(), worker(), worker()]).then(function () { return { clips: clips, error: err, fatal: fatal }; });
+  }
+  function vsVideo() {
+    if (!VS.url) return toast("Attach the video file first (📂 in step 1) — it stays on your device");
+    var voiced = VOICE !== "off", AC = window.AudioContext || window.webkitAudioContext, ac = voiced && AC ? new AC() : null, t0 = Date.now(), clips = {};
+    vsBusy(true, voiced ? "🎙️ Making the voice-over…" : "Preparing…", 0.05);
+    var v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = VS.url; v.style.cssText = "position:fixed;left:-9999px;top:0;width:2px;height:2px"; document.body.appendChild(v);
+    var cv = document.createElement("canvas"); cv.width = 1280; cv.height = 720; var g = cv.getContext("2d");
+    var seek = function (t) { return new Promise(function (res) { var ok = false, fin = function () { if (ok) return; ok = true; v.removeEventListener("seeked", fin); res(); }; v.addEventListener("seeked", fin); setTimeout(fin, 2000); try { v.currentTime = Math.max(0, Math.min(t, (v.duration || t) - 0.04)); } catch (e) { fin(); } }); };
+    var cleanup = function () { try { v.remove(); } catch (e) { } if (ac) { try { ac.close(); } catch (e) { } } };
+    (voiced && ac ? vsVoices(ac, vsTimeline(null)) : Promise.resolve({ clips: {} })).then(function (r) {
+      clips = r.clips; if (voiced && !Object.keys(clips).length) { if (!confirm("The AI voice isn't available right now (" + (r.error || "no voice") + "). Make the video without voice?")) throw new Error("Stopped — no voice"); voiced = false; }
+      var dur = {}; Object.keys(clips).forEach(function (k) { dur[k] = clips[k].duration; }); var T = vsTimeline(voiced ? dur : null);
+      return new Promise(function (res, rej) { if (v.readyState >= 1) res(); else { v.onloadedmetadata = res; v.onerror = function () { rej(new Error("This video can't be played here — try an MP4 (H.264) file.")); }; } }).then(function () { return fastVideo(voiced).then(function (fv) { return { T: T, fv: fv }; }); });
+    }).then(function (o) {
+      var T = o.T, fv = o.fv, total = T.total, intro0 = null;
+      var sceneAt = function (el) { for (var i = 0; i < T.sc.length; i++) if (el < T.sc[i].start + T.sc[i].dur) return T.sc[i]; return T.sc[T.sc.length - 1]; };
+      var finish = function (blob, ext, how) { cleanup(); download(blob, vsName(ext)); vsBusy(false, "✅ Video ready — " + Math.round(total / 1000) + " s " + ext.toUpperCase() + (voiced ? " with AI voice-over" : "") + " · " + how); };
+      return vsImg(VS.frames[0] && (VS.frames[0].src || VS.frames[0].thumb)).then(function (im0) { intro0 = im0;
+        if (fv) {   // ⚡ fast: seek the recording frame by frame and encode straight to MP4
+          var FPS = 15, NF = Math.ceil(total / 1000 * FPS), err = null, lastT = -1, snap = document.createElement("canvas");
+          var mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: /^vp09/.test(fv.vc) ? "vp9" : "avc", width: 1280, height: 720, frameRate: FPS }, audio: fv.ac ? { codec: fv.ac[1], numberOfChannels: 1, sampleRate: 48000 } : undefined, fastStart: "in-memory", firstTimestampBehavior: "offset" });
+          var venc = new VideoEncoder({ output: function (c, m) { mux.addVideoChunk(c, m); }, error: function (e) { err = e; } });
+          venc.configure({ codec: fv.vc, width: 1280, height: 720, bitrate: 2500000, framerate: FPS });
+          snap.width = v.videoWidth; snap.height = v.videoHeight; var sg = snap.getContext("2d");
+          var i = 0;
+          var next = function () {
+            if (err) return Promise.reject(err);
+            if (i >= NF) return Promise.resolve();
+            if (venc.encodeQueueSize > 6) return wait(5).then(next);
+            var el = i * 1000 / FPS, q = sceneAt(el), p = Promise.resolve();
+            if (q.k === "step") { var vt = q.vs + Math.min(el - q.start, q.seg) / 1000; if (Math.abs(vt - lastT) > 0.5 / FPS) { p = seek(vt).then(function () { sg.drawImage(v, 0, 0); lastT = vt; }); } }
+            return p.then(function () {
+              vsDraw(g, q, q.k === "step" ? snap : intro0, el - q.start, total, { at: el });
+              var fr = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) }); venc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close(); i++;
+              if (i % 15 === 0) vsBusy(true, "⚡ Rendering the video… " + Math.round(i / NF * 100) + "%", 0.35 + 0.6 * i / NF);
+              return next();
+            });
+          };
+          var audio = function () { if (!fv.ac || !voiced) return Promise.resolve();
+            var SR = 48000, oac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(total / 1000 * SR) + SR, SR);
+            T.sc.forEach(function (q) { var b = clips[q.id]; if (!b) return; var s = oac.createBufferSource(); s.buffer = b; s.connect(oac.destination); s.start(0.25 + q.start / 1000); });
+            return oac.startRendering().then(function (buf) { var d = buf.getChannelData(0), aenc = new AudioEncoder({ output: function (c, m) { mux.addAudioChunk(c, m); }, error: function (e) { err = e; } });
+              aenc.configure({ codec: fv.ac[0], sampleRate: SR, numberOfChannels: 1, bitrate: 96000 });
+              for (var o2 = 0; o2 < d.length; o2 += 4800) { var n = Math.min(4800, d.length - o2), ad = new AudioData({ format: "f32", sampleRate: SR, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(o2 / SR * 1e6), data: d.slice(o2, o2 + n) }); aenc.encode(ad); ad.close(); }
+              return aenc.flush(); }); };
+          return next().then(function () { return venc.flush(); }).then(audio).then(function () { if (err) throw err; mux.finalize(); finish(new Blob([mux.target.buffer], { type: "video/mp4" }), "mp4", "made in " + Math.max(1, Math.round((Date.now() - t0) / 1000)) + " s"); });
+        }
+        // fallback: play it in real time and record the screen of this page
+        if (!window.MediaRecorder || !cv.captureStream) throw new Error("This device can't make video — try Chrome on a laptop.");
+        var ac2 = ac || (AC ? new AC() : null), dest = voiced && ac2 && ac2.createMediaStreamDestination ? ac2.createMediaStreamDestination() : null, vs2 = cv.captureStream(30);
+        var stream = dest ? new MediaStream([vs2.getVideoTracks()[0]].concat(dest.stream.getAudioTracks())) : vs2;
+        var mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find(function (m) { return MediaRecorder.isTypeSupported(m); }) || "", ext = /mp4/.test(mime) ? "mp4" : "webm";
+        var rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 2500000 } : {}), chunks = [];
+        rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+        return new Promise(function (res) {
+          rec.onstop = function () { finish(new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" }), ext, "recorded in real time"); res(); };
+          var base = ac2 ? ac2.currentTime + 0.3 : 0, startMs = performance.now() + 300, curQ = null, fin = false;
+          if (dest) T.sc.forEach(function (q) { var b = clips[q.id]; if (!b) return; var s = ac2.createBufferSource(); s.buffer = b; s.connect(dest); s.start(base + 0.25 + q.start / 1000); });
+          var loop = function () {
+            var el = Math.max(0, performance.now() - startMs), q = sceneAt(el);
+            if (q !== curQ) { curQ = q; if (q.k === "step") { v.currentTime = q.vs; v.play().catch(function () { }); } else v.pause(); }
+            if (q.k === "step" && el - q.start >= q.seg && !v.paused) v.pause();
+            vsDraw(g, q, q.k === "step" ? v : intro0, el - q.start, total, { at: el }); vsBusy(true, "⏺ Recording in real time… " + Math.round(el / total * 100) + "% — keep this screen open", 0.35 + 0.6 * el / total);
+            if (el < total) requestAnimationFrame(loop); else if (!fin) { fin = true; setTimeout(function () { rec.stop(); }, 300); }
+          };
+          rec.start(500); requestAnimationFrame(loop);
+        });
+      });
+    }).catch(function (e) { cleanup(); vsBusy(false, "❌ " + (e.message || e)); });
+  }
   function draw() {
     var L = items(), groups = []; L.forEach(function (i) { if (groups.indexOf(i.group) < 0) groups.push(i.group); });
-    VIEW.innerHTML = '<div class="card"><div class="step"><span class="n">1</span><div style="flex:1"><b>Choose the tool or dashboard section</b><select class="tx" id="ms" style="margin-top:6px"><option value="">— select —</option>' + groups.map(function (g) { return '<optgroup label="' + esc(g) + '">' + L.filter(function (i) { return i.group === g; }).map(function (i) { return '<option value="' + esc(i.id) + '"' + (SEL && SEL.id === i.id ? " selected" : "") + ">" + esc(i.name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + '</select><div class="g2"><div><label class="lb">Language</label><select class="tx" id="ml">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === LANG ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">For</label><select class="tx" id="ma"><option value="both"' + (AUD === "both" ? " selected" : "") + '>Admins & end users</option><option value="admin"' + (AUD === "admin" ? " selected" : "") + '>Admins / IT team</option><option value="user"' + (AUD === "user" ? " selected" : "") + ">End users</option></select></div></div></div></div></div>" +
+    VIEW.innerHTML = vidCard() + '<div class="card"><div class="step"><span class="n">1</span><div style="flex:1"><b>Choose the tool or dashboard section</b><select class="tx" id="ms" style="margin-top:6px"><option value="">— select —</option>' + groups.map(function (g) { return '<optgroup label="' + esc(g) + '">' + L.filter(function (i) { return i.group === g; }).map(function (i) { return '<option value="' + esc(i.id) + '"' + (SEL && SEL.id === i.id ? " selected" : "") + ">" + esc(i.name) + "</option>"; }).join("") + "</optgroup>"; }).join("") + '</select><div class="g2"><div><label class="lb">Language</label><select class="tx" id="ml">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === LANG ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">For</label><select class="tx" id="ma"><option value="both"' + (AUD === "both" ? " selected" : "") + '>Admins & end users</option><option value="admin"' + (AUD === "admin" ? " selected" : "") + '>Admins / IT team</option><option value="user"' + (AUD === "user" ? " selected" : "") + ">End users</option></select></div></div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">2</span><div style="flex:1"><b>Capture the real screens</b><div class="muted" style="font-size:12px">Opens the tool as you see it (phone size) and photographs every tab. You can add your own screenshots too.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="mc"' + (SEL ? "" : " disabled") + '>📸 Capture screens</button><button class="btn sec sm" id="mu">＋ Add screenshot</button><button class="btn ghost sm" id="msv"' + (SEL ? "" : " disabled") + ' title="Saves these screens (and result examples) so the Monthly one-pager shows them">💾 Save for Monthly one-pager</button></div><div class="muted" id="svst" style="font-size:11.5px;margin-top:4px">' + (SAVED_AT ? "✅ Saved for the Monthly one-pager · " + SAVED_AT : "Screens are saved automatically after capturing, for the Monthly one-pager → App tools.") + '</div><div class="prog" id="cp" style="display:none"><i></i></div><div class="shots" id="sh">' + shotsHtml() + '</div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><b style="font-size:13px">✅ End result examples (sample data)</b><div class="muted" style="font-size:12px">What users see after finishing the task — shown in the PPT, PDF, one-pager and video. Empty fields on captured screens are filled with dummy examples. AI draws a sample result screen when you write the manual; add real app screenshots of a result too.</div><div class="row" style="gap:6px;margin-top:6px"><button class="btn sec sm" id="mr">＋ Add result screenshot</button></div><div class="shots" id="rs">' + shotsHtml(true) + "</div></div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">3</span><div style="flex:1"><b>Write the manual with AI</b><div class="muted" style="font-size:12px">Overview, roles, navigation map, every screen explained, admin & user flows, settings, data flow, rules, FAQs, troubleshooting, glossary, one-pager text and video captions — in the chosen language.</div><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="mg"' + (SEL ? "" : " disabled") + ">✨ " + (MAN ? "Rewrite" : "Write manual") + '</button></div><div id="mo">' + (MAN ? outline(MAN) : "") + "</div></div></div></div>" +
       '<div class="card"><div class="step"><span class="n">4</span><div style="flex:1"><b>Export</b><div class="exp"><button data-x="pptx">📊 PowerPoint<small>Editable .pptx — text, flowcharts, screens</small></button><button data-x="pdf">📄 PDF manual<small>Same slides as a PDF</small></button><button data-x="one">🖼️ One-pager creative<small>Poster PNG to share</small></button><button data-x="vid">🎬 Walkthrough video<small>Animated screens, captions + AI voice (MP4)</small></button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🎙️ Video voice-over</span><select class="tx" id="vv" style="flex:1;max-width:240px"><option value="f"' + (VOICE === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (VOICE === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (VOICE === "off" ? " selected" : "") + '>No voice</option></select><button class="btn ghost sm" id="vset" type="button">⚙️ Voice settings</button></div><div class="row" style="gap:8px;margin-top:8px;align-items:center"><span style="font-size:12.5px;font-weight:700">🧑‍🏫 AI presenter</span><select class="tx" id="vp" style="flex:1;max-width:240px">' + [["off", "None"], ["real", "📸 Real person — lifelike talking video"], ["priya", "Priya — illustrated (female)"], ["arjun", "Arjun — illustrated (male)"], ["vee", "Vee — friendly guide"], ["dev", "Dev — friendly guide"], ["robo", "Robo — AI robot"]].map(function (o) { return '<option value="' + o[0] + '"' + (PRES === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select><span class="muted" id="vph" style="font-size:11.5px">' + (PRES === "real" ? "a real-looking person (your consented presenter photo, animated by D-ID / HeyGen) talks in a picture-in-picture" : "points at each step, gestures & talks with the voice") + '</span></div><div style="margin-top:10px;border-top:1px dashed #E1E3EE;padding-top:8px"><div class="row" style="gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:12.5px">📝 Video script</b><button class="btn sec sm" id="scai" type="button">✨ Write with AI</button><button class="btn ghost sm" id="sced" type="button">✏️ View / edit</button><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" id="scuse"' + (USE_SCRIPT ? " checked" : "") + '> use it in the video</label></div><div class="muted" id="scst" style="font-size:11.5px;margin-top:4px"></div></div><div class="prog" id="xp" style="display:none"><i></i></div><div class="muted" id="xs" style="font-size:12px;margin-top:6px"></div></div></div></div>';
+    vsWire();
     $("ms").onchange = function () { SEL = L.find(function (i) { return i.id === $("ms").value; }) || null; SHOTS = []; RES = []; MAN = null; SAVED_AT = ""; SAVED_SIG = ""; draw(); if (SEL) { loadBundled(); loadCached(); } };
     $("ml").onchange = function () { LANG = this.value; MAN = null; dropMock(); draw(); if (SEL) loadCached(); };
     $("ma").onchange = function () { AUD = this.value; MAN = null; dropMock(); draw(); if (SEL) loadCached(); };

@@ -2,6 +2,8 @@
 // the user-guide entry and the screens captured on the page. The page turns it into an editable PPT, a PDF, a one-pager
 // creative or a walkthrough video. Cached per tool × language × audience so everyone can export it again.
 //   man:<tool>:<lang>:<aud>  { tool, lang, aud, data, at, by }
+import { seeFrames } from "./ux-core.mjs";
+import { randomBytes } from "node:crypto";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 export const LANGS = { en: "English", hi: "Hindi (हिन्दी)", ta: "Tamil", te: "Telugu", bn: "Bengali", mr: "Marathi", gu: "Gujarati", kn: "Kannada", ml: "Malayalam", pa: "Punjabi", or: "Odia", zh: "Simplified Chinese (简体中文)" };
@@ -43,6 +45,37 @@ Reply with ONE JSON object: {"lines":{"<scene id>":"spoken text", ...}} with an 
     const lines = {}; sc.forEach((q) => { const v = got[q.id]; if (v) lines[q.id] = String(v).replace(/\s+/g, " ").trim().slice(0, 700); });
     x.script = { lines, at: t, by, ai: true, tone }; await store.set(key, x); return json(200, { ok: true, script: x.script, missing: sc.length - Object.keys(lines).length });
   }
+  // ---------- 🎬 manual from a demo video / screen recording: AI watches key frames → editable script → voiced video, PPT, PDF ----------
+  //   manvid:<id>  { id, name, title, lang, aud, tone, dur, w, h, frames:[{t, thumb}], script:{ title, intro, outro, steps:[{f, title, text}] }, at, upd, by }
+  if (b.action === "man-vid-see") { const r = await seeFrames(ctx, b.frames, { offset: b.offset, times: b.times, about: b.about }); return json(r.ok ? 200 : 502, r); }
+  if (b.action === "man-vid-script") {
+    const F = (Array.isArray(b.seen) ? b.seen : []).slice(0, 24).map((x, i) => ({ f: i, t: Math.round((+x.t || 0) * 10) / 10, screen: str(x.screen, 60), kind: str(x.kind, 12), texts: (Array.isArray(x.texts) ? x.texts : []).slice(0, 25).map((y) => str(y, 60)), action: str(x.action, 300), why: str(x.why, 200) }));
+    if (!F.length) return json(400, { ok: false, error: "Read the video first." });
+    const L = LANGS[lang], tone = str(b.tone, 40) || "friendly trainer";
+    const sys = `You write the spoken voice-over and the step titles for a step-by-step demo video made from a SCREEN RECORDING of ${str(b.about, 200) || "an internal vivo India app / tool"}. Below is what each key frame shows (in time order, with seconds into the recording).
+Write in ${L}${lang !== "en" ? " (keep on-screen button and field names in English inside quotes)" : ""}, as a ${tone}, to ${aud === "admin" ? "admins" : aud === "user" ? "end users" : "both admins and end users"}. Natural spoken sentences, second person ("you"), no emojis, no markdown.
+For EVERY frame give one step: a short title (max 6 words) and 1-3 sentences that say what is on screen, exactly what to tap / type next (use the real labels) and why it matters. Link the steps so it flows ("Now…", "Next…"). Mark a frame "skip": true only if it is a loading screen, a blurred transition or the same as the previous frame with nothing new.
+Also write a title for the whole video, a 1-2 sentence intro and a 1-2 sentence closing.
+Reply with ONE JSON object: {"title":"…","intro":"…","outro":"…","steps":[{"f":frame number,"title":"…","text":"…","skip":false}]}`;
+    const r = await ctx.askAI(env, "Write the step titles and voice-over.", JSON.stringify({ video: str(b.name, 80), note: str(b.note, 600), frames: F }).slice(0, 24000), [], ctx.aiFetch, { system: sys, label: "MANUAL", maxTokens: 6000, json: true, raw: true });
+    const d = r.ok ? parseLoose(r.text) : null;
+    if (!d || !Array.isArray(d.steps)) return json(200, { ok: false, error: (r.error || "The AI reply couldn't be read") + " — try again." });
+    const steps = d.steps.map((x) => ({ f: Math.max(0, Math.min(F.length - 1, Math.round(+x.f || 0))), title: str(x.title, 80), text: String(x.text || "").replace(/\s+/g, " ").trim().slice(0, 700), skip: !!x.skip })).filter((x, i, a) => a.findIndex((y) => y.f === x.f) === i).sort((p, q) => p.f - q.f);
+    return json(200, { ok: true, script: { title: str(d.title, 120), intro: str(d.intro, 600), outro: str(d.outro, 600), steps } });
+  }
+  if (b.action === "man-vid-save") {
+    const IMG = /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/=]+$/, sc = b.script || {};
+    const id = str(b.id, 24).replace(/[^\w-]/g, "") || t.toString(36) + randomBytes(2).toString("hex"), old = await store.get("manvid:" + id);
+    const x = { id, name: str(b.name, 100), title: str(sc.title || b.name, 120), lang, aud, tone: str(b.tone, 40), dur: Math.max(0, +b.dur || 0), w: Math.round(+b.w || 0), h: Math.round(+b.h || 0),
+      frames: (Array.isArray(b.frames) ? b.frames : []).slice(0, 24).map((f) => ({ t: Math.max(0, +f.t || 0), thumb: IMG.test(String(f.thumb || "")) && String(f.thumb).length < 45000 ? String(f.thumb) : "" })),
+      script: { title: str(sc.title, 120), intro: str(sc.intro, 700), outro: str(sc.outro, 700), steps: (Array.isArray(sc.steps) ? sc.steps : []).slice(0, 40).map((q) => ({ f: Math.max(0, Math.round(+q.f || 0)), title: str(q.title, 80), text: String(q.text || "").replace(/\s+/g, " ").trim().slice(0, 700), skip: !!q.skip })) },
+      at: old ? old.at : t, upd: t, by };
+    if (JSON.stringify(x).length > 1200000) return json(413, { ok: false, error: "Too big to save — remove some frames." });
+    await store.set("manvid:" + id, x); return json(200, { ok: true, id });
+  }
+  if (b.action === "man-vid-list") { const K = (await store.list("manvid:")).slice(0, 200), R = []; for (const k of K) { const x = await store.get(k); if (x) R.push({ id: x.id, name: x.name, title: x.title, lang: x.lang, steps: x.script.steps.length, dur: x.dur, upd: x.upd, by: x.by, thumb: (x.frames[0] || {}).thumb || "" }); } return json(200, { ok: true, rows: R.sort((p, q) => q.upd - p.upd) }); }
+  if (b.action === "man-vid-get") { const x = await store.get("manvid:" + str(b.id, 24)); return x ? json(200, { ok: true, item: x }) : json(404, { ok: false, error: "Not found" }); }
+  if (b.action === "man-vid-del") { await store.delete("manvid:" + str(b.id, 24)); return json(200, { ok: true }); }
   if (b.action === "man-list") { const L = await store.list("man:"); return json(200, { ok: true, keys: L.slice(0, 500) }); }
   if (b.action === "man-tts") return manTts(b, ctx, lang);
   if (b.action === "man-voice") {   // which voice engines are connected; HO can save a Sarvam AI key (write-only, like the other AI keys)

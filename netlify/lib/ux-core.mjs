@@ -4,6 +4,8 @@
 //   ux:tok:<token>        { owner, id }                       public prototype link
 //   ux:r:<id>:<ts+rand>   one tester's session { at, name, tasks:[{id, ok, ms, taps, path[], gaveUp}], ease, note }
 import { randomBytes } from "node:crypto";
+import { readImages } from "./schemecalc-core.mjs";
+import { aiKeys } from "./aff-core.mjs";
 const J = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 const txt = (v, n) => String(v == null ? "" : v).replace(/\r/g, "").slice(0, n);
@@ -60,11 +62,35 @@ export function cleanDoc(d) {
   const out = screens.map((s) => ({ id: s.__id, name: str(s.name, 50) || s.__id, bg: col(s.bg, undefined), children: (Array.isArray(s.children) ? s.children : []).slice(0, 60).map((c) => node(c, 1)).filter(Boolean) }));
   out.forEach((s) => Object.keys(s).forEach((k) => s[k] === undefined && delete s[k]));
   if (!out.length) out.push({ id: "home", name: "Home", children: [{ t: "nav", title: "Home" }, { t: "text", text: "Start designing", size: 20, weight: 700 }] });
+  const sids = out.map((s) => s.id), IMG = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+  const V = d.video && typeof d.video === "object" && Array.isArray(d.video.frames) ? { name: str(d.video.name, 80), dur: num(d.video.dur, 0, 36000, 0), w: num(d.video.w, 0, 8000, 0), h: num(d.video.h, 0, 8000, 0),
+    frames: d.video.frames.slice(0, 24).map((f) => ({ t: Math.max(0, Math.min(36000, +f.t || 0)), src: IMG.test(String(f.src || "")) && String(f.src).length < 60000 ? String(f.src) : "", screen: sids.includes(str(f.screen, 24)) ? str(f.screen, 24) : "", what: str(f.what, 200) })).filter((f) => f.src) } : null;
+  const steps = (Array.isArray(d.steps) ? d.steps : []).slice(0, 30).map((x) => ({ screen: sids.includes(str(x && x.screen, 24)) ? str(x.screen, 24) : "", frame: x && x.frame != null && isFinite(+x.frame) ? num(x.frame, 0, 23, 0) : -1, title: str(x && x.title, 90), action: str(x && x.action, 300), why: str(x && x.why, 300), tip: str(x && x.tip, 200) })).filter((x) => x.title || x.action);
   return {
     title: str(d.title, 80) || "Untitled design", platform: pick(d.platform, ["mobile", "web", "tablet"], "mobile"), style: pick(d.style, ["wireframe", "hifi"], "hifi"),
     theme: { primary: col(th.primary, "#4D5BF9"), bg: col(th.bg, "#F5F6FA"), surface: col(th.surface, "#FFFFFF"), text: col(th.text, "#141833"), muted: col(th.muted, "#6B7090"), radius: num(th.radius, 0, 28, 14), font: pick(th.font, ["Inter", "Roboto", "Poppins", "Noto Sans"], "Inter") },
-    screens: out
+    screens: out, ...(steps.length ? { steps } : {}), ...(V && V.frames.length ? { video: V } : {})
   };
+}
+// what the AI reads: the design without the picture data of an imported video
+const forAI = (doc) => JSON.stringify(Object.assign({}, doc, { video: doc.video ? { name: doc.video.name, frames: doc.video.frames.map((f, i) => ({ i, t: f.t, screen: f.screen, what: f.what })) } : undefined }));
+const keepExtras = (from, to) => { if (from.video && !to.video) to.video = from.video; if (from.steps && !to.steps) to.steps = from.steps; return cleanDoc(to); };
+
+// Key frames of a screen recording → what each one shows (shared with Tool manuals). frames: data-URL JPEGs (≤3 per call)
+export async function seeFrames(ctx, frames, opt) {
+  opt = opt || {};
+  const imgs = (Array.isArray(frames) ? frames : []).filter((u) => /^data:image\/(jpeg|png|webp);base64,/.test(String(u)) && String(u).length < 1500000).slice(0, 3);
+  if (!imgs.length) return { ok: false, error: "No frames to read." };
+  const base = num(opt.offset, 0, 99, 0), times = Array.isArray(opt.times) ? opt.times : [];
+  const prompt = `These ${imgs.length} picture(s) are key frames, in time order, from a screen recording / demo video of ${opt.about ? str(opt.about, 200) : "an app or website"} (frame numbers ${imgs.map((_, i) => base + i).join(", ")}${times.length ? "; seconds into the video: " + times.slice(0, imgs.length).join(", ") : ""}).
+For EACH picture, read the screen carefully: its title, every visible label, button, field, tab, list row, number and message (exact words), and how it is laid out from top to bottom.
+Then say what the person in the recording is doing on it (what they tap, type or choose next, if you can tell) and why.
+Reply with ONLY JSON: {"frames":[{"i":frame number,"screen":"short screen name","kind":"screen|popup|menu|loading|home|other","platform":"mobile|web|tablet","texts":["exact visible words"],"layout":"top-to-bottom description: header, sections, cards, lists, buttons, tab bar","action":"what the user does here","why":"the purpose of this step in one short sentence","colours":"main colours seen"}]}`;
+  const keys = await aiKeys(ctx.store, ctx.env || {});
+  const v = await readImages(keys, ctx.env || {}, imgs, ctx.aiFetch, prompt, { json: true, timeout: 45000, maxModels: 3, accept: (t) => /"frames"\s*:/.test(t) });
+  if (!v.ok) return { ok: false, error: "The AI couldn't read the frames right now — try again. (" + String(v.error || "").slice(0, 120) + ")" };
+  const j = parse(v.text); if (!j || !Array.isArray(j.frames)) return { ok: false, error: "The AI answer wasn't readable — try again." };
+  return { ok: true, frames: j.frames.slice(0, imgs.length).map((f, k) => ({ i: base + k, screen: str(f.screen, 60), kind: str(f.kind, 12), platform: str(f.platform, 8), texts: (Array.isArray(f.texts) ? f.texts : []).slice(0, 40).map((x) => str(x, 80)), layout: str(f.layout, 700), action: str(f.action, 300), why: str(f.why, 200), colours: str(f.colours, 120) })) };
 }
 
 const SCHEMA = `Return JSON: {"title":"…","platform":"mobile|web|tablet","style":"hifi|wireframe","theme":{"primary":"#hex","bg":"#hex","surface":"#hex","text":"#hex","muted":"#hex","radius":14,"font":"Inter|Roboto|Poppins|Noto Sans"},
@@ -132,27 +158,48 @@ export async function uxAction(b, ctx) {
         q = "Edit the screen."; data = JSON.stringify({ theme: doc.theme, platform: doc.platform, style: doc.style, screen: doc.screens.find((s) => s.id === sid) }).slice(0, 14000); max = 5000;
       } else {
         sys = "You edit an app design. Apply the change and return the COMPLETE design JSON (all screens). Reply with JSON only.\n" + SCHEMA + "\nCHANGE: " + p;
-        q = "Apply the change."; data = JSON.stringify(doc).slice(0, 15000);
+        q = "Apply the change."; data = forAI(doc).slice(0, 15000);
       }
     } else if (b.mode === "review") {
       const doc = cleanDoc(b.doc);
       sys = "You are a UX reviewer. Review this app design against usability heuristics (clarity, consistency, feedback, error prevention, navigation, recognition over recall), accessibility (text size, contrast with the given colours, 44px tap targets, labels) and mobile / web best practice. Be specific: name the screen and element. Reply with JSON only: {\"score\":0-100,\"summary\":\"2 sentences\",\"strengths\":[\"…\"],\"issues\":[{\"screen\":\"<screen id>\",\"severity\":\"high|medium|low\",\"issue\":\"…\",\"fix\":\"…\"}]} with up to 12 issues, most important first.";
-      q = "Review the design."; data = JSON.stringify(doc).slice(0, 15000); max = 3000;
+      q = "Review the design."; data = forAI(doc).slice(0, 15000); max = 3000;
     } else if (b.mode === "tests") {
       const doc = cleanDoc(b.doc);
       sys = "Write 3-5 usability-test tasks for this prototype, each one a realistic goal a user would have, written to the tester (\"You want to …\"), and the screen id where the task is complete. Reply with JSON only: {\"tasks\":[{\"text\":\"…\",\"goal\":\"<screen id>\"}]}. Screen ids: " + doc.screens.map((s) => s.id + " (" + s.name + ")").join(", ");
-      q = "Write the tasks."; data = JSON.stringify(doc).slice(0, 12000); max = 1200;
+      q = "Write the tasks."; data = forAI(doc).slice(0, 12000); max = 1200;
+    } else if (b.mode === "see") {   // key frames of an imported recording → descriptions (vision)
+      const r = await seeFrames(ctx, b.frames, { offset: b.offset, times: b.times, about: b.about });
+      return J(r.ok ? 200 : 502, r);
+    } else if (b.mode === "fromvideo") {   // descriptions of the key frames → editable screens + step-by-step flow
+      const F = (Array.isArray(b.seen) ? b.seen : []).slice(0, 24), plat = pick(b.platform, ["mobile", "web", "tablet"], "mobile");
+      if (!F.length) return J(400, { ok: false, error: "Read the video first." });
+      sys = "You are a senior product designer. Below is what each key frame of a SCREEN RECORDING of an existing " + (plat === "web" ? "website" : plat === "tablet" ? "tablet app" : "mobile app") + " shows, in time order. Recreate it as an editable, clickable design in " + (b.style === "wireframe" ? "low-fidelity WIREFRAME style" : "polished HIGH-FIDELITY style") +
+        ": one design screen for each DISTINCT screen in the recording (frames showing the same screen become one screen; a pop-up or bottom sheet can be its own screen), keeping the real labels, texts, numbers, order and layout as seen — do not invent other features. Keep the colours you can see in the theme. Wire the links so the prototype follows the same path the user took in the recording.\n" +
+        "ALSO return \"steps\": the step-by-step flow of the recording for a user guide, one step per meaningful user action, in order: {\"title\":\"short step title\",\"screen\":\"<screen id>\",\"frame\":<key frame number that shows it>,\"action\":\"what to do, naming the exact button / field\",\"why\":\"what it achieves\",\"tip\":\"optional UX note or tip\"}.\n" +
+        "Reply with JSON only: the design object (title, platform, style, theme, screens) plus \"steps\".\n" + SCHEMA + (b.note ? "\nNOTE FROM THE DESIGNER: " + txt(b.note, 600) : "");
+      q = "Recreate the recording as a design with steps."; data = JSON.stringify({ platform: plat, video: str(b.name, 80), frames: F }).slice(0, 24000); max = 12000;
+    } else if (b.mode === "steps") {   // a step-by-step user flow for a design (e.g. one not made from a video)
+      const doc = cleanDoc(b.doc);
+      sys = "Write the step-by-step user flow of this app design for a user guide: the main journey a first-time user follows, one step per action, in order, using the exact button / field names on the screens. Reply with JSON only: {\"steps\":[{\"title\":\"short step title\",\"screen\":\"<screen id>\",\"action\":\"what to do\",\"why\":\"what it achieves\",\"tip\":\"optional tip\"}]}. Screen ids: " + doc.screens.map((s) => s.id + " (" + s.name + ")").join(", ");
+      q = "Write the steps."; data = forAI(doc).slice(0, 14000); max = 2500;
     } else if (b.mode === "insight") {
       sys = "Summarise these usability-test results for the designer in plain English: what worked, where people got stuck (use the tap paths and wrong screens), and the 3 changes that would help most. Plain text, short bullets starting with •."; q = "Summarise."; data = txt(b.data, 12000); max = 1500;
     } else return J(400, { ok: false, error: "Unknown mode" });
-    const r = await askAI(env, q, data, [], aiFetch, { system: sys, label: b.mode === "make" ? "BRIEF" : "DESIGN", json: b.mode !== "insight", maxTokens: max });
+    const r = await askAI(env, q, data, [], aiFetch, { system: sys, label: b.mode === "make" || b.mode === "fromvideo" ? "BRIEF" : "DESIGN", json: b.mode !== "insight", maxTokens: max });
     if (!r.ok) return J(502, { ok: false, error: r.error || "AI didn't answer — try again." });
     if (b.mode === "insight") return J(200, { ok: true, text: String(r.text).slice(0, 4000) });
     const j = parse(r.text); if (!j) return J(502, { ok: false, error: "The AI answer wasn't readable — try again." });
     if (b.mode === "review") return J(200, { ok: true, review: { score: num(j.score, 0, 100, 0), summary: str(j.summary, 400), strengths: (j.strengths || []).slice(0, 6).map((s) => str(s, 200)), issues: (Array.isArray(j.issues) ? j.issues : []).slice(0, 12).map((x) => ({ screen: str(x.screen, 24), severity: pick(x.severity, ["high", "medium", "low"], "medium"), issue: str(x.issue, 300), fix: str(x.fix, 300) })) } });
+    if (b.mode === "steps") { const d2 = cleanDoc(Object.assign({}, cleanDoc(b.doc), { steps: (Array.isArray(j.steps) ? j.steps : []).map((x) => Object.assign({ frame: -1 }, x)) })); return J(200, { ok: true, steps: d2.steps || [] }); }
     if (b.mode === "tests") { const doc = cleanDoc(b.doc), ids = doc.screens.map((s) => s.id); return J(200, { ok: true, tasks: (Array.isArray(j.tasks) ? j.tasks : []).slice(0, 6).map((k) => ({ text: str(k.text, 200), goal: ids.includes(k.goal) ? k.goal : "" })).filter((k) => k.text) }); }
     if (b.mode === "edit" && j.children && !j.screens) { const doc = cleanDoc(b.doc), i = doc.screens.findIndex((s) => s.id === str(b.screen, 24)); if (i < 0) return J(400, { ok: false, error: "Screen not found" }); doc.screens[i] = Object.assign({}, j, { id: doc.screens[i].id }); return J(200, { ok: true, doc: cleanDoc(doc) }); }
     if (!Array.isArray(j.screens)) return J(502, { ok: false, error: "The AI answer had no screens — try again." });
+    if (b.mode === "edit") return J(200, { ok: true, doc: keepExtras(cleanDoc(b.doc), j) });
+    if (b.mode === "fromvideo") { j.platform = j.platform || b.platform; const F = b.seen || []; j.video = b.video ? Object.assign({}, b.video, { frames: (b.video.frames || []).map((f, i) => Object.assign({}, f, { what: str((F[i] || {}).action || (F[i] || {}).screen, 200) })) }) : undefined; const d2 = cleanDoc(j);
+      // each key frame → the design screen it shows (from the steps, else by name)
+      if (d2.video) d2.video.frames.forEach((f, i) => { const st = (d2.steps || []).find((x) => x.frame === i && x.screen); const nm = String((F[i] || {}).screen || "").toLowerCase(); const byName = d2.screens.find((s) => nm && s.name.toLowerCase() === nm); f.screen = (st && st.screen) || (byName && byName.id) || f.screen || ""; });
+      return J(200, { ok: true, doc: d2 }); }
     return J(200, { ok: true, doc: cleanDoc(j) });
   }
   return J(400, { ok: false, error: "Unknown action" });
