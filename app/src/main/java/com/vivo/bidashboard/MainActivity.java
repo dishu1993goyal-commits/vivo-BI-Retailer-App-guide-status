@@ -2946,6 +2946,7 @@ public class MainActivity extends FragmentActivity {
                 if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                 filePathCallback = callback;
                 boolean image = false;
+                chooserVideo = false; for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("video")) chooserVideo = true;
                 for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("image")) image = true;
                 if (image && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                     pendingImageChooser = true;
@@ -3696,10 +3697,12 @@ public class MainActivity extends FragmentActivity {
     private void showSurveyPage(String hash) { showToolPage("survey.html", STATE_APP ? tr("surveys") : tr("survey_manager"), hash); }
 
     // Opens the picker for a web page file input. For images it also offers the camera (photo saved to the app cache).
+    private boolean chooserVideo = false;   // the page asked for a video (screen recording import)
     private boolean launchFileChooser(boolean image) {
         Intent pick = new Intent(Intent.ACTION_GET_CONTENT);
         pick.addCategory(Intent.CATEGORY_OPENABLE);
-        pick.setType(image ? "image/*" : "*/*");
+        boolean video = !image && chooserVideo; chooserVideo = false;
+        pick.setType(image ? "image/*" : video ? "video/*" : "*/*");
         Intent chooser = Intent.createChooser(pick, tr(image ? "take_or_choose_photo" : "choose_file"));
         cameraPhotoUri = null;
         if (image && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -3780,6 +3783,7 @@ public class MainActivity extends FragmentActivity {
                     if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                     filePathCallback = callback;
                     boolean image = false;
+                    chooserVideo = false; for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("video")) chooserVideo = true;
                     for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("image")) image = true;
                     if (image && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                         pendingImageChooser = true;
@@ -4892,6 +4896,7 @@ public class MainActivity extends FragmentActivity {
                     if (filePathCallback != null) filePathCallback.onReceiveValue(null);
                     filePathCallback = callback;
                     boolean image = false;
+                    chooserVideo = false; for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("video")) chooserVideo = true;
                     for (String t : params.getAcceptTypes()) if (t != null && t.startsWith("image")) image = true;
                     if (image && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                         pendingImageChooser = true;
