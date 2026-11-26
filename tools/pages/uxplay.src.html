@@ -24,6 +24,7 @@ html,body{background:#E9EBF5}
 (function () {
   "use strict";
   /*@@CORE@@*/
+  window.addEventListener("hashchange", function () { location.reload(); });   // a new shared link opened in the same tab / app screen must load fresh
   var APP = $("app"), K = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim(), D = null, TASKS = [], name = "", ti = -1, cur = "", hist = [], res = [], t0 = 0, taps = 0, path = [];
   var st = document.createElement("style"); st.textContent = UXR.css(".ux-screen"); document.head.appendChild(st);
   var pub = function (b) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state", k: K }, b)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No connection" }; }); };

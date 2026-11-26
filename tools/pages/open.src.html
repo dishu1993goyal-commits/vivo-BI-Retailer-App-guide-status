@@ -20,7 +20,9 @@
 (function () {
   "use strict";
   /*@@CORE@@*/
+  window.addEventListener("hashchange", function () { location.reload(); });   // a new shared link opened in the same tab / app screen must load fresh
   var VIEW = $("view"), K = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  if (!K) K = decodeURIComponent((location.search.match(/[?&]l=([^&]+)/) || [])[1] || "").trim();
   var pub = function (body) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" }, body: JSON.stringify(Object.assign({ app: "state" }, body)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No connection — check your internet and try again." }; }); };
   var cur = null; try { cur = JSON.parse(localStorage.getItem("biw-auth") || "null"); } catch (e) { }
   var id = K.split(".")[0];

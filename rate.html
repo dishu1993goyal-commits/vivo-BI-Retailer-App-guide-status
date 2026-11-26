@@ -27,6 +27,7 @@ textarea,input[type=text],input[type=tel]{width:100%;border:1.5px solid #DADDF0;
 <script>
 (function () {
   "use strict";
+  window.addEventListener("hashchange", function () { location.reload(); });   // a new shared link opened in the same tab / app screen must load fresh
   var V = document.getElementById("v"), code = (/[#&?]s=([a-zA-Z0-9]+)/.exec(location.hash + "&" + location.search) || [])[1] || "", R = 0, N = null;
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
   var post = function (b) { return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "x-bi-app": "1" }, body: JSON.stringify(Object.assign({ app: "state", s: code }, b)) }).then(function (r) { return r.json(); }).catch(function () { return { ok: false, error: "No internet connection. Please try again." }; }); };

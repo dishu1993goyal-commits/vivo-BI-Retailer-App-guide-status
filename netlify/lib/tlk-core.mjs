@@ -68,9 +68,9 @@ export async function tlkAction(b, ctx) {
     const id = t.toString(36) + randomBytes(3).toString("hex"), secret = randomBytes(18).toString("base64url");
     const origin = /^https:\/\/[\w.-]+$/.test(String(b.origin || "")) ? b.origin : "";
     const L = { id, hash: sha(secret), page: pages[0], pages, tabs, demo: !!b.demo, label: str(b.label, 80) || "Shared link", view, state, write: !b.demo && !!b.write, ask: b.ask !== false, pin: pin ? hashPin(pin) : "", max: Math.max(1, Math.min(500, Math.round(+b.max || 25))), exp: days ? t + days * 864e5 : 0, off: false, by, byKey: rec.username, at: t, opens: 0, devices: [] };
-    L.url = origin ? origin + "/open.html#" + id + "." + secret : "";
+    L.url = origin ? origin + "/open.html?i=" + id + "#" + id + "." + secret : "";
     await store.set("tlk:" + id, L);
-    return J(200, { ok: true, link: pubLink(L), url: "/open.html#" + id + "." + secret });
+    return J(200, { ok: true, link: pubLink(L), url: "/open.html?i=" + id + "#" + id + "." + secret });
   }
   const L = await store.get("tlk:" + str(b.id, 30)); if (!L) return J(404, { ok: false, error: "Link not found" });
   if (b.action === "tlk-set") {

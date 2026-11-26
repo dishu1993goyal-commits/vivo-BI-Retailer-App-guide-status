@@ -100,6 +100,7 @@ html,body{background:#F4F6F2;min-height:100%}
   "use strict";
   /*@@CORE@@*/
   var ROOT = $("root"), KA = ls("kh-auth"), MODE = "", SID = "", D = null, TAB = "home", PM = {}, RM = {}, PSEG = "c", ISEG = "all", ICAT = "";
+  window.addEventListener("hashchange", function () { if (location.hash.length > 1) location.reload(); });   // a new shared bill / login link opened in the same tab
   var H = (function () { var o = {}; String(location.hash || "").replace(/^#/, "").split("&").forEach(function (kv) { var a = kv.split("="); if (a[0]) o[a[0]] = decodeURIComponent(a[1] || ""); }); return o; })();
   var Q = (function () { var o = {}; String(location.search || "").replace(/^\?/, "").split("&").forEach(function (kv) { var a = kv.split("="); if (a[0]) o[a[0]] = decodeURIComponent(a[1] || ""); }); return o; })();
   var rs = function (n) { n = Number(n) || 0; return (n < 0 ? "−" : "") + "₹" + Math.round(Math.abs(n)).toLocaleString("en-IN"); };

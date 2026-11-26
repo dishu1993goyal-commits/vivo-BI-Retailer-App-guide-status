@@ -13,8 +13,16 @@
       if (here !== "index.html") location.reload(); return;
     }
     // A shared tool page opened again on a browser with no login of its own: the link session put aside earlier opens it
-    if ((!w || !w.token) && !portal && here !== "open.html") { var lk = JSON.parse(LS.getItem("biw-auth-link") || "null"); if (lk && lk.link && lk.token && pg(lk).indexOf(here) >= 0) { LS.setItem("biw-auth", JSON.stringify(lk)); location.reload(); return; } }
-    if (!w || !w.link || !w.link.page) return;
+    if ((!w || !w.token) && !portal && here !== "open.html" && !(location.search.length > 1)) { var lk = JSON.parse(LS.getItem("biw-auth-link") || "null"); if (lk && lk.link && lk.token && pg(lk).indexOf(here) >= 0) { LS.setItem("biw-auth", JSON.stringify(lk)); location.reload(); return; } }
+    if (!w || !w.link || !w.link.page || here === "open.html") return;
+    // A NEW shared address (its own ?key or #key, e.g. another tool link, a retailer page, a video guide, a survey) must open
+    // what it points to — never bounce back to the tool of an earlier link. The earlier link session is put aside (it comes
+    // back if that tool's page is opened again) and the person's own login, if one was kept aside, is used.
+    if (pg(w).indexOf(here) < 0 && (location.search.length > 1 || location.hash.length > 1)) {
+      LS.setItem("biw-auth-link", JSON.stringify(w));
+      var own = LS.getItem("biw-auth-main"); if (own) { LS.setItem("biw-auth", own); LS.removeItem("biw-auth-main"); } else LS.removeItem("biw-auth");
+      return;
+    }
     var L = w.link, pages = pg(w);
     if (here !== "open.html" && pages.indexOf(here) < 0) { location.replace("/" + pages[0]); return; }
     window.BI_LINK = L;

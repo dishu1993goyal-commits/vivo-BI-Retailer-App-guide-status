@@ -28,6 +28,7 @@
 (function () {
   "use strict";
   /*@@CORE@@*/
+  window.addEventListener("hashchange", function () { location.reload(); });   // a new shared link opened in the same tab / app screen must load fresh
   var VIEW = $("view"), TAB = "new", G = null, FR = [], LANG = "en", WHAT = "", PUBK = (location.hash.match(/k=([\w-]+)/) || [])[1];
   var LANGS = [["en", "English"], ["hi", "हिंदी Hindi"], ["bn", "বাংলা"], ["ta", "தமிழ்"], ["te", "తెలుగు"], ["kn", "ಕನ್ನಡ"], ["mr", "मराठी"], ["gu", "ગુજરાતી"], ["pa", "ਪੰਜਾਬੀ"], ["or", "ଓଡ଼ିଆ"], ["ml", "മലയാളം"], ["as", "অসমীয়া"]];
   var TABS = [["new", "🎬 New guide"], ["mine", "📚 Guides"]];
