@@ -2,8 +2,8 @@
   "versionCode": 55,
   "versionName": "8.9",
   "notes": [
-    "New: Portal task recorder (Admin app) — record a task once on a vivo portal, then the app repeats it for every Excel row. You log in and type every password and captcha yourself; the app stops and waits for you at those steps.",
-    "Product permissions keep working as in 7.5."
+    "New: import a screen recording or demo video in UI/UX studio and Tool manuals — the picker now opens your videos.",
+    "Fix: a new shared link always opens its own screen (never the previous link's tool)."
   ],
   "apk": {
     "admin": "https://github.com/dishu1993goyal-commits/vivo-BI-Retailer-App-guide-status/releases/latest/download/vivo-BI-Dashboard.apk",
