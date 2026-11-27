@@ -72,7 +72,7 @@
       VS.file = f; VS.url = URL.createObjectURL(f);
       if (keepFrames && VS.frames.length) { VS.name = VS.name || f.name; vsView(); toast("Video attached — you can make the voiced video now"); return; }
       vsView(); vsBusy(true, "Opening the video…");
-      lib2("/vidframes.js?v=1", function () { return window.VidFrames; }).then(function () {
+      lib2("/vidframes.js?v=2", function () { return window.VidFrames; }).then(function () {
         return VidFrames.pick(f, { max: 18, onProgress: function (p, m) { vsBusy(true, m, p); } });
       }).then(function (r) { VS.name = r.name; VS.dur = r.dur; VS.w = r.w; VS.h = r.h; VS.frames = r.frames; VS.script = null; VS.id = ""; vsBusy(false); vsView(); toast(r.frames.length + " key frames found — remove any you don't need, then let AI write the script"); })
         .catch(function (e) { vsBusy(false, ""); toast(e.message || "Couldn't read the video"); vsView(); });
@@ -126,18 +126,27 @@
   var vsName = function (ext) { return ("Demo_" + String((VS.script && VS.script.title) || VS.name || "video").replace(/\.[a-z0-9]+$/i, "").replace(/\W+/g, "_").slice(0, 40) + "_" + VS.lang + "." + ext); };
   function vsAI() {
     var F = VS.frames.filter(function (f) { return f.src; }); if (!F.length) return toast("Choose the video again — AI needs the full-size frames");
-    var seen = [], n = 0;
-    var batch = function (tries) {
-      if (n >= F.length) return Promise.resolve();
-      var part = F.slice(n, n + 3); vsBusy(true, "🤖 AI is watching frames " + (n + 1) + "–" + (n + part.length) + " of " + F.length + "…", 0.05 + 0.75 * n / F.length);
-      return api({ action: "man-vid-see", frames: part.map(function (f) { return f.src; }), offset: n, times: part.map(function (f) { return f.t; }), about: VS.note || "" }).then(function (r) {
-        if (!r.ok) { if (tries < 1) return batch(tries + 1); throw new Error(r.error); }
-        part.forEach(function (f, k) { seen.push(Object.assign({ t: f.t }, r.frames[k] || { screen: "Frame " + (n + k + 1) })); }); n += part.length; return batch(0);
+    vsBusy(true, "Sending " + F.length + " key frames to the AI…", 0.03);
+    vxRun({ kind: "man", frames: F.map(function (f) { return { t: f.t, src: f.src }; }), lang: VS.lang, aud: AUD, tone: VS_TONE, name: VS.name, about: VS.note || "", note: VS.note || "" }, function (p, m) { vsBusy(true, m, p); })
+      .then(function (r) { VS.script = r.script; vsBusy(false); vsView(); vsSave(false); toast("✅ Script ready — " + vsSteps().length + " steps. Edit anything, then export."); })
+      .catch(function (e) { vsBusy(false, "❌ " + (e.message || "AI couldn't write the script")); toast(e.message || "AI couldn't write the script"); });
+  }
+  // 🎬 long video AI work runs as a background job on the server; the page asks for progress every few seconds
+  function vxRun(body, onProg) {
+    return api(Object.assign({ action: "vx-job" }, body)).then(function (r) {
+      if (!r.ok) throw new Error(r.error || "Couldn't start the AI job");
+      var job = r.job, miss = 0, t0 = Date.now();
+      return new Promise(function (res, rej) {
+        var tick = function () {
+          api({ action: "vx-job-get", job: job }).then(function (g) {
+            if (!g.ok) { if (++miss > 8) return rej(new Error(g.error || "Lost the AI job — try again")); return setTimeout(tick, 4000); }
+            miss = 0; if (g.st === "done") { if (g.res && g.res.ok) return res(g.res); return rej(new Error((g.res && g.res.error) || "The AI job failed — try again")); }
+            onProg(g.p || 0, (g.msg || "Working…") + " · " + Math.round((Date.now() - t0) / 1000) + " s"); setTimeout(tick, 3000);
+          });
+        };
+        setTimeout(tick, 1500);
       });
-    };
-    batch(0).then(function () { vsBusy(true, "✍️ Writing the step-by-step script…", 0.85); return api({ action: "man-vid-script", seen: seen, lang: VS.lang, aud: AUD, tone: VS_TONE, name: VS.name, about: VS.note || "", note: VS.note || "" }); })
-      .then(function (r) { if (!r.ok) throw new Error(r.error); VS.script = r.script; vsBusy(false); vsView(); vsSave(false); toast("✅ Script ready — " + vsSteps().length + " steps. Edit anything, then export."); })
-      .catch(function (e) { vsBusy(false); toast(e.message || "AI couldn't write the script"); });
+    });
   }
   function vsPaste() {
     var ov = sheet("📋 Paste your own script", "One paragraph per step, in order (blank line between). You can also start lines with Intro:, Step 3: or Outro:. Steps match the key frames in order.", [["✓", "Use this script", function (o) {

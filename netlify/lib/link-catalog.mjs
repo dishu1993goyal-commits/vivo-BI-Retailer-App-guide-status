@@ -1555,9 +1555,9 @@ export const LINK_CATALOG = {
 "man-vid-get",
 "man-vid-list",
 "man-vid-save",
-"man-vid-script",
-"man-vid-see",
-"man-voice"
+"man-voice",
+"vx-job",
+"vx-job-get"
 ],
 "tabs": []
 },
@@ -1949,7 +1949,25 @@ export const LINK_CATALOG = {
 "ux-list",
 "ux-results",
 "ux-save",
-"ux-share"
+"ux-share",
+"vx-job",
+"vx-job-get"
+],
+"tabs": []
+},
+"vexplain.html": {
+"id": "vexplain",
+"icon": "🎬",
+"name": "Video explainer (AI presenter + voice)",
+"ho": false,
+"acts": [
+"ar-tts",
+"vx-del",
+"vx-get",
+"vx-job",
+"vx-job-get",
+"vx-list",
+"vx-save"
 ],
 "tabs": []
 },

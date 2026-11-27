@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Video explainer</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.step{display:flex;gap:10px;align-items:flex-start}.step>div{min-width:0;flex:1}.step .n{width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;font-size:13px}
+.fr{display:flex;gap:8px;overflow-x:auto;padding:6px 2px}.fr .f{flex:none;width:96px;position:relative;font-size:11px;text-align:center}.fr .f img{width:96px;height:170px;object-fit:contain;background:#111;border-radius:10px;display:block}.fr .f button{position:absolute;top:3px;right:3px;border:0;border-radius:50%;width:22px;height:22px;background:#0009;color:#fff;cursor:pointer}
+.prog{height:6px;border-radius:9px;background:#EEF0F6;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5B6CFF,#8F5BFF);transition:width .3s}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tabs button{border:1px solid #DADDF0;background:#fff;border-radius:999px;padding:6px 12px;font:700 12.5px inherit;cursor:pointer}.tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.sc{border-top:1px solid #EEF0F6;padding:12px 0;display:flex;gap:12px}.sc.skip{opacity:.45}
+.pic{position:relative;flex:none;width:150px;cursor:crosshair;align-self:flex-start}.pic img{width:150px;display:block;border-radius:10px;background:#111}.pic .pt{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#FF5A3C;color:#fff;font:800 11px/22px inherit;text-align:center;box-shadow:0 0 0 3px #fff8;pointer-events:none}.pic .pt.on{background:#6C5CFF;box-shadow:0 0 0 4px #fff}
+.bt{display:flex;gap:6px;align-items:flex-start;margin-top:6px}.bt .k{flex:none;width:22px;height:22px;border-radius:50%;background:#EEF0FF;color:var(--brand);font:800 11px/22px inherit;text-align:center;cursor:pointer;margin-top:6px}.bt .k.on{background:#6C5CFF;color:#fff}.bt textarea{flex:1}.bt button{flex:none;border:0;background:none;color:var(--mut);cursor:pointer;font-size:16px;margin-top:4px}
+.prs{display:flex;gap:8px;flex-wrap:wrap}.prs button{border:2px solid #E1E4F0;border-radius:14px;background:#fff;padding:4px 6px 6px;cursor:pointer;font:700 11.5px inherit;width:74px}.prs button.on{border-color:var(--brand);background:#F3F4FF}.prs canvas{width:60px;height:60px;display:block;margin:0 auto}
+.exp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.exp button{border:1px solid #E1E4F0;border-radius:14px;background:#fff;padding:10px;text-align:left;font:700 13px inherit;cursor:pointer}.exp button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px;margin-top:2px}.exp button.pri{background:linear-gradient(135deg,#4D5BF9,#7A4CFF);color:#fff;border:0}.exp button.pri small{color:#E6E8FF}
+.ck{display:flex;gap:6px;align-items:center;font-size:12.5px}
+video.pv{width:100%;border-radius:12px;background:#000;margin-top:8px}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=5"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎬</span></div>
+  <h1>Video explainer</h1><p>Turn a screen recording or demo video into a narrated explainer — AI presenter with a pointer, AI voice-over and captions, in English, हिन्दी, 中文 and more</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/vidframes.js?v=2"></script>
+<script src="/presenter.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view");
+  var LANGS = [["en", "English"], ["hi", "हिन्दी Hindi"], ["zh", "简体中文 Chinese"], ["ta", "தமிழ் Tamil"], ["te", "తెలుగు Telugu"], ["bn", "বাংলা Bengali"], ["mr", "मराठी Marathi"], ["gu", "ગુજરાતી Gujarati"], ["kn", "ಕನ್ನಡ Kannada"], ["ml", "മലയാളം Malayalam"], ["pa", "ਪੰਜਾਬੀ Punjabi"], ["or", "ଓଡ଼ିଆ Odia"]];
+  var LN = {}; LANGS.forEach(function (l) { LN[l[0]] = l[1]; });
+  var CSSF = "'Segoe UI','Noto Sans','Noto Sans Devanagari','Noto Sans SC','Microsoft YaHei','Nirmala UI',system-ui,sans-serif";
+  var LIB = { pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js", mux: "/vendor/mp4muxer/mp4-muxer.min.js" }, LOADED = {};
+  function lib(k) { if (LOADED[k]) return LOADED[k]; LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIB[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load " + k)); }; document.head.appendChild(s); }); return LOADED[k]; }
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var fmt = function (t) { t = Math.max(0, Math.round(t || 0)); return Math.floor(t / 60) + ":" + ("0" + (t % 60)).slice(-2); };
+  // ---------- project state ----------
+  // P: { id, name, dur, w, h, url (video on this device), frames:[{t, src, thumb}], scripts:{lang: script}, lang (shown), about, aud, tone }
+  // script: { title, intro, outro, steps:[{ f, title, skip, beats:[{ text, x, y (percent of the frame), pt }] }] }
+  var P = null, O = { pres: "priya", voice: "f", cap: true, ptr: true, full: false, maxF: 16 }, SELB = null;
+  try { var sv = JSON.parse(localStorage.getItem("vx-opts") || "null"); if (sv) O = Object.assign(O, sv); } catch (e) { }
+  var saveO = function () { try { localStorage.setItem("vx-opts", JSON.stringify(O)); } catch (e) { } };
+  var S = function () { return P && P.scripts[P.lang]; };
+  function busy(on, msg, p) { var b = $("pg"); if (!b) return; b.style.display = on ? "" : "none"; if (p != null) b.firstChild.style.width = Math.round(p * 100) + "%"; if ($("pm")) $("pm").textContent = msg || ""; [].forEach.call(VIEW.querySelectorAll("[data-b]"), function (x) { x.disabled = !!on; }); }
+
+  // ================= view =================
+  function draw() {
+    if (!P) {
+      VIEW.innerHTML = '<div class="card"><div class="step"><span class="n">1</span><div><b>Import a screen recording or demo video</b><div class="muted" style="font-size:12.5px;margin-top:3px">Any MP4 / screen recording from your phone or laptop. The video stays on your device — only a few key frames are read by AI.</div>' +
+        '<label class="lb">How much detail</label><select class="tx" id="mx"><option value="10"' + (O.maxF == 10 ? " selected" : "") + '>Short — up to 10 screens</option><option value="16"' + (O.maxF == 16 ? " selected" : "") + '>Normal — up to 16 screens</option><option value="24"' + (O.maxF == 24 ? " selected" : "") + ">Detailed — up to 24 screens</option></select>" +
+        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="pick" data-b>📂 Choose video</button><button class="btn ghost" id="saved">📁 Saved explainers</button></div><div class="prog" id="pg" style="display:none"><i></i></div><div class="muted" id="pm" style="font-size:12px;margin-top:4px"></div></div></div></div>' +
+        '<div class="card"><b>What you get</b><div class="muted" style="font-size:12.5px;line-height:1.55;margin-top:4px">🤖 AI watches every screen and writes what the presenter says — every feature, number and button, in order.<br>🧑‍🏫 An AI presenter explains, with a pointer that moves to each thing being explained.<br>🎙️ AI voice-over and 💬 captions at the bottom — English, हिन्दी, 中文 and 9 more Indian languages (add more languages to the same video).<br>✏️ Edit any line or move the pointer by tapping the screen.<br>🎬 MP4 video · 📊 PowerPoint · 📄 PDF · subtitles.</div></div>';
+      $("mx").onchange = function () { O.maxF = +this.value; saveO(); };
+      $("pick").onclick = function () { pickVideo(false); }; $("saved").onclick = savedList; return;
+    }
+    var sc = S(), F = P.frames;
+    VIEW.innerHTML = '<div class="row" style="gap:8px;margin-bottom:8px"><button class="btn ghost sm" id="home">← New video</button><b style="flex:1;align-self:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🎬 ' + esc((sc && sc.title) || P.name || "Video") + "</b></div>" +
+      '<div class="card"><div class="step"><span class="n">1</span><div><b>The recording</b><div class="muted" style="font-size:12px">' + esc(P.name || "") + " · " + fmt(P.dur) + " · " + F.length + " key screens" + (P.url ? "" : ' · <b style="color:#C2410C">attach the video file to make the MP4</b>') + "</div>" +
+      '<div class="fr">' + F.map(function (f, i) { return '<div class="f"><img src="' + (f.thumb || f.src) + '" alt=""><button data-rm="' + i + '" title="Remove">✕</button>' + (i + 1) + " · " + fmt(f.t) + "</div>"; }).join("") + "</div>" +
+      '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sec sm" id="att" data-b>📂 ' + (P.url ? "Choose another video" : "Attach the video file") + '</button></div><div class="prog" id="pg" style="display:none"><i></i></div><div class="muted" id="pm" style="font-size:12px;margin-top:4px"></div></div></div></div>' +
+      '<div class="card"><div class="step"><span class="n">2</span><div><b>AI explains it</b>' +
+      '<label class="lb">What is this video about? (helps the AI)</label><input class="tx" id="ab" placeholder="e.g. vivo Retailer App — how a retailer checks scheme payouts" value="' + esc(P.about || "") + '">' +
+      '<div class="g2"><div><label class="lb">Explain it to</label><select class="tx" id="au">' + [["user", "Users / field team"], ["retailer", "Retailers"], ["mgmt", "Management"], ["dev", "Developers"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === P.aud ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></div>" +
+      '<div><label class="lb">Style</label><select class="tx" id="to">' + [["friendly, clear trainer", "Friendly trainer"], ["formal corporate presenter", "Formal corporate"], ["energetic product demo host", "Energetic demo"], ["very simple, for first-time users", "Very simple"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === P.tone ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="lb">Language</label><select class="tx" id="lg">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === (P.lang || "en") ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + "</select>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="ai" data-b' + (F.some(function (f) { return f.src; }) ? "" : " disabled") + ">✨ " + (sc ? "Explain again with AI" : "AI watches & explains the video") + '</button><button class="btn sec sm" id="own" data-b>📋 Write / paste my own script</button></div>' +
+      (F.some(function (f) { return f.src; }) ? "" : '<div class="muted" style="font-size:12px;margin-top:4px">Attach the video file to let AI read it again.</div>') + "</div></div></div>" +
+      (sc ? scriptCard(sc) + exportCard() : "");
+    wire();
+  }
+  function scriptCard(sc) {
+    var langs = Object.keys(P.scripts);
+    return '<div class="card"><div class="step"><span class="n">3</span><div><b>Script — edit anything</b><div class="muted" style="font-size:12px">Each numbered line is said while the pointer shows that spot. Tap a number, then tap the picture to move its pointer.</div>' +
+      '<div class="tabs">' + langs.map(function (l) { return '<button data-lg="' + l + '"' + (l === P.lang ? ' class="on"' : "") + ">" + esc(LN[l] || l) + "</button>"; }).join("") + '<button id="addl" data-b>＋ Language</button></div>' +
+      '<label class="lb">Video title</label><input class="tx" data-k="title" value="' + esc(sc.title || "") + '"><label class="lb">🎬 Opening</label><textarea class="tx" rows="2" data-k="intro">' + esc(sc.intro || "") + "</textarea>" +
+      sc.steps.map(function (s, i) { var f = P.frames[s.f] || {};
+        return '<div class="sc' + (s.skip ? " skip" : "") + '"><div class="pic" data-pic="' + i + '"><img src="' + (f.thumb || f.src || "") + '" alt="">' + s.beats.map(function (b, k) { return b.pt || O.ptr ? '<div class="pt' + (SELB && SELB[0] === i && SELB[1] === k ? " on" : "") + '" style="left:' + b.x + "%;top:" + b.y + '%">' + (k + 1) + "</div>" : ""; }).join("") + '<div class="muted" style="font-size:11px;margin-top:2px">' + fmt(f.t) + "</div></div>" +
+          '<div style="flex:1;min-width:0"><div class="row" style="gap:6px;align-items:center"><input class="tx" data-s="' + i + '" data-f="title" value="' + esc(s.title) + '" style="flex:1;margin:0;padding:6px 8px"><label class="ck"><input type="checkbox" data-s="' + i + '" data-f="skip"' + (s.skip ? " checked" : "") + "> skip</label></div>" +
+          s.beats.map(function (b, k) { return '<div class="bt"><span class="k' + (SELB && SELB[0] === i && SELB[1] === k ? " on" : "") + '" data-sel="' + i + "," + k + '" title="Tap, then tap the picture to move this pointer">' + (k + 1) + '</span><textarea class="tx" rows="2" data-s="' + i + '" data-b2="' + k + '">' + esc(b.text) + '</textarea><button data-del="' + i + "," + k + '" title="Remove">✕</button></div>'; }).join("") +
+          '<button class="btn ghost sm" data-add="' + i + '" style="margin-top:6px">＋ Add a line</button></div></div>'; }).join("") +
+      '<label class="lb">👋 Closing</label><textarea class="tx" rows="2" data-k="outro">' + esc(sc.outro || "") + "</textarea>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn ghost sm" id="sv" data-b>💾 Save</button><button class="btn ghost sm" id="txt">⬇ Script .txt</button><button class="btn ghost sm" id="srt">⬇ Subtitles .srt</button></div></div></div></div>';
+  }
+  function exportCard() {
+    var P5 = window.BIPresenter ? window.BIPresenter.PRESETS : {}, ids = ["priya", "arjun", "vee", "dev", "robo"].filter(function (k) { return P5[k]; });
+    return '<div class="card"><div class="step"><span class="n">4</span><div><b>Make the explainer</b>' +
+      '<label class="lb">🧑‍🏫 AI presenter</label><div class="prs">' + ids.map(function (k) { return '<button data-pr="' + k + '"' + (O.pres === k ? ' class="on"' : "") + '><canvas width="120" height="120" data-pc="' + k + '"></canvas>' + esc(P5[k].n) + "</button>"; }).join("") + '<button data-pr="off"' + (O.pres === "off" ? ' class="on"' : "") + '><div style="height:60px;font-size:30px;line-height:60px">🚫</div>None</button></div>' +
+      '<div class="g2"><div><label class="lb">🎙️ Voice</label><select class="tx" id="vo"><option value="f"' + (O.voice === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (O.voice === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (O.voice === "off" ? " selected" : "") + '>No voice (captions only)</option></select></div>' +
+      '<div><label class="lb">Language of the video</label><select class="tx" id="vl">' + Object.keys(P.scripts).map(function (l) { return '<option value="' + l + '"' + (l === P.lang ? " selected" : "") + ">" + esc(LN[l] || l) + "</option>"; }).join("") + "</select></div></div>" +
+      '<div class="row" style="gap:14px;margin-top:8px;flex-wrap:wrap"><label class="ck"><input type="checkbox" id="ocap"' + (O.cap ? " checked" : "") + '> 💬 Captions at the bottom</label><label class="ck"><input type="checkbox" id="optr"' + (O.ptr ? " checked" : "") + '> 👆 Pointer</label><label class="ck"><input type="checkbox" id="ofull"' + (O.full ? " checked" : "") + "> Play the full recording between screens (longer)</label></div>" +
+      '<div class="exp"><button class="pri" data-x="mp4" data-b>🎬 Explainer video<small>MP4 · presenter, pointer, voice, captions</small></button><button data-x="prev" data-b>▶ Quick preview<small>First screens, no voice — check the look</small></button><button data-x="pptx" data-b>📊 PowerPoint<small>One slide per screen, numbered pointers, notes</small></button><button data-x="pdf" data-b>📄 PDF guide<small>Same as the slides</small></button></div>' +
+      '<div id="out"></div></div></div></div>';
+  }
+  function sync() {
+    if (!P) return; if ($("ab")) { P.about = $("ab").value; P.aud = $("au").value; P.tone = $("to").value; }
+    var sc = S(); if (!sc) return;
+    [].forEach.call(VIEW.querySelectorAll("[data-k]"), function (e) { sc[e.dataset.k] = e.value; });
+    [].forEach.call(VIEW.querySelectorAll("[data-s][data-f]"), function (e) { var s = sc.steps[+e.dataset.s]; if (e.dataset.f === "skip") s.skip = e.checked; else s[e.dataset.f] = e.value; });
+    [].forEach.call(VIEW.querySelectorAll("[data-b2]"), function (e) { sc.steps[+e.dataset.s].beats[+e.dataset.b2].text = e.value; });
+  }
+  function wire() {
+    $("home").onclick = function () { sync(); if (P && P.url && !confirm("Start a new video? Save first if you want to keep this one.")) return; P = null; draw(); };
+    $("att").onclick = function () { sync(); pickVideo(true); };
+    [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { sync(); var k = +b.dataset.rm; P.frames.splice(k, 1); Object.keys(P.scripts).forEach(function (l) { var s = P.scripts[l]; s.steps = s.steps.filter(function (x) { return x.f !== k; }).map(function (x) { if (x.f > k) x.f--; return x; }); }); draw(); }; });
+    $("lg").onchange = function () { P.lang0 = this.value; };
+    $("ai").onclick = function () { sync(); explain(); };
+    $("own").onclick = function () { sync(); ownScript(); };
+    if (!S()) return;
+    [].forEach.call(VIEW.querySelectorAll("[data-lg]"), function (b) { b.onclick = function () { sync(); P.lang = b.dataset.lg; SELB = null; draw(); }; });
+    $("addl").onclick = function () { sync(); addLang(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-s][data-f=skip]"), function (c) { c.onchange = function () { sync(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-sel]"), function (b) { b.onclick = function () { sync(); var q = b.dataset.sel.split(","); SELB = [+q[0], +q[1]]; draw(); toast("Now tap the picture where line " + (SELB[1] + 1) + " should point"); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-pic]"), function (d) { d.onclick = function (e) {
+      var i = +d.dataset.pic, s = S().steps[i], r = d.querySelector("img").getBoundingClientRect(); if (e.clientY > r.bottom) return;
+      var k = SELB && SELB[0] === i ? SELB[1] : 0; if (!s.beats[k]) return; sync();
+      s.beats[k].x = Math.round(Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100))); s.beats[k].y = Math.round(Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))); s.beats[k].pt = true;
+      Object.keys(P.scripts).forEach(function (l) { var o = P.scripts[l].steps[i]; if (o && o.beats[k]) { o.beats[k].x = s.beats[k].x; o.beats[k].y = s.beats[k].y; o.beats[k].pt = true; } });   // same spot in every language
+      SELB = [i, k]; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { sync(); var q = b.dataset.del.split(","); S().steps[+q[0]].beats.splice(+q[1], 1); SELB = null; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-add]"), function (b) { b.onclick = function () { sync(); S().steps[+b.dataset.add].beats.push({ text: "", x: 50, y: 50, pt: false }); draw(); }; });
+    $("sv").onclick = function () { sync(); save(true); };
+    $("txt").onclick = function () { sync(); download(new Blob([scriptText()], { type: "text/plain" }), fname("txt")); };
+    $("srt").onclick = function () { sync(); download(new Blob([srt()], { type: "text/plain" }), fname("srt")); };
+    [].forEach.call(VIEW.querySelectorAll("[data-pr]"), function (b) { b.onclick = function () { sync(); O.pres = b.dataset.pr; saveO(); [].forEach.call(VIEW.querySelectorAll("[data-pr]"), function (x) { x.classList.toggle("on", x === b); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-pc]"), function (c) { var g = c.getContext("2d"); g.fillStyle = "#EEF0FF"; g.fillRect(0, 0, 120, 120); try { BIPresenter.draw(g, { x: 60, y: 230, s: 0.48, style: c.dataset.pc, pose: "idle", expr: "smile", t: 0 }); } catch (e) { } });
+    $("vo").onchange = function () { O.voice = this.value; saveO(); };
+    $("vl").onchange = function () { sync(); P.lang = this.value; draw(); };
+    $("ocap").onchange = function () { O.cap = this.checked; saveO(); }; $("optr").onchange = function () { O.ptr = this.checked; saveO(); }; $("ofull").onchange = function () { O.full = this.checked; saveO(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { sync(); var x = b.dataset.x; if (x === "mp4") makeVideo(false); else if (x === "prev") makeVideo(true); else if (x === "pptx") makePptx(); else makePdf(); }; });
+  }
+  var fname = function (ext) { return "Explainer_" + String((S() && S().title) || P.name || "video").replace(/\.[a-z0-9]+$/i, "").replace(/[^\wऀ-ൿ一-鿿]+/g, "_").slice(0, 40) + "_" + P.lang + "." + ext; };
+
+  // ================= import =================
+  function pickVideo(attach) {
+    var i = document.createElement("input"); i.type = "file"; i.accept = "video/*";
+    i.onchange = function () {
+      var f = i.files && i.files[0]; if (!f) return; if (f.size > 2e9) return toast("That video is too large (max 2 GB)");
+      if (attach && P && P.frames.length) {   // same project, video file attached again: refresh the full-size key frames
+        if (P.url) { try { URL.revokeObjectURL(P.url); } catch (e) { } }
+        P.url = URL.createObjectURL(f); P.file = f; busy(true, "Reading the key screens from the video…", 0.1);
+        grabAt(P.url, P.frames.map(function (x) { return x.t; })).then(function (src) { src.forEach(function (s, k) { if (s) P.frames[k].src = s; }); busy(false); draw(); toast("Video attached ✓"); }).catch(function (e) { busy(false); toast(e.message || "Couldn't read the video"); });
+        return;
+      }
+      P = { name: f.name, frames: [], scripts: {}, lang: "en", lang0: "en", aud: "user", tone: "friendly, clear trainer", url: URL.createObjectURL(f), file: f };
+      busy(true, "Opening the video…", 0.02);
+      VidFrames.pick(f, { max: O.maxF || 16, maxW: 800, onProgress: function (p, m) { busy(true, m, p); } }).then(function (r) {
+        P.dur = r.dur; P.w = r.w; P.h = r.h; P.frames = r.frames; busy(false); draw(); toast(r.frames.length + " key screens found — remove any you don't need, then ✨ AI explains");
+      }).catch(function (e) { busy(false); P = null; draw(); toast(e.message || "Couldn't read the video"); });
+    };
+    i.click();
+  }
+  function grabAt(url, times) {
+    var v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url; v.style.cssText = "position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;z-index:-1"; document.body.appendChild(v);
+    var out = [], k = 0;
+    var seek = function (t) { return new Promise(function (r) { var ok = false, f = function () { if (ok) return; ok = true; v.removeEventListener("seeked", f); r(); }; v.addEventListener("seeked", f); setTimeout(f, 3000); v.currentTime = t; }); };
+    return new Promise(function (res, rej) { v.onloadeddata = res; v.onerror = function () { rej(new Error("This video can't be played here — try an MP4 (H.264) file.")); }; }).then(function () {
+      P.w = v.videoWidth; P.h = v.videoHeight; P.dur = P.dur || v.duration;
+      var next = function () { if (k >= times.length) { v.remove(); return out; } return seek(times[k] + 0.05).then(function () { var c = document.createElement("canvas"), s = Math.min(1, 800 / v.videoWidth); c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s); c.getContext("2d").drawImage(v, 0, 0, c.width, c.height); out.push(c.toDataURL("image/jpeg", 0.74)); k++; return next(); }); };
+      return next();
+    });
+  }
+  // ================= AI =================
+  function vxRun(body, onProg) {
+    return api(Object.assign({ action: "vx-job" }, body)).then(function (r) {
+      if (!r.ok) throw new Error(r.error || "Couldn't start the AI job");
+      var job = r.job, miss = 0, t0 = Date.now();
+      return new Promise(function (res, rej) {
+        var tick = function () {
+          api({ action: "vx-job-get", job: job }).then(function (g) {
+            if (!g.ok) { if (++miss > 8) return rej(new Error(g.error || "Lost the AI job — try again")); return setTimeout(tick, 4000); }
+            miss = 0; if (g.st === "done") { if (g.res && g.res.ok) return res(g.res); return rej(new Error((g.res && g.res.error) || "The AI job failed — try again")); }
+            onProg(g.p || 0, (g.msg || "Working…") + " · " + Math.round((Date.now() - t0) / 1000) + " s"); setTimeout(tick, 3000);
+          });
+        };
+        setTimeout(tick, 1500);
+      });
+    });
+  }
+  function explain() {
+    var F = P.frames.filter(function (f) { return f.src; }); if (!F.length) return toast("Attach the video file first");
+    var lang = P.lang0 || $("lg").value || "en";
+    busy(true, "Sending " + F.length + " key screens to the AI…", 0.03);
+    vxRun({ kind: "explain", frames: F.map(function (f) { return { t: f.t, src: f.src }; }), lang: lang, aud: P.aud, tone: P.tone, about: P.about || "", note: P.about || "", name: P.name }, function (p, m) { busy(true, m, p); })
+      .then(function (r) { P.scripts = {}; P.scripts[r.lang] = r.script; P.lang = r.lang; busy(false); draw(); save(false); toast("✅ Script ready — " + steps().length + " screens. Edit anything, then make the video."); })
+      .catch(function (e) { busy(false, "❌ " + e.message); toast(e.message); });
+  }
+  function addLang() {
+    var have = Object.keys(P.scripts), opts = LANGS.filter(function (l) { return have.indexOf(l[0]) < 0; });
+    var ov = sheet("＋ Add a language", "AI translates the " + (LN[P.lang] || P.lang) + " script (pointers stay the same). You can edit it afterwards.", [["🌐", "Translate", function (o) {
+      var to = o.querySelector("#tl").value; busy(true, "🌐 Translating to " + LN[to] + "…", 0.1);
+      vxRun({ kind: "translate", to: to, script: S() }, function (p, m) { busy(true, m, p); }).then(function (r) { P.scripts[r.lang] = r.script; P.lang = r.lang; busy(false); draw(); save(false); toast("✅ " + LN[r.lang] + " added"); }).catch(function (e) { busy(false, "❌ " + e.message); toast(e.message); });
+    }, "pri"]], '<select class="tx" id="tl">' + opts.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + "</option>"; }).join("") + "</select>");
+    return ov;
+  }
+  function ownScript() {
+    sheet("📋 Write / paste your own script", "One paragraph per screen, in order (blank line between). Start lines with Intro: or Outro: if you like. Each sentence becomes one line the presenter says.", [["✓", "Use this script", function (o) {
+      var raw = o.querySelector("#raw").value.trim(); if (!raw) { toast("Write or paste the script first"); return false; }
+      var lang = $("lg").value || "en", sc = { title: P.name.replace(/\.[a-z0-9]+$/i, ""), intro: "", outro: "", steps: P.frames.map(function (f, i) { return { f: i, title: "Screen " + (i + 1), skip: false, beats: [] }; }) };
+      var paras = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean), k = 0;
+      paras.forEach(function (p) { var m = /^\s*(intro|opening|outro|closing)\s*[:.\-–]\s*/i.exec(p), body = m ? p.slice(m[0].length) : p;
+        if (m && /^(intro|opening)/i.test(m[1])) sc.intro = body; else if (m) sc.outro = body;
+        else if (sc.steps[k]) { (body.match(/[^.!?。！？।]+[.!?。！？।]*/g) || [body]).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (x, j) { sc.steps[k].beats.push({ text: x, x: 50, y: 20 + (j % 4) * 20, pt: false }); }); k++; }
+        else sc.outro = (sc.outro ? sc.outro + " " : "") + body; });
+      sc.steps.forEach(function (s) { if (!s.beats.length) s.skip = true; });
+      P.scripts[lang] = sc; P.lang = lang; draw(); toast("Script placed — tap a number then the picture to set each pointer");
+    }, "pri"]], '<textarea class="tx" id="raw" rows="12" placeholder="Intro: In this video you will learn…\n\nThis is the Home screen. The top card shows your sales against target.\n\nNow tap Schemes…\n\nOutro: That\'s it!"></textarea>');
+  }
+  // ================= save / open =================
+  function save(say) {
+    var small = function (src) { return new Promise(function (res) { if (!src) return res(""); var im = new Image(); im.onload = function () { var k = Math.min(1, (P.w > P.h ? 560 : 300) / im.width), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", 0.6)); }; im.onerror = function () { res(""); }; im.src = src; }); };
+    Promise.all(P.frames.map(function (f) { return small(f.src || f.thumb); })).then(function (th) {
+      return api({ action: "vx-save", id: P.id || "", name: P.name, title: (S() && S().title) || "", dur: P.dur, w: P.w, h: P.h, presenter: O.pres, opts: { about: P.about, aud: P.aud, tone: P.tone }, frames: P.frames.map(function (f, i) { return { t: f.t, thumb: th[i] }; }), scripts: P.scripts });
+    }).then(function (r) { if (r.ok) { P.id = r.id; if (say) toast("💾 Saved — reopen it from 📁 Saved explainers"); } else if (say) toast(r.error); });
+  }
+  function savedList() {
+    api({ action: "vx-list" }).then(function (r) {
+      if (!r.ok) return toast(r.error); if (!r.rows.length) return toast("Nothing saved yet");
+      var ov = sheet("📁 Saved explainers", "Open one to edit or export again. To make the MP4, attach the same video file.", [], r.rows.map(function (x) { return '<div class="row" style="gap:10px;align-items:center;border-top:1px solid #EEF0F6;padding:8px 0;cursor:pointer" data-o="' + esc(x.id) + '">' + (x.thumb ? '<img src="' + x.thumb + '" style="width:48px;height:60px;object-fit:cover;border-radius:8px">' : "") + '<div style="flex:1;min-width:0"><b style="font-size:13.5px">' + esc(x.title || x.name) + '</b><div class="muted" style="font-size:12px">' + fmt(x.dur) + " · " + x.langs.map(function (l) { return LN[l] || l; }).join(", ") + '</div></div><button class="btn ghost sm" data-d="' + esc(x.id) + '">🗑</button></div>'; }).join(""));
+      [].forEach.call(ov.querySelectorAll("[data-o]"), function (row) { row.onclick = function (e) {
+        var d = e.target.closest("[data-d]"); if (d) { if (confirm("Delete this explainer?")) api({ action: "vx-del", id: d.dataset.d }).then(function () { row.remove(); }); return; }
+        api({ action: "vx-get", id: row.dataset.o }).then(function (g) { if (!g.ok) return toast(g.error); var x = g.item; ov.remove();
+          P = { id: x.id, name: x.name, dur: x.dur, w: x.w, h: x.h, frames: x.frames.map(function (f) { return { t: f.t, thumb: f.thumb, src: "" }; }), scripts: x.scripts, lang: Object.keys(x.scripts)[0] || "en", about: (x.opts || {}).about || "", aud: (x.opts || {}).aud || "user", tone: (x.opts || {}).tone || "" };
+          P.lang0 = P.lang; if (x.presenter) O.pres = x.presenter; draw(); });
+      }; });
+    });
+  }
+  // ================= timeline =================
+  function steps() { var sc = S(); return sc ? sc.steps.filter(function (s) { return !s.skip && P.frames[s.f] && s.beats.some(function (b) { return b.text.trim(); }); }) : []; }
+  // clips: { id → AudioBuffer } (null = estimate). Scenes: intro, per screen: beats over the still key screen, then the move to the next screen.
+  function timeline(clips) {
+    var sc = S(), act = steps(), out = [], at = 0, cjk = /^(zh)$/.test(P.lang);
+    var est = function (t) { t = String(t || ""); return Math.max(1.4, cjk ? t.length / 4.2 : t.split(/\s+/).filter(Boolean).length / 2.5); };
+    var d = function (id, t) { return clips ? (clips[id] ? clips[id].duration : 0) : est(t); };
+    var add = function (q) { q.start = at; at += q.dur; out.push(q); };
+    add({ k: "intro", id: "intro", text: sc.intro || "", dur: Math.max(3000, (d("intro", sc.intro) + 0.8) * 1000) });
+    act.forEach(function (s, i) {
+      var beats = s.beats.filter(function (b) { return b.text.trim(); });
+      beats.forEach(function (b, k) { var id = "s" + i + "b" + k; add({ k: "beat", id: id, n: i + 1, of: act.length, s: s, b: b, j: k, beats: beats, prev: k ? beats[k - 1] : null, f: s.f, text: b.text, title: s.title, dur: Math.max(1800, (d(id, b.text) + 0.45) * 1000) }); });
+      var nx = act[i + 1]; if (!nx) return;
+      var t0 = P.frames[s.f].t, t1 = P.frames[nx.f].t, real = Math.max(0.2, t1 - t0), dur = O.full ? real : Math.min(real, 4), speed = real / dur;   // the move between screens, sped up to ≤4 s
+      add({ k: "move", id: "m" + i, n: i + 2, of: act.length, s: s, f: s.f, vs: t0, ve: t1, speed: speed, title: nx.title, dur: dur * 1000 });
+    });
+    add({ k: "outro", id: "outro", text: sc.outro || "", dur: Math.max(3000, (d("outro", sc.outro) + 0.8) * 1000) });
+    return { sc: out, total: at };
+  }
+  function scriptText() { var sc = S(); return (sc.title || "") + "\n\n" + (sc.intro ? "Intro: " + sc.intro + "\n\n" : "") + steps().map(function (s, i) { return (i + 1) + ". " + s.title + " (" + fmt(P.frames[s.f].t) + ")\n" + s.beats.map(function (b, k) { return "   " + (k + 1) + ") " + b.text; }).join("\n"); }).join("\n\n") + (sc.outro ? "\n\nOutro: " + sc.outro : "") + "\n"; }
+  function srt(T) { T = T || timeline(null); var ts = function (ms) { var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, x = Math.floor(ms % 1000); return [h, m, s].map(function (v) { return ("0" + v).slice(-2); }).join(":") + "," + ("00" + x).slice(-3); }; return T.sc.filter(function (q) { return q.text; }).map(function (q, i) { return (i + 1) + "\n" + ts(q.start + 150) + " --> " + ts(q.start + q.dur - 150) + "\n" + q.text + "\n"; }).join("\n"); }
+  // ================= drawing one 1280×720 frame =================
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function wrap(g, text, maxW) {   // words, and characters for Chinese / long words
+    var L = [], cur = "", toks = String(text || "").match(/[一-鿿　-〿＀-￯]|[^\s一-鿿　-〿＀-￯]+|\s+/g) || [];
+    toks.forEach(function (t) { if (/^\s+$/.test(t)) { if (cur) cur += " "; return; } var n = cur + t; if (g.measureText(n).width > maxW && cur.trim()) { L.push(cur.trim()); cur = t; } else cur = n; });
+    if (cur.trim()) L.push(cur.trim()); return L;
+  }
+  function box() {   // where the recording goes
+    var port = (P.h || 16) > (P.w || 9) * 1.05, pres = O.pres !== "off";
+    if (port) { var vh = O.cap ? 560 : 640, vw = vh * (P.w || 9) / (P.h || 16), vx = pres ? 330 : 140; return { port: true, x: vx, y: 24, w: vw, h: vh }; }
+    var w = pres ? 900 : 1120, h = w * (P.h || 9) / (P.w || 16), mh = O.cap ? 540 : 620; if (h > mh) { h = mh; w = h * (P.w || 16) / (P.h || 9); }
+    return { port: false, x: pres ? 1280 - w - 30 : (1280 - w) / 2, y: 70, w: w, h: h };
+  }
+  var ease = function (x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; };
+  function paint(g, q, img, el, total, o) {
+    o = o || {}; var W = 1280, H = 720, f = q.dur ? Math.min(1, el / q.dur) : 0, B = box(), pres = O.pres !== "off" && window.BIPresenter;
+    var bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#151A4A"); bg.addColorStop(1, "#3A2A8C"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.textBaseline = "top"; g.textAlign = "left";
+    var sc = S();
+    if (q.k === "intro" || q.k === "outro") {
+      var intro = q.k === "intro";
+      if (img) { var ih = 600, iw = ih * img.width / img.height; if (iw > 560) { iw = 560; ih = iw * img.height / img.width; } g.save(); rr(g, W - iw - 60, (H - ih) / 2, iw, ih, 22); g.clip(); g.drawImage(img, W - iw - 60, (H - ih) / 2, iw, ih); g.restore(); }
+      var tx = pres ? 330 : 80, tw = (img ? W - 640 : W - 160) - tx + 40;
+      g.fillStyle = "#9DF0FF"; g.font = "800 21px " + CSSF; g.fillText(intro ? "EXPLAINER" : "✅", tx, 150);
+      g.fillStyle = "#fff"; g.font = "800 48px " + CSSF; var tl = wrap(g, intro ? sc.title || P.name : (P.lang === "hi" ? "धन्यवाद!" : P.lang === "zh" ? "谢谢观看！" : "Thank you!"), tw).slice(0, 3); tl.forEach(function (l, i) { g.fillText(l, tx, 190 + i * 58); });
+      if (!O.cap) { g.fillStyle = "#DDE3FF"; g.font = "26px " + CSSF; wrap(g, q.text, tw).slice(0, 6).forEach(function (l, i) { g.fillText(l, tx, 210 + tl.length * 58 + i * 38); }); }
+      if (pres) BIPresenter.draw(g, { x: 170, y: 712, s: 0.95, style: O.pres, pose: intro ? (f < 0.5 ? "wave" : "present") : (f < 0.5 ? "thumb" : "wave"), tx: W - 300, ty: 330, mouth: o.mouth || 0, expr: "happy", blink: o.blink, t: el });
+    } else {
+      // the recording (rounded; a phone frame for portrait videos)
+      if (B.port) { g.fillStyle = "#0B0D1E"; rr(g, B.x - 10, B.y - 10, B.w + 20, B.h + 20, 34); g.fill(); }
+      if (img) { var IW = img.videoWidth || img.width, IH = img.videoHeight || img.height; g.save(); rr(g, B.x, B.y, B.w, B.h, B.port ? 26 : 12); g.clip(); g.fillStyle = "#000"; g.fillRect(B.x, B.y, B.w, B.h); var k = Math.min(B.w / IW, B.h / IH), dw = IW * k, dh = IH * k; g.drawImage(img, B.x + (B.w - dw) / 2, B.y + (B.h - dh) / 2, dw, dh); g.restore(); }
+      // step chip + title + the lines of this screen
+      var chip = (P.lang === "zh" ? "第 " + q.n + " / " + q.of + " 步" : P.lang === "hi" ? "चरण " + q.n + " / " + q.of : "STEP " + q.n + " / " + q.of);
+      var px = B.port ? B.x + B.w + 50 : (pres ? 30 : 40), py = B.port ? 40 : 16, pw = B.port ? W - px - 40 : (pres ? B.x - 60 : W - 80);
+      g.font = "800 17px " + CSSF; var cw = g.measureText(chip).width + 26; g.fillStyle = "#6C5CFF"; rr(g, px, py, cw, 32, 16); g.fill(); g.fillStyle = "#fff"; g.fillText(chip, px + 13, py + 8);
+      if (B.port) {
+        g.font = "800 36px " + CSSF; var tl2 = wrap(g, q.title, pw).slice(0, 2); tl2.forEach(function (l, i) { g.fillText(l, px, py + 48 + i * 44); });
+        var yy = py + 66 + tl2.length * 44;
+        if (q.k === "beat") q.beats.forEach(function (b, k) {
+          if (yy > (O.cap ? 560 : 650)) return; var on = k === q.j, done = k < q.j;
+          g.fillStyle = on ? "#6C5CFF" : done ? "rgba(124,240,216,.9)" : "rgba(255,255,255,.18)"; g.beginPath(); g.arc(px + 14, yy + 14, 14, 0, Math.PI * 2); g.fill(); g.fillStyle = "#fff"; g.font = "800 15px " + CSSF; g.textAlign = "center"; g.fillText(done ? "✓" : String(k + 1), px + 14, yy + 6); g.textAlign = "left";
+          g.font = (on ? "700 " : "") + "21px " + CSSF; g.fillStyle = on ? "#fff" : "rgba(221,227,255,.72)"; var L2 = wrap(g, b.text, pw - 44).slice(0, on ? 4 : 2); L2.forEach(function (l, i) { g.fillText(l + (i === L2.length - 1 && !on && wrap(g, b.text, pw - 44).length > 2 ? "…" : ""), px + 40, yy + 3 + i * 28); }); yy += L2.length * 28 + 16;
+        });
+        else { g.fillStyle = "#DDE3FF"; g.font = "22px " + CSSF; g.fillText(P.lang === "zh" ? "下一步 →" : P.lang === "hi" ? "अगला →" : "Next →", px, yy); }
+      } else {
+        g.fillStyle = "#fff"; g.font = "800 24px " + CSSF; var tl3 = wrap(g, q.title, pres ? pw : pw - cw - 20); if (pres) tl3.slice(0, 3).forEach(function (l, i) { g.fillText(l, px, py + 44 + i * 30); }); else g.fillText(tl3[0] || "", px + cw + 14, py + 4);
+      }
+      // pointer: glides to the spot, then pulses
+      var pt = null;
+      if (q.k === "beat" && O.ptr && (q.b.pt || true)) {
+        var a = { x: B.x + B.w * q.b.x / 100, y: B.y + B.h * q.b.y / 100 }, s0 = q.prev ? { x: B.x + B.w * q.prev.x / 100, y: B.y + B.h * q.prev.y / 100 } : { x: B.x + B.w / 2, y: B.y + B.h * 0.9 };
+        var m = ease(Math.min(1, el / 550)); pt = { x: s0.x + (a.x - s0.x) * m, y: s0.y + (a.y - s0.y) * m };
+        if (m >= 1) { var ph = ((el - 550) % 1300) / 1300; g.strokeStyle = "rgba(255,90,60," + (0.8 * (1 - ph)) + ")"; g.lineWidth = 4; g.beginPath(); g.arc(pt.x, pt.y, 14 + ph * 34, 0, Math.PI * 2); g.stroke(); g.fillStyle = "rgba(255,200,40,.28)"; g.beginPath(); g.arc(pt.x, pt.y, 26, 0, Math.PI * 2); g.fill(); }
+        // arrow cursor
+        g.save(); g.translate(pt.x, pt.y); g.fillStyle = "#fff"; g.strokeStyle = "#111"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 30); g.lineTo(8, 23); g.lineTo(14, 36); g.lineTo(20, 33); g.lineTo(14, 21); g.lineTo(24, 21); g.closePath(); g.fill(); g.stroke(); g.restore();
+      }
+      if (pres) {
+        var px2 = B.port ? 170 : 150, sc2 = B.port ? 1 : 0.88;
+        BIPresenter.draw(g, { x: px2, y: 712, s: sc2, style: O.pres, pose: q.k === "beat" ? (pt ? "point" : "present") : "present", tx: pt ? pt.x : B.x + B.w / 2, ty: pt ? pt.y : B.y + B.h / 2, mouth: o.mouth || 0, expr: q.k === "beat" ? (q.j === 0 ? "explain" : "smile") : "smile", blink: o.blink, t: el });
+      }
+    }
+    // captions: the sentence being spoken
+    if (O.cap && q.text) {
+      var sen = String(q.text).match(/[^.!?。！？।]+[.!?。！？।]*/g) || [q.text], tot = sen.reduce(function (s, x) { return s + x.length; }, 0) || 1, pos = f * tot * 1.06, acc = 0, cur = sen[0];
+      for (var j = 0; j < sen.length; j++) { acc += sen[j].length; cur = sen[j]; if (pos <= acc) break; }
+      g.font = "600 26px " + CSSF; var L3 = wrap(g, cur.trim(), 1080).slice(0, 2);
+      if (L3.length) { var bh = 18 + L3.length * 34, by = H - bh - 22; g.fillStyle = "rgba(8,10,26,.84)"; rr(g, 70, by, W - 140, bh, 14); g.fill(); g.fillStyle = "#fff"; g.textAlign = "center"; L3.forEach(function (l, i) { g.fillText(l, W / 2, by + 10 + i * 34); }); g.textAlign = "left"; }
+    }
+    if (total) { g.fillStyle = "rgba(255,255,255,.16)"; g.fillRect(0, H - 6, W, 6); g.fillStyle = "#7CF0D8"; g.fillRect(0, H - 6, W * Math.min(1, (o.at || 0) / total), 6); }
+  }
+  function img(src) { return new Promise(function (res) { if (!src) return res(null); var im = new Image(); im.onload = function () { res(im); }; im.onerror = function () { res(null); }; im.src = src; }); }
+  // ================= voice =================
+  function b64buf(b64) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+  function decode(ac, buf) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); }); }
+  function voices(ac, T, prog) {
+    var clips = {}, q = T.sc.filter(function (x) { return x.text && x.text.trim(); }), n = q.length, done = 0, err = "", fatal = false;
+    var one = function (x, tries) { return api({ action: "ar-tts", lang: P.lang, voice: O.voice, text: x.text }).then(function (r) {
+      if (r.ok && r.b64) return decode(ac, b64buf(r.b64)).then(function (b) { clips[x.id] = b; }).catch(function () { });
+      if (r.retry && tries < 3) return wait(Math.min(20, r.retry) * 1000).then(function () { return one(x, tries + 1); });
+      if (r.notConfigured) fatal = true; if (!err) err = r.error || "no voice"; }); };
+    var worker = function () { var x = q.shift(); if (!x || fatal) return Promise.resolve(); return one(x, 0).then(function () { done++; prog(done / n, "🎙️ Making the voice-over… " + done + " / " + n); return worker(); }); };
+    return Promise.all([worker(), worker(), worker(), worker()]).then(function () { return { clips: clips, error: err }; });
+  }
+  function envOf(buf) { var d = buf.getChannelData(0), sr = buf.sampleRate, w = Math.round(sr * 0.04), out = []; for (var i = 0; i < d.length; i += w) { var s = 0; for (var j = i; j < Math.min(d.length, i + w); j += 4) s += Math.abs(d[j]); out.push(s / (w / 4)); } var mx = Math.max.apply(null, out.concat([0.01])); return out.map(function (x) { return Math.min(1, x / mx * 1.3); }); }
+  // ================= the MP4 =================
+  function fastVideo(voiced) {
+    if (!window.VideoEncoder || !window.VideoFrame) return Promise.resolve(null);
+    var C = ["avc1.640028", "avc1.4d0028", "avc1.42001f", "vp09.00.31.08"], i = 0;
+    var tryV = function () { if (i >= C.length) return Promise.resolve(null); var c = C[i++]; return VideoEncoder.isConfigSupported({ codec: c, width: 1280, height: 720, bitrate: 3000000, framerate: 25 }).then(function (r) { return r.supported ? c : tryV(); }).catch(tryV); };
+    return tryV().then(function (vc) {
+      if (!vc) return null; if (!voiced) return { vc: vc, ac: null };
+      if (!window.AudioEncoder || !window.AudioData) return null;
+      var A2 = [["mp4a.40.2", "aac"], ["opus", "opus"]], j = 0, tryA = function () { if (j >= A2.length) return Promise.resolve(null); var a = A2[j++]; return AudioEncoder.isConfigSupported({ codec: a[0], sampleRate: 48000, numberOfChannels: 1, bitrate: 96000 }).then(function (r) { return r.supported ? { vc: vc, ac: a } : tryA(); }).catch(tryA); };
+      return tryA();
+    }).then(function (cfg) { return cfg ? lib("mux").then(function () { return window.Mp4Muxer ? cfg : null; }).catch(function () { return null; }) : null; });
+  }
+  function makeVideo(preview) {
+    if (!steps().length) return toast("The script is empty");
+    if (!preview && !P.url) return toast("Attach the video file first (📂 in step 1) — it stays on your device");
+    var voiced = !preview && O.voice !== "off", AC = window.AudioContext || window.webkitAudioContext, ac = voiced && AC ? new AC() : null, t0 = Date.now(), clips = {}, ENV = {};
+    var out = $("out"); out.innerHTML = '<div class="prog" id="vp"><i></i></div><div class="muted" id="vm" style="font-size:12px;margin-top:4px">Preparing…</div>';
+    var st = function (p, m) { if ($("vp")) $("vp").firstChild.style.width = Math.round(p * 100) + "%"; if ($("vm")) $("vm").textContent = m; };
+    [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (x) { x.disabled = true; });
+    var v = null, cleanup = function () { try { if (v) v.remove(); } catch (e) { } if (ac) { try { ac.close(); } catch (e) { } } [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (x) { x.disabled = false; }); };
+    if (P.url) { v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = P.url; v.style.cssText = "position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;z-index:-1"; document.body.appendChild(v); }
+    var cv = document.createElement("canvas"); cv.width = 1280; cv.height = 720; var g = cv.getContext("2d");
+    var seek = function (t) { return new Promise(function (res) { var ok = false, fin = function () { if (ok) return; ok = true; v.removeEventListener("seeked", fin); res(); }; v.addEventListener("seeked", fin); setTimeout(fin, 2500); try { v.currentTime = Math.max(0, Math.min(t, (v.duration || t) - 0.04)); } catch (e) { fin(); } }); };
+    (voiced && ac ? voices(ac, timeline(null), function (p, m) { st(0.02 + p * 0.3, m); }) : Promise.resolve({ clips: {} })).then(function (r) {
+      clips = r.clips; if (voiced && !Object.keys(clips).length) { if (!confirm("The AI voice isn't available right now (" + (r.error || "no voice") + "). Make the video with captions only?")) throw new Error("Stopped — no voice"); voiced = false; }
+      Object.keys(clips).forEach(function (k) { ENV[k] = envOf(clips[k]); });
+      var T = timeline(voiced ? clips : null); if (preview) { var lim = 0; T.sc = T.sc.filter(function (q) { if (q.k === "outro") return false; lim += q.dur; return lim < 30000; }); T.total = T.sc.reduce(function (s, q) { return Math.max(s, q.start + q.dur); }, 0); }
+      return Promise.all(P.frames.map(function (f) { return img(f.src || f.thumb); })).then(function (ims) { return (v ? new Promise(function (res, rej) { if (v.readyState >= 2) res(); else { v.onloadeddata = res; v.onerror = function () { rej(new Error("This video can't be played here — try an MP4 (H.264) file.")); }; } }) : Promise.resolve()).then(function () { return fastVideo(voiced); }).then(function (fv) { return { T: T, ims: ims, fv: fv }; }); });
+    }).then(function (o) {
+      var T = o.T, ims = o.ims, fv = o.fv, total = T.total, lastT = -1, snap = document.createElement("canvas");
+      var sceneAt = function (el) { for (var i = 0; i < T.sc.length; i++) if (el < T.sc[i].start + T.sc[i].dur) return T.sc[i]; return T.sc[T.sc.length - 1]; };
+      var mouth = function (q, el) { var e = ENV[q.id]; if (!e) return voiced || !q.text ? 0 : Math.abs(Math.sin(el / 95)) * 0.5; var i = Math.floor((el - 250) / 40); return i >= 0 && i < e.length ? e[i] : 0; };
+      var blink = function (el) { return (el % 3700) < 130; };
+      var pic = function (q) { return q.k === "intro" || q.k === "outro" ? ims[0] : ims[q.f]; };
+      var finish = function (blob, ext, how) { cleanup(); var u = URL.createObjectURL(blob); $("out").innerHTML = '<video class="pv" controls playsinline src="' + u + '"></video><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="dl">⬇ Download ' + ext.toUpperCase() + '</button><button class="btn ghost sm" id="dls">⬇ Subtitles .srt</button></div><div class="muted" style="font-size:12px;margin-top:4px">' + (preview ? "Preview — no voice, first ~30 s" : "✅ " + Math.round(total / 1000) + " s" + (voiced ? " · AI voice" : "") + " · " + how) + "</div>";
+        $("dl").onclick = function () { download(blob, fname(ext)); }; $("dls").onclick = function () { download(new Blob([srt(T)], { type: "text/plain" }), fname("srt")); }; if (!preview) download(blob, fname(ext)); };
+      if (fv) {
+        var FPS = 20, NF = Math.ceil(total / 1000 * FPS), err = null;
+        var mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: /^vp09/.test(fv.vc) ? "vp9" : "avc", width: 1280, height: 720, frameRate: FPS }, audio: fv.ac ? { codec: fv.ac[1], numberOfChannels: 1, sampleRate: 48000 } : undefined, fastStart: "in-memory", firstTimestampBehavior: "offset" });
+        var venc = new VideoEncoder({ output: function (c, m) { mux.addVideoChunk(c, m); }, error: function (e) { err = e; } });
+        venc.configure({ codec: fv.vc, width: 1280, height: 720, bitrate: 3000000, framerate: FPS });
+        if (v) { snap.width = v.videoWidth; snap.height = v.videoHeight; } var sg = snap.getContext("2d"), i = 0;
+        var next = function () {
+          if (err) return Promise.reject(err); if (i >= NF) return Promise.resolve();
+          if (venc.encodeQueueSize > 8) return wait(4).then(next);
+          var el = i * 1000 / FPS, q = sceneAt(el), p = Promise.resolve(), src = pic(q);
+          if (q.k === "move" && v) { var vt = q.vs + (el - q.start) / 1000 * q.speed; src = snap; if (Math.abs(vt - lastT) > 0.4 / FPS * q.speed) p = seek(vt).then(function () { sg.drawImage(v, 0, 0); lastT = vt; }); }
+          return p.then(function () {
+            paint(g, q, src, el - q.start, total, { at: el, mouth: mouth(q, el - q.start), blink: blink(el) });
+            var fr = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) }); venc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close(); i++;
+            if (i % 20 === 0) st(0.33 + 0.62 * i / NF, "⚡ Making the video… " + Math.round(i / NF * 100) + "%");
+            return next();
+          });
+        };
+        var audio = function () { if (!fv.ac || !voiced) return Promise.resolve();
+          var SR = 48000, oac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(total / 1000 * SR) + SR, SR);
+          T.sc.forEach(function (q) { var b = clips[q.id]; if (!b) return; var s = oac.createBufferSource(); s.buffer = b; s.connect(oac.destination); s.start(0.25 + q.start / 1000); });
+          return oac.startRendering().then(function (buf) { var d = buf.getChannelData(0), aenc = new AudioEncoder({ output: function (c, m) { mux.addAudioChunk(c, m); }, error: function (e) { err = e; } });
+            aenc.configure({ codec: fv.ac[0], sampleRate: SR, numberOfChannels: 1, bitrate: 96000 });
+            for (var o2 = 0; o2 < d.length; o2 += 4800) { var n = Math.min(4800, d.length - o2), ad = new AudioData({ format: "f32", sampleRate: SR, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(o2 / SR * 1e6), data: d.slice(o2, o2 + n) }); aenc.encode(ad); ad.close(); }
+            return aenc.flush(); }); };
+        return next().then(function () { return venc.flush(); }).then(audio).then(function () { if (err) throw err; mux.finalize(); finish(new Blob([mux.target.buffer], { type: "video/mp4" }), "mp4", "made in " + Math.max(1, Math.round((Date.now() - t0) / 1000)) + " s"); });
+      }
+      // fallback: real-time recording of the canvas
+      if (!window.MediaRecorder || !cv.captureStream) throw new Error("This device can't make video — try Chrome on a laptop.");
+      var ac2 = ac || (AC ? new AC() : null), dest = voiced && ac2 ? ac2.createMediaStreamDestination() : null, vs2 = cv.captureStream(25);
+      var stream = dest ? new MediaStream([vs2.getVideoTracks()[0]].concat(dest.stream.getAudioTracks())) : vs2;
+      var mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].filter(function (m) { return MediaRecorder.isTypeSupported(m); })[0] || "", ext = /mp4/.test(mime) ? "mp4" : "webm";
+      var rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 3000000 } : {}), chunks = [];
+      rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+      return new Promise(function (res) {
+        rec.onstop = function () { finish(new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" }), ext, "recorded in real time"); res(); };
+        var base = ac2 ? ac2.currentTime + 0.3 : 0, startMs = performance.now() + 300, curQ = null, fin = false;
+        if (dest) T.sc.forEach(function (q) { var b = clips[q.id]; if (!b) return; var s = ac2.createBufferSource(); s.buffer = b; s.connect(dest); s.start(base + 0.25 + q.start / 1000); });
+        var loop = function () {
+          var el = Math.max(0, performance.now() - startMs), q = sceneAt(el);
+          if (q !== curQ) { curQ = q; if (q.k === "move" && v) { v.currentTime = q.vs; v.playbackRate = Math.min(16, q.speed); v.play().catch(function () { }); } else if (v) v.pause(); }
+          paint(g, q, q.k === "move" && v ? v : pic(q), el - q.start, total, { at: el, mouth: mouth(q, el - q.start), blink: blink(el) });
+          st(0.33 + 0.62 * el / total, "⏺ Recording in real time… " + Math.round(el / total * 100) + "% — keep this screen open");
+          if (el < total) requestAnimationFrame(loop); else if (!fin) { fin = true; setTimeout(function () { rec.stop(); }, 300); }
+        };
+        rec.start(500); requestAnimationFrame(loop);
+      });
+    }).catch(function (e) { cleanup(); st(0, "❌ " + (e.message || e)); });
+  }
+  // ================= PPT / PDF =================
+  function stills() {
+    var act = steps();
+    return Promise.all(P.frames.map(function (f) { return img(f.src || f.thumb); })).then(function (ims) {
+      return act.map(function (s, i) {   // one picture per screen: the key frame with numbered pointers
+        var im = ims[s.f]; if (!im) return null; var c = document.createElement("canvas"), k = Math.min(1, 900 / Math.max(im.width, im.height)); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); var g = c.getContext("2d"); g.drawImage(im, 0, 0, c.width, c.height);
+        s.beats.forEach(function (b, j) { var x = c.width * b.x / 100, y = c.height * b.y / 100, r = Math.max(12, c.width / 26); g.fillStyle = "rgba(255,90,60,.92)"; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 3; g.stroke(); g.fillStyle = "#fff"; g.font = "800 " + Math.round(r * 1.1) + "px " + CSSF; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(j + 1), x, y + 1); });
+        return { s: s, data: c.toDataURL("image/jpeg", 0.86), r: c.width / c.height };
+      });
+    });
+  }
+  function makePptx() {
+    var sc = S(); busy(true, "📊 Making the PowerPoint…", 0.2);
+    Promise.all([lib("pptx"), stills()]).then(function (x) {
+      var L = x[1], Pp = new PptxGenJS(); Pp.layout = "LAYOUT_WIDE"; Pp.title = sc.title || P.name;
+      var t = Pp.addSlide(); t.background = { color: "151A4A" }; t.addText(sc.title || P.name, { x: 0.7, y: 2.2, w: 11.5, h: 1.6, fontSize: 38, bold: true, color: "FFFFFF", valign: "top", fontFace: "Arial" }); t.addText(sc.intro || "", { x: 0.7, y: 3.9, w: 11, h: 1.8, fontSize: 18, color: "DDE3FF", valign: "top", fontFace: "Arial" }); t.addNotes(sc.intro || "");
+      L.forEach(function (o, i) { if (!o) return;
+        var sl = Pp.addSlide(); sl.background = { color: "F5F6FB" }; var port = o.r < 1, ih = 6.5, iw = ih * o.r; if (iw > (port ? 4 : 7.4)) { iw = port ? 4 : 7.4; ih = iw / o.r; }
+        sl.addImage({ data: o.data, x: 0.45, y: (7.5 - ih) / 2, w: iw, h: ih }); var tx = 0.45 + iw + 0.4, tw = 13.33 - tx - 0.45;
+        sl.addText((P.lang === "zh" ? "第 " + (i + 1) + " 步" : P.lang === "hi" ? "चरण " + (i + 1) : "STEP " + (i + 1)) + " / " + L.length, { x: tx, y: 0.5, w: 2.2, h: 0.4, fontSize: 12, bold: true, color: "4D5BF9", fontFace: "Arial" });
+        sl.addText(o.s.title || "", { x: tx, y: 0.95, w: tw, h: 0.9, fontSize: 26, bold: true, color: "1B1D2E", valign: "top", fontFace: "Arial" });
+        sl.addText(o.s.beats.map(function (b, j) { return { text: (j + 1) + "   " + b.text, options: { breakLine: j < o.s.beats.length - 1, paraSpaceAfter: 8 } }; }), { x: tx, y: 1.95, w: tw, h: 5.1, fontSize: 15, color: "1B1D2E", valign: "top", fontFace: "Arial" });
+        sl.addNotes(o.s.beats.map(function (b) { return b.text; }).join(" ")); });
+      var e = Pp.addSlide(); e.background = { color: "151A4A" }; e.addText(sc.outro || "✅", { x: 0.7, y: 2.6, w: 11.5, h: 2, fontSize: 24, color: "FFFFFF", valign: "top", fontFace: "Arial" }); e.addNotes(sc.outro || "");
+      return Pp.write({ outputType: "blob" });
+    }).then(function (b) { download(new Blob([b], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }), fname("pptx")); busy(false, "✅ PowerPoint ready"); }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  function makePdf() {
+    var sc = S(); busy(true, "📄 Making the PDF…", 0.2);
+    Promise.all([lib("pdf"), stills()]).then(function (x) {
+      var L = x[1].filter(Boolean), doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720], hotfixes: ["px_scaling"] });
+      var cover = document.createElement("canvas"); cover.width = 1280; cover.height = 720; var g = cover.getContext("2d");
+      paint(g, { k: "intro", text: sc.intro, dur: 1 }, null, 0, 0, {}); if (!O.cap) { } else { g.fillStyle = "#DDE3FF"; g.font = "26px " + CSSF; wrap(g, sc.intro, 900).slice(0, 5).forEach(function (l, i) { g.fillText(l, O.pres !== "off" ? 330 : 80, 380 + i * 38); }); }
+      doc.addImage(cover.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 1280, 720);
+      return Promise.all(L.map(function (o) { return img(o.data); })).then(function (ims) {
+        L.forEach(function (o, i) { doc.addPage([1280, 720], "landscape"); var c = document.createElement("canvas"); c.width = 1280; c.height = 720; var g2 = c.getContext("2d"); g2.fillStyle = "#F5F6FB"; g2.fillRect(0, 0, 1280, 720);
+          var im = ims[i], ih = 660, iw = ih * o.r; if (iw > (o.r < 1 ? 380 : 760)) { iw = o.r < 1 ? 380 : 760; ih = iw / o.r; } g2.drawImage(im, 30, (720 - ih) / 2, iw, ih);
+          var tx = 30 + iw + 40, tw = 1280 - tx - 40; g2.textBaseline = "top"; g2.fillStyle = "#4D5BF9"; g2.font = "800 18px " + CSSF; g2.fillText("STEP " + (i + 1) + " / " + L.length, tx, 40);
+          g2.fillStyle = "#1B1D2E"; g2.font = "800 34px " + CSSF; var tl = wrap(g2, o.s.title, tw).slice(0, 2); tl.forEach(function (l, k) { g2.fillText(l, tx, 72 + k * 42); });
+          var y = 90 + tl.length * 42; o.s.beats.forEach(function (b, j) { if (y > 680) return; g2.fillStyle = "#FF5A3C"; g2.beginPath(); g2.arc(tx + 14, y + 14, 14, 0, Math.PI * 2); g2.fill(); g2.fillStyle = "#fff"; g2.font = "800 15px " + CSSF; g2.textAlign = "center"; g2.fillText(String(j + 1), tx + 14, y + 5); g2.textAlign = "left"; g2.fillStyle = "#1B1D2E"; g2.font = "21px " + CSSF; var LL = wrap(g2, b.text, tw - 44); LL.forEach(function (l, k) { g2.fillText(l, tx + 40, y + 2 + k * 29); }); y += LL.length * 29 + 16; });
+          doc.addImage(c.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 1280, 720); });
+        download(doc.output("blob"), fname("pdf")); busy(false, "✅ PDF ready — " + (L.length + 1) + " pages");
+      });
+    }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  // ================= start =================
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>

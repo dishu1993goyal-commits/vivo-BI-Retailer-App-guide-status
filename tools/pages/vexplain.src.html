@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Video explainer</title>
+<style>
+/*@@CSS@@*/
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.step{display:flex;gap:10px;align-items:flex-start}.step>div{min-width:0;flex:1}.step .n{width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none;font-size:13px}
+.fr{display:flex;gap:8px;overflow-x:auto;padding:6px 2px}.fr .f{flex:none;width:96px;position:relative;font-size:11px;text-align:center}.fr .f img{width:96px;height:170px;object-fit:contain;background:#111;border-radius:10px;display:block}.fr .f button{position:absolute;top:3px;right:3px;border:0;border-radius:50%;width:22px;height:22px;background:#0009;color:#fff;cursor:pointer}
+.prog{height:6px;border-radius:9px;background:#EEF0F6;overflow:hidden;margin-top:8px}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,#5B6CFF,#8F5BFF);transition:width .3s}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.tabs button{border:1px solid #DADDF0;background:#fff;border-radius:999px;padding:6px 12px;font:700 12.5px inherit;cursor:pointer}.tabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.sc{border-top:1px solid #EEF0F6;padding:12px 0;display:flex;gap:12px}.sc.skip{opacity:.45}
+.pic{position:relative;flex:none;width:150px;cursor:crosshair;align-self:flex-start}.pic img{width:150px;display:block;border-radius:10px;background:#111}.pic .pt{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#FF5A3C;color:#fff;font:800 11px/22px inherit;text-align:center;box-shadow:0 0 0 3px #fff8;pointer-events:none}.pic .pt.on{background:#6C5CFF;box-shadow:0 0 0 4px #fff}
+.bt{display:flex;gap:6px;align-items:flex-start;margin-top:6px}.bt .k{flex:none;width:22px;height:22px;border-radius:50%;background:#EEF0FF;color:var(--brand);font:800 11px/22px inherit;text-align:center;cursor:pointer;margin-top:6px}.bt .k.on{background:#6C5CFF;color:#fff}.bt textarea{flex:1}.bt button{flex:none;border:0;background:none;color:var(--mut);cursor:pointer;font-size:16px;margin-top:4px}
+.prs{display:flex;gap:8px;flex-wrap:wrap}.prs button{border:2px solid #E1E4F0;border-radius:14px;background:#fff;padding:4px 6px 6px;cursor:pointer;font:700 11.5px inherit;width:74px}.prs button.on{border-color:var(--brand);background:#F3F4FF}.prs canvas{width:60px;height:60px;display:block;margin:0 auto}
+.exp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.exp button{border:1px solid #E1E4F0;border-radius:14px;background:#fff;padding:10px;text-align:left;font:700 13px inherit;cursor:pointer}.exp button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px;margin-top:2px}.exp button.pri{background:linear-gradient(135deg,#4D5BF9,#7A4CFF);color:#fff;border:0}.exp button.pri small{color:#E6E8FF}
+.ck{display:flex;gap:6px;align-items:center;font-size:12.5px}
+video.pv{width:100%;border-radius:12px;background:#000;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🎬</span></div>
+  <h1>Video explainer</h1><p>Turn a screen recording or demo video into a narrated explainer — AI presenter with a pointer, AI voice-over and captions, in English, हिन्दी, 中文 and more</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/vidframes.js?v=2"></script>
+<script src="/presenter.js?v=1"></script>
+<script>
+(function () {
+  "use strict";
+  /*@@CORE@@*/
+  var VIEW = $("view");
+  var LANGS = [["en", "English"], ["hi", "हिन्दी Hindi"], ["zh", "简体中文 Chinese"], ["ta", "தமிழ் Tamil"], ["te", "తెలుగు Telugu"], ["bn", "বাংলা Bengali"], ["mr", "मराठी Marathi"], ["gu", "ગુજરાતી Gujarati"], ["kn", "ಕನ್ನಡ Kannada"], ["ml", "മലയാളം Malayalam"], ["pa", "ਪੰਜਾਬੀ Punjabi"], ["or", "ଓଡ଼ିଆ Odia"]];
+  var LN = {}; LANGS.forEach(function (l) { LN[l[0]] = l[1]; });
+  var CSSF = "'Segoe UI','Noto Sans','Noto Sans Devanagari','Noto Sans SC','Microsoft YaHei','Nirmala UI',system-ui,sans-serif";
+  var LIB = { pptx: "/vendor/pptx/pptxgen.bundle.js", pdf: "/vendor/jspdf/jspdf.umd.min.js", mux: "/vendor/mp4muxer/mp4-muxer.min.js" }, LOADED = {};
+  function lib(k) { if (LOADED[k]) return LOADED[k]; LOADED[k] = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = LIB[k]; s.onload = res; s.onerror = function () { LOADED[k] = null; rej(new Error("Couldn't load " + k)); }; document.head.appendChild(s); }); return LOADED[k]; }
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  var fmt = function (t) { t = Math.max(0, Math.round(t || 0)); return Math.floor(t / 60) + ":" + ("0" + (t % 60)).slice(-2); };
+  // ---------- project state ----------
+  // P: { id, name, dur, w, h, url (video on this device), frames:[{t, src, thumb}], scripts:{lang: script}, lang (shown), about, aud, tone }
+  // script: { title, intro, outro, steps:[{ f, title, skip, beats:[{ text, x, y (percent of the frame), pt }] }] }
+  var P = null, O = { pres: "priya", voice: "f", cap: true, ptr: true, full: false, maxF: 16 }, SELB = null;
+  try { var sv = JSON.parse(localStorage.getItem("vx-opts") || "null"); if (sv) O = Object.assign(O, sv); } catch (e) { }
+  var saveO = function () { try { localStorage.setItem("vx-opts", JSON.stringify(O)); } catch (e) { } };
+  var S = function () { return P && P.scripts[P.lang]; };
+  function busy(on, msg, p) { var b = $("pg"); if (!b) return; b.style.display = on ? "" : "none"; if (p != null) b.firstChild.style.width = Math.round(p * 100) + "%"; if ($("pm")) $("pm").textContent = msg || ""; [].forEach.call(VIEW.querySelectorAll("[data-b]"), function (x) { x.disabled = !!on; }); }
+
+  // ================= view =================
+  function draw() {
+    if (!P) {
+      VIEW.innerHTML = '<div class="card"><div class="step"><span class="n">1</span><div><b>Import a screen recording or demo video</b><div class="muted" style="font-size:12.5px;margin-top:3px">Any MP4 / screen recording from your phone or laptop. The video stays on your device — only a few key frames are read by AI.</div>' +
+        '<label class="lb">How much detail</label><select class="tx" id="mx"><option value="10"' + (O.maxF == 10 ? " selected" : "") + '>Short — up to 10 screens</option><option value="16"' + (O.maxF == 16 ? " selected" : "") + '>Normal — up to 16 screens</option><option value="24"' + (O.maxF == 24 ? " selected" : "") + ">Detailed — up to 24 screens</option></select>" +
+        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="pick" data-b>📂 Choose video</button><button class="btn ghost" id="saved">📁 Saved explainers</button></div><div class="prog" id="pg" style="display:none"><i></i></div><div class="muted" id="pm" style="font-size:12px;margin-top:4px"></div></div></div></div>' +
+        '<div class="card"><b>What you get</b><div class="muted" style="font-size:12.5px;line-height:1.55;margin-top:4px">🤖 AI watches every screen and writes what the presenter says — every feature, number and button, in order.<br>🧑‍🏫 An AI presenter explains, with a pointer that moves to each thing being explained.<br>🎙️ AI voice-over and 💬 captions at the bottom — English, हिन्दी, 中文 and 9 more Indian languages (add more languages to the same video).<br>✏️ Edit any line or move the pointer by tapping the screen.<br>🎬 MP4 video · 📊 PowerPoint · 📄 PDF · subtitles.</div></div>';
+      $("mx").onchange = function () { O.maxF = +this.value; saveO(); };
+      $("pick").onclick = function () { pickVideo(false); }; $("saved").onclick = savedList; return;
+    }
+    var sc = S(), F = P.frames;
+    VIEW.innerHTML = '<div class="row" style="gap:8px;margin-bottom:8px"><button class="btn ghost sm" id="home">← New video</button><b style="flex:1;align-self:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🎬 ' + esc((sc && sc.title) || P.name || "Video") + "</b></div>" +
+      '<div class="card"><div class="step"><span class="n">1</span><div><b>The recording</b><div class="muted" style="font-size:12px">' + esc(P.name || "") + " · " + fmt(P.dur) + " · " + F.length + " key screens" + (P.url ? "" : ' · <b style="color:#C2410C">attach the video file to make the MP4</b>') + "</div>" +
+      '<div class="fr">' + F.map(function (f, i) { return '<div class="f"><img src="' + (f.thumb || f.src) + '" alt=""><button data-rm="' + i + '" title="Remove">✕</button>' + (i + 1) + " · " + fmt(f.t) + "</div>"; }).join("") + "</div>" +
+      '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn sec sm" id="att" data-b>📂 ' + (P.url ? "Choose another video" : "Attach the video file") + '</button></div><div class="prog" id="pg" style="display:none"><i></i></div><div class="muted" id="pm" style="font-size:12px;margin-top:4px"></div></div></div></div>' +
+      '<div class="card"><div class="step"><span class="n">2</span><div><b>AI explains it</b>' +
+      '<label class="lb">What is this video about? (helps the AI)</label><input class="tx" id="ab" placeholder="e.g. vivo Retailer App — how a retailer checks scheme payouts" value="' + esc(P.about || "") + '">' +
+      '<div class="g2"><div><label class="lb">Explain it to</label><select class="tx" id="au">' + [["user", "Users / field team"], ["retailer", "Retailers"], ["mgmt", "Management"], ["dev", "Developers"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === P.aud ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></div>" +
+      '<div><label class="lb">Style</label><select class="tx" id="to">' + [["friendly, clear trainer", "Friendly trainer"], ["formal corporate presenter", "Formal corporate"], ["energetic product demo host", "Energetic demo"], ["very simple, for first-time users", "Very simple"]].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === P.tone ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></div></div>" +
+      '<label class="lb">Language</label><select class="tx" id="lg">' + LANGS.map(function (l) { return '<option value="' + l[0] + '"' + (l[0] === (P.lang || "en") ? " selected" : "") + ">" + l[1] + "</option>"; }).join("") + "</select>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn pri" id="ai" data-b' + (F.some(function (f) { return f.src; }) ? "" : " disabled") + ">✨ " + (sc ? "Explain again with AI" : "AI watches & explains the video") + '</button><button class="btn sec sm" id="own" data-b>📋 Write / paste my own script</button></div>' +
+      (F.some(function (f) { return f.src; }) ? "" : '<div class="muted" style="font-size:12px;margin-top:4px">Attach the video file to let AI read it again.</div>') + "</div></div></div>" +
+      (sc ? scriptCard(sc) + exportCard() : "");
+    wire();
+  }
+  function scriptCard(sc) {
+    var langs = Object.keys(P.scripts);
+    return '<div class="card"><div class="step"><span class="n">3</span><div><b>Script — edit anything</b><div class="muted" style="font-size:12px">Each numbered line is said while the pointer shows that spot. Tap a number, then tap the picture to move its pointer.</div>' +
+      '<div class="tabs">' + langs.map(function (l) { return '<button data-lg="' + l + '"' + (l === P.lang ? ' class="on"' : "") + ">" + esc(LN[l] || l) + "</button>"; }).join("") + '<button id="addl" data-b>＋ Language</button></div>' +
+      '<label class="lb">Video title</label><input class="tx" data-k="title" value="' + esc(sc.title || "") + '"><label class="lb">🎬 Opening</label><textarea class="tx" rows="2" data-k="intro">' + esc(sc.intro || "") + "</textarea>" +
+      sc.steps.map(function (s, i) { var f = P.frames[s.f] || {};
+        return '<div class="sc' + (s.skip ? " skip" : "") + '"><div class="pic" data-pic="' + i + '"><img src="' + (f.thumb || f.src || "") + '" alt="">' + s.beats.map(function (b, k) { return b.pt || O.ptr ? '<div class="pt' + (SELB && SELB[0] === i && SELB[1] === k ? " on" : "") + '" style="left:' + b.x + "%;top:" + b.y + '%">' + (k + 1) + "</div>" : ""; }).join("") + '<div class="muted" style="font-size:11px;margin-top:2px">' + fmt(f.t) + "</div></div>" +
+          '<div style="flex:1;min-width:0"><div class="row" style="gap:6px;align-items:center"><input class="tx" data-s="' + i + '" data-f="title" value="' + esc(s.title) + '" style="flex:1;margin:0;padding:6px 8px"><label class="ck"><input type="checkbox" data-s="' + i + '" data-f="skip"' + (s.skip ? " checked" : "") + "> skip</label></div>" +
+          s.beats.map(function (b, k) { return '<div class="bt"><span class="k' + (SELB && SELB[0] === i && SELB[1] === k ? " on" : "") + '" data-sel="' + i + "," + k + '" title="Tap, then tap the picture to move this pointer">' + (k + 1) + '</span><textarea class="tx" rows="2" data-s="' + i + '" data-b2="' + k + '">' + esc(b.text) + '</textarea><button data-del="' + i + "," + k + '" title="Remove">✕</button></div>'; }).join("") +
+          '<button class="btn ghost sm" data-add="' + i + '" style="margin-top:6px">＋ Add a line</button></div></div>'; }).join("") +
+      '<label class="lb">👋 Closing</label><textarea class="tx" rows="2" data-k="outro">' + esc(sc.outro || "") + "</textarea>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn ghost sm" id="sv" data-b>💾 Save</button><button class="btn ghost sm" id="txt">⬇ Script .txt</button><button class="btn ghost sm" id="srt">⬇ Subtitles .srt</button></div></div></div></div>';
+  }
+  function exportCard() {
+    var P5 = window.BIPresenter ? window.BIPresenter.PRESETS : {}, ids = ["priya", "arjun", "vee", "dev", "robo"].filter(function (k) { return P5[k]; });
+    return '<div class="card"><div class="step"><span class="n">4</span><div><b>Make the explainer</b>' +
+      '<label class="lb">🧑‍🏫 AI presenter</label><div class="prs">' + ids.map(function (k) { return '<button data-pr="' + k + '"' + (O.pres === k ? ' class="on"' : "") + '><canvas width="120" height="120" data-pc="' + k + '"></canvas>' + esc(P5[k].n) + "</button>"; }).join("") + '<button data-pr="off"' + (O.pres === "off" ? ' class="on"' : "") + '><div style="height:60px;font-size:30px;line-height:60px">🚫</div>None</button></div>' +
+      '<div class="g2"><div><label class="lb">🎙️ Voice</label><select class="tx" id="vo"><option value="f"' + (O.voice === "f" ? " selected" : "") + '>AI voice — female</option><option value="m"' + (O.voice === "m" ? " selected" : "") + '>AI voice — male</option><option value="off"' + (O.voice === "off" ? " selected" : "") + '>No voice (captions only)</option></select></div>' +
+      '<div><label class="lb">Language of the video</label><select class="tx" id="vl">' + Object.keys(P.scripts).map(function (l) { return '<option value="' + l + '"' + (l === P.lang ? " selected" : "") + ">" + esc(LN[l] || l) + "</option>"; }).join("") + "</select></div></div>" +
+      '<div class="row" style="gap:14px;margin-top:8px;flex-wrap:wrap"><label class="ck"><input type="checkbox" id="ocap"' + (O.cap ? " checked" : "") + '> 💬 Captions at the bottom</label><label class="ck"><input type="checkbox" id="optr"' + (O.ptr ? " checked" : "") + '> 👆 Pointer</label><label class="ck"><input type="checkbox" id="ofull"' + (O.full ? " checked" : "") + "> Play the full recording between screens (longer)</label></div>" +
+      '<div class="exp"><button class="pri" data-x="mp4" data-b>🎬 Explainer video<small>MP4 · presenter, pointer, voice, captions</small></button><button data-x="prev" data-b>▶ Quick preview<small>First screens, no voice — check the look</small></button><button data-x="pptx" data-b>📊 PowerPoint<small>One slide per screen, numbered pointers, notes</small></button><button data-x="pdf" data-b>📄 PDF guide<small>Same as the slides</small></button></div>' +
+      '<div id="out"></div></div></div></div>';
+  }
+  function sync() {
+    if (!P) return; if ($("ab")) { P.about = $("ab").value; P.aud = $("au").value; P.tone = $("to").value; }
+    var sc = S(); if (!sc) return;
+    [].forEach.call(VIEW.querySelectorAll("[data-k]"), function (e) { sc[e.dataset.k] = e.value; });
+    [].forEach.call(VIEW.querySelectorAll("[data-s][data-f]"), function (e) { var s = sc.steps[+e.dataset.s]; if (e.dataset.f === "skip") s.skip = e.checked; else s[e.dataset.f] = e.value; });
+    [].forEach.call(VIEW.querySelectorAll("[data-b2]"), function (e) { sc.steps[+e.dataset.s].beats[+e.dataset.b2].text = e.value; });
+  }
+  function wire() {
+    $("home").onclick = function () { sync(); if (P && P.url && !confirm("Start a new video? Save first if you want to keep this one.")) return; P = null; draw(); };
+    $("att").onclick = function () { sync(); pickVideo(true); };
+    [].forEach.call(VIEW.querySelectorAll("[data-rm]"), function (b) { b.onclick = function () { sync(); var k = +b.dataset.rm; P.frames.splice(k, 1); Object.keys(P.scripts).forEach(function (l) { var s = P.scripts[l]; s.steps = s.steps.filter(function (x) { return x.f !== k; }).map(function (x) { if (x.f > k) x.f--; return x; }); }); draw(); }; });
+    $("lg").onchange = function () { P.lang0 = this.value; };
+    $("ai").onclick = function () { sync(); explain(); };
+    $("own").onclick = function () { sync(); ownScript(); };
+    if (!S()) return;
+    [].forEach.call(VIEW.querySelectorAll("[data-lg]"), function (b) { b.onclick = function () { sync(); P.lang = b.dataset.lg; SELB = null; draw(); }; });
+    $("addl").onclick = function () { sync(); addLang(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-s][data-f=skip]"), function (c) { c.onchange = function () { sync(); draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-sel]"), function (b) { b.onclick = function () { sync(); var q = b.dataset.sel.split(","); SELB = [+q[0], +q[1]]; draw(); toast("Now tap the picture where line " + (SELB[1] + 1) + " should point"); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-pic]"), function (d) { d.onclick = function (e) {
+      var i = +d.dataset.pic, s = S().steps[i], r = d.querySelector("img").getBoundingClientRect(); if (e.clientY > r.bottom) return;
+      var k = SELB && SELB[0] === i ? SELB[1] : 0; if (!s.beats[k]) return; sync();
+      s.beats[k].x = Math.round(Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100))); s.beats[k].y = Math.round(Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))); s.beats[k].pt = true;
+      Object.keys(P.scripts).forEach(function (l) { var o = P.scripts[l].steps[i]; if (o && o.beats[k]) { o.beats[k].x = s.beats[k].x; o.beats[k].y = s.beats[k].y; o.beats[k].pt = true; } });   // same spot in every language
+      SELB = [i, k]; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { sync(); var q = b.dataset.del.split(","); S().steps[+q[0]].beats.splice(+q[1], 1); SELB = null; draw(); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-add]"), function (b) { b.onclick = function () { sync(); S().steps[+b.dataset.add].beats.push({ text: "", x: 50, y: 50, pt: false }); draw(); }; });
+    $("sv").onclick = function () { sync(); save(true); };
+    $("txt").onclick = function () { sync(); download(new Blob([scriptText()], { type: "text/plain" }), fname("txt")); };
+    $("srt").onclick = function () { sync(); download(new Blob([srt()], { type: "text/plain" }), fname("srt")); };
+    [].forEach.call(VIEW.querySelectorAll("[data-pr]"), function (b) { b.onclick = function () { sync(); O.pres = b.dataset.pr; saveO(); [].forEach.call(VIEW.querySelectorAll("[data-pr]"), function (x) { x.classList.toggle("on", x === b); }); }; });
+    [].forEach.call(VIEW.querySelectorAll("[data-pc]"), function (c) { var g = c.getContext("2d"); g.fillStyle = "#EEF0FF"; g.fillRect(0, 0, 120, 120); try { BIPresenter.draw(g, { x: 60, y: 230, s: 0.48, style: c.dataset.pc, pose: "idle", expr: "smile", t: 0 }); } catch (e) { } });
+    $("vo").onchange = function () { O.voice = this.value; saveO(); };
+    $("vl").onchange = function () { sync(); P.lang = this.value; draw(); };
+    $("ocap").onchange = function () { O.cap = this.checked; saveO(); }; $("optr").onchange = function () { O.ptr = this.checked; saveO(); }; $("ofull").onchange = function () { O.full = this.checked; saveO(); };
+    [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (b) { b.onclick = function () { sync(); var x = b.dataset.x; if (x === "mp4") makeVideo(false); else if (x === "prev") makeVideo(true); else if (x === "pptx") makePptx(); else makePdf(); }; });
+  }
+  var fname = function (ext) { return "Explainer_" + String((S() && S().title) || P.name || "video").replace(/\.[a-z0-9]+$/i, "").replace(/[^\wऀ-ൿ一-鿿]+/g, "_").slice(0, 40) + "_" + P.lang + "." + ext; };
+
+  // ================= import =================
+  function pickVideo(attach) {
+    var i = document.createElement("input"); i.type = "file"; i.accept = "video/*";
+    i.onchange = function () {
+      var f = i.files && i.files[0]; if (!f) return; if (f.size > 2e9) return toast("That video is too large (max 2 GB)");
+      if (attach && P && P.frames.length) {   // same project, video file attached again: refresh the full-size key frames
+        if (P.url) { try { URL.revokeObjectURL(P.url); } catch (e) { } }
+        P.url = URL.createObjectURL(f); P.file = f; busy(true, "Reading the key screens from the video…", 0.1);
+        grabAt(P.url, P.frames.map(function (x) { return x.t; })).then(function (src) { src.forEach(function (s, k) { if (s) P.frames[k].src = s; }); busy(false); draw(); toast("Video attached ✓"); }).catch(function (e) { busy(false); toast(e.message || "Couldn't read the video"); });
+        return;
+      }
+      P = { name: f.name, frames: [], scripts: {}, lang: "en", lang0: "en", aud: "user", tone: "friendly, clear trainer", url: URL.createObjectURL(f), file: f };
+      busy(true, "Opening the video…", 0.02);
+      VidFrames.pick(f, { max: O.maxF || 16, maxW: 800, onProgress: function (p, m) { busy(true, m, p); } }).then(function (r) {
+        P.dur = r.dur; P.w = r.w; P.h = r.h; P.frames = r.frames; busy(false); draw(); toast(r.frames.length + " key screens found — remove any you don't need, then ✨ AI explains");
+      }).catch(function (e) { busy(false); P = null; draw(); toast(e.message || "Couldn't read the video"); });
+    };
+    i.click();
+  }
+  function grabAt(url, times) {
+    var v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url; v.style.cssText = "position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;z-index:-1"; document.body.appendChild(v);
+    var out = [], k = 0;
+    var seek = function (t) { return new Promise(function (r) { var ok = false, f = function () { if (ok) return; ok = true; v.removeEventListener("seeked", f); r(); }; v.addEventListener("seeked", f); setTimeout(f, 3000); v.currentTime = t; }); };
+    return new Promise(function (res, rej) { v.onloadeddata = res; v.onerror = function () { rej(new Error("This video can't be played here — try an MP4 (H.264) file.")); }; }).then(function () {
+      P.w = v.videoWidth; P.h = v.videoHeight; P.dur = P.dur || v.duration;
+      var next = function () { if (k >= times.length) { v.remove(); return out; } return seek(times[k] + 0.05).then(function () { var c = document.createElement("canvas"), s = Math.min(1, 800 / v.videoWidth); c.width = Math.round(v.videoWidth * s); c.height = Math.round(v.videoHeight * s); c.getContext("2d").drawImage(v, 0, 0, c.width, c.height); out.push(c.toDataURL("image/jpeg", 0.74)); k++; return next(); }); };
+      return next();
+    });
+  }
+  // ================= AI =================
+  function vxRun(body, onProg) {
+    return api(Object.assign({ action: "vx-job" }, body)).then(function (r) {
+      if (!r.ok) throw new Error(r.error || "Couldn't start the AI job");
+      var job = r.job, miss = 0, t0 = Date.now();
+      return new Promise(function (res, rej) {
+        var tick = function () {
+          api({ action: "vx-job-get", job: job }).then(function (g) {
+            if (!g.ok) { if (++miss > 8) return rej(new Error(g.error || "Lost the AI job — try again")); return setTimeout(tick, 4000); }
+            miss = 0; if (g.st === "done") { if (g.res && g.res.ok) return res(g.res); return rej(new Error((g.res && g.res.error) || "The AI job failed — try again")); }
+            onProg(g.p || 0, (g.msg || "Working…") + " · " + Math.round((Date.now() - t0) / 1000) + " s"); setTimeout(tick, 3000);
+          });
+        };
+        setTimeout(tick, 1500);
+      });
+    });
+  }
+  function explain() {
+    var F = P.frames.filter(function (f) { return f.src; }); if (!F.length) return toast("Attach the video file first");
+    var lang = P.lang0 || $("lg").value || "en";
+    busy(true, "Sending " + F.length + " key screens to the AI…", 0.03);
+    vxRun({ kind: "explain", frames: F.map(function (f) { return { t: f.t, src: f.src }; }), lang: lang, aud: P.aud, tone: P.tone, about: P.about || "", note: P.about || "", name: P.name }, function (p, m) { busy(true, m, p); })
+      .then(function (r) { P.scripts = {}; P.scripts[r.lang] = r.script; P.lang = r.lang; busy(false); draw(); save(false); toast("✅ Script ready — " + steps().length + " screens. Edit anything, then make the video."); })
+      .catch(function (e) { busy(false, "❌ " + e.message); toast(e.message); });
+  }
+  function addLang() {
+    var have = Object.keys(P.scripts), opts = LANGS.filter(function (l) { return have.indexOf(l[0]) < 0; });
+    var ov = sheet("＋ Add a language", "AI translates the " + (LN[P.lang] || P.lang) + " script (pointers stay the same). You can edit it afterwards.", [["🌐", "Translate", function (o) {
+      var to = o.querySelector("#tl").value; busy(true, "🌐 Translating to " + LN[to] + "…", 0.1);
+      vxRun({ kind: "translate", to: to, script: S() }, function (p, m) { busy(true, m, p); }).then(function (r) { P.scripts[r.lang] = r.script; P.lang = r.lang; busy(false); draw(); save(false); toast("✅ " + LN[r.lang] + " added"); }).catch(function (e) { busy(false, "❌ " + e.message); toast(e.message); });
+    }, "pri"]], '<select class="tx" id="tl">' + opts.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + "</option>"; }).join("") + "</select>");
+    return ov;
+  }
+  function ownScript() {
+    sheet("📋 Write / paste your own script", "One paragraph per screen, in order (blank line between). Start lines with Intro: or Outro: if you like. Each sentence becomes one line the presenter says.", [["✓", "Use this script", function (o) {
+      var raw = o.querySelector("#raw").value.trim(); if (!raw) { toast("Write or paste the script first"); return false; }
+      var lang = $("lg").value || "en", sc = { title: P.name.replace(/\.[a-z0-9]+$/i, ""), intro: "", outro: "", steps: P.frames.map(function (f, i) { return { f: i, title: "Screen " + (i + 1), skip: false, beats: [] }; }) };
+      var paras = raw.split(/\n\s*\n/).map(function (p) { return p.trim(); }).filter(Boolean), k = 0;
+      paras.forEach(function (p) { var m = /^\s*(intro|opening|outro|closing)\s*[:.\-–]\s*/i.exec(p), body = m ? p.slice(m[0].length) : p;
+        if (m && /^(intro|opening)/i.test(m[1])) sc.intro = body; else if (m) sc.outro = body;
+        else if (sc.steps[k]) { (body.match(/[^.!?。！？।]+[.!?。！？।]*/g) || [body]).map(function (x) { return x.trim(); }).filter(Boolean).forEach(function (x, j) { sc.steps[k].beats.push({ text: x, x: 50, y: 20 + (j % 4) * 20, pt: false }); }); k++; }
+        else sc.outro = (sc.outro ? sc.outro + " " : "") + body; });
+      sc.steps.forEach(function (s) { if (!s.beats.length) s.skip = true; });
+      P.scripts[lang] = sc; P.lang = lang; draw(); toast("Script placed — tap a number then the picture to set each pointer");
+    }, "pri"]], '<textarea class="tx" id="raw" rows="12" placeholder="Intro: In this video you will learn…\n\nThis is the Home screen. The top card shows your sales against target.\n\nNow tap Schemes…\n\nOutro: That\'s it!"></textarea>');
+  }
+  // ================= save / open =================
+  function save(say) {
+    var small = function (src) { return new Promise(function (res) { if (!src) return res(""); var im = new Image(); im.onload = function () { var k = Math.min(1, (P.w > P.h ? 560 : 300) / im.width), c = document.createElement("canvas"); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); res(c.toDataURL("image/jpeg", 0.6)); }; im.onerror = function () { res(""); }; im.src = src; }); };
+    Promise.all(P.frames.map(function (f) { return small(f.src || f.thumb); })).then(function (th) {
+      return api({ action: "vx-save", id: P.id || "", name: P.name, title: (S() && S().title) || "", dur: P.dur, w: P.w, h: P.h, presenter: O.pres, opts: { about: P.about, aud: P.aud, tone: P.tone }, frames: P.frames.map(function (f, i) { return { t: f.t, thumb: th[i] }; }), scripts: P.scripts });
+    }).then(function (r) { if (r.ok) { P.id = r.id; if (say) toast("💾 Saved — reopen it from 📁 Saved explainers"); } else if (say) toast(r.error); });
+  }
+  function savedList() {
+    api({ action: "vx-list" }).then(function (r) {
+      if (!r.ok) return toast(r.error); if (!r.rows.length) return toast("Nothing saved yet");
+      var ov = sheet("📁 Saved explainers", "Open one to edit or export again. To make the MP4, attach the same video file.", [], r.rows.map(function (x) { return '<div class="row" style="gap:10px;align-items:center;border-top:1px solid #EEF0F6;padding:8px 0;cursor:pointer" data-o="' + esc(x.id) + '">' + (x.thumb ? '<img src="' + x.thumb + '" style="width:48px;height:60px;object-fit:cover;border-radius:8px">' : "") + '<div style="flex:1;min-width:0"><b style="font-size:13.5px">' + esc(x.title || x.name) + '</b><div class="muted" style="font-size:12px">' + fmt(x.dur) + " · " + x.langs.map(function (l) { return LN[l] || l; }).join(", ") + '</div></div><button class="btn ghost sm" data-d="' + esc(x.id) + '">🗑</button></div>'; }).join(""));
+      [].forEach.call(ov.querySelectorAll("[data-o]"), function (row) { row.onclick = function (e) {
+        var d = e.target.closest("[data-d]"); if (d) { if (confirm("Delete this explainer?")) api({ action: "vx-del", id: d.dataset.d }).then(function () { row.remove(); }); return; }
+        api({ action: "vx-get", id: row.dataset.o }).then(function (g) { if (!g.ok) return toast(g.error); var x = g.item; ov.remove();
+          P = { id: x.id, name: x.name, dur: x.dur, w: x.w, h: x.h, frames: x.frames.map(function (f) { return { t: f.t, thumb: f.thumb, src: "" }; }), scripts: x.scripts, lang: Object.keys(x.scripts)[0] || "en", about: (x.opts || {}).about || "", aud: (x.opts || {}).aud || "user", tone: (x.opts || {}).tone || "" };
+          P.lang0 = P.lang; if (x.presenter) O.pres = x.presenter; draw(); });
+      }; });
+    });
+  }
+  // ================= timeline =================
+  function steps() { var sc = S(); return sc ? sc.steps.filter(function (s) { return !s.skip && P.frames[s.f] && s.beats.some(function (b) { return b.text.trim(); }); }) : []; }
+  // clips: { id → AudioBuffer } (null = estimate). Scenes: intro, per screen: beats over the still key screen, then the move to the next screen.
+  function timeline(clips) {
+    var sc = S(), act = steps(), out = [], at = 0, cjk = /^(zh)$/.test(P.lang);
+    var est = function (t) { t = String(t || ""); return Math.max(1.4, cjk ? t.length / 4.2 : t.split(/\s+/).filter(Boolean).length / 2.5); };
+    var d = function (id, t) { return clips ? (clips[id] ? clips[id].duration : 0) : est(t); };
+    var add = function (q) { q.start = at; at += q.dur; out.push(q); };
+    add({ k: "intro", id: "intro", text: sc.intro || "", dur: Math.max(3000, (d("intro", sc.intro) + 0.8) * 1000) });
+    act.forEach(function (s, i) {
+      var beats = s.beats.filter(function (b) { return b.text.trim(); });
+      beats.forEach(function (b, k) { var id = "s" + i + "b" + k; add({ k: "beat", id: id, n: i + 1, of: act.length, s: s, b: b, j: k, beats: beats, prev: k ? beats[k - 1] : null, f: s.f, text: b.text, title: s.title, dur: Math.max(1800, (d(id, b.text) + 0.45) * 1000) }); });
+      var nx = act[i + 1]; if (!nx) return;
+      var t0 = P.frames[s.f].t, t1 = P.frames[nx.f].t, real = Math.max(0.2, t1 - t0), dur = O.full ? real : Math.min(real, 4), speed = real / dur;   // the move between screens, sped up to ≤4 s
+      add({ k: "move", id: "m" + i, n: i + 2, of: act.length, s: s, f: s.f, vs: t0, ve: t1, speed: speed, title: nx.title, dur: dur * 1000 });
+    });
+    add({ k: "outro", id: "outro", text: sc.outro || "", dur: Math.max(3000, (d("outro", sc.outro) + 0.8) * 1000) });
+    return { sc: out, total: at };
+  }
+  function scriptText() { var sc = S(); return (sc.title || "") + "\n\n" + (sc.intro ? "Intro: " + sc.intro + "\n\n" : "") + steps().map(function (s, i) { return (i + 1) + ". " + s.title + " (" + fmt(P.frames[s.f].t) + ")\n" + s.beats.map(function (b, k) { return "   " + (k + 1) + ") " + b.text; }).join("\n"); }).join("\n\n") + (sc.outro ? "\n\nOutro: " + sc.outro : "") + "\n"; }
+  function srt(T) { T = T || timeline(null); var ts = function (ms) { var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, x = Math.floor(ms % 1000); return [h, m, s].map(function (v) { return ("0" + v).slice(-2); }).join(":") + "," + ("00" + x).slice(-3); }; return T.sc.filter(function (q) { return q.text; }).map(function (q, i) { return (i + 1) + "\n" + ts(q.start + 150) + " --> " + ts(q.start + q.dur - 150) + "\n" + q.text + "\n"; }).join("\n"); }
+  // ================= drawing one 1280×720 frame =================
+  function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+  function wrap(g, text, maxW) {   // words, and characters for Chinese / long words
+    var L = [], cur = "", toks = String(text || "").match(/[一-鿿　-〿＀-￯]|[^\s一-鿿　-〿＀-￯]+|\s+/g) || [];
+    toks.forEach(function (t) { if (/^\s+$/.test(t)) { if (cur) cur += " "; return; } var n = cur + t; if (g.measureText(n).width > maxW && cur.trim()) { L.push(cur.trim()); cur = t; } else cur = n; });
+    if (cur.trim()) L.push(cur.trim()); return L;
+  }
+  function box() {   // where the recording goes
+    var port = (P.h || 16) > (P.w || 9) * 1.05, pres = O.pres !== "off";
+    if (port) { var vh = O.cap ? 560 : 640, vw = vh * (P.w || 9) / (P.h || 16), vx = pres ? 330 : 140; return { port: true, x: vx, y: 24, w: vw, h: vh }; }
+    var w = pres ? 900 : 1120, h = w * (P.h || 9) / (P.w || 16), mh = O.cap ? 540 : 620; if (h > mh) { h = mh; w = h * (P.w || 16) / (P.h || 9); }
+    return { port: false, x: pres ? 1280 - w - 30 : (1280 - w) / 2, y: 70, w: w, h: h };
+  }
+  var ease = function (x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; };
+  function paint(g, q, img, el, total, o) {
+    o = o || {}; var W = 1280, H = 720, f = q.dur ? Math.min(1, el / q.dur) : 0, B = box(), pres = O.pres !== "off" && window.BIPresenter;
+    var bg = g.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#151A4A"); bg.addColorStop(1, "#3A2A8C"); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.textBaseline = "top"; g.textAlign = "left";
+    var sc = S();
+    if (q.k === "intro" || q.k === "outro") {
+      var intro = q.k === "intro";
+      if (img) { var ih = 600, iw = ih * img.width / img.height; if (iw > 560) { iw = 560; ih = iw * img.height / img.width; } g.save(); rr(g, W - iw - 60, (H - ih) / 2, iw, ih, 22); g.clip(); g.drawImage(img, W - iw - 60, (H - ih) / 2, iw, ih); g.restore(); }
+      var tx = pres ? 330 : 80, tw = (img ? W - 640 : W - 160) - tx + 40;
+      g.fillStyle = "#9DF0FF"; g.font = "800 21px " + CSSF; g.fillText(intro ? "EXPLAINER" : "✅", tx, 150);
+      g.fillStyle = "#fff"; g.font = "800 48px " + CSSF; var tl = wrap(g, intro ? sc.title || P.name : (P.lang === "hi" ? "धन्यवाद!" : P.lang === "zh" ? "谢谢观看！" : "Thank you!"), tw).slice(0, 3); tl.forEach(function (l, i) { g.fillText(l, tx, 190 + i * 58); });
+      if (!O.cap) { g.fillStyle = "#DDE3FF"; g.font = "26px " + CSSF; wrap(g, q.text, tw).slice(0, 6).forEach(function (l, i) { g.fillText(l, tx, 210 + tl.length * 58 + i * 38); }); }
+      if (pres) BIPresenter.draw(g, { x: 170, y: 712, s: 0.95, style: O.pres, pose: intro ? (f < 0.5 ? "wave" : "present") : (f < 0.5 ? "thumb" : "wave"), tx: W - 300, ty: 330, mouth: o.mouth || 0, expr: "happy", blink: o.blink, t: el });
+    } else {
+      // the recording (rounded; a phone frame for portrait videos)
+      if (B.port) { g.fillStyle = "#0B0D1E"; rr(g, B.x - 10, B.y - 10, B.w + 20, B.h + 20, 34); g.fill(); }
+      if (img) { var IW = img.videoWidth || img.width, IH = img.videoHeight || img.height; g.save(); rr(g, B.x, B.y, B.w, B.h, B.port ? 26 : 12); g.clip(); g.fillStyle = "#000"; g.fillRect(B.x, B.y, B.w, B.h); var k = Math.min(B.w / IW, B.h / IH), dw = IW * k, dh = IH * k; g.drawImage(img, B.x + (B.w - dw) / 2, B.y + (B.h - dh) / 2, dw, dh); g.restore(); }
+      // step chip + title + the lines of this screen
+      var chip = (P.lang === "zh" ? "第 " + q.n + " / " + q.of + " 步" : P.lang === "hi" ? "चरण " + q.n + " / " + q.of : "STEP " + q.n + " / " + q.of);
+      var px = B.port ? B.x + B.w + 50 : (pres ? 30 : 40), py = B.port ? 40 : 16, pw = B.port ? W - px - 40 : (pres ? B.x - 60 : W - 80);
+      g.font = "800 17px " + CSSF; var cw = g.measureText(chip).width + 26; g.fillStyle = "#6C5CFF"; rr(g, px, py, cw, 32, 16); g.fill(); g.fillStyle = "#fff"; g.fillText(chip, px + 13, py + 8);
+      if (B.port) {
+        g.font = "800 36px " + CSSF; var tl2 = wrap(g, q.title, pw).slice(0, 2); tl2.forEach(function (l, i) { g.fillText(l, px, py + 48 + i * 44); });
+        var yy = py + 66 + tl2.length * 44;
+        if (q.k === "beat") q.beats.forEach(function (b, k) {
+          if (yy > (O.cap ? 560 : 650)) return; var on = k === q.j, done = k < q.j;
+          g.fillStyle = on ? "#6C5CFF" : done ? "rgba(124,240,216,.9)" : "rgba(255,255,255,.18)"; g.beginPath(); g.arc(px + 14, yy + 14, 14, 0, Math.PI * 2); g.fill(); g.fillStyle = "#fff"; g.font = "800 15px " + CSSF; g.textAlign = "center"; g.fillText(done ? "✓" : String(k + 1), px + 14, yy + 6); g.textAlign = "left";
+          g.font = (on ? "700 " : "") + "21px " + CSSF; g.fillStyle = on ? "#fff" : "rgba(221,227,255,.72)"; var L2 = wrap(g, b.text, pw - 44).slice(0, on ? 4 : 2); L2.forEach(function (l, i) { g.fillText(l + (i === L2.length - 1 && !on && wrap(g, b.text, pw - 44).length > 2 ? "…" : ""), px + 40, yy + 3 + i * 28); }); yy += L2.length * 28 + 16;
+        });
+        else { g.fillStyle = "#DDE3FF"; g.font = "22px " + CSSF; g.fillText(P.lang === "zh" ? "下一步 →" : P.lang === "hi" ? "अगला →" : "Next →", px, yy); }
+      } else {
+        g.fillStyle = "#fff"; g.font = "800 24px " + CSSF; var tl3 = wrap(g, q.title, pres ? pw : pw - cw - 20); if (pres) tl3.slice(0, 3).forEach(function (l, i) { g.fillText(l, px, py + 44 + i * 30); }); else g.fillText(tl3[0] || "", px + cw + 14, py + 4);
+      }
+      // pointer: glides to the spot, then pulses
+      var pt = null;
+      if (q.k === "beat" && O.ptr && (q.b.pt || true)) {
+        var a = { x: B.x + B.w * q.b.x / 100, y: B.y + B.h * q.b.y / 100 }, s0 = q.prev ? { x: B.x + B.w * q.prev.x / 100, y: B.y + B.h * q.prev.y / 100 } : { x: B.x + B.w / 2, y: B.y + B.h * 0.9 };
+        var m = ease(Math.min(1, el / 550)); pt = { x: s0.x + (a.x - s0.x) * m, y: s0.y + (a.y - s0.y) * m };
+        if (m >= 1) { var ph = ((el - 550) % 1300) / 1300; g.strokeStyle = "rgba(255,90,60," + (0.8 * (1 - ph)) + ")"; g.lineWidth = 4; g.beginPath(); g.arc(pt.x, pt.y, 14 + ph * 34, 0, Math.PI * 2); g.stroke(); g.fillStyle = "rgba(255,200,40,.28)"; g.beginPath(); g.arc(pt.x, pt.y, 26, 0, Math.PI * 2); g.fill(); }
+        // arrow cursor
+        g.save(); g.translate(pt.x, pt.y); g.fillStyle = "#fff"; g.strokeStyle = "#111"; g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 30); g.lineTo(8, 23); g.lineTo(14, 36); g.lineTo(20, 33); g.lineTo(14, 21); g.lineTo(24, 21); g.closePath(); g.fill(); g.stroke(); g.restore();
+      }
+      if (pres) {
+        var px2 = B.port ? 170 : 150, sc2 = B.port ? 1 : 0.88;
+        BIPresenter.draw(g, { x: px2, y: 712, s: sc2, style: O.pres, pose: q.k === "beat" ? (pt ? "point" : "present") : "present", tx: pt ? pt.x : B.x + B.w / 2, ty: pt ? pt.y : B.y + B.h / 2, mouth: o.mouth || 0, expr: q.k === "beat" ? (q.j === 0 ? "explain" : "smile") : "smile", blink: o.blink, t: el });
+      }
+    }
+    // captions: the sentence being spoken
+    if (O.cap && q.text) {
+      var sen = String(q.text).match(/[^.!?。！？।]+[.!?。！？।]*/g) || [q.text], tot = sen.reduce(function (s, x) { return s + x.length; }, 0) || 1, pos = f * tot * 1.06, acc = 0, cur = sen[0];
+      for (var j = 0; j < sen.length; j++) { acc += sen[j].length; cur = sen[j]; if (pos <= acc) break; }
+      g.font = "600 26px " + CSSF; var L3 = wrap(g, cur.trim(), 1080).slice(0, 2);
+      if (L3.length) { var bh = 18 + L3.length * 34, by = H - bh - 22; g.fillStyle = "rgba(8,10,26,.84)"; rr(g, 70, by, W - 140, bh, 14); g.fill(); g.fillStyle = "#fff"; g.textAlign = "center"; L3.forEach(function (l, i) { g.fillText(l, W / 2, by + 10 + i * 34); }); g.textAlign = "left"; }
+    }
+    if (total) { g.fillStyle = "rgba(255,255,255,.16)"; g.fillRect(0, H - 6, W, 6); g.fillStyle = "#7CF0D8"; g.fillRect(0, H - 6, W * Math.min(1, (o.at || 0) / total), 6); }
+  }
+  function img(src) { return new Promise(function (res) { if (!src) return res(null); var im = new Image(); im.onload = function () { res(im); }; im.onerror = function () { res(null); }; im.src = src; }); }
+  // ================= voice =================
+  function b64buf(b64) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+  function decode(ac, buf) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); }); }
+  function voices(ac, T, prog) {
+    var clips = {}, q = T.sc.filter(function (x) { return x.text && x.text.trim(); }), n = q.length, done = 0, err = "", fatal = false;
+    var one = function (x, tries) { return api({ action: "ar-tts", lang: P.lang, voice: O.voice, text: x.text }).then(function (r) {
+      if (r.ok && r.b64) return decode(ac, b64buf(r.b64)).then(function (b) { clips[x.id] = b; }).catch(function () { });
+      if (r.retry && tries < 3) return wait(Math.min(20, r.retry) * 1000).then(function () { return one(x, tries + 1); });
+      if (r.notConfigured) fatal = true; if (!err) err = r.error || "no voice"; }); };
+    var worker = function () { var x = q.shift(); if (!x || fatal) return Promise.resolve(); return one(x, 0).then(function () { done++; prog(done / n, "🎙️ Making the voice-over… " + done + " / " + n); return worker(); }); };
+    return Promise.all([worker(), worker(), worker(), worker()]).then(function () { return { clips: clips, error: err }; });
+  }
+  function envOf(buf) { var d = buf.getChannelData(0), sr = buf.sampleRate, w = Math.round(sr * 0.04), out = []; for (var i = 0; i < d.length; i += w) { var s = 0; for (var j = i; j < Math.min(d.length, i + w); j += 4) s += Math.abs(d[j]); out.push(s / (w / 4)); } var mx = Math.max.apply(null, out.concat([0.01])); return out.map(function (x) { return Math.min(1, x / mx * 1.3); }); }
+  // ================= the MP4 =================
+  function fastVideo(voiced) {
+    if (!window.VideoEncoder || !window.VideoFrame) return Promise.resolve(null);
+    var C = ["avc1.640028", "avc1.4d0028", "avc1.42001f", "vp09.00.31.08"], i = 0;
+    var tryV = function () { if (i >= C.length) return Promise.resolve(null); var c = C[i++]; return VideoEncoder.isConfigSupported({ codec: c, width: 1280, height: 720, bitrate: 3000000, framerate: 25 }).then(function (r) { return r.supported ? c : tryV(); }).catch(tryV); };
+    return tryV().then(function (vc) {
+      if (!vc) return null; if (!voiced) return { vc: vc, ac: null };
+      if (!window.AudioEncoder || !window.AudioData) return null;
+      var A2 = [["mp4a.40.2", "aac"], ["opus", "opus"]], j = 0, tryA = function () { if (j >= A2.length) return Promise.resolve(null); var a = A2[j++]; return AudioEncoder.isConfigSupported({ codec: a[0], sampleRate: 48000, numberOfChannels: 1, bitrate: 96000 }).then(function (r) { return r.supported ? { vc: vc, ac: a } : tryA(); }).catch(tryA); };
+      return tryA();
+    }).then(function (cfg) { return cfg ? lib("mux").then(function () { return window.Mp4Muxer ? cfg : null; }).catch(function () { return null; }) : null; });
+  }
+  function makeVideo(preview) {
+    if (!steps().length) return toast("The script is empty");
+    if (!preview && !P.url) return toast("Attach the video file first (📂 in step 1) — it stays on your device");
+    var voiced = !preview && O.voice !== "off", AC = window.AudioContext || window.webkitAudioContext, ac = voiced && AC ? new AC() : null, t0 = Date.now(), clips = {}, ENV = {};
+    var out = $("out"); out.innerHTML = '<div class="prog" id="vp"><i></i></div><div class="muted" id="vm" style="font-size:12px;margin-top:4px">Preparing…</div>';
+    var st = function (p, m) { if ($("vp")) $("vp").firstChild.style.width = Math.round(p * 100) + "%"; if ($("vm")) $("vm").textContent = m; };
+    [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (x) { x.disabled = true; });
+    var v = null, cleanup = function () { try { if (v) v.remove(); } catch (e) { } if (ac) { try { ac.close(); } catch (e) { } } [].forEach.call(VIEW.querySelectorAll("[data-x]"), function (x) { x.disabled = false; }); };
+    if (P.url) { v = document.createElement("video"); v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = P.url; v.style.cssText = "position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;z-index:-1"; document.body.appendChild(v); }
+    var cv = document.createElement("canvas"); cv.width = 1280; cv.height = 720; var g = cv.getContext("2d");
+    var seek = function (t) { return new Promise(function (res) { var ok = false, fin = function () { if (ok) return; ok = true; v.removeEventListener("seeked", fin); res(); }; v.addEventListener("seeked", fin); setTimeout(fin, 2500); try { v.currentTime = Math.max(0, Math.min(t, (v.duration || t) - 0.04)); } catch (e) { fin(); } }); };
+    (voiced && ac ? voices(ac, timeline(null), function (p, m) { st(0.02 + p * 0.3, m); }) : Promise.resolve({ clips: {} })).then(function (r) {
+      clips = r.clips; if (voiced && !Object.keys(clips).length) { if (!confirm("The AI voice isn't available right now (" + (r.error || "no voice") + "). Make the video with captions only?")) throw new Error("Stopped — no voice"); voiced = false; }
+      Object.keys(clips).forEach(function (k) { ENV[k] = envOf(clips[k]); });
+      var T = timeline(voiced ? clips : null); if (preview) { var lim = 0; T.sc = T.sc.filter(function (q) { if (q.k === "outro") return false; lim += q.dur; return lim < 30000; }); T.total = T.sc.reduce(function (s, q) { return Math.max(s, q.start + q.dur); }, 0); }
+      return Promise.all(P.frames.map(function (f) { return img(f.src || f.thumb); })).then(function (ims) { return (v ? new Promise(function (res, rej) { if (v.readyState >= 2) res(); else { v.onloadeddata = res; v.onerror = function () { rej(new Error("This video can't be played here — try an MP4 (H.264) file.")); }; } }) : Promise.resolve()).then(function () { return fastVideo(voiced); }).then(function (fv) { return { T: T, ims: ims, fv: fv }; }); });
+    }).then(function (o) {
+      var T = o.T, ims = o.ims, fv = o.fv, total = T.total, lastT = -1, snap = document.createElement("canvas");
+      var sceneAt = function (el) { for (var i = 0; i < T.sc.length; i++) if (el < T.sc[i].start + T.sc[i].dur) return T.sc[i]; return T.sc[T.sc.length - 1]; };
+      var mouth = function (q, el) { var e = ENV[q.id]; if (!e) return voiced || !q.text ? 0 : Math.abs(Math.sin(el / 95)) * 0.5; var i = Math.floor((el - 250) / 40); return i >= 0 && i < e.length ? e[i] : 0; };
+      var blink = function (el) { return (el % 3700) < 130; };
+      var pic = function (q) { return q.k === "intro" || q.k === "outro" ? ims[0] : ims[q.f]; };
+      var finish = function (blob, ext, how) { cleanup(); var u = URL.createObjectURL(blob); $("out").innerHTML = '<video class="pv" controls playsinline src="' + u + '"></video><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="dl">⬇ Download ' + ext.toUpperCase() + '</button><button class="btn ghost sm" id="dls">⬇ Subtitles .srt</button></div><div class="muted" style="font-size:12px;margin-top:4px">' + (preview ? "Preview — no voice, first ~30 s" : "✅ " + Math.round(total / 1000) + " s" + (voiced ? " · AI voice" : "") + " · " + how) + "</div>";
+        $("dl").onclick = function () { download(blob, fname(ext)); }; $("dls").onclick = function () { download(new Blob([srt(T)], { type: "text/plain" }), fname("srt")); }; if (!preview) download(blob, fname(ext)); };
+      if (fv) {
+        var FPS = 20, NF = Math.ceil(total / 1000 * FPS), err = null;
+        var mux = new Mp4Muxer.Muxer({ target: new Mp4Muxer.ArrayBufferTarget(), video: { codec: /^vp09/.test(fv.vc) ? "vp9" : "avc", width: 1280, height: 720, frameRate: FPS }, audio: fv.ac ? { codec: fv.ac[1], numberOfChannels: 1, sampleRate: 48000 } : undefined, fastStart: "in-memory", firstTimestampBehavior: "offset" });
+        var venc = new VideoEncoder({ output: function (c, m) { mux.addVideoChunk(c, m); }, error: function (e) { err = e; } });
+        venc.configure({ codec: fv.vc, width: 1280, height: 720, bitrate: 3000000, framerate: FPS });
+        if (v) { snap.width = v.videoWidth; snap.height = v.videoHeight; } var sg = snap.getContext("2d"), i = 0;
+        var next = function () {
+          if (err) return Promise.reject(err); if (i >= NF) return Promise.resolve();
+          if (venc.encodeQueueSize > 8) return wait(4).then(next);
+          var el = i * 1000 / FPS, q = sceneAt(el), p = Promise.resolve(), src = pic(q);
+          if (q.k === "move" && v) { var vt = q.vs + (el - q.start) / 1000 * q.speed; src = snap; if (Math.abs(vt - lastT) > 0.4 / FPS * q.speed) p = seek(vt).then(function () { sg.drawImage(v, 0, 0); lastT = vt; }); }
+          return p.then(function () {
+            paint(g, q, src, el - q.start, total, { at: el, mouth: mouth(q, el - q.start), blink: blink(el) });
+            var fr = new VideoFrame(cv, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) }); venc.encode(fr, { keyFrame: i % (FPS * 2) === 0 }); fr.close(); i++;
+            if (i % 20 === 0) st(0.33 + 0.62 * i / NF, "⚡ Making the video… " + Math.round(i / NF * 100) + "%");
+            return next();
+          });
+        };
+        var audio = function () { if (!fv.ac || !voiced) return Promise.resolve();
+          var SR = 48000, oac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, Math.ceil(total / 1000 * SR) + SR, SR);
+          T.sc.forEach(function (q) { var b = clips[q.id]; if (!b) return; var s = oac.createBufferSource(); s.buffer = b; s.connect(oac.destination); s.start(0.25 + q.start / 1000); });
+          return oac.startRendering().then(function (buf) { var d = buf.getChannelData(0), aenc = new AudioEncoder({ output: function (c, m) { mux.addAudioChunk(c, m); }, error: function (e) { err = e; } });
+            aenc.configure({ codec: fv.ac[0], sampleRate: SR, numberOfChannels: 1, bitrate: 96000 });
+            for (var o2 = 0; o2 < d.length; o2 += 4800) { var n = Math.min(4800, d.length - o2), ad = new AudioData({ format: "f32", sampleRate: SR, numberOfFrames: n, numberOfChannels: 1, timestamp: Math.round(o2 / SR * 1e6), data: d.slice(o2, o2 + n) }); aenc.encode(ad); ad.close(); }
+            return aenc.flush(); }); };
+        return next().then(function () { return venc.flush(); }).then(audio).then(function () { if (err) throw err; mux.finalize(); finish(new Blob([mux.target.buffer], { type: "video/mp4" }), "mp4", "made in " + Math.max(1, Math.round((Date.now() - t0) / 1000)) + " s"); });
+      }
+      // fallback: real-time recording of the canvas
+      if (!window.MediaRecorder || !cv.captureStream) throw new Error("This device can't make video — try Chrome on a laptop.");
+      var ac2 = ac || (AC ? new AC() : null), dest = voiced && ac2 ? ac2.createMediaStreamDestination() : null, vs2 = cv.captureStream(25);
+      var stream = dest ? new MediaStream([vs2.getVideoTracks()[0]].concat(dest.stream.getAudioTracks())) : vs2;
+      var mime = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"].filter(function (m) { return MediaRecorder.isTypeSupported(m); })[0] || "", ext = /mp4/.test(mime) ? "mp4" : "webm";
+      var rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 3000000 } : {}), chunks = [];
+      rec.ondataavailable = function (e) { if (e.data.size) chunks.push(e.data); };
+      return new Promise(function (res) {
+        rec.onstop = function () { finish(new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" }), ext, "recorded in real time"); res(); };
+        var base = ac2 ? ac2.currentTime + 0.3 : 0, startMs = performance.now() + 300, curQ = null, fin = false;
+        if (dest) T.sc.forEach(function (q) { var b = clips[q.id]; if (!b) return; var s = ac2.createBufferSource(); s.buffer = b; s.connect(dest); s.start(base + 0.25 + q.start / 1000); });
+        var loop = function () {
+          var el = Math.max(0, performance.now() - startMs), q = sceneAt(el);
+          if (q !== curQ) { curQ = q; if (q.k === "move" && v) { v.currentTime = q.vs; v.playbackRate = Math.min(16, q.speed); v.play().catch(function () { }); } else if (v) v.pause(); }
+          paint(g, q, q.k === "move" && v ? v : pic(q), el - q.start, total, { at: el, mouth: mouth(q, el - q.start), blink: blink(el) });
+          st(0.33 + 0.62 * el / total, "⏺ Recording in real time… " + Math.round(el / total * 100) + "% — keep this screen open");
+          if (el < total) requestAnimationFrame(loop); else if (!fin) { fin = true; setTimeout(function () { rec.stop(); }, 300); }
+        };
+        rec.start(500); requestAnimationFrame(loop);
+      });
+    }).catch(function (e) { cleanup(); st(0, "❌ " + (e.message || e)); });
+  }
+  // ================= PPT / PDF =================
+  function stills() {
+    var act = steps();
+    return Promise.all(P.frames.map(function (f) { return img(f.src || f.thumb); })).then(function (ims) {
+      return act.map(function (s, i) {   // one picture per screen: the key frame with numbered pointers
+        var im = ims[s.f]; if (!im) return null; var c = document.createElement("canvas"), k = Math.min(1, 900 / Math.max(im.width, im.height)); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); var g = c.getContext("2d"); g.drawImage(im, 0, 0, c.width, c.height);
+        s.beats.forEach(function (b, j) { var x = c.width * b.x / 100, y = c.height * b.y / 100, r = Math.max(12, c.width / 26); g.fillStyle = "rgba(255,90,60,.92)"; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.strokeStyle = "#fff"; g.lineWidth = 3; g.stroke(); g.fillStyle = "#fff"; g.font = "800 " + Math.round(r * 1.1) + "px " + CSSF; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(j + 1), x, y + 1); });
+        return { s: s, data: c.toDataURL("image/jpeg", 0.86), r: c.width / c.height };
+      });
+    });
+  }
+  function makePptx() {
+    var sc = S(); busy(true, "📊 Making the PowerPoint…", 0.2);
+    Promise.all([lib("pptx"), stills()]).then(function (x) {
+      var L = x[1], Pp = new PptxGenJS(); Pp.layout = "LAYOUT_WIDE"; Pp.title = sc.title || P.name;
+      var t = Pp.addSlide(); t.background = { color: "151A4A" }; t.addText(sc.title || P.name, { x: 0.7, y: 2.2, w: 11.5, h: 1.6, fontSize: 38, bold: true, color: "FFFFFF", valign: "top", fontFace: "Arial" }); t.addText(sc.intro || "", { x: 0.7, y: 3.9, w: 11, h: 1.8, fontSize: 18, color: "DDE3FF", valign: "top", fontFace: "Arial" }); t.addNotes(sc.intro || "");
+      L.forEach(function (o, i) { if (!o) return;
+        var sl = Pp.addSlide(); sl.background = { color: "F5F6FB" }; var port = o.r < 1, ih = 6.5, iw = ih * o.r; if (iw > (port ? 4 : 7.4)) { iw = port ? 4 : 7.4; ih = iw / o.r; }
+        sl.addImage({ data: o.data, x: 0.45, y: (7.5 - ih) / 2, w: iw, h: ih }); var tx = 0.45 + iw + 0.4, tw = 13.33 - tx - 0.45;
+        sl.addText((P.lang === "zh" ? "第 " + (i + 1) + " 步" : P.lang === "hi" ? "चरण " + (i + 1) : "STEP " + (i + 1)) + " / " + L.length, { x: tx, y: 0.5, w: 2.2, h: 0.4, fontSize: 12, bold: true, color: "4D5BF9", fontFace: "Arial" });
+        sl.addText(o.s.title || "", { x: tx, y: 0.95, w: tw, h: 0.9, fontSize: 26, bold: true, color: "1B1D2E", valign: "top", fontFace: "Arial" });
+        sl.addText(o.s.beats.map(function (b, j) { return { text: (j + 1) + "   " + b.text, options: { breakLine: j < o.s.beats.length - 1, paraSpaceAfter: 8 } }; }), { x: tx, y: 1.95, w: tw, h: 5.1, fontSize: 15, color: "1B1D2E", valign: "top", fontFace: "Arial" });
+        sl.addNotes(o.s.beats.map(function (b) { return b.text; }).join(" ")); });
+      var e = Pp.addSlide(); e.background = { color: "151A4A" }; e.addText(sc.outro || "✅", { x: 0.7, y: 2.6, w: 11.5, h: 2, fontSize: 24, color: "FFFFFF", valign: "top", fontFace: "Arial" }); e.addNotes(sc.outro || "");
+      return Pp.write({ outputType: "blob" });
+    }).then(function (b) { download(new Blob([b], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }), fname("pptx")); busy(false, "✅ PowerPoint ready"); }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  function makePdf() {
+    var sc = S(); busy(true, "📄 Making the PDF…", 0.2);
+    Promise.all([lib("pdf"), stills()]).then(function (x) {
+      var L = x[1].filter(Boolean), doc = new window.jspdf.jsPDF({ orientation: "landscape", unit: "px", format: [1280, 720], hotfixes: ["px_scaling"] });
+      var cover = document.createElement("canvas"); cover.width = 1280; cover.height = 720; var g = cover.getContext("2d");
+      paint(g, { k: "intro", text: sc.intro, dur: 1 }, null, 0, 0, {}); if (!O.cap) { } else { g.fillStyle = "#DDE3FF"; g.font = "26px " + CSSF; wrap(g, sc.intro, 900).slice(0, 5).forEach(function (l, i) { g.fillText(l, O.pres !== "off" ? 330 : 80, 380 + i * 38); }); }
+      doc.addImage(cover.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 1280, 720);
+      return Promise.all(L.map(function (o) { return img(o.data); })).then(function (ims) {
+        L.forEach(function (o, i) { doc.addPage([1280, 720], "landscape"); var c = document.createElement("canvas"); c.width = 1280; c.height = 720; var g2 = c.getContext("2d"); g2.fillStyle = "#F5F6FB"; g2.fillRect(0, 0, 1280, 720);
+          var im = ims[i], ih = 660, iw = ih * o.r; if (iw > (o.r < 1 ? 380 : 760)) { iw = o.r < 1 ? 380 : 760; ih = iw / o.r; } g2.drawImage(im, 30, (720 - ih) / 2, iw, ih);
+          var tx = 30 + iw + 40, tw = 1280 - tx - 40; g2.textBaseline = "top"; g2.fillStyle = "#4D5BF9"; g2.font = "800 18px " + CSSF; g2.fillText("STEP " + (i + 1) + " / " + L.length, tx, 40);
+          g2.fillStyle = "#1B1D2E"; g2.font = "800 34px " + CSSF; var tl = wrap(g2, o.s.title, tw).slice(0, 2); tl.forEach(function (l, k) { g2.fillText(l, tx, 72 + k * 42); });
+          var y = 90 + tl.length * 42; o.s.beats.forEach(function (b, j) { if (y > 680) return; g2.fillStyle = "#FF5A3C"; g2.beginPath(); g2.arc(tx + 14, y + 14, 14, 0, Math.PI * 2); g2.fill(); g2.fillStyle = "#fff"; g2.font = "800 15px " + CSSF; g2.textAlign = "center"; g2.fillText(String(j + 1), tx + 14, y + 5); g2.textAlign = "left"; g2.fillStyle = "#1B1D2E"; g2.font = "21px " + CSSF; var LL = wrap(g2, b.text, tw - 44); LL.forEach(function (l, k) { g2.fillText(l, tx + 40, y + 2 + k * 29); }); y += LL.length * 29 + 16; });
+          doc.addImage(c.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 1280, 720); });
+        download(doc.output("blob"), fname("pdf")); busy(false, "✅ PDF ready — " + (L.length + 1) + " pages");
+      });
+    }).catch(function (e) { busy(false, "❌ " + (e.message || e)); });
+  }
+  // ================= start =================
+  if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+  draw();
+})();
+</script>
+</body>
+</html>

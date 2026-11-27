@@ -57,7 +57,7 @@ Write in ${L}${lang !== "en" ? " (keep on-screen button and field names in Engli
 For EVERY frame give one step: a short title (max 6 words) and 1-3 sentences that say what is on screen, exactly what to tap / type next (use the real labels) and why it matters. Link the steps so it flows ("Now…", "Next…"). Mark a frame "skip": true only if it is a loading screen, a blurred transition or the same as the previous frame with nothing new.
 Also write a title for the whole video, a 1-2 sentence intro and a 1-2 sentence closing.
 Reply with ONE JSON object: {"title":"…","intro":"…","outro":"…","steps":[{"f":frame number,"title":"…","text":"…","skip":false}]}`;
-    const r = await ctx.askAI(env, "Write the step titles and voice-over.", JSON.stringify({ video: str(b.name, 80), note: str(b.note, 600), frames: F }).slice(0, 24000), [], ctx.aiFetch, { system: sys, label: "MANUAL", maxTokens: 6000, json: true, raw: true });
+    const r = await ctx.askAI(env, "Write the step titles and voice-over.", JSON.stringify({ video: str(b.name, 80), note: str(b.note, 600), frames: F }).slice(0, 24000), [], ctx.aiFetch, { system: sys, label: "MANUAL", maxTokens: 7000, json: true, raw: true, ...(ctx.long ? { ctxMax: 30000, budgetMs: 400000, callMs: 180000 } : {}) });
     const d = r.ok ? parseLoose(r.text) : null;
     if (!d || !Array.isArray(d.steps)) return json(200, { ok: false, error: (r.error || "The AI reply couldn't be read") + " — try again." });
     const steps = d.steps.map((x) => ({ f: Math.max(0, Math.min(F.length - 1, Math.round(+x.f || 0))), title: str(x.title, 80), text: String(x.text || "").replace(/\s+/g, " ").trim().slice(0, 700), skip: !!x.skip })).filter((x, i, a) => a.findIndex((y) => y.f === x.f) === i).sort((p, q) => p.f - q.f);

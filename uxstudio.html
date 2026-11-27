@@ -448,7 +448,7 @@ td.n,th.n{text-align:right;white-space:nowrap}
       i.onchange = function () {
         var f = i.files && i.files[0]; if (!f) return; if (f.size > 1.5e9) return toast("That video is too large (max 1.5 GB)");
         $("vpick").disabled = true; $("vst").textContent = "Opening the video…";
-        lib("/vidframes.js?v=1", function () { return window.VidFrames; }).then(function () {
+        lib("/vidframes.js?v=2", function () { return window.VidFrames; }).then(function () {
           return VidFrames.pick(f, { max: 14, onProgress: function (p, m) { $("vst").textContent = m; } });
         }).then(function (r) {
           VID = r; ST.platform = r.w > r.h * 1.15 ? "web" : "mobile"; [].forEach.call($("pf").querySelectorAll("[data-v]"), function (y) { y.classList.toggle("on", y.dataset.v === ST.platform); });
@@ -458,23 +458,31 @@ td.n,th.n{text-align:right;white-space:nowrap}
       i.click();
     };
     $("vgo").onclick = function () {
-      if (!VID || !VID.frames.length) return; var F = VID.frames, seen = [], n = 0, note = $("vnote").value.trim(), btn = $("vgo"); btn.disabled = true;
-      var batch = function (tries) {
-        if (n >= F.length) return Promise.resolve();
-        var part = F.slice(n, n + 3); $("vst").textContent = "AI is watching frames " + (n + 1) + "–" + (n + part.length) + " of " + F.length + "…";
-        return api({ action: "ux-ai", mode: "see", frames: part.map(function (f) { return f.src; }), offset: n, times: part.map(function (f) { return f.t; }), about: note }).then(function (r) {
-          if (!r.ok) { if (tries < 1) return batch(tries + 1); throw new Error(r.error); }
-          part.forEach(function (f, k) { seen.push(Object.assign({ t: f.t }, r.frames[k] || { i: n + k, screen: "Frame " + (n + k + 1) })); }); n += part.length; return batch(0);
-        });
-      };
-      batch(0).then(function () {
-        $("vst").textContent = "Rebuilding " + F.length + " frames as editable screens with the step-by-step flow… (40–90 seconds)";
-        return api({ action: "ux-ai", mode: "fromvideo", seen: seen, platform: ST.platform, style: ST.style, name: VID.name, note: note, video: { name: VID.name, dur: VID.dur, w: VID.w, h: VID.h, frames: F.map(function (f) { return { t: f.t, src: f.thumb }; }) } });
-      }).then(function (r) {
-        if (!r.ok) throw new Error(r.error);
+      if (!VID || !VID.frames.length) return; var F = VID.frames, note = $("vnote").value.trim(), btn = $("vgo"); btn.disabled = true;
+      $("vst").textContent = "Sending " + F.length + " key frames to the AI…";
+      vxRun({ kind: "ux", frames: F.map(function (f) { return { t: f.t, src: f.src }; }), about: note, platform: ST.platform, style: ST.style, name: VID.name, note: note,
+        video: { name: VID.name, dur: VID.dur, w: VID.w, h: VID.h, frames: F.map(function (f) { return { t: f.t, src: f.thumb }; }) } }, function (p, m) { $("vst").textContent = Math.round(p * 100) + "% · " + m; })
+      .then(function (r) {
         D = r.doc; ID = ""; return api({ action: "ux-save", doc: D, prompt: "From video: " + VID.name + (note ? " — " + note : "") }).then(function (x) { if (x.ok) { ID = x.id; D = x.doc; } CUR = D.screens[0].id; SEL = ""; VID = null; editor(); toast(D.screens.length + " screens · " + (D.steps || []).length + " steps"); setTimeout(steps, 300); });
-      }).catch(function (e) { toast(e.message || "Couldn't build the design"); $("vst").textContent = ""; }).then(function () { if ($("vgo")) btn.disabled = false; });
+      }).catch(function (e) { toast(e.message || "Couldn't build the design"); if ($("vst")) $("vst").textContent = "❌ " + (e.message || "Couldn't build the design"); }).then(function () { if ($("vgo")) btn.disabled = false; });
     };
+  }
+  // 🎬 long video AI work runs as a background job on the server; the page asks for progress every few seconds
+  function vxRun(body, onProg) {
+    return api(Object.assign({ action: "vx-job" }, body)).then(function (r) {
+      if (!r.ok) throw new Error(r.error || "Couldn't start the AI job");
+      var job = r.job, miss = 0, t0 = Date.now();
+      return new Promise(function (res, rej) {
+        var tick = function () {
+          api({ action: "vx-job-get", job: job }).then(function (g) {
+            if (!g.ok) { if (++miss > 8) return rej(new Error(g.error || "Lost the AI job — try again")); return setTimeout(tick, 4000); }
+            miss = 0; if (g.st === "done") { if (g.res && g.res.ok) return res(g.res); return rej(new Error((g.res && g.res.error) || "The AI job failed — try again")); }
+            onProg(g.p || 0, (g.msg || "Working…") + " · " + Math.round((Date.now() - t0) / 1000) + " s"); setTimeout(tick, 3000);
+          });
+        };
+        setTimeout(tick, 1500);
+      });
+    });
   }
   // ================= step-by-step flow =================
   function stepsHtml(edit) {
