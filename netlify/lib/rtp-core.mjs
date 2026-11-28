@@ -83,7 +83,8 @@ async function orderInfo(store, pool, rid, D) {
   Object.keys(extra).forEach((k) => { const o = cfg.models[k] || {}; if (o.hide) return; const x = extra[k], price = num(o.price) || (x.pu ? Math.round(x.pv / x.pu) : 0), max = o.max != null && o.max !== "" ? Math.max(0, Math.round(num(o.max))) : cfg.defMax, avgM = (sales[k] || 0) / (m3.length || 1);
     models.push({ model: x.model, series: "", price, max, used: used[k] || 0, left: Math.max(0, max - (used[k] || 0)), stock: stock[k] || 0, avgSales: Math.round(avgM * 10) / 10, suggest: Math.min(Math.max(0, max - (used[k] || 0)), Math.max(0, Math.round(avgM * cfg.cover / 30 - (stock[k] || 0)))), last: last[k] || null }); });
   const L = models.filter(Boolean).sort((a, c) => (c.suggest - a.suggest) || (c.avgSales - a.avgSales) || (c.price - a.price));
-  const base = cfg.balance === "wallet" ? D.wallet.balance : cfg.balance === "credit" ? (num(D.retailer.credit) || D.wallet.balance) : null;
+  const cr0 = D.retailer.credit != null && String(D.retailer.credit).trim() !== "" ? num(D.retailer.credit) : null;   // payouts are never an ordering balance
+  const base = cfg.balance === "none" || cr0 == null ? null : cr0;
   return { on: cfg.on !== false, balanceMode: cfg.balance, balance: base, committed: r2(committed), available: base == null ? null : r2(base - committed), minValue: cfg.minValue, note: cfg.note, cover: cfg.cover, models: L, orders: orders.slice(0, 30) };
 }
 async function placeOrder(store, pool, rid, D, b, by, via, t) {
@@ -161,8 +162,8 @@ function aiContext(D) {
     announcements: D.anns.slice(0, 8).map((a) => ({ kind: a.kind, title: a.title, body: str(a.body, 300) })), launches: D.launches.slice(0, 5).map((l) => ({ name: l.name, launch: l.launch, mrp: l.mrp })),
     stockAgeing: { unsold: D.ageing.unsold, buckets: D.ageing.buckets, models: D.ageing.models.slice(0, 12) }, offers: (D.offers || []).slice(0, 12).map((o) => ({ model: o.model, price: o.price, offers: o.offers.slice(0, 6).map((x) => [x.kind, x.partner, x.scheme, x.benefit, x.details].filter(Boolean).join(" · ").slice(0, 160)) })) }).slice(0, 18000);
 }
-const AI_SYS = "You are the vivo India retailer assistant. Answer the retailer's or vivo staff member's question using ONLY the DATA given (their purchase, sales, stock, stock ageing, targets, payouts, wallet, running schemes, consumer offers (EMI / exchange / upgrade etc.), announcements and launches). Be short, friendly and specific with numbers (₹ and units). If something isn't in the DATA, say so and suggest raising a query to the sales team. Never invent scheme amounts. Plain text, at most 8 short lines; use • bullets where useful.";
-const AI_SUMMARY = "Give this retailer a one-glance business summary from DATA: 1) how this month is going vs target, 2) stock health (models with high stock and low sales, models running out), 3) money: payouts earned / wallet balance, 4) the 2-3 best scheme opportunities right now with exactly what to do, 5) one line on new launches. Use • bullets, under 10 lines.";
+const AI_SYS = "You are the vivo India retailer assistant. Answer the retailer's or vivo staff member's question using ONLY the DATA given (their purchase, sales, stock, stock ageing, targets, scheme payouts (total payout = amount paid / credited to the retailer; it is NOT a spendable balance), running schemes, consumer offers (EMI / exchange / upgrade etc.), announcements and launches). Be short, friendly and specific with numbers (₹ and units). If something isn't in the DATA, say so and suggest raising a query to the sales team. Never invent scheme amounts. Plain text, at most 8 short lines; use • bullets where useful.";
+const AI_SUMMARY = "Give this retailer a one-glance business summary from DATA: 1) how this month is going vs target, 2) stock health (models with high stock and low sales, models running out), 3) money: total payout received, 4) the 2-3 best scheme opportunities right now with exactly what to do, 5) one line on new launches. Use • bullets, under 10 lines.";
 
 async function ask(ctx, D, q, history, summary) {
   if (!ctx.askAI) return { ok: false, error: "AI is not available." };
@@ -318,7 +319,7 @@ export async function rtpAction(b, ctx) {
     if (!isHO) return json(403, { ok: false, error: "Only HO admins can change ordering rules." });
     const c = b.cfg || {}, models = {};
     Object.keys(c.models || {}).slice(0, 300).forEach((k) => { const x = c.models[k] || {}, o = {}; if (x.max !== "" && x.max != null && isFinite(+x.max)) o.max = Math.max(0, Math.round(+x.max)); if (num(x.price)) o.price = num(x.price); if (x.hide) o.hide = true; if (Object.keys(o).length) models[nk(k)] = o; });
-    const out = { on: c.on !== false, balance: ["credit", "wallet", "none"].includes(c.balance) ? c.balance : "credit", defMax: Math.max(0, Math.round(num(c.defMax))) || 20, cover: Math.max(7, Math.min(90, Math.round(num(c.cover)) || 30)), minValue: Math.max(0, num(c.minValue)), note: txt(c.note, 300), models, by, at: t };
+    const out = { on: c.on !== false, balance: c.balance === "none" ? "none" : "credit", defMax: Math.max(0, Math.round(num(c.defMax))) || 20, cover: Math.max(7, Math.min(90, Math.round(num(c.cover)) || 30)), minValue: Math.max(0, num(c.minValue)), note: txt(c.note, 300), models, by, at: t };
     await store.set("config:rtporder", out); return json(200, { ok: true, cfg: out });
   }
   if (b.action === "rtp-clear") {   // remove a retailer's business data (HO only)
