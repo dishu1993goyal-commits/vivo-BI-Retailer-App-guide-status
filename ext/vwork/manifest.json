@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "vivo BI vWork helper",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Lets the vivo BI KPI Dashboard tool open vWork and read the KPI reports for you. Read-only: it never saves, releases or changes anything in vWork.",
   "permissions": [
     "scripting",

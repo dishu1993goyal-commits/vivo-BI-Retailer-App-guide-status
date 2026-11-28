@@ -23,10 +23,13 @@
   var WN = "__bivw:";
   function load() {
     var a = null, b = null; try { a = JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch (e) { }
-    try { if (String(W.name).indexOf(WN) === 0) b = JSON.parse(W.name.slice(WN.length)); } catch (e) { }
+
     return a && b ? ((b.sv || 0) > (a.sv || 0) ? b : a) : a || b;
   }
-  function save(S) { if (!S) return; S.sv = Date.now(); var j = JSON.stringify(S); try { sessionStorage.setItem(KEY, j); } catch (e) { } try { W.name = WN + j; } catch (e) { } }
+  // never write window.name: vWork's report window (外嵌 = embedded report) reads its own window.name for its sign-in
+  // code, and overwriting it made every data request fail with "外嵌校验码有误". Only clear what older helpers left in the top page.
+  try { if (W === W.top && String(W.name).indexOf(WN) === 0) W.name = ""; } catch (e) { }
+  function save(S) { if (!S) return; S.sv = Date.now(); var j = JSON.stringify(S); try { sessionStorage.setItem(KEY, j); } catch (e) { } }
   // the report itself sits in a window from another vivo site (itbi-in / vform-in…) that this page can't read: open that window on its own
   function foreignFrame() {
     var best = null, ba = 0;
