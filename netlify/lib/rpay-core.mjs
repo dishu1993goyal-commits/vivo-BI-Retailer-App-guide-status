@@ -9,6 +9,8 @@
 //   rpv:cat           { items:[{ id, name, cat, provider, value, price, mode:"code"|"link", link, howTo, validity, active }] }
 //   rpv:codes:<item>  { codes:[…] }     — never sent to devices in bulk
 //   rps:<id>          { id, scheme, by, byKey, state, at }   — this tool's own scheme rules (separate from the payout calculator's)
+//   rpt:<state|_all>  manual-payout Excel template designed by that state: { state, name, fields:[{ id, label, kind, role, show, ex, note }], imei, by, at }
+//                     Every column is the state's own; a payout line keeps a snapshot of its columns (fv) so later template edits never change history.
 import { randomBytes } from "node:crypto";
 import { cleanScheme } from "./schemecalc-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
@@ -21,9 +23,36 @@ const MONTH = (v) => (/^\d{4}-\d{2}$/.test(String(v || "")) ? String(v) : "");
 const low = (x) => String(x || "").trim().toLowerCase();
 export const VCATS = { travel: "✈️ Air tickets & travel", hotel: "🏨 Hotel booking", grocery: "🛒 Grocery", shopping: "🛍️ Shopping", fuel: "⛽ Fuel", food: "🍽️ Food", mobile: "📱 Recharge & bills", other: "🎁 Other" };
 
+// ---------- state-designed manual-payout templates ----------
+export const TPL_KINDS = ["text", "number", "money", "percent", "date"];
+export const TPL_SHOWS = ["tile", "line", "note", "hidden"];
+export const TPL_ROLES = ["custom", "rid", "name", "mobile", "state", "city", "month", "scheme", "line", "amount", "deduction", "dedreason", "tds", "net", "remarks", "progT", "progA"];
+export const TPL_DEFAULT = { name: "vivo standard payout template", imei: true, fields: [
+  ["Retailer ID", "text", "rid", "hidden", "BRE010294"], ["Retailer name", "text", "name", "hidden", "Shree Mobiles"], ["Mobile", "text", "mobile", "hidden", "9876543210"], ["State", "text", "state", "hidden", "Bihar"], ["City", "text", "city", "hidden", "Patna"],
+  ["Month (YYYY-MM)", "text", "month", "hidden", ""], ["Scheme", "text", "scheme", "hidden", "S2FE Double Bonanza"], ["Payout line / slab", "text", "line", "line", "Slab 2: 6-9 units @ 1.5%"],
+  ["Target", "number", "progT", "tile", "10"], ["Achieved", "number", "progA", "tile", "7"], ["Achievement %", "percent", "custom", "tile", "70"], ["Units", "number", "custom", "tile", "7"], ["Sale value (Rs)", "money", "custom", "tile", "140000"],
+  ["Gross payout (Rs)", "money", "amount", "line", "2100"], ["Deduction (Rs)", "money", "deduction", "line", "630"], ["Deduction reason", "text", "dedreason", "note", "70% payout - monthly target missed"], ["TDS (Rs)", "money", "tds", "line", "0"], ["Net payout (Rs)", "money", "net", "line", "1470"], ["Remarks", "text", "remarks", "note", "Uploaded on V-Work"]
+].map((f, i) => ({ id: "f" + i, label: f[0], kind: f[1], role: f[2], show: f[3], ex: f[4], note: "" })) };
+export function cleanTpl(x) {
+  x = x || {}; const seen = {};
+  const fields = (Array.isArray(x.fields) ? x.fields : []).slice(0, 60).map((f, i) => {
+    f = f || {}; const label = str(f.label, 60); if (!label || seen[label.toLowerCase()]) return null; seen[label.toLowerCase()] = 1;
+    const role = TPL_ROLES.includes(f.role) ? f.role : "custom";
+    return { id: str(f.id, 12).replace(/[^a-z0-9]/gi, "") || "c" + i, label, kind: TPL_KINDS.includes(f.kind) ? f.kind : "text", role, show: TPL_SHOWS.includes(f.show) ? f.show : "tile", ex: str(f.ex, 80), note: str(f.note, 160) };
+  }).filter(Boolean);
+  // one column per identity role; amount / deduction may repeat (each becomes its own breakup line)
+  const one = {}; fields.forEach((f) => { if (!["custom", "amount", "deduction"].includes(f.role)) { if (one[f.role]) f.role = "custom"; one[f.role] = 1; } });
+  return { name: str(x.name, 80) || "Payout template", imei: x.imei !== false, fields };
+}
+const cleanFv = (arr, n) => (Array.isArray(arr) ? arr : []).slice(0, n || 40).map((f) => {
+  if (!f || !str(f.l, 60)) return null;
+  const k = TPL_KINDS.includes(f.k) ? f.k : "text", v = k === "text" || k === "date" ? str(f.v, 200) : numOr(f.v);
+  return v == null || v === "" ? null : { l: str(f.l, 60), v, k, s: TPL_SHOWS.includes(f.s) ? f.s : "tile" };
+}).filter(Boolean);
+
 function cleanRow(x, defState) {
   x = x || {};
-  const parts = (Array.isArray(x.parts) ? x.parts : []).slice(0, 30).map((p) => ({ label: str(p && p.label, 120) || "Payout", slab: str(p && p.slab, 60), amount: money(p && p.amount), type: str(p && p.type, 20) })).filter((p) => p.amount || p.label);
+  const parts = (Array.isArray(x.parts) ? x.parts : []).slice(0, 30).map((p) => { const o = { label: str(p && p.label, 120) || "Payout", slab: str(p && p.slab, 60), amount: money(p && p.amount), type: str(p && p.type, 20) }; const fv = cleanFv(p && p.fv, 20); if (fv.length) o.fv = fv; return o; }).filter((p) => p.amount || p.label);
   let gross = numOr(x.gross), ded = Math.abs(money(x.ded)), tds = Math.abs(money(x.tds)), net = numOr(x.net);
   const pos = parts.filter((p) => p.amount > 0 && p.type !== "tds").reduce((a, p) => a + p.amount, 0), neg = -parts.filter((p) => p.amount < 0 && p.type !== "tds").reduce((a, p) => a + p.amount, 0);
   if (gross == null) gross = parts.length ? pos : net || 0;
@@ -38,7 +67,7 @@ function cleanRow(x, defState) {
   // IMEI / model-wise detail for this payout line: [imei, model, qty, date, value, eligible 1|0, payout per unit, payout amount, remark]
   const items = (Array.isArray(x.items) ? x.items : []).slice(0, 5000).map((it) => Array.isArray(it) ? [str(it[0], 20).replace(/[^0-9A-Za-z]/g, ""), str(it[1], 50), numOr(it[2]) == null ? 1 : numOr(it[2]), str(it[3], 10), money(it[4]), it[5] === 0 || it[5] === "N" || it[5] === false ? 0 : 1, money(it[6]), money(it[7]), str(it[8], 80)] : null).filter((it) => it && (it[0] || it[1]));
   let input = null; if (x.input && typeof x.input === "object") { try { const s = JSON.stringify(x.input); if (s.length < 60000) input = JSON.parse(s); } catch (e) { } }
-  return { rid: RID(x.rid), name: str(x.name, 80), mobile: str(x.mobile, 20), state: str(x.state, 40) || defState || "", city: str(x.city, 60), scheme: str(x.scheme, 100) || "Scheme", skey: str(x.skey, 40), parts, gross: Math.round(gross * 100) / 100, ded, tds, net: Math.round(net * 100) / 100, info, next, input, items: items.length ? items : undefined, remarks: str(x.remarks, 300), query: x.query ? { by: str(x.query.by, 60), at: Number(x.query.at) || 0, note: str(x.query.note, 300) } : null };
+  return { rid: RID(x.rid), name: str(x.name, 80), mobile: str(x.mobile, 20), state: str(x.state, 40) || defState || "", city: str(x.city, 60), scheme: str(x.scheme, 100) || "Scheme", skey: str(x.skey, 40), parts, gross: Math.round(gross * 100) / 100, ded, tds, net: Math.round(net * 100) / 100, info, next, input, items: items.length ? items : undefined, remarks: str(x.remarks, 300), query: x.query, fv: (() => { const v = cleanFv(x.fv, 40); return v.length ? v : undefined; })(), dl: (() => { const v = (Array.isArray(x.dl) ? x.dl : []).slice(0, 10).map((d) => ({ label: str(d && d.label, 80) || "Deduction", amount: Math.abs(money(d && d.amount)) })).filter((d) => d.amount); return v.length ? v : undefined; })() ? { by: str(x.query.by, 60), at: Number(x.query.at) || 0, note: str(x.query.note, 300) } : null };
 }
 
 const PK_TEXT = "Hi {name}, this is the vivo BI team. Your retailer payout for {month} is ready: ₹{amount}. See the scheme-wise details and your IMEI / model report here: {link}\nIf you'd rather not get these messages, just reply STOP.";
@@ -52,7 +81,7 @@ export async function rpayAction(b, ctx) {
   const getR = async (rid) => store.get(`rpr:${rid}`);
   const sum = (r) => { let cr = 0, dr = 0, last = ""; (r.entries || []).forEach((e) => { if (e.type === "cr") cr += e.amount; else dr += e.amount; if (e.month > last) last = e.month; }); return { n: r.name, s: r.state, c: r.city, cr: Math.round(cr * 100) / 100, dr: Math.round(dr * 100) / 100, bal: Math.round((cr - dr) * 100) / 100, last }; };
   const saveR = async (r, I) => { await store.set(`rpr:${r.rid}`, r); I[r.rid] = sum(r); };
-  const pubBatch = (x) => ({ id: x.id, title: x.title, month: x.month, source: x.source, status: x.status, state: x.state, by: x.by, at: x.at, publishedAt: x.publishedAt || 0, count: x.rows.length, total: Math.round(x.rows.reduce((a, r) => a + r.net, 0) * 100) / 100, schemes: [...new Set(x.rows.map((r) => r.scheme))].slice(0, 12), queries: x.rows.filter((r) => r.query).length });
+  const pubBatch = (x) => ({ id: x.id, title: x.title, month: x.month, source: x.source, status: x.status, state: x.state, by: x.by, at: x.at, publishedAt: x.publishedAt || 0, count: x.rows.length, total: Math.round(x.rows.reduce((a, r) => a + r.net, 0) * 100) / 100, schemes: [...new Set(x.rows.map((r) => r.scheme))].slice(0, 12), queries: x.rows.filter((r) => r.query).length, cols: x.cols || null });
   const visRows = (x) => x.rows.filter((r) => seeState(r.state));
 
   // ---------- this tool's scheme rule sets (read from letters by AI; the payout calculator's schemes are not touched) ----------
@@ -73,6 +102,26 @@ export async function rpayAction(b, ctx) {
     await store.delete(`rps:${x.id}`); return json(200, { ok: true });
   }
 
+  // ---------- manual-payout templates (each state designs its own columns) ----------
+  const tKey = (st) => "rpt:" + (low(st) || "_all").replace(/[^a-z0-9_ ]/g, "").replace(/\s+/g, "-").slice(0, 40);
+  const tplFor = async (st) => (st ? await store.get(tKey(st)) : null) || (await store.get(tKey(""))) || null;
+  if (b.action === "rp-tpl-get") {   // the template for my state (HO: any state; "" = PAN India default)
+    const st = isAdmin ? str(b.state, 40) : myState, own = st ? await store.get(tKey(st)) : await store.get(tKey("")), base = own || (await tplFor(st));
+    const out = { ok: true, state: st || "PAN India", own: !!own, tpl: base ? cleanTpl(base) : cleanTpl(TPL_DEFAULT), by: base ? base.by : "", at: base ? base.at : 0, from: own ? "own" : base ? "pan-india" : "standard", kinds: TPL_KINDS, shows: TPL_SHOWS, roles: TPL_ROLES };
+    if (isAdmin) out.states = (await pool(await store.list("rpt:"), 20, (k) => store.get(k))).filter(Boolean).map((x) => ({ state: x.state || "PAN India", name: x.name, n: (x.fields || []).length, at: x.at, by: x.by }));
+    return json(200, out);
+  }
+  if (b.action === "rp-tpl-save" || b.action === "rp-tpl-reset") {
+    const st = isAdmin ? str(b.state, 40) : myState;
+    if (!isAdmin && !st) return json(403, { ok: false, error: "Your account has no state." });
+    if (b.action === "rp-tpl-reset") { await store.delete(tKey(st)); return json(200, { ok: true }); }
+    const x = cleanTpl(b.tpl);
+    if (!x.fields.some((f) => f.role === "rid")) return json(400, { ok: false, error: "Mark one column as “Retailer ID”." });
+    if (!x.fields.some((f) => f.role === "amount" || f.role === "net")) return json(400, { ok: false, error: "Mark at least one column as a payout amount (“Payout amount — adds to gross” or “Net payout”)." });
+    await store.set(tKey(st), Object.assign(x, { state: st || "PAN India", by, at: t }));
+    return json(200, { ok: true, tpl: x });
+  }
+
   // ---------- batches ----------
   if (b.action === "rp-batch-save") {   // create / replace a draft batch (calculator results or manual Excel)
     const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 6000).map((x) => cleanRow(x, myState)).filter((r) => r.rid);
@@ -83,7 +132,8 @@ export async function rpayAction(b, ctx) {
     if (old && old.status === "published") return json(400, { ok: false, error: "This batch is published — unpublish it first to change it." });
     if (old && !isAdmin && old.byKey !== app + ":" + rec.username) return json(403, { ok: false, error: "This draft belongs to someone else." });
     const schemes = {}; if (b.schemes && typeof b.schemes === "object") Object.keys(b.schemes).slice(0, 20).forEach((k) => { try { const s = JSON.stringify(b.schemes[k]); if (s.length < 80000) schemes[str(k, 40)] = JSON.parse(s); } catch (e) { } });
-    const x = { id: old ? old.id : nid(t), title: str(b.title, 120) || "Payouts " + month, month, source: b.source === "calc" ? "calc" : "manual", status: "draft", state: isAdmin ? str(b.state, 40) || "PAN India" : myState, by, byKey: old ? old.byKey : app + ":" + rec.username, at: old ? old.at : t, updatedAt: t, schemes, rows };
+    const cols = (Array.isArray(b.cols) ? b.cols : []).slice(0, 60).map((c) => c && str(c.l, 60) ? { l: str(c.l, 60), k: TPL_KINDS.includes(c.k) ? c.k : "text", s: TPL_SHOWS.includes(c.s) ? c.s : "tile" } : null).filter(Boolean);
+    const x = { id: old ? old.id : nid(t), title: str(b.title, 120) || "Payouts " + month, month, source: b.source === "calc" ? "calc" : "manual", status: "draft", cols: cols.length ? cols : undefined, state: isAdmin ? str(b.state, 40) || "PAN India" : myState, by, byKey: old ? old.byKey : app + ":" + rec.username, at: old ? old.at : t, updatedAt: t, schemes, rows };
     await store.set(`rpb:${x.id}`, x);
     return json(200, { ok: true, batch: pubBatch(x) });
   }
@@ -144,7 +194,7 @@ export async function rpayAction(b, ctx) {
     const rid = RID(b.rid), r = await getR(rid);
     const batches = (await pool(await store.list("rpb:"), 30, (k) => store.get(k))).filter(Boolean);
     const lines = [];
-    batches.forEach((x) => x.rows.forEach((row, i) => { if (row.rid === rid) lines.push({ batch: x.id, row: i, title: x.title, month: x.month, status: x.status, source: x.source, scheme: row.scheme, parts: row.parts, gross: row.gross, ded: row.ded, tds: row.tds, net: row.net, info: row.info, next: row.next, remarks: row.remarks, query: row.query, verifiable: !!(row.input && row.skey && x.schemes && x.schemes[row.skey]), ni: (row.items || []).length, nq: (row.items || []).reduce((a, it) => a + (it[5] ? it[2] : 0), 0), name: row.name, state: row.state, city: row.city, mobile: row.mobile }); }));
+    batches.forEach((x) => x.rows.forEach((row, i) => { if (row.rid === rid) lines.push({ batch: x.id, row: i, title: x.title, month: x.month, status: x.status, source: x.source, scheme: row.scheme, parts: row.parts, gross: row.gross, ded: row.ded, tds: row.tds, net: row.net, info: row.info, next: row.next, remarks: row.remarks, fv: row.fv, dl: row.dl, query: row.query, verifiable: !!(row.input && row.skey && x.schemes && x.schemes[row.skey]), ni: (row.items || []).length, nq: (row.items || []).reduce((a, it) => a + (it[5] ? it[2] : 0), 0), name: row.name, state: row.state, city: row.city, mobile: row.mobile }); }));
     const st = (r && r.state) || (lines[0] && lines[0].state) || "";
     if (!r && !lines.length) return json(404, { ok: false, error: "No payouts for this retailer yet." });
     if (!seeState(st)) return json(403, { ok: false, error: "This retailer is in another state." });

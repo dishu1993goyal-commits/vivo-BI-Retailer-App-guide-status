@@ -68,8 +68,8 @@ MODELS: ${JSON.stringify(avail)}
 ANSWERS: ${answers}`;
     const r = await aiRun(prompt, (d) => d && Array.isArray(d.picks) && d.picks.length);
     if (!r.ok) return json(200, { ok: false, error: r.error });
-    const names = {}; avail.forEach((x) => { names[nameKey(x.name)] = x; });
-    const picks = r.data.picks.slice(0, 3).map((p) => { const hit = names[nameKey(p.name)]; return hit ? { name: hit.name, slug: slugify(hit.name), why: str(p.why, 300), highlight: str(p.highlight, 100), price: hit.price || 0, priceText: str(p.price, 24) } : null; }).filter(Boolean);
+    const names = {}; list.forEach((x) => { names[nameKey(x.name)] = x; });
+    const picks = r.data.picks.slice(0, 3).map((p) => { const hit = names[nameKey(p.name)]; return hit ? { name: hit.name, slug: hit.slug || slugify(hit.name), why: str(p.why, 300), highlight: str(p.highlight, 100), price: hit.price || 0, priceText: str(p.price, 24) } : null; }).filter(Boolean);
     try { await ctx.logEvent(store, t, app, rec, "advis-ask", { device: picks.map((p) => p.name).join(", ").slice(0, 55), ver: "" }); } catch (e) { }
     return json(200, { ok: true, picks, tip: str(r.data.tip, 200) });
   }

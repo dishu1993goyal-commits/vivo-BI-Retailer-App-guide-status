@@ -34,7 +34,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
 </head>
 <body>
 <div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">💼</span></div>
-  <h1>Retailer payouts</h1><p>Scheme-wise payouts, balance, credits &amp; debits for every retailer — verify, share the payout letter and use the balance for vouchers</p></div>
+  <h1>Retailer payouts</h1><p>Scheme-wise payouts, total payout and payments for every retailer — verify, share the payout letter and answer queries. Payouts are display-only; vouchers come only from Rewards Hub points</p></div>
 <div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
 <script>
 (function () {
@@ -78,7 +78,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     draw(); window.scrollTo(0, 0); return true;
   };
   function draw() {
-    var tabs = [["ret", "👥 Retailers"], ["calc", "🧮 Calculate"], ["bat", "📦 Batches"], ["vch", "🎁 Vouchers"]].concat(ADMIN ? [["pay", "🏦 Payments"]] : []);
+    var tabs = [["ret", "👥 Retailers"], ["calc", "🧮 Calculate"], ["bat", "📦 Batches"]].concat(ADMIN ? [["pay", "🏦 Payments"]] : []);
     VIEW.innerHTML = '<div class="seg">' + tabs.map(function (x) { return '<button data-tb="' + x[0] + '" class="' + (TAB === x[0] ? "on" : "") + '">' + x[1] + "</button>"; }).join("") + '</div><div id="pane"></div>';
     [].forEach.call(VIEW.querySelectorAll("[data-tb]"), function (b) { b.onclick = function () { TAB = b.dataset.tb; draw(); }; });
     ({ ret: pRetailers, calc: pCalc, bat: pBatches, vch: pVouchers, pay: pPayments })[TAB]();
@@ -101,9 +101,9 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     api({ action: "rp-retailers", q: Q, state: FST }).then(function (r) {
       if (!$("rl")) return; if (!r.ok) { $("rl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
       if (first || !$("fst").options.length) $("fst").innerHTML = '<option value="">' + (ADMIN ? "All states" : "My state") + "</option>" + r.states.map(function (s) { return "<option" + (s === FST ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("");
-      $("tot").innerHTML = '<div class="tiles" style="margin-top:12px">' + tile("👥", "#EEF0FF", r.count.toLocaleString("en-IN"), "Retailers") + tile("💰", "#E6F4EA", rs(r.totals.cr), "Total payouts") + tile("🏦", "#FFF4E5", rs(r.totals.dr), "Paid / used") + tile("👛", "#F4EEFF", rs(r.totals.bal), "Balance due") + "</div>";
-      $("rl").innerHTML = r.items.length ? r.items.map(function (x) { return '<div class="li" data-r="' + esc(x.rid) + '"><div style="flex:1;min-width:0"><b>' + esc(x.n || x.rid) + '</b><div class="muted" style="font-size:12px">' + esc(x.rid) + (x.c ? " · " + esc(x.c) : "") + (x.s ? " · " + esc(x.s) : "") + (x.last ? " · last " + mlabel(x.last) : "") + '</div></div><div style="text-align:right"><div class="amt ' + (x.bal > 0 ? "pos" : "") + '">' + rs(x.bal) + '</div><div class="muted" style="font-size:11px">balance</div></div></div>'; }).join("") + (r.count > r.items.length ? '<div class="muted" style="font-size:12px;margin-top:8px">Showing ' + r.items.length + " of " + r.count + " — search to narrow.</div>" : "")
-        : '<div class="card empty"><div class="big">💼</div>No retailers with published payouts yet.<div class="muted" style="font-size:12.5px;margin-top:6px">Calculate them in 🧮 Calculate from several scheme letters, or upload a manual-payout Excel in 📦 Payout batches. HO publishes them to retailer balances.</div><div class="row" style="justify-content:center;gap:6px;margin-top:10px"><input class="tx" id="ridq" placeholder="Open by Retailer ID" style="max-width:200px"><button class="btn sec sm" id="ridgo">Open</button></div></div>';
+      $("tot").innerHTML = '<div class="tiles" style="margin-top:12px">' + tile("👥", "#EEF0FF", r.count.toLocaleString("en-IN"), "Retailers") + tile("💰", "#E6F4EA", rs(r.totals.cr), "Total payouts") + tile("🏦", "#FFF4E5", rs(r.totals.dr), "Paid to retailers") + tile("⏳", "#F4EEFF", rs(r.totals.bal), "Still to be paid") + "</div>";
+      $("rl").innerHTML = r.items.length ? r.items.map(function (x) { return '<div class="li" data-r="' + esc(x.rid) + '"><div style="flex:1;min-width:0"><b>' + esc(x.n || x.rid) + '</b><div class="muted" style="font-size:12px">' + esc(x.rid) + (x.c ? " · " + esc(x.c) : "") + (x.s ? " · " + esc(x.s) : "") + (x.last ? " · last " + mlabel(x.last) : "") + '</div></div><div style="text-align:right"><div class="amt ' + (x.bal > 0 ? "pos" : "") + '">' + rs(x.bal) + '</div><div class="muted" style="font-size:11px">to be paid</div></div></div>'; }).join("") + (r.count > r.items.length ? '<div class="muted" style="font-size:12px;margin-top:8px">Showing ' + r.items.length + " of " + r.count + " — search to narrow.</div>" : "")
+        : '<div class="card empty"><div class="big">💼</div>No retailers with published payouts yet.<div class="muted" style="font-size:12.5px;margin-top:6px">Calculate them in 🧮 Calculate from several scheme letters, or upload a manual-payout Excel in 📦 Payout batches. HO publishes them to each retailer’s Total payout.</div><div class="row" style="justify-content:center;gap:6px;margin-top:10px"><input class="tx" id="ridq" placeholder="Open by Retailer ID" style="max-width:200px"><button class="btn sec sm" id="ridgo">Open</button></div></div>';
       [].forEach.call($("rl").querySelectorAll("[data-r]"), function (d) { d.onclick = function () { location.hash = "r=" + encodeURIComponent(d.dataset.r); }; });
       if ($("ridgo")) $("ridgo").onclick = function () { var v = $("ridq").value.trim(); if (v) location.hash = "r=" + encodeURIComponent(v.toUpperCase()); };
     });
@@ -133,7 +133,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     var qs = R.lines.filter(function (l) { return l.query; });
     VIEW.innerHTML = '<div class="row" style="gap:6px"><button class="btn ghost sm" id="bk">← Retailers</button><span style="flex:1"></span><button class="btn sec sm" id="pdf">📄 Payout letter (PDF)</button><button class="btn sec sm" id="wa">💬 Share</button></div>' +
       '<div class="card"><div class="row" style="gap:10px;align-items:center"><div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#4D5BF9,#9152E0);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex:none">' + esc((me.name || me.rid).slice(0, 1).toUpperCase()) + '</div><div style="flex:1;min-width:0"><b style="font-size:16px">' + esc(me.name || me.rid) + '</b><div class="muted" style="font-size:12.5px">' + esc(me.rid) + (me.city ? " · " + esc(me.city) : "") + (me.state ? " · " + esc(me.state) : "") + (me.mobile ? " · 📞 " + esc(me.mobile) : "") + "</div></div></div></div>" +
-      '<div class="tiles" style="margin-top:12px">' + tile("👛", "#F4EEFF", rs(S.bal), "Balance due", "credits − paid − vouchers") + tile("💰", "#E6F4EA", rs(S.cr), "Total earned", "all published payouts") + tile("🏦", "#FFF4E5", rs(paid), "Paid to retailer", "bank / UPI / credit note") + tile("🎁", "#EEF0FF", rs(used), "Used for vouchers") + "</div>" +
+      '<div class="tiles" style="margin-top:12px">' + tile("💰", "#E6F4EA", rs(S.cr), "Total payout", "all published payouts") + tile("🏦", "#FFF4E5", rs(paid), "Paid to retailer", "bank / UPI / credit note") + tile("⏳", "#F4EEFF", rs(S.bal), "Still to be paid", "total payout − paid") + "</div>" +
       '<div class="card"><div class="row"><b style="flex:1">📅 Month</b><select class="tx" id="mon" style="max-width:170px">' + (months.length ? months : [NOWM]).map(function (m) { return '<option value="' + m + '"' + (m === MON ? " selected" : "") + ">" + mlabel(m) + "</option>"; }).join("") + "</select></div>" +
       '<div class="kv"><div>This month<b>' + rs(mNet) + "</b></div><div>Published<b>" + rs(mPub) + "</b></div><div>Schemes<b>" + Object.keys(schemeShare).length + "</b></div></div>" +
       (mNet !== mPub ? '<div class="muted" style="font-size:11.5px;margin-top:6px">⏳ ' + rs(mNet - mPub) + " is still a draft — it adds to the balance once HO publishes it.</div>" : "") + "</div>" +
@@ -142,12 +142,12 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       (ach.some(function (x) { return x[1]; }) ? '<div class="card"><b>🎯 Best achievement % by month</b>' + bars(ach, { fmt: function (v) { return Math.round(v) + "%"; } }) + "</div>" : "") +
       (nexts.length ? '<div class="card"><b>🚀 How to earn more this month</b>' + nexts.map(function (l) { return '<div class="notice info" style="margin-top:6px"><b>' + esc(l.scheme) + ":</b> sell " + l.next.need + " more" + (l.next.model ? " " + esc(l.next.model) : "") + " → <b>+" + rs(l.next.gain) + "</b></div>"; }).join("") + "</div>" : "") +
       (qs.length ? '<div class="notice" style="margin-top:12px">🚩 ' + qs.length + " payout line(s) flagged for checking.</div>" : "") +
-      '<h3 style="margin:16px 2px 0">🧾 Scheme-wise payout details · ' + mlabel(MON) + "</h3>" + (mLines.length ? mLines.map(lineCard).join("") : '<div class="card empty">No scheme payouts for ' + mlabel(MON) + ".</div>") +
-      '<div class="card"><div class="row"><b style="flex:1">🎁 Use balance</b><span class="pos" style="font-weight:800">' + rs(S.bal) + '</span></div><div class="muted" style="font-size:12.5px">Buy vouchers or services (travel, hotel, grocery, shopping…) instantly from this retailer’s balance — no approval needed. The code / link appears straight away to share with the retailer.</div><button class="btn pri block" id="buy" style="margin-top:8px"' + (S.bal > 0 ? "" : " disabled") + ">🎁 Choose a voucher / service</button></div>" +
+      '<h3 style="margin:16px 2px 0">🧾 Scheme-wise payout details · ' + mlabel(MON) + "</h3>" + (mLines.length ? mLines.map(function (l, i) { return lineCard(l, i); }).join("") : '<div class="card empty">No scheme payouts for ' + mlabel(MON) + ".</div>") +
+      '' +
       '<div class="card"><div class="row"><b style="flex:1">📒 Credit / debit ledger</b>' + (ADMIN ? '<button class="btn ghost sm" id="adj">± Adjust</button>' : "") + "</div>" + ledger() + "</div>";
     $("bk").onclick = function () { location.hash = ""; };
     $("mon").onchange = function () { MON = this.value; dash(); };
-    $("pdf").onclick = letterPdf; $("wa").onclick = shareText; $("buy").onclick = buyFlow;
+    $("pdf").onclick = letterPdf; $("wa").onclick = shareText; if ($("buy")) $("buy").onclick = buyFlow;
     if ($("adj")) $("adj").onclick = adjust;
     [].forEach.call(VIEW.querySelectorAll("[data-items]"), function (b) { b.onclick = function () { var l = mLines[+b.dataset.items]; Promise.all([libPI(), api({ action: "rp-items", id: l.batch, row: l.row })]).then(function (x) { var r = x[1]; if (!r.ok) return toast(r.error); PAYITEMS.show(r.items, r.line, { sheet: sheet, esc: esc, download: download, xlsx: xlsx }); }); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-ver]"), function (b) { b.onclick = function () { verify(mLines[+b.dataset.ver], b.parentNode.parentNode.querySelector(".vres")); }; });
@@ -155,7 +155,8 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     [].forEach.call(VIEW.querySelectorAll("[data-del]"), function (b) { b.onclick = function () { sheet("Remove this ledger line?", "", [["🗑️", "Remove", function () { api({ action: "rp-entry-delete", rid: me.rid, entry: b.dataset.del }).then(function (x) { if (!x.ok) return toast(x.error); openRetailer(me.rid); }); }, "danger"]]); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-code]"), function (b) { b.onclick = function () { var e = RET.entries.find(function (x) { return x.id === b.dataset.code; }); if (e) showVoucher(e); }; });
   }
-  function lineCard(l, i) {
+  function lineCard(l, i, demo) {
+    if (l.fv || l.dl) return lineCardT(l, i, demo);
     var inf = l.info || {}, achv = inf.ach != null ? inf.ach : inf.target && inf.achieved != null ? inf.achieved / inf.target * 100 : null;
     return '<div class="sch"><div class="hd"><b>' + esc(l.scheme) + '</b><span class="bdg ' + (l.status === "published" ? "b-pub" : "b-dr") + '">' + (l.status === "published" ? "Published" : "Draft") + "</span>" + (l.query ? '<span class="bdg b-q">Query</span>' : "") + "</div>" +
       '<div class="muted" style="font-size:11.5px">' + esc(l.title) + " · " + (l.source === "calc" ? "calculated by the payout engine" : "manual payout") + "</div>" +
@@ -167,6 +168,23 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       '<div class="pl" style="border:0;font-size:15px"><b>Net payout</b><b class="pos">' + rs(l.net) + "</b></div></div>" +
       (l.remarks ? '<div class="muted" style="font-size:12px">ℹ️ ' + esc(l.remarks) + "</div>" : "") + (l.query ? '<div class="notice" style="margin-top:6px">🚩 ' + esc(l.query.note) + ' <span class="muted">— ' + esc(l.query.by) + "</span></div>" : "") +
       '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">' + (l.ni ? '<button class="btn pri sm" data-items="' + i + '">📄 IMEI / model report (' + l.ni + ")</button>" : "") + '<button class="btn sec sm" data-ver="' + i + '">✔ Verify this payout</button><button class="btn ghost sm" data-q="' + i + '">' + (l.query ? "Clear query" : "🚩 Raise query") + '</button></div><div class="vres"></div></div>';
+  }
+  function lineCardT(l, i, demo) {   // a manual payout uploaded with a state-designed template: show the state's own columns
+    var fv = l.fv || [], tiles = fv.filter(function (f) { return f.s === "tile"; }), rowsF = fv.filter(function (f) { return f.s === "line"; }), notes = fv.filter(function (f) { return f.s === "note"; }), hid = fv.filter(function (f) { return f.s === "hidden"; });
+    var inf = l.info || {}, achv = inf.target > 0 && inf.achieved != null ? inf.achieved / inf.target * 100 : null, multi = (l.parts || []).length > 1 || l.ded || l.tds || rowsF.length;
+    return '<div class="sch"><div class="hd"><b>' + esc(l.scheme) + '</b><span class="bdg ' + (l.status === "published" ? "b-pub" : "b-dr") + '">' + (l.status === "published" ? "Published" : "Draft") + "</span>" + (l.query ? '<span class="bdg b-q">Query</span>' : "") + "</div>" +
+      '<div class="muted" style="font-size:11.5px">' + esc(l.title) + " · manual payout</div>" +
+      (tiles.length ? '<div class="kv">' + tiles.map(function (f) { return "<div>" + esc(f.l) + "<b" + (f.k === "text" && String(f.v).length > 14 ? ' style="font-size:12px"' : "") + ">" + fmtV(f.k, f.v) + "</b></div>"; }).join("") + "</div>" : "") +
+      (achv != null ? '<div class="prog"><i style="width:' + Math.min(100, achv) + "%;background:" + (achv >= 100 ? "#1E9E61" : achv >= 80 ? "#F5A524" : "#E5484D") + '"></i></div>' : "") +
+      '<div style="margin-top:8px">' + (l.parts || []).map(function (p) { return '<div class="pl"><span>' + esc(p.label) + ((p.fv || []).length ? '<br><span class="muted" style="font-size:11.5px">' + p.fv.filter(function (f) { return demo || f.s !== "hidden"; }).map(function (f) { return esc(f.l) + " " + fmtV(f.k, f.v); }).join(" · ") + "</span>" : "") + '</span><b class="' + (p.amount < 0 ? "neg" : "") + '">' + rs(p.amount) + "</b></div>"; }).join("") +
+      rowsF.map(function (f) { return '<div class="pl"><span>' + esc(f.l) + "</span><b>" + fmtV(f.k, f.v) + "</b></div>"; }).join("") +
+      (multi ? '<div class="pl"><span>Gross payout</span><b>' + rs(l.gross) + "</b></div>" : "") +
+      (l.dl ? l.dl.map(function (d) { return '<div class="pl"><span>' + esc(d.label) + '</span><b class="neg">−' + rs(d.amount) + "</b></div>"; }).join("") : l.ded ? '<div class="pl"><span>Deductions' + (inf.dedReason ? " (" + esc(inf.dedReason) + ")" : "") + '</span><b class="neg">−' + rs(l.ded) + "</b></div>" : "") + (l.tds ? '<div class="pl"><span>TDS</span><b class="neg">−' + rs(l.tds) + "</b></div>" : "") +
+      '<div class="pl" style="border:0;font-size:15px"><b>Net payout</b><b class="pos">' + rs(l.net) + "</b></div></div>" +
+      notes.map(function (f) { return '<div class="muted" style="font-size:12px">📝 <b>' + esc(f.l) + ":</b> " + fmtV(f.k, f.v) + "</div>"; }).join("") +
+      (l.remarks ? '<div class="muted" style="font-size:12px">ℹ️ ' + esc(l.remarks) + "</div>" : "") + (hid.length && !demo ? '<div class="muted" style="font-size:11.5px;margin-top:4px">🔒 Staff only: ' + hid.map(function (f) { return esc(f.l) + " " + fmtV(f.k, f.v); }).join(" · ") + "</div>" : "") +
+      (l.query ? '<div class="notice" style="margin-top:6px">🚩 ' + esc(l.query.note) + ' <span class="muted">— ' + esc(l.query.by) + "</span></div>" : "") +
+      (demo ? "" : '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">' + (l.ni ? '<button class="btn pri sm" data-items="' + i + '">📄 IMEI / model report (' + l.ni + ")</button>" : "") + '<button class="btn sec sm" data-ver="' + i + '">✔ Verify this payout</button><button class="btn ghost sm" data-q="' + i + '">' + (l.query ? "Clear query" : "🚩 Raise query") + '</button></div><div class="vres"></div>') + "</div>";
   }
   function ledger() {
     var E = RET.entries; if (!E.length) return '<div class="muted" style="font-size:13px;margin-top:6px">No published credits or debits yet.</div>';
@@ -247,10 +265,10 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     L.forEach(function (l) {
       brk(120); var inf = l.info || {};
       line(l.scheme + "  (" + (l.source === "calc" ? "calculated" : "manual") + ")", { b: true, size: 10 });
-      var facts = []; if (inf.target != null) facts.push("Target " + inf.target); if (inf.achieved != null || inf.units != null) facts.push("Achieved " + (inf.achieved != null ? inf.achieved : inf.units)); if (inf.ach != null) facts.push("Achievement " + pc(inf.ach)); if (inf.value) facts.push("Sale value " + rs(inf.value)); if (inf.slab) facts.push("Slab: " + inf.slab); if (inf.vsTarget) facts.push("V-Shield " + (inf.vsSold || 0) + "/" + inf.vsTarget);
+      var facts = (l.fv || []).filter(function (f) { return f.s === "tile" || f.s === "line" || f.s === "note"; }).map(function (f) { return f.l + ": " + fmtV(f.k, f.v).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"); }); if (!l.fv && inf.target != null) facts.push("Target " + inf.target); if (inf.achieved != null || inf.units != null) facts.push("Achieved " + (inf.achieved != null ? inf.achieved : inf.units)); if (inf.ach != null) facts.push("Achievement " + pc(inf.ach)); if (inf.value) facts.push("Sale value " + rs(inf.value)); if (inf.slab) facts.push("Slab: " + inf.slab); if (inf.vsTarget) facts.push("V-Shield " + (inf.vsSold || 0) + "/" + inf.vsTarget);
       if (facts.length) line(facts.join("   |   "), { size: 8.5, c: "0.35 0.37 0.5" });
       (inf.models || []).forEach(function (m) { line("  " + m.name + ": sold " + (m.sold == null ? "-" : m.sold) + (m.target != null ? " of " + m.target : ""), { size: 8.5 }); });
-      (l.parts || []).forEach(function (p) { row([[52, (p.label + (p.slab ? " (" + p.slab + ")" : "")).slice(0, 80)], [480, rs(p.amount)]], { size: 8.5, gap: 12 }); });
+      (l.parts || []).forEach(function (p) { row([[52, (p.label + (p.slab ? " (" + p.slab + ")" : "")).slice(0, 80)], [480, rs(p.amount)]], { size: 8.5, gap: 12 }); }); (l.dl || []).forEach(function (d) { row([[52, d.label.slice(0, 80)], [480, "-" + rs(d.amount)]], { size: 8.5, gap: 12 }); }); if (!l.dl && l.ded) row([[52, "Deductions" + (inf.dedReason ? " (" + inf.dedReason + ")" : "")], [480, "-" + rs(l.ded)]], { size: 8.5, gap: 12 }); if (l.tds) row([[52, "TDS"], [480, "-" + rs(l.tds)]], { size: 8.5, gap: 12 });
       row([[52, "Net payout"], [480, rs(l.net)]], { b: true, size: 9, gap: 12 });
       if (l.remarks) line("Note: " + l.remarks.slice(0, 120), { size: 8, c: "0.45 0.47 0.6" });
       y -= 6;
@@ -445,21 +463,136 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     }).catch(function (e) { toast(e.message); });
   }
 
+  // ================= State-designed payout template =================
+  // Each state builds its own manual-payout Excel: its own column names, order and meaning. Retailers then see exactly
+  // those headers — nothing is forced (no Target / Achievement unless the state adds them).
+  var TPL = null, TST = "";   // TPL = rp-tpl-get result; TST = state being edited (HO)
+  var ROLE_L = { custom: "Just show it (no maths)", rid: "Retailer ID (required)", name: "Retailer name", mobile: "Mobile", state: "State", city: "City", month: "Month (YYYY-MM)", scheme: "Scheme name", line: "Breakup line name", amount: "Payout amount — adds to gross", deduction: "Deduction — subtracted", dedreason: "Deduction reason", tds: "TDS — subtracted", net: "Net payout (final)", remarks: "Remarks", progT: "Progress bar — target", progA: "Progress bar — achieved" };
+  var SHOW_L = { tile: "🟦 Highlight box", line: "₹ Breakup row", note: "📝 Small note", hidden: "🔒 Hidden from retailer" };
+  var KIND_L = { text: "Text", number: "Number", money: "Amount ₹", percent: "Percent %", date: "Date" };
+  var IDROLE = { rid: 1, name: 1, mobile: 1, state: 1, city: 1, month: 1, scheme: 1 }, MONEYROLE = { amount: 1, deduction: 1, tds: 1, net: 1 };
+  var nh = function (s) { return String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9%₹]+/g, ""); };
+  function fmtV(k, v) { if (v == null || v === "") return "—"; if (k === "money") return rs(v); if (k === "percent") return (Math.round(Number(v) * 10) / 10) + "%"; if (k === "number") return Number(v).toLocaleString("en-IN"); return esc(String(v)); }
+  function loadTpl(st) { return api({ action: "rp-tpl-get", state: st || "" }).then(function (r) { if (r.ok) { TPL = r; TST = r.state === "PAN India" ? "" : r.state; } return r; }); }
+  function tplCard() {
+    var T = TPL.tpl, src = { own: "designed for " + TPL.state, "pan-india": "PAN India default (no " + TPL.state + " template yet)", standard: "vivo standard — not customised yet" }[TPL.from];
+    return '<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap"><b style="flex:1">📐 Payout template · ' + esc(TPL.state) + '</b>' + (ADMIN ? '<input class="tx" id="tst" list="tstl" placeholder="State (blank = PAN India default)" value="' + esc(TST) + '" style="max-width:240px"><datalist id="tstl">' + (TPL.states || []).map(function (s) { return '<option value="' + esc(s.state === "PAN India" ? "" : s.state) + '">' + esc(s.state) + " · " + s.n + " columns</option>"; }).join("") + "</datalist>" : "") + "</div>" +
+      '<div class="muted" style="font-size:12.5px;margin-top:3px">' + esc(T.name) + " · " + T.fields.length + " columns · " + esc(src) + ". Your columns, your names, your order — retailers see exactly these headers.</div>" +
+      '<div class="chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">' + T.fields.map(function (f) { return '<span class="bdg" style="background:' + (f.role === "rid" ? "#E6F4EA" : MONEYROLE[f.role] ? "#EEF0FF" : f.show === "hidden" ? "#F2F3F7" : "#FFF4E5") + ';color:#1D2433;font-weight:600" title="' + esc(ROLE_L[f.role] + " · " + SHOW_L[f.show]) + '">' + esc(f.label) + "</span>"; }).join("") + "</div>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sec sm" id="tdes">✏️ Design my template</button><button class="btn sec sm" id="tpl">⬇ Download my template</button><button class="btn pri sm" id="imp">📁 Upload filled template</button><button class="btn ghost sm" id="tocalc">🧮 Calculate from scheme letters →</button></div><div id="impres"></div></div>';
+  }
+  function tplDownload() {
+    var T = TPL.tpl, ex = T.fields.map(function (f) { return f.role === "month" ? (f.ex || NOWM) : f.kind === "text" || f.kind === "date" ? f.ex : f.ex === "" ? "" : Number(f.ex); });
+    var sheets = [{ name: "Payouts", rows: [T.fields.map(function (f) { return f.label; }), ex] }];
+    if (T.imei) sheets.push({ name: "IMEI & model details", rows: [["Retailer ID", "Month (YYYY-MM)", "Scheme", "IMEI (optional)", "Model", "Qty", "Sale / activation date", "Sale value (Rs)", "Eligible (Y/N)", "Payout per unit (Rs)", "Payout amount (Rs)", "Remark"]] });
+    sheets.push({ name: "How to fill", rows: [["Column", "Type", "What it means", "How the retailer sees it", "Note"]].concat(T.fields.map(function (f) { return [f.label, KIND_L[f.kind], ROLE_L[f.role], IDROLE[f.role] ? "Used to identify the payout" : SHOW_L[f.show].replace(/^\S+\s/, ""), f.note || ""]; })).concat([[""], ["Rules", "", "One row per retailer per scheme. Several rows for the same retailer + scheme become its breakup lines.", "", ""], ["", "", "Keep the header names exactly as they are. To add, rename or remove a column, change the template in Retailer payouts → Batches → ✏️ Design my template.", "", ""], ["", "", "A column you add in Excel without changing the template is still read and shown to retailers under its own header; you can then save it to the template.", "", ""]]) });
+    download(xlsx(sheets), "Payout_template_" + (TPL.state || "PAN_India").replace(/\W+/g, "_") + ".xlsx");
+  }
+  // header-driven mapping: template columns by name, then sensible guesses, then any extra column becomes its own field
+  function mapHeaders(H, sample) {
+    var T = TPL.tpl, map = [], used = {}, extra = [];
+    H.forEach(function (h, i) { var f = T.fields.find(function (x) { return nh(x.label) === nh(h) && !used[x.id]; }); if (f) { used[f.id] = 1; map[i] = f; } });
+    var has = function (role) { return map.some(function (f) { return f && f.role === role; }); };
+    var guess = [["rid", /retailer\s*id|^rid$|dealer\s*code|retailer\s*code/i], ["month", /^month/i], ["scheme", /^scheme(\s*name)?$/i], ["net", /^net(\s*payout)?/i], ["amount", /gross|payout\s*amount|^payout|^amount/i]];
+    H.forEach(function (h, i) {
+      if (map[i] || !String(h).trim()) return;
+      var vals = sample.map(function (r) { return r[i]; }).filter(function (v) { return v !== "" && v != null; }), num = vals.length && vals.every(function (v) { return numv(v) != null; });
+      var role = "custom"; guess.forEach(function (g) { if (role === "custom" && !has(g[0]) && g[1].test(String(h).trim())) role = g[0]; });
+      var kind = /month/i.test(h) || role === "rid" || role === "scheme" ? "text" : num ? (/rs\b|₹|amount|payout|value|incentive|commission|bonus/i.test(h) ? "money" : /%|percent|ach/i.test(h) ? "percent" : "number") : /date/i.test(h) ? "date" : "text";
+      var f = { id: "x" + i, label: String(h).trim(), kind: kind, role: role, show: IDROLE[role] ? "hidden" : MONEYROLE[role] ? "line" : num ? "tile" : "note", ex: vals.length ? String(vals[0]) : "", note: "" };
+      map[i] = f; extra.push(f);
+    });
+    // no "payout amount" column but there is a Net: money columns that add up to Net on every row are the payout breakup
+    if (!map.some(function (f) { return f && f.role === "amount"; })) {
+      var ni = map.findIndex(function (f) { return f && f.role === "net"; }), cand = [];
+      map.forEach(function (f, i) { if (f && f.role === "custom" && f.kind === "money" && extra.indexOf(f) >= 0) cand.push(i); });
+      var rowsN = sample.filter(function (r) { return ni >= 0 && numv(r[ni]) != null; });
+      if (cand.length && rowsN.length && rowsN.every(function (r) { return Math.abs(cand.reduce(function (a, i) { return a + (numv(r[i]) || 0); }, 0) - numv(r[ni])) <= 1; }))
+        cand.forEach(function (i) { map[i].role = "amount"; map[i].show = "line"; });
+    }
+    var roleHit = {}; map.forEach(function (f) { if (f) roleHit[f.role] = 1; });
+    return { map: map, extra: extra, missing: T.fields.filter(function (f) { return !used[f.id] && !(roleHit[f.role] && f.role !== "custom") && !extra.some(function (e) { return e.label === f.label; }); }) };
+  }
+  function parsePayouts(A, defMonth) {
+    var H = A[0].map(function (h) { return String(h == null ? "" : h).trim(); }), M = mapHeaders(H, A.slice(1, 30)), mp = M.map;
+    var byRole = function (role) { for (var i = 0; i < mp.length; i++) if (mp[i] && mp[i].role === role) return i; return -1; };
+    var c = { rid: byRole("rid"), name: byRole("name"), mobile: byRole("mobile"), state: byRole("state"), city: byRole("city"), month: byRole("month"), scheme: byRole("scheme"), line: byRole("line"), dedr: byRole("dedreason"), tds: byRole("tds"), net: byRole("net"), rem: byRole("remarks"), pt: byRole("progT"), pa: byRole("progA") };
+    var amtCols = [], dedCols = [], showCols = [];
+    mp.forEach(function (f, i) { if (!f) return; if (f.role === "amount") amtCols.push(i); else if (f.role === "deduction") dedCols.push(i); else if (f.role === "custom" || f.role === "progT" || f.role === "progA") showCols.push(i); });
+    if (c.rid < 0) throw new Error("No Retailer ID column found. Your template calls it “" + ((TPL.tpl.fields.find(function (f) { return f.role === "rid"; }) || {}).label || "Retailer ID") + "”.");
+    if (!amtCols.length && c.net < 0) throw new Error("No payout amount column found — mark a column as “Payout amount” or “Net payout” in ✏️ Design my template.");
+    var g = function (r, k) { return k < 0 ? "" : r[k] == null ? "" : r[k]; }, groups = {}, months = {}, bad = 0;
+    var val = function (f, v) { return f.kind === "text" || f.kind === "date" ? (typeof v === "number" && f.kind === "date" ? xdate(v) : String(v).trim()) : numv(v); };
+    A.slice(1).forEach(function (r) {
+      var rid = String(g(r, c.rid)).trim().toUpperCase(); if (!rid) return;
+      var amts = amtCols.map(function (i) { return [mp[i].label, numv(g(r, i))]; }).filter(function (x) { return x[1] != null; }), net = numv(g(r, c.net));
+      if (!amts.length && net == null) { bad++; return; }
+      var m = (c.month >= 0 ? xmonth(g(r, c.month)) : "") || defMonth || "", sch = String(g(r, c.scheme) || "Scheme").trim(), k = m + "|" + rid + "|" + sch;
+      var o = groups[k] || (groups[k] = { month: m, rid: rid, name: "", mobile: "", state: "", city: "", scheme: sch, parts: [], ded: 0, dl: [], tds: 0, net: null, info: {}, fv: [], remarks: [] });
+      ["name", "mobile", "state", "city"].forEach(function (f) { if (!o[f] && c[f] >= 0) o[f] = String(g(r, c[f])).trim(); });
+      var rowFv = showCols.map(function (i) { var f = mp[i], v = val(f, g(r, i)); return v == null || v === "" ? null : { l: f.label, v: v, k: f.kind, s: f.show }; }).filter(Boolean);
+      rowFv.forEach(function (x) { if (!o.fv.some(function (y) { return y.l === x.l; })) o.fv.push(x); });
+      var line = String(g(r, c.line) || "").trim();
+      if (amts.length) amts.forEach(function (a) { o.parts.push({ label: line ? line + (amts.length > 1 ? " · " + a[0] : "") : a[0], amount: a[1], fv: rowFv }); });
+      else o.parts.push({ label: line || sch, amount: net, fv: rowFv });
+      dedCols.forEach(function (i) { var v = numv(g(r, i)); if (v) { o.ded += Math.abs(v); var dr = String(g(r, c.dedr) || "").trim(); o.dl.push({ label: mp[i].label + (dr ? " (" + dr + ")" : ""), amount: Math.abs(v) }); } });
+      if (!dedCols.length && c.dedr >= 0 && String(g(r, c.dedr)).trim()) o.info.dedReason = String(g(r, c.dedr)).trim();
+      o.tds += Math.abs(numv(g(r, c.tds)) || 0); if (net != null) o.net = (o.net || 0) + net;
+      var pt = numv(g(r, c.pt)), pa = numv(g(r, c.pa)); if (pt != null && o.info.target == null) o.info.target = pt; if (pa != null && o.info.achieved == null) o.info.achieved = pa;
+      var rm = String(g(r, c.rem) || "").trim(); if (rm) o.remarks.push(rm);
+      months[m] = (months[m] || 0) + 1;
+    });
+    Object.keys(groups).forEach(function (k) { var o = groups[k]; o.parts.forEach(function (p) { p.fv = (p.fv || []).filter(function (x) { var mfv = o.fv.find(function (y) { return y.l === x.l; }); return o.parts.length > 1 && (!mfv || mfv.v !== x.v); }); }); if (o.info.target > 0 && o.info.achieved != null) o.info.ach = Math.round(o.info.achieved / o.info.target * 1000) / 10; if (!o.dl.length) delete o.dl; });
+    var cols = mp.filter(function (f) { return f && (f.role === "custom" || f.role === "progT" || f.role === "progA"); }).map(function (f) { return { l: f.label, k: f.kind, s: f.show }; });
+    return { groups: groups, months: months, bad: bad, extra: M.extra, missing: M.missing, cols: cols, map: mp.filter(Boolean) };
+  }
+  // ---------- designer ----------
+  function tplDesigner() {
+    var T = JSON.parse(JSON.stringify(TPL.tpl)), P = $("pane");
+    var opts = function (o, cur, dis) { return Object.keys(o).map(function (k) { return '<option value="' + k + '"' + (k === cur ? " selected" : "") + (dis && dis(k) ? " disabled" : "") + ">" + o[k] + "</option>"; }).join(""); };
+    var paint = function () {
+      P.innerHTML = '<button class="btn ghost sm" id="tback">← Batches</button><div class="card"><b style="font-size:16px">✏️ Design the payout template · ' + esc(TPL.state) + '</b><div class="muted" style="font-size:12.5px;margin-top:3px">Add your own columns with your own names. Choose what each column means and how the retailer sees it. Only two things are needed: a <b>Retailer ID</b> column and at least one <b>payout amount</b> (or Net payout) column. Everything else is up to ' + esc(TPL.state) + ".</div>" +
+        '<div class="g2" style="margin-top:8px"><div><label class="lb">Template name</label><input class="tx" id="tnm" value="' + esc(T.name) + '"></div><div><label class="lb">Start from</label><div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn ghost sm" id="tfx">📁 Headers of my Excel</button><button class="btn ghost sm" id="tstd">vivo standard</button><button class="btn ghost sm" id="tmin">Minimum (ID + amount)</button></div></div></div>' +
+        '<div class="tbw" style="margin-top:10px"><table class="dt" id="tft"><tr><th>#</th><th>Column header (exactly as in Excel)</th><th>Type</th><th>What it means</th><th>Retailer sees it as</th><th>Example value</th><th></th></tr>' +
+        T.fields.map(function (f, i) { var lockShow = IDROLE[f.role] || MONEYROLE[f.role]; return '<tr data-i="' + i + '"><td>' + (i + 1) + '</td><td><input class="tx" data-k="label" value="' + esc(f.label) + '" style="min-width:170px"></td><td><select class="tx" data-k="kind" style="min-width:110px">' + opts(KIND_L, f.kind) + '</select></td><td><select class="tx" data-k="role" style="min-width:190px">' + opts(ROLE_L, f.role, function (k) { return k !== f.role && !(k === "custom" || k === "amount" || k === "deduction") && T.fields.some(function (y) { return y.role === k; }); }) + '</select></td><td><select class="tx" data-k="show" style="min-width:170px"' + (lockShow ? " disabled" : "") + ">" + opts(SHOW_L, IDROLE[f.role] ? "hidden" : MONEYROLE[f.role] ? "line" : f.show) + '</select></td><td><input class="tx" data-k="ex" value="' + esc(f.ex) + '" style="min-width:110px"></td><td style="white-space:nowrap"><button class="btn ghost sm" data-up="' + i + '">↑</button><button class="btn ghost sm" data-dn="' + i + '">↓</button><button class="btn ghost sm" data-rm="' + i + '" style="color:var(--bad)">✕</button></td></tr>'; }).join("") + "</table></div>" +
+        '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="tadd">＋ Add column</button><label style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="timei"' + (T.imei ? " checked" : "") + "> Include the optional “IMEI & model details” sheet</label></div>" +
+        '<div id="terr"></div><div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn ok" id="tsave">💾 Save template for ' + esc(TPL.state) + '</button>' + (TPL.own ? '<button class="btn ghost" id="treset">↺ Remove ' + esc(TPL.state) + "’s template</button>" : "") + "</div></div>" +
+        '<div class="card"><b>👀 Preview — how a retailer sees one payout</b><div class="muted" style="font-size:12px">Made from the example values above.</div><div id="tprev"></div></div>';
+      $("tback").onclick = function () { pBatches(); };
+      var sync = function () { [].forEach.call(P.querySelectorAll("#tft tr[data-i]"), function (tr) { var f = T.fields[+tr.dataset.i]; [].forEach.call(tr.querySelectorAll("[data-k]"), function (el) { if (!el.disabled) f[el.dataset.k] = el.value; }); if (IDROLE[f.role]) f.show = "hidden"; else if (MONEYROLE[f.role]) { f.show = "line"; if (f.kind === "text") f.kind = "money"; } }); T.name = $("tnm").value; T.imei = $("timei").checked; };
+      [].forEach.call(P.querySelectorAll("#tft [data-k]"), function (el) { el.onchange = function () { sync(); if (el.dataset.k === "role") paint(); else prev(); }; el.oninput = function () { if (el.dataset.k !== "role") { sync(); prev(); } }; });
+      [].forEach.call(P.querySelectorAll("[data-up],[data-dn],[data-rm]"), function (b) { b.onclick = function () { sync(); var i = +(b.dataset.up || b.dataset.dn || b.dataset.rm); if (b.dataset.rm != null) T.fields.splice(i, 1); else { var j = b.dataset.up != null ? i - 1 : i + 1; if (j < 0 || j >= T.fields.length) return; var t = T.fields[i]; T.fields[i] = T.fields[j]; T.fields[j] = t; } paint(); }; });
+      $("tadd").onclick = function () { sync(); T.fields.push({ id: "n" + Date.now().toString(36), label: "New column " + (T.fields.length + 1), kind: "number", role: "custom", show: "tile", ex: "", note: "" }); paint(); };
+      $("tstd").onclick = function () { T.fields = STD_FIELDS(); paint(); };
+      $("tmin").onclick = function () { T.fields = [{ id: "m1", label: "Retailer ID", kind: "text", role: "rid", show: "hidden", ex: "BRE010294" }, { id: "m2", label: "Scheme", kind: "text", role: "scheme", show: "hidden", ex: "November booster" }, { id: "m3", label: "Payout (Rs)", kind: "money", role: "amount", show: "line", ex: "1500" }]; paint(); };
+      $("tfx").onclick = function () { pickFile(".xlsx,.xls,.csv", function (file) { readBook(file).then(function (book) { var A = book.find(function (X) { return X.length && X[0].some(function (h) { return /retailer\s*id|^rid$|dealer\s*code/i.test(String(h).trim()); }); }) || book[0]; var keep = TPL.tpl; TPL.tpl = { name: T.name, imei: T.imei, fields: [] }; var M = mapHeaders(A[0].map(function (h) { return String(h == null ? "" : h).trim(); }), A.slice(1, 30)); TPL.tpl = keep; T.fields = M.extra; paint(); toast(T.fields.length + " columns read — check what each one means"); }).catch(function (e) { toast(e.message); }); }); };
+      $("tsave").onclick = function () { sync(); var bt = this; bt.disabled = true; api({ action: "rp-tpl-save", state: TST, tpl: T }).then(function (r) { bt.disabled = false; if (!r.ok) { $("terr").innerHTML = '<div class="err" style="margin-top:8px">' + esc(r.error) + "</div>"; return; } toast("Template saved for " + TPL.state); loadTpl(TST).then(pBatches); }); };
+      if ($("treset")) $("treset").onclick = function () { sheet("Remove " + TPL.state + "’s template?", "It falls back to the PAN India default (or the vivo standard). Batches already uploaded keep their own columns.", [["↺", "Remove", function () { api({ action: "rp-tpl-reset", state: TST }).then(function () { loadTpl(TST).then(pBatches); }); }, "danger"]]); };
+      prev();
+    };
+    var prev = function () {
+      var sTpl = TPL.tpl; TPL.tpl = T; var rows = [T.fields.map(function (f) { return f.label; }), T.fields.map(function (f) { return f.role === "month" ? NOWM : f.ex; })], res;
+      try { res = parsePayouts(rows, NOWM); } catch (e) { TPL.tpl = sTpl; $("tprev").innerHTML = '<div class="notice" style="margin-top:6px">⚠️ ' + esc(e.message) + "</div>"; return; }
+      TPL.tpl = sTpl;
+      var o = res.groups[Object.keys(res.groups)[0]];
+      if (!o) { $("tprev").innerHTML = '<div class="notice" style="margin-top:6px">Fill example values (Retailer ID and an amount) to see the preview.</div>'; return; }
+      o.gross = o.parts.reduce(function (a, p) { return a + (Number(p.amount) || 0); }, 0); if (o.net == null) o.net = o.gross - o.ded - o.tds; o.remarks = o.remarks.join("; ");
+      $("tprev").innerHTML = lineCard(Object.assign({ status: "published", title: "Example batch", source: "manual" }, o), 0, true);
+    };
+    paint();
+  }
+  var STD_FIELDS = function () { return [["Retailer ID", "text", "rid", "hidden", "BRE010294"], ["Retailer name", "text", "name", "hidden", "Shree Mobiles"], ["Mobile", "text", "mobile", "hidden", "9876543210"], ["State", "text", "state", "hidden", "Bihar"], ["City", "text", "city", "hidden", "Patna"], ["Month (YYYY-MM)", "text", "month", "hidden", ""], ["Scheme", "text", "scheme", "hidden", "S2FE Double Bonanza"], ["Payout line / slab", "text", "line", "line", "Slab 2: 6-9 units @ 1.5%"], ["Target", "number", "progT", "tile", "10"], ["Achieved", "number", "progA", "tile", "7"], ["Achievement %", "percent", "custom", "tile", "70"], ["Units", "number", "custom", "tile", "7"], ["Sale value (Rs)", "money", "custom", "tile", "140000"], ["Gross payout (Rs)", "money", "amount", "line", "2100"], ["Deduction (Rs)", "money", "deduction", "line", "630"], ["Deduction reason", "text", "dedreason", "note", "70% payout - monthly target missed"], ["TDS (Rs)", "money", "tds", "line", "0"], ["Net payout (Rs)", "money", "net", "line", "1470"], ["Remarks", "text", "remarks", "note", "Uploaded on V-Work"]].map(function (f, i) { return { id: "f" + i, label: f[0], kind: f[1], role: f[2], show: f[3], ex: f[4], note: "" }; }); };
+
   // ================= Batches =================
   function pBatches() {
-    $("pane").innerHTML = '<div class="card"><b>📥 Manual payouts (Excel)</b><div class="muted" style="font-size:12.5px">For retailers whose payout is worked out outside the calculator. One row per retailer per scheme (several rows for the same scheme become its breakup lines). Uploads go in as a draft; HO publishes.</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="tpl">⬇ Template</button><button class="btn pri sm" id="imp">📁 Upload filled template</button><button class="btn ghost sm" id="tocalc">🧮 Calculate from scheme letters →</button></div><div id="impres"></div></div><div id="bl"><div class="loading"><div class="spin"></div></div></div>';
-    $("tpl").onclick = function () {
-      download(xlsx([{ name: "Payouts", rows: [["Retailer ID", "Retailer name", "Mobile", "State", "City", "Month (YYYY-MM)", "Scheme", "Payout line / slab", "Target", "Achieved", "Achievement %", "Units", "Sale value (Rs)", "Gross payout (Rs)", "Deduction (Rs)", "Deduction reason", "TDS (Rs)", "Net payout (Rs)", "Remarks"],
-        ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "S2FE Double Bonanza", "Slab 2: 6-9 units @ 1.5%", 10, 7, 70, 7, 140000, 2100, 630, "70% payout - monthly target missed", 0, 1470, "Uploaded on V-Work"],
-        ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "Sellout payout", "X/V/S series 5.5% (>=90%)", 200000, 190000, 95, "", 150000, 8250, "", "", 0, "", ""],
-        ["BRE010294", "Shree Mobiles", "9876543210", "Bihar", "Patna", NOWM, "Sellout payout", "Y51 Pro 4 x Rs1550", "", "", "", 4, "", 6200, "", "", 0, "", ""]] },
-        { name: "IMEI & model details", rows: [["Retailer ID", "Month (YYYY-MM)", "Scheme", "IMEI (optional)", "Model", "Qty", "Sale / activation date", "Sale value (Rs)", "Eligible (Y/N)", "Payout per unit (Rs)", "Payout amount (Rs)", "Remark"],
-          ["BRE010294", NOWM, "S2FE Double Bonanza", "356938035643809", "S2FE 8+256", 1, NOWM + "-04", 20000, "Y", 300, 300, ""],
-          ["BRE010294", NOWM, "S2FE Double Bonanza", "356938035643817", "S2FE 8+256", 1, NOWM + "-09", 20000, "Y", 300, 300, ""],
-          ["BRE010294", NOWM, "S2FE Double Bonanza", "356938035643825", "S2FE 8+128", 1, NOWM + "-11", 18000, "N", 0, 0, "Activated outside the scheme period"],
-          ["BRE010294", NOWM, "Sellout payout", "", "Y51 Pro", 4, "", 70000, "Y", 1550, 6200, "Model-wise row (no IMEI)"]] },
-        { name: "How to fill", rows: [["Column", "What to enter"], ["— Sheet “IMEI & model details” —", "Optional. One row per IMEI (Qty 1) or one row per model with its Qty. Retailer ID + Month + Scheme link each row to that retailer’s payout line. Each retailer then sees and downloads only their own list for that scheme (Retailer payouts, the PDF letter’s summary and their Retailer-portal link). If a retailer + scheme has detail rows but no row in “Payouts”, a payout line is made from the Payout amount column."], ["— Sheet “Payouts” —", "One row per retailer per scheme (breakup lines allowed) — as before."], ["Retailer ID", "Required — the same ID used everywhere (vChat / DMS)"], ["Month", "Payout month, e.g. " + NOWM + " (one batch is made per month)"], ["Scheme", "Scheme name. Several rows with the same retailer + scheme are added up as breakup lines"], ["Payout line / slab", "What this amount is for — shown to the retailer and in the PDF letter"], ["Target / Achieved / Achievement %", "Optional but recommended — used in the dashboard, letter and the Verify check"], ["Gross / Deduction / TDS / Net", "Gross payout before cuts; Net = Gross − Deduction − TDS (left blank = calculated). Verify flags rows where they don't add up"]] }]), "Manual_payout_template.xlsx");
-    };
+    $("pane").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+    (TPL ? Promise.resolve(TPL) : loadTpl(TST)).then(function (T) { if (!T || !T.ok) { $("pane").innerHTML = '<div class="err">' + esc((T && T.error) || "Could not load the template") + "</div>"; return; } pBatches2(); });
+  }
+  function pBatches2() {
+    $("pane").innerHTML = tplCard() + '<div class="card"><b>📦 Batches</b><div id="bl" style="margin-top:6px"><div class="loading"><div class="spin"></div></div></div></div>';
+    if ($("tst")) $("tst").onchange = function () { loadTpl(this.value.trim()).then(pBatches2); };
+    $("tdes").onclick = tplDesigner;
+    $("tpl").onclick = tplDownload;
     $("imp").onclick = function () { pickFile(".xlsx,.xls,.csv", importManual); };
     $("tocalc").onclick = function () { TAB = "calc"; draw(); };
     api({ action: "rp-batches" }).then(function (r) {
@@ -471,28 +604,13 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
   function importManual(file) {
     $("impres").innerHTML = '<div class="loading" style="margin-top:8px"><div class="spin"></div>Reading…</div>';
     readBook(file).then(function (book) {
-      var isPay = function (A) { return A.length > 1 && A[0].some(function (h) { return /retailer\s*id|^rid$/i.test(String(h).trim()); }) && A[0].some(function (h) { return /gross|net/i.test(String(h)); }); };
       var isDet = function (A) { return A.length > 1 && A[0].some(function (h) { return /retailer\s*id|^rid$/i.test(String(h).trim()); }) && A[0].some(function (h) { return /imei|model/i.test(String(h)); }) && A[0].some(function (h) { return /^qty|quantity|units/i.test(String(h).trim()); }) && !A[0].some(function (h) { return /gross/i.test(String(h)); }); };
-      var A = book.find(isPay) || [[]], DT = book.find(isDet);
-      var H = A[0].map(function (h) { return String(h); }), c = {
-        rid: col(H, /retailer\s*id|^rid|dealer\s*code|retailer\s*code/), name: col(H, /retailer\s*name|^name/), mobile: col(H, /mobile|phone/), state: col(H, /state/), city: col(H, /city|town/), month: col(H, /month/), scheme: col(H, /scheme/), line: col(H, /payout\s*line|slab|basis|component/),
-        target: col(H, /^target/), achieved: col(H, /^achieved|achievement\s*\(?units|actual/), ach: col(H, /achievement\s*%|ach\s*%/), units: col(H, /^units/), value: col(H, /sale\s*value|value/), gross: col(H, /gross/), ded: col(H, /^deduction\s*\(|deduction \(rs|^deduction$/), dedr: col(H, /deduction\s*reason|reason/), tds: col(H, /tds/), net: col(H, /net/), remarks: col(H, /remark|note/) };
-      if (c.rid < 0 && !DT) throw new Error("No “Retailer ID” column found — use the template.");
-      var g = (function (r, k) { return k < 0 ? "" : r[k]; }), groups = {}, months = {}, bad = 0;
-      A.slice(1).forEach(function (r) {
-        var rid = String(g(r, c.rid)).trim().toUpperCase(); if (!rid) return;
-        var m = xmonth(g(r, c.month)) || "", sch = String(g(r, c.scheme) || "Scheme").trim(), k = m + "|" + rid + "|" + sch;
-        var gross = numv(g(r, c.gross)), ded = numv(g(r, c.ded)), tds = numv(g(r, c.tds)), net = numv(g(r, c.net));
-        if (gross == null && net == null) { bad++; return; }
-        var o = groups[k] || (groups[k] = { month: m, rid: rid, name: "", mobile: "", state: "", city: "", scheme: sch, parts: [], ded: 0, tds: 0, net: null, info: {}, remarks: [] });
-        ["name", "mobile", "state", "city"].forEach(function (f) { if (!o[f] && c[f] >= 0) o[f] = String(g(r, c[f])).trim(); });
-        o.parts.push({ label: String(g(r, c.line) || "Payout").trim(), amount: gross != null ? gross : net });
-        o.ded += ded || 0; o.tds += tds || 0; if (net != null) o.net = (o.net || 0) + net;
-        [["target", c.target], ["achieved", c.achieved], ["ach", c.ach], ["units", c.units], ["value", c.value]].forEach(function (z) { var v = numv(g(r, z[1])); if (v != null && o.info[z[0]] == null) o.info[z[0]] = v; });
-        var dr = String(g(r, c.dedr) || "").trim(); if (dr) o.info.dedReason = dr;
-        var rm = String(g(r, c.remarks) || "").trim(); if (rm) o.remarks.push(rm);
-        months[m] = (months[m] || 0) + 1;
-      });
+      var DT = book.find(isDet);
+      var score = function (X) { var hs = X.length ? X[0].map(nh) : []; return TPL.tpl.fields.filter(function (f) { return hs.indexOf(nh(f.label)) >= 0; }).length * 2 + (X.length && X[0].some(function (h) { return /retailer\s*id|^rid$|dealer\s*code|retailer\s*code/i.test(String(h).trim()); }) ? 1 : 0); };
+      var A = book.filter(function (X) { return X.length > 1 && X !== DT && !/how to fill/i.test(String(X[0][0])); }).sort(function (x, y) { return score(y) - score(x); })[0];
+      if (!A && !DT) throw new Error("No payout rows found in this file.");
+      var P = A ? parsePayouts(A, "") : { groups: {}, months: {}, bad: 0, extra: [], missing: [], cols: [] }, groups = P.groups, months = P.months, bad = P.bad;
+      var g = function (r, k) { return k < 0 ? "" : r[k]; };
       // IMEI / model details → attached to their retailer × scheme payout line
       var nItems = 0, orphan = 0, made = 0;
       if (DT) {
@@ -504,7 +622,7 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
           var m = xmonth(g(r, d.month)) || "", k = m + "|" + rid + "|" + sch, o = groups[k] || byKey[rid + "|" + sch.toLowerCase()];
           var qty = numv(g(r, d.qty)); qty = qty == null ? 1 : qty; var el = String(g(r, d.elig)).trim().toUpperCase(), pu = numv(g(r, d.pu)) || 0, amt = numv(g(r, d.amt)); var ok = !(el === "N" || el === "NO" || el === "0");
           if (amt == null) amt = ok ? pu * qty : 0;
-          if (!o) { o = groups[k] = { month: m, rid: rid, name: "", mobile: "", state: "", city: "", scheme: sch, parts: [], ded: 0, tds: 0, net: null, info: {}, remarks: [], auto: true }; byKey[rid + "|" + sch.toLowerCase()] = o; made++; if (m) months[m] = (months[m] || 0) + 1; }
+          if (!o) { o = groups[k] = { month: m, rid: rid, name: "", mobile: "", state: "", city: "", scheme: sch, parts: [], ded: 0, tds: 0, net: null, info: {}, fv: [], remarks: [], auto: true }; byKey[rid + "|" + sch.toLowerCase()] = o; made++; if (m) months[m] = (months[m] || 0) + 1; }
           var dv = g(r, d.date), ds = dv === "" ? "" : (typeof dv === "number" ? xdate(dv) : String(dv).slice(0, 10));
           (o.items = o.items || []).push([imei, model, qty, ds, numv(g(r, d.value)) || 0, ok ? 1 : 0, pu, amt, String(g(r, d.rem) || "").trim()]); nItems++;
         });
@@ -516,18 +634,24 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
       var noMonth = list.filter(function (o) { return !o.month; }).length;
       var mm = Object.keys(months).filter(Boolean).sort();
       var bal = list.filter(function (o) { return Math.abs(o.gross - o.ded - o.tds - o.net) > 1; }).length;
-      $("impres").innerHTML = '<div class="card" style="background:#F7F8FC"><b>Preview</b><div style="font-size:13px;margin-top:4px">' + list.length + " retailer × scheme lines · " + new Set(list.map(function (o) { return o.rid; })).size + " retailers · total " + rs(list.reduce(function (a, o) { return a + o.net; }, 0)) + "</div>" +
+      var newCols = P.extra.filter(function (f) { return f.role === "custom" || MONEYROLE[f.role]; });
+      $("impres").innerHTML = '<div class="card" style="background:#F7F8FC"><b>Preview</b>' +
+        (newCols.length ? '<div class="notice info" style="margin-top:6px">🆕 ' + newCols.length + " column(s) not in your template — they’ll be shown to retailers under their own header: <b>" + newCols.map(function (f) { return esc(f.label); }).join(", ") + '</b>. <div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn pri sm" id="xuse">📐 Make this file’s columns my template</button><button class="btn sec sm" id="xsave">➕ Add them to my current template</button></div></div>' : "") +
+        (P.missing.filter(function (f) { return !IDROLE[f.role] || f.role === "scheme"; }).length ? '<div class="muted" style="font-size:12px;margin-top:4px">Not in this file (fine — left empty): ' + P.missing.map(function (f) { return esc(f.label); }).join(", ") + "</div>" : "") +
+        '<div class="tbw" style="margin-top:6px"><table class="dt"><tr><th>Retailer</th><th>Scheme</th>' + P.cols.filter(function (c) { return c.s !== "hidden"; }).slice(0, 5).map(function (c) { return '<th class="n">' + esc(c.l) + "</th>"; }).join("") + '<th class="n">Net</th></tr>' + Object.keys(groups).slice(0, 5).map(function (k) { var o = groups[k], gr = o.parts.reduce(function (a2, p) { return a2 + (Number(p.amount) || 0); }, 0); return "<tr><td>" + esc(o.rid) + "</td><td>" + esc(o.scheme) + "</td>" + P.cols.filter(function (c) { return c.s !== "hidden"; }).slice(0, 5).map(function (c) { var f = o.fv.find(function (y) { return y.l === c.l; }); return '<td class="n">' + (f ? fmtV(f.k, f.v) : "") + "</td>"; }).join("") + '<td class="n"><b>' + rs(o.net != null ? o.net : gr - o.ded - o.tds) + "</b></td></tr>"; }).join("") + "</table></div>" + '<div style="font-size:13px;margin-top:4px">' + list.length + " retailer × scheme lines · " + new Set(list.map(function (o) { return o.rid; })).size + " retailers · total " + rs(list.reduce(function (a, o) { return a + o.net; }, 0)) + "</div>" +
         (DT ? '<div style="font-size:13px;margin-top:4px">📄 ' + nItems.toLocaleString("en-IN") + " IMEI / model rows attached to " + list.filter(function (o) { return o.items; }).length + " payout lines" + (made ? " · " + made + " line(s) made from the detail sheet" : "") + (orphan ? ' · <span style="color:#B42318">' + orphan + " retailer × scheme detail group(s) skipped — no payout row and no payout amount</span>" : "") + "</div>" : "") +
         (bad ? '<div class="muted" style="font-size:12px">' + bad + " row(s) skipped — no payout amount.</div>" : "") + (bal ? '<div class="notice" style="margin-top:6px">⚠️ ' + bal + " line(s) where Gross − Deduction − TDS ≠ Net. They’ll show as failed in Verify — fix the file or continue.</div>" : "") +
         (noMonth ? '<label class="lb">Month for rows without one</label><input class="tx" type="month" id="dm" value="' + NOWM + '">' : "") +
         '<label class="lb">Batch title</label><input class="tx" id="bt" value="Manual payouts ' + esc(file.name.replace(/\.[a-z]+$/i, "")).slice(0, 80) + '">' +
         '<div class="muted" style="font-size:12px;margin-top:6px">Months: ' + (mm.length ? mm.map(mlabel).join(", ") : "—") + " · one draft batch per month.</div>" +
         '<button class="btn ok block" id="isave" style="margin-top:10px">💾 Save as draft</button></div>';
+      if ($("xuse")) $("xuse").onclick = function () { var T = { name: TPL.state + " payout template", imei: TPL.tpl.imei, fields: P.map.map(function (f, i) { return Object.assign({}, f, { id: "f" + i }); }) }; api({ action: "rp-tpl-save", state: TST, tpl: T }).then(function (r) { if (!r.ok) return toast(r.error); toast(TPL.state + "’s template now has exactly this file’s " + T.fields.length + " columns"); loadTpl(TST).then(function () { var b2 = $("xuse"); if (b2) b2.parentNode.innerHTML = "<b>✓ Template saved — " + T.fields.length + " columns, exactly as in this file. Fine-tune it in ✏️ Design my template.</b>"; }); }); };
+      if ($("xsave")) $("xsave").onclick = function () { var T = JSON.parse(JSON.stringify(TPL.tpl)); newCols.forEach(function (f) { if (!T.fields.some(function (y) { return nh(y.label) === nh(f.label); })) T.fields.push(f); }); api({ action: "rp-tpl-save", state: TST, tpl: T }).then(function (r) { if (!r.ok) return toast(r.error); toast("Added to " + TPL.state + "’s template"); loadTpl(TST).then(function () { var b2 = $("xsave"); if (b2) b2.outerHTML = "<b>✓ saved</b>"; }); }); };
       $("isave").onclick = function () {
         var dm = $("dm") ? $("dm").value : "", byM = {}; list.forEach(function (o) { var m = o.month || dm; if (!m) return; (byM[m] = byM[m] || []).push(o); });
         var ms = Object.keys(byM); if (!ms.length) return toast("Choose the month");
         var bt = this; bt.disabled = true; bt.textContent = "Saving…"; var chain = Promise.resolve(), done = [];
-        ms.forEach(function (m) { chain = chain.then(function () { return api({ action: "rp-batch-save", month: m, title: $("bt").value + (ms.length > 1 ? " · " + mlabel(m) : ""), source: "manual", rows: byM[m] }).then(function (r) { if (!r.ok) throw new Error(r.error); done.push(r.batch); }); }); });
+        ms.forEach(function (m) { chain = chain.then(function () { return api({ action: "rp-batch-save", month: m, title: $("bt").value + (ms.length > 1 ? " · " + mlabel(m) : ""), source: "manual", rows: byM[m], cols: P.cols }).then(function (r) { if (!r.ok) throw new Error(r.error); done.push(r.batch); }); }); });
         chain.then(function () { toast(done.length + " draft batch(es) saved"); pBatches(); }).catch(function (e) { bt.disabled = false; bt.textContent = "💾 Save as draft"; toast(e.message); });
       };
     }).catch(function (e) { $("impres").innerHTML = '<div class="err" style="margin-top:8px">' + esc(e.message || e) + "</div>"; });
@@ -621,19 +745,19 @@ label.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:8
     api({ action: "rp-batch-get", id: id }).then(function (r) {
       if (!r.ok) { VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Back</button><div class="err" style="margin-top:10px">' + esc(r.error) + "</div>"; $("bk").onclick = function () { location.hash = ""; }; return; }
       var b = r.batch, pub = b.status === "published", bys = {}; b.rows.forEach(function (x) { bys[x.scheme] = (bys[x.scheme] || 0) + x.net; });
-      var bad = b.rows.filter(function (x) { return Math.abs(x.gross - x.ded - x.tds - x.net) > 1; }).length;
+      var bad = b.rows.filter(function (x) { return Math.abs(x.gross - x.ded - x.tds - x.net) > 1; }).length; var BC = (b.cols || []).slice(0, 8);
       VIEW.innerHTML = '<button class="btn ghost sm" id="bk">← Batches</button><div class="card"><div class="row"><b style="flex:1;font-size:16px">' + esc(b.title) + '</b><span class="bdg ' + (pub ? "b-pub" : "b-dr") + '">' + (pub ? "Published" : "Draft") + '</span></div><div class="muted" style="font-size:12.5px">' + mlabel(b.month) + " · " + b.count + " lines · " + (b.source === "calc" ? "from the payout calculator" : "manual Excel") + " · by " + esc(b.by || "") + (pub ? " · published" : "") + "</div>" +
         '<div class="tiles" style="margin-top:10px">' + tile("💰", "#E6F4EA", rs(b.total), "Total net payout") + tile("👥", "#EEF0FF", new Set(b.rows.map(function (x) { return x.rid; })).size, "Retailers") + tile("🧩", "#F4EEFF", Object.keys(bys).length, "Schemes") + tile(bad ? "⚠️" : "✅", bad ? "#FDECEC" : "#E6F4EA", bad, "Lines that don’t add up") + "</div>" +
         hbars(Object.keys(bys).map(function (k) { return [k, bys[k]]; }), "#1E9E61") +
-        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">' + (ADMIN ? (pub ? '<button class="btn sec" id="unp">↩ Unpublish</button>' : '<button class="btn ok" id="pubb">🚀 Publish to retailer balances</button>') : '<span class="muted" style="font-size:12.5px">' + (pub ? "Published by HO." : "Waiting for HO to publish.") + "</span>") + (!pub ? '<button class="btn ghost" id="del" style="color:var(--bad)">🗑️ Delete draft</button>' : "") + '<button class="btn ghost" id="bx">⬇ Excel</button>' + (pub ? '<button class="btn pri" id="shr">📤 Send to all retailers</button>' : "") + "</div>" + (b.rows.some(function (x) { return x.ni; }) ? '<div class="muted" style="font-size:12px;margin-top:6px">📄 ' + b.rows.filter(function (x) { return x.ni; }).length + " lines have an IMEI / model report (" + b.rows.reduce(function (a, x) { return a + (x.ni || 0); }, 0).toLocaleString("en-IN") + " rows) — retailers download it from their link.</div>" : "") + "</div>" +
-        '<div class="tbw"><table class="dt"><tr><th>Retailer</th><th>Scheme</th><th class="n">Ach %</th><th class="n">Gross</th><th class="n">Deduct.</th><th class="n">TDS</th><th class="n">Net</th><th>Check</th></tr>' + b.rows.map(function (x) { var okA = Math.abs(x.gross - x.ded - x.tds - x.net) <= 1; return '<tr data-r="' + esc(x.rid) + '" style="cursor:pointer"><td><b>' + esc(x.rid) + "</b>" + (x.name ? '<br><span class="muted">' + esc(x.name) + "</span>" : "") + "</td><td>" + esc(x.scheme) + (x.query ? ' <span class="bdg b-q">🚩</span>' : "") + '</td><td class="n">' + pc(x.info && x.info.ach) + '</td><td class="n">' + rs(x.gross) + '</td><td class="n">' + (x.ded ? rs(x.ded) : "") + '</td><td class="n">' + (x.tds ? rs(x.tds) : "") + '</td><td class="n"><b>' + rs(x.net) + "</b></td><td>" + (okA ? "✅" : "⚠️") + "</td></tr>"; }).join("") + "</table></div>";
+        '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap">' + (ADMIN ? (pub ? '<button class="btn sec" id="unp">↩ Unpublish</button>' : '<button class="btn ok" id="pubb">🚀 Publish to retailers</button>') : '<span class="muted" style="font-size:12.5px">' + (pub ? "Published by HO." : "Waiting for HO to publish.") + "</span>") + (!pub ? '<button class="btn ghost" id="del" style="color:var(--bad)">🗑️ Delete draft</button>' : "") + '<button class="btn ghost" id="bx">⬇ Excel</button>' + (pub ? '<button class="btn pri" id="shr">📤 Send to all retailers</button>' : "") + "</div>" + (b.rows.some(function (x) { return x.ni; }) ? '<div class="muted" style="font-size:12px;margin-top:6px">📄 ' + b.rows.filter(function (x) { return x.ni; }).length + " lines have an IMEI / model report (" + b.rows.reduce(function (a, x) { return a + (x.ni || 0); }, 0).toLocaleString("en-IN") + " rows) — retailers download it from their link.</div>" : "") + "</div>" +
+        '<div class="tbw"><table class="dt"><tr><th>Retailer</th><th>Scheme</th>' + (BC.length ? BC.map(function (c) { return '<th class="n">' + esc(c.l) + (c.s === "hidden" ? " 🔒" : "") + "</th>"; }).join("") : '<th class="n">Ach %</th>') + '<th class="n">Gross</th><th class="n">Deduct.</th><th class="n">TDS</th><th class="n">Net</th><th>Check</th></tr>' + b.rows.map(function (x) { var okA = Math.abs(x.gross - x.ded - x.tds - x.net) <= 1; return '<tr data-r="' + esc(x.rid) + '" style="cursor:pointer"><td><b>' + esc(x.rid) + "</b>" + (x.name ? '<br><span class="muted">' + esc(x.name) + "</span>" : "") + "</td><td>" + esc(x.scheme) + (x.query ? ' <span class="bdg b-q">🚩</span>' : "") + "</td>" + (BC.length ? BC.map(function (c) { var f = (x.fv || []).find(function (y) { return y.l === c.l; }); return '<td class="n">' + (f ? fmtV(f.k, f.v) : "") + "</td>"; }).join("") : '<td class="n">' + pc(x.info && x.info.ach) + "</td>") + '<td class="n">' + rs(x.gross) + '</td><td class="n">' + (x.ded ? rs(x.ded) : "") + '</td><td class="n">' + (x.tds ? rs(x.tds) : "") + '</td><td class="n"><b>' + rs(x.net) + "</b></td><td>" + (okA ? "✅" : "⚠️") + "</td></tr>"; }).join("") + "</table></div>";
       $("bk").onclick = function () { location.hash = ""; };
       if ($("shr")) $("shr").onclick = function () { shareBatch(b); };
       [].forEach.call(VIEW.querySelectorAll("tr[data-r]"), function (tr) { tr.onclick = function () { MON = b.month; location.hash = "r=" + encodeURIComponent(tr.dataset.r); }; });
-      if ($("pubb")) $("pubb").onclick = function () { sheet("Publish " + rs(b.total) + "?", b.count + " payout lines go into retailer balances for " + mlabel(b.month) + (bad ? ". ⚠️ " + bad + " line(s) don't add up." : "."), [["🚀", "Publish", function () { api({ action: "rp-publish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); toast("Published"); openBatch(b.id); }); }]]); };
-      if ($("unp")) $("unp").onclick = function () { sheet("Unpublish this batch?", "Its payouts are taken out of retailer balances (vouchers already bought stay).", [["↩", "Unpublish", function () { api({ action: "rp-unpublish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); openBatch(b.id); }); }, "danger"]]); };
+      if ($("pubb")) $("pubb").onclick = function () { sheet("Publish " + rs(b.total) + "?", b.count + " payout lines are published to retailers for " + mlabel(b.month) + (bad ? ". ⚠️ " + bad + " line(s) don't add up." : "."), [["🚀", "Publish", function () { api({ action: "rp-publish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); toast("Published"); openBatch(b.id); }); }]]); };
+      if ($("unp")) $("unp").onclick = function () { sheet("Unpublish this batch?", "Its payouts are removed from every retailer's Total payout.", [["↩", "Unpublish", function () { api({ action: "rp-unpublish", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); openBatch(b.id); }); }, "danger"]]); };
       if ($("del")) $("del").onclick = function () { sheet("Delete this draft?", b.title, [["🗑️", "Delete", function () { api({ action: "rp-batch-delete", id: b.id }).then(function (x) { if (!x.ok) return toast(x.error); location.hash = ""; }); }, "danger"]]); };
-      $("bx").onclick = function () { download(xlsx([{ name: "Payouts", rows: [["Retailer ID", "Retailer name", "State", "City", "Month", "Scheme", "Target", "Achieved", "Achievement %", "Gross", "Deduction", "TDS", "Net", "Breakup", "Remarks", "Query"]].concat(b.rows.map(function (x) { var i = x.info || {}; return [x.rid, x.name, x.state, x.city, b.month, x.scheme, i.target, i.achieved != null ? i.achieved : i.units, i.ach, x.gross, x.ded, x.tds, x.net, (x.parts || []).map(function (p) { return p.label + " " + p.amount; }).join("; "), x.remarks, x.query ? x.query.note : ""]; })) }]), "Payouts_" + b.month + "_" + b.id + ".xlsx"); };
+      $("bx").onclick = function () { var XC = b.cols || []; download(xlsx([{ name: "Payouts", rows: [["Retailer ID", "Retailer name", "State", "City", "Month", "Scheme"].concat(XC.length ? XC.map(function (c) { return c.l; }) : ["Target", "Achieved", "Achievement %"]).concat(["Gross", "Deduction", "TDS", "Net", "Breakup", "Remarks", "Query"])].concat(b.rows.map(function (x) { var i = x.info || {}; return [x.rid, x.name, x.state, x.city, b.month, x.scheme].concat(XC.length ? XC.map(function (c) { var f = (x.fv || []).find(function (y) { return y.l === c.l; }); return f ? f.v : ""; }) : [i.target, i.achieved != null ? i.achieved : i.units, i.ach]).concat([x.gross, x.ded, x.tds, x.net, (x.parts || []).map(function (p) { return p.label + " " + p.amount; }).join("; ") + (x.dl ? "; " + x.dl.map(function (d) { return d.label + " -" + d.amount; }).join("; ") : ""), x.remarks, x.query ? x.query.note : ""]); })) }]), "Payouts_" + b.month + "_" + b.id + ".xlsx"); };
     });
   }
 

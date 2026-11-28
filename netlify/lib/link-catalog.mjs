@@ -1138,6 +1138,9 @@ export const LINK_CATALOG = {
 "rp-scheme-list",
 "rp-scheme-save",
 "rp-share",
+"rp-tpl-get",
+"rp-tpl-reset",
+"rp-tpl-save",
 "rp-unpublish",
 "rp-verify",
 "rp-voucher-delete",
@@ -1161,10 +1164,6 @@ export const LINK_CATALOG = {
 [
 "bat",
 "📦 Batches"
-],
-[
-"vch",
-"🎁 Vouchers"
 ],
 [
 "pay",
