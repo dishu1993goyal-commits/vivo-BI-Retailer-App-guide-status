@@ -104,14 +104,26 @@
   }
   function paint() {
     var R = CUR.retailer, w = CUR.wallet, B = biz();
-    var tabs = [["ov", "🏠 Overview"], ["biz", "📊 Business"], ["rep", "📈 Reports"], ["stk", "📦 Stock & IMEI"], ["off", "💳 Offers" + (CUR.offers && CUR.offers.length ? " · " + CUR.offers.length : "")], ["ord", "🛒 Order"], ["sch", "🎯 Schemes" + (CUR.schemes.length ? " · " + CUR.schemes.length : "")], ["pay", "💰 Payouts"], ["news", "📣 News" + (CUR.anns.length + CUR.launches.length ? " · " + (CUR.anns.length + CUR.launches.length) : "")], ["help", "💬 Help"]];
+    var tabs = [["ov", "🏠 Overview"], ["biz", "📊 Business"], ["rep", "📈 Reports"], ["stk", "📦 Stock & IMEI"], ["off", "💳 Offers" + (CUR.offers && CUR.offers.length ? " · " + CUR.offers.length : "")], ["ord", "🛒 Order"], ["sch", "🎯 Schemes" + (CUR.schemes.length ? " · " + CUR.schemes.length : "")], ["rw", "🏆 Rewards"], ["pay", "💰 Payouts"], ["news", "📣 News" + (CUR.anns.length + CUR.launches.length ? " · " + (CUR.anns.length + CUR.launches.length) : "")], ["help", "💬 Help"]];
     VIEW.innerHTML = (PUB ? "" : back()) + '<div class="rh"' + (PUB ? "" : ' style="margin-top:10px"') + '><h2>' + esc(R.name) + '</h2><div class="m">' + esc([R.rid, R.type, R.city, R.state].filter(Boolean).join(" · ")) + (R.owner && !PUB ? " · " + esc(R.owner) : "") + '</div><div class="ch"><button data-go="help">🤖 Ask AI</button><button data-go="helpq">✉️ Raise a query</button>' + (PUB ? "" : '<button id="shr">🔗 Share with retailer</button>' + (R.mobile ? '<a href="tel:' + esc(R.mobile) + '">📞 Call</a>' : "")) + "</div></div>" +
       '<div class="tabs">' + tabs.map(function (t) { return '<button data-t="' + t[0] + '" class="' + (RT === t[0] ? "on" : "") + '">' + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
     wireBack();
     [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { RT = b.dataset.t; paint(); }; });
     [].forEach.call(VIEW.querySelectorAll("[data-go]"), function (b) { b.onclick = function () { RT = "help"; paint(); if (b.dataset.go === "helpq") raiseQ(); }; });
     if ($("shr")) $("shr").onclick = share;
-    ({ ov: tOv, biz: tBiz, rep: tRep, stk: tStk, off: tOff, ord: tOrd, sch: tSch, pay: tPay, news: tNews, help: tHelp })[RT](B);
+    ({ ov: tOv, biz: tBiz, rep: tRep, stk: tStk, off: tOff, ord: tOrd, sch: tSch, rw: tRw, pay: tPay, news: tNews, help: tHelp })[RT](B);
+  }
+  // 🏆 Rewards: club, points, how to earn, redeem vouchers, tasks — from the state's Retailer Rewards Hub program
+  function tRw() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div>Loading rewards…</div>';
+    var call = function (body) { return PUB ? papi(Object.assign({ action: "rtp-public-rh" }, body)) : api(Object.assign({ action: "rtp-rh", rid: CUR.retailer.rid }, body)); };
+    var go = function (tab) {
+      var run = function () { call({ rh: "view" }).then(function (r) { if (!$("tp") || RT !== "rw") return; if (!r.ok && r.error) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+        RHView.mount($("tp"), r, { tab: tab, call: call, reload: go });
+        if (!PUB) { var a = document.createElement("div"); a.className = "muted"; a.style.cssText = "font-size:12px;margin-top:10px"; a.innerHTML = 'Staff view — the retailer sees the same in the app. Change rules, clubs and vouchers in <a href="/rhub.html">🏆 Retailer Rewards Hub</a>.'; $("tp").appendChild(a); } }); };
+      if (window.RHView) run(); else { var s = document.createElement("script"); s.src = "/rhview.js?v=2"; s.onload = run; document.head.appendChild(s); }
+    };
+    go("earn");
   }
   function tOv(B) {
     var c = B.cur, w = CUR.wallet, t = c && c.t, pct = t && t.u ? Math.round(c.su / t.u * 100) : null, pctV = t && t.v ? Math.round(c.sv / t.v * 100) : null;

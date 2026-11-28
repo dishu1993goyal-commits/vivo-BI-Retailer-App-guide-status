@@ -1222,9 +1222,11 @@ export const LINK_CATALOG = {
 "rtp-public-order-cancel",
 "rtp-public-ordercat",
 "rtp-public-q",
+"rtp-public-rh",
 "rtp-q-list",
 "rtp-q-raise",
-"rtp-q-reply"
+"rtp-q-reply",
+"rtp-rh"
 ],
 "tabs": [
 [
@@ -1248,12 +1250,105 @@ export const LINK_CATALOG = {
 "🛒 Order"
 ],
 [
+"rw",
+"🏆 Rewards"
+],
+[
 "pay",
 "💰 Payouts"
 ],
 [
 "help",
 "💬 Help"
+]
+]
+},
+"rhub.html": {
+"id": "rhub",
+"icon": "🏆",
+"name": "Retailer Rewards Hub (clubs, points, vouchers)",
+"ho": false,
+"acts": [
+"rh-adjust",
+"rh-ai",
+"rh-ai-offers",
+"rh-ai-review",
+"rh-ai-rule",
+"rh-approve",
+"rh-audit",
+"rh-bulk",
+"rh-codes",
+"rh-dash",
+"rh-get",
+"rh-kpi",
+"rh-ledger",
+"rh-meta",
+"rh-preview",
+"rh-red-act",
+"rh-redeem-for",
+"rh-reds",
+"rh-reject",
+"rh-retailers",
+"rh-rollback",
+"rh-run",
+"rh-runs",
+"rh-save",
+"rh-stock",
+"rh-submit",
+"rh-switch",
+"rh-tiers",
+"rh-tsub-act",
+"rh-tsubs",
+"rh-versions"
+],
+"tabs": [
+[
+"dash",
+"📊 Dashboard"
+],
+[
+"prog",
+"⚙️ Program"
+],
+[
+"ai",
+"✨ AI setup"
+],
+[
+"tiers",
+"🏅 Clubs"
+],
+[
+"rules",
+"📐 Earning rules"
+],
+[
+"offers",
+"🎁 Vouchers"
+],
+[
+"tasks",
+"✅ Tasks"
+],
+[
+"run",
+"▶️ Run & simulate"
+],
+[
+"ret",
+"👥 Retailers"
+],
+[
+"red",
+"🧾 Redemptions"
+],
+[
+"appr",
+"🛡 Approval & history"
+],
+[
+"see",
+"👁 Retailer view"
 ]
 ]
 },

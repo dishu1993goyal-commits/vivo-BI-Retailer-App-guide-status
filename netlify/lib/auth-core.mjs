@@ -47,6 +47,7 @@ import { sfAction } from "./sf-core.mjs";
 import { tlkAction, tlkPublic, linkGate } from "./tlk-core.mjs";
 import { uxAction, uxPublic } from "./ux-core.mjs";
 import { vxAction } from "./vx-core.mjs";
+import { rhAction } from "./rh-core.mjs";
 import { lxAction, vgPublic, csPublic } from "./lx-core.mjs";
 import { bzAction } from "./bz-core.mjs";
 import { arAction, loadRouter, routerChat, makeLog } from "./router-core.mjs";
@@ -934,7 +935,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     "kb-list", "kb-read", "kb-get", "kb-att", "kb-save", "kb-delete",
     "aff-catalog", "aff-model", "aff-many", "aff-states", "aff-report-add", "aff-report-delete", "aff-report-verify", "aff-photo", "aff-refresh", "aff-hide", "aff-status", "aff-refresh-stale", "aff-keys", "aff-keys-test", "aff-model-edit", "aff-images", "aff-tpl-get", "aff-tpl-set", "aff-report-bulk", "aff-report-ai", "aff-amounts",
     "admin-security", "admin-set-auth", "admin-pwreq-decide", "admin-email-test", "admin-email-config", "admin-admin-emails", "vchat-link", "vdir-get", "vdir-import", "vdir-upsert", "vdir-delete", "vdir-unlink"];
-  const NEW_PREFIX = /^(vx|bp|ph|ap|cr|dx|cs|vg|rpl|bot|eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv|du|ar)-/;
+  const NEW_PREFIX = /^(rh|vx|bp|ph|ap|cr|dx|cs|vg|rpl|bot|eapi|hr|pc|ms|xm|oa|st|pp|sq|sf|tlk|ux|mod|faq|help|esc|flow|scheme|disp|hyg|quiz|poll|wall|recog|people|engage|autorep|inv|cust|ct|cxx|master|tl|sc|ml|theme|bnr|map|face|ins|board|cal|fest|launch|mkt|tr|my|acc|ds|pm|pt|rw|nl|ag|geo|store|phub|advis|scha|rp|pln|spol|roledir|rtp|iub|so|roi|fc|cmp|man|bm|sal|kh|lh|ls|lt|mp|cv|du|ar)-/;
   if (SESSION_ACTIONS.includes(b.action) || NEW_PREFIX.test(b.action) || b.action === "hub") {
     const key = userKey(b.username), lnk = /^lnk_/i.test(String(b.username || "")), recKey = key ? (lnk ? "lnkuser:" + key : uKeyOf(key)) : "";
     const rec = key ? await store.get(recKey) : null;
@@ -1088,6 +1089,7 @@ export async function handle(req, { store, now = () => Date.now(), tcFetch = fet
     if (/^sq-/.test(b.action)) return sqAction(b, surveyCtx());
     if (/^sf-/.test(b.action)) return sfAction(b, Object.assign(surveyCtx(), { jobFetch }));
     if (/^tlk-/.test(b.action)) return tlkAction(b, surveyCtx());
+    if (/^rh-/.test(b.action)) return rhAction(b, surveyCtx());
     if (/^vx-/.test(b.action)) return vxAction(b, Object.assign(surveyCtx(), { jobFetch, siteUrl: env.SITE_URL || "" }));
     if (/^ux-/.test(b.action)) return uxAction(b, surveyCtx());
     if (/^(dx|cs|vg|rpl|bot)-/.test(b.action)) return lxAction(b, Object.assign(surveyCtx(), { jobFetch }));

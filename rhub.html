@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Retailer Rewards Hub</title>
+<style>
+
+:root{
+  --ink:#141833;--ink2:#4A4F6A;--mut:#7A7F99;--line:#E6E8F0;--bg:#F3F4F9;--card:#fff;
+  --brand:#4D5BF9;--brand2:#9152E0;--navy:#1B1F5E;--ok:#1E9E61;--warn:#E69A00;--bad:#D93B3B;--gold:#C9A227;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit}
+.hero{background:linear-gradient(135deg,var(--navy) 0%,#3A3FB8 55%,var(--brand2) 100%);color:#fff;padding:14px 16px 52px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.07)}
+.hero .top{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.hero .logo{background:#fff;border-radius:12px;padding:5px 9px;height:40px;display:flex;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.hero .logo img{height:30px;width:auto;display:block}
+.hero .sp{flex:1}
+.hero .hic{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:21px}
+.hero h1{margin:14px 0 2px;font-size:22px;position:relative;z-index:1;letter-spacing:.2px}
+.hero p{margin:0;opacity:.86;font-size:13px;position:relative;z-index:1}
+.wrap{max-width:860px;margin:-36px auto 0;padding:0 12px 60px;position:relative;z-index:2}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:620px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--card);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(20,24,51,.06)}
+.tile .ic{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;font-size:16px}
+.tile b{display:block;font-size:22px;letter-spacing:-.3px}.tile span{font-size:12px;color:var(--mut)}.tile small{display:block;font-size:11px;color:var(--ink2);margin-top:2px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05)}
+.card h3{margin:0 0 2px;font-size:15px;display:flex;align-items:center;gap:8px}
+.card .sub{font-size:12px;color:var(--mut);margin-bottom:10px}
+.btn{border:0;border-radius:11px;padding:11px 15px;font:600 14px inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-decoration:none}
+.btn.pri{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff;box-shadow:0 4px 12px rgba(77,91,249,.3)}
+.btn.sec{background:var(--card);color:var(--brand);border:1px solid #C9CDF7}
+.btn.ghost{background:#F1F2FA;color:var(--ink2)}
+.btn.ok{background:var(--ok);color:#fff}.btn.danger{background:#fff;color:var(--bad);border:1px solid #F2C4C4}
+.btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.55;cursor:default}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+.seg{display:flex;gap:6px;background:var(--card);border-radius:14px;padding:5px;box-shadow:0 6px 20px rgba(20,24,51,.08);margin-bottom:4px}
+.seg button{flex:1;border:0;background:none;padding:10px 6px;border-radius:10px;font:600 13.5px inherit;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.seg button.on{background:linear-gradient(135deg,var(--brand),var(--brand2));color:#fff}
+.seg button .n{display:inline-block;min-width:18px;border-radius:99px;background:rgba(0,0,0,.08);font-size:11px;padding:1px 5px;margin-left:4px}
+.seg button.on .n{background:rgba(255,255,255,.25)}
+.sv{display:flex;background:var(--card);border-radius:14px;margin-top:10px;overflow:hidden;box-shadow:0 2px 10px rgba(20,24,51,.05);cursor:pointer;border:1px solid transparent}
+.sv:hover{border-color:#D6D9F7}
+.sv .strip{width:5px;flex:none}
+.sv .in{padding:12px 14px;flex:1;min-width:0}
+.sv .t{font-size:16px;font-weight:700;margin:6px 0 3px}
+.sv .d{font-size:13px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sv .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin-top:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700;background:#EEF0FF;color:#3D47C8}
+.chip.live{background:#E6F4EA;color:var(--ok)}.chip.draft{background:#EEE;color:#616161}.chip.closed{background:#FDECEC;color:#B3402F}
+.chip.new{background:#E53935;color:#fff}.chip.done{background:#E6F4EA;color:var(--ok)}.chip.warn{background:#FFF4E5;color:#B26A00}
+.prog{height:7px;background:#EEF0F6;border-radius:99px;overflow:hidden;margin-top:8px}
+.prog i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--brand2));border-radius:99px}
+.empty{padding:36px 10px;text-align:center;color:var(--mut)}
+.empty .big{font-size:44px;margin-bottom:6px}
+.err{background:#FDECEC;color:var(--bad);border-radius:12px;padding:12px;margin-top:12px;font-size:14px}
+.loading{padding:40px 10px;text-align:center;color:var(--mut)}
+.spin{width:28px;height:28px;border:3px solid #DADCF5;border-top-color:var(--brand);border-radius:50%;margin:0 auto 10px;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.back{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--card);color:var(--brand);font:600 13px inherit;border-radius:99px;padding:7px 12px;box-shadow:0 2px 10px rgba(20,24,51,.08);cursor:pointer;margin-bottom:6px}
+/* form */
+.q{background:var(--card);border-radius:16px;padding:16px;margin-top:12px;box-shadow:0 2px 10px rgba(20,24,51,.05);border:2px solid transparent;transition:border-color .2s}
+.q.bad{border-color:#F1A9A9}
+.q .qt{font-size:16px;font-weight:700;line-height:1.35}
+.q .qt .no{color:var(--brand);margin-right:4px}
+.q .req{color:var(--bad)}
+.q .qh{font-size:13px;color:var(--mut);margin:4px 0 0}
+.q .qe{color:var(--bad);font-size:13px;margin-top:8px;display:none}.q.bad .qe{display:block}
+.q .ans{margin-top:12px}
+.sec{margin:22px 4px 0;padding-bottom:6px;border-bottom:2px solid #DCDFF5}
+.sec b{font-size:17px}.sec p{margin:3px 0 0;font-size:13px;color:var(--mut)}
+input.tx,textarea.tx,select.tx{width:100%;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:11px;padding:12px;font-size:15px;color:var(--ink)}
+input.tx:focus,textarea.tx:focus,select.tx:focus{outline:2px solid #BFC5FA;background:#fff}
+textarea.tx{min-height:110px;resize:vertical}
+.opt{display:flex;align-items:center;gap:10px;border:1px solid #E1E3EE;background:#FAFBFE;border-radius:11px;padding:11px 12px;margin-top:7px;cursor:pointer;font-size:15px}
+.opt:hover{background:#F3F4FD}
+.opt.on{border:2px solid var(--brand);background:#EEF0FF;padding:10px 11px}
+.opt .bx{width:20px;height:20px;border:2px solid #B5B9D6;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+.opt.multi .bx{border-radius:6px}
+.opt.on .bx{background:var(--brand);border-color:var(--brand)}
+.opt input.other{flex:1;border:0;border-bottom:1px solid #C9CDF7;background:transparent;font-size:14px;padding:3px 2px;min-width:60px}
+.yn{display:flex;gap:10px}.yn .opt{flex:1;justify-content:center;font-weight:700}
+.stars{display:flex;gap:6px}
+.stars button{border:0;background:none;font-size:38px;line-height:1;color:#D5D8E8;cursor:pointer;padding:0}
+.stars button.on{color:#F5A623}
+.scale{display:flex;gap:5px;flex-wrap:wrap}
+.scale button{flex:1;min-width:34px;border:1px solid #D8DAE5;background:#F7F8FC;border-radius:9px;padding:10px 0;font:700 14px inherit;cursor:pointer;color:var(--ink2)}
+.scale button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.scale.nps button.d.on{background:#E05757;border-color:#E05757}.scale.nps button.p.on{background:#E6A100;border-color:#E6A100}.scale.nps button.g.on{background:var(--ok);border-color:var(--ok)}
+.lohi{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:6px}
+.unit{display:flex;align-items:center;gap:8px}.unit span{color:var(--mut);font-size:14px}
+.att{display:flex;align-items:center;gap:8px;background:#F5F6FA;border-radius:9px;padding:9px 11px;margin-top:6px;font-size:13.5px}
+.att span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att button{border:0;background:none;color:#C62828;font-size:17px;cursor:pointer}
+.attbtn{width:100%;border:1.5px dashed #9AA1F5;background:#F7F8FF;color:var(--brand);border-radius:11px;padding:13px;font:600 14px inherit;cursor:pointer}
+.stick{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(243,244,249,0),var(--bg) 30%);padding:18px 0 10px;margin-top:6px;z-index:5}
+.fillhead{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(20,24,51,.08);border-top:5px solid var(--brand)}
+.fillhead h2{margin:4px 0 4px;font-size:20px}
+.fillhead .d{font-size:14px;color:var(--ink2);white-space:pre-wrap;line-height:1.45}
+.progtxt{display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-top:10px}
+.done{text-align:center;padding:30px 16px}
+.done .ck{width:76px;height:76px;border-radius:50%;background:linear-gradient(135deg,#27C281,#1E9E61);color:#fff;font-size:40px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;box-shadow:0 10px 24px rgba(30,158,97,.35);animation:pop .4s ease-out}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.ro{background:#F7F8FC;border-radius:10px;padding:10px 12px;font-size:15px;white-space:pre-wrap;word-wrap:break-word}
+.ro.none{color:var(--mut);font-style:italic}
+/* builder */
+.bq{background:var(--card);border-radius:14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.05);border-left:4px solid var(--brand);overflow:hidden}
+.bq.secq{border-left-color:var(--gold)}
+.bq .bh{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FAFBFE;border-bottom:1px solid #F0F1F6}
+.bq .bh .num{font-weight:800;color:var(--brand);font-size:13px}
+.bq .bh select{border:1px solid #D8DAE5;border-radius:8px;padding:6px 8px;font-size:13px;background:#fff;max-width:190px}
+.bq .bh .tools{margin-left:auto;display:flex;gap:2px}
+.bq .bh .tools button{border:0;background:none;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink2)}
+.bq .bh .tools button:hover{background:#EEF0FF}
+.bq .bb{padding:12px}
+.bq label.l{display:block;font-size:12px;color:var(--mut);margin:10px 2px 4px;font-weight:600}
+.bq input.tx,.bq textarea.tx,.bq select.tx{font-size:14px;padding:10px 11px}
+.bq textarea.tx{min-height:60px}
+.oprow{display:flex;gap:6px;align-items:center;margin-top:6px}
+.oprow .dot{width:16px;height:16px;border:2px solid #B5B9D6;border-radius:50%;flex:none}
+.oprow .dot.sq{border-radius:4px}
+.oprow input{flex:1}
+.oprow button{border:0;background:none;color:#9A9EB5;font-size:17px;cursor:pointer;width:30px}
+.tg{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none}
+.tg input{display:none}
+.tg i{width:38px;height:22px;border-radius:99px;background:#D3D6E4;position:relative;flex:none;transition:.2s}
+.tg i:after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg input:checked+i{background:var(--ok)}.tg input:checked+i:after{left:18px}
+.opts2{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.palette{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:560px){.palette{grid-template-columns:repeat(3,1fr)}}
+.palette button{border:1px solid #E1E3EE;background:#FAFBFE;border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;font:600 13.5px inherit;color:var(--ink);display:flex;gap:9px;align-items:center}
+.palette button:hover{border-color:var(--brand);background:#EEF0FF}
+.palette button .e{font-size:19px}
+.palette button small{display:block;font-weight:400;color:var(--mut);font-size:11.5px}
+.tpl{display:grid;grid-template-columns:1fr;gap:9px}
+@media(min-width:560px){.tpl{grid-template-columns:1fr 1fr}}
+.tpl button{border:1px solid #E1E3EE;background:var(--card);border-radius:14px;padding:14px;text-align:left;cursor:pointer;font:inherit;display:flex;gap:12px;align-items:flex-start;box-shadow:0 2px 8px rgba(20,24,51,.04)}
+.tpl button:hover{border-color:var(--brand)}
+.tpl .e{font-size:26px;width:44px;height:44px;border-radius:12px;background:#EEF0FF;display:flex;align-items:center;justify-content:center;flex:none}
+.tpl b{display:block;font-size:14.5px}.tpl small{color:var(--mut);font-size:12px;line-height:1.35;display:block;margin-top:2px}
+.colors{display:flex;gap:8px}.colors button{width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #D8DAE5;cursor:pointer}
+.colors button.on{box-shadow:0 0 0 2px var(--ink)}
+.stchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.stchips label{border:1px solid #D8DAE5;border-radius:99px;padding:6px 11px;font-size:13px;cursor:pointer;background:#fff;user-select:none}
+.stchips label.on{background:#EEF0FF;border-color:var(--brand);color:#2B33A6;font-weight:700}
+.stchips input{display:none}
+.notice{background:#FFF7E0;border:1px solid #F0DCA0;border-radius:12px;padding:10px 12px;font-size:13px;color:#5C4300;margin-top:10px;line-height:1.45}
+.notice.info{background:#EEF0FF;border-color:#C9CDF7;color:#2B33A6}
+/* results */
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink2);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.gauge{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.bigstat{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px}
+.bigstat div{background:#F7F8FC;border-radius:12px;padding:10px 14px;min-width:90px}
+.bigstat b{display:block;font-size:22px}.bigstat span{font-size:12px;color:var(--mut)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--mut);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:6px;border-bottom:1px solid var(--line)}
+td{padding:8px 6px;border-bottom:1px solid #F0F1F6;vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap}
+.tscroll{overflow-x:auto;margin:0 -4px}
+.txtans{border-left:3px solid #C9CDF7;background:#FAFBFE;border-radius:0 10px 10px 0;padding:8px 11px;margin-top:7px;font-size:14px;white-space:pre-wrap;word-wrap:break-word}
+.txtans small{display:block;color:var(--mut);font-size:11.5px;margin-top:3px;white-space:normal}
+.words{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
+.words span{background:#EEF0FF;color:#2B33A6;border-radius:99px;padding:3px 9px;font-size:12px;font-weight:600}
+.qlabel{font-size:11px;font-weight:800;color:var(--brand);text-transform:uppercase;letter-spacing:.06em}
+.filebtn{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #DADCF5;border-radius:9px;padding:8px 10px;margin-top:6px;color:#2B33A6;font-size:13.5px;cursor:pointer;width:100%;text-align:left}
+.ai{background:linear-gradient(135deg,#F4F1FF,#EEF6FF);border:1px solid #D9D3FA}
+.ai .out{white-space:pre-wrap;font-size:14px;line-height:1.5;margin-top:8px}
+.searchin{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;margin:6px 0}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,17,40,.5);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:620px){.ov{align-items:center}}
+.sheet{background:#fff;width:100%;max-width:520px;max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:18px 16px 22px;animation:up .2s ease-out}
+@media(min-width:620px){.sheet{border-radius:20px}}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.sheet h3{margin:0 0 4px;font-size:18px}
+.sheet .acts{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.sheet .act{display:flex;align-items:center;gap:12px;border:0;background:#F7F8FC;border-radius:12px;padding:13px 14px;font:600 15px inherit;cursor:pointer;text-align:left;color:var(--ink)}
+.sheet .act:hover{background:#EEF0FF}.sheet .act.red{color:var(--bad)}
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,20px);background:#141833;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:60;opacity:0;transition:.25s;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.muted{color:var(--mut)}
+.foot{font-size:11px;color:var(--mut);text-align:center;margin-top:20px}
+
+.lb{display:block;font-size:12px;font-weight:700;color:var(--ink2);margin:9px 0 4px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.nav{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;position:sticky;top:0;z-index:5;background:var(--bg)}.nav button{flex:none;border:1px solid #DDE0EF;background:#fff;border-radius:99px;padding:7px 12px;font:700 12.5px inherit;cursor:pointer;white-space:nowrap}.nav button.on{background:#141833;color:#fff;border-color:#141833}
+.sb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 2px 10px rgba(20,24,51,.06);margin-bottom:10px}.sb .s{font-size:12.5px;flex:1;min-width:160px}
+.pill{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:800}.pill.live{background:#E6F6EE;color:#13693F}.pill.draft{background:#EEF0FF;color:#4D5BF9}.pill.pending{background:#FFF4E0;color:#8A5300}.pill.off{background:#F1F2FA;color:#7A7F99}.pill.risk{background:#FDECEC;color:#A12A2A}
+.li{display:flex;gap:10px;align-items:center;background:#fff;border-radius:14px;padding:11px 12px;margin-top:8px;box-shadow:0 1px 6px rgba(20,24,51,.06)}.li .ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex:none;background:#EEF0FF}.li .bd{flex:1;min-width:0}.li .bd b{font-size:13.5px}.li .bd .m{font-size:12px;color:var(--mut);margin-top:2px}.li.off{opacity:.55}
+.sw{position:relative;width:40px;height:23px;flex:none}.sw input{opacity:0;width:0;height:0}.sw i{position:absolute;inset:0;background:#CBD0E2;border-radius:99px;transition:.2s;cursor:pointer}.sw i:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}.sw input:checked+i{background:#16A06A}.sw input:checked+i:before{transform:translateX(17px)}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;margin-top:8px}.tg button{border:1px solid #E1E4F0;background:#fff;border-radius:14px;padding:10px;text-align:left;cursor:pointer;font:inherit}.tg button b{display:block;font-size:13px;margin-top:4px}.tg button span{font-size:11.5px;color:var(--mut)}.tg .e{font-size:22px}
+.cond{display:grid;grid-template-columns:1.6fr .7fr 1fr auto;gap:6px;align-items:center;margin-top:6px}.cond .x{border:0;background:none;color:var(--mut);font-size:16px;cursor:pointer}.cond .ex{grid-column:1/-1}
+.slab{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;gap:6px;align-items:center;margin-top:5px;font-size:12px}
+.ck{display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:6px}.cks{display:flex;flex-wrap:wrap;gap:4px 12px}
+.ed{background:#fff;border-radius:16px;padding:12px 14px;margin-top:10px;box-shadow:0 2px 10px rgba(20,24,51,.06)}.ed h4{margin:0 0 4px;font-size:14.5px}
+.prev{background:#F5F6FF;border-radius:10px;padding:8px 10px;font-size:12.5px;margin-top:8px;color:#2B2F55}
+.bud{height:10px;border-radius:9px;background:#EEF0F6;overflow:hidden;margin-top:6px}.bud i{display:block;height:100%;background:linear-gradient(90deg,#16A06A,#F2B705 70%,#D9434A)}
+.tl td,.tl th{font-size:12px}.tm{font-size:11.5px;color:var(--mut)}
+.rel{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:8px}.rel a{background:#fff;border-radius:12px;padding:10px;text-decoration:none;color:var(--ink);font-size:12.5px;font-weight:700;box-shadow:0 1px 6px rgba(20,24,51,.06)}.rel a span{display:block;font-weight:400;color:var(--mut);font-size:11.5px;margin-top:2px}
+.ph img{max-width:120px;max-height:120px;border-radius:8px;display:block;margin-top:4px}
+</style>
+<script src="theme.js?v=8"></script>
+<script src="lang.js?v=3" defer></script>
+<script src="access.js?v=5"></script>
+<script src="cust.js?v=65"></script>
+</head>
+<body>
+<div class="hero"><div class="top"><span class="logo"><img src="brand-logo.png" alt="vivo Business Innovation"></span><span class="sp"></span><span class="hic">🏆</span></div>
+  <h1>Retailer Rewards Hub</h1><p>Clubs, reward points and vouchers for retailers — a separate, fully configurable program for every state</p></div>
+<div class="wrap" id="view"><div class="loading"><div class="spin"></div>Loading…</div></div>
+<script src="/rhview.js?v=2"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var fmtN = function (n) { return (n == null || isNaN(n)) ? "—" : Number(n).toLocaleString("en-IN", { maximumFractionDigits: 1 }); };
+  var pct = function (a, b) { return b ? Math.round(a / b * 1000) / 10 : 0; };
+  var IST = "Asia/Kolkata";
+  var dfmt = function (t, o) { return t ? new Date(t).toLocaleString("en-IN", Object.assign({ timeZone: IST }, o)) : "—"; };
+  var dt = function (t) { return dfmt(t, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }); };
+  var dOnly = function (t) { return dfmt(t, { day: "numeric", month: "short", year: "numeric" }); };
+  var istDay = function (t) { return new Date(t + 5.5 * 3600000).toISOString().slice(0, 10); };
+  var dayLabel = function (d) { var x = new Date(d + "T00:00:00Z"); return x.getUTCDate() + " " + x.toLocaleString("en", { month: "short", timeZone: "UTC" }); };
+  function addDays(d, n) { return new Date(Date.parse(d + "T00:00:00Z") + n * 86400000).toISOString().slice(0, 10); }
+  function mins(ms) { if (!ms) return "—"; var m = ms / 60000; return m < 1 ? Math.max(1, Math.round(ms / 1000)) + " sec" : m < 90 ? Math.round(m) + " min" : (Math.round(m / 6) / 10) + " h"; }
+  function ls(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null"); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) { return null; } }
+  function toast(m) { var t = document.createElement("div"); t.className = "toast"; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.classList.add("on"); }, 10); setTimeout(function () { t.classList.remove("on"); setTimeout(function () { t.remove(); }, 300); }, 3000); }
+  function uid() { return "q" + Math.random().toString(36).slice(2, 9); }
+  function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // ---------- auth + API (app bridge, or the web dashboard's login) ----------
+  var AUTH = null;
+  try { AUTH = window.BIApp ? JSON.parse(window.BIApp.getAuth()) : null; } catch (e) { AUTH = null; }
+  if (!AUTH || !AUTH.token) { var w = ls("biw-auth"); if (w && w.token) AUTH = { app: w.app, username: w.username, token: w.token }; }
+  var ADMIN = !!(AUTH && AUTH.app === "admin");
+  var VIA = window.BIApp ? "app" : "web";
+  function api(body) {
+    if (!AUTH || !AUTH.token) return Promise.resolve({ ok: false, error: "Please log in to the BI app or dashboard first." });
+    return fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json", "X-BI-App": "1" },
+      body: JSON.stringify(Object.assign({ app: AUTH.app, username: AUTH.username, token: AUTH.token }, body)) })
+      .then(function (r) { return r.json().catch(function () { return { ok: false, error: "Server error " + r.status }; }); })
+      .catch(function () { return { ok: false, error: "No internet connection. Please try again." }; });
+  }
+  function changed() { try { if (window.BIApp && window.BIApp.surveysChanged) window.BIApp.surveysChanged(); } catch (e) { } try { parent !== window && parent.postMessage({ biSurvey: "changed" }, location.origin); } catch (e) { } }
+
+  // ---------- charts (inline SVG) ----------
+  function colBars(labels, series, opts) {
+    // series: [{name, color, values[]}] stacked
+    opts = opts || {};
+    var W = 360, H = opts.h || 170, pl = 30, pb = 26, pt = 10, n = labels.length;
+    var tot = labels.map(function (_, i) { return series.reduce(function (s, x) { return s + (x.values[i] || 0); }, 0); });
+    var max = Math.max(1, Math.max.apply(null, tot)); var step = Math.pow(10, Math.floor(Math.log10(max))); var top = Math.max(4, Math.ceil(max / step) * step);
+    var bw = (W - pl - 6) / n, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (H - pt - pb) * k / 4, val = Math.round(top * (1 - k / 4));
+      g += '<line x1="' + pl + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF0F6"/><text x="' + (pl - 4) + '" y="' + (y + 3) + '" font-size="9" fill="#9A9EB5" text-anchor="end">' + val + "</text>"; }
+    var every = Math.ceil(n / (opts.maxLabels || 10));
+    labels.forEach(function (lab, i) {
+      var x = pl + i * bw + bw * 0.15, w = Math.max(2, bw * 0.7), base = H - pb;
+      series.forEach(function (s) {
+        var v = s.values[i] || 0, h = (H - pt - pb) * v / top;
+        if (v > 0) g += '<rect x="' + x.toFixed(1) + '" y="' + (base - h).toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(3, w / 3) + '" fill="' + s.color + '"><title>' + esc(lab + " · " + s.name + ": " + v) + "</title></rect>";
+        base -= h;
+      });
+      if (i % every === 0) g += '<text x="' + (x + w / 2).toFixed(1) + '" y="' + (H - 9) + '" font-size="9" fill="#7A7F99" text-anchor="middle">' + esc(lab) + "</text>";
+    });
+    g += "</svg>";
+    if (series.length > 1) g += '<div class="legend">' + series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + "</span>"; }).join("") + "</div>";
+    return g;
+  }
+  function hBars(items, color, opts) {
+    opts = opts || {};
+    if (!items.length) return '<div class="empty">No data for this period</div>';
+    var max = Math.max.apply(null, items.map(function (x) { return x[1]; })) || 1, rowH = 26, W = 360, lw = opts.lw || 120, rw = opts.rw || 44;
+    var H = items.length * rowH + 4, g = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '">';
+    items.forEach(function (it, i) {
+      var y = i * rowH + 4, w = (W - lw - rw) * it[1] / max;
+      g += '<text x="' + (lw - 6) + '" y="' + (y + 14) + '" font-size="11" fill="#4A4F6A" text-anchor="end">' + esc(String(it[0]).length > 22 ? String(it[0]).slice(0, 21) + "…" : it[0]) + "</text>" +
+        '<rect x="' + lw + '" y="' + (y + 3) + '" width="' + Math.max(2, w).toFixed(1) + '" height="16" rx="4" fill="' + (it[2] || color) + '"/>' +
+        '<text x="' + (lw + Math.max(2, w) + 5).toFixed(1) + '" y="' + (y + 15) + '" font-size="11" font-weight="700" fill="#141833">' + esc(opts.fmt ? opts.fmt(it[1], it) : fmtN(it[1])) + "</text>";
+    });
+    return g + "</svg>";
+  }
+  function donut(parts, center, sub) {
+    var tot = parts.reduce(function (s, p) { return s + p[1]; }, 0), R = 52, r = 34, cx = 70, cy = 66, a0 = -Math.PI / 2;
+    var g = '<div class="gauge"><svg viewBox="0 0 140 132" style="width:140px;flex:none">';
+    if (!tot) g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="#EEF0F6" stroke-width="' + (R - r) + '"/>';
+    parts.forEach(function (p) {
+      if (!p[1]) return;
+      if (p[1] === tot) { g += '<circle cx="' + cx + '" cy="' + cy + '" r="' + ((R + r) / 2) + '" fill="none" stroke="' + p[2] + '" stroke-width="' + (R - r) + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></circle>"; return; }
+      var a1 = a0 + 2 * Math.PI * p[1] / tot, large = a1 - a0 > Math.PI ? 1 : 0;
+      var pts = [cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), cx + r * Math.cos(a1), cy + r * Math.sin(a1), cx + r * Math.cos(a0), cy + r * Math.sin(a0)].map(function (v) { return v.toFixed(2); });
+      g += '<path d="M' + pts[0] + " " + pts[1] + " A" + R + " " + R + " 0 " + large + " 1 " + pts[2] + " " + pts[3] + " L" + pts[4] + " " + pts[5] + " A" + r + " " + r + " 0 " + large + " 0 " + pts[6] + " " + pts[7] + 'Z" fill="' + p[2] + '"><title>' + esc(p[0] + ": " + p[1]) + "</title></path>";
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy + 2) + '" font-size="20" font-weight="800" text-anchor="middle" fill="#141833">' + esc(center) + '</text><text x="' + cx + '" y="' + (cy + 17) + '" font-size="9" text-anchor="middle" fill="#7A7F99">' + esc(sub || "") + "</text></svg>";
+    g += '<div class="legend" style="flex-direction:column;gap:6px">' + parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + esc(p[0]) + " · <b>" + fmtN(p[1]) + "</b> (" + pct(p[1], tot) + "%)</span>"; }).join("") + "</div></div>";
+    return g;
+  }
+  function tile(icon, color, bg, value, label, note) {
+    return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + ic(icon) + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>";
+  }
+  function card(icon, title, sub, body) { return '<div class="card"><h3>' + ic(icon) + esc(title) + "</h3>" + (sub ? '<div class="sub">' + esc(sub) + "</div>" : "") + body + "</div>"; }
+  function table(head, rows, numCols) {
+    numCols = numCols || [];
+    if (!rows.length) return '<div class="empty">Nothing to show</div>';
+    return '<div class="tscroll"><table><thead><tr>' + head.map(function (h, i) { return "<th" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + esc(h) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+      rows.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + (numCols.indexOf(i) >= 0 ? ' class="n"' : "") + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+  }
+  function count(arr, fn) { var m = {}; arr.forEach(function (x) { var k = fn(x); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; }); return m; }
+  function topN(m, n) { return Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n || 10); }
+
+  // ---------- Excel (.xlsx) writer, no libraries ----------
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], off = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.data), crc = crc32(data);
+      var h = new DataView(new ArrayBuffer(30));
+      h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(8, 0, true); h.setUint32(14, crc, true);
+      h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(h.buffer), name, data);
+      var c = new DataView(new ArrayBuffer(46));
+      c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint32(16, crc, true);
+      c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, off, true);
+      central.push(new Uint8Array(c.buffer), name);
+      off += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var e = new DataView(new ArrayBuffer(22));
+    e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, csize, true); e.setUint32(16, off, true);
+    return new Blob(parts.concat(central, [new Uint8Array(e.buffer)]), { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  function xesc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); }
+  function colName(i) { var s = ""; i++; while (i) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  function sheetXml(rows) {
+    var widths = []; rows.forEach(function (r) { r.forEach(function (v, i) { widths[i] = Math.min(60, Math.max(widths[i] || 8, String(v == null ? "" : v).length + 2)); }); });
+    var x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>' +
+      widths.map(function (w, i) { return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>'; }).join("") + "</cols><sheetData>";
+    rows.forEach(function (r, ri) {
+      x += '<row r="' + (ri + 1) + '">';
+      r.forEach(function (v, ci) {
+        var ref = colName(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : "";
+        if (typeof v === "number" && isFinite(v)) x += '<c r="' + ref + '"' + st + "><v>" + v + "</v></c>";
+        else if (v != null && v !== "") x += '<c r="' + ref + '" t="inlineStr"' + st + "><is><t xml:space=\"preserve\">" + xesc(v) + "</t></is></c>";
+      });
+      x += "</row>";
+    });
+    return x + "</sheetData></worksheet>";
+  }
+  function xlsx(sheets) {
+    var files = [
+      { name: "[Content_Types].xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+        sheets.map(function (_, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join("") + "</Types>" },
+      { name: "_rels/.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' },
+      { name: "xl/workbook.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+        sheets.map(function (s, i) { return '<sheet name="' + xesc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join("") + "</sheets></workbook>" },
+      { name: "xl/_rels/workbook.xml.rels", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        sheets.map(function (_, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join("") +
+        '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' },
+      { name: "xl/styles.xml", data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4D5BF9"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs></styleSheet>' }
+    ];
+    sheets.forEach(function (s, i) { files.push({ name: "xl/worksheets/sheet" + (i + 1) + ".xml", data: sheetXml(s.rows) }); });
+    return zip(files);
+  }
+
+  function download(blob, name) {
+    if (window.AndroidDL && window.AndroidDL.save) {
+      var fr = new FileReader();
+      fr.onload = function () { window.AndroidDL.save(String(fr.result).split(",")[1], name, blob.type || ""); };
+      fr.readAsDataURL(blob); return;
+    }
+    var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+  }
+  function b64ToBlob(b64, mime) { var bin = atob(b64), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type: mime || "application/octet-stream" }); }
+  function tileS(e, bg, v, l, note) { return '<div class="tile"><div class="ic" style="background:' + bg + '">' + e + "</div><b>" + v + "</b><span>" + esc(l) + "</span>" + (note ? "<small>" + note + "</small>" : "") + "</div>"; }
+  // ---------- modal sheet ----------
+  function sheet(title, sub, acts, body) {
+    var ov = document.createElement("div"); ov.className = "ov";
+    ov.innerHTML = '<div class="sheet"><h3>' + esc(title) + "</h3>" + (sub ? '<div class="muted" style="font-size:13px">' + esc(sub) + "</div>" : "") + (body || "") +
+      '<div class="acts">' + acts.map(function (a, i) { return '<button class="act ' + (a[3] || "") + '" data-i="' + i + '"><span>' + a[0] + "</span>" + esc(a[1]) + "</button>"; }).join("") +
+      '<button class="act" data-x="1" style="justify-content:center;background:none;color:var(--mut)">Cancel</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function () { ov.remove(); };
+    ov.onclick = function (e) { if (e.target === ov) close(); };
+    [].forEach.call(ov.querySelectorAll(".act"), function (b) { b.onclick = function () { if (b.dataset.x) return close(); var a = acts[+b.dataset.i]; if (a[2](ov) !== false) close(); }; });
+    return ov;
+  }
+  var VIEW = $("view"), META = null, STATE = "", G = null, CFG = null, TAB = "dash", DIRTY = false, XL = null;
+  var inr = function (v) { return "₹" + Math.round(v || 0).toLocaleString("en-IN"); }, n0 = function (v) { return Math.round(v || 0).toLocaleString("en-IN"); };
+  var today = function () { return new Date(Date.now() + 19800000).toISOString().slice(0, 10); };
+  var uid = function (p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); };
+  var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
+  var lst = function (v) { return String(v || "").split(/[,\n;]/).map(function (x) { return x.trim(); }).filter(Boolean); };
+  function xl() { return XL || (XL = new Promise(function (res, rej) { var s = document.createElement("script"); s.src = "/vendor/xlsx.full.min.js"; s.onload = res; s.onerror = function () { XL = null; rej(new Error("Couldn't load the Excel reader")); }; document.head.appendChild(s); })); }
+  function readSheet(f) { return xl().then(function () { return f.arrayBuffer(); }).then(function (buf) { var wb = XLSX.read(buf, { type: "array" }); return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "", raw: true }); }); }
+  function pickFile(accept, cb) { var i = document.createElement("input"); i.type = "file"; i.accept = accept; i.onchange = function () { if (i.files[0]) cb(i.files[0]); }; i.click(); }
+  var col = function (row, names) { var k = Object.keys(row); for (var i = 0; i < names.length; i++) { var h = k.filter(function (x) { return x.toLowerCase().replace(/[^a-z0-9]/g, "").indexOf(names[i]) >= 0; })[0]; if (h != null && row[h] !== "") return row[h]; } return ""; };
+  var mName = function (m) { var x = (META.metrics.filter(function (y) { return y[0] === m; })[0]) || [m, m, ""]; return x; };
+  var tierName = function (id) { var t = CFG.tiers.filter(function (x) { return x.id === id; })[0]; return t ? t.icon + " " + t.name : (id || "—"); };
+
+  // ================= load =================
+  function boot() {
+    if (!AUTH || !AUTH.token) { VIEW.innerHTML = '<div class="err">Please log in first.</div>'; return; }
+    api({ action: "rh-meta" }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } META = r;
+      STATE = r.isHO ? (localStorage.getItem("rh-state") || r.states[0] || "") : r.myState; if (!STATE && r.isHO) return pickState(); load(); });
+  }
+  function pickState() {
+    VIEW.innerHTML = '<div class="card"><b>Choose a state</b><div class="muted" style="font-size:12.5px">Each state has its own program.</div><select class="tx" id="ps" style="margin-top:8px">' + META.states.map(function (s) { return "<option" + (s === STATE ? " selected" : "") + ">" + esc(s) + "</option>"; }).join("") + '</select><input class="tx" id="pn" placeholder="…or type a state name" style="margin-top:6px"><button class="btn pri" id="pg" style="margin-top:8px">Open</button></div>';
+    $("pg").onclick = function () { STATE = $("pn").value.trim() || $("ps").value; localStorage.setItem("rh-state", STATE); load(); };
+  }
+  function load(tab) {
+    VIEW.innerHTML = '<div class="loading"><div class="spin"></div>Loading ' + esc(STATE) + "…</div>";
+    api({ action: "rh-get", state: STATE }).then(function (r) { if (!r.ok) { VIEW.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } G = r; CFG = clone(r.doc.draft); DIRTY = false; if (tab) TAB = tab; draw(); });
+  }
+  function save(note) { return api({ action: "rh-save", state: STATE, cfg: CFG, note: note || "" }).then(function (r) { if (!r.ok) { toast(r.error); return r; } DIRTY = false; G.doc.status = r.status; toast("💾 Draft saved"); statusBar(); return r; }); }
+  function mark() { DIRTY = true; statusBar(); }
+  window.addEventListener("beforeunload", function (e) { if (DIRTY) { e.preventDefault(); e.returnValue = ""; } });
+
+  // ================= frame =================
+  var TABS = [["dash", "📊 Dashboard"], ["prog", "⚙️ Program"], ["ai", "✨ AI setup"], ["tiers", "🏅 Clubs"], ["rules", "📐 Earning rules"], ["offers", "🎁 Vouchers"], ["tasks", "✅ Tasks"], ["run", "▶️ Run & simulate"], ["ret", "👥 Retailers"], ["red", "🧾 Redemptions"], ["appr", "🛡 Approval & history"], ["see", "👁 Retailer view"]];
+  function draw() {
+    VIEW.innerHTML = '<div class="sb" id="sb"></div><div class="nav">' + TABS.map(function (t) { return '<button data-t="' + t[0] + '"' + (t[0] === TAB ? ' class="on"' : "") + ">" + t[1] + "</button>"; }).join("") + '</div><div id="tp"></div>';
+    [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (b) { b.onclick = function () { TAB = b.dataset.t; [].forEach.call(VIEW.querySelectorAll("[data-t]"), function (x) { x.classList.toggle("on", x === b); }); paint(); }; });
+    statusBar(); paint();
+  }
+  function statusBar() {
+    var d = G.doc, st = d.status, el = $("sb"); if (!el) return;
+    el.innerHTML = (META.isHO ? '<button class="btn ghost sm" id="chs">📍 ' + esc(STATE) + " ▾</button>" : '<b>📍 ' + esc(STATE) + "</b>") +
+      '<div class="s"><span class="pill ' + (DIRTY ? "draft" : st) + '">' + (DIRTY ? "UNSAVED CHANGES" : st === "live" ? "LIVE · v" + d.ver : st === "pending" ? "WAITING FOR APPROVAL" : d.live ? "DRAFT CHANGES (live v" + d.ver + ")" : "DRAFT — NOT LIVE YET") + "</span>" + (d.live && !d.live.on ? ' <span class="pill off">PROGRAM PAUSED</span>' : "") + '<div class="tm" style="margin-top:3px">' + esc(CFG.name) + (d.upd ? " · saved " + new Date(d.upd).toLocaleString("en-IN") + " by " + esc(d.by || "") : "") + "</div></div>" +
+      '<button class="btn sec sm" id="sv"' + (DIRTY ? "" : " disabled") + '>💾 Save draft</button><button class="btn pri sm" id="sbm"' + (st === "pending" ? " disabled" : "") + ">🚀 " + (CFG.approval.required ? "Submit for approval" : "Go live") + "</button>";
+    if ($("chs")) $("chs").onclick = function () { if (DIRTY && !confirm("Discard unsaved changes?")) return; pickState(); };
+    $("sv").onclick = function () { save(); };
+    $("sbm").onclick = function () { var note = prompt("What changed? (shown to the approver)", ""); if (note === null) return; (DIRTY ? save(note) : Promise.resolve({ ok: true })).then(function (r) { if (!r.ok) return; api({ action: "rh-submit", state: STATE, note: note }).then(function (x) { if (!x.ok) return toast(x.error); toast(x.status === "live" ? "✅ Live — version " + x.ver : "Sent for approval"); load(); }); }); };
+  }
+  function paint() { DIRTY && statusBar(); ({ dash: tDash, prog: tProg, ai: tAI, tiers: tTiers, rules: tRules, offers: tOffers, tasks: tTasks, run: tRun, ret: tRet, red: tRed, appr: tAppr, see: tSee })[TAB](); }
+  function kpiT(icon, color, bg, value, label, note) { return '<div class="tile"><div class="ic" style="background:' + bg + ';color:' + color + '">' + icon + "</div><b>" + value + "</b><span>" + esc(label) + "</span>" + (note ? "<small>" + esc(note) + "</small>" : "") + "</div>"; }
+  function sw(id, on) { return '<label class="sw"><input type="checkbox" data-sw="' + id + '"' + (on ? " checked" : "") + "><i></i></label>"; }
+  function wireSw(kind, list) {   // instant on/off — applies to live too (safety switch), audited
+    [].forEach.call($("tp").querySelectorAll("[data-sw]"), function (c) { c.onclick = function (e) { e.stopPropagation(); }; c.onchange = function () { var id = c.dataset.sw, on = c.checked, x = list.filter(function (y) { return y.id === id; })[0]; if (x) x.on = on;
+      api({ action: "rh-switch", state: STATE, kind: kind, id: id, on: on }).then(function (r) { if (!r.ok) return toast(r.error); toast((on ? "✅ On" : "⏸ Off") + (G.doc.live ? " — live right away" : "")); if (G.doc.live) { var L = G.doc.live[kind].filter(function (y) { return y.id === id; })[0]; if (L) L.on = on; } c.closest(".li") && c.closest(".li").classList.toggle("off", !on); }); }; });
+  }
+
+  // ================= 📊 dashboard =================
+  function tDash() {
+    $("tp").innerHTML = '<div class="loading"><div class="spin"></div>Reading the ledger…</div>';
+    api({ action: "rh-dash", state: STATE }).then(function (r) {
+      if (!r.ok) { $("tp").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } var k = r.kpi;
+      var bud = k.budgetYear ? Math.min(100, k.spentYear / k.budgetYear * 100) : 0;
+      $("tp").innerHTML = (!G.doc.live ? '<div class="card" style="border:2px dashed #C9CEF5"><b>🚀 Set up ' + esc(STATE) + "'s program</b><div class=\"muted\" style=\"font-size:12.5px;margin-top:4px\">1 ⚙️ Program basics → 2 🏅 Clubs → 3 📐 Earning rules (pick templates) → 4 🎁 Vouchers → 5 ▶️ Simulate → 6 🚀 Submit for approval. Or let ✨ AI setup build a first draft from your state's policy.</div><div class=\"row\" style=\"gap:6px;margin-top:8px;flex-wrap:wrap\"><button class=\"btn pri sm\" data-go=\"ai\">✨ AI setup from my policy</button><button class=\"btn sec sm\" data-go=\"prog\">⚙️ Start step by step</button></div></div>" : "") +
+        '<div class="tiles">' + kpiT("🏪", "#4D5BF9", "#EEF0FF", n0(k.members) + " / " + n0(k.retailers), "Members / retailers", n0(k.active) + " have earned points") + kpiT("⬆️", "#16A06A", "#E6F6EE", n0(k.issued), "Points issued", inr(k.issued * CFG.pointValue)) + kpiT("🎁", "#8E5CF6", "#F3EEFF", n0(k.redeemed), "Points redeemed", k.redRate + "% redemption rate") + kpiT("💼", "#C2410C", "#FFF1E8", inr(k.liabilityRs), "Outstanding liability", n0(k.outstanding) + " pts unredeemed") + "</div>" +
+        (k.budgetYear ? '<div class="card"><b>Budget ' + today().slice(0, 4) + '</b><div class="tm">' + inr(k.spentYear) + " of " + inr(k.budgetYear) + " issued (" + Math.round(bud) + "%)" + (bud >= CFG.budget.alertPct ? " · ⚠️ above the " + CFG.budget.alertPct + "% alert" : "") + '</div><div class="bud"><i style="width:' + bud + '%"></i></div></div>' : "") +
+        ((k.pendingRed || k.pendingTasks || r.lowStock.length || k.risk || r.pending) ? '<div class="card"><b>Needs attention</b>' + (r.pending ? '<div class="li" data-go="appr"><div class="ic">🛡</div><div class="bd"><b>Program change waiting for approval</b><div class="m">' + esc(r.pending.by) + " · " + esc(r.pending.note || "") + "</div></div></div>" : "") + (k.pendingRed ? '<div class="li" data-go="red"><div class="ic">🧾</div><div class="bd"><b>' + k.pendingRed + " redemption(s) to approve</b></div></div>" : "") + (k.pendingTasks ? '<div class="li" data-go="red"><div class="ic">✅</div><div class="bd"><b>' + k.pendingTasks + " task proof(s) to check</b></div></div>" : "") + r.lowStock.map(function (o) { return '<div class="li" data-go="offers"><div class="ic">📉</div><div class="bd"><b>Low stock: ' + esc(o.name) + '</b><div class="m">' + o.free + " codes left</div></div></div>"; }).join("") + (k.risk ? '<div class="li" data-go="ret"><div class="ic">⚠️</div><div class="bd"><b>' + k.risk + " retailers at risk of losing their club</b></div></div>" : "") + "</div>" : "") +
+        '<div class="card"><b>Points by month</b>' + (r.months.length ? colBars(r.months.map(function (m) { return m.m.slice(2); }), [{ name: "Issued", color: "#4D5BF9", values: r.months.map(function (m) { return m.iss; }) }, { name: "Redeemed", color: "#16A06A", values: r.months.map(function (m) { return m.red; }) }, { name: "Expired", color: "#F2B705", values: r.months.map(function (m) { return m.exp; }) }]) : '<div class="empty">No points yet — run the rules in ▶️ Run & simulate.</div>') + "</div>" +
+        '<div class="card"><b>Club mix</b>' + donut(CFG.tiers.map(function (t) { return [t.icon + " " + t.name, r.dist[t.id] || 0, t.color]; }).concat(r.dist["-"] ? [["Not reviewed yet", r.dist["-"], "#CBD0E2"]] : []), n0(k.members), "members") + '</div><div class="card"><b>Points by rule</b>' + hBars(r.rules.map(function (x) { return [x.name, x.pts]; }), "#8E5CF6", { lw: 150 }) + "</div>" +
+        '<div class="card"><b>Top vouchers</b>' + (r.offers.length ? table(["Offer", "Redeemed", "Points"], r.offers.map(function (o) { return [esc(o.name), n0(o.n), n0(o.pts)]; }), [1, 2]) : '<div class="empty">No redemptions yet</div>') + "</div>" +
+        '<div class="card"><b>🔗 Linked tools</b><div class="tm">Rewards read the same data as these tools — business & targets, IMEIs, scheme payouts and the scheme wallet.</div><div class="rel">' +
+        [["retailerportal.html", "🏬 Retailer portal", "Retailers see 🏆 Rewards here"], ["schemepolicy.html", "📜 Scheme policies", "Schemes & slabs"], ["retailerpay.html", "💰 Retailer payouts", "Payouts → points & wallet credit"], ["payplanner.html", "🎯 Payout target planner", "Plan targets"], ["schemecalc.html", "🧮 Scheme calculator", "Payout calculation"], ["schemeassist.html", "🤖 Scheme assistant", "Ask about schemes"]].map(function (x) { return '<a href="/' + x[0] + '">' + x[1] + "<span>" + x[2] + "</span></a>"; }).join("") + "</div></div>";
+      [].forEach.call($("tp").querySelectorAll("[data-go]"), function (b) { b.onclick = function () { TAB = b.dataset.go; draw(); }; });
+    });
+  }
+
+  // ================= ⚙️ program =================
+  function tProg() {
+    var c = CFG, e = c.eligible, b = c.budget, ap = c.approval, rd = c.redeem;
+    $("tp").innerHTML = '<div class="ed"><h4>Program basics</h4><div class="ck">' + sw("prog", c.on).replace('data-sw="prog"', 'id="pon"') + " Program running (switch off to pause earning & redeeming)</div>" +
+      '<label class="lb">Program name</label><input class="tx" data-f="name" value="' + esc(c.name) + '"><div class="g2"><div><label class="lb">Starts</label><input type="date" class="tx" data-f="from" value="' + esc(c.from) + '"></div><div><label class="lb">Ends</label><input type="date" class="tx" data-f="to" value="' + esc(c.to) + '"></div></div></div>' +
+      '<div class="ed"><h4>Point economics</h4><div class="g2"><div><label class="lb">1 point = ₹</label><input type="number" step="0.01" class="tx" data-f="pointValue" value="' + c.pointValue + '"></div><div><label class="lb">Points expire</label><select class="tx" data-f="expiry.mode"><option value="rolling"' + (c.expiry.mode === "rolling" ? " selected" : "") + '>Rolling — months after earning</option><option value="fixed"' + (c.expiry.mode === "fixed" ? " selected" : "") + '>On a fixed date</option><option value="never"' + (c.expiry.mode === "never" ? " selected" : "") + ">Never</option></select></div></div>" +
+      '<div class="g2"><div><label class="lb">Months (rolling)</label><input type="number" class="tx" data-f="expiry.months" value="' + c.expiry.months + '"></div><div><label class="lb">Fixed expiry date</label><input type="date" class="tx" data-f="expiry.fixedDate" value="' + esc(c.expiry.fixedDate) + '"></div></div><label class="ck"><input type="checkbox" data-f="carryOver"' + (c.carryOver ? " checked" : "") + "> Carry unexpired points into the next program year</label></div>" +
+      '<div class="ed"><h4>Who is in the program</h4><div class="tm">Empty = all retailers of ' + esc(STATE) + '.</div><label class="lb">Retailer types (e.g. Multi-brand, Exclusive)</label><input class="tx" data-f="eligible.types" value="' + esc(e.types.join(", ")) + '"><label class="lb">Cities</label><input class="tx" data-f="eligible.cities" value="' + esc(e.cities.join(", ")) + '"><div class="g2"><div><label class="lb">Always include (IDs)</label><textarea class="tx" rows="2" data-f="eligible.include">' + esc(e.include.join(", ")) + '</textarea></div><div><label class="lb">Exclude (IDs)</label><textarea class="tx" rows="2" data-f="eligible.exclude">' + esc(e.exclude.join(", ")) + "</textarea></div></div></div>" +
+      '<div class="ed"><h4>Budget guard-rails</h4><div class="g3"><div><label class="lb">Yearly cap ₹</label><input type="number" class="tx" data-f="budget.yearRs" value="' + b.yearRs + '"></div><div><label class="lb">Monthly cap ₹</label><input type="number" class="tx" data-f="budget.monthRs" value="' + b.monthRs + '"></div><div><label class="lb">Alert at %</label><input type="number" class="tx" data-f="budget.alertPct" value="' + b.alertPct + '"></div></div><label class="ck"><input type="checkbox" data-f="budget.block"' + (b.block ? " checked" : "") + "> Block posting points beyond the cap</label></div>" +
+      '<div class="ed"><h4>Redemption rules</h4><div class="g2"><div><label class="lb">Auto-approve redemptions up to (pts)</label><input type="number" class="tx" data-f="approval.autoRedeemUpTo" value="' + ap.autoRedeemUpTo + '"></div><div><label class="lb">Keep a minimum balance (pts)</label><input type="number" class="tx" data-f="redeem.minBalance" value="' + rd.minBalance + '"></div></div><div class="g2"><div><label class="lb">Max redemptions / retailer / month</label><input type="number" class="tx" data-f="redeem.maxPerMonth" value="' + rd.maxPerMonth + '"></div><div><label class="lb">Redeeming opens from club</label><select class="tx" data-f="redeem.minTier"><option value="">Any club</option>' + c.tiers.map(function (t) { return '<option value="' + esc(t.id) + '"' + (rd.minTier === t.id ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") + '</select></div></div><label class="ck"><input type="checkbox" data-f="redeem.blockIfAtRisk"' + (rd.blockIfAtRisk ? " checked" : "") + "> Pause redeeming while a retailer's club is at risk</label></div>" +
+      '<div class="ed"><h4>Premium models (for “premium mix” rules)</h4><div class="g2"><div><label class="lb">Premium if avg price ≥ ₹</label><input type="number" class="tx" data-f="premium.asp" value="' + c.premium.asp + '"></div><div><label class="lb">…or these models / series</label><input class="tx" data-f="premium.models" value="' + esc(c.premium.models.join(", ")) + '"></div></div></div>' +
+      '<div class="ed"><h4>Approvals</h4><label class="ck"><input type="checkbox" data-f="approval.required"' + (ap.required ? " checked" : "") + "> Changes go live only after approval (maker–checker)</label><label class=\"ck\"><input type=\"checkbox\" data-f=\"approval.selfApprove\"" + (ap.selfApprove ? " checked" : "") + '> Approvers may approve their own changes</label><label class="lb">Approvers in ' + esc(STATE) + ' (usernames / e-mails; HO can always approve)</label><input class="tx" id="apv" value="' + esc((G.doc.roles.approvers || []).join(", ")) + '"></div>' +
+      '<div class="ed"><h4>Terms shown to retailers</h4><textarea class="tx" rows="4" data-f="terms">' + esc(c.terms) + "</textarea></div>";
+    bindFields($("tp"), CFG);
+    $("pon").onchange = function () { CFG.on = this.checked; api({ action: "rh-switch", state: STATE, kind: "program", on: CFG.on }).then(function (r) { toast(r.ok ? (CFG.on ? "Program running" : "Program paused") : r.error); }); };
+    $("apv").onchange = function () { G.doc.roles.approvers = lst(this.value); api({ action: "rh-save", state: STATE, cfg: CFG, roles: { approvers: G.doc.roles.approvers } }).then(function (r) { if (r.ok) { DIRTY = false; statusBar(); toast("Approvers saved"); } }); };
+  }
+  function setPath(o, path, v) { var p = path.split("."), x = o; for (var i = 0; i < p.length - 1; i++) x = x[p[i]]; x[p[p.length - 1]] = v; }
+  function getPath(o, path) { return path.split(".").reduce(function (x, k) { return x == null ? x : x[k]; }, o); }
+  function bindFields(root, obj, after) {
+    [].forEach.call(root.querySelectorAll("[data-f]"), function (el) { el.onchange = function () { var f = el.dataset.f, old = getPath(obj, f), v;
+      if (el.type === "checkbox") v = el.checked; else if (Array.isArray(old)) v = lst(el.value); else if (typeof old === "number" || el.type === "number") v = Number(el.value) || 0; else v = el.value;
+      setPath(obj, f, v); mark(); if (after) after(f); }; });
+  }
+
+  // ================= ✨ AI setup =================
+  function tAI() {
+    $("tp").innerHTML = '<div class="ed"><h4>✨ Build the program from your policy</h4><div class="tm">Paste ' + esc(STATE) + "'s retailer policy / circular (clubs, slabs, bonuses, festive offers, vouchers) or describe it in your words. AI turns it into clubs, earning rules, vouchers and tasks as a DRAFT — you review everything before it goes live.</div>" +
+      '<textarea class="tx" id="pol" rows="10" placeholder="e.g. 4 clubs on quarterly sell-out value: Diamond ≥ ₹50L (stay ≥ ₹40L), Platinum ≥ ₹30L, Gold ≥ ₹15L, Silver below. Monthly target: 90% → 200 pts, 100% → 500, 110% → 750. Diwali 20 Oct–5 Nov: 15 pts per unit. Growth over last year ≥ 15% → 400 pts. V70 launch: 25 pts/unit. 1 pt = ₹0.25, expiry 12 months. Vouchers: Amazon ₹500 (2000 pts), MakeMyTrip ₹1000…"></textarea>' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri" id="aig">✨ Build draft</button><button class="btn ghost sm" id="aif">📄 Load text from a file</button></div><div id="aio"></div></div>';
+    $("aif").onclick = function () { pickFile(".txt,.csv,.md", function (f) { f.text().then(function (t) { $("pol").value = t.slice(0, 12000); }); }); };
+    $("aig").onclick = function () { var t = $("pol").value.trim(); if (t.length < 20) return toast("Describe the policy first"); $("aig").disabled = true; $("aio").innerHTML = '<div class="loading"><div class="spin"></div>AI is designing the program… (30–60 s)</div>';
+      api({ action: "rh-ai", state: STATE, brief: t }).then(function (r) { $("aig").disabled = false; if (!r.ok) { $("aio").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } var c = r.cfg;
+        $("aio").innerHTML = '<div class="prev" style="margin-top:12px"><b>' + esc(c.name) + "</b> · 1 pt = ₹" + c.pointValue + " · expiry " + (c.expiry.mode === "never" ? "never" : c.expiry.mode === "fixed" ? c.expiry.fixedDate : c.expiry.months + " months") + '</div><div class="card"><b>🏅 Clubs</b>' + c.tiers.map(function (t) { return '<div class="tm">' + esc(t.icon + " " + t.name) + " — enter ≥ " + n0(t.min) + " · stay ≥ " + n0(t.keep) + " · " + t.mult + "×</div>"; }).join("") + '<b style="display:block;margin-top:8px">📐 ' + c.rules.length + " earning rules</b>" + c.rules.map(function (x) { return '<div class="tm">• ' + esc(x.name) + " — " + esc(x.desc || "") + "</div>"; }).join("") + '<b style="display:block;margin-top:8px">🎁 ' + c.offers.length + " vouchers · ✅ " + c.tasks.length + " tasks</b></div>" +
+          '<div class="row" style="gap:6px;flex-wrap:wrap"><button class="btn pri" id="aiu">Use as my draft (replace)</button><button class="btn sec" id="aia">Add rules, vouchers & tasks to my draft</button></div>';
+        $("aiu").onclick = function () { if (!confirm("Replace the whole draft with this? (The live program does not change until approved.)")) return; CFG = c; save("AI setup from policy").then(function () { TAB = "tiers"; draw(); }); };
+        $("aia").onclick = function () { CFG.rules = CFG.rules.concat(c.rules); CFG.offers = CFG.offers.concat(c.offers); CFG.tasks = CFG.tasks.concat(c.tasks); save("AI: added rules / vouchers / tasks").then(function () { TAB = "rules"; draw(); }); };
+      }); };
+  }
+
+  // ================= 🏅 clubs =================
+  function tTiers() {
+    var te = CFG.tierEval;
+    $("tp").innerHTML = '<div class="ed"><h4>How clubs are decided</h4><div class="g2"><div><label class="lb">Based on</label><select class="tx" data-f="tierEval.basis">' + [["sv", "Sell-out value ₹"], ["su", "Sell-out units"], ["pv", "Purchase value ₹"], ["ach_v", "Target achievement % (value)"], ["qpts", "Qualifying points earned"]].map(function (o) { return '<option value="' + o[0] + '"' + (te.basis === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Over the last (months)</label><input type="number" class="tx" data-f="tierEval.window" value="' + te.window + '"></div></div>' +
+      '<div class="g2"><div><label class="lb">Review</label><select class="tx" data-f="tierEval.period">' + [["month", "Monthly"], ["quarter", "Quarterly"], ["half", "Half-yearly"], ["year", "Yearly"]].map(function (o) { return '<option value="' + o[0] + '"' + (te.period === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Downgrade</label><select class="tx" data-f="tierEval.downgrade"><option value="one"' + (te.downgrade === "one" ? " selected" : "") + '>One club at a time</option><option value="fit"' + (te.downgrade === "fit" ? " selected" : "") + ">Straight to the club that fits</option></select></div></div>" +
+      '<label class="ck"><input type="checkbox" data-f="tierEval.upgradeNow"' + (te.upgradeNow ? " checked" : "") + '> Upgrade straight to the highest club reached (else one at a time)</label><div class="g3"><div><label class="lb">Fast-track (1 month ≥)</label><input type="number" class="tx" data-f="tierEval.fastTrack" value="' + te.fastTrack + '" title="0 = off"></div><div><label class="lb">No downgrades from</label><input type="date" class="tx" data-f="tierEval.lockFrom" value="' + esc(te.lockFrom) + '"></div><div><label class="lb">…to</label><input type="date" class="tx" data-f="tierEval.lockTo" value="' + esc(te.lockTo) + '"></div></div>' +
+      '<label class="lb">New retailers start in</label><select class="tx" data-f="tierEval.newTier"><option value="">The club they qualify for</option>' + CFG.tiers.map(function (t) { return '<option value="' + esc(t.id) + '"' + (te.newTier === t.id ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") + "</select></div>" +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn ghost sm" data-ps="four">💎 4 clubs preset</button><button class="btn ghost sm" data-ps="three">🥇 3 clubs</button><button class="btn ghost sm" data-ps="five">👑 5 clubs</button><button class="btn sec sm" id="tadd">＋ Add club</button></div>' +
+      '<div class="tm" style="margin-top:6px">Top club first. A retailer is placed in the highest club whose entry they meet; they keep it while above “stay”, and fall after the grace reviews.</div>' +
+      CFG.tiers.map(function (t, i) { return '<div class="li' + (t.on ? "" : " off") + '"><div class="ic" style="background:' + esc(t.color) + '33">' + esc(t.icon) + '</div><div class="bd" data-e="' + i + '" style="cursor:pointer"><b>' + esc(t.name) + '</b><div class="m">Enter ≥ ' + n0(t.min) + " · stay ≥ " + n0(t.keep) + " · " + t.mult + "× points · grace " + t.grace + (t.extra.length ? " · +" + t.extra.length + " condition(s)" : "") + (t.upBonus ? " · +" + t.upBonus + " on upgrade" : "") + '</div></div><button class="btn ghost sm" data-u="' + i + '">↑</button>' + sw(t.id, t.on) + "</div>"; }).join("") +
+      '<div id="ted"></div><div class="ed"><h4>Run a club review</h4><div class="tm">Preview who moves up, down or is at risk — then update the clubs (live program).</div><div class="g2"><input type="date" class="tx" id="tdt" value="' + today() + '"><div class="row" style="gap:6px"><button class="btn sec sm" id="tsim">👁 Preview (draft)</button><button class="btn pri sm" id="tpost">Update clubs</button></div></div><div id="tres"></div></div>';
+    bindFields($("tp"), CFG); wireSw("tiers", CFG.tiers);
+    [].forEach.call($("tp").querySelectorAll("[data-ps]"), function (b) { b.onclick = function () { if (!confirm("Replace the clubs with this preset?")) return; CFG.tiers = clone(META.tierPresets[b.dataset.ps]).map(function (t) { return Object.assign({ benefits: "", extra: [], upBonus: 0, keepBonus: 0, on: true }, t); }); mark(); tTiers(); }; });
+    $("tadd").onclick = function () { CFG.tiers.push({ id: uid("t"), name: "New club", icon: "⭐", color: "#6C5CFF", min: 0, keep: 0, mult: 1, grace: 0, extra: [], upBonus: 0, keepBonus: 0, benefits: "", on: true }); mark(); tTiers(); tierEd(CFG.tiers.length - 1); };
+    [].forEach.call($("tp").querySelectorAll("[data-u]"), function (b) { b.onclick = function () { var i = +b.dataset.u; if (!i) return; var x = CFG.tiers.splice(i, 1)[0]; CFG.tiers.splice(i - 1, 0, x); mark(); tTiers(); }; });
+    [].forEach.call($("tp").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { tierEd(+b.dataset.e); }; });
+    var rev = function (post) { $("tres").innerHTML = '<div class="loading"><div class="spin"></div>Reviewing…</div>'; api({ action: "rh-tiers", state: STATE, date: $("tdt").value, draft: !post, post: post }).then(function (r) { if (!r.ok) { $("tres").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+      $("tres").innerHTML = '<div class="prev">' + (post ? "✅ Clubs updated · " : "") + "⬆️ " + r.up + " up · ⬇️ " + r.down + " down · ⚠️ " + r.risk + " at risk · window " + esc(r.window.from) + " → " + esc(r.window.to) + "</div>" + table(["Retailer", "From", "To", "", "Basis", "Need for next"], r.rows.slice(0, 300).map(function (x) { return [esc(x.name) + '<div class="tm">' + esc(x.rid) + "</div>", esc(tierName(x.from)), esc(tierName(x.to)), '<span class="pill ' + (x.act === "up" ? "live" : x.act === "down" || x.act === "at risk" ? "risk" : "draft") + '">' + esc(x.act) + "</span>", n0(x.basis), x.need ? n0(x.need) : "—"]; }), [4, 5]); }); };
+    $("tsim").onclick = function () { (DIRTY ? save() : Promise.resolve()).then(function () { rev(false); }); };
+    $("tpost").onclick = function () { if (!G.doc.live) return toast("Go live first (🚀)"); if (confirm("Update every retailer's club now, using the LIVE program?")) rev(true); };
+  }
+  function tierEd(i) {
+    var t = CFG.tiers[i];
+    $("ted").innerHTML = '<div class="ed"><h4>' + esc(t.icon + " " + t.name) + '</h4><div class="g3"><div><label class="lb">Name</label><input class="tx" data-f="name" value="' + esc(t.name) + '"></div><div><label class="lb">Icon</label><input class="tx" data-f="icon" value="' + esc(t.icon) + '"></div><div><label class="lb">Colour</label><input type="color" class="tx" data-f="color" value="' + esc(t.color) + '" style="height:38px;padding:2px"></div></div>' +
+      '<div class="g3"><div><label class="lb">Entry ≥</label><input type="number" class="tx" data-f="min" value="' + t.min + '"></div><div><label class="lb">Stay ≥</label><input type="number" class="tx" data-f="keep" value="' + t.keep + '"></div><div><label class="lb">Grace reviews</label><input type="number" class="tx" data-f="grace" value="' + t.grace + '"></div></div>' +
+      '<div class="g3"><div><label class="lb">Points multiplier</label><input type="number" step="0.05" class="tx" data-f="mult" value="' + t.mult + '"></div><div><label class="lb">Upgrade bonus pts</label><input type="number" class="tx" data-f="upBonus" value="' + t.upBonus + '"></div><div><label class="lb">Retention bonus pts</label><input type="number" class="tx" data-f="keepBonus" value="' + t.keepBonus + '"></div></div>' +
+      '<label class="lb">Extra conditions to enter / stay (all must be true)</label><div id="tx"></div><button class="btn ghost sm" id="txa" style="margin-top:6px">＋ Condition</button>' +
+      '<label class="lb">Benefits shown to retailers</label><textarea class="tx" rows="2" data-f="benefits">' + esc(t.benefits) + '</textarea><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="tok">Done</button><button class="btn danger sm" id="tdel">Delete club</button></div></div>';
+    bindFields($("ted"), t); condsUI($("tx"), t.extra);
+    $("txa").onclick = function () { t.extra.push({ m: "prem_share", op: ">=", v: 20, v2: 0, models: [], thr: 100, kpi: "" }); mark(); condsUI($("tx"), t.extra); };
+    $("tok").onclick = function () { tTiers(); }; $("tdel").onclick = function () { if (confirm("Delete " + t.name + "?")) { CFG.tiers.splice(i, 1); mark(); tTiers(); } };
+    $("ted").scrollIntoView({ behavior: "smooth" });
+  }
+  function condsUI(box, conds) {
+    box.innerHTML = conds.map(function (c, i) { var mt = mName(c.m);
+      return '<div class="cond"><select class="tx" data-c="' + i + '" data-k="m">' + META.metrics.map(function (m) { return '<option value="' + m[0] + '"' + (m[0] === c.m ? " selected" : "") + ">" + esc(m[1]) + "</option>"; }).join("") + '</select><select class="tx" data-c="' + i + '" data-k="op">' + META.ops.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === c.op ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+        '<div class="row" style="gap:4px"><input type="number" class="tx" data-c="' + i + '" data-k="v" value="' + c.v + '" placeholder="' + esc(mt[2]) + '">' + (c.op === "between" ? '<input type="number" class="tx" data-c="' + i + '" data-k="v2" value="' + c.v2 + '">' : "") + '</div><button class="x" data-cx="' + i + '">✕</button>' +
+        (c.m === "models_u" || c.m === "models_v" ? '<input class="tx ex" data-c="' + i + '" data-k="models" value="' + esc(c.models.join(", ")) + '" placeholder="Models or series, e.g. V70, X200, Y">' : c.m === "streak" ? '<div class="ex row" style="gap:6px;font-size:12px;align-items:center">each month at ≥ <input type="number" class="tx" style="width:80px" data-c="' + i + '" data-k="thr" value="' + c.thr + '"> % of target</div>' : c.m === "kpi" ? '<input class="tx ex" data-c="' + i + '" data-k="kpi" value="' + esc(c.kpi) + '" placeholder="KPI name from your upload, e.g. display_score">' : "") + "</div>"; }).join("") || '<div class="tm">No conditions — always applies.</div>';
+    [].forEach.call(box.querySelectorAll("[data-c]"), function (el) { el.onchange = function () { var c = conds[+el.dataset.c], k = el.dataset.k; c[k] = k === "models" ? lst(el.value) : (k === "m" || k === "op" || k === "kpi") ? el.value : Number(el.value) || 0; mark(); if (k === "m" || k === "op") condsUI(box, conds); else if (box.onchanged) box.onchanged(); }; });
+    [].forEach.call(box.querySelectorAll("[data-cx]"), function (b) { b.onclick = function () { conds.splice(+b.dataset.cx, 1); mark(); condsUI(box, conds); }; });
+  }
+
+  // ================= 📐 earning rules =================
+  function tRules() {
+    $("tp").innerHTML = '<div class="ed" style="background:linear-gradient(135deg,#F5F3FF,#EEF6FF)"><h4>✨ Describe a rule in your words</h4><div class="tm">e.g. “Retailers in Patna and Gaya get 20 points per V70 sold between 1 and 15 December, double for Diamond, max 2,000 points each” — AI builds the rule; you check it before adding.</div><textarea class="tx" id="air" rows="3" placeholder="Describe the rule — English or Hindi"></textarea><div class="row" style="gap:6px;margin-top:6px"><button class="btn pri sm" id="airg">✨ Build rule</button></div><div id="airo"></div></div>' +
+      '<div class="ed"><h4>📚 Templates — tap to add, then edit anything</h4><div class="tg">' + META.templates.map(function (t) { return '<button data-tpl="' + t.k + '"><span class="e">' + esc(t.ic) + "</span><b>" + esc(t.name) + "</b><span>" + esc(t.desc) + "</span></button>"; }).join("") + '</div><button class="btn sec sm" id="rnew" style="margin-top:8px">＋ Blank custom rule (IF … THEN …)</button></div>' +
+      '<div class="ed"><h4>' + CFG.rules.length + " rules in " + esc(STATE) + '</h4><div class="tm">Switching a rule off applies to the live program at once. Other edits go live after approval.</div>' + (CFG.rules.length ? CFG.rules.map(function (r, i) { return '<div class="li' + (r.on ? "" : " off") + '"><div class="ic">' + esc((META.templates.filter(function (t) { return t.k === r.template; })[0] || { ic: "📐" }).ic) + '</div><div class="bd" data-e="' + i + '" style="cursor:pointer"><b>' + esc(r.name) + '</b><div class="m">' + esc(periodLabel(r)) + " · " + esc(ruleText(r)) + (r.tiers.length ? " · clubs: " + esc(r.tiers.join(", ")) : "") + "</div></div>" + sw(r.id, r.on) + "</div>"; }).join("") : '<div class="empty">No rules yet — add one from the templates above.</div>') + '</div><div id="red"></div>';
+    wireSw("rules", CFG.rules);
+    [].forEach.call($("tp").querySelectorAll("[data-tpl]"), function (b) { b.onclick = function () { var t = META.templates.filter(function (x) { return x.k === b.dataset.tpl; })[0], r = Object.assign(blankRule(), clone(t.rule), { id: uid("r"), name: t.name, desc: t.desc, template: t.k }); if (r.period === "custom" && !r.from) { r.from = today(); r.to = today(); } CFG.rules.push(r); mark(); tRules(); ruleEd(CFG.rules.length - 1); }; });
+    $("rnew").onclick = function () { var r = blankRule(); CFG.rules.push(r); mark(); tRules(); ruleEd(CFG.rules.length - 1); };
+    $("airg").onclick = function () { var t = $("air").value.trim(); if (t.length < 8) return toast("Describe the rule first"); $("airg").disabled = true; $("airo").innerHTML = '<div class="loading"><div class="spin"></div>AI is building the rule…</div>';
+      (DIRTY ? save() : Promise.resolve()).then(function () { return api({ action: "rh-ai-rule", state: STATE, text: t }); }).then(function (r) { $("airg").disabled = false; if (!r.ok) { $("airo").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+        $("airo").innerHTML = '<div class="prev"><b>' + esc(r.rule.name) + "</b> · " + esc(periodLabel(r.rule)) + "<br>📝 " + esc(ruleText(r.rule)) + (r.note ? '<div class="tm" style="margin-top:4px">AI assumed: ' + esc(r.note) + "</div>" : "") + '</div><div class="row" style="gap:6px;margin-top:6px"><button class="btn ok sm" id="airok">＋ Add & open</button><button class="btn ghost sm" id="airx">Discard</button></div>';
+        $("airok").onclick = function () { var x = r.rule; x.id = uid("r"); CFG.rules.push(x); mark(); tRules(); ruleEd(CFG.rules.length - 1); }; $("airx").onclick = function () { $("airo").innerHTML = ""; }; }); };
+    [].forEach.call($("tp").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { ruleEd(+b.dataset.e); }; });
+  }
+  function blankRule() { return { id: uid("r"), name: "New rule", desc: "", on: true, template: "", show: true, period: "month", from: "", to: "", dateFrom: "", dateTo: "", when: { all: true, conds: [{ m: "ach_v", op: ">=", v: 100, v2: 0, models: [], thr: 100, kpi: "" }] }, award: { type: "fixed", value: 100, per: 1, base: 100, metric: "su", models: [], kpi: "", slabs: [], rules: [] }, tiers: [], types: [], cities: [], include: [], exclude: [], tierMult: false, cap: { perRetailer: 0, total: 0 }, priority: 5, group: "", stack: true, qualifying: true, once: false, expiryMonths: 0 }; }
+  function periodLabel(r) { return r.period === "custom" ? "🪔 " + (r.from || "?") + " → " + (r.to || "?") : (META.periods.filter(function (p) { return p[0] === r.period; })[0] || ["", r.period])[1]; }
+  function fmtV(v, m) { var u = mName(m)[2]; return u === "₹" ? inr(v) : u === "%" ? v + "%" : n0(v); }
+  function ruleText(r) {
+    var a = r.award, cs = r.when.conds.map(function (c) { return mName(c.m)[1] + ((c.m === "models_u" || c.m === "models_v") && c.models.length ? " (" + c.models.join(", ") + ")" : "") + " " + ((META.ops.filter(function (o) { return o[0] === c.op; })[0] || [0, c.op])[1]) + " " + fmtV(c.v, c.m) + (c.op === "between" ? "–" + fmtV(c.v2, c.m) : ""); }).join(r.when.all ? " AND " : " OR ");
+    var t = a.type === "fixed" ? a.value + " pts" : a.type === "per_unit" ? a.value + " pts per unit of " + mName(a.metric)[1].toLowerCase() : a.type === "per_value" ? a.value + " pts per ₹" + n0(a.per) + " of " + mName(a.metric)[1].toLowerCase() : a.type === "slab" ? "slabs on " + mName(a.metric)[1].toLowerCase() + ": " + a.slabs.map(function (s) { return fmtV(s.min, a.metric) + (s.max ? "–" + fmtV(s.max, a.metric) : "+") + "→" + s.pts + (s.perUnit ? "/unit" : ""); }).join(", ") : a.type === "per_pct_over" ? a.value + " pts per 1% above " + a.base + "%" : a.type === "pct_bonus" ? "+" + a.value + "% of points earned" : "×" + a.value + " points" + (a.rules.length ? " of " + a.rules.length + " rule(s)" : "");
+    return (cs ? "IF " + cs + " THEN " : "") + t + (r.tierMult ? " × club multiplier" : "") + (r.cap.perRetailer ? " (max " + n0(r.cap.perRetailer) + ")" : "");
+  }
+  function ruleEd(i) {
+    var r = CFG.rules[i], a = r.award;
+    var tierCks = CFG.tiers.map(function (t) { return '<label class="ck"><input type="checkbox" data-tier="' + esc(t.id) + '"' + (r.tiers.indexOf(t.id) >= 0 ? " checked" : "") + "> " + esc(t.icon + " " + t.name) + "</label>"; }).join("");
+    $("red").innerHTML = '<div class="ed" id="rbox"><h4>✏️ ' + esc(r.name) + '</h4><label class="lb">Rule name (retailers see it)</label><input class="tx" data-f="name" value="' + esc(r.name) + '"><label class="lb">Description for retailers (empty = written automatically)</label><textarea class="tx" rows="2" data-f="desc">' + esc(r.desc) + "</textarea>" +
+      '<label class="lb">Measured</label><select class="tx" data-f="period">' + META.periods.map(function (p) { return '<option value="' + p[0] + '"' + (p[0] === r.period ? " selected" : "") + ">" + p[1] + "</option>"; }).join("") + "</select>" + (r.period === "custom" ? '<div class="g2"><div><label class="lb">From</label><input type="date" class="tx" data-f="from" value="' + esc(r.from) + '"></div><div><label class="lb">To</label><input type="date" class="tx" data-f="to" value="' + esc(r.to) + '"></div></div>' : '<div class="g2"><div><label class="lb">Active from</label><input type="date" class="tx" data-f="dateFrom" value="' + esc(r.dateFrom) + '"></div><div><label class="lb">Active till</label><input type="date" class="tx" data-f="dateTo" value="' + esc(r.dateTo) + '"></div></div>') +
+      '<label class="lb">IF — conditions <select class="tx" id="all" style="display:inline-block;width:auto;margin-left:6px"><option value="1"' + (r.when.all ? " selected" : "") + '>ALL must be true</option><option value="0"' + (r.when.all ? "" : " selected") + ">ANY is true</option></select></label><div id=\"rc\"></div><button class=\"btn ghost sm\" id=\"rca\" style=\"margin-top:6px\">＋ Condition</button>" +
+      '<label class="lb">THEN — award</label><div class="g2"><select class="tx" data-f="award.type">' + META.awards.map(function (x) { return '<option value="' + x[0] + '"' + (x[0] === a.type ? " selected" : "") + ">" + x[1] + "</option>"; }).join("") + "</select>" + (a.type === "slab" || a.type === "per_unit" || a.type === "per_value" || a.type === "per_pct_over" ? '<select class="tx" data-f="award.metric">' + META.metrics.map(function (m) { return '<option value="' + m[0] + '"' + (m[0] === a.metric ? " selected" : "") + ">" + esc(m[1]) + "</option>"; }).join("") + "</select>" : "<div></div>") + "</div>" +
+      (a.type === "slab" ? '<div class="slab tm"><span>From</span><span>To (0 = no limit)</span><span>Points</span><span>per unit</span><span></span></div>' + a.slabs.map(function (s, k) { return '<div class="slab"><input type="number" class="tx" data-s="' + k + '" data-k="min" value="' + s.min + '"><input type="number" class="tx" data-s="' + k + '" data-k="max" value="' + s.max + '"><input type="number" class="tx" data-s="' + k + '" data-k="pts" value="' + s.pts + '"><input type="checkbox" data-s="' + k + '" data-k="perUnit"' + (s.perUnit ? " checked" : "") + '><button class="btn ghost sm" data-sx="' + k + '">✕</button></div>'; }).join("") + '<button class="btn ghost sm" id="sla" style="margin-top:6px">＋ Slab</button>' :
+        '<div class="g3"><div><label class="lb">' + (a.type === "per_value" ? "Points" : a.type === "pct_bonus" ? "Bonus %" : a.type === "multiplier" ? "Multiply by" : a.type === "per_pct_over" ? "Points per 1%" : a.type === "per_unit" ? "Points per unit" : "Points") + '</label><input type="number" step="0.01" class="tx" data-f="award.value" value="' + a.value + '"></div>' + (a.type === "per_value" ? '<div><label class="lb">per ₹</label><input type="number" class="tx" data-f="award.per" value="' + a.per + '"></div>' : a.type === "per_pct_over" ? '<div><label class="lb">above (%)</label><input type="number" class="tx" data-f="award.base" value="' + a.base + '"></div>' : "<div></div>") + "<div></div></div>") +
+      ((a.metric === "models_u" || a.metric === "models_v") && a.type !== "fixed" ? '<label class="lb">Models / series counted</label><input class="tx" data-f="award.models" value="' + esc(a.models.join(", ")) + '">' : "") + (a.metric === "kpi" ? '<label class="lb">KPI name</label><input class="tx" data-f="award.kpi" value="' + esc(a.kpi) + '">' : "") +
+      (a.type === "multiplier" || a.type === "pct_bonus" ? '<label class="lb">On points from (none ticked = all rules)</label><div class="cks">' + CFG.rules.filter(function (x) { return x.id !== r.id && ["pct_bonus", "multiplier"].indexOf(x.award.type) < 0; }).map(function (x) { return '<label class="ck"><input type="checkbox" data-ar="' + esc(x.id) + '"' + (a.rules.indexOf(x.id) >= 0 ? " checked" : "") + "> " + esc(x.name) + "</label>"; }).join("") + "</div>" : "") +
+      '<label class="ck"><input type="checkbox" data-f="tierMult"' + (r.tierMult ? " checked" : "") + "> Multiply by the retailer's club multiplier</label>" +
+      '<label class="lb">Only for clubs (none ticked = all)</label><div class="cks">' + tierCks + '</div><div class="g2"><div><label class="lb">Only retailer types</label><input class="tx" data-f="types" value="' + esc(r.types.join(", ")) + '"></div><div><label class="lb">Only cities</label><input class="tx" data-f="cities" value="' + esc(r.cities.join(", ")) + '"></div></div><div class="g2"><div><label class="lb">Only these IDs</label><input class="tx" data-f="include" value="' + esc(r.include.join(", ")) + '"></div><div><label class="lb">Except IDs</label><input class="tx" data-f="exclude" value="' + esc(r.exclude.join(", ")) + "\"></div></div>" +
+      '<div class="g3"><div><label class="lb">Max pts / retailer / period</label><input type="number" class="tx" data-f="cap.perRetailer" value="' + r.cap.perRetailer + '"></div><div><label class="lb">Rule budget (total pts)</label><input type="number" class="tx" data-f="cap.total" value="' + r.cap.total + '"></div><div><label class="lb">Priority (1 first)</label><input type="number" class="tx" data-f="priority" value="' + r.priority + '"></div></div>' +
+      '<div class="g2"><div><label class="lb">Group (rules in one group…)</label><input class="tx" data-f="group" value="' + esc(r.group) + '" placeholder="e.g. target"></div><div><label class="lb">Points expire after (months, 0 = program default)</label><input type="number" class="tx" data-f="expiryMonths" value="' + r.expiryMonths + '"></div></div>' +
+      '<label class="ck"><input type="checkbox" data-f="stack"' + (r.stack ? " checked" : "") + '> Stacks with other rules in its group (off = only the best rule of the group pays)</label><label class="ck"><input type="checkbox" data-f="qualifying"' + (r.qualifying ? " checked" : "") + '> Counts as qualifying points for clubs</label><label class="ck"><input type="checkbox" data-f="once"' + (r.once ? " checked" : "") + '> Only once per retailer</label><label class="ck"><input type="checkbox" data-f="show"' + (r.show ? " checked" : "") + "> Show to retailers in the app</label>" +
+      '<div class="prev" id="rpv"></div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="rok">Done</button><button class="btn sec sm" id="rtest">🧪 Test on this month</button><button class="btn ghost sm" id="rdup">⎘ Duplicate</button><button class="btn danger sm" id="rdel">Delete</button></div><div id="rto"></div></div>';
+    var pv = function () { $("rpv").textContent = "📝 " + ruleText(r); };
+    bindFields($("rbox"), r, function (f) { if (f === "award.type" || f === "period" || f === "award.metric") ruleEd(i); else pv(); }); pv();
+    var cb = $("rc"); cb.onchanged = pv; condsUI(cb, r.when.conds);
+    $("all").onchange = function () { r.when.all = this.value === "1"; mark(); pv(); };
+    $("rca").onclick = function () { r.when.conds.push({ m: "su", op: ">=", v: 1, v2: 0, models: [], thr: 100, kpi: "" }); mark(); condsUI(cb, r.when.conds); pv(); };
+    [].forEach.call($("rbox").querySelectorAll("[data-tier]"), function (c) { c.onchange = function () { r.tiers = [].filter.call($("rbox").querySelectorAll("[data-tier]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.tier; }); mark(); pv(); }; });
+    [].forEach.call($("rbox").querySelectorAll("[data-ar]"), function (c) { c.onchange = function () { a.rules = [].filter.call($("rbox").querySelectorAll("[data-ar]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.ar; }); mark(); pv(); }; });
+    [].forEach.call($("rbox").querySelectorAll("[data-s]"), function (el) { el.onchange = function () { var s = a.slabs[+el.dataset.s]; s[el.dataset.k] = el.type === "checkbox" ? el.checked : Number(el.value) || 0; mark(); pv(); }; });
+    [].forEach.call($("rbox").querySelectorAll("[data-sx]"), function (b) { b.onclick = function () { a.slabs.splice(+b.dataset.sx, 1); mark(); ruleEd(i); }; });
+    if ($("sla")) $("sla").onclick = function () { var l = a.slabs[a.slabs.length - 1]; a.slabs.push({ min: l ? (l.max || l.min) + 1 : 0, max: 0, pts: 100, perUnit: false }); mark(); ruleEd(i); };
+    $("rok").onclick = function () { tRules(); };
+    $("rdup").onclick = function () { var x = clone(r); x.id = uid("r"); x.name += " (copy)"; CFG.rules.push(x); mark(); tRules(); ruleEd(CFG.rules.length - 1); };
+    $("rdel").onclick = function () { if (confirm("Delete this rule?")) { CFG.rules.splice(i, 1); mark(); tRules(); } };
+    $("rtest").onclick = function () { save().then(function () { var pk = r.period === "custom" ? "C:" + r.from + "_" + r.to : periodKey(r.period, today()); $("rto").innerHTML = '<div class="loading"><div class="spin"></div>Testing…</div>';
+      api({ action: "rh-run", state: STATE, draft: true, period: pk, rules: [r.id] }).then(function (x) { if (!x.ok) { $("rto").innerHTML = '<div class="err">' + esc(x.error) + "</div>"; return; } var hit = x.rows.filter(function (y) { return y.total > 0; });
+        $("rto").innerHTML = '<div class="prev">' + esc(x.period.label) + ": <b>" + hit.length + "</b> of " + x.retailers + " retailers earn · " + n0(x.total) + " pts · cost " + inr(x.costRs) + "</div>" + table(["Retailer", "Sales", "Ach %", "Points", "Why"], hit.slice(0, 50).map(function (y) { return [esc(y.name), inr(y.m.sv), y.m.ach_v + "%", n0(y.total), '<span class="tm">' + esc(Object.values(y.why).join(" · ")) + "</span>"]; }), [1, 2, 3]); }); }); };
+    $("red").scrollIntoView({ behavior: "smooth" });
+  }
+  function periodKey(kind, d) { var y = d.slice(0, 4), mo = +d.slice(5, 7); if (kind === "week") { var x = new Date(d + "T00:00:00Z"), wd = (x.getUTCDay() + 6) % 7; return "W:" + new Date(Date.parse(d) - wd * 864e5).toISOString().slice(0, 10); } if (kind === "quarter") return "Q:" + y + "-Q" + Math.ceil(mo / 3); if (kind === "half") return "H:" + y + "-H" + (mo <= 6 ? 1 : 2); if (kind === "year") return "Y:" + y; return "M:" + d.slice(0, 7); }
+
+  // ================= 🎁 vouchers =================
+  var PRESETS = [["Amazon Pay e-gift ₹500", "Amazon", "shopping", "🛍", 500, "codes"], ["Flipkart gift card ₹500", "Flipkart", "shopping", "🛒", 500, "codes"], ["MakeMyTrip ₹1,000 travel voucher", "MakeMyTrip", "travel", "✈️", 1000, "codes"], ["Hotel stay voucher ₹2,000", "MakeMyTrip / Goibibo", "hotel", "🏨", 2000, "codes"], ["Swiggy ₹250", "Swiggy", "food", "🍽", 250, "codes"], ["Fuel voucher ₹500", "IndianOil / HP", "fuel", "⛽", 500, "codes"], ["vivo TWS earbuds", "vivo", "vivo", "🎧", 2500, "manual"], ["₹1,000 credit to scheme wallet", "vivo", "wallet", "💰", 1000, "wallet"], ["Movie tickets ₹500", "BookMyShow", "experience", "🎟", 500, "codes"], ["Myntra ₹1,000", "Myntra", "shopping", "👗", 1000, "codes"]];
+  function tOffers() {
+    $("tp").innerHTML = '<div class="ed"><h4>Quick add</h4><div class="tm">Points are set from the value at 1 pt = ₹' + CFG.pointValue + " — change anything after adding.</div><div class=\"tg\">" + PRESETS.map(function (p, i) { return '<button data-pre="' + i + '"><span class="e">' + p[3] + "</span><b>" + esc(p[0]) + "</b><span>" + n0(Math.round(p[4] / CFG.pointValue)) + " pts · " + (p[5] === "codes" ? "code pool" : p[5]) + "</span></button>"; }).join("") + '</div><div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn sec sm" id="onew">＋ Custom voucher / offer</button><button class="btn pri sm" id="oai">✨ AI: suggest a catalogue & points</button></div><div id="oaio"></div></div>' +
+      '<div class="ed"><h4>' + CFG.offers.length + ' vouchers & offers</h4><div id="olist"></div></div><div id="oed"></div>';
+    var list = function (stock) { $("olist").innerHTML = CFG.offers.length ? CFG.offers.map(function (o, i) { var s = stock && stock[o.id]; return '<div class="li' + (o.on ? "" : " off") + '"><div class="ic">' + (o.img ? '<img src="' + esc(o.img) + '" style="width:38px;height:38px;border-radius:10px;object-fit:cover">' : esc(o.icon)) + '</div><div class="bd" data-e="' + i + '" style="cursor:pointer"><b>' + esc(o.name) + '</b><div class="m">' + n0(o.pts) + " pts" + (o.value ? " · " + inr(o.value) : "") + " · " + esc(o.fulfil === "codes" ? "code pool" + (s ? " — " + s.free + " / " + s.total + " left" : "") : o.fulfil === "link" ? "redirect link" : o.fulfil === "wallet" ? "scheme wallet credit" : "manual") + (o.tiers.length ? " · " + esc(o.tiers.join(", ")) : "") + (o.perMonth ? " · " + o.perMonth + "/month" : "") + (s && s.free <= o.stockAlert ? ' · <b style="color:#C2410C">low stock</b>' : "") + "</div></div>" + sw(o.id, o.on) + "</div>"; }).join("") : '<div class="empty">No vouchers yet — quick-add above.</div>';
+      wireSw("offers", CFG.offers); [].forEach.call($("olist").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { offerEd(+b.dataset.e); }; }); };
+    list(); api({ action: "rh-stock", state: STATE }).then(function (r) { if (r.ok) list(r.stock); });
+    [].forEach.call($("tp").querySelectorAll("[data-pre]"), function (b) { b.onclick = function () { var p = PRESETS[+b.dataset.pre]; CFG.offers.push({ id: uid("o"), name: p[0], brand: p[1], cat: p[2], icon: p[3], img: "", pts: Math.round(p[4] / CFG.pointValue), value: p[4], fulfil: p[5], link: "", howTo: p[5] === "codes" ? "Copy the code and use it at checkout on the " + p[1] + " app / website." : p[5] === "wallet" ? "The amount is added to your scheme wallet — use it for orders or settlement." : "", terms: "", validityDays: 180, tiers: [], types: [], cities: [], perMonth: 1, perTotal: 0, stockAlert: 20, approval: "auto", from: "", to: "", on: true, featured: false, maxStock: 0 }); mark(); tOffers(); offerEd(CFG.offers.length - 1); }; });
+    $("oai").onclick = function () { var note = prompt("Anything to keep in mind? (budget, partners you have, festive focus…)", "") ; if (note === null) return; $("oaio").innerHTML = '<div class="loading"><div class="spin"></div>AI is planning the catalogue…</div>';
+      (DIRTY ? save() : Promise.resolve()).then(function () { return api({ action: "rh-ai-offers", state: STATE, text: note }); }).then(function (r) { if (!r.ok) { $("oaio").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+        $("oaio").innerHTML = '<div class="tm" style="margin-top:8px">Tick the ones to add (you can edit each one after):</div>' + r.offers.map(function (o, i) { return '<label class="li" style="cursor:pointer"><input type="checkbox" data-ao="' + i + '" checked><div class="ic">' + esc(o.icon) + '</div><div class="bd"><b>' + esc(o.name) + '</b><div class="m">' + n0(o.pts) + " pts · " + inr(o.value) + " · " + esc(o.fulfil) + (o.tiers.length ? " · " + esc(o.tiers.join(", ")) : "") + " — " + esc(o.why) + "</div></div></label>"; }).join("") + '<button class="btn ok sm" id="aoadd" style="margin-top:8px">＋ Add selected</button>';
+        $("aoadd").onclick = function () { var n = 0; [].forEach.call($("oaio").querySelectorAll("[data-ao]"), function (c) { if (!c.checked) return; var o = r.offers[+c.dataset.ao]; delete o.why; o.id = uid("o"); CFG.offers.push(o); n++; }); mark(); toast(n + " added — set codes / links for each"); tOffers(); }; }); };
+    $("onew").onclick = function () { CFG.offers.push({ id: uid("o"), name: "New offer", brand: "", cat: "other", icon: "🎁", img: "", pts: 1000, value: 0, fulfil: "codes", link: "", howTo: "", terms: "", validityDays: 180, tiers: [], types: [], cities: [], perMonth: 0, perTotal: 0, stockAlert: 20, approval: "auto", from: "", to: "", on: true, featured: false, maxStock: 0 }); mark(); tOffers(); offerEd(CFG.offers.length - 1); };
+  }
+  function offerEd(i) {
+    var o = CFG.offers[i];
+    $("oed").innerHTML = '<div class="ed" id="obox"><h4>✏️ ' + esc(o.name) + '</h4><div class="g2"><div><label class="lb">Name</label><input class="tx" data-f="name" value="' + esc(o.name) + '"></div><div><label class="lb">Brand / partner</label><input class="tx" data-f="brand" value="' + esc(o.brand) + '"></div></div>' +
+      '<div class="g3"><div><label class="lb">Category</label><select class="tx" data-f="cat">' + META.cats.map(function (c) { return '<option value="' + c[0] + '"' + (c[0] === o.cat ? " selected" : "") + ">" + c[1] + "</option>"; }).join("") + '</select></div><div><label class="lb">Icon</label><input class="tx" data-f="icon" value="' + esc(o.icon) + '"></div><div><label class="lb">Banner image (https link)</label><input class="tx" data-f="img" value="' + esc(o.img) + '"></div></div>' +
+      '<div class="g3"><div><label class="lb">Points needed</label><input type="number" class="tx" data-f="pts" value="' + o.pts + '"></div><div><label class="lb">Face value ₹</label><input type="number" class="tx" data-f="value" value="' + o.value + '"></div><div><label class="lb">Valid for (days)</label><input type="number" class="tx" data-f="validityDays" value="' + o.validityDays + '"></div></div>' +
+      '<label class="lb">How the retailer gets it</label><select class="tx" data-f="fulfil"><option value="codes"' + (o.fulfil === "codes" ? " selected" : "") + '>Coupon code from a pool (shown instantly)</option><option value="link"' + (o.fulfil === "link" ? " selected" : "") + '>Redirect link (partner page)</option><option value="manual"' + (o.fulfil === "manual" ? " selected" : "") + '>Manual — HO fulfils (e.g. gift, travel booking)</option><option value="wallet"' + (o.fulfil === "wallet" ? " selected" : "") + ">Credit to the retailer's scheme wallet (₹ face value)</option></select>" +
+      (o.fulfil === "link" ? '<label class="lb">Link (https; {rid} and {ref} are filled in)</label><input class="tx" data-f="link" value="' + esc(o.link) + '" placeholder="https://partner.example/redeem?store={rid}&ref={ref}">' : "") +
+      (o.fulfil === "codes" ? '<div class="prev" id="ocs">Code pool: …</div><div class="row" style="gap:6px;margin-top:6px;flex-wrap:wrap"><button class="btn sec sm" id="ocp">📋 Paste codes</button><button class="btn sec sm" id="ocx">📥 Upload codes (Excel / CSV)</button><button class="btn ghost sm" id="occ">Clear unused</button></div><div class="g2"><div><label class="lb">Low-stock alert below</label><input type="number" class="tx" data-f="stockAlert" value="' + o.stockAlert + '"></div><div></div></div>' : "") +
+      '<label class="lb">How to use (shown with the voucher)</label><textarea class="tx" rows="2" data-f="howTo">' + esc(o.howTo) + '</textarea><label class="lb">Terms</label><textarea class="tx" rows="2" data-f="terms">' + esc(o.terms) + "</textarea>" +
+      '<label class="lb">Visible to clubs (none = all)</label><div class="cks">' + CFG.tiers.map(function (t) { return '<label class="ck"><input type="checkbox" data-tier="' + esc(t.id) + '"' + (o.tiers.indexOf(t.id) >= 0 ? " checked" : "") + "> " + esc(t.icon + " " + t.name) + "</label>"; }).join("") + '</div><div class="g2"><div><label class="lb">Only retailer types</label><input class="tx" data-f="types" value="' + esc(o.types.join(", ")) + '"></div><div><label class="lb">Only cities</label><input class="tx" data-f="cities" value="' + esc(o.cities.join(", ")) + '"></div></div>' +
+      '<div class="g3"><div><label class="lb">Per retailer / month</label><input type="number" class="tx" data-f="perMonth" value="' + o.perMonth + '"></div><div><label class="lb">Per retailer total</label><input type="number" class="tx" data-f="perTotal" value="' + o.perTotal + '"></div><div><label class="lb">Approval</label><select class="tx" data-f="approval"><option value="auto"' + (o.approval === "auto" ? " selected" : "") + '>Instant</option><option value="above"' + (o.approval === "above" ? " selected" : "") + '>Approve above auto limit</option><option value="manual"' + (o.approval === "manual" ? " selected" : "") + ">Always approve</option></select></div></div>" +
+      '<div class="g2"><div><label class="lb">Show from</label><input type="date" class="tx" data-f="from" value="' + esc(o.from) + '"></div><div><label class="lb">Show till</label><input type="date" class="tx" data-f="to" value="' + esc(o.to) + '"></div></div><label class="ck"><input type="checkbox" data-f="featured"' + (o.featured ? " checked" : "") + '> ★ Featured</label>' +
+      '<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn pri sm" id="ook">Done</button><button class="btn ghost sm" id="odup">⎘ Duplicate</button><button class="btn danger sm" id="odel">Delete</button></div></div>';
+    bindFields($("obox"), o, function (f) { if (f === "fulfil") offerEd(i); });
+    [].forEach.call($("obox").querySelectorAll("[data-tier]"), function (c) { c.onchange = function () { o.tiers = [].filter.call($("obox").querySelectorAll("[data-tier]"), function (x) { return x.checked; }).map(function (x) { return x.dataset.tier; }); mark(); }; });
+    var cnt = function (r) { if ($("ocs") && r && r.ok) $("ocs").innerHTML = "Code pool: <b>" + r.free + "</b> available of " + r.total + " uploaded (codes are never shown here again)"; };
+    var send = function (codes) { (DIRTY ? save() : Promise.resolve()).then(function () { api({ action: "rh-codes", state: STATE, offer: o.id, add: codes }).then(function (r) { if (!r.ok) return toast(r.error); cnt(r); toast("Codes added"); }); }); };
+    if ($("ocs")) { api({ action: "rh-codes", state: STATE, offer: o.id }).then(cnt);
+      $("ocp").onclick = function () { var t = prompt("Paste codes — one per line"); if (t) send(t.split(/[\n,;]+/).map(function (x) { return x.trim(); }).filter(Boolean)); };
+      $("ocx").onclick = function () { pickFile(".xlsx,.xls,.csv", function (f) { readSheet(f).then(function (rows) { send(rows.map(function (r) { return String(col(r, ["code", "coupon", "voucher", "pin"]) || Object.values(r)[0] || "").trim(); }).filter(Boolean)); }).catch(function (e) { toast(e.message); }); }); };
+      $("occ").onclick = function () { if (confirm("Remove all unused codes of this offer?")) api({ action: "rh-codes", state: STATE, offer: o.id, clearUnused: true }).then(cnt); }; }
+    $("ook").onclick = function () { tOffers(); }; $("odup").onclick = function () { var x = clone(o); x.id = uid("o"); x.name += " (copy)"; CFG.offers.push(x); mark(); tOffers(); };
+    $("odel").onclick = function () { if (confirm("Delete this offer?")) { CFG.offers.splice(i, 1); mark(); tOffers(); } };
+    $("oed").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ================= ✅ tasks =================
+  function tTasks() {
+    $("tp").innerHTML = '<div class="ed"><h4>Tasks retailers can do for points</h4><div class="tm">Display photo, training, survey, app use, demo-unit check… Retailers send proof in the app; you approve in 🧾 Redemptions → Tasks (or set auto-approve).</div><button class="btn sec sm" id="knew" style="margin-top:8px">＋ New task</button>' +
+      (CFG.tasks.length ? CFG.tasks.map(function (k, i) { return '<div class="li' + (k.on ? "" : " off") + '"><div class="ic">✅</div><div class="bd" data-e="' + i + '" style="cursor:pointer"><b>' + esc(k.name) + '</b><div class="m">+' + n0(k.pts) + " pts · " + k.freq + " · proof: " + k.proof + (k.auto ? " · auto-approve" : "") + "</div></div>" + sw(k.id, k.on) + "</div>"; }).join("") : '<div class="empty">No tasks yet</div>') + '</div><div id="ked"></div>';
+    wireSw("tasks", CFG.tasks);
+    $("knew").onclick = function () { CFG.tasks.push({ id: uid("k"), name: "Display photo", desc: "Upload a photo of the vivo display with the latest POSM.", pts: 50, proof: "photo", freq: "monthly", from: "", to: "", tiers: [], on: true, auto: false, tierMult: false }); mark(); tTasks(); kEd(CFG.tasks.length - 1); };
+    [].forEach.call($("tp").querySelectorAll("[data-e]"), function (b) { b.onclick = function () { kEd(+b.dataset.e); }; });
+  }
+  function kEd(i) {
+    var k = CFG.tasks[i];
+    $("ked").innerHTML = '<div class="ed" id="kbox"><h4>✏️ ' + esc(k.name) + '</h4><label class="lb">Task</label><input class="tx" data-f="name" value="' + esc(k.name) + '"><label class="lb">What to do</label><textarea class="tx" rows="2" data-f="desc">' + esc(k.desc) + '</textarea><div class="g3"><div><label class="lb">Points</label><input type="number" class="tx" data-f="pts" value="' + k.pts + '"></div><div><label class="lb">Proof</label><select class="tx" data-f="proof"><option value="photo"' + (k.proof === "photo" ? " selected" : "") + '>Photo</option><option value="text"' + (k.proof === "text" ? " selected" : "") + '>Note</option><option value="none"' + (k.proof === "none" ? " selected" : "") + '>None</option></select></div><div><label class="lb">How often</label><select class="tx" data-f="freq">' + ["once", "daily", "weekly", "monthly"].map(function (f) { return '<option value="' + f + '"' + (k.freq === f ? " selected" : "") + ">" + f + "</option>"; }).join("") + "</select></div></div>" +
+      '<div class="g2"><div><label class="lb">From</label><input type="date" class="tx" data-f="from" value="' + esc(k.from) + '"></div><div><label class="lb">To</label><input type="date" class="tx" data-f="to" value="' + esc(k.to) + '"></div></div><label class="ck"><input type="checkbox" data-f="auto"' + (k.auto ? " checked" : "") + '> Auto-approve (no check)</label><label class="ck"><input type="checkbox" data-f="tierMult"' + (k.tierMult ? " checked" : "") + '> × club multiplier</label><div class="row" style="gap:6px;margin-top:8px"><button class="btn pri sm" id="kok">Done</button><button class="btn danger sm" id="kdel">Delete</button></div></div>';
+    bindFields($("kbox"), k); $("kok").onclick = tTasks; $("kdel").onclick = function () { if (confirm("Delete this task?")) { CFG.tasks.splice(i, 1); mark(); tTasks(); } };
+  }
+
+  // ================= ▶️ run & simulate =================
+  function tRun() {
+    var m = today().slice(0, 7);
+    $("tp").innerHTML = '<div class="ed"><h4>Work out points for a period</h4><div class="tm">Simulate first (nothing is credited), then post with the live program. Posting the same period again recalculates — no double points.</div>' +
+      '<div class="g2"><div><label class="lb">Period</label><select class="tx" id="pk"><option value="month">Month</option><option value="week">Week</option><option value="quarter">Quarter</option><option value="half">Half-year</option><option value="year">Year</option><option value="custom">Festival / custom dates</option></select></div><div id="pv"></div></div>' +
+      '<div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sec" id="sd">🧪 Simulate draft</button><button class="btn sec" id="sl">🧪 Simulate live</button><button class="btn pri" id="po">✅ Post points (live)</button><button class="btn ghost sm" id="xl" style="display:none">⬇ Excel</button></div><div id="ro"></div></div>' +
+      '<div class="ed"><h4>📤 Upload a KPI sheet</h4><div class="tm">Excel with Retailer ID + one column per KPI (e.g. display_score, training_score). Use it in rules with “Uploaded KPI”.</div><button class="btn sec sm" id="kup" style="margin-top:6px">📥 Upload KPIs for the period above</button><div id="ko"></div></div><div class="ed"><h4>Posting history</h4><div id="rh"></div></div>';
+    var pv = function () { var k = $("pk").value; $("pv").innerHTML = k === "custom" ? '<div class="g2"><div><label class="lb">From</label><input type="date" class="tx" id="pf" value="' + today() + '"></div><div><label class="lb">To</label><input type="date" class="tx" id="pt" value="' + today() + '"></div></div>' : '<label class="lb">' + (k === "month" ? "Month" : "Any date in it") + '</label><input type="' + (k === "month" ? "month" : "date") + '" class="tx" id="pd" value="' + (k === "month" ? m : today()) + '">'; };
+    pv(); $("pk").onchange = pv;
+    var key = function () { var k = $("pk").value; if (k === "custom") return "C:" + $("pf").value + "_" + $("pt").value; var d = $("pd").value; return k === "month" ? "M:" + d : periodKey(k, d); };
+    var LAST = null;
+    var run = function (draft, post) { $("ro").innerHTML = '<div class="loading"><div class="spin"></div>Working out points for every retailer…</div>'; (draft && DIRTY ? save() : Promise.resolve()).then(function () { api({ action: "rh-run", state: STATE, period: key(), draft: draft, post: post }).then(function (r) {
+      if (!r.ok) { $("ro").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } LAST = r; $("xl").style.display = "";
+      var B = r.budget, bp = B.yearRs ? Math.min(100, B.afterRs / B.yearRs * 100) : 0, ids = Object.keys(r.byRule), C2 = (draft ? G.doc.draft : (G.doc.live || G.doc.draft));
+      var rn = function (id) { return ((C2.rules.filter(function (x) { return x.id === id; })[0]) || { name: id }).name; };
+      $("ro").innerHTML = (r.posted ? '<div class="prev">✅ Posted · ' + r.posted.changed + " ledgers changed · net " + (r.posted.delta >= 0 ? "+" : "") + n0(r.posted.delta) + " pts</div>" : "") + '<div class="tiles" style="margin-top:10px">' + kpiT("📅", "#4D5BF9", "#EEF0FF", esc(r.period.label), draft ? "Draft simulation" : post ? "Posted (live)" : "Live simulation", r.retailers + " retailers") + kpiT("🏪", "#16A06A", "#E6F6EE", n0(r.earners), "Retailers earning") + kpiT("⭐", "#8E5CF6", "#F3EEFF", n0(r.total), "Points") + kpiT("₹", "#C2410C", "#FFF1E8", inr(r.costRs), "Cost at ₹" + CFG.pointValue + "/pt") + "</div>" +
+        (B.yearRs ? '<div class="card"><b>Budget after this</b><div class="tm">' + inr(B.afterRs) + " of " + inr(B.yearRs) + " (" + Math.round(bp) + "%)" + (r.over ? " · ⚠️ over the cap" : "") + '</div><div class="bud"><i style="width:' + bp + '%"></i></div></div>' : "") +
+        '<div class="card"><b>By rule</b>' + table(["Rule", "Retailers", "Points", "₹"], ids.map(function (id) { var b = r.byRule[id]; return [esc(rn(id)) + (b.scaled ? ' <span class="tm">(scaled ×' + b.scaled + " — rule budget)</span>" : ""), n0(b.n), n0(b.pts), inr(b.pts * CFG.pointValue)]; }), [1, 2, 3]) + "</div>" +
+        '<div class="card" style="background:linear-gradient(135deg,#F5F3FF,#EEF6FF)"><b>🤖 Ask AI about this result</b><div class="tm">Cost per retailer, who gets most, rules that pay too much or nothing, and what to change.</div><button class="btn pri sm" id="sai" style="margin-top:6px">🤖 Analyse</button><div id="saio"></div></div>' +
+        '<div class="card"><b>Retailers</b>' + table(["Retailer", "Club", "Sales", "Ach %", "Growth", "Points"], r.rows.filter(function (x) { return x.total > 0; }).slice(0, 300).map(function (x) { return [esc(x.name) + '<div class="tm">' + esc(x.rid) + "</div>", esc(tierName(x.tier)), inr(x.m.sv), x.m.ach_v + "%", x.m.g_mom_v + "%", "<b>" + n0(x.total) + "</b>"]; }), [2, 3, 4, 5]) + "</div>";
+      $("sai").onclick = function () { var top = r.rows.slice().sort(function (a, b) { return b.total - a.total; }), tot = r.total || 1, t10 = top.slice(0, Math.max(1, Math.ceil(top.length / 10))).reduce(function (s2, x) { return s2 + x.total; }, 0);
+        aiReview($("saio"), { period: r.period.label, retailers: r.retailers, earners: r.earners, points: r.total, costRs: r.costRs, budget: r.budget, top10pctShare: Math.round(t10 / tot * 100), byRule: ids.map(function (id) { var b = r.byRule[id]; return { rule: rn(id), retailers: b.n, points: b.pts }; }), sample: top.slice(0, 8).map(function (x) { return { club: x.tier, salesRs: Math.round(x.m.sv), ach: x.m.ach_v, growth: x.m.g_mom_v, points: x.total }; }) }, "Analyse this simulation"); };
+      if (post) hist(); }); }); };
+    $("sd").onclick = function () { run(true, false); }; $("sl").onclick = function () { run(false, false); };
+    $("po").onclick = function () { if (!G.doc.live) return toast("Go live first (🚀 Submit)"); if (confirm("Credit points for " + key() + " with the LIVE program? Re-posting later recalculates.")) run(false, true); };
+    $("xl").onclick = function () { if (!LAST) return; var ids = Object.keys(LAST.byRule), C2 = G.doc.live || G.doc.draft, rn = function (id) { return ((C2.rules.filter(function (x) { return x.id === id; })[0]) || { name: id }).name; };
+      download(xlsx([{ name: "Points", rows: [["Retailer ID", "Name", "City", "Club", "Sales ₹", "Units", "Achievement %", "Growth %", "Premium %"].concat(ids.map(rn)).concat(["Total points", "Value ₹"])].concat(LAST.rows.map(function (x) { return [x.rid, x.name, x.city, x.tier, x.m.sv, x.m.su, x.m.ach_v, x.m.g_mom_v, x.m.prem_share].concat(ids.map(function (id) { return x.pts[id] || 0; })).concat([x.total, Math.round(x.total * CFG.pointValue * 100) / 100]); })) }]), "Rewards_" + STATE + "_" + LAST.period.key.replace(/[^\w-]/g, "_") + ".xlsx"); };
+    $("kup").onclick = function () { pickFile(".xlsx,.xls,.csv", function (f) { readSheet(f).then(function (rows) { var out = []; rows.forEach(function (r) { var rid = col(r, ["retailerid", "rid", "storeid", "dealercode", "code"]); if (!rid) return; Object.keys(r).forEach(function (h) { if (/retailer|^rid$|store ?id|dealer|code|name/i.test(h)) return; var v = Number(r[h]); if (isFinite(v) && r[h] !== "") out.push({ rid: rid, metric: h.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"), value: v }); }); });
+      api({ action: "rh-kpi", state: STATE, period: key(), rows: out }).then(function (r) { $("ko").innerHTML = r.ok ? '<div class="prev">✅ ' + r.n + " values · KPIs: " + esc(r.metrics.join(", ")) + "</div>" : '<div class="err">' + esc(r.error) + "</div>"; }); }).catch(function (e) { toast(e.message); }); }); };
+    var hist = function () { api({ action: "rh-runs", state: STATE }).then(function (r) { $("rh").innerHTML = r.ok && r.rows.length ? table(["When", "Period", "By", "Points", "Change"], r.rows.slice(0, 50).map(function (x) { return [new Date(x.at).toLocaleString("en-IN"), esc(x.label), esc(x.by), n0(x.total), (x.delta >= 0 ? "+" : "") + n0(x.delta)]; }), [3, 4]) : '<div class="tm">Nothing posted yet.</div>'; }); };
+    hist();
+  }
+
+  function aiReview(box, sim, focus) {
+    box.innerHTML = '<div class="loading"><div class="spin"></div>AI is reviewing the program…</div>';
+    (DIRTY ? save() : Promise.resolve()).then(function () { return api({ action: "rh-ai-review", state: STATE, sim: sim, focus: focus || "" }); }).then(function (r) { box.innerHTML = r.ok ? '<div class="prev" style="white-space:pre-wrap;line-height:1.5">' + esc(r.text) + "</div>" : '<div class="err">' + esc(r.error) + "</div>"; });
+  }
+  // ================= 👥 retailers & ledger =================
+  function tRet() {
+    $("tp").innerHTML = '<div class="ed"><div class="row" style="gap:6px;flex-wrap:wrap"><input class="tx" id="q" placeholder="Search ID, name or city" style="flex:1;min-width:160px"><button class="btn sec sm" id="bu">📥 Bulk points / clubs (Excel)</button><button class="btn ghost sm" id="rx">⬇ Excel</button></div><div class="tm" style="margin-top:4px">Excel columns: Retailer ID, Points (+ credit / − debit), Reason, Club (optional).</div><div id="rl"><div class="loading"><div class="spin"></div></div></div></div>';
+    var ROWS = [];
+    var show = function () { var q = $("q").value.toLowerCase(); $("rl").innerHTML = table(["Retailer", "Club", "Balance", "Earned", "Redeemed", ""], ROWS.filter(function (r) { return !q || (r.rid + " " + r.name + " " + r.city).toLowerCase().indexOf(q) >= 0; }).slice(0, 400).map(function (r) { return ['<a href="#" data-r="' + esc(r.rid) + '">' + esc(r.name) + '</a><div class="tm">' + esc(r.rid + " · " + r.city) + "</div>", esc(tierName(r.tier)) + (r.atRisk ? ' <span class="pill risk">at risk</span>' : "") + (r.elig ? "" : ' <span class="pill off">not eligible</span>'), "<b>" + n0(r.bal) + "</b>", n0(r.earned), n0(r.redeemed), '<a href="#" data-v="' + esc(r.rid) + '">👁</a>']; }), [2, 3, 4]);
+      [].forEach.call($("rl").querySelectorAll("[data-r]"), function (a) { a.onclick = function (e) { e.preventDefault(); ledger(a.dataset.r); }; });
+      [].forEach.call($("rl").querySelectorAll("[data-v]"), function (a) { a.onclick = function (e) { e.preventDefault(); TAB = "see"; draw(); setTimeout(function () { $("sq").value = a.dataset.v; $("sgo").click(); }, 50); }; }); };
+    api({ action: "rh-retailers", state: STATE }).then(function (r) { if (!r.ok) { $("rl").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } ROWS = r.rows.sort(function (a, b) { return b.bal - a.bal; }); show(); });
+    $("q").oninput = show;
+    $("rx").onclick = function () { download(xlsx([{ name: "Retailers", rows: [["Retailer ID", "Name", "City", "Type", "Club", "At risk", "Club basis", "Balance", "Earned", "Redeemed", "Value ₹"]].concat(ROWS.map(function (r) { return [r.rid, r.name, r.city, r.type, r.tier, r.atRisk ? "Yes" : "", r.basis, r.bal, r.earned, r.redeemed, Math.round(r.bal * CFG.pointValue * 100) / 100]; })) }]), "Rewards_retailers_" + STATE + ".xlsx"); };
+    $("bu").onclick = function () { pickFile(".xlsx,.xls,.csv", function (f) { readSheet(f).then(function (rows) { var R = rows.map(function (r) { return { rid: col(r, ["retailerid", "rid", "storeid", "dealercode"]), pts: col(r, ["points", "pts"]), note: col(r, ["reason", "note", "remark"]), tier: col(r, ["club", "tier"]), name: col(r, ["name"]) }; }).filter(function (r) { return r.rid; });
+      if (!confirm(R.length + " rows — credit / debit points now?")) return; api({ action: "rh-bulk", state: STATE, rows: R }).then(function (x) { toast(x.ok ? "✅ " + x.n + " retailers · " + x.pts + " pts" + (x.bad ? " · " + x.bad + " skipped" : "") : x.error); tRet(); }); }).catch(function (e) { toast(e.message); }); }); };
+  }
+  function ledger(rid) {
+    api({ action: "rh-ledger", state: STATE, rid: rid }).then(function (r) { if (!r.ok) return toast(r.error); var L = r.led;
+      var ov = sheet("🧾 " + (L.name || rid), rid + " · " + tierName(L.tier) + (L.atRisk ? " · at risk" : "") + " · balance " + n0(L.bal) + " pts", [["➕", "Credit / debit points", function () { var p = prompt("Points (use − to debit)"); if (!p) return false; var why = prompt("Reason (required)"); if (!why) return false; api({ action: "rh-adjust", state: STATE, rid: rid, pts: Number(p), note: why }).then(function (x) { toast(x.ok ? "Done — balance " + x.bal : x.error); ledger(rid); }); }],
+        ["🏅", "Set club manually", function () { var t = prompt("Club id: " + CFG.tiers.map(function (t) { return t.id; }).join(", ")); if (!t) return false; var why = prompt("Reason (required)"); if (!why) return false; api({ action: "rh-adjust", state: STATE, rid: rid, tier: t, note: why }).then(function (x) { toast(x.ok ? "Club set" : x.error); ledger(rid); }); }]],
+        (L.hist.length ? '<div class="tm" style="margin-top:8px"><b>Club history</b> · ' + L.hist.slice(-6).map(function (h) { return esc(h.d + ": " + (h.from || "—") + " → " + h.to + " (" + h.act + ")"); }).join(" · ") + "</div>" : "") +
+        table(["Date", "What", "Points", "Left", "Expires"], L.e.map(function (e) { return [esc(e.d), esc(e.note || e.type) + (e.by ? '<div class="tm">' + esc(e.by) + "</div>" : ""), '<b style="color:' + (e.pts >= 0 ? "#16A06A" : "#C2410C") + '">' + (e.pts >= 0 ? "+" : "") + n0(e.pts) + "</b>", e.type === "earn" ? n0(e.left) : "", esc(e.exp || "")]; }), [2, 3]));
+    });
+  }
+
+  // ================= 🧾 redemptions & task proofs =================
+  function tRed() {
+    $("tp").innerHTML = '<div class="nav" style="position:static"><button class="on" data-rt="red">🎁 Redemptions</button><button data-rt="task">✅ Task proofs</button></div><div id="rr"></div>';
+    var mode = "red";
+    [].forEach.call($("tp").querySelectorAll("[data-rt]"), function (b) { b.onclick = function () { mode = b.dataset.rt; [].forEach.call($("tp").querySelectorAll("[data-rt]"), function (x) { x.classList.toggle("on", x === b); }); go(); }; });
+    var go = function () { $("rr").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+      if (mode === "red") api({ action: "rh-reds", state: STATE }).then(function (r) { if (!r.ok) return; var R = r.rows;
+        $("rr").innerHTML = '<div class="row" style="gap:6px;margin:6px 0"><span class="tm" style="flex:1">' + R.filter(function (x) { return x.status === "pending"; }).length + " pending · " + R.length + ' total</span><button class="btn ghost sm" id="rxl">⬇ Excel</button></div>' + table(["When", "Retailer", "Offer", "Pts", "Status", ""], R.slice(0, 500).map(function (x) { return [new Date(x.at).toLocaleDateString("en-IN"), esc(x.name) + '<div class="tm">' + esc(x.rid) + " · " + esc(x.via || "") + "</div>", esc(x.oname) + (x.code ? '<div class="tm">' + esc(x.code) + "</div>" : ""), n0(x.pts), '<span class="pill ' + (x.status === "fulfilled" ? "live" : x.status === "pending" ? "pending" : "off") + '">' + esc(x.status) + "</span>", x.status === "pending" ? '<button class="btn pri sm" data-ap="' + x.id + '">Approve</button> <button class="btn ghost sm" data-rj="' + x.id + '">Reject</button>' : x.status === "fulfilled" ? '<button class="btn ghost sm" data-cn="' + x.id + '">Reverse</button>' : ""]; }), [3]);
+        $("rxl").onclick = function () { download(xlsx([{ name: "Redemptions", rows: [["Date", "Retailer ID", "Name", "Offer", "Points", "Value ₹", "Status", "Via", "Note"]].concat(R.map(function (x) { return [new Date(x.at).toISOString().slice(0, 10), x.rid, x.name, x.oname, x.pts, x.value, x.status, x.via, x.note || ""]; })) }]), "Redemptions_" + STATE + ".xlsx"); };
+        [].forEach.call($("rr").querySelectorAll("[data-ap]"), function (b) { b.onclick = function () { var x = R.filter(function (y) { return y.id === b.dataset.ap; })[0], code = "", link = ""; if (x.fulfil === "manual") { code = prompt("Voucher code / booking reference / details for the retailer (optional)") || ""; link = prompt("Link (https, optional)") || ""; } api({ action: "rh-red-act", state: STATE, id: x.id, do: "approve", code: code, link: link }).then(function (r) { toast(r.ok ? "Approved" : r.error); go(); }); }; });
+        [].forEach.call($("rr").querySelectorAll("[data-rj]"), function (b) { b.onclick = function () { var n = prompt("Reason (the retailer sees it; points are returned)"); if (n === null) return; api({ action: "rh-red-act", state: STATE, id: b.dataset.rj, do: "reject", note: n }).then(function (r) { toast(r.ok ? "Rejected — points returned" : r.error); go(); }); }; });
+        [].forEach.call($("rr").querySelectorAll("[data-cn]"), function (b) { b.onclick = function () { var n = prompt("Reverse this redemption and return the points? Reason:"); if (!n) return; api({ action: "rh-red-act", state: STATE, id: b.dataset.cn, do: "cancel", note: n, force: true }).then(function (r) { toast(r.ok ? "Reversed" : r.error); go(); }); }; });
+      });
+      else api({ action: "rh-tsubs", state: STATE }).then(function (r) { if (!r.ok) return;
+        $("rr").innerHTML = r.rows.length ? r.rows.slice(0, 300).map(function (s) { return '<div class="li"><div class="bd ph"><b>' + esc(s.tname) + " · " + esc(s.name) + '</b><div class="m">' + esc(s.rid) + " · " + new Date(s.at).toLocaleString("en-IN") + " · +" + n0(s.pts) + " pts" + (s.note ? " · “" + esc(s.note) + "”" : "") + "</div>" + (s.photo ? '<img src="' + s.photo + '" alt="proof">' : "") + '</div><div><span class="pill ' + (s.status === "approved" ? "live" : s.status === "pending" ? "pending" : "off") + '">' + esc(s.status) + "</span>" + (s.status === "pending" ? '<div style="margin-top:6px"><button class="btn pri sm" data-ta="' + s.id + '">✓</button> <button class="btn ghost sm" data-tr="' + s.id + '">✕</button></div>' : "") + "</div></div>"; }).join("") : '<div class="empty">No task proofs yet</div>';
+        [].forEach.call($("rr").querySelectorAll("[data-ta]"), function (b) { b.onclick = function () { api({ action: "rh-tsub-act", state: STATE, id: b.dataset.ta, do: "approve" }).then(function (x) { toast(x.ok ? "Approved — points credited" : x.error); go(); }); }; });
+        [].forEach.call($("rr").querySelectorAll("[data-tr]"), function (b) { b.onclick = function () { var n = prompt("Reason"); if (n === null) return; api({ action: "rh-tsub-act", state: STATE, id: b.dataset.tr, do: "reject", note: n }).then(function (x) { toast(x.ok ? "Rejected" : x.error); go(); }); }; });
+      }); };
+    go();
+  }
+
+  // ================= 🛡 approval & history =================
+  function tAppr() {
+    var d = G.doc, L = d.live, D = CFG;
+    var diff = function (k) { var a = (L ? L[k] : []).length, b = D[k].length; return b + (L && a !== b ? " (live " + a + ")" : ""); };
+    $("tp").innerHTML = '<div class="ed"><h4>Status: <span class="pill ' + d.status + '">' + esc(d.status.toUpperCase()) + "</span>" + (L ? " · live version " + d.ver : "") + '</h4><div class="tm">Draft → submit → approve → live. Switching rules / vouchers / clubs off is instant and logged. ' + (G.canApprove ? "You can approve changes for " + esc(STATE) + "." : "An approver for " + esc(STATE) + " or HO approves.") + "</div>" +
+      table(["", "Draft", ""], [["🏅 Clubs", diff("tiers"), ""], ["📐 Earning rules", diff("rules"), ""], ["🎁 Vouchers", diff("offers"), ""], ["✅ Tasks", diff("tasks"), ""], ["⭐ Point value", "₹" + D.pointValue + (L && L.pointValue !== D.pointValue ? " (live ₹" + L.pointValue + ")" : ""), ""]]) +
+      (d.pending ? '<div class="prev">🕒 Submitted by <b>' + esc(d.pending.by) + "</b> on " + new Date(d.pending.at).toLocaleString("en-IN") + (d.pending.note ? " — “" + esc(d.pending.note) + "”" : "") + "</div>" + (G.canApprove ? '<div class="row" style="gap:6px;margin-top:8px"><button class="btn ok" id="ap">✅ Approve & go live</button><button class="btn danger" id="rj">Send back</button></div>' : "") : "") + "</div>" +
+      '<div class="ed" style="background:linear-gradient(135deg,#F5F3FF,#EEF6FF)"><h4>🤖 AI review of the draft</h4><div class="tm">Before you submit: AI checks overlaps, unreachable or too-easy rules, club gaps, voucher value per point, budget and abuse risks — and suggests exact fixes.</div><input class="tx" id="arf" placeholder="Optional focus, e.g. keep cost under ₹2L a month" style="margin-top:6px"><button class="btn pri sm" id="arg" style="margin-top:6px">🤖 Review my program</button><div id="aro"></div></div>' +
+      '<div class="ed"><h4>Versions</h4><div id="vl"><div class="loading"><div class="spin"></div></div></div></div><div class="ed"><h4>Audit log</h4><div class="row" style="gap:6px"><span class="tm" style="flex:1">Who changed what and when</span><button class="btn ghost sm" id="axl">⬇ Excel</button></div><div id="al"></div></div>';
+    $("arg").onclick = function () { aiReview($("aro"), null, $("arf").value); };
+    if ($("ap")) $("ap").onclick = function () { api({ action: "rh-approve", state: STATE }).then(function (r) { toast(r.ok ? "✅ Version " + r.ver + " is live" : r.error); load("appr"); }); };
+    if ($("rj")) $("rj").onclick = function () { var n = prompt("Why? (the maker sees this in the audit log)"); if (n === null) return; api({ action: "rh-reject", state: STATE, note: n }).then(function (r) { toast(r.ok ? "Sent back" : r.error); load("appr"); }); };
+    api({ action: "rh-versions", state: STATE }).then(function (r) { $("vl").innerHTML = r.ok && r.rows.length ? table(["v", "Live from", "Made by", "Approved by", "Note", ""], r.rows.map(function (v) { return ["v" + v.n, new Date(v.at).toLocaleString("en-IN"), esc(v.by), esc(v.approvedBy), esc(v.note || "") + '<div class="tm">' + v.tiers + " clubs · " + v.rules + " rules · " + v.offers + " vouchers</div>", '<button class="btn ghost sm" data-rb="' + v.n + '">↩ Restore to draft</button>']; })) : '<div class="tm">No versions yet.</div>';
+      [].forEach.call($("vl").querySelectorAll("[data-rb]"), function (b) { b.onclick = function () { if (confirm("Copy version " + b.dataset.rb + " into the draft? (Live stays the same until approved.)")) api({ action: "rh-rollback", state: STATE, n: +b.dataset.rb }).then(function (x) { toast(x.ok ? "Draft restored" : x.error); load("appr"); }); }; }); });
+    api({ action: "rh-audit", state: STATE }).then(function (r) { var A = r.rows || []; $("al").innerHTML = table(["When", "Who", "Action", "Detail"], A.slice(0, 200).map(function (x) { return [new Date(x.at).toLocaleString("en-IN"), esc(x.by), esc(x.act), esc(x.what)]; }));
+      $("axl").onclick = function () { download(xlsx([{ name: "Audit", rows: [["When", "Who", "Action", "Detail"]].concat(A.map(function (x) { return [new Date(x.at).toISOString(), x.by, x.act, x.what]; })) }]), "Rewards_audit_" + STATE + ".xlsx"); }; });
+  }
+
+  // ================= 👁 retailer view =================
+  function tSee() {
+    $("tp").innerHTML = '<div class="ed"><h4>See it as a retailer</h4><div class="tm">Exactly what the retailer sees in the Retailer portal / vivo Retailer App (live program). You can redeem for them.</div><div class="row" style="gap:6px;margin-top:6px"><input class="tx" id="sq" placeholder="Retailer ID" style="flex:1"><button class="btn pri sm" id="sgo">Open</button></div></div><div id="sv2"></div>';
+    $("sgo").onclick = function () { var rid = $("sq").value.trim().toUpperCase(); if (!rid) return; $("sv2").innerHTML = '<div class="loading"><div class="spin"></div></div>';
+      var call = function (b) { return b.rh === "redeem" ? api({ action: "rh-redeem-for", state: STATE, rid: rid, offer: b.offer }) : api({ action: "rh-preview", state: STATE, rid: rid, rh: b.rh, q: b.q }); };
+      var go = function (tab) { api({ action: "rh-preview", state: STATE, rid: rid }).then(function (r) { if (!r.ok && r.error) { $("sv2").innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; } RHView.mount($("sv2"), r, { tab: tab, call: call, reload: go }); }); };
+      go("earn"); };
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

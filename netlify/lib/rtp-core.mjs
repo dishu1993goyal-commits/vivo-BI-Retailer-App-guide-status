@@ -15,6 +15,7 @@
 //   rto:<id>         order { id, rid, rname, state, items:[{ model, qty, price, value }], total, status, note, by, via, at, month, history }
 //   config:rtporder  { on, balance:"credit"|"wallet"|"none", defMax, cover, minValue, note, models:{ <key>:{ max, price, hide } } }
 import { randomBytes } from "node:crypto";
+import { rhRetailer } from "./rh-core.mjs";
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
 const str = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
 const txt = (v, n) => String(v == null ? "" : v).replace(/\r/g, "").trim().slice(0, n);
@@ -192,6 +193,7 @@ export async function rtpPublic(b, ctx) {
     return json(200, { ok: true, items: row.items || [], line: { scheme: row.scheme, month: x.month, net: row.net, title: x.title, name: row.name, rid: row.rid } });
   }
   if (b.action === "rtp-public-imei") { const i = IMEI(b.imei), il = (await store.get(`rtil:${L.rid}`)) || { items: [] }, x = il.items.find((y) => y.i === i); return json(200, x ? { ok: true, item: imeiOut(x, D.today), retailer: { rid: L.rid, name: D.retailer.name } } : { ok: false, error: "This IMEI isn't in your stock list." }); }
+  if (b.action === "rtp-public-rh") { const r = await rhRetailer(store, pool, L.rid, D.retailer.state, b, { via: "retailer", by: str(b.name, 60) || D.retailer.name }, ctx); return json(r.ok ? 200 : 400, r); }   // 🏆 rewards: club, points, earn, redeem, tasks
   if (b.action === "rtp-public-ordercat") return json(200, Object.assign({ ok: true }, await orderInfo(store, pool, L.rid, D)));
   if (b.action === "rtp-public-order") { const r = await placeOrder(store, pool, L.rid, D, b, str(b.name, 60) || D.retailer.name, "link", t); return json(r.error ? 400 : 200, r.error ? { ok: false, error: r.error } : { ok: true, order: r.order }); }
   if (b.action === "rtp-public-order-cancel") { const o = await store.get(`rto:${str(b.id, 30).replace(/[^a-z0-9]/gi, "")}`); if (!o || o.rid !== L.rid) return json(404, { ok: false, error: "Not found." }); if (o.status !== "placed") return json(400, { ok: false, error: "Only orders not yet accepted can be cancelled." }); o.status = "cancelled"; o.history.push({ status: "cancelled", by: D.retailer.name, at: t }); await store.set(`rto:${o.id}`, o); return json(200, { ok: true }); }
@@ -230,6 +232,11 @@ export async function rtpAction(b, ctx) {
     const links = [];
     for (const k of await store.list("rtplink:")) { const L = await store.get(k); if (L && L.rid === rid && !L.revoked && L.exp > t) links.push({ k: k.slice(8), exp: L.exp, by: L.by, at: L.at }); }
     return json(200, Object.assign({ ok: true, topics: RTP_TOPICS, links, isHO }, D));
+  }
+  if (b.action === "rtp-rh") {   // staff open the retailer's 🏆 Rewards tab (view; redeem for the retailer)
+    const rid = RID(b.rid), m = await store.get(`rtl:${rid}`), I = (await store.get("rtpidx")) || {}, st = (m && m.state) || (I[rid] && I[rid].s) || "";
+    if (!st) return json(404, { ok: false, error: "Retailer not found." }); if (!seeState(st)) return json(403, { ok: false, error: "This retailer is in another state." });
+    const r = await rhRetailer(store, pool, rid, st, b, { via: "staff", by }, ctx); return json(r.ok ? 200 : 400, r);
   }
   if (b.action === "rtp-import") {   // kind "master" (retailer list) or "biz" (month × model rows)
     const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 20000); let n = 0, skipped = 0;
