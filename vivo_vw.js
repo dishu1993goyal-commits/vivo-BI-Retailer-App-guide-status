@@ -40,13 +40,14 @@
     var ka = +a.slice(0, 4) * 12 + (+a.slice(5, 7) - 1), H = calHeads(); if (!H.length) return "noheader";
     var h = H.filter(function (x) { return x.k === ka; })[0];
     if (!h) { var dir = H[0].k > ka ? -1 : 1, nav = [].filter.call(qa("button,span,a,i"), function (e) { var c = String(e.className && e.className.baseVal != null ? e.className.baseVal : e.className); return vis(e) && (dir < 0 ? /prev(?!.*year)|[‹<](?!<)/.test(c + " " + txt(e)) && !/super-prev|prev-year|«/.test(c + txt(e)) : /next(?!.*year)|[›>](?!>)/.test(c + " " + txt(e)) && !/super-next|next-year|»/.test(c + txt(e))); }); if (nav[0]) tap(nav[0]); return "nav"; }
-    var hb = h.e.getBoundingClientRect(), cells = [].filter.call(qa("td,div,span"), function (e) { var r = e.getBoundingClientRect(), cl = String(e.className || "") + " " + String((e.parentElement || {}).className || ""); return vis(e) && !e.children.length && /^\d{1,2}$/.test(txt(e)) && r.top >= hb.bottom - 2 && r.top < hb.bottom + 320 && Math.abs(r.left + r.width / 2 - (hb.left + hb.width / 2)) < 200 && !/disabled|other|prev-month|next-month|not-current|-out|cell-out|is-other/i.test(cl); });
+    var mine = function (hh, e) { var r = e.getBoundingClientRect(), cx = r.left + r.width / 2, d0 = Math.abs(cx - (hh.getBoundingClientRect().left + hh.getBoundingClientRect().width / 2)); return !H.some(function (o) { var ob = o.e.getBoundingClientRect(); return o.e !== hh && ob.bottom <= r.top + 2 && Math.abs(cx - (ob.left + ob.width / 2)) < d0; }); };
+    var hb = h.e.getBoundingClientRect(), cells = [].filter.call(qa("td,div,span"), function (e) { var r = e.getBoundingClientRect(), cl = String(e.className || "") + " " + String((e.parentElement || {}).className || ""); return vis(e) && !e.children.length && /^\d{1,2}$/.test(txt(e)) && r.top >= hb.bottom - 2 && r.top < hb.bottom + 320 && Math.abs(r.left + r.width / 2 - (hb.left + hb.width / 2)) < 200 && mine(h.e, e) && !/disabled|other|prev-month|next-month|not-current|-out|cell-out|is-other/i.test(cl); });
     var cellOf = function (d) { var n = +d.slice(8); return cells.filter(function (e) { return +txt(e) === n; }).sort(function (p, q) { return n > 20 ? q.getBoundingClientRect().top - p.getBoundingClientRect().top : p.getBoundingClientRect().top - q.getBoundingClientRect().top; })[0]; };
     var c0 = cellOf(a); if (!c0) return "nocell";
     tap(c0);
     var kb = +b.slice(0, 4) * 12 + (+b.slice(5, 7) - 1), hb2 = H.filter(function (x) { return x.k === kb; })[0];
     if (!hb2) return "start";   // end month not shown: next tick moves the calendar
-    if (hb2 !== h) { hb = hb2.e.getBoundingClientRect(); cells = [].filter.call(qa("td,div,span"), function (e) { var r = e.getBoundingClientRect(), cl = String(e.className || "") + " " + String((e.parentElement || {}).className || ""); return vis(e) && !e.children.length && /^\d{1,2}$/.test(txt(e)) && r.top >= hb.bottom - 2 && r.top < hb.bottom + 320 && Math.abs(r.left + r.width / 2 - (hb.left + hb.width / 2)) < 200 && !/disabled|other|prev-month|next-month|not-current|-out|cell-out|is-other/i.test(cl); }); }
+    if (hb2 !== h) { hb = hb2.e.getBoundingClientRect(); cells = [].filter.call(qa("td,div,span"), function (e) { var r = e.getBoundingClientRect(), cl = String(e.className || "") + " " + String((e.parentElement || {}).className || ""); return vis(e) && !e.children.length && /^\d{1,2}$/.test(txt(e)) && r.top >= hb.bottom - 2 && r.top < hb.bottom + 320 && Math.abs(r.left + r.width / 2 - (hb.left + hb.width / 2)) < 200 && mine(hb2.e, e) && !/disabled|other|prev-month|next-month|not-current|-out|cell-out|is-other/i.test(cl); }); }
     var c1 = cellOf(b); if (c1) tap(c1);
     var ok = [].filter.call(qa("button,a,span"), function (e) { return vis(e) && /^(ok|confirm|确定)$/i.test(txt(e)); })[0]; if (ok) setTimeout(function () { tap(ok); }, 120);
     return "picked";
@@ -118,6 +119,17 @@
       try { var sd = w.DataTransfer.prototype.setData; w.DataTransfer.prototype.setData = function (f, t) { if (/text/.test(f)) keep(t); return sd.apply(this, arguments); }; } catch (x) { }
       try { var ex = d.execCommand; d.execCommand = function (c) { if (/copy/i.test(c)) { var a = d.activeElement; keep(a && "value" in a && a.value ? a.value : String(w.getSelection())); } return ex.apply(d, arguments); }; } catch (x) { }
       try { var co = w.URL.createObjectURL; w.URL.createObjectURL = function (b) { try { if (b && b.size > 100) W.__biBlob = b; } catch (x) { } return co.apply(w.URL, arguments); }; } catch (x) { }
+    });
+  }
+  // catch vWork's own "Download data" file (a blob made in the page, or a link) instead of saving it on the phone
+  function hookDl() {
+    docs().forEach(function (d) { var w = d.defaultView; if (!w || w.__biDlHook) return; w.__biDlHook = 1;
+      var blobs = {}, rec = function (u, n) { if (!u || W.__biDl) return false; u = String(u); var b = blobs[u]; if (b) { W.__biDl = { blob: b, name: n || "" }; return true; } if (/^https?:/i.test(u) && /xls|download|export|file/i.test(u + " " + (n || ""))) { W.__biDl = { url: new URL(u, d.baseURI).href, name: n || "" }; return true; } return false; };
+      try { var co = w.URL.createObjectURL; w.URL.createObjectURL = function (b) { var u = co.apply(w.URL, arguments); try { if (b && b.size > 50) blobs[u] = b; } catch (x) { } return u; }; } catch (x) { }
+      try { var ac = w.HTMLAnchorElement.prototype.click; w.HTMLAnchorElement.prototype.click = function () { if (rec(this.href, this.download)) return; return ac.apply(this, arguments); }; } catch (x) { }
+      try { var ad = w.HTMLAnchorElement.prototype.dispatchEvent; w.HTMLAnchorElement.prototype.dispatchEvent = function (ev) { if (ev && ev.type === "click" && rec(this.href, this.download)) return false; return ad.apply(this, arguments); }; } catch (x) { }
+      try { d.addEventListener("click", function (ev) { var a = ev.target && ev.target.closest && ev.target.closest("a[href]"); if (a && (a.hasAttribute("download") || /^blob:/.test(a.href)) && rec(a.href, a.getAttribute("download"))) { ev.preventDefault(); ev.stopPropagation(); } }, true); } catch (x) { }
+      try { var wo = w.open; w.open = function (u) { if (rec(u, "")) return null; return wo.apply(w, arguments); }; } catch (x) { }
     });
   }
   function parseCopy(t, S) {   // tab-separated: Job No. · Menu path · Visit Date · count
@@ -218,7 +230,7 @@
       var inPage = !!(gen || leaf(/^copy data$/i)[0] || exploreIcon() || leaf(/^visit date\s*:?$/i)[0]);
       var ff4 = !inPage && !isCanvas() && foreignFrame();
       if (ff4 && (menuOn || titleOn || sinceA() > 2)) { delegate(S, ff4); return outR({ s: "run", pct: 4, msg: "Working inside the Visit Details window…" }); }
-      if (inPage) { go("explore"); return outR({ s: "run", pct: 5, msg: "Visit Details open — opening Data exploration" }); }
+      if (inPage) { go(S.useExp ? "explore" : "vdate"); return outR({ s: "run", pct: 5, msg: "Visit Details open — setting the Visit Date" }); }
       if (S.sub) { if (sinceA() > 40) return fin("err", "The Visit Details window didn't show its filters", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Waiting for the Visit Details window to load…" }); }
       if (menuOn || titleOn) { if (sinceA() > 45) return fin("err", "Visit Details is open but its report didn't load", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Visit Details is open — waiting for the report to load…" }); }
       var vd = find(/^visit details$/i);   // tap the menu ONCE (again only if it still isn't open 20 s later)
@@ -226,6 +238,57 @@
       var it = find(/^it operations$/i); if (!vd && it && (S.itT == null || S.tick - S.itT > 12)) { tap(it); S.itT = S.tick; save(S); }
       if (sinceA() > 40) return outR({ s: "you", msg: "Open IT Operations → Visit Details in vWork — the helper then builds the Retailer App logs" });
       return outR({ s: "run", pct: 3, msg: vd ? "Opening Visit Details…" : "Opening IT Operations…" });
+    }
+    // ---- the steps of the screen recording: Visit Date (the period chosen in the BI tool) → Generate → Download data → the file goes to the tool
+    var vdBox = function () {
+      var g = gen && gen.getBoundingClientRect(), labs = leaf(/^visit date\s*:?$/i).filter(function (e) { return !e.closest("th,thead,table") && (!g || e.getBoundingClientRect().top < g.top); });
+      for (var li = 0; li < labs.length; li++) {
+        var lr = labs[li].getBoundingClientRect(), ins = [].filter.call(labs[li].ownerDocument.querySelectorAll("input"), function (i) { var r = i.getBoundingClientRect(); return vis(i) && r.top > lr.top - 8 && r.top < lr.bottom + 60 && r.left > lr.left - 10 && r.left - lr.left < 300; });
+        ins.sort(function (a, b) { var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return (ra.top - lr.top) + (ra.left - lr.left) / 4 - ((rb.top - lr.top) + (rb.left - lr.left) / 4); });
+        var box = ins[0] || labs[li].nextElementSibling || labs[li].parentElement, v = ins.map(function (i) { return i.value + " " + (i.title || ""); }).join(" ");
+        for (var k = 0, x = box; k < 4 && x; k++, x = x.parentElement) v += " " + (x.getAttribute && x.getAttribute("title") || "");
+        return { box: box, ins: ins, v: v.replace(/\//g, "-") };
+      }
+      return null;
+    };
+    var pickerOpen = function () { return leaf(/^fixed time$/i)[0] || null; };
+    var closePicker = function () { docs().forEach(function (d) { try { d.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true })); d.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); d.body.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); d.body.click(); } catch (x) { } }); };
+    if (A === "vdate") {
+      var B = vdBox();
+      if (!B) { if (sinceA() > 15) return fin("err", "Couldn't find the Visit Date filter on Visit Details", { diag: diag(S) }); return outR({ s: "run", pct: 8, msg: "Looking for the Visit Date filter…" }); }
+      if (B.v.indexOf(S.from) >= 0 && B.v.indexOf(S.to) >= 0) { if (pickerOpen()) closePicker(); go("vgen"); return outR({ s: "run", pct: 30, msg: "Visit Date " + S.from + " → " + S.to }); }
+      S.tries++; save(S);
+      if (S.tries > 30 && !leaf(/^download data$/i)[0]) { S.useExp = 1; go("explore"); return outR({ s: "run", pct: 8, msg: "Using Data exploration instead" }); }
+      if (S.tries > 30) return fin("err", "Couldn't set the Visit Date to " + S.from + " → " + S.to + " (it shows " + B.v.trim().slice(0, 40) + ") — set it yourself and press 🤖 again", { diag: diag(S) });
+      var pk = pickerOpen();
+      if (!pk && S.tries > 9 && S.tries % 3 === 0 && B.ins.length) { if (B.ins.length >= 2) { setInput(B.ins[0], S.from); enter(B.ins[0]); setInput(B.ins[1], S.to); enter(B.ins[1]); } else { setInput(B.ins[0], S.from + " To " + S.to); enter(B.ins[0]); } return outR({ s: "run", pct: 10, msg: "Typing the Visit Date…" }); }
+      if (!pk) { if (S.tries % 3 === 1) { tap(B.box); try { B.box.focus(); } catch (x) { } } return outR({ s: "run", pct: 10, msg: "Opening the Visit Date calendar…" }); }
+      if (!S.fxT) { tap(pk); S.fxT = 1; save(S); return outR({ s: "run", pct: 12, msg: "Fixed time…" }); }
+      var cp = calPick(S.from, S.to);
+      return outR({ s: "run", pct: 15, msg: cp === "picked" ? "Picking " + S.from + " → " + S.to + " on the calendar…" : cp === "start" ? "Start day picked — moving to the end month…" : "Finding the month on the calendar…" });
+    }
+    if (A === "vgen") {
+      if (pickerOpen()) { closePicker(); if (sinceA() < 4) return outR({ s: "run", pct: 32, msg: "Closing the calendar…" }); }
+      if (!gen) { if (sinceA() > 10) return fin("err", "No Generate button", { diag: diag(S) }); return outR({ s: "run", pct: 32, msg: "Looking for Generate…" }); }
+      tap(gen); go("vwait"); return outR({ s: "run", pct: 40, msg: "Generate " + S.from + " → " + S.to + "…" });
+    }
+    if (A === "vwait") {
+      if (sinceA() < 4 || busy() || [].some.call(qa("[class*=loading],[class*=spin]"), function (e) { return vis(e) && /spin|loading/.test(e.className) && !/spin-container|nested/.test(e.className) && e.getBoundingClientRect().width < 200; })) { if (sinceA() > 180) return fin("err", "vWork didn't finish generating", { diag: diag(S) }); return outR({ s: "run", pct: 50, msg: "vWork is generating " + S.from + " → " + S.to + "…" }); }
+      hookDl(); go("vdl"); return outR({ s: "run", pct: 60, msg: "Download data…" });
+    }
+    if (A === "vdl") {
+      hookDl();
+      var got = W.__biDl;
+      if (got && got.b64) return fin("done", "Downloaded " + (got.name || "the Retailer App logs") + " (" + Math.round(got.size / 1024) + " KB) from Visit Details", { b64: got.b64, fname: got.name || ("Visit_Details_" + S.from + "_" + S.to + ".xlsx"), size: got.size });
+      if (got && got.blob && !got.reading) { got.reading = 1; var fr2 = new FileReader(); fr2.onload = function () { got.b64 = String(fr2.result).split(",")[1] || ""; got.size = got.blob.size; }; fr2.onerror = function () { got.err = 1; }; fr2.readAsDataURL(got.blob); return outR({ s: "run", pct: 85, msg: "Reading the downloaded file…" }); }
+      if (got && got.err) return fin("err", "Couldn't read the downloaded file", { diag: diag(S) });
+      if (got && got.url && /^https:/i.test(got.url)) { if (!S.app) return fin("done", "Downloaded " + (got.name || "the file") + " — drop it into the vivo BI tool", { file: "browser", fname: got.name }); return out({ s: "grab", url: got.url, fname: got.name || "" }); }
+      if (got) return outR({ s: "run", pct: 85, msg: "Reading the downloaded file…" });
+      var dlb = [].filter.call(qa("span,button,a,div"), function (e) { return vis(e) && /^download data$/i.test(txt(e)); }); dlb = dlb.filter(function (e) { return !dlb.some(function (o) { return o !== e && e.contains(o); }); })[0];
+      if (!dlb) { if (sinceA() > 15) { S.useExp = 1; go("explore"); return outR({ s: "run", pct: 60, msg: "No Download data button — using Data exploration instead" }); } return outR({ s: "run", pct: 62, msg: "Looking for Download data…" }); }
+      if (S.dlT == null || (S.tick - S.dlT > 25 && S.dlN < 2)) { tap(dlb); S.dlT = S.tick; S.dlN = (S.dlN || 0) + 1; save(S); return outR({ s: "run", pct: 70, msg: "Download data…" }); }
+      if (S.tick - S.dlT > 60) { if (isCanvas() || exploreIcon() || toolbarIcons().length) { S.useExp = 1; go("explore"); return outR({ s: "run", pct: 60, msg: "Download data gave no file — reading the rows through Data exploration instead" }); } return fin("err", "“Download data” didn't give a file — tap it yourself in vWork and drop the file into the tool", { diag: diag(S) }); }
+      return outR({ s: "run", pct: 75, msg: "vWork is preparing the file…" });
     }
     if (A === "explore") {
       if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }

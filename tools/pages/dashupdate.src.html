@@ -458,7 +458,7 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
     if (U.notes) showNotes();
   }
   // ---- vWork robot: the app opens vWork, the person logs in, the helper (vivo_vw.js) picks ALL + the month, presses Query and reads the state rows. Nothing is saved or changed in vWork.
-  var VWR = { app: { name: "Retailer App logs", where: "vWork → IT Operations → Visit Details → your saved analysis “Retailer app usability”", ana: 1 }, visit: { name: "Customer visit report", where: "vWork → Visit Form → Personnel visit" }, comp: { name: "Competition uploads", where: "vWork → Competitor Tracking → Upload history", file: 1 }, sd: { name: "Support desk logs", where: "vWork → Office → Retailer Support Desk", file: 1 } }, VWURL = "https://in-vwork.vivo.xyz/vwork/";
+  var VWR = { app: { name: "Retailer App logs", where: "vWork → IT Operations → Visit Details → Visit Date (your period) → Generate → Download data", ana: 1 }, visit: { name: "Customer visit report", where: "vWork → Visit Form → Personnel visit" }, comp: { name: "Competition uploads", where: "vWork → Competitor Tracking → Upload history", file: 1 }, sd: { name: "Support desk logs", where: "vWork → Office → Retailer Support Desk", file: 1 } }, VWURL = "https://in-vwork.vivo.xyz/vwork/";
   var BB = window.BIBot && window.BIBot.version ? window.BIBot : null;
   function b64j(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))); }
   function unb64j(t) { try { return JSON.parse(decodeURIComponent(escape(atob(String(t || "").trim())))); } catch (e) { return null; } }
@@ -512,9 +512,10 @@ body.dkb{background:#0A0D24}body.dkb .hero{background:linear-gradient(135deg,#12
   }
   function vwGot(r) {
     if (!r || r.mode !== "vw") return;
-    if (r.s !== "done" || (!r.file && r.cz == null && (!r.rows || r.rows.length < 2))) { sheet("vWork", r.s === "stopped" ? "Stopped" : "Couldn't read the report", [], '<div class="err">' + esc(r.msg || "Nothing read") + "</div>" + (r.diag ? '<div class="help" style="word-break:break-word;font-size:11px">What the helper saw (share this with the BI admin): ' + esc(r.diag) + "</div>" : "")); return; }
+    if (r.s !== "done" || (!r.file && !r.b64 && r.cz == null && (!r.rows || r.rows.length < 2))) { sheet("vWork", r.s === "stopped" ? "Stopped" : "Couldn't read the report", [], '<div class="err">' + esc(r.msg || "Nothing read") + "</div>" + (r.diag ? '<div class="help" style="word-break:break-word;font-size:11px">What the helper saw (share this with the BI admin): ' + esc(r.diag) + "</div>" : "")); return; }
     var r0 = r.parts && r.parts.length ? r.parts[0].from : r.from;
     if (r0 && (r0 < U.from || r0 > U.to)) return toast("That result is for " + r0 + " → " + (r.to || "") + " — choose that period first");
+    if (r.b64) { var bn = atob(r.b64), u8b = new Uint8Array(bn.length); for (var qb = 0; qb < bn.length; qb++) u8b[qb] = bn.charCodeAt(qb); addFiles([new File([u8b], r.fname || ("vWork_" + r.rep + ".xlsx"))]); return; }
     if (r.file === "browser") return toast("✅ " + (r.fname || "The file") + " is in your Downloads — drop it in the box above");
     if (r.file) {   // the app downloaded vWork's export: read it in 1 MB parts and add it like a dropped file
       if (!BB || !BB.file) return toast("Update the app to 8.2");
