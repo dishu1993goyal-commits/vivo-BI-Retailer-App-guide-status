@@ -56,6 +56,20 @@
   function delegate(S, src) { var o = src.match(/^https?:\/\/[^\/]+/)[0]; S.deleg = o; S.subN = (S.subN || 0) + 1; S.subJob = Object.assign({}, S.job || {}, { id: S.id + "f" + S.subN, sub: true }); S.dt0 = S.tick; W.__biVwSub = null; save(S); }
   function hop(S, url, why) { S.hops = (S.hops || 0) + 1; save(S); if (S.hops > 6) return false; setTimeout(function () { location.href = url; }, 50); return true; }
   function out(o) { return JSON.stringify(o); }
+  // a menu item that is already the open page (highlighted): tapping it again makes vWork reload the report window,
+  // and the reloaded window fails with "外嵌校验码有误" (its one-time code was already used) — so never tap an open item
+  function menuActive(re) {
+    return leaf(re).some(function (e) { for (var k = 0, x = e; k < 4 && x && x.getAttribute; k++, x = x.parentElement) { var c = String(x.className && x.className.baseVal != null ? x.className.baseVal : x.className || ""); if (/(^|[\s_-])(active|selected|current|checked|on)(?=$|[\s_-])/i.test(c) || x.getAttribute("aria-selected") === "true" || x.getAttribute("aria-current")) return true; } return false; });
+  }
+  // the report window refused its embed code (外嵌校验码有误 = "embedded check code is wrong")
+  function embedErr() { return /外嵌校验码|校验码有误|check\s*code\s*(is\s*)?(wrong|incorrect|invalid|error)/i.test(allText()); }
+  function reloadFix(S, fin) {   // reload vWork once or twice: the menu opens the report again with a fresh code
+    S.rl = (S.rl || 0) + 1;
+    if (S.rl > 2) return fin("err", "vWork's report window keeps saying “外嵌校验码有误” (it refused its sign-in code). Open the report in vWork yourself once — if the table shows data, press 🤖 Get from vWork again. If vWork shows the same error to you, it is a vWork issue: tell vWork IT support.", { diag: diag(S) });
+    S.deleg = null; S.ast = "find"; S.st = "open"; S.appTapped = 0; S.menuTapped = 0; S.vdT = null; S.at0 = S.tick; S.t0 = S.tick; S.rlT = S.tick; W.__biVwSub = null; save(S);
+    setTimeout(function () { try { location.reload(); } catch (x) { } }, 150);
+    return out({ s: "run", pct: 3, msg: "vWork's report window refused its code (外嵌校验码有误) — reloading vWork (" + S.rl + " of 2)…" });
+  }
   function setInput(el, v) { el.focus(); try { el.select(); } catch (e) { } var ok = false; try { ok = el.ownerDocument.execCommand("insertText", false, v); } catch (e) { } if (!ok || el.value !== v) { Object.getOwnPropertyDescriptor((el.ownerDocument.defaultView || W).HTMLInputElement.prototype, "value").set.call(el, v); el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); } }
   function enter(el) { ["keydown", "keypress", "keyup"].forEach(function (t) { el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true })); }); }
   function busy() { return [].some.call(qa(".ant-spin-spinning,.ant-table-loading,.el-loading-mask,.ant-spin-dot"), vis); }
@@ -199,13 +213,19 @@
     };
     if (A === "find") {   // IT Operations → Visit Details → 🔍 Data exploration
       if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
-      var onVD = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; }) || (leaf(/^copy data$/i)[0] && leaf(/^visit date\s*:?$/i)[0]);
-      var ff4 = !onVD && !isCanvas() && foreignFrame(); if (ff4 && sinceA() > 2) { delegate(S, ff4); return outR({ s: "run", pct: 4, msg: "Working inside the Visit Details window…" }); }
-      if (onVD) { go("explore"); return outR({ s: "run", pct: 5, msg: "Visit Details open — opening Data exploration" }); }
-      var vd = find(/^visit details$/i); if (vd && sinceA() % 6 === 1) tap(vd);
-      var it = find(/^it operations$/i); if (!vd && it && sinceA() % 8 === 3) tap(it);
-      if (sinceA() > 30) return outR({ s: "you", msg: "Open IT Operations → Visit Details in vWork — the helper then builds the Retailer App logs" });
-      return outR({ s: "run", pct: 3, msg: "Opening IT Operations → Visit Details…" });
+      if (sinceA() < 4 && S.rlT != null && S.tick - S.rlT < 8) return outR({ s: "run", pct: 3, msg: "vWork reloaded — waiting for it to open…" });
+      var menuOn = menuActive(/^visit details$/i), titleOn = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; });
+      var inPage = !!(gen || leaf(/^copy data$/i)[0] || exploreIcon() || leaf(/^visit date\s*:?$/i)[0]);
+      var ff4 = !inPage && !isCanvas() && foreignFrame();
+      if (ff4 && (menuOn || titleOn || sinceA() > 2)) { delegate(S, ff4); return outR({ s: "run", pct: 4, msg: "Working inside the Visit Details window…" }); }
+      if (inPage) { go("explore"); return outR({ s: "run", pct: 5, msg: "Visit Details open — opening Data exploration" }); }
+      if (S.sub) { if (sinceA() > 40) return fin("err", "The Visit Details window didn't show its filters", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Waiting for the Visit Details window to load…" }); }
+      if (menuOn || titleOn) { if (sinceA() > 45) return fin("err", "Visit Details is open but its report didn't load", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Visit Details is open — waiting for the report to load…" }); }
+      var vd = find(/^visit details$/i);   // tap the menu ONCE (again only if it still isn't open 20 s later)
+      if (vd && (S.vdT == null || S.tick - S.vdT > 20)) { tap(vd); S.vdT = S.tick; save(S); return outR({ s: "run", pct: 3, msg: "Opening Visit Details…" }); }
+      var it = find(/^it operations$/i); if (!vd && it && (S.itT == null || S.tick - S.itT > 12)) { tap(it); S.itT = S.tick; save(S); }
+      if (sinceA() > 40) return outR({ s: "you", msg: "Open IT Operations → Visit Details in vWork — the helper then builds the Retailer App logs" });
+      return outR({ s: "run", pct: 3, msg: vd ? "Opening Visit Details…" : "Opening IT Operations…" });
     }
     if (A === "explore") {
       if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
@@ -341,11 +361,13 @@
       if (job && job.stop) return fin("stopped", "Stopped");
       if ([].some.call(qa("input[type=password]"), vis)) return out({ s: "login" });
       S.tick++; save(S);
+      if (embedErr()) { if (S.sub) return out({ s: "embederr", msg: "The report window refused its code" }); return reloadFix(S, fin); }
       var since = function () { return S.tick - S.t0; }, step = function (st) { S.st = st; S.t0 = S.tick; save(S); };
       if (S.tick > (R.kind === "ana" ? 1500 : 400)) return fin("err", "vWork took too long", { diag: diag(S) });
       if (S.deleg) {   // the report runs inside the other vivo window: pass the job on, relay its answer
         var fr = subFrame(S.deleg), sub = W.__biVwSub;
         if (fr) try { fr.contentWindow.postMessage({ biVwCmd: "tick", job: job && job.stop ? Object.assign({}, S.subJob, { stop: true }) : S.subJob }, "*"); } catch (x) { }
+        if (sub && sub.s === "embederr") return reloadFix(S, fin);
         if (sub && sub.s === "handback") { S.deleg = null; S.st = sub.st; S.t14 = sub.t14; S.t0 = S.tick; W.__biVwSub = null; save(S); return out({ s: "run", pct: 60, msg: "Back in vWork…" }); }
         if (sub && /^(done|err|stopped)$/.test(sub.s)) { S.done = Object.assign({}, sub, { id: S.id, mode: "vw", rep: S.rep }); if (sub.s !== "done" && sub.diag) S.done.diag = "[report window] " + sub.diag; save(S); return out(S.done); }
         if (sub && (sub.s === "login" || sub.s === "you" || sub.s === "grab")) return out(sub);
@@ -359,7 +381,7 @@
         if (ff0 && (R.kind === "export" || R.kind === "ana")) { delegate(S, ff0); return out({ s: "run", pct: 10, msg: "Working inside the report window…" }); }
         if (ff0 && R.menu) { step("org"); return out({ s: "run", pct: 12, msg: "Report open" }); }
         if (R.menu ? (find(R.menu) || ready()) : ready()) { step("menu"); return out({ s: "run", pct: 12, msg: "Report open" }); }
-        if (S.appTapped && since() < 8) return out({ s: "run", pct: 8, msg: "Opening…" });
+        if (S.appTapped && since() < 15) return out({ s: "run", pct: 8, msg: "Opening…" });
         var aa = findAll(R.app), a = R.last ? aa[aa.length - 1] : aa[0];
         if (a) { tap(a); S.appTapped = 1; if (R.menu) { step("menu"); } else { S.t0 = S.tick; save(S); }  return out({ s: "run", pct: 8, msg: "Opening " + txt(a) + "…" }); }
         var srch = [].filter.call(qa("input"), function (i) { return vis(i) && /search for an app/i.test(i.placeholder || ""); })[0];
@@ -368,7 +390,7 @@
         return out({ s: "run", pct: 4, msg: "Looking for the report in vWork…" });
       }
       if (S.st === "menu") {
-        var m = R.menu ? find(R.menu) : null; if (!R.menu) S.menuTapped = 1; if (m && (!S.menuTapped || since() % 8 === 7)) { tap(m); S.menuTapped = 1; save(S); }
+        var m = R.menu ? find(R.menu) : null; if (!R.menu) S.menuTapped = 1; if (m && (!S.menuTapped || (since() % 15 === 14 && !menuActive(R.menu)))) { tap(m); S.menuTapped = 1; save(S); }
         var ff1 = !ready() && since() > 3 && foreignFrame();
         if (ff1 && R.kind === "export") { delegate(S, ff1); return out({ s: "run", pct: 14, msg: "Working inside the report window…" }); }
         if (ff1) { step("org"); return out({ s: "run", pct: 15, msg: "Report open — choosing ALL first" }); }
