@@ -223,49 +223,97 @@
       var zf = zone("filter"), c = zf && zf.chips.filter(function (e) { return /^visit date\s*:/i.test(txt(e)); })[0]; if (c) return c;
       var zr = zone("row"); return zr && zr.chips.filter(function (e) { return /^visit date\s*\(/i.test(txt(e)) || /^visit date$/i.test(txt(e)); })[0];
     };
+    // the left menu has two groups — BI and vwork; the Retailer App usability view is vwork → Visit Details
+    var leftX = innerWidth * 0.45, G = (A === "find" || A === "vdate") ? leaf(/^(bi|vwork)$/i).filter(function (e) { return e.getBoundingClientRect().left < leftX && e.getBoundingClientRect().top > 60; }) : [];
     if (A === "find") {   // IT Operations → Visit Details → 🔍 Data exploration
       if (isCanvas()) { go("build"); return outR({ s: "run", pct: 6, msg: "Data exploration open" }); }
       if (sinceA() < 4 && S.rlT != null && S.tick - S.rlT < 8) return outR({ s: "run", pct: 3, msg: "vWork reloaded — waiting for it to open…" });
-      var menuOn = menuActive(/^visit details$/i), titleOn = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; });
-      var inPage = !!(gen || leaf(/^copy data$/i)[0] || exploreIcon() || leaf(/^visit date\s*:?$/i)[0]);
+      var grpOf = function (e) { var t = e.getBoundingClientRect().top, best = null; G.forEach(function (g) { var gt = g.getBoundingClientRect().top; if (gt < t && (!best || gt > best.getBoundingClientRect().top)) best = g; }); return best ? txt(best).toLowerCase() : ""; };
+      var vwH = G.filter(function (g) { return /^vwork$/i.test(txt(g)); })[0], vwVD = leaf(/^visit details$/i).filter(function (e) { return e.getBoundingClientRect().left < leftX && grpOf(e) === "vwork"; })[0];
+      var actOn = function (e) { for (var k = 0, x = e; k < 4 && x && x.getAttribute; k++, x = x.parentElement) { var c = String(x.className && x.className.baseVal != null ? x.className.baseVal : x.className || ""); if (/(^|[\s_-])(active|selected|current|checked|on)(?=$|[\s_-])/i.test(c) || x.getAttribute("aria-selected") === "true" || x.getAttribute("aria-current")) return true; } return false; };
+      if (S.wrongVD && vwVD && actOn(vwVD) && S.wrongVD > 1) S.wrongVD = 0;
+      var menuOn = G.length ? !!(vwVD && actOn(vwVD) && !(S.wrongVD && S.tick - (S.wvT || 0) < 3)) : menuActive(/^visit details$/i), titleOn = leaf(/^visit details$/i).some(function (e) { return e.getBoundingClientRect().top > 150 && e.getBoundingClientRect().left > 300; });
+      var inPage = !!(gen || leaf(/^copy data$/i)[0] || exploreIcon() || leaf(/^visit date\s*:?$/i)[0]) && (S.sub || !G.length || menuOn);
       var ff4 = !inPage && !isCanvas() && foreignFrame();
-      if (ff4 && (menuOn || titleOn || sinceA() > 2)) { delegate(S, ff4); return outR({ s: "run", pct: 4, msg: "Working inside the Visit Details window…" }); }
+      if (ff4 && (menuOn || (!G.length && (titleOn || sinceA() > 2)))) { delegate(S, ff4); return outR({ s: "run", pct: 4, msg: "Working inside the Visit Details window…" }); }
       if (inPage) { go(S.useExp ? "explore" : "vdate"); return outR({ s: "run", pct: 5, msg: "Visit Details open — setting the Visit Date" }); }
       if (S.sub) { if (sinceA() > 40) return fin("err", "The Visit Details window didn't show its filters", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Waiting for the Visit Details window to load…" }); }
-      if (menuOn || titleOn) { if (sinceA() > 45) return fin("err", "Visit Details is open but its report didn't load", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Visit Details is open — waiting for the report to load…" }); }
-      var vd = find(/^visit details$/i);   // tap the menu ONCE (again only if it still isn't open 20 s later)
-      if (vd && (S.vdT == null || S.tick - S.vdT > 20)) { tap(vd); S.vdT = S.tick; save(S); return outR({ s: "run", pct: 3, msg: "Opening Visit Details…" }); }
+      if (menuOn || (!G.length && titleOn)) { if (sinceA() > 45) return fin("err", "Visit Details is open but its report didn't load", { diag: diag(S) }); return outR({ s: "run", pct: 4, msg: "Visit Details is open — waiting for the report to load…" }); }
+      var vd = vwVD || (G.length ? null : find(/^visit details$/i));   // tap the menu ONCE (again only if it still isn't open 20 s later)
+      if (!vd && vwH && (S.vwT == null || S.tick - S.vwT > 8)) { tap(vwH); S.vwT = S.tick; save(S); return outR({ s: "run", pct: 3, msg: "Opening the vwork menu…" }); }
+      if (vd && (S.vdT == null || S.tick - S.vdT > 20)) { tap(vd); S.vdT = S.tick; save(S); return outR({ s: "run", pct: 3, msg: "Opening vwork → Visit Details…" }); }
       var it = find(/^it operations$/i); if (!vd && it && (S.itT == null || S.tick - S.itT > 12)) { tap(it); S.itT = S.tick; save(S); }
       if (sinceA() > 40) return outR({ s: "you", msg: "Open IT Operations → Visit Details in vWork — the helper then builds the Retailer App logs" });
       return outR({ s: "run", pct: 3, msg: vd ? "Opening Visit Details…" : "Opening IT Operations…" });
     }
     // ---- the steps of the screen recording: Visit Date (the period chosen in the BI tool) → Generate → Download data → the file goes to the tool
-    var vdBox = function () {
+    var DRE = /^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}/;
+    var vdBox = function () {   // the Visit Date filter box (inputs or plain text) next to its label, above Generate
       var g = gen && gen.getBoundingClientRect(), labs = leaf(/^visit date\s*:?$/i).filter(function (e) { return !e.closest("th,thead,table") && (!g || e.getBoundingClientRect().top < g.top); });
       for (var li = 0; li < labs.length; li++) {
-        var lr = labs[li].getBoundingClientRect(), ins = [].filter.call(labs[li].ownerDocument.querySelectorAll("input"), function (i) { var r = i.getBoundingClientRect(); return vis(i) && r.top > lr.top - 8 && r.top < lr.bottom + 60 && r.left > lr.left - 10 && r.left - lr.left < 300; });
-        ins.sort(function (a, b) { var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return (ra.top - lr.top) + (ra.left - lr.left) / 4 - ((rb.top - lr.top) + (rb.left - lr.left) / 4); });
-        var box = ins[0] || labs[li].nextElementSibling || labs[li].parentElement, v = ins.map(function (i) { return i.value + " " + (i.title || ""); }).join(" ");
+        var lr = labs[li].getBoundingClientRect(), near = function (e) { var r = e.getBoundingClientRect(); return vis(e) && r.top > lr.top - 10 && r.top < lr.bottom + 60 && r.left > lr.left - 10 && r.left - lr.left < 320 && r.width < 400; };
+        var d0 = labs[li].ownerDocument, ins = [].filter.call(d0.querySelectorAll("input"), near);
+        var dt = [].filter.call(d0.querySelectorAll("div,span,p"), function (e) { return near(e) && DRE.test(txt(e)) && txt(e).length < 60 && ![].some.call(e.children, function (c) { return DRE.test(txt(c)); }); });
+        var pk = [].filter.call(d0.querySelectorAll("[class*=picker],[class*=date],[class*=range],[class*=calendar]"), function (e) { return near(e) && e.getBoundingClientRect().height < 60; });
+        var box = ins[0] || dt[0] || pk[0] || labs[li].nextElementSibling; if (!box) continue;
+        var v = ins.map(function (i) { return i.value + " " + (i.title || ""); }).concat(dt.map(txt)).join(" ");
         for (var k = 0, x = box; k < 4 && x; k++, x = x.parentElement) v += " " + (x.getAttribute && x.getAttribute("title") || "");
-        return { box: box, ins: ins, v: v.replace(/\//g, "-") };
+        return { box: box, ins: ins, v: v };
       }
       return null;
     };
+    var nd = function (t) { var m = String(t).match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/g) || []; return m.map(function (x) { var q = x.split(/[-\/]/); return q[0] + "-" + ("0" + q[1]).slice(-2) + "-" + ("0" + q[2]).slice(-2); }); };
     var pickerOpen = function () { return leaf(/^fixed time$/i)[0] || null; };
-    var closePicker = function () { docs().forEach(function (d) { try { d.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true })); d.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); d.body.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); d.body.click(); } catch (x) { } }); };
+    var pickerBox = function () { var f = pickerOpen(); if (!f) return null; for (var x = f.parentElement; x && x.parentElement; x = x.parentElement) if (calHeads(x).length) return x; return null; };
+    var readout = function () {   // the dates the open calendar shows on top ("2026-11-01 ~ 2026-11-28")
+      var pb = pickerBox(); if (!pb) return [];
+      var ds = [].filter.call(pb.querySelectorAll("*"), function (e) { return vis(e) && !e.children.length && DRE.test(txt(e)) && txt(e).length < 40; }).map(txt);
+      [].forEach.call(pb.querySelectorAll("input"), function (i) { if (vis(i) && i.value) ds.push(i.value); });
+      return nd(ds.join(" "));
+    };
+    var dayCell = function (d) {   // the day cell of date d on the open calendar (moves the calendar when that month isn't shown)
+      var pb = pickerBox(), H = calHeads(pb || undefined); if (!H.length) return "noheader";
+      var k = +d.slice(0, 4) * 12 + (+d.slice(5, 7) - 1), h = H.filter(function (x) { return x.k === k; })[0];
+      if (!h) { var dir = H[0].k > k ? -1 : 1, nav = [].filter.call((pb || D).querySelectorAll("button,span,a,i,div"), function (e) { var c = String(e.className && e.className.baseVal != null ? e.className.baseVal : e.className || "") + " " + txt(e); return vis(e) && txt(e).length < 3 && (dir < 0 ? /prev|‹|^<$/.test(c) && !/super|year|«/.test(c) : /next|›|^>$/.test(c) && !/super|year|»/.test(c)); }); if (nav[0]) tap(nav[0]); return "nav"; }
+      var hr = h.e.getBoundingClientRect(), hx = hr.left + hr.width / 2, n = +d.slice(8);
+      var own = function (e) { var r = e.getBoundingClientRect(), cx = r.left + r.width / 2, d0 = Math.abs(cx - hx); return !H.some(function (o) { var ob = o.e.getBoundingClientRect(); return o !== h && Math.abs(cx - (ob.left + ob.width / 2)) < d0; }); };
+      var cells = [].filter.call((pb || D).querySelectorAll("td,div,span"), function (e) { var r = e.getBoundingClientRect(); return vis(e) && !e.children.length && +txt(e) === n && /^\d{1,2}$/.test(txt(e)) && r.top > hr.bottom - 2 && r.top < hr.bottom + 330 && own(e) && !/disabled/i.test(String(e.className || "") + " " + String((e.parentElement || {}).className || "")); });
+      cells.sort(function (a, b) { return n > 15 ? b.getBoundingClientRect().top - a.getBoundingClientRect().top : a.getBoundingClientRect().top - b.getBoundingClientRect().top; });
+      return cells[0] || "nocell";
+    };
+    var closePicker = function () { docs().forEach(function (d) { try { d.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true })); } catch (x) { } }); var t = leaf(/^visit details$/i).filter(function (e) { return e.getBoundingClientRect().left > innerWidth * 0.2 || S.sub; })[0] || leaf(/^vi\.{0,3}…?$/i)[0]; if (t) { ["mousedown", "mouseup", "click"].forEach(function (ty) { try { t.dispatchEvent(new MouseEvent(ty, { bubbles: true, view: t.ownerDocument.defaultView })); } catch (x) { } }); } };
     if (A === "vdate") {
-      var B = vdBox();
-      if (!B) { if (sinceA() > 15) return fin("err", "Couldn't find the Visit Date filter on Visit Details", { diag: diag(S) }); return outR({ s: "run", pct: 8, msg: "Looking for the Visit Date filter…" }); }
-      if (B.v.indexOf(S.from) >= 0 && B.v.indexOf(S.to) >= 0) { if (pickerOpen()) closePicker(); go("vgen"); return outR({ s: "run", pct: 30, msg: "Visit Date " + S.from + " → " + S.to }); }
+      if (!S.sub && !S.wchk && G.length && !(S.wrongVD > 2)) {   // same check when the report is in this page
+        var th0 = [].filter.call(qa("th"), vis).map(txt);
+        if (th0.length && th0.some(function (h) { return /^access duration$|^module$/i.test(h); }) && th0.filter(function (h) { return /^(job no\.?(-\d)?|menu path|visit date)$/i.test(h); }).length < th0.length - 2) { S.wrongVD = (S.wrongVD || 0) + 1; S.wvT = S.tick; S.vdT = null; go("find"); return outR({ s: "run", pct: 3, msg: "That was the BI Visit Details — opening vwork → Visit Details…" }); }
+        S.wchk = 1; save(S);
+      }
+      if (S.sub && !S.wchk) {   // the Visit Details of the BI group shows every column (System, Module…): wrong report
+        var th = [].filter.call(qa("th"), vis).map(txt);
+        if (th.length && th.some(function (h) { return /^access duration$|^module$/i.test(h); }) && th.filter(function (h) { return /^(job no\.?(-\d)?|menu path|visit date)$/i.test(h); }).length < th.length - 2) return outR({ s: "wrongvd", msg: "This is not the vwork Visit Details" });
+        S.wchk = 1; save(S);
+      }
+      var rd = pickerOpen() ? readout() : [];
+      if (rd.indexOf(S.from) >= 0 && rd.indexOf(S.to) >= 0 && rd.length <= 3) { closePicker(); go("vgen"); return outR({ s: "run", pct: 30, msg: "Visit Date " + S.from + " → " + S.to }); }
+      var B = vdBox(), bv = B ? nd(B.v) : [];
+      if (!pickerOpen() && bv.indexOf(S.from) >= 0 && bv.indexOf(S.to) >= 0) { go("vgen"); return outR({ s: "run", pct: 30, msg: "Visit Date " + S.from + " → " + S.to }); }
+      if (!B && !pickerOpen()) { if (sinceA() > 15) return fin("err", "Couldn't find the Visit Date filter on Visit Details", { diag: diag(S) }); return outR({ s: "run", pct: 8, msg: "Looking for the Visit Date filter…" }); }
       S.tries++; save(S);
       if (S.tries > 30 && !leaf(/^download data$/i)[0]) { S.useExp = 1; go("explore"); return outR({ s: "run", pct: 8, msg: "Using Data exploration instead" }); }
-      if (S.tries > 30) return fin("err", "Couldn't set the Visit Date to " + S.from + " → " + S.to + " (it shows " + B.v.trim().slice(0, 40) + ") — set it yourself and press 🤖 again", { diag: diag(S) });
+      if (!pickerOpen() && S.tries > 9 && S.tries % 3 === 0 && B && B.ins.length) { if (B.ins.length >= 2) { setInput(B.ins[0], S.from); enter(B.ins[0]); setInput(B.ins[1], S.to); enter(B.ins[1]); } else { setInput(B.ins[0], S.from + " To " + S.to); enter(B.ins[0]); } return outR({ s: "run", pct: 10, msg: "Typing the Visit Date…" }); }
+      if (S.tries > 40) return fin("err", "Couldn't set the Visit Date to " + S.from + " → " + S.to + " (the calendar shows " + (rd.join(" ~ ") || bv.join(" ~ ") || "nothing") + ") — set it yourself and press 🤖 again", { diag: diag(S) + " | vdbox=" + (B ? B.box.tagName + "." + String(B.box.className).slice(0, 40) + "=" + B.v.slice(0, 60) : "-") });
       var pk = pickerOpen();
-      if (!pk && S.tries > 9 && S.tries % 3 === 0 && B.ins.length) { if (B.ins.length >= 2) { setInput(B.ins[0], S.from); enter(B.ins[0]); setInput(B.ins[1], S.to); enter(B.ins[1]); } else { setInput(B.ins[0], S.from + " To " + S.to); enter(B.ins[0]); } return outR({ s: "run", pct: 10, msg: "Typing the Visit Date…" }); }
-      if (!pk) { if (S.tries % 3 === 1) { tap(B.box); try { B.box.focus(); } catch (x) { } } return outR({ s: "run", pct: 10, msg: "Opening the Visit Date calendar…" }); }
+      if (!pk) { S.ph = 0; if (S.tries % 3 === 1) { tap(B.box); try { B.box.focus(); } catch (x) { } var ic = B.box.parentElement && [].filter.call(B.box.parentElement.querySelectorAll("i,svg,[class*=icon]"), vis)[0]; if (ic && S.tries > 3) tap(ic); } return outR({ s: "run", pct: 10, msg: "Opening the Visit Date calendar…" }); }
       if (!S.fxT) { tap(pk); S.fxT = 1; save(S); return outR({ s: "run", pct: 12, msg: "Fixed time…" }); }
-      var cp = calPick(S.from, S.to);
-      return outR({ s: "run", pct: 15, msg: cp === "picked" ? "Picking " + S.from + " → " + S.to + " on the calendar…" : cp === "start" ? "Start day picked — moving to the end month…" : "Finding the month on the calendar…" });
+      if (!S.ph || S.ph === 2) {   // start day, then (next second) end day, then read what the calendar shows
+        if (S.ph === 2) { S.ph = 0; save(S); return outR({ s: "run", pct: 16, msg: "Calendar shows " + (rd.join(" ~ ") || "?") + " — picking again…" }); }
+        var c0 = dayCell(S.from); if (typeof c0 === "string") return outR({ s: "run", pct: 13, msg: c0 === "nav" ? "Moving the calendar to " + S.from.slice(0, 7) + "…" : "Reading the calendar…" });
+        tap(c0); S.ph = 1; save(S); return outR({ s: "run", pct: 14, msg: "Start " + S.from + "…" });
+      }
+      var c1 = dayCell(S.to); if (typeof c1 === "string") return outR({ s: "run", pct: 15, msg: c1 === "nav" ? "Moving the calendar to " + S.to.slice(0, 7) + "…" : "Reading the calendar…" });
+      tap(c1); S.ph = 2; save(S);
+      var okb = [].filter.call(qa("button,a,span"), function (e) { return vis(e) && /^(ok|confirm|确定)$/i.test(txt(e)); })[0]; if (okb) setTimeout(function () { tap(okb); }, 150);
+      return outR({ s: "run", pct: 15, msg: "End " + S.to + "…" });
     }
     if (A === "vgen") {
       if (pickerOpen()) { closePicker(); if (sinceA() < 4) return outR({ s: "run", pct: 32, msg: "Closing the calendar…" }); }
@@ -431,6 +479,7 @@
         var fr = subFrame(S.deleg), sub = W.__biVwSub;
         if (fr) try { fr.contentWindow.postMessage({ biVwCmd: "tick", job: job && job.stop ? Object.assign({}, S.subJob, { stop: true }) : S.subJob }, "*"); } catch (x) { }
         if (sub && sub.s === "embederr") return reloadFix(S, fin);
+        if (sub && sub.s === "wrongvd") { S.deleg = null; S.wrongVD = (S.wrongVD || 0) + 1; S.wvT = S.tick; S.vdT = null; S.ast = "find"; S.at0 = S.tick; W.__biVwSub = null; if (S.wrongVD > 3) return fin("err", "vWork keeps opening a Visit Details without the Retailer App usability columns (Job No. · Menu path · Visit Date). Open vwork → Visit Details yourself once, then press 🤖 again.", { diag: diag(S) }); save(S); var vw2 = leaf(/^visit details$/i).filter(function (e) { return e.getBoundingClientRect().left < innerWidth * 0.45; }); return out({ s: "run", pct: 3, msg: "That was the BI Visit Details — opening vwork → Visit Details…" }); }
         if (sub && sub.s === "handback") { S.deleg = null; S.st = sub.st; S.t14 = sub.t14; S.t0 = S.tick; W.__biVwSub = null; save(S); return out({ s: "run", pct: 60, msg: "Back in vWork…" }); }
         if (sub && /^(done|err|stopped)$/.test(sub.s)) { S.done = Object.assign({}, sub, { id: S.id, mode: "vw", rep: S.rep }); if (sub.s !== "done" && sub.diag) S.done.diag = "[report window] " + sub.diag; save(S); return out(S.done); }
         if (sub && (sub.s === "login" || sub.s === "you" || sub.s === "grab")) return out(sub);
